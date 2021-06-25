@@ -539,6 +539,9 @@ message ShardInstanceConfig {
   
   // default timeouts on grpc requests made by instances
   google.protobuf.Duration grpc_timeout = 8;
+  
+  // Whether the instance should consult a denylist when looking up actions & invocations.
+  bool use_deny_list = 10;
 }
 
 message ShardWorkerInstanceConfig {
@@ -574,6 +577,18 @@ message DequeueMatchSettings {
   
   // worker platform used to match operations
   build.bazel.remote.execution.v2.Platform platform = 3;
+}
+
+message WorkerCapabilities {
+  
+  // This determines whether the shard instance will participate in the backplane
+  // and cache it's operation outputs in its own cache file CAS.
+  // When omitted from CAS, the worker will send its execution outputs.
+  bool cas = 1;
+  
+  // This determines whether the shard instance will participate in the execution pool.
+  // Workers that don't execute may be used for storage only.
+  bool execution = 2;
 }
 
 message ShardWorkerConfig {
@@ -642,10 +657,7 @@ message ShardWorkerConfig {
   // user principal name for executions
   string exec_owner = 32;
   
-  // This determines whether the shard instance will participate in the backplane
-  // and cache it's operation outputs in its own cache file CAS.
-  // When omitted from CAS, the worker will send its output to another worker's CAS.
-  bool omit_from_cas = 33;
+  WorkerCapabilities capabilities = 38;
   
   bool error_operation_remaining_resources = 34;
 

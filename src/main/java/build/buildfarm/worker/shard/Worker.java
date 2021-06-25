@@ -89,6 +89,7 @@ import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.services.HealthStatusManager;
+import io.prometheus.client.Counter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -117,6 +118,12 @@ public class Worker extends LoggingMain {
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
+  private static final Counter healthCheckMetric =
+      Counter.build()
+          .name("health_check")
+          .labelNames("lifecycle")
+          .help("Service health check.")
+          .register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
   private final boolean isCasShard;
@@ -339,7 +346,7 @@ public class Worker extends LoggingMain {
       throws ConfigurationException {
     super("BuildFarmShardWorker");
     this.config = config;
-    isCasShard = !config.getOmitFromCas();
+    isCasShard = config.getCapabilities().getCas();
     String identifier = "buildfarm-worker-" + config.getPublicName() + "-" + session;
     root = getValidRoot(config);
     if (config.getPublicName().isEmpty()) {
@@ -733,6 +740,7 @@ public class Worker extends LoggingMain {
     }
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
+    healthCheckMetric.labels("stop").inc();
     if (execFileSystem != null) {
       logger.log(INFO, "Stopping exec filesystem");
       execFileSystem.stop();
@@ -917,6 +925,7 @@ public class Worker extends LoggingMain {
       return;
     }
     pipeline.start();
+    healthCheckMetric.labels("start").inc();
   }
 
   @Override
