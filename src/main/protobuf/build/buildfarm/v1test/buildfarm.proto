@@ -677,7 +677,6 @@ enum WorkerType {
   MIXED = 2;
 };
 
-
 message ShardWorker {
   string endpoint = 1;
 
