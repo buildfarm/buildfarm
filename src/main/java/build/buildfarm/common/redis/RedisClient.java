@@ -33,12 +33,12 @@ public class RedisClient implements Closeable {
   private static final String MISCONF_RESPONSE = "MISCONF";
 
   @FunctionalInterface
-  public static interface JedisContext<T> {
+  public interface JedisContext<T> {
     T run(JedisCluster jedis) throws JedisException;
   }
 
   @FunctionalInterface
-  public static interface JedisInterruptibleContext<T> {
+  public interface JedisInterruptibleContext<T> {
     T run(JedisCluster jedis) throws InterruptedException, JedisException;
   }
 
