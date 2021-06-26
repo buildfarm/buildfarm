@@ -667,10 +667,23 @@ message ShardWorkerConfig {
   
 }
 
+// A 'worker type' helps distinguish a group of workers by their 'capabilities'.
+// A worker that can both execute & store CAS entries is known as a 'mixed worker'.
+enum WorkerType {
+  EXECUTE = 0;
+
+  STORAGE = 1;
+
+  MIXED = 2;
+};
+
+
 message ShardWorker {
   string endpoint = 1;
 
   int64 expire_at = 2;
+  
+  WorkerType type = 3;
 }
 
 message WorkerChange {

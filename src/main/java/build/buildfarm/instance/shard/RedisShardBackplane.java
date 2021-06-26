@@ -37,9 +37,9 @@ import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;
+import build.buildfarm.common.redis.RedisHashMap;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisMap;
-import build.buildfarm.common.redis.RedisHashMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Utils;
@@ -63,6 +63,7 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
+import build.buildfarm.v1test.WorkerType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -172,7 +173,12 @@ public class RedisShardBackplane implements Backplane {
   private RedisMap blockedInvocations;
   private RedisMap processingOperations;
   private RedisMap dispatchedOperations;
+
+  // registered workers organized by type
+  private RedisHashMap executeWorkers;
+  private RedisHashMap storageWorkers;
   private RedisHashMap mixedWorkers;
+
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
   private CasWorkerMap casWorkerMap;
@@ -555,6 +561,8 @@ public class RedisShardBackplane implements Backplane {
     blockedInvocations = new RedisMap(config.getInvocationBlacklistPrefix());
     processingOperations = new RedisMap(config.getProcessingPrefix());
     dispatchedOperations = new RedisMap(config.getDispatchingPrefix());
+    executeWorkers = new RedisHashMap(config.getWorkersHashName() + "_execute");
+    storageWorkers = new RedisHashMap(config.getWorkersHashName() + "_storage");
     mixedWorkers = new RedisHashMap(config.getWorkersHashName());
 
     if (config.getSubscribeToBackplane()) {
@@ -713,8 +721,7 @@ public class RedisShardBackplane implements Backplane {
         jedis -> {
           // could rework with an hget to publish prior, but this seems adequate, and
           // we are the only guaranteed source
-          
-          boolean inserted = mixedWorkers.insert(jedis,shardWorker.getEndpoint(),json);
+          boolean inserted = mixedWorkers.insert(jedis, shardWorker.getEndpoint(), json);
           if (inserted) {
             jedis.publish(config.getWorkerChannel(), workerChangeJson);
           }
@@ -722,9 +729,18 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
+  private boolean addWorkerByType(JedisCluster jedis, ShardWorker shardWorker, String json) {
+    if (shardWorker.getType() == WorkerType.EXECUTE) {
+      return executeWorkers.insert(jedis, shardWorker.getEndpoint(), json);
+    } else if (shardWorker.getType() == WorkerType.STORAGE) {
+      return storageWorkers.insert(jedis, shardWorker.getEndpoint(), json);
+    }
+
+    return mixedWorkers.insert(jedis, shardWorker.getEndpoint(), json);
+  }
+
   private boolean removeWorkerAndPublish(JedisCluster jedis, String name, String changeJson) {
-    
-    boolean removed = mixedWorkers.remove(jedis,name);
+    boolean removed = mixedWorkers.remove(jedis, name);
     if (removed) {
       jedis.publish(config.getWorkerChannel(), changeJson);
     }

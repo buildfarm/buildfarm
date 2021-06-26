@@ -56,6 +56,8 @@ import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
+import build.buildfarm.v1test.WorkerCapabilities;
+import build.buildfarm.v1test.WorkerType;
 import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
@@ -851,6 +853,7 @@ public class Worker extends LoggingMain {
   private void startFailsafeRegistration() {
     String endpoint = config.getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
+    worker.setType(decideWorkerType(config.getCapabilities()));
     int registrationIntervalMillis = 10000;
     int registrationOffsetMillis = registrationIntervalMillis * 3;
     new Thread(
@@ -895,6 +898,21 @@ public class Worker extends LoggingMain {
               }
             })
         .start();
+  }
+
+  private WorkerType decideWorkerType(WorkerCapabilities capabilities) {
+    // extract capabilities
+    boolean storage = config.getCapabilities().getCas();
+    boolean execute = config.getCapabilities().getExecution();
+
+    // decide worker type based on capabilities
+    if (storage && execute) {
+      return WorkerType.MIXED;
+    }
+    if (storage) {
+      return WorkerType.STORAGE;
+    }
+    return WorkerType.EXECUTE;
   }
 
   public void start() throws InterruptedException {
