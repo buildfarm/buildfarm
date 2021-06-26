@@ -39,6 +39,7 @@ import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisMap;
+import build.buildfarm.common.redis.RedisHashMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Utils;
@@ -171,6 +172,7 @@ public class RedisShardBackplane implements Backplane {
   private RedisMap blockedInvocations;
   private RedisMap processingOperations;
   private RedisMap dispatchedOperations;
+  private RedisHashMap mixedWorkers;
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
   private CasWorkerMap casWorkerMap;
@@ -553,6 +555,7 @@ public class RedisShardBackplane implements Backplane {
     blockedInvocations = new RedisMap(config.getInvocationBlacklistPrefix());
     processingOperations = new RedisMap(config.getProcessingPrefix());
     dispatchedOperations = new RedisMap(config.getDispatchingPrefix());
+    mixedWorkers = new RedisHashMap(config.getWorkersHashName());
 
     if (config.getSubscribeToBackplane()) {
       startSubscriptionThread();
@@ -710,20 +713,22 @@ public class RedisShardBackplane implements Backplane {
         jedis -> {
           // could rework with an hget to publish prior, but this seems adequate, and
           // we are the only guaranteed source
-          if (jedis.hset(config.getWorkersHashName(), shardWorker.getEndpoint(), json) == 1) {
+          
+          boolean inserted = mixedWorkers.insert(jedis,shardWorker.getEndpoint(),json);
+          if (inserted) {
             jedis.publish(config.getWorkerChannel(), workerChangeJson);
-            return true;
           }
-          return false;
+          return inserted;
         });
   }
 
   private boolean removeWorkerAndPublish(JedisCluster jedis, String name, String changeJson) {
-    if (jedis.hdel(config.getWorkersHashName(), name) == 1) {
+    
+    boolean removed = mixedWorkers.remove(jedis,name);
+    if (removed) {
       jedis.publish(config.getWorkerChannel(), changeJson);
-      return true;
     }
-    return false;
+    return removed;
   }
 
   @Override
@@ -827,7 +832,7 @@ public class RedisShardBackplane implements Backplane {
   private Set<String> fetchAndExpireWorkers(JedisCluster jedis, long now) {
     Set<String> workers = Sets.newConcurrentHashSet();
     ImmutableList.Builder<ShardWorker> invalidWorkers = ImmutableList.builder();
-    for (Map.Entry<String, String> entry : jedis.hgetAll(config.getWorkersHashName()).entrySet()) {
+    for (Map.Entry<String, String> entry : mixedWorkers.asMap(jedis).entrySet()) {
       String json = entry.getValue();
       String name = entry.getKey();
       try {
