@@ -458,7 +458,6 @@ public class Worker extends LoggingMain {
       Instances instances,
       Pipeline pipeline,
       ShardWorkerContext context) {
-
     serverBuilder.addService(healthStatusManager.getHealthService());
     serverBuilder.addService(
         new ContentAddressableStorageService(
@@ -470,8 +469,7 @@ public class Worker extends LoggingMain {
     // A worker that is capable of execution will construct an execution pipeline.
     // It will use various execution phases for it's profile service.
     // On the other hand, a worker that is only capable of CAS storage will construct a pipeline for
-    // storage
-    // replication.
+    // storage replication.
     if (hasExecutionCapability) {
       PipelineStage completeStage =
           new PutOperationStage((operation) -> context.deactivate(operation.getName()));
