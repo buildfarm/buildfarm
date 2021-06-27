@@ -61,6 +61,7 @@ public class ExecutionPropertiesParser {
     parser.put(DEBUG_AFTER_EXECUTION, ExecutionPropertiesParser::storeAfterExecutionDebug);
     parser.put(DEBUG_TESTS_ONLY, ExecutionPropertiesParser::storeDebugTestsOnly);
     parser.put(DEBUG_TARGET, ExecutionPropertiesParser::storeDebugTarget);
+    parser.put(CHECK_DETERMINISM, ExecutionPropertiesParser::storeCheckDeterminism);
 
     ResourceLimits limits = new ResourceLimits();
     command
@@ -299,6 +300,18 @@ public class ExecutionPropertiesParser {
     limits.debugTarget = property.getValue();
     describeChange(limits.description, "debug target", property.getValue(), property);
   }
+  
+  /**
+   * @brief Store the property for checking determinism.
+   * @details Parses and stores the property.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeCheckDeterminism(ResourceLimits limits, Property property) {
+    limits.checkDeterminism = Integer.parseInt(property.getValue());
+    describeChange(limits.description, "check determinism", property.getValue(), property);
+  }
+  
 
   /**
    * @brief Convert map to printable string.

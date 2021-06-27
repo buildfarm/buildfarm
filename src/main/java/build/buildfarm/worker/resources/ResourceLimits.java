@@ -128,6 +128,14 @@ public class ResourceLimits {
   public String debugTarget = "";
 
   /**
+   * @field checkDeterminism
+   * @brief check the determinism of the action.
+   * @details This requires more than 1 execution. The value should be the number of times to run
+   *     the action looking for nondeterminism.
+   */
+  public int checkDeterminism = 0;
+
+  /**
    * @field unusedProperties
    * @brief Exec_properties that were not used when deciding resource limits.
    * @details Foreign platform properties may be be added to the command that are ignored when

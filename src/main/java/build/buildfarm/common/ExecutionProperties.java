@@ -144,6 +144,15 @@ public class ExecutionProperties {
   public static final String DEBUG_TARGET = "debug-target";
 
   /**
+   * @field CHECK_DETERMINISM
+   * @brief The exec_property and platform property name for testing the determinism of an action.
+   * @details This is intended to be used to interactively debug remote executions. The key's value
+   *     should be an integer representing the number of times to run an action and compare it's
+   *     outputs.
+   */
+  public static final String CHECK_DETERMINISM = "check-determinism";
+
+  /**
    * @field CHOOSE_QUEUE
    * @brief The exec_property to allow directly matching with a queue.
    * @details This is to support a paradigm where actions want to specifically request the queue to
