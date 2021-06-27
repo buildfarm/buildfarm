@@ -28,6 +28,9 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
 
 /**
  * @class DeterminismChecker
@@ -68,13 +71,39 @@ public class DeterminismChecker {
       ProcessBuilder processBuilder,
       ResourceLimits limits,
       ActionResult.Builder resultBuilder) {
-    // Run the action once to create a baseline set of output file digests.
-    // We will compare these digests to further executions of the action to check for determinism.
+    
+    // Run the action once to create a baseline set of output digests.
     runAction(processBuilder);
     HashMap<Path, Digest> fileDigests = computeFileDigests(operationContext);
+    
+    // Re-run the action a specified number of times to create additional output digests.
+    List<HashMap<Path, Digest>> rerunDigests = new ArrayList<HashMap<Path, Digest>>();
+    for (int i = 0; i < limits.checkDeterminism; ++i){
+      resetWorkingDirectory();
+      runAction(processBuilder);
+      rerunDigests.add(computeFileDigests(operationContext));
+    }
+    
+    // Find any digest discrepancies between the runs.  If any discrepancies are found we consider the action nondeterministic.
+    for (Map.Entry<Path, Digest> entry : fileDigests.entrySet()){
+      System.out.println(entry.getKey() + " " + entry.getValue());
+    }
+    System.out.println("-------");
+    
+    for (HashMap<Path, Digest> digests : rerunDigests){
+      for (Map.Entry<Path, Digest> entry : digests.entrySet()){
+        System.out.println(entry.getKey() + " " + entry.getValue());
+      }
+    }
 
     return "";
   }
+  
+  
+  private static void resetWorkingDirectory(){
+  }
+  
+  
 
   private static void runAction(ProcessBuilder processBuilder) {
     try {
