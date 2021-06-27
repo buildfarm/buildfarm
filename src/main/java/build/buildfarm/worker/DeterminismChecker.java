@@ -15,22 +15,33 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.worker.resources.ResourceLimits;
-import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.protobuf.ByteString;
 import com.google.rpc.Code;
+import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.HashMap;
 
 /**
  * @class DeterminismChecker
  * @brief Run an action multiple times and fail it if its outputs are not deterministic in content
- * @details The determinism checker can be used by the client to find nondeterministic actions and sources of cache positioning.
+ * @details The determinism checker can be used by the client to find nondeterministic actions and
+ *     sources of cache positioning.
  */
 public class DeterminismChecker {
   /**
-   * @brief Check the determinism of an action by running it multiple times and comparing the outputs of each execution.
+   * @brief Check the determinism of an action by running it multiple times and comparing the
+   *     outputs of each execution.
    * @details This allows clients to find nondeterministic actions and sources of cache positioning.
+   * @param workerContext x
+   * @param operationContext x
    * @param processBuilder The process to run.
    * @param limits The resource limitations of an execution (contains determinism check settings).
    * @param resultBuilder Used to report back debug information.
@@ -38,14 +49,81 @@ public class DeterminismChecker {
    * @note Suggested return identifier: code.
    */
   public static Code checkDeterminism(
-      ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    String message = getDeterminismResults(processBuilder, limits, resultBuilder);
+      WorkerContext workerContext,
+      OperationContext operationContext,
+      ProcessBuilder processBuilder,
+      ResourceLimits limits,
+      ActionResult.Builder resultBuilder) {
+    String message =
+        getDeterminismResults(
+            workerContext, operationContext, processBuilder, limits, resultBuilder);
     resultBuilder.setStderrRaw(ByteString.copyFromUtf8(message));
     resultBuilder.setExitCode(-1);
     return Code.OK;
   }
-  
-  private static String getDeterminismResults(ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder){
+
+  private static String getDeterminismResults(
+      WorkerContext workerContext,
+      OperationContext operationContext,
+      ProcessBuilder processBuilder,
+      ResourceLimits limits,
+      ActionResult.Builder resultBuilder) {
+    // Run the action once to create a baseline set of output file digests.
+    // We will compare these digests to further executions of the action to check for determinism.
+    runAction(processBuilder);
+    HashMap<Path, Digest> fileDigests = computeFileDigests(operationContext);
+
     return "";
+  }
+
+  private static void runAction(ProcessBuilder processBuilder) {
+    try {
+      Process process = processBuilder.start();
+      int exitCode = process.waitFor();
+    } catch (IOException | InterruptedException e) {
+    }
+  }
+
+  private static HashMap<Path, Digest> computeFileDigests(OperationContext operationContext) {
+    HashMap<Path, Digest> fileDigests = new HashMap<>();
+
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
+
+    for (String outputFile : operationContext.command.getOutputFilesList()) {
+      Path outputPath = operationContext.execDir.resolve(outputFile);
+      addPathDigest(fileDigests, outputPath, digestUtil);
+    }
+    for (String outputDir : operationContext.command.getOutputDirectoriesList()) {
+      Path outputDirPath = operationContext.execDir.resolve(outputDir);
+      addDirDigests(fileDigests, outputDirPath, digestUtil);
+    }
+
+    return fileDigests;
+  }
+
+  private static void addPathDigest(
+      HashMap<Path, Digest> fileDigests, Path path, DigestUtil digestUtil) {
+    try {
+      Digest digest = digestUtil.compute(path);
+      fileDigests.put(path, digest);
+    } catch (IOException e) {
+    }
+  }
+
+  private static void addDirDigests(
+      HashMap<Path, Digest> fileDigests, Path path, DigestUtil digestUtil) {
+    try {
+      Files.walkFileTree(
+          path,
+          new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                throws IOException {
+              addPathDigest(fileDigests, file, digestUtil);
+              return FileVisitResult.CONTINUE;
+            }
+          });
+    } catch (IOException e) {
+    }
   }
 }

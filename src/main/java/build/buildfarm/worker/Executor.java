@@ -437,10 +437,11 @@ class Executor {
     if (limits.debugBeforeExecution) {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
     }
-    
+
     // allow running an action multiple times to check determinism
-    if (limits.checkDeterminism > 0){
-      return DeterminismChecker.checkDeterminism(processBuilder, limits, resultBuilder);
+    if (limits.checkDeterminism > 0) {
+      return DeterminismChecker.checkDeterminism(
+          workerContext, operationContext, processBuilder, limits, resultBuilder);
     }
 
     long startNanoTime = System.nanoTime();

@@ -300,7 +300,7 @@ public class ExecutionPropertiesParser {
     limits.debugTarget = property.getValue();
     describeChange(limits.description, "debug target", property.getValue(), property);
   }
-  
+
   /**
    * @brief Store the property for checking determinism.
    * @details Parses and stores the property.
@@ -311,7 +311,6 @@ public class ExecutionPropertiesParser {
     limits.checkDeterminism = Integer.parseInt(property.getValue());
     describeChange(limits.description, "check determinism", property.getValue(), property);
   }
-  
 
   /**
    * @brief Convert map to printable string.
