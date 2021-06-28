@@ -4,8 +4,8 @@ java_library(
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
-        "//src/main/java/build/buildfarm/instance",
-        "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/java/build/buildfarm/worker:operation_context",
+        "//src/main/java/build/buildfarm/worker:worker_context",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@bazel//src/main/protobuf:execution_statistics_java_proto",
@@ -29,7 +29,5 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
-        "//src/main/java/build/buildfarm/worker:worker_context",
-        "//src/main/java/build/buildfarm/worker:operation_context",
     ],
 )
