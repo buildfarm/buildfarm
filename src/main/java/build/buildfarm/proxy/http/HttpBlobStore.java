@@ -374,10 +374,12 @@ public final class HttpBlobStore implements SimpleBlobStore {
   }
 
   private boolean isChannelPipelineEmpty(ChannelPipeline pipeline) {
-    return (pipeline.first() == null)
-        || (useTls
-            && "ssl-handler".equals(pipeline.firstContext().name())
-            && pipeline.first() == pipeline.last());
+    if (pipeline.first() == null) {
+      return true;
+    }
+    return useTls
+        && "ssl-handler".equals(pipeline.firstContext().name())
+        && pipeline.first() == pipeline.last();
   }
 
   @Override

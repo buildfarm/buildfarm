@@ -99,7 +99,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         if (errorResponse(status.asException())) {
           logger.log(
               status.getCode() == Status.Code.CANCELLED ? Level.FINE : Level.SEVERE,
-              format("error writing %s", (name == null ? request.getResourceName() : name)),
+              format("error writing %s", name == null ? request.getResourceName() : name),
               e);
         }
       }

@@ -1426,11 +1426,11 @@ public class RedisShardBackplane implements Backplane {
 
   private boolean isBlacklisted(JedisCluster jedis, RequestMetadata requestMetadata) {
     boolean isActionBlocked =
-        (!requestMetadata.getActionId().isEmpty()
-            && blockedActions.exists(jedis, requestMetadata.getActionId()));
+        !requestMetadata.getActionId().isEmpty()
+            && blockedActions.exists(jedis, requestMetadata.getActionId());
     boolean isInvocationBlocked =
-        (!requestMetadata.getToolInvocationId().isEmpty()
-            && blockedInvocations.exists(jedis, requestMetadata.getToolInvocationId()));
+        !requestMetadata.getToolInvocationId().isEmpty()
+            && blockedInvocations.exists(jedis, requestMetadata.getToolInvocationId());
     return isActionBlocked || isInvocationBlocked;
   }
 

@@ -54,17 +54,30 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   private ListenableFuture<Boolean> getBlob(
       Digest blobDigest, long offset, long limit, OutputStream out) {
     int size = (int) blobDigest.getSizeBytes();
-    if (offset < 0
-        || size < 0
-        || (size == 0 && offset > 0)
-        || (size > 0 && offset >= size)
-        || limit < 0) {
+
+    boolean isValid = validateGetBlob(offset, size, limit);
+    if (!isValid) {
       return immediateFailedFuture(new IndexOutOfBoundsException());
     }
 
     return simpleBlobStore.get(
         blobDigest.getHash(),
         new SkipLimitOutputStream(out, offset, limit <= 0 ? size - offset : limit));
+  }
+
+  private static boolean validateGetBlob(long offset, int size, long limit) {
+    // values should not be negative
+    if (offset < 0 || size < 0 || limit < 0) {
+      return false;
+    }
+
+    // offset cannot exceed size
+    if (offset >= size) {
+      return false;
+    }
+
+    // otherwise, valid
+    return true;
   }
 
   private void readBlob(ReadRequest request, StreamObserver<ReadResponse> responseObserver)

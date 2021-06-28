@@ -1648,9 +1648,7 @@ public class ShardInstance extends AbstractServerInstance {
       PreconditionFailure.Builder preconditionFailure) {
     if (action.hasTimeout() && hasMaxActionTimeout()) {
       Duration timeout = action.getTimeout();
-      if (timeout.getSeconds() > maxActionTimeout.getSeconds()
-          || (timeout.getSeconds() == maxActionTimeout.getSeconds()
-              && timeout.getNanos() > maxActionTimeout.getNanos())) {
+      if (Durations.compare(timeout, maxActionTimeout) > 0) {
         preconditionFailure
             .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
