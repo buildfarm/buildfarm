@@ -28,7 +28,7 @@ public class ExecutionPolicies {
   private ExecutionPolicies() {}
 
   @FunctionalInterface
-  static interface ExecutionPoliciesIndex {
+  interface ExecutionPoliciesIndex {
     Iterable<ExecutionPolicy> get(String name);
   }
 
