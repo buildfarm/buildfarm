@@ -32,6 +32,7 @@ import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import io.grpc.Deadline;
 import java.io.IOException;
@@ -62,9 +63,8 @@ public class InputFetcher implements Runnable {
     if (action.hasTimeout() && workerContext.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
       Duration maximum = workerContext.getMaximumActionTimeout();
-      if (timeout.getSeconds() > maximum.getSeconds()
-          || (timeout.getSeconds() == maximum.getSeconds()
-              && timeout.getNanos() > maximum.getNanos())) {
+      ;
+      if (Durations.compare(timeout, maximum) > 0) {
         return false;
       }
     }

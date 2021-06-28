@@ -148,19 +148,19 @@ public class UploadManifest {
     } else {
       setRaw.accept(ByteString.EMPTY);
     }
-    if (canInsert(policy,withinLimit)) {
+    if (canInsert(policy, withinLimit)) {
       Digest digest = digestUtil.compute(content);
       setDigest.accept(digest);
       Chunker chunker = Chunker.builder().setInput(content).build();
       digestToChunkers.put(digest, chunker);
     }
   }
-  
+
   private boolean canInsert(CASInsertionPolicy policy, boolean withinLimit) {
-    if (policy.equals(CASInsertionPolicy.ALWAYS_INSERT)){
+    if (policy.equals(CASInsertionPolicy.ALWAYS_INSERT)) {
       return true;
     }
-    
+
     return !withinLimit && policy.equals(CASInsertionPolicy.INSERT_ABOVE_LIMIT);
   }
 
@@ -222,12 +222,12 @@ public class UploadManifest {
 
     return b.build();
   }
-  
-  private boolean isFileOrSymlink(Dirent dirent){
-    if (dirent.getType() == Dirent.Type.FILE){
+
+  private boolean isFileOrSymlink(Dirent dirent) {
+    if (dirent.getType() == Dirent.Type.FILE) {
       return true;
     }
-    
+
     return dirent.getType() == Dirent.Type.SYMLINK && allowSymlinks;
   }
 

@@ -84,12 +84,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
       int currentSlot = getCurrentSlot(now);
       if (lastOperationCompleteTime != null && lastUsedSlot >= 0) {
         Duration duration = Timestamps.between(lastOperationCompleteTime, now);
-        // if 1) duration between the new added operation and last added one is longer than period
-        // or 2) the duration is shorter than period but longer than time range of a single bucket
-        //       and at the same time currentSlot == lastUsedSlot
-        if ((Durations.toMillis(duration) >= Durations.toMillis(period))
-            || (lastUsedSlot == currentSlot
-                && Durations.toMillis(duration) > (Durations.toMillis(period) / buckets.length))) {
+        if (bucketsNeedReset(duration, period, lastUsedSlot, currentSlot, buckets.length)) {
           for (OperationStageDurations bucket : buckets) {
             bucket.reset();
           }
@@ -101,6 +96,23 @@ public class PutOperationStage extends PipelineStage.NullStage {
           }
         }
       }
+    }
+
+    private boolean bucketsNeedReset(
+        Duration duration,
+        Duration period,
+        int lastUsedSlot,
+        int currentSlot,
+        int numberOfBuckets) {
+      // if 1) duration between the new added operation and last added one is longer than period
+      if (Durations.toMillis(duration) >= Durations.toMillis(period)) {
+        return true;
+      }
+
+      // or 2) the duration is shorter than period but longer than time range of a single bucket
+      //       and at the same time currentSlot == lastUsedSlot
+      return lastUsedSlot == currentSlot
+          && Durations.toMillis(duration) > Durations.toMillis(period) / numberOfBuckets;
     }
 
     // Compute the bucket index the Timestamp would belong to

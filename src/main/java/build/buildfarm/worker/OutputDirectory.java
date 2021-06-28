@@ -112,7 +112,7 @@ public class OutputDirectory {
                         "/" + file.substring(0, file.lastIndexOf('/') + 1), false)),
             Iterables.transform(
                 outputDirs,
-                (dir) -> new OutputDirectoryEntry(dir.isEmpty() ? "/" : ("/" + dir + "/"), true)),
+                (dir) -> new OutputDirectoryEntry(dir.isEmpty() ? "/" : "/" + dir + "/", true)),
             envVarOutputDirectoryEntries(envVars)));
   }
 

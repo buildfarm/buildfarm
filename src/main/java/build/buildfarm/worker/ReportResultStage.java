@@ -149,10 +149,7 @@ public class ReportResultStage extends PipelineStage {
 
     ExecuteResponse executeResponse = operationContext.executeResponse.build();
 
-    if (blacklist
-        || (!operationContext.action.getDoNotCache()
-            && executeResponse.getStatus().getCode() == Code.OK.getNumber()
-            && executeResponse.getResult().getExitCode() == 0)) {
+    if (blacklist || successfulCacheableAction(operationContext, executeResponse)) {
       try {
         if (blacklist) {
           workerContext.blacklistAction(metadata.getActionDigest().getHash());
@@ -196,6 +193,13 @@ public class ReportResultStage extends PipelineStage {
     }
 
     return operationContext.toBuilder().setOperation(completedOperation).build();
+  }
+
+  private boolean successfulCacheableAction(
+      OperationContext operationContext, ExecuteResponse executeResponse) {
+    return !operationContext.action.getDoNotCache()
+        && executeResponse.getStatus().getCode() == Code.OK.getNumber()
+        && executeResponse.getResult().getExitCode() == 0;
   }
 
   @Override

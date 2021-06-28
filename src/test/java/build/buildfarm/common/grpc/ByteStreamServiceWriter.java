@@ -56,9 +56,7 @@ public class ByteStreamServiceWriter extends ByteStreamImplBase {
     @Override
     public void onNext(WriteRequest request) {
       boolean hasSeenValidResourceName = hasSeenResourceName && request.getResourceName().isEmpty();
-      checkState(
-          hasSeenValidResourceName
-              || request.getResourceName().equals(resourceName));
+      checkState(hasSeenValidResourceName || request.getResourceName().equals(resourceName));
       hasSeenResourceName = true;
       checkState(!finished);
       ByteString data = request.getData();
