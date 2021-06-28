@@ -146,6 +146,7 @@ public class ShardInstanceTest {
             /* maxCpu=*/ 1,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
             new ArrayList<>(),
+            /* useDenyList=*/ true,
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
             /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()));

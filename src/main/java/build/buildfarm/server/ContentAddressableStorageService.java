@@ -64,7 +64,6 @@ public class ContentAddressableStorageService
   private final Instances instances;
   private final long writeDeadlineAfter;
   private final TimeUnit writeDeadlineAfterUnits;
-  private final Level requestLogLevel;
 
   public ContentAddressableStorageService(
       Instances instances,
@@ -74,7 +73,6 @@ public class ContentAddressableStorageService
     this.instances = instances;
     this.writeDeadlineAfter = writeDeadlineAfter;
     this.writeDeadlineAfterUnits = writeDeadlineAfterUnits;
-    this.requestLogLevel = requestLogLevel;
   }
 
   String checkMessage(Digest digest, boolean found) {

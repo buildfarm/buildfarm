@@ -58,4 +58,15 @@ public class Time {
   public static long secondsToNanoseconds(long seconds) {
     return seconds * 1000000000;
   }
+
+  /**
+   * @brief Milliseconds to seconds.
+   * @details Milliseconds to seconds.
+   * @param milliseconds Milliseconds to convert.
+   * @return Seconds converted from milliseconds.
+   * @note Suggested return identifier: seconds.
+   */
+  public static int millisecondsToSeconds(int milliseconds) {
+    return milliseconds / 1000;
+  }
 }

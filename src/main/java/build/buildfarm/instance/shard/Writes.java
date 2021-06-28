@@ -40,7 +40,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 class Writes {
-  private final Supplier<Instance> instanceSupplier;
   private final LoadingCache<BlobWriteKey, Instance> blobWriteInstances;
 
   private class InvalidatingWrite implements Write {
@@ -121,7 +120,6 @@ class Writes {
   }
 
   Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter, TimeUnit writeExpiresUnit) {
-    this.instanceSupplier = instanceSupplier;
     blobWriteInstances =
         CacheBuilder.newBuilder()
             .expireAfterWrite(writeExpiresAfter, writeExpiresUnit)

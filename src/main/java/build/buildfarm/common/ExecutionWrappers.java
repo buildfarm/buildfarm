@@ -57,4 +57,26 @@ public class ExecutionWrappers {
    * @details This program is expected to be packaged with the worker image.
    */
   public static final String PROCESS_WRAPPER = "/app/build_buildfarm/process-wrapper";
+
+  /**
+   * @field SKIP_SLEEP
+   * @brief The program to use when running actions under bazel's skip sleep wrapper.
+   * @details This program is expected to be packaged with the worker image.
+   */
+  public static final String SKIP_SLEEP = "/app/build_buildfarm/skip_sleep";
+
+  /**
+   * @field SKIP_SLEEP_PRELOAD
+   * @brief The shared object that the skip sleep wrapper uses to spoof syscalls.
+   * @details The shared object needs passed to the program which will LD_PRELOAD it.
+   */
+  public static final String SKIP_SLEEP_PRELOAD = "/app/build_buildfarm/skip_sleep_preload.so";
+
+  /**
+   * @field DELAY
+   * @brief The program to used to timeshift actions when running under skip_sleep.
+   * @details This program is expected to be packaged with the worker image. Warning: This wrapper
+   *     is only intended to be used with skip_sleep.
+   */
+  public static final String DELAY = "/app/build_buildfarm/delay.sh";
 }

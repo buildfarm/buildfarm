@@ -36,6 +36,7 @@ import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
+import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -44,6 +45,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import io.grpc.Deadline;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -530,7 +532,19 @@ class Executor {
 
     // allow debugging after an execution
     if (limits.debugAfterExecution) {
-      return ExecutionDebugger.performAfterExecutionDebug(processBuilder, limits, resultBuilder);
+      // Obtain execution statistics recorded while the action executed.
+      // Currently we can only source this data when using the sandbox.
+      ExecutionStatistics executionStatistics = ExecutionStatistics.newBuilder().build();
+      if (limits.useLinuxSandbox) {
+        executionStatistics =
+            ExecutionStatistics.newBuilder()
+                .mergeFrom(
+                    new FileInputStream(execDir.resolve("action_execution_statistics").toString()))
+                .build();
+      }
+
+      return ExecutionDebugger.performAfterExecutionDebug(
+          processBuilder, limits, executionStatistics, resultBuilder);
     }
 
     return statusCode;

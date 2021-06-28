@@ -31,7 +31,6 @@ import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.util.concurrent.FutureCallback;
@@ -41,6 +40,7 @@ import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import io.prometheus.client.Summary;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -51,6 +51,8 @@ import javax.annotation.concurrent.GuardedBy;
 
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Logger logger = Logger.getLogger(WriteStreamObserver.class.getName());
+  private static final Summary ioMetric =
+      Summary.build().name("io_bytes_write").help("I/O (bytes)").register();
 
   private final Instances instances;
   private final long deadlineAfter;
@@ -64,7 +66,6 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private String name = null;
   private Write write = null;
   private FeedbackOutputStream out = null;
-  private Instance instance = null;
   private final AtomicReference<Throwable> exception = new AtomicReference<>(null);
   private final AtomicBoolean wasReady = new AtomicBoolean(false);
   private long expectedCommittedSize = -1;
@@ -379,6 +380,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     try {
       data.writeTo(getOutput());
       requestNextIfReady();
+      ioMetric.observe(data.size());
     } catch (EntryLimitException e) {
       throw e;
     } catch (IOException e) {

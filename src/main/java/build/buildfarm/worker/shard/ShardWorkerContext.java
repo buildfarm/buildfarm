@@ -27,7 +27,6 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
@@ -51,7 +50,6 @@ import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
-import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.worker.DequeueMatchEvaluator;
 import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecutionPolicies;
@@ -66,14 +64,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
-import com.google.common.collect.Sets;
 import com.google.longrunning.Operation;
-import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -95,7 +90,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -117,7 +111,6 @@ class ShardWorkerContext implements WorkerContext {
   private final SetMultimap<String, String> matchProvisions;
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
-  private final int inlineContentLimit;
   private final int inputFetchStageWidth;
   private final int executeStageWidth;
   private final Backplane backplane;
@@ -125,8 +118,6 @@ class ShardWorkerContext implements WorkerContext {
   private final InputStreamFactory inputStreamFactory;
   private final ListMultimap<String, ExecutionPolicy> policies;
   private final Instance instance;
-  private final long deadlineAfter;
-  private final TimeUnit deadlineAfterUnits;
   private final Duration defaultActionTimeout;
   private final Duration maximumActionTimeout;
   private final boolean limitExecution;
@@ -178,7 +169,6 @@ class ShardWorkerContext implements WorkerContext {
     this.matchProvisions = getMatchProvisions(platform, policies, executeStageWidth);
     this.operationPollPeriod = operationPollPeriod;
     this.operationPoller = operationPoller;
-    this.inlineContentLimit = inlineContentLimit;
     this.inputFetchStageWidth = inputFetchStageWidth;
     this.executeStageWidth = executeStageWidth;
     this.backplane = backplane;
@@ -186,8 +176,6 @@ class ShardWorkerContext implements WorkerContext {
     this.inputStreamFactory = inputStreamFactory;
     this.policies = ExecutionPolicies.toMultimap(policies);
     this.instance = instance;
-    this.deadlineAfter = deadlineAfter;
-    this.deadlineAfterUnits = deadlineAfterUnits;
     this.defaultActionTimeout = defaultActionTimeout;
     this.maximumActionTimeout = maximumActionTimeout;
     this.limitExecution = limitExecution;
@@ -393,36 +381,6 @@ class ShardWorkerContext implements WorkerContext {
         throw Status.fromThrowable(e).asRuntimeException();
       }
     }
-  }
-
-  private ExecuteOperationMetadata expectExecuteOperationMetadata(Operation operation) {
-    Any metadata = operation.getMetadata();
-    if (metadata == null) {
-      return null;
-    }
-
-    if (metadata.is(QueuedOperationMetadata.class)) {
-      try {
-        return operation
-            .getMetadata()
-            .unpack(QueuedOperationMetadata.class)
-            .getExecuteOperationMetadata();
-      } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.SEVERE, "invalid operation metadata: " + operation.getName(), e);
-        return null;
-      }
-    }
-
-    if (metadata.is(ExecuteOperationMetadata.class)) {
-      try {
-        return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-      } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.SEVERE, "invalid operation metadata: " + operation.getName(), e);
-        return null;
-      }
-    }
-
-    return null;
   }
 
   private void requeue(String operationName) {
@@ -757,21 +715,6 @@ class ShardWorkerContext implements WorkerContext {
     return success;
   }
 
-  private Map<Digest, Directory> createDirectoriesIndex(Iterable<Directory> directories) {
-    Set<Digest> directoryDigests = Sets.newHashSet();
-    ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
-    for (Directory directory : directories) {
-      // double compute here...
-      Digest directoryDigest = getDigestUtil().compute(directory);
-      if (!directoryDigests.add(directoryDigest)) {
-        continue;
-      }
-      directoriesIndex.put(directoryDigest, directory);
-    }
-
-    return directoriesIndex.build();
-  }
-
   @Override
   public Path createExecDir(
       String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
@@ -952,45 +895,69 @@ class ShardWorkerContext implements WorkerContext {
     // For reference on how bazel spawns the sandbox:
     // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
     if (limits.useLinuxSandbox) {
-      // Construct the CLI options for this binary.
-      LinuxSandboxOptions options = new LinuxSandboxOptions();
-      options.createNetns = limits.network.blockNetwork;
-      options.workingDir = workingDirectory.toString();
-
-      // Bazel encodes these directly
-      options.writableFiles.add(execFileSystem.root().toString());
-      options.writableFiles.add(workingDirectory.toString());
-
-      // For the time being, the linux-sandbox version of "nobody"
-      // does not pair with buildfarm's implementation of exec_owner: "nobody".
-      // This will need fixed to enable using fakeUsername with the sandbox.
-      // TODO: provide proper support for bazel sandbox's fakeUsername "-U" flag.
-      // options.fakeUsername = limits.fakeUsername;
-
-      // these were hardcoded in bazel based on a filesystem configuration typical to ours
-      // TODO: they may be incorrect for say Windows, and support will need adjusted in the future.
-      options.writableFiles.add("/tmp");
-      options.writableFiles.add("/dev/shm");
-
-      if (limits.tmpFs) {
-        options.tmpfsDirs.add("/tmp");
-      }
-
-      // Bazel looks through environment variables based on operation system to provide additional
-      // write files.
-      // TODO: Add other paths based on environment variables
-      // all:     TEST_TMPDIR
-      // windows: TEMP
-      // windows: TMP
-      // linux:   TMPDIR
-
+      LinuxSandboxOptions options = decideLinuxSandboxOptions(limits, workingDirectory);
       addLinuxSandboxCli(arguments, options);
+    }
+
+    if (limits.time.skipSleep) {
+      arguments.add(ExecutionWrappers.SKIP_SLEEP);
+
+      // we set these values very high because we want sleep calls to return immediately.
+      arguments.add("90000000"); // delay factor
+      arguments.add("90000000"); // time factor
+      arguments.add(ExecutionWrappers.SKIP_SLEEP_PRELOAD);
+
+      if (limits.time.timeShift != 0) {
+        arguments.add(ExecutionWrappers.DELAY);
+        arguments.add(String.valueOf(limits.time.timeShift));
+      }
     }
 
     // The executor expects a single IOResource.
     // However, we may have multiple IOResources due to using multiple cgroup groups.
     // We construct a single IOResource to account for this.
     return combineResources(resources);
+  }
+
+  private LinuxSandboxOptions decideLinuxSandboxOptions(
+      ResourceLimits limits, Path workingDirectory) {
+    // Construct the CLI options for this binary.
+    LinuxSandboxOptions options = new LinuxSandboxOptions();
+    options.createNetns = limits.network.blockNetwork;
+    options.workingDir = workingDirectory.toString();
+
+    // Bazel encodes these directly
+    options.writableFiles.add(execFileSystem.root().toString());
+    options.writableFiles.add(workingDirectory.toString());
+
+    // For the time being, the linux-sandbox version of "nobody"
+    // does not pair with buildfarm's implementation of exec_owner: "nobody".
+    // This will need fixed to enable using fakeUsername with the sandbox.
+    // TODO: provide proper support for bazel sandbox's fakeUsername "-U" flag.
+    // options.fakeUsername = limits.fakeUsername;
+
+    // these were hardcoded in bazel based on a filesystem configuration typical to ours
+    // TODO: they may be incorrect for say Windows, and support will need adjusted in the future.
+    options.writableFiles.add("/tmp");
+    options.writableFiles.add("/dev/shm");
+
+    if (limits.tmpFs) {
+      options.tmpfsDirs.add("/tmp");
+    }
+
+    if (limits.debugAfterExecution) {
+      options.statsPath = workingDirectory.resolve("action_execution_statistics").toString();
+    }
+
+    // Bazel looks through environment variables based on operation system to provide additional
+    // write files.
+    // TODO: Add other paths based on environment variables
+    // all:     TEST_TMPDIR
+    // windows: TEMP
+    // windows: TMP
+    // linux:   TMPDIR
+
+    return options;
   }
 
   private void addLinuxSandboxCli(
@@ -1012,6 +979,10 @@ class ShardWorkerContext implements WorkerContext {
     if (!options.workingDir.isEmpty()) {
       arguments.add("-W");
       arguments.add(options.workingDir);
+    }
+    if (!options.statsPath.isEmpty()) {
+      arguments.add("-S");
+      arguments.add(options.statsPath);
     }
     for (String writablePath : options.writableFiles) {
       arguments.add("-w");

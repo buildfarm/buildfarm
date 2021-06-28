@@ -38,13 +38,13 @@ import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
+import io.prometheus.client.Counter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -60,9 +60,14 @@ public class BuildFarmServer extends LoggingMain {
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
   private static final Logger logger = Logger.getLogger(BuildFarmServer.class.getName());
+  private static final Counter healthCheckMetric =
+      Counter.build()
+          .name("health_check")
+          .labelNames("lifecycle")
+          .help("Service health check.")
+          .register();
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-  private final ActionCacheRequestCounter actionCacheRequestCounter;
   private final Instances instances;
   private final HealthStatusManager healthStatusManager;
   private final Server server;
@@ -83,15 +88,13 @@ public class BuildFarmServer extends LoggingMain {
         new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
 
     healthStatusManager = new HealthStatusManager();
-    actionCacheRequestCounter =
-        new ActionCacheRequestCounter(ActionCacheService.logger, Duration.ofSeconds(10));
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
 
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instances, actionCacheRequestCounter::increment))
+            .addService(new ActionCacheService(instances))
             .addService(new CapabilitiesService(instances))
             .addService(
                 new ContentAddressableStorageService(
@@ -145,12 +148,12 @@ public class BuildFarmServer extends LoggingMain {
 
   public synchronized void start(String publicName, int prometheusPort) throws IOException {
     checkState(!stopping, "must not call start after stop");
-    actionCacheRequestCounter.start();
     instances.start(publicName);
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
     prometheusPublisher.startHttpServer(prometheusPort);
+    healthCheckMetric.labels("start").inc();
   }
 
   @Override
@@ -170,6 +173,7 @@ public class BuildFarmServer extends LoggingMain {
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     prometheusPublisher.stopHttpServer();
+    healthCheckMetric.labels("stop").inc();
     try {
       if (server != null) {
         server.shutdown();
@@ -183,9 +187,6 @@ public class BuildFarmServer extends LoggingMain {
     }
     if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
       logger.log(Level.WARNING, "could not shut down keepalive scheduler");
-    }
-    if (!actionCacheRequestCounter.stop()) {
-      logger.log(Level.WARNING, "count not shut down action cache request counter");
     }
   }
 
