@@ -34,6 +34,7 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.determinism.DeterminismChecker;
+import build.buildfarm.worker.determinism.DeterminismCheckSettings;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
@@ -441,6 +442,7 @@ class Executor {
 
     // allow running an action multiple times to check determinism
     if (limits.checkDeterminism > 0) {
+      DeterminismCheckSettings settings = new DeterminismCheckSettings();
       return DeterminismChecker.checkDeterminism(
           workerContext, operationContext, processBuilder, limits, resultBuilder);
     }
