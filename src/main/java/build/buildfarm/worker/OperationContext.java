@@ -22,14 +22,14 @@ import build.buildfarm.v1test.QueueEntry;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
 
-final class OperationContext {
-  final ExecuteResponse.Builder executeResponse;
-  final Operation operation;
-  final Poller poller;
-  final Path execDir;
-  final Action action;
-  final Command command;
-  final QueueEntry queueEntry;
+public final class OperationContext {
+  public final ExecuteResponse.Builder executeResponse;
+  public final Operation operation;
+  public final Poller poller;
+  public final Path execDir;
+  public final Action action;
+  public final Command command;
+  public final QueueEntry queueEntry;
 
   private OperationContext(
       ExecuteResponse.Builder executeResponse,

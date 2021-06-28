@@ -11,6 +11,7 @@ java_library(
         "//src/main/java/build/buildfarm/worker",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/java/build/buildfarm/worker:worker_context",
         "@maven//:com_github_pcj_google_options",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",

@@ -4,6 +4,7 @@ java_library(
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/worker",
+        "//src/main/java/build/buildfarm/worker:worker_context",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
     ],

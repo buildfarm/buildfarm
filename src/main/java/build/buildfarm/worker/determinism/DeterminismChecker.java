@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.determinism;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.worker.OperationContext;
+import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.protobuf.ByteString;
 import com.google.rpc.Code;
@@ -27,9 +31,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.Map;
 
 /**
@@ -71,45 +75,79 @@ public class DeterminismChecker {
       ProcessBuilder processBuilder,
       ResourceLimits limits,
       ActionResult.Builder resultBuilder) {
-    
     // Run the action once to create a baseline set of output digests.
     runAction(processBuilder);
     HashMap<Path, Digest> fileDigests = computeFileDigests(operationContext);
-    
-    // Re-run the action a specified number of times to create additional output digests.
+
+    // Re-run the action a specified number of times to create comparable output digests.
     List<HashMap<Path, Digest>> rerunDigests = new ArrayList<HashMap<Path, Digest>>();
-    for (int i = 0; i < limits.checkDeterminism; ++i){
-      resetWorkingDirectory();
+    for (int i = 0; i < limits.checkDeterminism; ++i) {
+      resetWorkingDirectory(workerContext, operationContext);
       runAction(processBuilder);
       rerunDigests.add(computeFileDigests(operationContext));
     }
-    
-    // Find any digest discrepancies between the runs.  If any discrepancies are found we consider the action nondeterministic.
-    for (Map.Entry<Path, Digest> entry : fileDigests.entrySet()){
+
+    // Find any digest discrepancies between the runs to determine if the action is
+    // nondeterministic.
+    for (Map.Entry<Path, Digest> entry : fileDigests.entrySet()) {
       System.out.println(entry.getKey() + " " + entry.getValue());
     }
     System.out.println("-------");
-    
-    for (HashMap<Path, Digest> digests : rerunDigests){
-      for (Map.Entry<Path, Digest> entry : digests.entrySet()){
+
+    for (HashMap<Path, Digest> digests : rerunDigests) {
+      for (Map.Entry<Path, Digest> entry : digests.entrySet()) {
         System.out.println(entry.getKey() + " " + entry.getValue());
       }
     }
 
     return "";
   }
-  
-  
-  private static void resetWorkingDirectory(){
+
+  private static void resetWorkingDirectory(
+      WorkerContext workerContext, OperationContext operationContext) {
+    // After an action runs, the working directory is contaminated with outputs.
+    // In order to evaluate another run of the action, we will need to reconstruct the exec
+    // filesystem back to the original state.
+    try {
+      // Get information needed to reconstruct the exec filesystem
+      String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
+      QueuedOperation queuedOperation =
+          workerContext.getQueuedOperation(operationContext.queueEntry);
+      Map<Digest, Directory> directoriesIndex = createExecDirIndex(workerContext, queuedOperation);
+
+      // Reconstruct the exec filesystem.
+      // Create API will remove existing files.
+      workerContext.createExecDir(
+          operationName,
+          directoriesIndex,
+          queuedOperation.getAction(),
+          queuedOperation.getCommand());
+    } catch (IOException | InterruptedException e) {
+      System.out.println(e);
+    }
   }
-  
-  
+
+  private static Map<Digest, Directory> createExecDirIndex(
+      WorkerContext workerContext, QueuedOperation queuedOperation) {
+    Map<Digest, Directory> directoriesIndex;
+
+    if (queuedOperation.hasTree()) {
+      directoriesIndex =
+          DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories());
+    } else {
+      directoriesIndex =
+          workerContext.getDigestUtil().createDirectoriesIndex(queuedOperation.getLegacyTree());
+    }
+
+    return directoriesIndex;
+  }
 
   private static void runAction(ProcessBuilder processBuilder) {
     try {
       Process process = processBuilder.start();
       int exitCode = process.waitFor();
     } catch (IOException | InterruptedException e) {
+      System.out.println(e);
     }
   }
 
@@ -136,6 +174,7 @@ public class DeterminismChecker {
       Digest digest = digestUtil.compute(path);
       fileDigests.put(path, digest);
     } catch (IOException e) {
+      System.out.println(e);
     }
   }
 
@@ -153,6 +192,7 @@ public class DeterminismChecker {
             }
           });
     } catch (IOException e) {
+      System.out.println(e);
     }
   }
 }

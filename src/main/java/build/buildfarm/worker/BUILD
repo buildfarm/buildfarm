@@ -1,12 +1,50 @@
 java_library(
+    name = "operation_context",
+    visibility = ["//visibility:public"],
+    srcs = ["OperationContext.java"],
+    deps = [
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/java/build/buildfarm/common",
+    ]
+)
+
+java_library(
+    name = "worker_context",
+    visibility = ["//visibility:public"],
+    srcs = ["WorkerContext.java"],
+    deps = [
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/instance",
+        "//src/main/java/build/buildfarm/worker/resources",
+        "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/java/build/buildfarm/worker:operation_context",
+        "@maven//:io_grpc_grpc_context",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:com_google_guava_guava",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        
+    ]
+)
+
+
+java_library(
     name = "worker",
-    srcs = glob(["*.java"]),
+    srcs = glob(["*.java"], exclude = [
+                "OperationContext.java",
+                "WorkerContext.java",
+    ]),
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/worker/resources",
+        "//src/main/java/build/buildfarm/worker/determinism",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@bazel//src/main/protobuf:execution_statistics_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
@@ -29,5 +67,7 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
+        ":operation_context",
+        ":worker_context",
     ],
 )
