@@ -24,14 +24,12 @@ import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
 import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.rpc.Code;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
@@ -39,14 +37,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
   public OperationQueueService(Instances instances) {
     this.instances = instances;
-  }
-
-  private static <V> V getUnchecked(ListenableFuture<V> future) throws InterruptedException {
-    try {
-      return future.get();
-    } catch (ExecutionException e) {
-      return null;
-    }
   }
 
   private static class OperationQueueMatchListener implements MatchListener {

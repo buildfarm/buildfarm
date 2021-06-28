@@ -38,7 +38,6 @@ public class HttpProxy extends LoggingMain {
   private static final Logger nettyLogger = Logger.getLogger("io.grpc.netty");
   public static final Logger logger = Logger.getLogger(HttpProxy.class.getName());
 
-  private final HttpProxyOptions options;
   private final Server server;
 
   public HttpProxy(HttpProxyOptions options, @Nullable Credentials creds)
@@ -50,7 +49,6 @@ public class HttpProxy extends LoggingMain {
       ServerBuilder<?> serverBuilder, @Nullable Credentials creds, HttpProxyOptions options)
       throws URISyntaxException, SSLException {
     super("HttpProxy");
-    this.options = options;
     SimpleBlobStore simpleBlobStore =
         HttpBlobStore.create(
             URI.create(options.httpCache),

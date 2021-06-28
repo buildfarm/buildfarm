@@ -66,7 +66,6 @@ import javax.naming.ConfigurationException;
 public class ShardWorkerInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardWorkerInstance.class.getName());
 
-  private final ShardWorkerInstanceConfig config;
   private final Backplane backplane;
 
   public ShardWorkerInstance(
@@ -77,7 +76,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       ShardWorkerInstanceConfig config)
       throws ConfigurationException {
     super(name, digestUtil, contentAddressableStorage, null, null, null, null);
-    this.config = config;
     this.backplane = backplane;
   }
 

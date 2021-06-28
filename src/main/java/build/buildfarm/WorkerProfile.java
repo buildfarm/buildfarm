@@ -230,8 +230,7 @@ class WorkerProfile {
     }
   }
 
-  private static void getWorkerProfile(Instance instance) {
-    // List<String> worker = instance.
+  public static void getWorkerProfile(Instance instance) {
     WorkerProfileMessage response = instance.getWorkerProfile();
     System.out.println("\nWorkerProfile:");
     String strIntFormat = "%-50s : %d";

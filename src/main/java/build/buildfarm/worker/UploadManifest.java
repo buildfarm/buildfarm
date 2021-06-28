@@ -122,8 +122,6 @@ public class UploadManifest {
     }
   }
 
-  private void addFiles(Iterable<Path> files, boolean isDirectory, CASInsertionPolicy policy)
-      throws IllegalStateException, IOException, InterruptedException {}
   /** Map of digests to file paths to upload. */
   public Map<Digest, Path> getDigestToFile() {
     return digestToFile;

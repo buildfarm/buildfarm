@@ -159,7 +159,6 @@ public class RedisShardBackplane implements Backplane {
   private RedisShardSubscriber subscriber = null;
   private RedisShardSubscription operationSubscription = null;
   private ExecutorService subscriberService = null;
-  private boolean poolStarted = false;
   private @Nullable RedisClient client = null;
   private @Nullable RedissonClient redissonClient = null;
 
