@@ -59,6 +59,7 @@
 
 <rule ref="category/java/codestyle.xml">
     <exclude name="LongVariable"/> <!-- some of these long variable names are helpful -->
+    <exclude name="UseUnderscoresInNumericLiterals"/> <!-- these underscores are deemed annoying -->
     <exclude name="AbstractNaming"/>
     <exclude name="AtLeastOneConstructor"/>
     <exclude name="AvoidDollarSigns"/>
@@ -111,9 +112,6 @@
     <exclude name="UselessParentheses"/>
     <exclude name="UselessQualifiedThis"/>
     <exclude name="UseShortArrayInitializer"/>
-    <exclude name="UseUnderscoresInNumericLiterals"/>
-    <exclude name="VariableNamingConventions"/>
-    <exclude name="WhileLoopsMustUseBraces"/>
 </rule>
 
 <rule ref="category/java/design.xml">
