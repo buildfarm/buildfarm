@@ -133,10 +133,10 @@ public class RedisClient implements Closeable {
       // persistent state which can exist long past the error
       throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
     } catch (JedisConnectionException e) {
-      
-      boolean unexpectedEndOfStream = e.getMessage() != null && e.getMessage().equals("Unexpected end of stream.");
+      boolean unexpectedEndOfStream =
+          e.getMessage() != null && e.getMessage().equals("Unexpected end of stream.");
       boolean generalConnectException = e.getCause() instanceof ConnectException;
-                                       
+
       if (unexpectedEndOfStream || generalConnectException) {
         throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
       }
@@ -144,9 +144,10 @@ public class RedisClient implements Closeable {
       Status status = Status.UNKNOWN;
       while (status.getCode() == Code.UNKNOWN && cause != null) {
         String message = cause.getMessage() == null ? "" : cause.getMessage();
-        
-        boolean connectionReset = cause instanceof SocketException && cause.getMessage().equals("Connection reset");
-        
+
+        boolean connectionReset =
+            cause instanceof SocketException && cause.getMessage().equals("Connection reset");
+
         if (connectionReset
             || cause instanceof ConnectException
             || message.equals("Unexpected end of stream.")) {

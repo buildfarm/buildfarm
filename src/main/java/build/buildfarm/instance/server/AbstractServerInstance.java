@@ -369,7 +369,7 @@ public abstract class AbstractServerInstance implements Instance {
       return null;
     }
 
-    boolean isValid = validateGetBlob(blob,offset,count);
+    boolean isValid = validateGetBlob(blob, offset, count);
     if (!isValid) {
       throw new IndexOutOfBoundsException();
     }
@@ -379,23 +379,22 @@ public abstract class AbstractServerInstance implements Instance {
     return blob.getData()
         .substring((int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
   }
-  
-  private static boolean validateGetBlob(Blob blob, long offset, long count){
-    
-    //values should not be negative
-    if (offset < 0 || count < 0){
+
+  private static boolean validateGetBlob(Blob blob, long offset, long count) {
+    // values should not be negative
+    if (offset < 0 || count < 0) {
       return false;
     }
-    
-    //out-of-bounds offset
-    if (blob.isEmpty() && offset > 0){
+
+    // out-of-bounds offset
+    if (blob.isEmpty() && offset > 0) {
       return false;
     }
-    if (!blob.isEmpty() && offset >= blob.size()){
+    if (!blob.isEmpty() && offset >= blob.size()) {
       return false;
     }
-    
-    //otherwise valid
+
+    // otherwise valid
     return true;
   }
 
