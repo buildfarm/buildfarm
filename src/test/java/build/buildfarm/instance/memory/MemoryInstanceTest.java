@@ -126,9 +126,9 @@ public class MemoryInstanceTest {
     MemoryInstanceConfig memoryInstanceConfig =
         MemoryInstanceConfig.newBuilder()
             .setListOperationsDefaultPageSize(1024)
-            .setListOperationsMaxPageSize(16384)
+            .setListOperationsMaxPageSize(16_384)
             .setTreeDefaultPageSize(1024)
-            .setTreeMaxPageSize(16384)
+            .setTreeMaxPageSize(16_384)
             .setOperationPollTimeout(Durations.fromSeconds(10))
             .setOperationCompletedDelay(Durations.fromSeconds(10))
             .setDefaultActionTimeout(Durations.fromSeconds(600))

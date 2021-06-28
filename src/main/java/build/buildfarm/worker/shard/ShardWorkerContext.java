@@ -1003,11 +1003,11 @@ class ShardWorkerContext implements WorkerContext {
       cpu.close();
       if (limits.cpu.max > 0) {
         /* period of 100ms */
-        cpu.setCFSPeriod(100000);
-        cpu.setCFSQuota(limits.cpu.max * 100000);
+        cpu.setCFSPeriod(100_000);
+        cpu.setCFSQuota(limits.cpu.max * 100_000);
       }
       if (limits.cpu.min > 0) {
-        cpu.setShares(limits.cpu.min * 1024);
+        cpu.setShares(limits.cpu.min * 1_024);
       }
     } catch (IOException e) {
       // clear interrupt flag if set due to ClosedByInterruptException

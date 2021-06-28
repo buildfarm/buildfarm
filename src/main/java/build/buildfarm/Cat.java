@@ -496,7 +496,7 @@ class Cat {
           System.out.println(
               "    RetryDelay: "
                   + (retryInfo.getRetryDelay().getSeconds()
-                      + retryInfo.getRetryDelay().getNanos() / 1000000000.0f));
+                      + retryInfo.getRetryDelay().getNanos() / 1_000_000_000.0f));
         } else if (detail.is(PreconditionFailure.class)) {
           PreconditionFailure preconditionFailure = detail.unpack(PreconditionFailure.class);
           System.out.println("    PreconditionFailure:");
@@ -662,13 +662,13 @@ class Cat {
       case 600:
         periodInfo += "10 minutes";
         break;
-      case 3600:
+      case 3_600:
         periodInfo += "1 hour";
         break;
-      case 10800:
+      case 10_800:
         periodInfo += "3 hours";
         break;
-      case 86400:
+      case 86_400:
         periodInfo += "24 hours";
         break;
       default:

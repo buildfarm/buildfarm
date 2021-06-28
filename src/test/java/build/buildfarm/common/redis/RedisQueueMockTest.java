@@ -116,12 +116,12 @@ public class RedisQueueMockTest {
     RedisQueue queue = new RedisQueue("test");
 
     // ACT
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < 1_000; ++i) {
       queue.push(redis, "foo" + String.valueOf(i));
     }
 
     // ASSERT
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < 1_000; ++i) {
       verify(redis, times(1)).lpush("test", "foo" + String.valueOf(i));
     }
   }
@@ -217,7 +217,7 @@ public class RedisQueueMockTest {
         new Thread(
             () -> {
               try {
-                String val = queue.dequeue(redis, 100000);
+                String val = queue.dequeue(redis, 100_000);
               } catch (Exception e) {
               }
             });

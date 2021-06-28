@@ -55,8 +55,8 @@ public class Poller {
         Duration waitTime = getWaitTime();
         if (waitTime.getSeconds() != 0 || waitTime.getNanos() != 0) {
           wait(
-              waitTime.getSeconds() * 1000 + waitTime.getNanos() / 1000000,
-              waitTime.getNanos() % 1000000);
+              waitTime.getSeconds() * 1_000 + waitTime.getNanos() / 1_000_000,
+              waitTime.getNanos() % 1_000_000);
         }
       } catch (InterruptedException e) {
         running = false;
@@ -88,8 +88,8 @@ public class Poller {
   }
 
   public Poller(Duration period) {
-    checkState(period.getSeconds() > 0 || period.getNanos() >= 1000);
-    periodMicros = period.getSeconds() * 1000000 + period.getNanos() / 1000;
+    checkState(period.getSeconds() > 0 || period.getNanos() >= 1_000);
+    periodMicros = period.getSeconds() * 1_000_000 + period.getNanos() / 1_000;
     periodDeadline = Deadline.after(periodMicros, MICROSECONDS);
   }
 

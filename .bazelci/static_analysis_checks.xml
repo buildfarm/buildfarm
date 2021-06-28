@@ -111,9 +111,6 @@
     <exclude name="UselessParentheses"/>
     <exclude name="UselessQualifiedThis"/>
     <exclude name="UseShortArrayInitializer"/>
-    <exclude name="UseUnderscoresInNumericLiterals"/>
-    <exclude name="VariableNamingConventions"/>
-    <exclude name="WhileLoopsMustUseBraces"/>
 </rule>
 
 <rule ref="category/java/design.xml">

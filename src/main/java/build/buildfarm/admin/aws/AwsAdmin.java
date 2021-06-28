@@ -149,7 +149,7 @@ public class AwsAdmin implements Admin {
 
   private long getHostUptimeInMinutes(Date launchTime) {
     Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-    return (cal.getTime().getTime() - launchTime.getTime()) / 60000;
+    return (cal.getTime().getTime() - launchTime.getTime()) / 60_000;
   }
 
   /**

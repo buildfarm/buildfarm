@@ -742,7 +742,7 @@ public class RedisShardBackplane implements Backplane {
     CasIndexSettings settings = new CasIndexSettings();
     settings.hostName = hostName;
     settings.casQuery = config.getCasPrefix() + ":*";
-    settings.scanAmount = 10000;
+    settings.scanAmount = 10_000;
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
 
@@ -752,7 +752,7 @@ public class RedisShardBackplane implements Backplane {
     FindOperationsSettings settings = new FindOperationsSettings();
     settings.filterPredicate = filterPredicate;
     settings.operationQuery = config.getOperationPrefix() + ":*";
-    settings.scanAmount = 10000;
+    settings.scanAmount = 10_000;
     return client.call(jedis -> OperationsFinder.findOperations(jedis, instance, settings));
   }
 

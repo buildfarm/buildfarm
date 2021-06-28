@@ -287,13 +287,13 @@ class WorkerProfile {
       case 600:
         periodInfo += "10 minutes";
         break;
-      case 3600:
+      case 3_600:
         periodInfo += "1 hour";
         break;
-      case 10800:
+      case 10_800:
         periodInfo += "3 hours";
         break;
-      case 86400:
+      case 86_400:
         periodInfo += "24 hours";
         break;
       default:
@@ -348,7 +348,7 @@ class WorkerProfile {
   }
 
   private static float durationToMillis(Duration d) {
-    return Durations.toNanos(d) / (1000.0f * 1000.0f);
+    return Durations.toNanos(d) / (1_000.0f * 1_000.0f);
   }
 
   // how to run the binary: bf-workerprofile WorkerProfile shard SHA256

@@ -851,7 +851,7 @@ public class Worker extends LoggingMain {
   private void startFailsafeRegistration() {
     String endpoint = config.getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
-    int registrationIntervalMillis = 10000;
+    int registrationIntervalMillis = 10_000;
     int registrationOffsetMillis = registrationIntervalMillis * 3;
     new Thread(
             new Runnable() {

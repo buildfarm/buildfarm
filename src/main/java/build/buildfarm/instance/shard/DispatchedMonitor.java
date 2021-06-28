@@ -57,7 +57,7 @@ class DispatchedMonitor implements Runnable {
     requeuedFuture.addListener(
         () -> {
           long endTime = System.nanoTime();
-          float ms = (endTime - startTime) / 1000000.0f;
+          float ms = (endTime - startTime) / 1_000_000.0f;
           logger.log(
               Level.INFO, format("DispatchedMonitor::run: requeue(%s) %gms", operationName, ms));
         },

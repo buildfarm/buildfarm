@@ -157,7 +157,7 @@ class Executor {
       pollDeadline =
           Deadline.after(
               // 10s of padding for the timeout in question, so that we can guarantee cleanup
-              (timeout.getSeconds() + 10) * 1000000 + timeout.getNanos() / 1000, MICROSECONDS);
+              (timeout.getSeconds() + 10) * 1_000_000 + timeout.getNanos() / 1_000, MICROSECONDS);
     }
 
     workerContext.resumePoller(
@@ -485,7 +485,7 @@ class Executor {
         exitCode = process.waitFor();
         processCompleted = true;
       } else {
-        long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
+        long timeoutNanos = timeout.getSeconds() * 1_000_000_000L + timeout.getNanos();
         long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
         if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
           exitCode = process.exitValue();

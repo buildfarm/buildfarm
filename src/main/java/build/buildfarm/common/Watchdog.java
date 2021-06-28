@@ -38,7 +38,7 @@ public class Watchdog implements Runnable {
       synchronized (this) {
         start = System.nanoTime();
         while (!stopped && timeoutNanos > 0) {
-          this.wait(timeoutNanos / 1000000L, (int) (timeoutNanos % 1000000L));
+          this.wait(timeoutNanos / 1_000_000L, (int) (timeoutNanos % 1_000_000L));
           long now = System.nanoTime();
           timeoutNanos -= now - start;
           start = now;
@@ -59,7 +59,7 @@ public class Watchdog implements Runnable {
 
   private synchronized void reset(Duration timeout) {
     start = System.nanoTime();
-    timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
+    timeoutNanos = timeout.getSeconds() * 1_000_000_000L + timeout.getNanos();
     this.notify();
   }
 

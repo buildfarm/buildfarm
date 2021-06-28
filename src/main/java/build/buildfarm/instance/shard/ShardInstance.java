@@ -162,7 +162,7 @@ public class ShardInstance extends AbstractServerInstance {
   private static final String TIMEOUT_OUT_OF_BOUNDS =
       "A timeout specified is out of bounds with a configured range";
 
-  private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
+  private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1_000_000;
 
   // Prometheus metrics
   private static final Counter executionSuccess =

@@ -173,7 +173,7 @@ public class RedisQueue {
    * @note Overloaded.
    */
   private void visit(JedisCluster jedis, String queueName, StringVisitor visitor) {
-    int listPageSize = 10000;
+    int listPageSize = 10_000;
 
     int index = 0;
     int nextIndex = listPageSize;
