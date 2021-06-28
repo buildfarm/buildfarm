@@ -369,10 +369,8 @@ public abstract class AbstractServerInstance implements Instance {
       return null;
     }
 
-    if (offset < 0
-        || (blob.isEmpty() && offset > 0)
-        || (!blob.isEmpty() && offset >= blob.size())
-        || count < 0) {
+    boolean isValid = validateGetBlob(blob,offset,count);
+    if (!isValid) {
       throw new IndexOutOfBoundsException();
     }
 
@@ -380,6 +378,25 @@ public abstract class AbstractServerInstance implements Instance {
 
     return blob.getData()
         .substring((int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
+  }
+  
+  private static boolean validateGetBlob(Blob blob, long offset, long count){
+    
+    //values should not be negative
+    if (offset < 0 || count < 0){
+      return false;
+    }
+    
+    //out-of-bounds offset
+    if (blob.isEmpty() && offset > 0){
+      return false;
+    }
+    if (!blob.isEmpty() && offset >= blob.size()){
+      return false;
+    }
+    
+    //otherwise valid
+    return true;
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
@@ -666,7 +683,7 @@ public abstract class AbstractServerInstance implements Instance {
       Consumer<String> onInputDirectory) {
     for (FileNode fileNode : directory.getFilesList()) {
       String fileName = fileNode.getName();
-      String filePath = directoryPath.isEmpty() ? fileName : (directoryPath + "/" + fileName);
+      String filePath = directoryPath.isEmpty() ? fileName : directoryPath + "/" + fileName;
       onInputFile.accept(filePath);
     }
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
@@ -674,7 +691,7 @@ public abstract class AbstractServerInstance implements Instance {
 
       Digest directoryDigest = directoryNode.getDigest();
       String subDirectoryPath =
-          directoryPath.isEmpty() ? directoryName : (directoryPath + "/" + directoryName);
+          directoryPath.isEmpty() ? directoryName : directoryPath + "/" + directoryName;
       onInputDirectory.accept(subDirectoryPath);
       enumerateActionInputDirectory(
           subDirectoryPath,
@@ -726,7 +743,7 @@ public abstract class AbstractServerInstance implements Instance {
       entryNames.add(fileName);
 
       onInputDigest.accept(fileNode.getDigest());
-      String filePath = directoryPath.isEmpty() ? fileName : (directoryPath + "/" + fileName);
+      String filePath = directoryPath.isEmpty() ? fileName : directoryPath + "/" + fileName;
       onInputFile.accept(filePath);
     }
     String lastSymlinkName = "";
@@ -791,7 +808,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setDescription("/" + directoryPath + ": " + directoryName);
       } else {
         String subDirectoryPath =
-            directoryPath.isEmpty() ? directoryName : (directoryPath + "/" + directoryName);
+            directoryPath.isEmpty() ? directoryName : directoryPath + "/" + directoryName;
         onInputDirectory.accept(subDirectoryPath);
         if (!visited.contains(directoryDigest)) {
           validateActionInputDirectoryDigest(

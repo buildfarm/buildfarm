@@ -262,9 +262,9 @@ public class Utils {
       if (obj == this) return true;
       if (!(obj instanceof WindowsFileKey)) return false;
       WindowsFileKey other = (WindowsFileKey) obj;
-      return (this.volSerialNumber == other.volSerialNumber)
-          && (this.fileIndexHigh == other.fileIndexHigh)
-          && (this.fileIndexLow == other.fileIndexLow);
+      return this.volSerialNumber == other.volSerialNumber
+          && this.fileIndexHigh == other.fileIndexHigh
+          && this.fileIndexLow == other.fileIndexLow;
     }
 
     @Override

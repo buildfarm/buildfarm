@@ -448,9 +448,7 @@ public class MemoryInstance extends AbstractServerInstance {
     if (action.hasTimeout() && config.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
       Duration maximum = config.getMaximumActionTimeout();
-      if (timeout.getSeconds() > maximum.getSeconds()
-          || (timeout.getSeconds() == maximum.getSeconds()
-              && timeout.getNanos() > maximum.getNanos())) {
+      if (Durations.compare(timeout,maximum) > 0) {
         preconditionFailure
             .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
