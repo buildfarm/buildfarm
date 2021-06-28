@@ -784,7 +784,7 @@ public class RedisShardBackplane implements Backplane {
   // sophisticated in the future. But for now, we'll give back n random workers.
   public List<String> suggestedWorkersToScaleDown(int numWorkers) throws IOException {
     // get all workers
-    List<String> allWorkers = new ArrayList<String>();
+    List<String> allWorkers = new ArrayList<>();
     allWorkers.addAll(getWorkers());
 
     // ensure selection amount is in range [0 - size]
@@ -901,7 +901,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
     // convert action keys to strings
-    List<String> keyNames = new ArrayList<String>();
+    List<String> keyNames = new ArrayList<>();
     actionKeys.forEach(
         key -> {
           keyNames.add(asDigestStr(key));

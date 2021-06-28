@@ -47,7 +47,7 @@ public class OperationsFinder {
   public static FindOperationsResults findOperations(
       JedisCluster cluster, Instance instance, FindOperationsSettings settings) {
     FindOperationsResults results = new FindOperationsResults();
-    results.operations = new HashMap<String, EnrichedOperation>();
+    results.operations = new HashMap<>();
 
     adjustFilter(settings);
 

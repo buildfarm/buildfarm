@@ -43,7 +43,7 @@ public class BuildFarmInstances implements Instances {
       String defaultInstanceName,
       Runnable onStop)
       throws InterruptedException, ConfigurationException {
-    instances = new HashMap<String, Instance>();
+    instances = new HashMap<>();
     createInstances(session, instanceConfigs, onStop);
     if (!defaultInstanceName.isEmpty()) {
       if (!instances.containsKey(defaultInstanceName)) {
