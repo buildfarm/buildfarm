@@ -96,7 +96,7 @@ public class ByteStreamServiceTest {
   static String createBlobUploadResourceName(String instanceName, String id, Digest digest) {
     return String.format(
         "%suploads/%s/blobs/%s",
-        instanceName.isEmpty() ? "" : (instanceName + "/"), id, DigestUtil.toString(digest));
+        instanceName.isEmpty() ? "" : instanceName + "/", id, DigestUtil.toString(digest));
   }
 
   private String createBlobDownloadResourceName(Digest digest) {
@@ -106,7 +106,7 @@ public class ByteStreamServiceTest {
   private String createBlobDownloadResourceName(String instanceName, Digest digest) {
     return String.format(
         "%sblobs/%s",
-        instanceName.isEmpty() ? "" : (instanceName + "/"), DigestUtil.toString(digest));
+        instanceName.isEmpty() ? "" : instanceName + "/", DigestUtil.toString(digest));
   }
 
   @Test

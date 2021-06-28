@@ -95,7 +95,7 @@ final class TestSuiteBuilder {
    */
   private static boolean isSuite(Class<?> container) {
     RunWith runWith = container.getAnnotation(RunWith.class);
-    return (runWith != null) && ((runWith.value() == CustomSuite.class));
+    return runWith != null && runWith.value() == CustomSuite.class;
   }
 
   /**

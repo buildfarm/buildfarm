@@ -108,7 +108,6 @@
     <exclude name="UnnecessaryFullyQualifiedName"/>
     <exclude name="UnnecessaryLocalBeforeReturn"/>
     <exclude name="UseDiamondOperator"/>
-    <exclude name="UselessParentheses"/>
     <exclude name="UselessQualifiedThis"/>
     <exclude name="UseShortArrayInitializer"/>
     <exclude name="UseUnderscoresInNumericLiterals"/>

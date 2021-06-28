@@ -148,13 +148,20 @@ public class UploadManifest {
     } else {
       setRaw.accept(ByteString.EMPTY);
     }
-    if (policy.equals(CASInsertionPolicy.ALWAYS_INSERT)
-        || (!withinLimit && policy.equals(CASInsertionPolicy.INSERT_ABOVE_LIMIT))) {
+    if (canInsert(policy,withinLimit)) {
       Digest digest = digestUtil.compute(content);
       setDigest.accept(digest);
       Chunker chunker = Chunker.builder().setInput(content).build();
       digestToChunkers.put(digest, chunker);
     }
+  }
+  
+  private boolean canInsert(CASInsertionPolicy policy, boolean withinLimit) {
+    if (policy.equals(CASInsertionPolicy.ALWAYS_INSERT)){
+      return true;
+    }
+    
+    return !withinLimit && policy.equals(CASInsertionPolicy.INSERT_ABOVE_LIMIT);
   }
 
   private void addFile(Path file, CASInsertionPolicy policy) throws IOException {
@@ -201,8 +208,7 @@ public class UploadManifest {
         Directory dir = computeDirectory(child, tree);
         b.addDirectoriesBuilder().setName(name).setDigest(digestUtil.compute(dir));
         tree.addChildren(dir);
-      } else if (dirent.getType() == Dirent.Type.FILE
-          || (dirent.getType() == Dirent.Type.SYMLINK && allowSymlinks)) {
+      } else if (isFileOrSymlink(dirent)) {
         Digest digest = digestUtil.compute(child);
         b.addFilesBuilder()
             .setName(name)
@@ -215,6 +221,14 @@ public class UploadManifest {
     }
 
     return b.build();
+  }
+  
+  private boolean isFileOrSymlink(Dirent dirent){
+    if (dirent.getType() == Dirent.Type.FILE){
+      return true;
+    }
+    
+    return dirent.getType() == Dirent.Type.SYMLINK && allowSymlinks;
   }
 
   private void mismatchedOutput(Path what) throws IllegalStateException, IOException {
