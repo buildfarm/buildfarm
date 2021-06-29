@@ -262,11 +262,9 @@ class Executor {
         int size = (int) missingDigest.getSizeBytes() + 48;
         for (int i = 0; i < 128; i++) {
           int newBucketSize = bucketSizes[i] + size;
-          if (newBucketSize < Size.mbToBytes(2)) {
-            if (bucketSizes[i] < minBucketSize) {
-              minBucketSize = bucketSizes[i];
-              minBucketIndex = i;
-            }
+          if (newBucketSize < Size.mbToBytes(2) && bucketSizes[i] < minBucketSize) {
+            minBucketSize = bucketSizes[i];
+            minBucketIndex = i;
           }
           if (bucketSizes[i] > maxBucketSize) {
             maxBucketSize = bucketSizes[i];

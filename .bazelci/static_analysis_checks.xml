@@ -126,7 +126,6 @@
     <exclude name="AvoidThrowingRawExceptionTypes"/>
     <exclude name="AvoidUncheckedExceptionsInSignatures"/>
     <exclude name="ClassWithOnlyPrivateConstructorsShouldBeFinal"/>
-    <exclude name="CollapsibleIfStatements"/>
     <exclude name="CouplingBetweenObjects"/>
     <exclude name="CyclomaticComplexity"/>
     <exclude name="DataClass"/>

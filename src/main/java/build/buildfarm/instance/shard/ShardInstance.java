@@ -1850,16 +1850,14 @@ public class ShardInstance extends AbstractServerInstance {
 
       @Override
       public void observe(Operation operation) {
-        if (operation != null) {
-          if (writeThrough) {
-            ActionResult actionResult = getCacheableActionResult(operation);
-            if (actionResult != null) {
-              readThroughActionCache.readThrough(actionKey, actionResult);
-            } else if (wasCompletelyExecuted(operation)) {
-              // we want to avoid presenting any results for an action which
-              // was not completely executed
-              readThroughActionCache.invalidate(actionKey);
-            }
+        if (operation != null && writeThrough) {
+          ActionResult actionResult = getCacheableActionResult(operation);
+          if (actionResult != null) {
+            readThroughActionCache.readThrough(actionKey, actionResult);
+          } else if (wasCompletelyExecuted(operation)) {
+            // we want to avoid presenting any results for an action which
+            // was not completely executed
+            readThroughActionCache.invalidate(actionKey);
           }
         }
         if (operation != null && operation.getMetadata().is(Action.class)) {
@@ -1905,14 +1903,11 @@ public class ShardInstance extends AbstractServerInstance {
               .toString());
 
       readThroughActionCache.invalidate(DigestUtil.asActionKey(actionDigest));
-      if (!skipCacheLookup) {
-        if (recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
-          logger.log(
-              Level.FINE,
-              format(
-                  "Operation %s will have skip_cache_lookup = true due to retry", operationName));
-          skipCacheLookup = true;
-        }
+      if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
+        logger.log(
+            Level.FINE,
+            format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
+        skipCacheLookup = true;
       }
 
       String stdoutStreamName = operationName + "/streams/stdout";
