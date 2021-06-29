@@ -295,10 +295,6 @@
     <exclude name="AvoidInstantiatingObjectsInLoops"/>
     <exclude name="OptimizableToArrayCall"/>
     <exclude name="RedundantFieldInitializer"/>
-    <exclude name="TooFewBranchesForASwitchStatement"/>
-    <exclude name="UnnecessaryWrapperObjectCreation"/>
-    <exclude name="UseArrayListInsteadOfVector"/>
-    <exclude name="UseArraysAsList"/>
     <exclude name="UseIndexOfChar"/>
     <exclude name="UseIOStreamsWithApacheCommonsFileItem"/>
     <exclude name="UselessStringValueOf"/>
