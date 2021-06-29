@@ -1469,6 +1469,12 @@ public class RedisShardBackplane implements Backplane {
    */
   private DispatchedOperationsStatus getDispatchedOperationsStatus(
       JedisCluster jedis, Instance instance) {
+    // Settings on which metrics to populate.  Some of these metrics might be a lot of data so we
+    // choose to skip it.
+    // However, I'd like to preserve the possibility of populating this data since its useful for
+    // locally seeing it logged.
+    boolean populateTargetIds = false;
+
     // Metrics related to dispatched operations
     ActionAmounts actionAmounts = new ActionAmounts();
     Integer requeuedOperationsAmount = 0;
@@ -1524,9 +1530,11 @@ public class RedisShardBackplane implements Backplane {
 
         // Record the target Id that initiated the operation.
         // Note: This metadata is not populated by bazel until 4.1.0
-        String targetId =
-            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getTargetId();
-        incrementValue(targetIds, targetId);
+        if (populateTargetIds) {
+          String targetId =
+              operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getTargetId();
+          incrementValue(targetIds, targetId);
+        }
 
         // Record the build configuration of the action.
         // Note: This metadata is not populated by bazel until 4.1.0
