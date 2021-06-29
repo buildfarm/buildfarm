@@ -371,8 +371,8 @@ public class ProvisionedRedisQueueTest {
     boolean isEligible = queue.isEligible(userGivenProperties);
 
     // ASSERT
-    String expected_explanation = "The properties are eligible for the foo queue.\n";
-    expected_explanation += "The queue was specifically chosen.\n";
+    String expected_explanation =
+        "The properties are eligible for the foo queue.\nThe queue was specifically chosen.\n";
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
@@ -393,10 +393,8 @@ public class ProvisionedRedisQueueTest {
     boolean isEligible = queue.isEligible(userGivenProperties);
 
     // ASSERT
-    String expected_explanation = "The properties are not eligible for the foo queue.\n";
-    expected_explanation += "matched: {}\n";
-    expected_explanation += "unmatched: {choose-queue=[wrong]}\n";
-    expected_explanation += "still required: {}\n";
+    String expected_explanation =
+        "The properties are not eligible for the foo queue.\nmatched: {}\nunmatched: {choose-queue=[wrong]}\nstill required: {}\n";
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isFalse();
   }
