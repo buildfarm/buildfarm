@@ -248,8 +248,8 @@ public class ByteStreamServiceTest {
         channel.newCall(ByteStreamGrpc.getWriteMethod(), CallOptions.DEFAULT);
     ClientCall.Listener<WriteResponse> finishCallListener =
         new ClientCall.Listener<WriteResponse>() {
-          boolean complete = false;
-          boolean callHalfClosed = false;
+          boolean complete;
+          boolean callHalfClosed;
 
           @Override
           public void onReady() {

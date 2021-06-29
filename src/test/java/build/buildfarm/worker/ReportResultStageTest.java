@@ -55,7 +55,7 @@ public class ReportResultStageTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   class SingleOutputSink extends PipelineStage {
-    OperationContext operationContext = null;
+    OperationContext operationContext;
 
     public SingleOutputSink() {
       super("SingleOutputSink", /* workerContext=*/ null, /* output=*/ null, /* error=*/ null);

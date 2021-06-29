@@ -274,7 +274,7 @@ public class ByteStreamServiceTest {
   class CountingReadObserver implements StreamObserver<ReadResponse> {
     private final List<Integer> sizes = Lists.newArrayList();
     private final ByteString.Output sink = ByteString.newOutput();
-    private boolean completed = false;
+    private boolean completed;
 
     @Override
     public void onNext(ReadResponse response) {

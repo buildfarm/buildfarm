@@ -294,7 +294,6 @@
     <exclude name="AvoidFileStream"/>
     <exclude name="AvoidInstantiatingObjectsInLoops"/>
     <exclude name="OptimizableToArrayCall"/>
-    <exclude name="RedundantFieldInitializer"/>
     <exclude name="TooFewBranchesForASwitchStatement"/>
     <exclude name="UnnecessaryWrapperObjectCreation"/>
     <exclude name="UseArrayListInsteadOfVector"/>
