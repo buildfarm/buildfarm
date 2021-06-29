@@ -310,8 +310,8 @@ public class ExecutionPropertiesParser {
    */
   private static String toString(Map<String, ?> map) {
     return map.keySet().stream()
-            .map(key -> key + "=" + map.get(key))
-            .collect(Collectors.joining(", ", "{", "}"));
+        .map(key -> key + "=" + map.get(key))
+        .collect(Collectors.joining(", ", "{", "}"));
   }
 
   /**

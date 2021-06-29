@@ -584,8 +584,7 @@ public class RedisShardBackplane implements Backplane {
             .addNodeAddress(config.getRedisUri())
             .setCheckSlotsCoverage(false);
 
-    RedissonClient client = Redisson.create(redissonConfig);
-    return client;
+    return Redisson.create(redissonConfig);
   }
 
   static RedisMap createActionCache(RedisClient client, RedisShardBackplaneConfig config)
@@ -642,12 +641,10 @@ public class RedisShardBackplane implements Backplane {
   }
 
   static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
-    List<String> clusterHashes =
-        client.call(
-            jedis ->
-                RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(
-                    jedis, RedisHashtags.existingHash(queueName)));
-    return clusterHashes;
+    return client.call(
+        jedis ->
+            RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(
+                jedis, RedisHashtags.existingHash(queueName)));
   }
 
   @Override
@@ -1028,8 +1025,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private String getOperation(JedisCluster jedis, String operationName) {
-    String json = jedis.get(operationKey(operationName));
-    return json;
+    return jedis.get(operationKey(operationName));
   }
 
   @Override
@@ -1594,24 +1590,21 @@ public class RedisShardBackplane implements Backplane {
       logger.log(Level.SEVERE, "Unable to analyze dispatched operation: ", e);
     }
 
-    DispatchedOperationsStatus status =
-        DispatchedOperationsStatus.newBuilder()
-            .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
-            .setBuildActionAmount(actionAmounts.build)
-            .setTestActionAmount(actionAmounts.test)
-            .setUnknownActionAmount(actionAmounts.unknown)
-            .setRequeuedOperationsAmount(requeuedOperationsAmount)
-            .addAllFromQueues(toLabeledCounts(fromQueueAmounts))
-            .addAllTools(toLabeledCounts(toolAmounts))
-            .addAllActionMnemonics(toLabeledCounts(actionMnemonics))
-            .addAllCommandTools(toLabeledCounts(commandTools))
-            .addAllTargetIds(toLabeledCounts(targetIds))
-            .addAllConfigIds(toLabeledCounts(configIds))
-            .addAllPlatformProperties(toLabeledCounts(platformProperties))
-            .setUniqueClientsAmount(uniqueToolInvocationIds.size())
-            .build();
-
-    return status;
+    return DispatchedOperationsStatus.newBuilder()
+        .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
+        .setBuildActionAmount(actionAmounts.build)
+        .setTestActionAmount(actionAmounts.test)
+        .setUnknownActionAmount(actionAmounts.unknown)
+        .setRequeuedOperationsAmount(requeuedOperationsAmount)
+        .addAllFromQueues(toLabeledCounts(fromQueueAmounts))
+        .addAllTools(toLabeledCounts(toolAmounts))
+        .addAllActionMnemonics(toLabeledCounts(actionMnemonics))
+        .addAllCommandTools(toLabeledCounts(commandTools))
+        .addAllTargetIds(toLabeledCounts(targetIds))
+        .addAllConfigIds(toLabeledCounts(configIds))
+        .addAllPlatformProperties(toLabeledCounts(platformProperties))
+        .setUniqueClientsAmount(uniqueToolInvocationIds.size())
+        .build();
   }
 
   /**

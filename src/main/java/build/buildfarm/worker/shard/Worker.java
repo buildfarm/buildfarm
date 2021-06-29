@@ -154,8 +154,8 @@ public class Worker extends LoggingMain {
 
     private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
       return execFileSystem
-              .getStorage()
-              .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+          .getStorage()
+          .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
     }
 
     private void insertStream(Digest digest, IOSupplier<InputStream> suppliedStream)
