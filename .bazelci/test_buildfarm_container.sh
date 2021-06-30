@@ -103,4 +103,4 @@ cat server.log
 check_for_crashes &
 
 #Run a test against the cluster
-$1
+$RUN_TEST
