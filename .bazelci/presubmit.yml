@@ -85,13 +85,13 @@ tasks:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - ./.bazelci/integration_test.sh
   integration_test:
-    name: "Integration Test (Memory)"
+    name: "Abseil Test (Memory)"
     platform: ubuntu1804
     shell_commands:
     - export TEST_SHARD=true
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
   integration_test_shard:
-    name: "Integration Test (Shard)"
+    name: "Abseil Test (Shard)"
     platform: ubuntu1804
     shell_commands:
     - export TEST_SHARD=true
