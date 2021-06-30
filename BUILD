@@ -16,7 +16,7 @@ buildifier(
 # Therefore, users may want to ensure that the same bazel version is sourced here as is used locally.
 java_library(
     name = "execution_wrappers",
-    deps = [
+    runtime_deps = [
         ":as-nobody",
         ":delay",
         ":linux-sandbox.binary",
