@@ -76,11 +76,11 @@ tasks:
     platform: ubuntu1804
     shell_commands:
     - export TEST_SHARD=true
-    - export RUN_TEST=./.bazelci/integration_test.sh
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
   integration_test_shard:
     name: "Integration Test (Shard)"
     platform: ubuntu1804
     shell_commands:
     - export TEST_SHARD=true
-    - export RUN_TEST=./.bazelci/integration_test.sh
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - ./.bazelci/integration_test.sh
