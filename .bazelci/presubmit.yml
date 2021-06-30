@@ -90,6 +90,7 @@ tasks:
     shell_commands:
     - export TEST_SHARD=true
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
+    - ./.bazelci/integration_test.sh
   integration_test_shard:
     name: "Abseil Test (Shard)"
     platform: ubuntu1804
