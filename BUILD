@@ -14,9 +14,9 @@ buildifier(
 # Buildfarm may also choose different execution wrappers dynamically based on exec_properties.
 # Be aware that the process-wrapper and linux-sandbox come from bazel itself.
 # Therefore, users may want to ensure that the same bazel version is sourced here as is used locally.
-filegroup(
+java_library(
     name = "execution_wrappers",
-    data = [
+    deps = [
         ":as-nobody",
         ":delay",
         ":linux-sandbox.binary",
