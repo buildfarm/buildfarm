@@ -30,4 +30,12 @@ public class DigestMismatchException extends IOException {
     this.actual = actual;
     this.expected = expected;
   }
+
+  public Digest getActual() {
+    return actual;
+  }
+
+  public Digest getExpected() {
+    return expected;
+  }
 }

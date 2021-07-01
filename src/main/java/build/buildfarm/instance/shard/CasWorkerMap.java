@@ -29,7 +29,7 @@ public interface CasWorkerMap {
    * @param addWorkers Workers to add.
    * @param removeWorkers Workers to remove.
    */
-  public void adjust(
+  void adjust(
       RedisClient client, Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
       throws IOException;
 
@@ -41,7 +41,7 @@ public interface CasWorkerMap {
    * @param blobDigest The blob digest to adjust worker information from.
    * @param workerName The worker to add for looking up the blob.
    */
-  public void add(RedisClient client, Digest blobDigest, String workerName) throws IOException;
+  void add(RedisClient client, Digest blobDigest, String workerName) throws IOException;
 
   /**
    * @brief Update multiple blob entries for a worker.
@@ -51,7 +51,7 @@ public interface CasWorkerMap {
    * @param blobDigests The blob digests to adjust worker information from.
    * @param workerName The worker to add for looking up the blobs.
    */
-  public void addAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
+  void addAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
       throws IOException;
 
   /**
@@ -61,7 +61,7 @@ public interface CasWorkerMap {
    * @param blobDigest The blob digest to remove the worker from.
    * @param workerName The worker name to remove.
    */
-  public void remove(RedisClient client, Digest blobDigest, String workerName) throws IOException;
+  void remove(RedisClient client, Digest blobDigest, String workerName) throws IOException;
 
   /**
    * @brief Remove worker value from all blob keys.
@@ -71,7 +71,7 @@ public interface CasWorkerMap {
    * @param blobDigests The blob digests to remove the worker from.
    * @param workerName The worker name to remove.
    */
-  public void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
+  void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
       throws IOException;
 
   /**
@@ -82,7 +82,7 @@ public interface CasWorkerMap {
    * @return A worker for where the blob is.
    * @note Suggested return identifier: workerName.
    */
-  public String getAny(RedisClient client, Digest blobDigest) throws IOException;
+  String getAny(RedisClient client, Digest blobDigest) throws IOException;
 
   /**
    * @brief Get all of the workers for where a blob resides.
@@ -92,7 +92,7 @@ public interface CasWorkerMap {
    * @return All the workers where the blob is expected to be.
    * @note Suggested return identifier: workerNames.
    */
-  public Set<String> get(RedisClient client, Digest blobDigest) throws IOException;
+  Set<String> get(RedisClient client, Digest blobDigest) throws IOException;
 
   /**
    * @brief Get all of the key values as a map from the digests given.
@@ -102,7 +102,7 @@ public interface CasWorkerMap {
    * @return The key/value map for digests to workers.
    * @note Suggested return identifier: casWorkerMap.
    */
-  public Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests)
+  Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests)
       throws IOException;
 
   /**
@@ -112,5 +112,5 @@ public interface CasWorkerMap {
    * @return The size of the map.
    * @note Suggested return identifier: mapSize.
    */
-  public int size(RedisClient client) throws IOException;
+  int size(RedisClient client) throws IOException;
 }

@@ -40,10 +40,8 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
-import java.util.logging.Logger;
 
 public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
-  private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());
   private static final int DEFAULT_CHUNK_SIZE = 1024 * 16;
 
   private final Map<String, WriteObserver> writeObservers = Maps.newConcurrentMap();

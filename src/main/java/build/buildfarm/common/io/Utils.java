@@ -60,7 +60,7 @@ public class Utils {
             return osName.startsWith("mac");
           });
 
-  private static final jnr.ffi.Runtime runtime() {
+  private static jnr.ffi.Runtime runtime() {
     return jnr.ffi.Runtime.getRuntime(libc.get());
   }
 
@@ -341,7 +341,7 @@ public class Utils {
             // Windows will leave the fileKey verbatim via NIO for comparison and hashing
             try {
               String keyStr = attributes.fileKey().toString();
-              String inode = keyStr.substring(keyStr.indexOf("ino=") + 4, keyStr.indexOf(")"));
+              String inode = keyStr.substring(keyStr.indexOf("ino=") + 4, keyStr.indexOf(')'));
               return Long.parseLong(inode);
             } catch (Exception e) {
               return attributes.fileKey();
