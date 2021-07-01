@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.QueueEntry;
@@ -186,6 +187,10 @@ public class RedisShardBackplaneTest {
   public void dispatchedOperationsShowProperRequeueAmount0to1()
       throws IOException, InterruptedException {
     // ARRANGE
+    int STARTING_REQUEUE_AMOUNT = 0;
+    int REQUEUE_AMOUNT_WHEN_DISPATCHED = 0;
+    int REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE = 1;
+
     // create a backplane
     RedisShardBackplaneConfig config =
         RedisShardBackplaneConfig.newBuilder()
@@ -201,18 +206,34 @@ public class RedisShardBackplaneTest {
     backplane.start("startTime/test:0000");
 
     // ARRANGE
-    // assume the operation queue is already populated with a first-time operation.
+    // Assume the operation queue is already populated with a first-time operation.
     // this means the operation's requeue amount will be 0.
-    // the jedis cluser is also mocked to assume success on other operations.
+    // The jedis cluser is also mocked to assume success on other operations.
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
             .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("op").build())
+            .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
     when(jedisCluster.brpoplpush(any(String.class), any(String.class), any(Integer.class)))
         .thenReturn(queueEntryJson);
+
+    // PRE-ASSERT
     when(jedisCluster.hsetnx(any(String.class), any(String.class), any(String.class)))
-        .thenReturn(1L);
+        .thenAnswer(
+            args -> {
+              // Extract the operation that was dispatched
+              String dispatchedOperationJson = args.getArgument(2);
+              DispatchedOperation.Builder dispatchedOperationBuilder =
+                  DispatchedOperation.newBuilder();
+              JsonFormat.parser().merge(dispatchedOperationJson, dispatchedOperationBuilder);
+              DispatchedOperation dispatchedOperation = dispatchedOperationBuilder.build();
+
+              assertThat(dispatchedOperation.getQueueEntry().getRequeueAttempts())
+                  .isEqualTo(REQUEUE_AMOUNT_WHEN_DISPATCHED);
+
+              return 1L;
+            });
 
     // ACT
     // dispatch the operation and test properties of the QueueEntry and internal jedis calls.
@@ -224,13 +245,18 @@ public class RedisShardBackplaneTest {
     }
 
     // ASSERT
-    assertThat(readyForRequeue.getRequeueAttempts()).isEqualTo(1);
+    assertThat(readyForRequeue.getRequeueAttempts())
+        .isEqualTo(REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE);
   }
 
   @Test
   public void dispatchedOperationsShowProperRequeueAmount1to2()
       throws IOException, InterruptedException {
     // ARRANGE
+    int STARTING_REQUEUE_AMOUNT = 1;
+    int REQUEUE_AMOUNT_WHEN_DISPATCHED = 1;
+    int REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE = 2;
+
     // create a backplane
     RedisShardBackplaneConfig config =
         RedisShardBackplaneConfig.newBuilder()
@@ -245,20 +271,34 @@ public class RedisShardBackplaneTest {
             config, "requeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
     backplane.start("startTime/test:0000");
 
-    // ARRANGE
-    // assume the operation queue is already populated with a first-time operation.
-    // this means the operation's requeue amount will be 0.
-    // the jedis cluser is also mocked to assume success on other operations.
+    // Assume the operation queue is already populated from a first re-queue.
+    // this means the operation's requeue amount will be 1.
+    // The jedis cluser is also mocked to assume success on other operations.
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
             .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("op").build())
-            .setRequeueAttempts(1)
+            .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
     when(jedisCluster.brpoplpush(any(String.class), any(String.class), any(Integer.class)))
         .thenReturn(queueEntryJson);
+
+    // PRE-ASSERT
     when(jedisCluster.hsetnx(any(String.class), any(String.class), any(String.class)))
-        .thenReturn(1L);
+        .thenAnswer(
+            args -> {
+              // Extract the operation that was dispatched
+              String dispatchedOperationJson = args.getArgument(2);
+              DispatchedOperation.Builder dispatchedOperationBuilder =
+                  DispatchedOperation.newBuilder();
+              JsonFormat.parser().merge(dispatchedOperationJson, dispatchedOperationBuilder);
+              DispatchedOperation dispatchedOperation = dispatchedOperationBuilder.build();
+
+              assertThat(dispatchedOperation.getQueueEntry().getRequeueAttempts())
+                  .isEqualTo(REQUEUE_AMOUNT_WHEN_DISPATCHED);
+
+              return 1L;
+            });
 
     // ACT
     // dispatch the operation and test properties of the QueueEntry and internal jedis calls.
@@ -270,7 +310,8 @@ public class RedisShardBackplaneTest {
     }
 
     // ASSERT
-    assertThat(readyForRequeue.getRequeueAttempts()).isEqualTo(2);
+    assertThat(readyForRequeue.getRequeueAttempts())
+        .isEqualTo(REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE);
   }
 
   @Test
