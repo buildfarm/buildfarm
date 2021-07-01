@@ -299,7 +299,6 @@
     <exclude name="UnnecessaryWrapperObjectCreation"/>
     <exclude name="UseArrayListInsteadOfVector"/>
     <exclude name="UseArraysAsList"/>
-    <exclude name="UselessStringValueOf"/>
     <exclude name="UseStringBufferForStringAppends"/>
 </rule>
 
