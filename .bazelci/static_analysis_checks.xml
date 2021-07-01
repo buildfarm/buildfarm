@@ -301,7 +301,6 @@
     <exclude name="UseArraysAsList"/>
     <exclude name="UseIndexOfChar"/>
     <exclude name="UseIOStreamsWithApacheCommonsFileItem"/>
-    <exclude name="UselessStringValueOf"/>
     <exclude name="UseStringBufferForStringAppends"/>
 </rule>
 
