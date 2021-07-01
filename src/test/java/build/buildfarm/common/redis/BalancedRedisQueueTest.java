@@ -113,7 +113,7 @@ public class BalancedRedisQueueTest {
 
     // ACT
     for (int i = 0; i < 1000; ++i) {
-      queue.push(redis, "foo" + String.valueOf(i));
+      queue.push(redis, "foo" + i);
     }
   }
 
