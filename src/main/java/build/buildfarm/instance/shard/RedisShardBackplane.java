@@ -83,6 +83,7 @@ import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -1447,16 +1448,42 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public BackplaneStatus backplaneStatus(Instance instance) throws IOException {
     Set<String> workers = getWorkers();
+
+    // TODO: make metric collections configurable
+    boolean populatePrequeue = true;
+    boolean populateOperationQueue = true;
+    boolean populateBlockedActionsSize = false;
+    boolean populateBlockedInvocationsSize = false;
+    boolean populateDispatchedOperations = true;
+    boolean populateActiveWorkers = true;
+
     return client.call(
-        jedis ->
-            BackplaneStatus.newBuilder()
-                .setPrequeue(prequeue.status(jedis))
-                .setOperationQueue(operationQueue.status(jedis))
-                .setBlockedActionsSize(blockedActions.size(jedis))
-                .setBlockedInvocationsSize(blockedInvocations.size(jedis))
-                .setDispatchedOperations(getDispatchedOperationsStatus(jedis, instance))
-                .addAllActiveWorkers(workers)
-                .build());
+        jedis -> {
+          Instant startTime = Instant.now();
+          BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
+          if (populatePrequeue) {
+            builder.setPrequeue(prequeue.status(jedis));
+          }
+          if (populateOperationQueue) {
+            builder.setOperationQueue(operationQueue.status(jedis));
+          }
+          if (populateBlockedActionsSize) {
+            builder.setBlockedActionsSize(blockedActions.size(jedis));
+          }
+          if (populateBlockedInvocationsSize) {
+            builder.setBlockedInvocationsSize(blockedInvocations.size(jedis));
+          }
+          if (populateDispatchedOperations) {
+            builder.setDispatchedOperations(getDispatchedOperationsStatus(jedis, instance));
+          }
+          if (populateActiveWorkers) {
+            builder.addAllActiveWorkers(workers);
+          }
+          Instant endTime = Instant.now();
+          Duration fetchTime = Duration.between(startTime, endTime);
+          builder.setFetchTimeMs(fetchTime.toMillis());
+          return builder.build();
+        });
   }
 
   /**
