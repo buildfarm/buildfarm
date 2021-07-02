@@ -1447,6 +1447,7 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public BackplaneStatus backplaneStatus(Instance instance) throws IOException {
+    Instant startTime = Instant.now();
     Set<String> workers = getWorkers();
 
     // TODO: make metric collections configurable
@@ -1459,7 +1460,6 @@ public class RedisShardBackplane implements Backplane {
 
     return client.call(
         jedis -> {
-          Instant startTime = Instant.now();
           BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
           if (populatePrequeue) {
             builder.setPrequeue(prequeue.status(jedis));
