@@ -46,7 +46,6 @@
     <exclude name="SystemPrintln"/>
     <exclude name="UnusedAssignment"/>
     <exclude name="UnusedFormalParameter"/>
-    <exclude name="UnusedImports"/>
     <exclude name="UnusedLocalVariable"/>
     <exclude name="UseAssertEqualsInsteadOfAssertTrue"/>
     <exclude name="UseAssertNullInsteadOfAssertTrue"/>
