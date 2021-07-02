@@ -107,7 +107,7 @@ public class RedisQueueTest {
 
     // ACT
     for (int i = 0; i < 1000; ++i) {
-      queue.push(redis, "foo" + String.valueOf(i));
+      queue.push(redis, "foo" + i);
     }
   }
 
@@ -226,7 +226,7 @@ public class RedisQueueTest {
     queue.push(redis, "element 8");
 
     // ACT
-    List<String> visited = new ArrayList<String>();
+    List<String> visited = new ArrayList<>();
     StringVisitor visitor =
         new StringVisitor() {
           public void visit(String entry) {
@@ -255,11 +255,11 @@ public class RedisQueueTest {
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
     for (int i = 0; i < 2500; ++i) {
-      queue.push(redis, "foo" + String.valueOf(i));
+      queue.push(redis, "foo" + i);
     }
 
     // ACT
-    List<String> visited = new ArrayList<String>();
+    List<String> visited = new ArrayList<>();
     StringVisitor visitor =
         new StringVisitor() {
           public void visit(String entry) {
@@ -271,7 +271,7 @@ public class RedisQueueTest {
     // ASSERT
     assertThat(visited.size()).isEqualTo(2500);
     for (int i = 0; i < 2500; ++i) {
-      assertThat(visited.contains("foo" + String.valueOf(i))).isTrue();
+      assertThat(visited.contains("foo" + i)).isTrue();
     }
   }
 }

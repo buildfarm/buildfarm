@@ -97,7 +97,7 @@ class Executor {
     ExecuteOperationMetadata executingMetadata =
         metadata.toBuilder().setStage(ExecutionStage.Value.EXECUTING).build();
 
-    Iterable<ExecutionPolicy> policies = new ArrayList<ExecutionPolicy>();
+    Iterable<ExecutionPolicy> policies = new ArrayList<>();
     if (limits.useExecutionPolicies) {
       policies =
           ExecutionPolicies.forPlatform(

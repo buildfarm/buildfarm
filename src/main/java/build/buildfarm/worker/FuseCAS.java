@@ -538,7 +538,7 @@ public class FuseCAS extends FuseStubFS {
   }
 
   private String basename(String path) {
-    return path.substring(path.lastIndexOf("/") + 1);
+    return path.substring(path.lastIndexOf('/') + 1);
   }
 
   @Override
