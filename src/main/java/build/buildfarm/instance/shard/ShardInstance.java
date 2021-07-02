@@ -265,6 +265,13 @@ public class ShardInstance extends AbstractServerInstance {
           .name("blocked_invocations_size")
           .help("The number of blocked invocations")
           .register();
+
+  private static final Gauge bacplaneFetchTimeMs =
+      Gauge.build()
+          .name("backplane_fetch_time_ms")
+          .help("The amount of time is took to capture backplane metrics in milliseconds.")
+          .register();
+
   private static final Summary ioMetric =
       Summary.build().name("io_bytes_read").help("I/O (bytes)").register();
 
@@ -592,6 +599,7 @@ public class ShardInstance extends AbstractServerInstance {
                       backplaneStatus.getDispatchedOperations().getUniqueClientsAmount());
                   requeuedOperationsAmount.set(
                       backplaneStatus.getDispatchedOperations().getRequeuedOperationsAmount());
+                  bacplaneFetchTimeMs.set(backplaneStatus.getFetchTimeMs());
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
