@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker.determinism;
 
-
 public class DeterminismCheckResults {
   public boolean isDeterministic = true;
 

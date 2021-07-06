@@ -60,6 +60,12 @@ public class DeterminismChecker {
     // Run the action multiple times to evaluate its determinism.
     DeterminismCheckResults results = getDeterminismResults(settings, resultBuilder);
 
+    decideActionResults(results, resultBuilder);
+    return Code.OK;
+  }
+
+  private static void decideActionResults(
+      DeterminismCheckResults results, ActionResult.Builder resultBuilder) {
     // Succeed deterministic actions and fail nondeterministic actions.
     // Failed actions will show which files did not match digests in its stderr.
     // This will help debugging on the client side.
@@ -69,7 +75,6 @@ public class DeterminismChecker {
       resultBuilder.setStderrRaw(ByteString.copyFromUtf8(results.determinisimFailMessage));
       resultBuilder.setExitCode(-1);
     }
-    return Code.OK;
   }
 
   private static DeterminismCheckResults getDeterminismResults(
@@ -92,7 +97,6 @@ public class DeterminismChecker {
 
   private static DeterminismCheckResults synthesizeDigestResults(
       List<HashMap<Path, Digest>> fileDigests) {
-
     // Collect all digest runs into a single map.
     Map<Path, Map<Digest, Integer>> fileDigestCounts = new HashMap();
     for (HashMap<Path, Digest> digestRun : fileDigests) {
