@@ -313,11 +313,9 @@ public class ExecutionPropertiesParser {
    * @note Suggested return identifier: str.
    */
   private static String toString(Map<String, ?> map) {
-    String mapAsString =
-        map.keySet().stream()
-            .map(key -> key + "=" + map.get(key))
-            .collect(Collectors.joining(", ", "{", "}"));
-    return mapAsString;
+    return map.keySet().stream()
+        .map(key -> key + "=" + map.get(key))
+        .collect(Collectors.joining(", ", "{", "}"));
   }
 
   /**
