@@ -94,7 +94,7 @@ public class ResourceLimits {
    * @details These variables are added to the end of the existing environment variables in the
    *     Command.
    */
-  public Map<String, String> extraEnvironmentVariables = new HashMap<String, String>();
+  public Map<String, String> extraEnvironmentVariables = new HashMap<>();
 
   /**
    * @field debugBeforeExecution
@@ -133,7 +133,7 @@ public class ResourceLimits {
    * @details Foreign platform properties may be be added to the command that are ignored when
    *     parsing exec_properties. They are listed here for visibility.
    */
-  public Map<String, String> unusedProperties = new HashMap<String, String>();
+  public Map<String, String> unusedProperties = new HashMap<>();
 
   /**
    * @field description
