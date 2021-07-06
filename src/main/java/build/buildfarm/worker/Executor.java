@@ -443,8 +443,11 @@ class Executor {
     // allow running an action multiple times to check determinism
     if (limits.checkDeterminism > 0) {
       DeterminismCheckSettings settings = new DeterminismCheckSettings();
-      return DeterminismChecker.checkDeterminism(
-          workerContext, operationContext, processBuilder, limits, resultBuilder);
+      settings.workerContext = workerContext;
+      settings.operationContext = operationContext;
+      settings.processBuilder = processBuilder;
+      settings.limits = limits;
+      return DeterminismChecker.checkDeterminism(settings, resultBuilder);
     }
 
     long startNanoTime = System.nanoTime();

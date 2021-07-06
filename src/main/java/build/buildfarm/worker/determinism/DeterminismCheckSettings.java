@@ -19,11 +19,11 @@ import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.resources.ResourceLimits;
 
 public class DeterminismCheckSettings {
-  WorkerContext workerContext;
+  public WorkerContext workerContext;
 
-  OperationContext operationContext;
+  public OperationContext operationContext;
 
-  ProcessBuilder processBuilder;
+  public ProcessBuilder processBuilder;
 
-  ResourceLimits limits;
+  public ResourceLimits limits;
 }

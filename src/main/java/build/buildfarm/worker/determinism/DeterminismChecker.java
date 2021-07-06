@@ -22,7 +22,6 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.worker.OperationContext;
 import build.buildfarm.worker.WorkerContext;
-import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.protobuf.ByteString;
 import com.google.rpc.Code;
 import java.io.IOException;
@@ -56,35 +55,25 @@ public class DeterminismChecker {
    * @note Suggested return identifier: code.
    */
   public static Code checkDeterminism(
-      WorkerContext workerContext,
-      OperationContext operationContext,
-      ProcessBuilder processBuilder,
-      ResourceLimits limits,
-      ActionResult.Builder resultBuilder) {
-    String message =
-        getDeterminismResults(
-            workerContext, operationContext, processBuilder, limits, resultBuilder);
+      DeterminismCheckSettings settings, ActionResult.Builder resultBuilder) {
+    String message = getDeterminismResults(settings, resultBuilder);
     resultBuilder.setStderrRaw(ByteString.copyFromUtf8(message));
     resultBuilder.setExitCode(-1);
     return Code.OK;
   }
 
   private static String getDeterminismResults(
-      WorkerContext workerContext,
-      OperationContext operationContext,
-      ProcessBuilder processBuilder,
-      ResourceLimits limits,
-      ActionResult.Builder resultBuilder) {
+      DeterminismCheckSettings settings, ActionResult.Builder resultBuilder) {
     // Run the action once to create a baseline set of output digests.
-    runAction(processBuilder);
-    HashMap<Path, Digest> fileDigests = computeFileDigests(operationContext);
+    runAction(settings.processBuilder);
+    HashMap<Path, Digest> fileDigests = computeFileDigests(settings.operationContext);
 
     // Re-run the action a specified number of times to create comparable output digests.
     List<HashMap<Path, Digest>> rerunDigests = new ArrayList<HashMap<Path, Digest>>();
-    for (int i = 0; i < limits.checkDeterminism; ++i) {
-      resetWorkingDirectory(workerContext, operationContext);
-      runAction(processBuilder);
-      rerunDigests.add(computeFileDigests(operationContext));
+    for (int i = 0; i < settings.limits.checkDeterminism; ++i) {
+      resetWorkingDirectory(settings.workerContext, settings.operationContext);
+      runAction(settings.processBuilder);
+      rerunDigests.add(computeFileDigests(settings.operationContext));
     }
 
     // Find any digest discrepancies between the runs to determine if the action is
