@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * @class DeterminismChecker
@@ -56,40 +57,102 @@ public class DeterminismChecker {
    */
   public static Code checkDeterminism(
       DeterminismCheckSettings settings, ActionResult.Builder resultBuilder) {
-    String message = getDeterminismResults(settings, resultBuilder);
-    resultBuilder.setStderrRaw(ByteString.copyFromUtf8(message));
-    resultBuilder.setExitCode(-1);
+    // Run the action multiple times to evaluate its determinism.
+    DeterminismCheckResults results = getDeterminismResults(settings, resultBuilder);
+
+    // Succeed deterministic actions and fail nondeterministic actions.
+    // Failed actions will show which files did not match digests in its stderr.
+    // This will help debugging on the client side.
+    if (results.isDeterministic) {
+      resultBuilder.setExitCode(0);
+    } else {
+      resultBuilder.setStderrRaw(ByteString.copyFromUtf8(results.determinisimFailMessage));
+      resultBuilder.setExitCode(-1);
+    }
     return Code.OK;
   }
 
-  private static String getDeterminismResults(
+  private static DeterminismCheckResults getDeterminismResults(
       DeterminismCheckSettings settings, ActionResult.Builder resultBuilder) {
     // Run the action once to create a baseline set of output digests.
     runAction(settings.processBuilder);
-    HashMap<Path, Digest> fileDigests = computeFileDigests(settings.operationContext);
+
+    List<HashMap<Path, Digest>> fileDigests = new ArrayList<>();
+    fileDigests.add(computeFileDigests(settings.operationContext));
 
     // Re-run the action a specified number of times to create comparable output digests.
-    List<HashMap<Path, Digest>> rerunDigests = new ArrayList<HashMap<Path, Digest>>();
     for (int i = 0; i < settings.limits.checkDeterminism; ++i) {
       resetWorkingDirectory(settings.workerContext, settings.operationContext);
       runAction(settings.processBuilder);
-      rerunDigests.add(computeFileDigests(settings.operationContext));
+      fileDigests.add(computeFileDigests(settings.operationContext));
     }
 
-    // Find any digest discrepancies between the runs to determine if the action is
-    // nondeterministic.
-    for (Map.Entry<Path, Digest> entry : fileDigests.entrySet()) {
-      System.out.println(entry.getKey() + " " + entry.getValue());
-    }
-    System.out.println("-------");
+    return synthesizeDigestResults(fileDigests);
+  }
 
-    for (HashMap<Path, Digest> digests : rerunDigests) {
-      for (Map.Entry<Path, Digest> entry : digests.entrySet()) {
-        System.out.println(entry.getKey() + " " + entry.getValue());
+  private static DeterminismCheckResults synthesizeDigestResults(
+      List<HashMap<Path, Digest>> fileDigests) {
+
+    // Collect all digest runs into a single map.
+    Map<Path, Map<Digest, Integer>> fileDigestCounts = new HashMap();
+    for (HashMap<Path, Digest> digestRun : fileDigests) {
+      for (Map.Entry<Path, Digest> entry : digestRun.entrySet()) {
+        // add file if missing
+        fileDigestCounts.putIfAbsent(entry.getKey(), new HashMap());
+
+        // increment it's digest count
+        Map<Digest, Integer> updatedDigestCount = fileDigestCounts.get(entry.getKey());
+        incrementValue(updatedDigestCount, entry.getValue());
+        fileDigestCounts.put(entry.getKey(), updatedDigestCount);
       }
     }
 
-    return "";
+    // If a file has more than 1 digest entry its not deterministic.
+    // The reason we count the digest frequency, is to make debugging easier.
+    // Debugging messages can contain the digest frequency to determine how nondeterministic file
+    // content is.
+    DeterminismCheckResults results = new DeterminismCheckResults();
+    results.isDeterministic = true;
+    for (Map.Entry<Path, Map<Digest, Integer>> entry : fileDigestCounts.entrySet()) {
+      // more than 1 digest found for output file
+      if (entry.getValue().size() != 1) {
+        results.isDeterministic = false;
+        results.determinisimFailMessage +=
+            entry.getKey() + " has non-deterministic output content:\n";
+        results.determinisimFailMessage += toString(entry.getValue()) + "\n";
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * @brief Increment the value of any key.
+   * @details Add the key with value 1 if it does not previously exist.
+   * @param map The map to find and increment the key in.
+   * @param key The key to increment the value of.
+   */
+  private static <K> void incrementValue(Map<K, Integer> map, K key) {
+    Integer count = map.get(key);
+    if (count == null) {
+      map.put(key, 1);
+    } else {
+      map.put(key, count + 1);
+    }
+  }
+
+  /**
+   * @brief Convert map to printable string.
+   * @details Uses streams.
+   * @param map Map to convert to string.
+   * @return String representation of map.
+   * @note Overloaded.
+   * @note Suggested return identifier: str.
+   */
+  private static String toString(Map<?, ?> map) {
+    return map.keySet().stream()
+        .map(key -> key + "=" + map.get(key))
+        .collect(Collectors.joining(", ", "{", "}"));
   }
 
   private static void resetWorkingDirectory(
