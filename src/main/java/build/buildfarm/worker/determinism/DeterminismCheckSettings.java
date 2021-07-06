@@ -18,12 +18,38 @@ import build.buildfarm.worker.OperationContext;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.resources.ResourceLimits;
 
+/**
+ * @class DeterminismCheckSettings
+ * @brief Information used for testing whether an action is deterministic.
+ * @details The executor can use this context information to execute an action multiple times and
+ *     discover if it is deterministic.
+ */
 public class DeterminismCheckSettings {
+  /**
+   * @field workerContext
+   * @brief Contains information about an action and where its results exist on a worker.
+   * @details We need to be able to get queued the operation and control of the exec filesystem.
+   */
   public WorkerContext workerContext;
 
+  /**
+   * @field operationContext
+   * @brief Contains information about an action and where its results exist on a worker.
+   * @details We need the queue entry, command, and execution directory.
+   */
   public OperationContext operationContext;
 
+  /**
+   * @field processBuilder
+   * @brief This represents the process that we are going to test the determinism of.
+   * @details We expect the process itself to have already been built up by the caller.
+   */
   public ProcessBuilder processBuilder;
 
+  /**
+   * @field limits
+   * @brief Resource limit information about the process to run.
+   * @details This has determinism running information as one of the resource properties.
+   */
   public ResourceLimits limits;
 }
