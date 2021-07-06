@@ -46,7 +46,6 @@
     <exclude name="SystemPrintln"/>
     <exclude name="UnusedAssignment"/>
     <exclude name="UnusedFormalParameter"/>
-    <exclude name="UnusedImports"/>
     <exclude name="UnusedLocalVariable"/>
     <exclude name="UseAssertEqualsInsteadOfAssertTrue"/>
     <exclude name="UseAssertNullInsteadOfAssertTrue"/>
@@ -108,7 +107,6 @@
     <exclude name="UnnecessaryConstructor"/>
     <exclude name="UnnecessaryFullyQualifiedName"/>
     <exclude name="UnnecessaryLocalBeforeReturn"/>
-    <exclude name="UseDiamondOperator"/>
     <exclude name="UselessParentheses"/>
     <exclude name="UselessQualifiedThis"/>
     <exclude name="UseShortArrayInitializer"/>
@@ -297,9 +295,6 @@
     <exclude name="UnnecessaryWrapperObjectCreation"/>
     <exclude name="UseArrayListInsteadOfVector"/>
     <exclude name="UseArraysAsList"/>
-    <exclude name="UseIndexOfChar"/>
-    <exclude name="UseIOStreamsWithApacheCommonsFileItem"/>
-    <exclude name="UselessStringValueOf"/>
     <exclude name="UseStringBufferForStringAppends"/>
 </rule>
 

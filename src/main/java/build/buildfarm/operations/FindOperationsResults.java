@@ -29,7 +29,7 @@ public class FindOperationsResults {
    * @details The key is the operation keu, and the value is all the collected information about the
    *     operation.
    */
-  public Map<String, EnrichedOperation> operations = new HashMap<String, EnrichedOperation>();
+  public Map<String, EnrichedOperation> operations = new HashMap<>();
 
   /**
    * @brief Get a string message for the results.

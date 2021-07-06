@@ -125,7 +125,7 @@ public class RedisSlotToHash {
    * @note Suggested return identifier: lookupTable.
    */
   private static List<String> getLookupTable() {
-    List<String> lookupTable = new ArrayList<String>();
+    List<String> lookupTable = new ArrayList<>();
     lookupTable.addAll(slots0To4999());
     lookupTable.addAll(slots5000To9999());
     lookupTable.addAll(slots10000To14999());
