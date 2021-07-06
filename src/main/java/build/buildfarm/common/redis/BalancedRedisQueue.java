@@ -68,7 +68,7 @@ public class BalancedRedisQueue {
    * @details Although these are multiple queues, the balanced redis queue treats them as one in its
    *     interface.
    */
-  private List<RedisQueue> queues = new ArrayList<RedisQueue>();
+  private List<RedisQueue> queues = new ArrayList<>();
 
   /**
    * @field currentPushQueue
@@ -279,9 +279,7 @@ public class BalancedRedisQueue {
     }
 
     // build proto
-    QueueStatus status =
-        QueueStatus.newBuilder().setName(name).setSize(size).addAllInternalSizes(sizes).build();
-    return status;
+    return QueueStatus.newBuilder().setName(name).setSize(size).addAllInternalSizes(sizes).build();
   }
 
   /**
@@ -404,20 +402,6 @@ public class BalancedRedisQueue {
   }
 
   /**
-   * @brief Get the previous queue in the round robin.
-   * @details If we are currently on the first queue it becomes the last queue.
-   * @param index Current queue index.
-   * @return And adjusted val based on the current queue index.
-   * @note Suggested return identifier: adjustedCurrentQueue.
-   */
-  private int previousQueueInRoundRobin(int index) {
-    if (index == 0) {
-      return queues.size() - 1;
-    }
-    return index - 1;
-  }
-
-  /**
    * @brief List of queues in a particular order for full iteration over all of the queues.
    * @details An ordered list of queues for operations that assume to traverse over all of the
    *     queues. Some operations like clear() / size() require calling methods on all of the
@@ -445,7 +429,7 @@ public class BalancedRedisQueue {
     // to improve cpu utilization, we can try randomizing
     // the order we traverse the internal queues for operations
     // that may return early
-    List<RedisQueue> randomQueues = new ArrayList<RedisQueue>();
+    List<RedisQueue> randomQueues = new ArrayList<>();
     randomQueues.addAll(queues);
     Collections.shuffle(randomQueues);
     return randomQueues;

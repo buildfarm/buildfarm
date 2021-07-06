@@ -42,13 +42,9 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
-import java.util.logging.Logger;
 
 public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
-  private static final Logger logger =
-      Logger.getLogger(ContentAddressableStorageService.class.getName());
-
   private final SimpleBlobStore simpleBlobStore;
   private final int treeDefaultPageSize;
   private final int treeMaxPageSize;

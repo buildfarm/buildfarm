@@ -34,14 +34,6 @@ import org.redisson.api.RedissonClient;
  */
 public class RedissonCasWorkerMap implements CasWorkerMap {
   /**
-   * @field name
-   * @brief The unique name of the map.
-   * @details The name is used in redis to store/access the data. If two maps had the same name,
-   *     they would be instances of the same underlying redis map.
-   */
-  private final String name;
-
-  /**
    * @field keyExpiration_s
    * @brief When keys will expire automatically.
    * @details This is currently the same for every key added or adjusted.
@@ -66,7 +58,6 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @note Overloaded.
    */
   public RedissonCasWorkerMap(RedissonClient client, String name, int keyExpiration_s) {
-    this.name = name;
     this.keyExpiration_s = keyExpiration_s;
     this.cacheMap = client.getSetMultimapCache(name);
   }

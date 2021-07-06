@@ -244,6 +244,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   @Override
   public void put(Blob blob) {
     put(blob, null);
+    onPut.accept(blob.getDigest());
   }
 
   @Override
@@ -254,6 +255,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
     if (add(blob, onExpiration)) {
       writes.getFuture(blob.getDigest()).set(blob.getData());
+      onPut.accept(blob.getDigest());
     }
   }
 
