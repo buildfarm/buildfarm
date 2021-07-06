@@ -858,8 +858,8 @@ class ShardWorkerContext implements WorkerContext {
     // and collect group names to use on the CLI.
     String operationId = getOperationId(operationName);
     final Group group = operationsGroup.getChild(operationId);
-    ArrayList<IOResource> resources = new ArrayList<IOResource>();
-    ArrayList<String> usedGroups = new ArrayList<String>();
+    ArrayList<IOResource> resources = new ArrayList<>();
+    ArrayList<String> usedGroups = new ArrayList<>();
 
     // Possibly set core restrictions.
     if (limits.cpu.limit) {
