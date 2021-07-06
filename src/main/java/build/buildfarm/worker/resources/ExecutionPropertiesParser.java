@@ -65,7 +65,8 @@ public class ExecutionPropertiesParser {
     parser.put(
         ExecutionProperties.DEBUG_TESTS_ONLY, ExecutionPropertiesParser::storeDebugTestsOnly);
     parser.put(ExecutionProperties.DEBUG_TARGET, ExecutionPropertiesParser::storeDebugTarget);
-    parser.put(ExecutionProperties.CHECK_DETERMINISM, ExecutionPropertiesParser::storeCheckDeterminism);
+    parser.put(
+        ExecutionProperties.CHECK_DETERMINISM, ExecutionPropertiesParser::storeCheckDeterminism);
 
     ResourceLimits limits = new ResourceLimits();
     command
