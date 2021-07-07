@@ -140,7 +140,7 @@ instances {
 
       # The delay in milliseconds used to populate processing operation
       # entries
-      processing_timeout_millis: 10000
+      processing_timeout_millis: 20000
 
       # The redis key used to store a list of QueueEntrys
       # awaiting execution by workers. These are queued
