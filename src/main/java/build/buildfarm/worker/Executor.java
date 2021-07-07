@@ -447,7 +447,7 @@ class Executor {
       settings.operationContext = operationContext;
       settings.processBuilder = processBuilder;
       settings.limits = limits;
-      return DeterminismChecker.checkDeterminism(settings, resultBuilder);
+      return DeterminismChecker.checkActionDeterminism(settings, resultBuilder);
     }
 
     long startNanoTime = System.nanoTime();
