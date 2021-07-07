@@ -29,6 +29,7 @@ import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.MapUtils;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Watcher;
@@ -1556,21 +1557,21 @@ public class RedisShardBackplane implements Backplane {
                       .getRequestMetadata()
                       .getToolDetails()
                       .getToolVersion();
-          incrementValue(toolAmounts, toolName);
+          MapUtils.incrementValue(toolAmounts, toolName);
 
           // Record the target Id that initiated the operation.
           // Note: This metadata is not populated by bazel until 4.1.0
           if (populateTargetIds) {
             String targetId =
                 operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getTargetId();
-            incrementValue(targetIds, targetId);
+            MapUtils.incrementValue(targetIds, targetId);
           }
 
           // Record the build configuration of the action.
           // Note: This metadata is not populated by bazel until 4.1.0
           String configId =
               operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getConfigurationId();
-          incrementValue(configIds, configId);
+          MapUtils.incrementValue(configIds, configId);
 
           // 2. Information about where the worker fetched the operation.
 
@@ -1581,7 +1582,7 @@ public class RedisShardBackplane implements Backplane {
           // operations.
           String queueName =
               operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
-          incrementValue(fromQueueAmounts, queueName);
+          MapUtils.incrementValue(fromQueueAmounts, queueName);
 
           // Record whether the operation has been requeued before
           if (operation.getQueueEntry().getRequeueAttempts() > 0) {
@@ -1606,7 +1607,7 @@ public class RedisShardBackplane implements Backplane {
           // Note: This metadata is not populated by bazel until 4.1.0
           String actionMnemonic =
               operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getActionMnemonic();
-          incrementValue(actionMnemonics, actionMnemonic);
+          MapUtils.incrementValue(actionMnemonics, actionMnemonic);
 
           // Record the programs being run (ex. clang, bash).
           // Not all actions have mnemonics, and some mnemonics are used for multiple program
@@ -1615,7 +1616,7 @@ public class RedisShardBackplane implements Backplane {
           // operation information.
           List<String> arguments = queuedOperation.getCommand().getArgumentsList();
           if (!arguments.isEmpty()) {
-            incrementValue(commandTools, arguments.get(0));
+            MapUtils.incrementValue(commandTools, arguments.get(0));
           }
 
           // Record platform properties being used on dispatched operations.
@@ -1624,7 +1625,8 @@ public class RedisShardBackplane implements Backplane {
           // For example, we may see many dispatched operations using a high amount of cores.
           for (Platform.Property property :
               queuedOperation.getCommand().getPlatform().getPropertiesList()) {
-            incrementValue(platformProperties, property.getName() + "=" + property.getValue());
+            MapUtils.incrementValue(
+                platformProperties, property.getName() + "=" + property.getValue());
           }
         }
 
@@ -1680,21 +1682,6 @@ public class RedisShardBackplane implements Backplane {
       }
     } else {
       actionAmounts.unknown++;
-    }
-  }
-
-  /**
-   * @brief Increment the value of any key.
-   * @details Add the key with value 1 if it does not previously exist.
-   * @param map The map to find and increment the key in.
-   * @param key The key to increment the value of.
-   */
-  private static <K> void incrementValue(Map<K, Integer> map, K key) {
-    Integer count = map.get(key);
-    if (count == null) {
-      map.put(key, 1);
-    } else {
-      map.put(key, count + 1);
     }
   }
 
