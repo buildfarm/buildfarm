@@ -279,9 +279,7 @@ public class BalancedRedisQueue {
     }
 
     // build proto
-    QueueStatus status =
-        QueueStatus.newBuilder().setName(name).setSize(size).addAllInternalSizes(sizes).build();
-    return status;
+    return QueueStatus.newBuilder().setName(name).setSize(size).addAllInternalSizes(sizes).build();
   }
 
   /**

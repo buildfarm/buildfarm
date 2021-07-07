@@ -816,15 +816,12 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public int commandExecutionClaims(Command command) {
-    ResourceLimits limits = commandExecutionSettings(command);
-    return limits.cpu.claimed;
+    return commandExecutionSettings(command).cpu.claimed;
   }
 
   public ResourceLimits commandExecutionSettings(Command command) {
-    ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(
-            command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
-    return limits;
+    return ResourceDecider.decideResourceLimitations(
+        command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
   }
 
   @Override
