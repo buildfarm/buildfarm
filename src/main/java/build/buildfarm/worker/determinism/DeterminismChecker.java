@@ -48,7 +48,6 @@ import java.util.Map;
  *     build/test invocations but is used for debugging and discovering issues.
  */
 public class DeterminismChecker {
-
   /**
    * @brief Run an action multiple times on behalf of the executor in order to decide if it is
    *     deterministic.
