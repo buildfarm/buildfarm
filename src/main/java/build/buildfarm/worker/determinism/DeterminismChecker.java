@@ -48,6 +48,7 @@ import java.util.Map;
  *     build/test invocations but is used for debugging and discovering issues.
  */
 public class DeterminismChecker {
+
   /**
    * @brief Run an action multiple times on behalf of the executor in order to decide if it is
    *     deterministic.
@@ -65,6 +66,7 @@ public class DeterminismChecker {
       DeterminismCheckSettings settings, ActionResult.Builder resultBuilder) {
     // Run the action multiple times to evaluate its determinism.
     DeterminismCheckResults results = getDeterminismResults(settings);
+
     // build action results so caller knows if action succeeded or failed based on check
     decideActionResults(results, resultBuilder);
     return Code.OK;
@@ -81,9 +83,11 @@ public class DeterminismChecker {
   private static DeterminismCheckResults getDeterminismResults(DeterminismCheckSettings settings) {
     // Run the action once to create a baseline set of output digests.
     runAction(settings.processBuilder);
+
     // collect digests for future comparison
     List<HashMap<Path, Digest>> fileDigests = new ArrayList<>();
     fileDigests.add(computeFileDigests(settings.workerContext, settings.operationContext));
+
     // Re-run the action a specified number of times to create comparable output digests.
     for (int i = 0; i < settings.limits.checkDeterminism; ++i) {
       resetWorkingDirectory(settings.workerContext, settings.operationContext);
@@ -111,6 +115,7 @@ public class DeterminismChecker {
       QueuedOperation queuedOperation =
           workerContext.getQueuedOperation(operationContext.queueEntry);
       Map<Digest, Directory> directoriesIndex = createExecDirIndex(workerContext, queuedOperation);
+
       // Reconstruct the exec filesystem.
       // Create API will remove existing files.
 
@@ -239,12 +244,14 @@ public class DeterminismChecker {
       for (Map.Entry<Path, Digest> entry : digestRun.entrySet()) {
         // add file if missing
         fileDigestCounts.putIfAbsent(entry.getKey(), new HashMap());
+
         // increment it's digest count
         Map<Digest, Integer> updatedDigestCount = fileDigestCounts.get(entry.getKey());
         MapUtils.incrementValue(updatedDigestCount, entry.getValue());
         fileDigestCounts.put(entry.getKey(), updatedDigestCount);
       }
     }
+
     // If a file has more than 1 digest entry its not deterministic. The reason we count the digest
     // frequency, is to make debugging easier. Debugging messages can contain the digest frequency
     // to determine how nondeterministic file content is.
