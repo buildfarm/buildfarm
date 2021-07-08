@@ -44,7 +44,7 @@ public class ExecutionDebugInfo {
    * @brief The environment variables for the command.
    * @details The environment variables are decided by both users and buildfarm.
    */
-  public Map<String, String> environment = new HashMap<String, String>();
+  public Map<String, String> environment = new HashMap<>();
 
   /**
    * @field workingDirectory

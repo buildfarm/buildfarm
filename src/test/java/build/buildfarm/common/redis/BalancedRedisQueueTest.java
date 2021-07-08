@@ -113,7 +113,7 @@ public class BalancedRedisQueueTest {
 
     // ACT
     for (int i = 0; i < 1000; ++i) {
-      queue.push(redis, "foo" + String.valueOf(i));
+      queue.push(redis, "foo" + i);
     }
   }
 
@@ -360,7 +360,7 @@ public class BalancedRedisQueueTest {
     queue.push(redis, "element 8");
 
     // ACT
-    List<String> visited = new ArrayList<String>();
+    List<String> visited = new ArrayList<>();
     StringVisitor visitor =
         new StringVisitor() {
           public void visit(String entry) {

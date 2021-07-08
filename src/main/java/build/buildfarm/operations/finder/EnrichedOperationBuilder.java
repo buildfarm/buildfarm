@@ -87,8 +87,7 @@ public class EnrichedOperationBuilder {
    */
   private static Operation operationKeyToOperation(JedisCluster cluster, String operationKey) {
     String json = cluster.get(operationKey);
-    Operation operation = jsonToOperation(json);
-    return operation;
+    return jsonToOperation(json);
   }
 
   /**
