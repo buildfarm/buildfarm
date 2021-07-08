@@ -141,10 +141,10 @@ public class ProvisionedRedisQueue {
     Set<Map.Entry<String, String>> requirements = new HashSet<>(provisions.required);
     for (Map.Entry<String, String> property : properties.entries()) {
       // for each of the properties specified, we must match requirements
-      if (!provisions.wildcard.contains(property.getKey()) && !requirements.remove(property)) {
-        if (!allowUserUnmatched) {
-          return false;
-        }
+      if (!provisions.wildcard.contains(property.getKey())
+          && !requirements.remove(property)
+          && !allowUserUnmatched) {
+        return false;
       }
     }
     return requirements.isEmpty();
