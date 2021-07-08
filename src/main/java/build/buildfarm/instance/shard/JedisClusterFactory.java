@@ -124,7 +124,7 @@ public class JedisClusterFactory {
     // we cannot pass all of the keys to del because of the following error:
     // "CROSSSLOT Keys in request don't hash to the same slot"
     // so iterate over and delete them individually.
-    for (String key : matchingKeys.toArray(new String[matchingKeys.size()])) {
+    for (String key : matchingKeys.toArray(new String[0])) {
       node.del(key);
     }
   }

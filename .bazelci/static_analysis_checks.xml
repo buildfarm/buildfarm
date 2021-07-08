@@ -285,7 +285,6 @@
     <exclude name="AvoidCalendarDateCreation"/>
     <exclude name="AvoidFileStream"/>
     <exclude name="AvoidInstantiatingObjectsInLoops"/>
-    <exclude name="OptimizableToArrayCall"/>
     <exclude name="RedundantFieldInitializer"/>
     <exclude name="UseStringBufferForStringAppends"/>
 </rule>
