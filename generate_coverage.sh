@@ -82,12 +82,16 @@ gate_lcov_results() {
         print_error "line coverage is below gating percentage: "
         print_error "$line_percentage < $GATING_LINE_PERCENTAGE"
         exit 1;
+    else
+        echo "current line coverage: " $line_percentage%
     fi
     
     if [ "$function_percentage" -lt "$GATING_FUNC_PERCENTAGE" ]; then
         print_error "function coverage is below gating percentage: "
         print_error "$function_percentage < $GATING_FUNC_PERCENTAGE"
         exit 1;
+    else
+        echo "current function coverage: " $function_percentage%
     fi
     
     exit 0
