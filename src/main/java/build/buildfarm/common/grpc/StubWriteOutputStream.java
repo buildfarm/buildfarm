@@ -165,11 +165,9 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public void flush() throws IOException {
-    if (!checkComplete()) {
-      if (offset != 0) {
-        initiateWrite();
-        flushSome(getCommittedSize() + offset == expectedSize);
-      }
+    if (!checkComplete() && offset != 0) {
+      initiateWrite();
+      flushSome(getCommittedSize() + offset == expectedSize);
     }
   }
 
