@@ -107,7 +107,6 @@
     <exclude name="UnnecessaryConstructor"/>
     <exclude name="UnnecessaryFullyQualifiedName"/>
     <exclude name="UselessParentheses"/>
-    <exclude name="UseShortArrayInitializer"/>
 </rule>
 
 <rule ref="category/java/design.xml">
