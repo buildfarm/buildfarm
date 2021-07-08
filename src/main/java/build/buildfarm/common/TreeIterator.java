@@ -41,8 +41,8 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
 
   public TreeIterator(DirectoryFetcher directoryFetcher, Digest rootDigest, String pageToken) {
     this.directoryFetcher = directoryFetcher;
-    parentPath = new ArrayDeque<Digest>();
-    pointers = new Stack<Iterator<Digest>>();
+    parentPath = new ArrayDeque<>();
+    pointers = new Stack<>();
 
     Iterator<Digest> iter = Iterators.singletonIterator(rootDigest);
 

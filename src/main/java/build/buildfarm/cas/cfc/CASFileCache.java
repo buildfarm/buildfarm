@@ -1485,16 +1485,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         // decide if file is a directory or empty/non-empty file
         boolean isDirectory = dirent.getFileStatus().isDirectory();
         boolean isEmptyFile = false;
-        if (e == null) {
-          if (!isDirectory) {
-            if (dirent.getFileStatus().getSize() == 0) {
-              isEmptyFile = true;
-            } else {
-              // no entry, not a directory, will NPE
-              b.addFilesBuilder().setName(name + "-MISSING");
-              // continue here to hopefully result in invalid directory
-              break;
-            }
+        if (e == null && !isDirectory) {
+          if (dirent.getFileStatus().getSize() == 0) {
+            isEmptyFile = true;
+          } else {
+            // no entry, not a directory, will NPE
+            b.addFilesBuilder().setName(name + "-MISSING");
+            // continue here to hopefully result in invalid directory
+            break;
           }
         }
 

@@ -816,15 +816,12 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public int commandExecutionClaims(Command command) {
-    ResourceLimits limits = commandExecutionSettings(command);
-    return limits.cpu.claimed;
+    return commandExecutionSettings(command).cpu.claimed;
   }
 
   public ResourceLimits commandExecutionSettings(Command command) {
-    ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(
-            command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
-    return limits;
+    return ResourceDecider.decideResourceLimitations(
+        command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
   }
 
   @Override
@@ -861,8 +858,8 @@ class ShardWorkerContext implements WorkerContext {
     // and collect group names to use on the CLI.
     String operationId = getOperationId(operationName);
     final Group group = operationsGroup.getChild(operationId);
-    ArrayList<IOResource> resources = new ArrayList<IOResource>();
-    ArrayList<String> usedGroups = new ArrayList<String>();
+    ArrayList<IOResource> resources = new ArrayList<>();
+    ArrayList<String> usedGroups = new ArrayList<>();
 
     // Possibly set core restrictions.
     if (limits.cpu.limit) {

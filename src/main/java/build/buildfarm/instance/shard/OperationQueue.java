@@ -204,9 +204,10 @@ public class OperationQueue {
     }
 
     // build proto
-    OperationQueueStatus status =
-        OperationQueueStatus.newBuilder().setSize(size(jedis)).addAllProvisions(provisions).build();
-    return status;
+    return OperationQueueStatus.newBuilder()
+        .setSize(size(jedis))
+        .addAllProvisions(provisions)
+        .build();
   }
 
   /**
