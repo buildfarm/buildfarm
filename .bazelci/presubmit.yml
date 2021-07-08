@@ -70,15 +70,31 @@ tasks:
     
   # Test that buildfarm can build software using the default configurations.
   # It starts the distributed storage backend and buildfarm services.
-  # It performs a realistic build on generated cc targets.
-  integration_test:
+  # It performs a realistic build on generated cc targets and gating projects.
+  integration_test_many:
     name: "Integration Test (Memory)"
     platform: ubuntu1804
     shell_commands:
-    - ./.bazelci/integration_test.sh
-  integration_test_shard:
+    - export TEST_SHARD=true
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+  integration_test_many_shard:
     name: "Integration Test (Shard)"
     platform: ubuntu1804
     shell_commands:
     - export TEST_SHARD=true
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - ./.bazelci/integration_test.sh
+  integration_test_abseil:
+    name: "Abseil Test (Memory)"
+    platform: ubuntu1804
+    shell_commands:
+    - export TEST_SHARD=true
+    - export RUN_TEST=./.bazelci/run_abseil_test.sh
+    - ./.bazelci/integration_test.sh
+  integration_test_abseil_shard:
+    name: "Abseil Test (Shard)"
+    platform: ubuntu1804
+    shell_commands:
+    - export TEST_SHARD=true
+    - export RUN_TEST=./.bazelci/run_abseil_test.sh
     - ./.bazelci/integration_test.sh

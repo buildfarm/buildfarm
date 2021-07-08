@@ -265,6 +265,13 @@ public class ShardInstance extends AbstractServerInstance {
           .name("blocked_invocations_size")
           .help("The number of blocked invocations")
           .register();
+
+  private static final Gauge bacplaneFetchTimeMs =
+      Gauge.build()
+          .name("backplane_fetch_time_ms")
+          .help("The amount of time is took to capture backplane metrics in milliseconds.")
+          .register();
+
   private static final Summary ioMetric =
       Summary.build().name("io_bytes_read").help("I/O (bytes)").register();
 
@@ -592,6 +599,7 @@ public class ShardInstance extends AbstractServerInstance {
                       backplaneStatus.getDispatchedOperations().getUniqueClientsAmount());
                   requeuedOperationsAmount.set(
                       backplaneStatus.getDispatchedOperations().getRequeuedOperationsAmount());
+                  bacplaneFetchTimeMs.set(backplaneStatus.getFetchTimeMs());
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
@@ -1850,16 +1858,14 @@ public class ShardInstance extends AbstractServerInstance {
 
       @Override
       public void observe(Operation operation) {
-        if (operation != null) {
-          if (writeThrough) {
-            ActionResult actionResult = getCacheableActionResult(operation);
-            if (actionResult != null) {
-              readThroughActionCache.readThrough(actionKey, actionResult);
-            } else if (wasCompletelyExecuted(operation)) {
-              // we want to avoid presenting any results for an action which
-              // was not completely executed
-              readThroughActionCache.invalidate(actionKey);
-            }
+        if (operation != null && writeThrough) {
+          ActionResult actionResult = getCacheableActionResult(operation);
+          if (actionResult != null) {
+            readThroughActionCache.readThrough(actionKey, actionResult);
+          } else if (wasCompletelyExecuted(operation)) {
+            // we want to avoid presenting any results for an action which
+            // was not completely executed
+            readThroughActionCache.invalidate(actionKey);
           }
         }
         if (operation != null && operation.getMetadata().is(Action.class)) {
@@ -1905,14 +1911,11 @@ public class ShardInstance extends AbstractServerInstance {
               .toString());
 
       readThroughActionCache.invalidate(DigestUtil.asActionKey(actionDigest));
-      if (!skipCacheLookup) {
-        if (recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
-          logger.log(
-              Level.FINE,
-              format(
-                  "Operation %s will have skip_cache_lookup = true due to retry", operationName));
-          skipCacheLookup = true;
-        }
+      if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
+        logger.log(
+            Level.FINE,
+            format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
+        skipCacheLookup = true;
       }
 
       String stdoutStreamName = operationName + "/streams/stdout";
