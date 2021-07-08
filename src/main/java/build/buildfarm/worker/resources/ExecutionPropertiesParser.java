@@ -17,11 +17,11 @@ package build.buildfarm.worker.resources;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.ExecutionProperties;
+import build.buildfarm.common.MapUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
@@ -218,7 +218,7 @@ public class ExecutionPropertiesParser {
       JSONParser parser = new JSONParser();
       Map<String, String> map = (Map<String, String>) parser.parse(property.getValue());
       limits.extraEnvironmentVariables = map;
-      describeChange(limits.description, "extra env vars added", toString(map), property);
+      describeChange(limits.description, "extra env vars added", MapUtils.toString(map), property);
     } catch (ParseException pe) {
       limits.description.add("extra env vars could not be added due to parsing error");
     }
@@ -302,20 +302,6 @@ public class ExecutionPropertiesParser {
   private static void storeDebugTarget(ResourceLimits limits, Property property) {
     limits.debugTarget = property.getValue();
     describeChange(limits.description, "debug target", property.getValue(), property);
-  }
-
-  /**
-   * @brief Convert map to printable string.
-   * @details Uses streams.
-   * @param map Map to convert to string.
-   * @return String representation of map.
-   * @note Overloaded.
-   * @note Suggested return identifier: str.
-   */
-  private static String toString(Map<String, ?> map) {
-    return map.keySet().stream()
-        .map(key -> key + "=" + map.get(key))
-        .collect(Collectors.joining(", ", "{", "}"));
   }
 
   /**
