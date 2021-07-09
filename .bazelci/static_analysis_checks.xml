@@ -107,7 +107,6 @@
     <exclude name="UnnecessaryConstructor"/>
     <exclude name="UnnecessaryFullyQualifiedName"/>
     <exclude name="UselessParentheses"/>
-    <exclude name="UseShortArrayInitializer"/>
 </rule>
 
 <rule ref="category/java/design.xml">
@@ -286,12 +285,7 @@
     <exclude name="AvoidCalendarDateCreation"/>
     <exclude name="AvoidFileStream"/>
     <exclude name="AvoidInstantiatingObjectsInLoops"/>
-    <exclude name="OptimizableToArrayCall"/>
     <exclude name="RedundantFieldInitializer"/>
-    <exclude name="TooFewBranchesForASwitchStatement"/>
-    <exclude name="UnnecessaryWrapperObjectCreation"/>
-    <exclude name="UseArrayListInsteadOfVector"/>
-    <exclude name="UseArraysAsList"/>
     <exclude name="UseStringBufferForStringAppends"/>
 </rule>
 

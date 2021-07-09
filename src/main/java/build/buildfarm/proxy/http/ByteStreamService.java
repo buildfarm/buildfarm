@@ -129,12 +129,10 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
     try {
       ResourceOperation resourceOperation = detectResourceOperation(resourceName);
-      switch (resourceOperation) {
-        case Blob:
-          readBlob(request, responseObserver);
-          break;
-        default:
-          throw new InvalidResourceNameException(resourceName, "Unsupported service");
+      if (resourceOperation == ResourceOperation.Blob) {
+        readBlob(request, responseObserver);
+      } else {
+        throw new InvalidResourceNameException(resourceName, "Unsupported service");
       }
     } catch (IllegalArgumentException | InvalidResourceNameException e) {
       String description = e.getLocalizedMessage();
