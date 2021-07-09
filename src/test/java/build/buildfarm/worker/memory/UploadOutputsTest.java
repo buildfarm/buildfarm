@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.operationqueue;
+package build.buildfarm.worker.memory;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;

@@ -1,5 +1,5 @@
 java_library(
-    name = "operationqueue",
+    name = "memory",
     srcs = glob(["*.java"]),
     visibility = ["//visibility:public"],
     deps = [

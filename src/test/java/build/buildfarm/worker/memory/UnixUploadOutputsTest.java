@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,23 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.operationqueue;
+package build.buildfarm.worker.memory;
 
-import build.buildfarm.v1test.WorkerConfig;
-import javax.naming.ConfigurationException;
-import org.junit.Test;
+import com.google.common.jimfs.Configuration;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class WorkerTest {
-  @Test(expected = ConfigurationException.class)
-  public void missingWorkerRoot() throws ConfigurationException {
-    new Worker(WorkerConfig.newBuilder().setCasCacheDirectory("/cache").build());
-  }
-
-  @Test(expected = ConfigurationException.class)
-  public void missingCasCacheDirectory() throws ConfigurationException {
-    new Worker(WorkerConfig.newBuilder().setRoot("/").build());
+public class UnixUploadOutputsTest extends UploadOutputsTest {
+  public UnixUploadOutputsTest() {
+    super(Configuration.unix());
   }
 }
