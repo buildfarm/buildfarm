@@ -32,7 +32,7 @@ public final class CustomSuite extends Suite {
 
   private static Class<?>[] getClasses(Class<?> klass) {
     Set<Class<?>> result = evalSuite(klass);
-    return result.toArray(new Class<?>[result.size()]);
+    return result.toArray(new Class<?>[0]);
   }
 
   @SuppressWarnings("unchecked") // unchecked cast to a generic type
