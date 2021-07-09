@@ -84,7 +84,7 @@ java_binary(
     main_class = "build.buildfarm.worker.operationqueue.Worker",
     visibility = ["//visibility:public"],
     runtime_deps = [
-        "//src/main/java/build/buildfarm/worker/operationqueue",
+        "//src/main/java/build/buildfarm/worker/memory",
     ],
 )
 

@@ -10,7 +10,7 @@ java_test(
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
-        "//src/main/java/build/buildfarm/worker/operationqueue",
+        "//src/main/java/build/buildfarm/worker/memory",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "@maven//:com_google_guava_guava",
