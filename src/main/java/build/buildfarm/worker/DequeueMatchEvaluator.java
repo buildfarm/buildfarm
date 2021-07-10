@@ -52,12 +52,6 @@ public class DequeueMatchEvaluator {
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       QueueEntry queueEntry) {
-    // if the queue entry was not actually dequeued, should we still accept it?
-    // TODO(luxe): find out why its currently like this, and if that still makes sense.
-    if (queueEntry == null) {
-      return true;
-    }
-
     return shouldKeepViaPlatform(matchSettings, workerProvisions, queueEntry.getPlatform());
   }
 
@@ -94,6 +88,7 @@ public class DequeueMatchEvaluator {
       SetMultimap<String, String> workerProvisions,
       Platform platform) {
     // attempt to execute everything it gets off the queue.
+    // this is a recommended configuration.
     if (matchSettings.acceptEverything) {
       return true;
     }
