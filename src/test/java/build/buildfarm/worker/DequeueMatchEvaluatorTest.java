@@ -42,7 +42,6 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class DequeueMatchEvaluatorTest {
-
   // Function under test: shouldKeepOperation
   // Reason for testing: empty plaform queue entries should be kept
   // Failure explanation: properties are being evaluated differently now
