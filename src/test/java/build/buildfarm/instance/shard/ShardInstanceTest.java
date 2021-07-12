@@ -80,6 +80,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
@@ -108,8 +109,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import com.google.protobuf.Duration;
-import com.google.protobuf.util.Durations;
 
 @RunWith(JUnit4.class)
 public class ShardInstanceTest {
@@ -291,7 +290,9 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance
+          .queue(executeEntry, poller, DEFAULT_TIMEOUT)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -354,7 +355,9 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance
+          .queue(executeEntry, poller, DEFAULT_TIMEOUT)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -403,7 +406,9 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance
+          .queue(executeEntry, poller, DEFAULT_TIMEOUT)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -482,7 +487,9 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance
+          .queue(executeEntry, poller, DEFAULT_TIMEOUT)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -549,7 +556,9 @@ public class ShardInstanceTest {
     boolean unavailableExceptionCaught = false;
     try {
       // anything more would be unreasonable
-      instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance
+          .queue(executeEntry, poller, DEFAULT_TIMEOUT)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.UNAVAILABLE.getNumber()) {
@@ -586,7 +595,7 @@ public class ShardInstanceTest {
 
     Poller poller = mock(Poller.class);
 
-    instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get();
+    instance.queue(executeEntry, poller, DEFAULT_TIMEOUT).get();
 
     verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(CACHE_CHECK));
     verify(mockBackplane, never()).putOperation(any(Operation.class), eq(QUEUED));
@@ -628,7 +637,7 @@ public class ShardInstanceTest {
 
     Poller poller = mock(Poller.class);
 
-    instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+    instance.queue(executeEntry, poller, DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
 
     verify(mockBackplane, times(1)).queue(any(QueueEntry.class), any(Operation.class));
     verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(CACHE_CHECK));
@@ -679,7 +688,9 @@ public class ShardInstanceTest {
             .setRequestMetadata(requestMetadata)
             .build();
     Poller poller = mock(Poller.class);
-    instance.queue(cacheServedExecuteEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+    instance
+        .queue(cacheServedExecuteEntry, poller, DEFAULT_TIMEOUT)
+        .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
 
     verify(poller, times(1)).pause();
     verify(mockBackplane, never()).queue(any(QueueEntry.class), any(Operation.class));
@@ -741,7 +752,7 @@ public class ShardInstanceTest {
                     .setSkipCacheLookup(true)
                     .setActionDigest(actionDigest))
             .build();
-    instance.requeueOperation(queueEntry,Durations.fromSeconds(60)).get();
+    instance.requeueOperation(queueEntry, Durations.fromSeconds(60)).get();
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(mockBackplane, times(1)).putOperation(operationCaptor.capture(), eq(COMPLETED));
     Operation operation = operationCaptor.getValue();
@@ -812,7 +823,7 @@ public class ShardInstanceTest {
                     .setActionDigest(actionDigest))
             .setQueuedOperationDigest(queuedOperationDigest)
             .build();
-    instance.requeueOperation(queueEntry,Durations.fromSeconds(60)).get();
+    instance.requeueOperation(queueEntry, Durations.fromSeconds(60)).get();
   }
 
   @Test

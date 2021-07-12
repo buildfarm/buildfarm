@@ -32,10 +32,11 @@ import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 import java.util.function.BiFunction;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,8 +44,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import com.google.protobuf.Duration;
-import com.google.protobuf.util.Durations;
 
 @RunWith(JUnit4.class)
 public class DispatchedMonitorTest {
@@ -57,7 +56,7 @@ public class DispatchedMonitorTest {
   @Before
   public void setUp() throws InterruptedException {
     MockitoAnnotations.initMocks(this);
-    when(requeuer.apply(any(QueueEntry.class),any(Duration.class)))
+    when(requeuer.apply(any(QueueEntry.class), any(Duration.class)))
         .thenReturn(immediateFailedFuture(new RuntimeException("unexpected requeue")));
     dispatchedMonitor = new DispatchedMonitor(backplane, requeuer, /* intervalSeconds=*/ 0);
   }
@@ -99,9 +98,9 @@ public class DispatchedMonitorTest {
                     .setRequeueAt(0)
                     .setQueueEntry(queueEntry)
                     .build()));
-    when(requeuer.apply(eq(queueEntry),any(Duration.class))).thenReturn(immediateFuture(null));
+    when(requeuer.apply(eq(queueEntry), any(Duration.class))).thenReturn(immediateFuture(null));
     dispatchedMonitor.iterate();
-    verify(requeuer, times(1)).apply(queueEntry,Durations.fromSeconds(60));
+    verify(requeuer, times(1)).apply(queueEntry, Durations.fromSeconds(60));
   }
 
   @Test
@@ -122,7 +121,7 @@ public class DispatchedMonitorTest {
                     .setRequeueAt(0)
                     .setQueueEntry(queueEntry)
                     .build()));
-    when(requeuer.apply(eq(queueEntry),any(Duration.class))).thenReturn(immediateFuture(null));
+    when(requeuer.apply(eq(queueEntry), any(Duration.class))).thenReturn(immediateFuture(null));
     dispatchedMonitor.iterate();
     verifyZeroInteractions(requeuer);
   }
@@ -153,10 +152,10 @@ public class DispatchedMonitorTest {
                     .setRequeueAt(0)
                     .setQueueEntry(queueEntry)
                     .build()));
-    when(requeuer.apply(eq(queueEntry),any(Duration.class)))
+    when(requeuer.apply(eq(queueEntry), any(Duration.class)))
         .thenReturn(immediateFailedFuture(new Exception("error during requeue")));
     dispatchedMonitor.iterate();
-    verify(requeuer, times(1)).apply(queueEntry,Durations.fromSeconds(60));
+    verify(requeuer, times(1)).apply(queueEntry, Durations.fromSeconds(60));
   }
 
   @Test
