@@ -2147,13 +2147,13 @@ public class ShardInstance extends AbstractServerInstance {
                     getName(), operation.getName(), checkCacheUSecs));
             return IMMEDIATE_VOID_FUTURE;
           }
-          return transformAndQueue(executeEntry, poller, operation, stopwatch);
+          return transformAndQueue(executeEntry, poller, operation, stopwatch, Durations.fromSeconds(60));
         },
         operationTransformService);
   }
 
   private ListenableFuture<Void> transformAndQueue(
-      ExecuteEntry executeEntry, Poller poller, Operation operation, Stopwatch stopwatch) {
+      ExecuteEntry executeEntry, Poller poller, Operation operation, Stopwatch stopwatch, Duration timeout) {
     long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
     ExecuteOperationMetadata metadata;
     try {
@@ -2275,7 +2275,7 @@ public class ShardInstance extends AbstractServerInstance {
                   profiledQueuedMetadata.getQueuedOperationMetadata().getQueuedOperationDigest();
               long startUploadUSecs = stopwatch.elapsed(MICROSECONDS);
               return transform(
-                  writeBlobFuture(queuedOperationDigest, queuedOperationBlob, requestMetadata,Durations.fromSeconds(60)),
+                  writeBlobFuture(queuedOperationDigest, queuedOperationBlob, requestMetadata,timeout),
                   (committedSize) ->
                       profiledQueuedMetadata
                           .setUploadedIn(
