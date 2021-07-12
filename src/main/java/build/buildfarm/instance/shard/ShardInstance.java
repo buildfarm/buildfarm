@@ -311,6 +311,9 @@ public class ShardInstance extends AbstractServerInstance {
   private boolean stopping = false;
   private boolean stopped = true;
   private Thread prometheusMetricsThread;
+  
+  //TODO: move to config
+  private static final Duration queueTimeout = Durations.fromSeconds(60);
 
   private static Duration getGrpcTimeout(ShardInstanceConfig config) {
     // return the configured
@@ -476,7 +479,7 @@ public class ShardInstance extends AbstractServerInstance {
                       Deadline.after(5, MINUTES));
                   try {
                     logger.log(Level.FINE, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller,Durations.fromSeconds(60));
+                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller,queueTimeout);
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {
