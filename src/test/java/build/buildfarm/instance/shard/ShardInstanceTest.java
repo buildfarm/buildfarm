@@ -115,6 +115,7 @@ import com.google.protobuf.util.Durations;
 public class ShardInstanceTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
   private static final long QUEUE_TEST_TIMEOUT_SECONDS = 3;
+  private static final Duration DEFAULT_TIMEOUT = Durations.fromSeconds(60);
   private static final Command SIMPLE_COMMAND =
       Command.newBuilder().addAllArguments(ImmutableList.of("true")).build();
 
@@ -290,7 +291,7 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -353,7 +354,7 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -402,7 +403,7 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -481,7 +482,7 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -548,7 +549,7 @@ public class ShardInstanceTest {
     boolean unavailableExceptionCaught = false;
     try {
       // anything more would be unreasonable
-      instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.UNAVAILABLE.getNumber()) {
@@ -585,7 +586,7 @@ public class ShardInstanceTest {
 
     Poller poller = mock(Poller.class);
 
-    instance.queue(executeEntry, poller).get();
+    instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get();
 
     verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(CACHE_CHECK));
     verify(mockBackplane, never()).putOperation(any(Operation.class), eq(QUEUED));
@@ -627,7 +628,7 @@ public class ShardInstanceTest {
 
     Poller poller = mock(Poller.class);
 
-    instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+    instance.queue(executeEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
 
     verify(mockBackplane, times(1)).queue(any(QueueEntry.class), any(Operation.class));
     verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(CACHE_CHECK));
@@ -678,7 +679,7 @@ public class ShardInstanceTest {
             .setRequestMetadata(requestMetadata)
             .build();
     Poller poller = mock(Poller.class);
-    instance.queue(cacheServedExecuteEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+    instance.queue(cacheServedExecuteEntry, poller,DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
 
     verify(poller, times(1)).pause();
     verify(mockBackplane, never()).queue(any(QueueEntry.class), any(Operation.class));

@@ -476,7 +476,7 @@ public class ShardInstance extends AbstractServerInstance {
                       Deadline.after(5, MINUTES));
                   try {
                     logger.log(Level.FINE, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller);
+                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller,Durations.fromSeconds(60));
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {
@@ -2110,7 +2110,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller)
+  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout)
       throws InterruptedException {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
@@ -2147,7 +2147,7 @@ public class ShardInstance extends AbstractServerInstance {
                     getName(), operation.getName(), checkCacheUSecs));
             return IMMEDIATE_VOID_FUTURE;
           }
-          return transformAndQueue(executeEntry, poller, operation, stopwatch, Durations.fromSeconds(60));
+          return transformAndQueue(executeEntry, poller, operation, stopwatch, timeout);
         },
         operationTransformService);
   }
