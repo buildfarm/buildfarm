@@ -108,6 +108,8 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 
 @RunWith(JUnit4.class)
 public class ShardInstanceTest {
@@ -738,7 +740,7 @@ public class ShardInstanceTest {
                     .setSkipCacheLookup(true)
                     .setActionDigest(actionDigest))
             .build();
-    instance.requeueOperation(queueEntry).get();
+    instance.requeueOperation(queueEntry,Durations.fromSeconds(60)).get();
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(mockBackplane, times(1)).putOperation(operationCaptor.capture(), eq(COMPLETED));
     Operation operation = operationCaptor.getValue();
@@ -809,7 +811,7 @@ public class ShardInstanceTest {
                     .setActionDigest(actionDigest))
             .setQueuedOperationDigest(queuedOperationDigest)
             .build();
-    instance.requeueOperation(queueEntry).get();
+    instance.requeueOperation(queueEntry,Durations.fromSeconds(60)).get();
   }
 
   @Test
