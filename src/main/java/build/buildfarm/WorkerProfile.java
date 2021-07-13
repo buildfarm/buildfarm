@@ -14,7 +14,6 @@
 
 package build.buildfarm;
 
-
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.instance.Instance;

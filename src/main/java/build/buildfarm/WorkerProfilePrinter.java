@@ -25,7 +25,6 @@ import com.google.protobuf.util.Durations;
 import java.util.List;
 
 class WorkerProfilePrinter {
-
   public static void getWorkerProfile(Instance instance) {
     WorkerProfileMessage response = instance.getWorkerProfile();
     System.out.println("\nWorkerProfile:");
