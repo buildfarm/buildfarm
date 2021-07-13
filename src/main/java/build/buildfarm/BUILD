@@ -217,6 +217,7 @@ java_binary(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        ":worker-profiler-printer",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_google_guava_guava",
@@ -246,6 +247,7 @@ java_binary(
         "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/worker/shard",
+        ":worker-profiler-printer",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//third_party/jedis",
         "@maven//:com_github_pcj_google_options",
@@ -367,3 +369,30 @@ java_binary(
         "@maven//:io_grpc_grpc_stub",
     ],
 )
+
+java_library(
+    name = "worker-profiler-printer",
+    srcs = ["WorkerProfilePrinter.java"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/redis",
+        "//src/main/java/build/buildfarm/instance",
+        "//src/main/java/build/buildfarm/instance/shard",
+        "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/java/build/buildfarm/worker/shard",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//third_party/jedis",
+        "@maven//:com_github_pcj_google_options",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_context",
+        "@maven//:io_grpc_grpc_core",
+        "@maven//:io_grpc_grpc_netty",
+        "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:io_grpc_grpc_stub",
+    ],
+)
+
