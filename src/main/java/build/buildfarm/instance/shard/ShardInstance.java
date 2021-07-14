@@ -436,19 +436,10 @@ public class ShardInstance extends AbstractServerInstance {
       dispatchedMonitor = null;
     }
 
-    // get operation queuer settings
-    OperationQueuerSettings operationQueuerSettings = new OperationQueuerSettings();
-    operationQueuerSettings.run = operationQueuerConfig.getRun();
-    operationQueuerSettings.operationWriteTimeout =
-        Durations.fromSeconds(operationQueuerConfig.getOperationWriteTimeoutS());
-    operationQueuerSettings.pollFrequency =
-        Durations.fromSeconds(operationQueuerConfig.getPollFrequencyS());
-    operationQueuerSettings.pollTimeout =
-        Durations.fromSeconds(operationQueuerConfig.getPollTimeoutS());
-    operationQueuerSettings.queueConcurrency = operationQueuerConfig.getQueueConcurrency();
-
+    // Create and configure the operation queuer.
+    OperationQueuerSettings operationQueuerSettings =
+        createOperationQueuerSettings(operationQueuerConfig);
     this.transformTokensQueue = new LinkedBlockingQueue(operationQueuerSettings.queueConcurrency);
-
     if (operationQueuerSettings.run) {
       operationQueuer =
           new Thread(
@@ -623,6 +614,16 @@ public class ShardInstance extends AbstractServerInstance {
               }
             },
             "Prometheus Metrics Collector");
+  }
+
+  private OperationQueuerSettings createOperationQueuerSettings(OperationQueuerConfig config) {
+    OperationQueuerSettings settings = new OperationQueuerSettings();
+    settings.run = config.getRun();
+    settings.operationWriteTimeout = Durations.fromSeconds(config.getOperationWriteTimeoutS());
+    settings.pollFrequency = Durations.fromSeconds(config.getPollFrequencyS());
+    settings.pollTimeout = Durations.fromSeconds(config.getPollTimeoutS());
+    settings.queueConcurrency = config.getQueueConcurrency();
+    return settings;
   }
 
   private void updateLabelCount(List<LabeledCount> list, Gauge gauge) {
