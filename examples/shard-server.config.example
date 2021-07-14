@@ -40,7 +40,17 @@ instances {
     # or no operation execution will take place.
     # The operation queuer is exclusive and should run on
     # multiple instances concurrently.
-    run_operation_queuer: true
+    operation_queuer: {
+        run: true
+        
+        operation_write_timeout_s: 60
+        
+        poll_frequency_s: 0
+        
+        poll_timeout_s: 0
+        
+        queue_concurrency: 0
+      }
 
     # The maximum size of a single blob accepted via a
     # ByteStream#write or ContentAddressableStorage#batchUpdateBlobs

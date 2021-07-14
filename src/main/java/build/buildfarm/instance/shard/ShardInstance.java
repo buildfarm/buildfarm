@@ -86,6 +86,7 @@ import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardInstanceConfig;
+import build.buildfarm.v1test.OperationQueuerConfig;
 import build.buildfarm.v1test.Tree;
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -153,6 +154,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import build.buildfarm.common.Time;
 
 public class ShardInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardInstance.class.getName());
@@ -303,15 +305,12 @@ public class ShardInstance extends AbstractServerInstance {
   private final ScheduledExecutorService contextDeadlineScheduler =
       newSingleThreadScheduledExecutor();
   private final ExecutorService operationDeletionService = newSingleThreadExecutor();
-  private final BlockingQueue transformTokensQueue = new LinkedBlockingQueue(256);
+  private final BlockingQueue transformTokensQueue;
   private final boolean useDenyList;
   private Thread operationQueuer;
   private boolean stopping = false;
   private boolean stopped = true;
   private Thread prometheusMetricsThread;
-
-  // TODO: move to config
-  private static final Duration queueTimeout = Durations.fromSeconds(60);
 
   private static Duration getGrpcTimeout(ShardInstanceConfig config) {
     // return the configured
@@ -379,7 +378,7 @@ public class ShardInstance extends AbstractServerInstance {
             DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE, backplane, actionCacheFetchService),
         config.getRunDispatchedMonitor(),
         config.getDispatchedMonitorIntervalSeconds(),
-        config.getRunOperationQueuer(),
+        config.getOperationQueuer(),
         config.getMaxBlobSize(),
         config.getMaxCpu(),
         config.getMaximumActionTimeout(),
@@ -397,7 +396,7 @@ public class ShardInstance extends AbstractServerInstance {
       ReadThroughActionCache readThroughActionCache,
       boolean runDispatchedMonitor,
       int dispatchedMonitorIntervalSeconds,
-      boolean runOperationQueuer,
+      OperationQueuerConfig operationQueuerConfig,
       long maxBlobSize,
       int maxCpu,
       Duration maxActionTimeout,
@@ -438,8 +437,18 @@ public class ShardInstance extends AbstractServerInstance {
     } else {
       dispatchedMonitor = null;
     }
+    
+    //get operation queuer settings
+    OperationQueuerSettings operationQueuerSettings = new OperationQueuerSettings();
+    operationQueuerSettings.run = operationQueuerConfig.getRun();
+    operationQueuerSettings.operationWriteTimeout = Durations.fromSeconds(operationQueuerConfig.getOperationWriteTimeoutS());
+    operationQueuerSettings.pollFrequency = Durations.fromSeconds(operationQueuerConfig.getPollFrequencyS());
+    operationQueuerSettings.pollTimeout = Durations.fromSeconds(operationQueuerConfig.getPollTimeoutS());
+    operationQueuerSettings.queueConcurrency = operationQueuerConfig.getQueueConcurrency();
+  
+  this.transformTokensQueue = new LinkedBlockingQueue(operationQueuerSettings.queueConcurrency);
 
-    if (runOperationQueuer) {
+    if (operationQueuerSettings.run) {
       operationQueuer =
           new Thread(
               new Runnable() {
@@ -456,7 +465,7 @@ public class ShardInstance extends AbstractServerInstance {
                     return immediateFuture(null);
                   }
                   // half the watcher expiry, need to expose this from backplane
-                  Poller poller = new Poller(Durations.fromSeconds(5));
+                  Poller poller = new Poller(operationQueuerSettings.pollFrequency);
                   String operationName = executeEntry.getOperationName();
                   poller.resume(
                       () -> {
@@ -474,10 +483,10 @@ public class ShardInstance extends AbstractServerInstance {
                         return !stopping && !stopped;
                       },
                       () -> {},
-                      Deadline.after(5, MINUTES));
+                      Time.toDeadline(operationQueuerSettings.pollTimeout));
                   try {
                     logger.log(Level.FINE, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller, queueTimeout);
+                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller, operationQueuerSettings.operationWriteTimeout);
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {

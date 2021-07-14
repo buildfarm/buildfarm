@@ -67,6 +67,7 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.OperationQueuerConfig;
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.cache.CacheBuilder;
@@ -135,6 +136,7 @@ public class ShardInstanceTest {
     blobDigests = Sets.newHashSet();
     ReadThroughActionCache actionCache =
         new ShardActionCache(10, mockBackplane, newDirectExecutorService());
+    
     instance =
         new ShardInstance(
             "shard",
@@ -143,7 +145,7 @@ public class ShardInstanceTest {
             actionCache,
             /* runDispatchedMonitor=*/ false,
             /* dispatchedMonitorIntervalSeconds=*/ 0,
-            /* runOperationQueuer=*/ false,
+            OperationQueuerConfig.newBuilder().setQueueConcurrency(256).build(),
             /* maxBlobSize=*/ 0,
             /* maxCpu=*/ 1,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),

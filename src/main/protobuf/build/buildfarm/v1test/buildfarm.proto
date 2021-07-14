@@ -517,12 +517,24 @@ message RedisShardBackplaneConfig {
   int32 max_attempts = 33;
 }
 
+message OperationQueuerConfig {
+  bool run = 1;
+  
+  int32 operation_write_timeout_s = 2;
+  
+  int32 poll_frequency_s = 3;
+  
+  int32 poll_timeout_s = 4;
+  
+  int32 queue_concurrency = 5;
+}
+
 message ShardInstanceConfig {
   bool run_dispatched_monitor = 1;
 
   int32 dispatched_monitor_interval_seconds = 2;
-
-  bool run_operation_queuer = 3;
+  
+  OperationQueuerConfig operationQueuer = 11;
 
   oneof backplane {
     RedisShardBackplaneConfig redis_shard_backplane_config = 4;
