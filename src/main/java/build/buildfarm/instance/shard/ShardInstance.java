@@ -310,6 +310,9 @@ public class ShardInstance extends AbstractServerInstance {
   private boolean stopped = true;
   private Thread prometheusMetricsThread;
 
+  // TODO: move to config
+  private static final Duration queueTimeout = Durations.fromSeconds(60);
+
   private static Duration getGrpcTimeout(ShardInstanceConfig config) {
     // return the configured
     if (config.hasGrpcTimeout()) {
@@ -474,7 +477,7 @@ public class ShardInstance extends AbstractServerInstance {
                       Deadline.after(5, MINUTES));
                   try {
                     logger.log(Level.FINE, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller);
+                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller, queueTimeout);
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {
@@ -1507,7 +1510,10 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<QueuedOperationResult> uploadQueuedOperation(
-      QueuedOperation queuedOperation, ExecuteEntry executeEntry, ExecutorService service)
+      QueuedOperation queuedOperation,
+      ExecuteEntry executeEntry,
+      ExecutorService service,
+      Duration timeout)
       throws EntryLimitException {
     ByteString queuedOperationBlob = queuedOperation.toByteString();
     Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
@@ -1525,13 +1531,13 @@ public class ShardInstance extends AbstractServerInstance {
             .build();
     return transform(
         writeBlobFuture(
-            queuedOperationDigest, queuedOperationBlob, executeEntry.getRequestMetadata()),
+            queuedOperationDigest, queuedOperationBlob, executeEntry.getRequestMetadata(), timeout),
         (committedSize) -> new QueuedOperationResult(entry, metadata),
         service);
   }
 
   private ListenableFuture<Long> writeBlobFuture(
-      Digest digest, ByteString content, RequestMetadata requestMetadata)
+      Digest digest, ByteString content, RequestMetadata requestMetadata, Duration timeout)
       throws EntryLimitException {
     checkState(digest.getSizeBytes() == content.size());
     SettableFuture<Long> writtenFuture = SettableFuture.create();
@@ -1550,7 +1556,7 @@ public class ShardInstance extends AbstractServerInstance {
           }
         },
         directExecutor());
-    try (OutputStream out = write.getOutput(60, SECONDS, () -> {})) {
+    try (OutputStream out = write.getOutput(timeout.getSeconds(), SECONDS, () -> {})) {
       content.writeTo(out);
     } catch (IOException e) {
       // if the stream is complete already, we will have already set the future value
@@ -1671,7 +1677,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<Void> validateAndRequeueOperation(
-      Operation operation, QueueEntry queueEntry) {
+      Operation operation, QueueEntry queueEntry, Duration timeout) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
     checkState(operationName.equals(operation.getName()));
@@ -1727,7 +1733,7 @@ public class ShardInstance extends AbstractServerInstance {
                     Throwable.class,
                     (e) ->
                         uploadQueuedOperation(
-                            queuedOperation, executeEntry, operationTransformService),
+                            queuedOperation, executeEntry, operationTransformService, timeout),
                     operationTransformService),
             directExecutor());
 
@@ -1779,7 +1785,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry) {
+  public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry, Duration timeout) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
     try {
@@ -1847,7 +1853,7 @@ public class ShardInstance extends AbstractServerInstance {
           if (cachedResult) {
             return IMMEDIATE_VOID_FUTURE;
           }
-          return validateAndRequeueOperation(operation, queueEntry);
+          return validateAndRequeueOperation(operation, queueEntry, timeout);
         },
         operationTransformService);
   }
@@ -2108,7 +2114,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller)
+  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout)
       throws InterruptedException {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
@@ -2145,13 +2151,17 @@ public class ShardInstance extends AbstractServerInstance {
                     getName(), operation.getName(), checkCacheUSecs));
             return IMMEDIATE_VOID_FUTURE;
           }
-          return transformAndQueue(executeEntry, poller, operation, stopwatch);
+          return transformAndQueue(executeEntry, poller, operation, stopwatch, timeout);
         },
         operationTransformService);
   }
 
   private ListenableFuture<Void> transformAndQueue(
-      ExecuteEntry executeEntry, Poller poller, Operation operation, Stopwatch stopwatch) {
+      ExecuteEntry executeEntry,
+      Poller poller,
+      Operation operation,
+      Stopwatch stopwatch,
+      Duration timeout) {
     long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
     ExecuteOperationMetadata metadata;
     try {
@@ -2273,7 +2283,8 @@ public class ShardInstance extends AbstractServerInstance {
                   profiledQueuedMetadata.getQueuedOperationMetadata().getQueuedOperationDigest();
               long startUploadUSecs = stopwatch.elapsed(MICROSECONDS);
               return transform(
-                  writeBlobFuture(queuedOperationDigest, queuedOperationBlob, requestMetadata),
+                  writeBlobFuture(
+                      queuedOperationDigest, queuedOperationBlob, requestMetadata, timeout),
                   (committedSize) ->
                       profiledQueuedMetadata
                           .setUploadedIn(

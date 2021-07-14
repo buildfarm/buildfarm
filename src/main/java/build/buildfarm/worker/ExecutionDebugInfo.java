@@ -81,4 +81,12 @@ public class ExecutionDebugInfo {
    * @details Converted from proto bytes.
    */
   public String stderr = "";
+
+  /**
+   * @field exitCode
+   * @brief The exit code of the execution.
+   * @details The debugger will fail the execution but this is to indicate what the actual exit code
+   *     of the action was.
+   */
+  public int exitCode = 0;
 }
