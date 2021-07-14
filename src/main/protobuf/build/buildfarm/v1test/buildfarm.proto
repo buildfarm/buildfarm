@@ -534,7 +534,7 @@ message ShardInstanceConfig {
 
   int32 dispatched_monitor_interval_seconds = 2;
   
-  OperationQueuerConfig operationQueuer = 11;
+  OperationQueuerConfig operation_queuer = 11;
 
   oneof backplane {
     RedisShardBackplaneConfig redis_shard_backplane_config = 4;

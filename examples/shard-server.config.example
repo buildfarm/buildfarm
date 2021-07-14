@@ -41,15 +41,28 @@ instances {
     # The operation queuer is exclusive and should run on
     # multiple instances concurrently.
     operation_queuer: {
+      
+        # Whether we should run the operation queuer.
+        # If true, we will run the operation queuer on a separate thread.
+        # If false, we will not run the operation queuer and none of these other settings will be relevant.
         run: true
         
+        # How long should we wait to write a QueuedOperation to the CAS?
+        # This timeout determines when we give up trying to write a particular QueuedOperation to the CAS.
+        # Failure to write operations may result in prequeue congestion.
         operation_write_timeout_s: 60
         
-        poll_frequency_s: 0
+        # The polling frequency for updating the expiration status of a an operation we are currently trying to queue.
+        # This could be half the watch expiry.
+        poll_frequency_s: 5
         
-        poll_timeout_s: 0
+        # How long to wait before giving up on polling.
+        # This duration represents a deadline from when the poller is created.
+        poll_timeout_s: 300
         
-        queue_concurrency: 0
+        # How many operations can the operation queuer work on concurrently?
+        # Keep in mind, this does not guarantee any amount of parallelism and will depend on the executor service.
+        queue_concurrency: 256
       }
 
     # The maximum size of a single blob accepted via a

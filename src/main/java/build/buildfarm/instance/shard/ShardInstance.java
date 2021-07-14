@@ -37,7 +37,6 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
-import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
@@ -64,6 +63,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.Poller;
+import build.buildfarm.common.Time;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
@@ -79,6 +79,7 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.LabeledCount;
 import build.buildfarm.v1test.OperationIteratorToken;
+import build.buildfarm.v1test.OperationQueuerConfig;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
@@ -86,7 +87,6 @@ import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardInstanceConfig;
-import build.buildfarm.v1test.OperationQueuerConfig;
 import build.buildfarm.v1test.Tree;
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -114,7 +114,6 @@ import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Context;
-import io.grpc.Deadline;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusException;
@@ -154,7 +153,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
-import build.buildfarm.common.Time;
 
 public class ShardInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardInstance.class.getName());
@@ -437,16 +435,19 @@ public class ShardInstance extends AbstractServerInstance {
     } else {
       dispatchedMonitor = null;
     }
-    
-    //get operation queuer settings
+
+    // get operation queuer settings
     OperationQueuerSettings operationQueuerSettings = new OperationQueuerSettings();
     operationQueuerSettings.run = operationQueuerConfig.getRun();
-    operationQueuerSettings.operationWriteTimeout = Durations.fromSeconds(operationQueuerConfig.getOperationWriteTimeoutS());
-    operationQueuerSettings.pollFrequency = Durations.fromSeconds(operationQueuerConfig.getPollFrequencyS());
-    operationQueuerSettings.pollTimeout = Durations.fromSeconds(operationQueuerConfig.getPollTimeoutS());
+    operationQueuerSettings.operationWriteTimeout =
+        Durations.fromSeconds(operationQueuerConfig.getOperationWriteTimeoutS());
+    operationQueuerSettings.pollFrequency =
+        Durations.fromSeconds(operationQueuerConfig.getPollFrequencyS());
+    operationQueuerSettings.pollTimeout =
+        Durations.fromSeconds(operationQueuerConfig.getPollTimeoutS());
     operationQueuerSettings.queueConcurrency = operationQueuerConfig.getQueueConcurrency();
-  
-  this.transformTokensQueue = new LinkedBlockingQueue(operationQueuerSettings.queueConcurrency);
+
+    this.transformTokensQueue = new LinkedBlockingQueue(operationQueuerSettings.queueConcurrency);
 
     if (operationQueuerSettings.run) {
       operationQueuer =
@@ -486,7 +487,8 @@ public class ShardInstance extends AbstractServerInstance {
                       Time.toDeadline(operationQueuerSettings.pollTimeout));
                   try {
                     logger.log(Level.FINE, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller, operationQueuerSettings.operationWriteTimeout);
+                    ListenableFuture<Void> queueFuture =
+                        queue(executeEntry, poller, operationQueuerSettings.operationWriteTimeout);
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {
