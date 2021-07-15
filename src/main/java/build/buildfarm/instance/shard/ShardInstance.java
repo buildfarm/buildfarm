@@ -77,7 +77,6 @@ import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.LabeledCount;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.ProvisionedQueue;
@@ -176,101 +175,12 @@ public class ShardInstance extends AbstractServerInstance {
           .name("dispatched_operations_size")
           .help("Dispatched operations size.")
           .register();
-  private static final Gauge buildActionAmount =
-      Gauge.build()
-          .name("dispatched_operations_build_amount")
-          .help("Dispatched operations build amount.")
-          .register();
-  private static final Gauge testActionAmount =
-      Gauge.build()
-          .name("dispatched_operations_test_amount")
-          .help("Dispatched operations test amount.")
-          .register();
-  private static final Gauge unknownActionAmount =
-      Gauge.build()
-          .name("dispatched_operations_unknown_amount")
-          .help("Dispatched operations unknown amount.")
-          .register();
-
-  private static final Gauge dispatchedOperationsFromQueue =
-      Gauge.build()
-          .name("dispatched_operations_from_queue_amount")
-          .labelNames("queue_name")
-          .help("Dispatched operations by origin queue.")
-          .register();
-
-  private static final Gauge dispatchedOperationsTools =
-      Gauge.build()
-          .name("dispatched_operations_tools_amount")
-          .labelNames("tool_name")
-          .help("Dispatched operations by tool name.")
-          .register();
-
-  private static final Gauge dispatchedOperationsMnemonics =
-      Gauge.build()
-          .name("dispatched_operations_mnemonics_amount")
-          .labelNames("mnemonic")
-          .help("Dispatched operations by action mnemonic.")
-          .register();
-
-  private static final Gauge dispatchedOperationsCommandTools =
-      Gauge.build()
-          .name("dispatched_operations_command_tools")
-          .labelNames("tool")
-          .help("Dispatched operations by command tools.")
-          .register();
-
-  private static final Gauge dispatchedOperationsTargets =
-      Gauge.build()
-          .name("dispatched_operations_targets_amount")
-          .labelNames("target")
-          .help("Dispatched operations by target.")
-          .register();
-
-  private static final Gauge dispatchedOperationsConfigs =
-      Gauge.build()
-          .name("dispatched_operations_config_amount")
-          .labelNames("config")
-          .help("Dispatched operations by config.")
-          .register();
-
-  private static final Gauge dispatchedOperationsPlatformProperties =
-      Gauge.build()
-          .name("dispatched_operations_platform_properties")
-          .labelNames("config")
-          .help("Dispatched operations by platform properties.")
-          .register();
-
-  private static final Gauge uniqueClientsAmount =
-      Gauge.build()
-          .name("dispatched_operations_clients_being_served")
-          .help("The number of clients currently being served.")
-          .register();
-
-  private static final Gauge requeuedOperationsAmount =
-      Gauge.build()
-          .name("dispatched_operations_requeued_operations_amount")
-          .help("The number of dispatched operations that have been requeued.")
-          .register();
 
   // Other metrics from the backplane
   private static final Gauge workerPoolSize =
       Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
   private static final Gauge queueSize =
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
-  private static final Gauge blockedActionsSize =
-      Gauge.build().name("blocked_actions_size").help("The number of blocked actions").register();
-  private static final Gauge blockedInvocationsSize =
-      Gauge.build()
-          .name("blocked_invocations_size")
-          .help("The number of blocked invocations")
-          .register();
-
-  private static final Gauge bacplaneFetchTimeMs =
-      Gauge.build()
-          .name("backplane_fetch_time_ms")
-          .help("The amount of time is took to capture backplane metrics in milliseconds.")
-          .register();
 
   private static final Summary ioMetric =
       Summary.build().name("io_bytes_read").help("I/O (bytes)").register();
@@ -566,43 +476,9 @@ public class ShardInstance extends AbstractServerInstance {
                   TimeUnit.SECONDS.sleep(30);
                   BackplaneStatus backplaneStatus = backplaneStatus();
                   workerPoolSize.set(backplaneStatus.getActiveWorkersCount());
-                  dispatchedOperationsSize.set(backplaneStatus.getDispatchedOperations().getSize());
+                  dispatchedOperationsSize.set(backplaneStatus.getDispatchedSize());
                   preQueueSize.set(backplaneStatus.getPrequeue().getSize());
                   updateQueueSizes(backplaneStatus.getOperationQueue().getProvisionsList());
-                  blockedActionsSize.set(backplaneStatus.getBlockedActionsSize());
-                  blockedInvocationsSize.set(backplaneStatus.getBlockedInvocationsSize());
-                  buildActionAmount.set(
-                      backplaneStatus.getDispatchedOperations().getBuildActionAmount());
-                  testActionAmount.set(
-                      backplaneStatus.getDispatchedOperations().getTestActionAmount());
-                  unknownActionAmount.set(
-                      backplaneStatus.getDispatchedOperations().getUnknownActionAmount());
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getFromQueuesList(),
-                      dispatchedOperationsFromQueue);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getToolsList(),
-                      dispatchedOperationsTools);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getActionMnemonicsList(),
-                      dispatchedOperationsMnemonics);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getCommandToolsList(),
-                      dispatchedOperationsCommandTools);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getTargetIdsList(),
-                      dispatchedOperationsTargets);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getConfigIdsList(),
-                      dispatchedOperationsConfigs);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getPlatformPropertiesList(),
-                      dispatchedOperationsPlatformProperties);
-                  uniqueClientsAmount.set(
-                      backplaneStatus.getDispatchedOperations().getUniqueClientsAmount());
-                  requeuedOperationsAmount.set(
-                      backplaneStatus.getDispatchedOperations().getRequeuedOperationsAmount());
-                  bacplaneFetchTimeMs.set(backplaneStatus.getFetchTimeMs());
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
@@ -612,12 +488,6 @@ public class ShardInstance extends AbstractServerInstance {
               }
             },
             "Prometheus Metrics Collector");
-  }
-
-  private void updateLabelCount(List<LabeledCount> list, Gauge gauge) {
-    for (LabeledCount label : list) {
-      gauge.labels(label.getName()).set(label.getSize());
-    }
   }
 
   private void updateQueueSizes(List<QueueStatus> queues) {
