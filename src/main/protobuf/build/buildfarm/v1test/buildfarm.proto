@@ -848,6 +848,10 @@ message BackplaneStatus {
   int64 blocked_actions_size = 7;
   
   int64 blocked_invocations_size = 8;
+  
+  int64 fetch_time_ms = 10;
+
+  int64 dispatched_size = 11;
 }
 
 message QueuedOperationMetadata {

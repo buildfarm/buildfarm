@@ -100,8 +100,7 @@ public class Utils {
 
   private static final LinkOption[] NO_LINK_OPTION = new LinkOption[0];
   // This isn't generally safe; we rely on the file system APIs not modifying the array.
-  private static final LinkOption[] NOFOLLOW_LINKS_OPTION =
-      new LinkOption[] {LinkOption.NOFOLLOW_LINKS};
+  private static final LinkOption[] NOFOLLOW_LINKS_OPTION = {LinkOption.NOFOLLOW_LINKS};
 
   private static LinkOption[] linkOpts(boolean followSymlinks) {
     return followSymlinks ? NO_LINK_OPTION : NOFOLLOW_LINKS_OPTION;
@@ -291,70 +290,67 @@ public class Utils {
     } catch (java.nio.file.FileSystemException e) {
       throw new NoSuchFileException(path + ERR_NO_SUCH_FILE_OR_DIR);
     }
-    FileStatus status =
-        new FileStatus() {
-          @Override
-          public boolean isFile() {
-            return attributes.isRegularFile() || isSpecialFile();
-          }
+    return new FileStatus() {
+      @Override
+      public boolean isFile() {
+        return attributes.isRegularFile() || isSpecialFile();
+      }
 
-          @Override
-          public boolean isSpecialFile() {
-            return attributes.isOther();
-          }
+      @Override
+      public boolean isSpecialFile() {
+        return attributes.isOther();
+      }
 
-          @Override
-          public boolean isDirectory() {
-            return attributes.isDirectory();
-          }
+      @Override
+      public boolean isDirectory() {
+        return attributes.isDirectory();
+      }
 
-          @Override
-          public boolean isSymbolicLink() {
-            return attributes.isSymbolicLink();
-          }
+      @Override
+      public boolean isSymbolicLink() {
+        return attributes.isSymbolicLink();
+      }
 
-          @Override
-          public long getSize() throws IOException {
-            return attributes.size();
-          }
+      @Override
+      public long getSize() throws IOException {
+        return attributes.size();
+      }
 
-          @Override
-          public long getLastModifiedTime() throws IOException {
-            return attributes.lastModifiedTime().toMillis();
-          }
+      @Override
+      public long getLastModifiedTime() throws IOException {
+        return attributes.lastModifiedTime().toMillis();
+      }
 
-          @Override
-          public long getLastChangeTime() {
-            // This is the best we can do with Java NIO...
-            return attributes.lastModifiedTime().toMillis();
-          }
+      @Override
+      public long getLastChangeTime() {
+        // This is the best we can do with Java NIO...
+        return attributes.lastModifiedTime().toMillis();
+      }
 
-          @Override
-          public Object fileKey() {
-            if (attributes instanceof DosFileAttributes) {
-              return new WindowsFileKey((DosFileAttributes) attributes);
-            }
-            // UnixFileKeys will correspond to a supported "posix" FileAttributeView
-            // This will mean that NamedFileKeys are populated with inodes
-            // We cannot construct UnixFileKeys, so this is our best option to use
-            // fast directory reads.
-            // Windows will leave the fileKey verbatim via NIO for comparison and hashing
-            try {
-              String keyStr = attributes.fileKey().toString();
-              String inode = keyStr.substring(keyStr.indexOf("ino=") + 4, keyStr.indexOf(")"));
-              return Long.parseLong(inode);
-            } catch (Exception e) {
-              return attributes.fileKey();
-            }
-          }
+      @Override
+      public Object fileKey() {
+        if (attributes instanceof DosFileAttributes) {
+          return new WindowsFileKey((DosFileAttributes) attributes);
+        }
+        // UnixFileKeys will correspond to a supported "posix" FileAttributeView
+        // This will mean that NamedFileKeys are populated with inodes
+        // We cannot construct UnixFileKeys, so this is our best option to use
+        // fast directory reads.
+        // Windows will leave the fileKey verbatim via NIO for comparison and hashing
+        try {
+          String keyStr = attributes.fileKey().toString();
+          String inode = keyStr.substring(keyStr.indexOf("ino=") + 4, keyStr.indexOf(')'));
+          return Long.parseLong(inode);
+        } catch (Exception e) {
+          return attributes.fileKey();
+        }
+      }
 
-          @Override
-          public boolean isReadOnlyExecutable() {
-            return isReadOnlyExecutable;
-          }
-        };
-
-    return status;
+      @Override
+      public boolean isReadOnlyExecutable() {
+        return isReadOnlyExecutable;
+      }
+    };
   }
 
   /* other */

@@ -944,8 +944,7 @@ class CASFileCacheTest {
       if (Thread.interrupted()) {
         throw new RuntimeException(new InterruptedException());
       }
-      Path path = Files.createTempDirectory("native-cas-test");
-      return path;
+      return Files.createTempDirectory("native-cas-test");
     }
   }
 
@@ -959,8 +958,7 @@ class CASFileCacheTest {
       if (Thread.interrupted()) {
         throw new RuntimeException(new InterruptedException());
       }
-      Path path = Files.createTempDirectory("native-cas-test");
-      return path;
+      return Files.createTempDirectory("native-cas-test");
     }
   }
 

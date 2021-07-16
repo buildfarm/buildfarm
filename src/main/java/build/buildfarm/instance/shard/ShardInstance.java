@@ -77,7 +77,6 @@ import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.LabeledCount;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.ProvisionedQueue;
@@ -176,95 +175,13 @@ public class ShardInstance extends AbstractServerInstance {
           .name("dispatched_operations_size")
           .help("Dispatched operations size.")
           .register();
-  private static final Gauge buildActionAmount =
-      Gauge.build()
-          .name("dispatched_operations_build_amount")
-          .help("Dispatched operations build amount.")
-          .register();
-  private static final Gauge testActionAmount =
-      Gauge.build()
-          .name("dispatched_operations_test_amount")
-          .help("Dispatched operations test amount.")
-          .register();
-  private static final Gauge unknownActionAmount =
-      Gauge.build()
-          .name("dispatched_operations_unknown_amount")
-          .help("Dispatched operations unknown amount.")
-          .register();
-
-  private static final Gauge dispatchedOperationsFromQueue =
-      Gauge.build()
-          .name("dispatched_operations_from_queue_amount")
-          .labelNames("queue_name")
-          .help("Dispatched operations by origin queue.")
-          .register();
-
-  private static final Gauge dispatchedOperationsTools =
-      Gauge.build()
-          .name("dispatched_operations_tools_amount")
-          .labelNames("tool_name")
-          .help("Dispatched operations by tool name.")
-          .register();
-
-  private static final Gauge dispatchedOperationsMnemonics =
-      Gauge.build()
-          .name("dispatched_operations_mnemonics_amount")
-          .labelNames("mnemonic")
-          .help("Dispatched operations by action mnemonic.")
-          .register();
-
-  private static final Gauge dispatchedOperationsCommandTools =
-      Gauge.build()
-          .name("dispatched_operations_command_tools")
-          .labelNames("tool")
-          .help("Dispatched operations by command tools.")
-          .register();
-
-  private static final Gauge dispatchedOperationsTargets =
-      Gauge.build()
-          .name("dispatched_operations_targets_amount")
-          .labelNames("target")
-          .help("Dispatched operations by target.")
-          .register();
-
-  private static final Gauge dispatchedOperationsConfigs =
-      Gauge.build()
-          .name("dispatched_operations_config_amount")
-          .labelNames("config")
-          .help("Dispatched operations by config.")
-          .register();
-
-  private static final Gauge dispatchedOperationsPlatformProperties =
-      Gauge.build()
-          .name("dispatched_operations_platform_properties")
-          .labelNames("config")
-          .help("Dispatched operations by platform properties.")
-          .register();
-
-  private static final Gauge uniqueClientsAmount =
-      Gauge.build()
-          .name("dispatched_operations_clients_being_served")
-          .help("The number of clients currently being served.")
-          .register();
-
-  private static final Gauge requeuedOperationsAmount =
-      Gauge.build()
-          .name("dispatched_operations_requeued_operations_amount")
-          .help("The number of dispatched operations that have been requeued.")
-          .register();
 
   // Other metrics from the backplane
   private static final Gauge workerPoolSize =
       Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
   private static final Gauge queueSize =
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
-  private static final Gauge blockedActionsSize =
-      Gauge.build().name("blocked_actions_size").help("The number of blocked actions").register();
-  private static final Gauge blockedInvocationsSize =
-      Gauge.build()
-          .name("blocked_invocations_size")
-          .help("The number of blocked invocations")
-          .register();
+
   private static final Summary ioMetric =
       Summary.build().name("io_bytes_read").help("I/O (bytes)").register();
 
@@ -302,6 +219,9 @@ public class ShardInstance extends AbstractServerInstance {
   private boolean stopping = false;
   private boolean stopped = true;
   private Thread prometheusMetricsThread;
+
+  // TODO: move to config
+  private static final Duration queueTimeout = Durations.fromSeconds(60);
 
   private static Duration getGrpcTimeout(ShardInstanceConfig config) {
     // return the configured
@@ -467,7 +387,7 @@ public class ShardInstance extends AbstractServerInstance {
                       Deadline.after(5, MINUTES));
                   try {
                     logger.log(Level.FINE, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller);
+                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller, queueTimeout);
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {
@@ -556,42 +476,9 @@ public class ShardInstance extends AbstractServerInstance {
                   TimeUnit.SECONDS.sleep(30);
                   BackplaneStatus backplaneStatus = backplaneStatus();
                   workerPoolSize.set(backplaneStatus.getActiveWorkersCount());
-                  dispatchedOperationsSize.set(backplaneStatus.getDispatchedOperations().getSize());
+                  dispatchedOperationsSize.set(backplaneStatus.getDispatchedSize());
                   preQueueSize.set(backplaneStatus.getPrequeue().getSize());
                   updateQueueSizes(backplaneStatus.getOperationQueue().getProvisionsList());
-                  blockedActionsSize.set(backplaneStatus.getBlockedActionsSize());
-                  blockedInvocationsSize.set(backplaneStatus.getBlockedInvocationsSize());
-                  buildActionAmount.set(
-                      backplaneStatus.getDispatchedOperations().getBuildActionAmount());
-                  testActionAmount.set(
-                      backplaneStatus.getDispatchedOperations().getTestActionAmount());
-                  unknownActionAmount.set(
-                      backplaneStatus.getDispatchedOperations().getUnknownActionAmount());
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getFromQueuesList(),
-                      dispatchedOperationsFromQueue);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getToolsList(),
-                      dispatchedOperationsTools);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getActionMnemonicsList(),
-                      dispatchedOperationsMnemonics);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getCommandToolsList(),
-                      dispatchedOperationsCommandTools);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getTargetIdsList(),
-                      dispatchedOperationsTargets);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getConfigIdsList(),
-                      dispatchedOperationsConfigs);
-                  updateLabelCount(
-                      backplaneStatus.getDispatchedOperations().getPlatformPropertiesList(),
-                      dispatchedOperationsPlatformProperties);
-                  uniqueClientsAmount.set(
-                      backplaneStatus.getDispatchedOperations().getUniqueClientsAmount());
-                  requeuedOperationsAmount.set(
-                      backplaneStatus.getDispatchedOperations().getRequeuedOperationsAmount());
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
@@ -601,12 +488,6 @@ public class ShardInstance extends AbstractServerInstance {
               }
             },
             "Prometheus Metrics Collector");
-  }
-
-  private void updateLabelCount(List<LabeledCount> list, Gauge gauge) {
-    for (LabeledCount label : list) {
-      gauge.labels(label.getName()).set(label.getSize());
-    }
   }
 
   private void updateQueueSizes(List<QueueStatus> queues) {
@@ -1499,7 +1380,10 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<QueuedOperationResult> uploadQueuedOperation(
-      QueuedOperation queuedOperation, ExecuteEntry executeEntry, ExecutorService service)
+      QueuedOperation queuedOperation,
+      ExecuteEntry executeEntry,
+      ExecutorService service,
+      Duration timeout)
       throws EntryLimitException {
     ByteString queuedOperationBlob = queuedOperation.toByteString();
     Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
@@ -1517,13 +1401,13 @@ public class ShardInstance extends AbstractServerInstance {
             .build();
     return transform(
         writeBlobFuture(
-            queuedOperationDigest, queuedOperationBlob, executeEntry.getRequestMetadata()),
+            queuedOperationDigest, queuedOperationBlob, executeEntry.getRequestMetadata(), timeout),
         (committedSize) -> new QueuedOperationResult(entry, metadata),
         service);
   }
 
   private ListenableFuture<Long> writeBlobFuture(
-      Digest digest, ByteString content, RequestMetadata requestMetadata)
+      Digest digest, ByteString content, RequestMetadata requestMetadata, Duration timeout)
       throws EntryLimitException {
     checkState(digest.getSizeBytes() == content.size());
     SettableFuture<Long> writtenFuture = SettableFuture.create();
@@ -1542,7 +1426,7 @@ public class ShardInstance extends AbstractServerInstance {
           }
         },
         directExecutor());
-    try (OutputStream out = write.getOutput(60, SECONDS, () -> {})) {
+    try (OutputStream out = write.getOutput(timeout.getSeconds(), SECONDS, () -> {})) {
       content.writeTo(out);
     } catch (IOException e) {
       // if the stream is complete already, we will have already set the future value
@@ -1663,7 +1547,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<Void> validateAndRequeueOperation(
-      Operation operation, QueueEntry queueEntry) {
+      Operation operation, QueueEntry queueEntry, Duration timeout) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
     checkState(operationName.equals(operation.getName()));
@@ -1719,7 +1603,7 @@ public class ShardInstance extends AbstractServerInstance {
                     Throwable.class,
                     (e) ->
                         uploadQueuedOperation(
-                            queuedOperation, executeEntry, operationTransformService),
+                            queuedOperation, executeEntry, operationTransformService, timeout),
                     operationTransformService),
             directExecutor());
 
@@ -1771,7 +1655,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry) {
+  public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry, Duration timeout) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
     try {
@@ -1839,7 +1723,7 @@ public class ShardInstance extends AbstractServerInstance {
           if (cachedResult) {
             return IMMEDIATE_VOID_FUTURE;
           }
-          return validateAndRequeueOperation(operation, queueEntry);
+          return validateAndRequeueOperation(operation, queueEntry, timeout);
         },
         operationTransformService);
   }
@@ -1850,16 +1734,14 @@ public class ShardInstance extends AbstractServerInstance {
 
       @Override
       public void observe(Operation operation) {
-        if (operation != null) {
-          if (writeThrough) {
-            ActionResult actionResult = getCacheableActionResult(operation);
-            if (actionResult != null) {
-              readThroughActionCache.readThrough(actionKey, actionResult);
-            } else if (wasCompletelyExecuted(operation)) {
-              // we want to avoid presenting any results for an action which
-              // was not completely executed
-              readThroughActionCache.invalidate(actionKey);
-            }
+        if (operation != null && writeThrough) {
+          ActionResult actionResult = getCacheableActionResult(operation);
+          if (actionResult != null) {
+            readThroughActionCache.readThrough(actionKey, actionResult);
+          } else if (wasCompletelyExecuted(operation)) {
+            // we want to avoid presenting any results for an action which
+            // was not completely executed
+            readThroughActionCache.invalidate(actionKey);
           }
         }
         if (operation != null && operation.getMetadata().is(Action.class)) {
@@ -1905,14 +1787,11 @@ public class ShardInstance extends AbstractServerInstance {
               .toString());
 
       readThroughActionCache.invalidate(DigestUtil.asActionKey(actionDigest));
-      if (!skipCacheLookup) {
-        if (recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
-          logger.log(
-              Level.FINE,
-              format(
-                  "Operation %s will have skip_cache_lookup = true due to retry", operationName));
-          skipCacheLookup = true;
-        }
+      if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
+        logger.log(
+            Level.FINE,
+            format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
+        skipCacheLookup = true;
       }
 
       String stdoutStreamName = operationName + "/streams/stdout";
@@ -2105,7 +1984,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller)
+  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout)
       throws InterruptedException {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
@@ -2142,13 +2021,17 @@ public class ShardInstance extends AbstractServerInstance {
                     getName(), operation.getName(), checkCacheUSecs));
             return IMMEDIATE_VOID_FUTURE;
           }
-          return transformAndQueue(executeEntry, poller, operation, stopwatch);
+          return transformAndQueue(executeEntry, poller, operation, stopwatch, timeout);
         },
         operationTransformService);
   }
 
   private ListenableFuture<Void> transformAndQueue(
-      ExecuteEntry executeEntry, Poller poller, Operation operation, Stopwatch stopwatch) {
+      ExecuteEntry executeEntry,
+      Poller poller,
+      Operation operation,
+      Stopwatch stopwatch,
+      Duration timeout) {
     long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
     ExecuteOperationMetadata metadata;
     try {
@@ -2270,7 +2153,8 @@ public class ShardInstance extends AbstractServerInstance {
                   profiledQueuedMetadata.getQueuedOperationMetadata().getQueuedOperationDigest();
               long startUploadUSecs = stopwatch.elapsed(MICROSECONDS);
               return transform(
-                  writeBlobFuture(queuedOperationDigest, queuedOperationBlob, requestMetadata),
+                  writeBlobFuture(
+                      queuedOperationDigest, queuedOperationBlob, requestMetadata, timeout),
                   (committedSize) ->
                       profiledQueuedMetadata
                           .setUploadedIn(

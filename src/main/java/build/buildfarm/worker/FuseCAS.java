@@ -396,7 +396,7 @@ public class FuseCAS extends FuseStubFS {
       }
       if (!mounted) {
         logger.log(Level.INFO, "Mounting FuseCAS");
-        String[] fuseOpts = new String[] {"-o", "max_write=131072", "-o", "big_writes"};
+        String[] fuseOpts = {"-o", "max_write=131072", "-o", "big_writes"};
         try {
           mount(mountPath, /* blocking=*/ false, /* debug=*/ false, /* fuseOpts=*/ fuseOpts);
         } catch (FuseException e) {
@@ -538,7 +538,7 @@ public class FuseCAS extends FuseStubFS {
   }
 
   private String basename(String path) {
-    return path.substring(path.lastIndexOf("/") + 1);
+    return path.substring(path.lastIndexOf('/') + 1);
   }
 
   @Override
