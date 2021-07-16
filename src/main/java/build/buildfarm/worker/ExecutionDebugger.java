@@ -55,6 +55,8 @@ public class ExecutionDebugger {
    *     via a failed result.
    * @details This allows users to see relevant debug information related to the executor.
    * @param processBuilder Information about the constructed process.
+   * @param exitCode The original exit code of the execution. The debugger will fail the execution
+   *     but show the exit code in the debug message.
    * @param limits The resource limitations of an execution.
    * @param executionStatistics Resource usage information about the executed action.
    * @param resultBuilder Used to report back debug information.
@@ -63,11 +65,13 @@ public class ExecutionDebugger {
    */
   public static Code performAfterExecutionDebug(
       ProcessBuilder processBuilder,
+      int exitCode,
       ResourceLimits limits,
       ExecutionStatistics executionStatistics,
       ActionResult.Builder resultBuilder) {
     String message =
-        getAfterExecutionDebugInfo(processBuilder, limits, executionStatistics, resultBuilder);
+        getAfterExecutionDebugInfo(
+            processBuilder, exitCode, limits, executionStatistics, resultBuilder);
     resultBuilder.setStderrRaw(ByteString.copyFromUtf8(message));
     resultBuilder.setExitCode(-1);
     return Code.OK;
@@ -107,6 +111,8 @@ public class ExecutionDebugger {
    * @brief Build the debug log message that we want users to see.
    * @details This be sent back to the user via the stderr of their execution.
    * @param processBuilder Information about the constructed process.
+   * @param exitCode The original exit code of the execution. The debugger will fail the execution
+   *     but show the exit code in the debug message.
    * @param limits The resource limitations of an execution.
    * @param executionStatistics Resource usage information about the executed action.
    * @param resultBuilder Used to report back debug information.
@@ -115,6 +121,7 @@ public class ExecutionDebugger {
    */
   private static String getAfterExecutionDebugInfo(
       ProcessBuilder processBuilder,
+      int exitCode,
       ResourceLimits limits,
       ExecutionStatistics executionStatistics,
       ActionResult.Builder resultBuilder) {
@@ -132,6 +139,8 @@ public class ExecutionDebugger {
     ByteString stderrBytes = resultBuilder.build().getStderrRaw();
     info.stdout = stdoutBytes.toStringUtf8();
     info.stderr = stderrBytes.toStringUtf8();
+
+    info.exitCode = exitCode;
 
     // convert to json
     Gson gson = new GsonBuilder().setPrettyPrinting().create();

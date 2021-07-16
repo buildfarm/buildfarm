@@ -84,7 +84,7 @@ java_binary(
     main_class = "build.buildfarm.worker.operationqueue.Worker",
     visibility = ["//visibility:public"],
     runtime_deps = [
-        "//src/main/java/build/buildfarm/worker/operationqueue",
+        "//src/main/java/build/buildfarm/worker/memory",
     ],
 )
 
@@ -213,6 +213,7 @@ java_binary(
     main_class = "build.buildfarm.Cat",
     visibility = ["//visibility:public"],
     deps = [
+        ":worker-profiler-printer",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
@@ -240,6 +241,7 @@ java_binary(
     main_class = "build.buildfarm.WorkerProfile",
     visibility = ["//visibility:public"],
     deps = [
+        ":worker-profiler-printer",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/redis",
         "//src/main/java/build/buildfarm/instance",
@@ -359,6 +361,32 @@ java_binary(
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_context",
+        "@maven//:io_grpc_grpc_core",
+        "@maven//:io_grpc_grpc_netty",
+        "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:io_grpc_grpc_stub",
+    ],
+)
+
+java_library(
+    name = "worker-profiler-printer",
+    srcs = ["WorkerProfilePrinter.java"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/redis",
+        "//src/main/java/build/buildfarm/instance",
+        "//src/main/java/build/buildfarm/instance/shard",
+        "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/java/build/buildfarm/worker/shard",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//third_party/jedis",
+        "@maven//:com_github_pcj_google_options",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
         "@maven//:io_grpc_grpc_api",
         "@maven//:io_grpc_grpc_context",
         "@maven//:io_grpc_grpc_core",
