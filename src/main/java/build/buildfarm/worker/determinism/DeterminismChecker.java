@@ -34,6 +34,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * @class DeterminismChecker
@@ -48,6 +50,7 @@ import java.util.Map;
  *     build/test invocations but is used for debugging and discovering issues.
  */
 public class DeterminismChecker {
+  private static final Logger logger = Logger.getLogger(DeterminismChecker.class.getName());
 
   /**
    * @brief Run an action multiple times on behalf of the executor in order to decide if it is
@@ -125,7 +128,7 @@ public class DeterminismChecker {
           queuedOperation.getAction(),
           queuedOperation.getCommand());
     } catch (IOException | InterruptedException e) {
-      System.out.println(e);
+      logger.log(Level.SEVERE, "cannot create exec dir: ", e);
     }
   }
   /**
@@ -159,7 +162,7 @@ public class DeterminismChecker {
       Process process = processBuilder.start();
       int exitCode = process.waitFor();
     } catch (IOException | InterruptedException e) {
-      System.out.println(e);
+      logger.log(Level.SEVERE, "process did not complete: ", e);
     }
   }
   /**
@@ -201,7 +204,7 @@ public class DeterminismChecker {
       Digest digest = digestUtil.compute(path);
       fileDigests.put(path, digest);
     } catch (IOException e) {
-      System.out.println(e);
+      logger.log(Level.SEVERE, "could not compute file digest: ", e);
     }
   }
   /**
@@ -225,7 +228,7 @@ public class DeterminismChecker {
             }
           });
     } catch (IOException e) {
-      System.out.println(e);
+      logger.log(Level.SEVERE, "could not traverse file tree and collect dir digests: ", e);
     }
   }
   /**
