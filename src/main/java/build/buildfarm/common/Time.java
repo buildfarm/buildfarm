@@ -56,7 +56,7 @@ public class Time {
    * @note Suggested return identifier: nanoseconds.
    */
   public static long secondsToNanoseconds(long seconds) {
-    return seconds * 1000000000;
+    return seconds * 1000000000L;
   }
 
   /**
@@ -66,7 +66,7 @@ public class Time {
    * @return Seconds converted from milliseconds.
    * @note Suggested return identifier: seconds.
    */
-  public static int millisecondsToSeconds(int milliseconds) {
-    return milliseconds / 1000;
+  public static long millisecondsToSeconds(long milliseconds) {
+    return milliseconds / 1000L;
   }
 }
