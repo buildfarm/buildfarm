@@ -912,8 +912,8 @@ public class RedisShardBackplane implements Backplane {
 
               List<Response<String>> actionResults = new ArrayList<>(keyResults.size());
               JedisClusterPipeline p = jedis.pipelined();
-              for (int i = 0; i < keyResults.size(); i++) {
-                actionResults.add(p.get(keyResults.get(i)));
+              for (String key : keyResults) {
+                actionResults.add(p.get(key));
               }
               p.sync();
               for (int i = 0; i < keyResults.size(); i++) {
