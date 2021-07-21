@@ -288,7 +288,7 @@ public class Retrier {
 
   public static class ProgressiveBackoff implements Backoff {
     private final Supplier<Backoff> backoffSupplier;
-    private Backoff currentBackoff = null;
+    private Backoff currentBackoff;
     private int retries = 0;
 
     /**

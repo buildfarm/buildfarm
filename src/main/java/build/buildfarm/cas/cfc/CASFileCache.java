@@ -359,8 +359,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return null;
     }
 
-    boolean isExecutable = false;
-    boolean hasSizeComponent = false;
     Digest digest;
     try {
       // Can be legacy: <hash>_<size>[_exec]
@@ -368,12 +366,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       // Streamline when legacy is removed for #677
       String hashComponent = components[0];
       digest = digestUtil.build(hashComponent, size);
-      isExecutable = components[components.length - 1].equals("exec");
+      boolean isExecutable = components[components.length - 1].equals("exec");
       // must be executable for 3 fields
       if (!isExecutable && components.length > 2) {
         return null;
       }
-      hasSizeComponent = components.length == (isExecutable ? 3 : 2);
+      boolean hasSizeComponent = components.length == (isExecutable ? 3 : 2);
       long parsedSizeComponent = hasSizeComponent ? Long.parseLong(components[1]) : size;
       if (size != parsedSizeComponent) {
         return null;
@@ -494,9 +492,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       String key = getKey(digest, isExecutable);
       Entry e = storage.get(key);
       if (e != null) {
-        InputStream input = null;
         try {
-          input = Files.newInputStream(getPath(key));
+          InputStream input = Files.newInputStream(getPath(key));
           input.skip(offset);
         } catch (NoSuchFileException eNoEnt) {
           boolean removed = false;
@@ -2319,10 +2316,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private void copyExternalInput(Digest digest, CancellableOutputStream out)
       throws IOException, InterruptedException {
     logger.log(Level.FINE, format("downloading %s", DigestUtil.toString(digest)));
-    boolean complete = false;
     try (InputStream in = newExternalInput(digest, /* offset=*/ 0)) {
       ByteStreams.copy(in, out);
-      complete = true;
     } catch (IOException e) {
       out.cancel();
       logger.log(
