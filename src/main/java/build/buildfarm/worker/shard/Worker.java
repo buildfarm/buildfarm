@@ -698,7 +698,8 @@ public class Worker extends LoggingMain {
       throws ConfigurationException {
     ImmutableList.Builder<ContentAddressableStorage> storages = ImmutableList.builder();
     // must construct delegates first
-    ContentAddressableStorage storage = null, delegate = null;
+    ContentAddressableStorage storage = null;
+    ContentAddressableStorage delegate = null;
     for (ContentAddressableStorageConfig config : Lists.reverse(configs)) {
       storage =
           createStorage(

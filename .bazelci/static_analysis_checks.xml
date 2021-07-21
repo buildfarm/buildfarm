@@ -35,7 +35,6 @@
     <exclude name="LooseCoupling"/>
     <exclude name="MethodReturnsInternalArray"/>
     <exclude name="MissingOverride"/>
-    <exclude name="OneDeclarationPerLine"/>
     <exclude name="PositionLiteralsFirstInCaseInsensitiveComparisons"/>
     <exclude name="PositionLiteralsFirstInComparisons"/>
     <exclude name="PreserveStackTrace"/>

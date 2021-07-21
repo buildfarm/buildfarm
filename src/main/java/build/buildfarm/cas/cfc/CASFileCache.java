@@ -1643,8 +1643,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     while (header.after == header) {
       int references = 0;
       int keys = 0;
-      int min = -1, max = 0;
-      String minkey = null, maxkey = null;
+      int min = -1;
+      int max = 0;
+      String minkey = null;
+      String maxkey = null;
       logger.log(
           Level.INFO,
           format(
@@ -2740,7 +2742,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @VisibleForTesting
   public static class Entry {
-    Entry before, after;
+    Entry before;
+    Entry after;
     final String key;
     final long size;
     int referenceCount;
