@@ -672,24 +672,22 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   @Override
   public void put(Blob blob, Runnable onExpiration) throws InterruptedException {
     String key = getKey(blob.getDigest(), false);
-    try {
+    try (OutputStream out =
+        putImpl(
+            key,
+            UUID.randomUUID(),
+            () -> completeWrite(blob.getDigest()),
+            blob.getDigest().getSizeBytes(),
+            /* isExecutable=*/ false,
+            () -> invalidateWrite(blob.getDigest()),
+            /* isReset=*/ true)) {
       logger.log(Level.FINE, format("put: %s", key));
-      OutputStream out =
-          putImpl(
-              key,
-              UUID.randomUUID(),
-              () -> completeWrite(blob.getDigest()),
-              blob.getDigest().getSizeBytes(),
-              /* isExecutable=*/ false,
-              () -> invalidateWrite(blob.getDigest()),
-              /* isReset=*/ true);
       boolean referenced = out == null;
       try {
         if (out != null) {
           try {
             blob.getData().writeTo(out);
           } finally {
-            out.close();
             referenced = true;
           }
         }

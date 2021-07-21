@@ -52,7 +52,6 @@
     <exclude name="UseAssertSameInsteadOfAssertTrue"/>
     <exclude name="UseAssertTrueInsteadOfAssertEquals"/>
     <exclude name="UseCollectionIsEmpty"/>
-    <exclude name="UseTryWithResources"/>
     <exclude name="UseVarargs"/>
 </rule>
 
