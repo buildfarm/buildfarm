@@ -87,8 +87,9 @@ tasks:
     - ./.bazelci/integration_test.sh
     
   # Memory integration test is too slow.
-  # We can re-enable it, if memory instance is faster or we build less targets.
-  # It is preserved here for testing.
+  # We can re-enable it if memory instance becomes faster or we build less targets.
+  # It is preserved here for offline testing.
+  
   # integration_test_abseil:
   #   name: "Abseil Test (Memory)"
   #   platform: ubuntu1804
@@ -96,6 +97,7 @@ tasks:
   #   - export TEST_SHARD=false
   #   - export RUN_TEST=./.bazelci/run_abseil_test.sh
   #   - ./.bazelci/integration_test.sh
+  
   integration_test_abseil_shard:
     name: "Abseil Test (Shard)"
     platform: ubuntu1804
