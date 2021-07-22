@@ -158,6 +158,11 @@ public class UploadManifest {
 
   private void addFile(Path file, CASInsertionPolicy policy) throws IOException {
     Digest digest = digestUtil.compute(file);
+    result
+        .addOutputFilesBuilder()
+        .setPath(execRoot.relativize(file).toString())
+        .setIsExecutable(Files.isExecutable(file))
+        .setDigest(digest);
     digestToFile.put(digest, file);
   }
 

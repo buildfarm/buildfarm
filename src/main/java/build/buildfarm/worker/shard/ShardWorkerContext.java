@@ -532,6 +532,12 @@ class ShardWorkerContext implements WorkerContext {
       return;
     }
 
+    resultBuilder
+        .addOutputFilesBuilder()
+        .setPath(outputFile)
+        .setDigest(digest)
+        .setIsExecutable(Files.isExecutable(outputPath));
+
     try {
       insertFile(digest, outputPath);
     } catch (EntryLimitException e) {
