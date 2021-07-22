@@ -193,7 +193,6 @@ public class Worker extends LoggingMain {
         throws IOException, InterruptedException, ExecutionException {
       // create a write for inserting into another CAS member.
       String workerName = getRandomWorker();
-      Instance casMember = workerStub(workerName);
       Write write = getCasMemberWrite(digest, workerName);
 
       streamIntoWriteFuture(in, write, digest).get();

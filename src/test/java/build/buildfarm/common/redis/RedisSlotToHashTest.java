@@ -58,7 +58,7 @@ public class RedisSlotToHashTest {
   // Failure explanation: the object cannot be constructed
   @Test
   public void correlateEnsureConstruction() throws Exception {
-    RedisSlotToHash slotToHash = new RedisSlotToHash();
+    new RedisSlotToHash();
   }
 
   // Function under test: correlateRange

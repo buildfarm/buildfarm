@@ -2041,7 +2041,6 @@ public class ShardInstance extends AbstractServerInstance {
     }
     Digest actionDigest = metadata.getActionDigest();
     SettableFuture<Void> queueFuture = SettableFuture.create();
-    long startTransformUSecs = stopwatch.elapsed(MICROSECONDS);
     logger.log(
         Level.FINE,
         format(

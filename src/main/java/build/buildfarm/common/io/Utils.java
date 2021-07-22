@@ -172,7 +172,7 @@ public class Utils {
       direntPtr = libc.readdir(DIR);
     }
 
-    int return_value = libc.closedir(DIR);
+    libc.closedir(DIR);
     return dirents;
   }
 
@@ -465,7 +465,6 @@ public class Utils {
 
   public static @Nullable UserPrincipal getUser(String userName, FileSystem fileSystem)
       throws IOException {
-    final @Nullable UserPrincipal user;
     if (Strings.isNullOrEmpty(userName)) {
       return null;
     }

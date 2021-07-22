@@ -254,7 +254,6 @@ class Executor {
                 .setDigest(missingDigest)
                 .setData(ByteString.copyFrom(Files.readAllBytes(path)))
                 .build();
-        boolean foundBucket = false;
         int maxBucketSize = 0;
         long minBucketSize = Size.mbToBytes(2) + 1;
         int maxBucketIndex = 0;
@@ -335,7 +334,7 @@ class Executor {
             writtenBytes += len;
             first = false;
           }
-          WriteResponse response = writtenFuture.get();
+          writtenFuture.get();
           System.out.println(
               "Wrote long "
                   + DigestUtil.toString(missingDigest)
