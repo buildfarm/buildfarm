@@ -81,7 +81,7 @@ container_image(
 java_binary(
     name = "buildfarm-operationqueue-worker",
     jvm_flags = ensure_accurate_metadata(),
-    main_class = "build.buildfarm.worker.operationqueue.Worker",
+    main_class = "build.buildfarm.worker.memory.Worker",
     visibility = ["//visibility:public"],
     runtime_deps = [
         "//src/main/java/build/buildfarm/worker/memory",
