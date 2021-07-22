@@ -53,7 +53,7 @@ class FindOperations {
 
     // get operations and print them
     ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
-    String token = instance.listOperations(100, "/operations", filterPredicate, operations);
+    instance.listOperations(100, "/operations", filterPredicate, operations);
     for (Operation operation : operations.build()) {
       System.out.println(operation.getName());
     }

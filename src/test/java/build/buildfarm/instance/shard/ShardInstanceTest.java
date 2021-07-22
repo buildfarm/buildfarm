@@ -50,7 +50,6 @@ import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
-import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
@@ -325,14 +324,6 @@ public class ShardInstanceTest {
 
   @Test
   public void queueActionFailsQueueEligibility() throws Exception {
-    ByteString foo = ByteString.copyFromUtf8("foo");
-    Digest fooDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("foo"));
-    // no need to provide foo, just want to make a non-default directory
-    Directory subdir =
-        Directory.newBuilder()
-            .addFiles(FileNode.newBuilder().setName("foo").setDigest(fooDigest))
-            .build();
-    Digest subdirDigest = DIGEST_UTIL.compute(foo);
     Directory inputRoot = Directory.newBuilder().build();
     ByteString inputRootContent = inputRoot.toByteString();
     Digest inputRootDigest = DIGEST_UTIL.compute(inputRootContent);
@@ -454,12 +445,6 @@ public class ShardInstanceTest {
   @Test
   public void queueDirectoryMissingErrorsOperation() throws Exception {
     ByteString foo = ByteString.copyFromUtf8("foo");
-    Digest fooDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("foo"));
-    // no need to provide foo, just want to make a non-default directory
-    Directory subdir =
-        Directory.newBuilder()
-            .addFiles(FileNode.newBuilder().setName("foo").setDigest(fooDigest))
-            .build();
     Digest subdirDigest = DIGEST_UTIL.compute(foo);
     Directory inputRoot =
         Directory.newBuilder()
@@ -616,17 +601,6 @@ public class ShardInstanceTest {
     when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
-
-    ActionResult actionResult =
-        ActionResult.newBuilder()
-            .addOutputFiles(
-                OutputFile.newBuilder()
-                    .setPath("output/path")
-                    .setDigest(
-                        Digest.newBuilder()
-                            .setHash("find-missing-blobs-causes-resource-exhausted")
-                            .setSizeBytes(1)))
-            .build();
 
     when(mockBackplane.getActionResult(eq(actionKey)))
         .thenThrow(new IOException(Status.UNAVAILABLE.asException()));

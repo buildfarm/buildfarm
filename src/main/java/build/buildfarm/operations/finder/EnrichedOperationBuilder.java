@@ -134,27 +134,22 @@ public class EnrichedOperationBuilder {
    */
   private static Digest operationToActionDigest(Operation operation) {
     ExecuteOperationMetadata metadata;
-    RequestMetadata requestMetadata;
 
     try {
       if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
         QueuedOperationMetadata queuedOperationMetadata =
             operation.getMetadata().unpack(QueuedOperationMetadata.class);
         metadata = queuedOperationMetadata.getExecuteOperationMetadata();
-        requestMetadata = queuedOperationMetadata.getRequestMetadata();
       } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
         ExecutingOperationMetadata executingMetadata =
             operation.getMetadata().unpack(ExecutingOperationMetadata.class);
         metadata = executingMetadata.getExecuteOperationMetadata();
-        requestMetadata = executingMetadata.getRequestMetadata();
       } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
         CompletedOperationMetadata completedMetadata =
             operation.getMetadata().unpack(CompletedOperationMetadata.class);
         metadata = completedMetadata.getExecuteOperationMetadata();
-        requestMetadata = completedMetadata.getRequestMetadata();
       } else {
         metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-        requestMetadata = null;
       }
 
     } catch (InvalidProtocolBufferException e) {
