@@ -160,7 +160,7 @@ public class DeterminismChecker {
   private static void runAction(ProcessBuilder processBuilder) {
     try {
       Process process = processBuilder.start();
-      int exitCode = process.waitFor();
+      process.waitFor();
     } catch (IOException | InterruptedException e) {
       logger.log(Level.SEVERE, "process did not complete: ", e);
     }
