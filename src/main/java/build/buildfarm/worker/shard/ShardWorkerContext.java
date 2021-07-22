@@ -29,7 +29,6 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
-import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.backplane.Backplane;
@@ -533,12 +532,12 @@ class ShardWorkerContext implements WorkerContext {
       return;
     }
 
-    OutputFile.Builder outputFileBuilder =
-        resultBuilder
-            .addOutputFilesBuilder()
-            .setPath(outputFile)
-            .setDigest(digest)
-            .setIsExecutable(Files.isExecutable(outputPath));
+    resultBuilder
+        .addOutputFilesBuilder()
+        .setPath(outputFile)
+        .setDigest(digest)
+        .setIsExecutable(Files.isExecutable(outputPath));
+
     try {
       insertFile(digest, outputPath);
     } catch (EntryLimitException e) {

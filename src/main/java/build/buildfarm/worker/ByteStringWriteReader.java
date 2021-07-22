@@ -43,7 +43,6 @@ public class ByteStringWriteReader implements Runnable {
   }
 
   public void run() {
-    boolean closed = false;
     byte[] buffer = new byte[1024 * 16];
     int len;
     write.getFuture().addListener(this::complete, directExecutor());

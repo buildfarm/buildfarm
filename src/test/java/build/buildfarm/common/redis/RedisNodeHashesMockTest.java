@@ -87,7 +87,7 @@ public class RedisNodeHashesMockTest {
   // Failure explanation: the object cannot be constructed
   @Test
   public void getEvenlyDistributedHashesCanConstruct() throws Exception {
-    RedisNodeHashes converter = new RedisNodeHashes();
+    new RedisNodeHashes();
   }
 
   // Function under test: getEvenlyDistributedHashesWithPrefix

@@ -61,7 +61,6 @@ import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.hash.HashCode;
-import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.CancelOperationRequest;
 import com.google.longrunning.GetOperationRequest;
 import com.google.longrunning.ListOperationsRequest;
@@ -440,7 +439,6 @@ public class BuildFarmServerTest {
 
     assertThat(getBlob(digest)).isNull();
 
-    SettableFuture<Void> partialFuture = SettableFuture.create();
     FutureWriteResponseObserver futureResponder = new FutureWriteResponseObserver();
     StreamObserver<WriteRequest> requestObserver =
         ByteStreamGrpc.newStub(inProcessChannel).write(futureResponder);

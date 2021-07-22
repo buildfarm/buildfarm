@@ -242,7 +242,7 @@ public class RedisShardBackplane implements Backplane {
           protected void visit(ExecuteEntry executeEntry, String executeEntryJson) {
             String operationName = executeEntry.getOperationName();
             String value = processingOperations.get(jedis, operationName);
-            int defaultTimeout_ms = config.getProcessingTimeoutMillis();
+            long defaultTimeout_ms = config.getProcessingTimeoutMillis();
 
             // get the operation's expiration
             Instant expiresAt = convertToMilliInstant(value, operationName);
@@ -251,7 +251,7 @@ public class RedisShardBackplane implements Backplane {
             if (expiresAt == null) {
               expiresAt = now.plusMillis(defaultTimeout_ms);
               String keyValue = String.format("%d", expiresAt.toEpochMilli());
-              int timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
+              long timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
               processingOperations.insert(jedis, operationName, keyValue, timeout_s);
             }
 
@@ -275,7 +275,7 @@ public class RedisShardBackplane implements Backplane {
           protected void visit(QueueEntry queueEntry, String queueEntryJson) {
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             String value = dispatchedOperations.get(jedis, operationName);
-            int defaultTimeout_ms = config.getDispatchingTimeoutMillis();
+            long defaultTimeout_ms = config.getDispatchingTimeoutMillis();
 
             // get the operation's expiration
             Instant expiresAt = convertToMilliInstant(value, operationName);
@@ -284,7 +284,7 @@ public class RedisShardBackplane implements Backplane {
             if (expiresAt == null) {
               expiresAt = now.plusMillis(defaultTimeout_ms);
               String keyValue = String.format("%d", expiresAt.toEpochMilli());
-              int timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
+              long timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
               dispatchedOperations.insert(jedis, operationName, keyValue, timeout_s);
             }
 
@@ -1021,8 +1021,6 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public boolean putOperation(Operation operation, ExecutionStage.Value stage) throws IOException {
-    // FIXME queue and prequeue should no longer be passed to here
-    boolean prequeue = stage == ExecutionStage.Value.UNKNOWN && !operation.getDone();
     boolean queue = stage == ExecutionStage.Value.QUEUED;
     boolean complete = !queue && operation.getDone();
     boolean publish = !queue && stage != ExecutionStage.Value.UNKNOWN;
