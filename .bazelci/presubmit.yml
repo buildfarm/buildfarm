@@ -89,7 +89,7 @@ tasks:
     name: "Abseil Test (Memory)"
     platform: ubuntu1804
     shell_commands:
-    - export TEST_SHARD=true
+    - export TEST_SHARD=false
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
     - ./.bazelci/integration_test.sh
   integration_test_abseil_shard:
