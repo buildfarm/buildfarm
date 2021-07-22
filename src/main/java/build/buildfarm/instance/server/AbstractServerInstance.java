@@ -932,14 +932,12 @@ public abstract class AbstractServerInstance implements Instance {
       PreconditionFailure.Builder preconditionFailure,
       RequestMetadata requestMetadata)
       throws StatusException, InterruptedException {
-    final ListenableFuture<Void> validatedFuture;
     if (!queuedOperation.hasAction()) {
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("blobs/" + DigestUtil.toString(actionDigest))
           .setDescription(MISSING_ACTION);
-      validatedFuture = Futures.immediateFuture(null);
     } else {
       ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
       validateAction(
@@ -1247,9 +1245,8 @@ public abstract class AbstractServerInstance implements Instance {
       RequestMetadata requestMetadata,
       Watcher watcher)
       throws InterruptedException {
-    Action action;
     try {
-      action = validateActionDigest("execute", actionDigest, requestMetadata);
+      validateActionDigest("execute", actionDigest, requestMetadata);
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {

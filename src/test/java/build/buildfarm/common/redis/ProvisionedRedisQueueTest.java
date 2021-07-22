@@ -47,8 +47,7 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the object cannot be constructed
   @Test
   public void provisionedRedisQueueCanConstruct() throws Exception {
-    ProvisionedRedisQueue queue =
-        new ProvisionedRedisQueue("name", ImmutableList.of(), HashMultimap.create());
+    new ProvisionedRedisQueue("name", ImmutableList.of(), HashMultimap.create());
   }
 
   // Function under test: ProvisionedRedisQueue
@@ -56,8 +55,7 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the object cannot be constructed
   @Test
   public void provisionedRedisQueueCanConstructOverload() throws Exception {
-    ProvisionedRedisQueue queue =
-        new ProvisionedRedisQueue("name", ImmutableList.of(), HashMultimap.create(), true);
+    new ProvisionedRedisQueue("name", ImmutableList.of(), HashMultimap.create(), true);
   }
 
   // Function under test: explainEligibility
