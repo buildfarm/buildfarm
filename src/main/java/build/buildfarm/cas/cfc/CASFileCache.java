@@ -459,16 +459,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       accessed(foundDigests);
     }
     ImmutableList<Digest> missingDigests = builder.build();
-    if (delegate != null && !missingDigests.isEmpty()) {
-      return delegate.findMissingBlobs(missingDigests);
-    }
-    return missingDigests;
+    return findMissingBlobsFallback(missingDigests);
   }
 
   @Override
   public boolean contains(Digest digest, Digest.Builder result) {
-    return containsLocal(digest, result, (key) -> accessed(ImmutableList.of(key)))
-        || (delegate != null && delegate.contains(digest, result));
+    boolean found = containsLocal(digest, result, (key) -> accessed(ImmutableList.of(key)));
+    if (found) {
+      return true;
+    }
+
+    return containsFallback(digest, result);
   }
 
   @Override
@@ -480,11 +481,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     try {
       return newLocalInput(digest, offset);
     } catch (NoSuchFileException e) {
-      if (delegate == null) {
-        throw e;
-      }
+      return newTransparentInputFallback(e, digest, offset);
     }
-    return delegate.newInput(digest, offset);
   }
 
   InputStream newLocalInput(Digest digest, long offset) throws IOException {
@@ -531,25 +529,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     try {
       return newLocalInput(digest, offset);
     } catch (NoSuchFileException e) {
-      if (delegate == null) {
-        throw e;
-      }
+      return newInputFallback(e, digest, offset);
     }
-    if (digest.getSizeBytes() > maxEntrySizeInBytes) {
-      return delegate.newInput(digest, offset);
-    }
-    Write write = getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-    return newReadThroughInput(digest, offset, write);
-  }
-
-  ReadThroughInputStream newReadThroughInput(Digest digest, long offset, Write write)
-      throws IOException {
-    return new ReadThroughInputStream(
-        delegate.newInput(digest, 0),
-        localOffset -> newTransparentInput(digest, localOffset),
-        digest.getSizeBytes(),
-        offset,
-        write);
   }
 
   @Override
@@ -1194,11 +1175,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   public StartupCacheResults start(
       Consumer<Digest> onStartPut, ExecutorService removeDirectoryService, boolean skipLoad)
       throws IOException, InterruptedException {
-    // start delegate if it exists
-    if (delegate != null && delegate instanceof CASFileCache) {
-      CASFileCache fileCacheDelegate = (CASFileCache) delegate;
-      fileCacheDelegate.start(onStartPut, removeDirectoryService, skipLoad);
-    }
+    startFallback(onStartPut, removeDirectoryService, skipLoad);
 
     logger.log(Level.INFO, "Initializing cache at: " + root);
     Instant startTime = Instant.now();
@@ -1802,30 +1779,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 + e.referenceCount
                 + " references");
       }
-      boolean interrupted = false;
-      if (delegate != null) {
-        FileEntryKey fileEntryKey = parseFileEntryKey(e.key, e.size);
-        if (fileEntryKey == null) {
-          logger.log(Level.SEVERE, format("error parsing expired key %s", e.key));
-        } else {
-          Write write =
-              delegate.getWrite(
-                  fileEntryKey.getDigest(),
-                  UUID.randomUUID(),
-                  RequestMetadata.getDefaultInstance());
-          try (OutputStream out = write.getOutput(1, MINUTES, () -> {});
-              InputStream in = Files.newInputStream(getPath(e.key))) {
-            ByteStreams.copy(in, out);
-          } catch (IOException ioEx) {
-            interrupted =
-                Thread.interrupted()
-                    || ioEx.getCause() instanceof InterruptedException
-                    || ioEx instanceof ClosedByInterruptException;
-            write.reset();
-            logger.log(Level.SEVERE, format("error delegating expired entry %s", e.key), ioEx);
-          }
-        }
-      }
+      boolean interrupted = expireEntryFallback(e);
       Entry removedEntry = storage.remove(e.key);
       // reference compare on purpose
       if (removedEntry == e) {
@@ -2886,4 +2840,89 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   protected abstract InputStream newExternalInput(Digest digest, long offset)
       throws IOException, InterruptedException;
+
+  // CAS fallback methods
+  private void startFallback(
+      Consumer<Digest> onStartPut, ExecutorService removeDirectoryService, boolean skipLoad)
+      throws IOException, InterruptedException {
+    // start delegate if we specifically have a CASFileCache
+    if (delegate != null && delegate instanceof CASFileCache) {
+      CASFileCache fileCacheDelegate = (CASFileCache) delegate;
+      fileCacheDelegate.start(onStartPut, removeDirectoryService, skipLoad);
+    }
+  }
+
+  private InputStream newTransparentInputFallback(NoSuchFileException e, Digest digest, long offset)
+      throws IOException {
+    if (delegate == null) {
+      throw e;
+    }
+    return delegate.newInput(digest, offset);
+  }
+
+  private InputStream newInputFallback(NoSuchFileException e, Digest digest, long offset)
+      throws IOException {
+    if (delegate == null) {
+      throw e;
+    }
+
+    if (digest.getSizeBytes() > maxEntrySizeInBytes) {
+      return delegate.newInput(digest, offset);
+    }
+    Write write = getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+    return newReadThroughInput(digest, offset, write);
+  }
+
+  ReadThroughInputStream newReadThroughInput(Digest digest, long offset, Write write)
+      throws IOException {
+    return new ReadThroughInputStream(
+        delegate.newInput(digest, 0),
+        localOffset -> newTransparentInput(digest, localOffset),
+        digest.getSizeBytes(),
+        offset,
+        write);
+  }
+
+  private Iterable<Digest> findMissingBlobsFallback(ImmutableList<Digest> missingDigests)
+      throws InterruptedException {
+    // skip calling the fallback CAS if it does not exist or we already found the digests
+    if (delegate == null || missingDigests.isEmpty()) {
+      return missingDigests;
+    }
+
+    return delegate.findMissingBlobs(missingDigests);
+  }
+
+  private boolean containsFallback(Digest digest, Digest.Builder result) {
+    if (delegate == null) {
+      return false;
+    }
+    return delegate.contains(digest, result);
+  }
+
+  private boolean expireEntryFallback(Entry e) throws IOException, InterruptedException {
+    boolean interrupted = false;
+    if (delegate != null) {
+      FileEntryKey fileEntryKey = parseFileEntryKey(e.key, e.size);
+      if (fileEntryKey == null) {
+        logger.log(Level.SEVERE, format("error parsing expired key %s", e.key));
+      } else {
+        Write write =
+            delegate.getWrite(
+                fileEntryKey.getDigest(), UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+        try (OutputStream out = write.getOutput(1, MINUTES, () -> {});
+            InputStream in = Files.newInputStream(getPath(e.key))) {
+          ByteStreams.copy(in, out);
+        } catch (IOException ioEx) {
+          interrupted =
+              Thread.interrupted()
+                  || ioEx.getCause() instanceof InterruptedException
+                  || ioEx instanceof ClosedByInterruptException;
+          write.reset();
+          logger.log(Level.SEVERE, format("error delegating expired entry %s", e.key), ioEx);
+        }
+      }
+    }
+    return interrupted;
+  }
 }
