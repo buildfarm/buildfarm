@@ -75,7 +75,7 @@ tasks:
     name: "Integration Test (Memory)"
     platform: ubuntu1804
     shell_commands:
-    - export TEST_SHARD=true
+    - export TEST_SHARD=false
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
   integration_test_many_shard:
     name: "Integration Test (Shard)"
