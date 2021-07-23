@@ -5,7 +5,7 @@ cd buildfarm;
 
 #Various targets to be tested
 BUILDFARM_SERVER_TARGET="//src/main/java/build/buildfarm:buildfarm-server"
-BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-operationqueue-worker"
+BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-memory-worker"
 BUILDFARM_SHARD_WORKER_TAERGET="//src/main/java/build/buildfarm:buildfarm-shard-worker"
 
 #The configs used by the targets
