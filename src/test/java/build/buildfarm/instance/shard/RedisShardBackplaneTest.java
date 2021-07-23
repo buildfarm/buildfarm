@@ -241,8 +241,6 @@ public class RedisShardBackplaneTest {
             config, "invocation-blacklist-test", o -> o, o -> o, mockJedisClusterFactory);
     backplane.start("startTime/test:0000");
 
-    final String opName = "op";
-
     assertThat(
             backplane.isBlacklisted(
                 RequestMetadata.newBuilder()
