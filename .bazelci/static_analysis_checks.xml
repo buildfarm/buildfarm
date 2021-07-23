@@ -19,7 +19,6 @@
     <exclude name="CheckResultSet"/>
     <exclude name="ConstantsInInterface"/>
     <exclude name="DefaultLabelNotLastInSwitchStmt"/>
-    <exclude name="DoubleBraceInitialization"/>
     <exclude name="ForLoopVariableCount"/>
     <exclude name="GuardLogStatement"/>
     <exclude name="JUnit4SuitesShouldUseSuiteAnnotation"/>
@@ -34,7 +33,6 @@
     <exclude name="LooseCoupling"/>
     <exclude name="MethodReturnsInternalArray"/>
     <exclude name="MissingOverride"/>
-    <exclude name="OneDeclarationPerLine"/>
     <exclude name="PositionLiteralsFirstInCaseInsensitiveComparisons"/>
     <exclude name="PositionLiteralsFirstInComparisons"/>
     <exclude name="PreserveStackTrace"/>
@@ -45,7 +43,6 @@
     <exclude name="SystemPrintln"/>
     <exclude name="UnusedAssignment"/>
     <exclude name="UnusedFormalParameter"/>
-    <exclude name="UnusedLocalVariable"/>
     <exclude name="UseAssertEqualsInsteadOfAssertTrue"/>
     <exclude name="UseAssertNullInsteadOfAssertTrue"/>
     <exclude name="UseAssertSameInsteadOfAssertTrue"/>

@@ -1021,8 +1021,6 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public boolean putOperation(Operation operation, ExecutionStage.Value stage) throws IOException {
-    // FIXME queue and prequeue should no longer be passed to here
-    boolean prequeue = stage == ExecutionStage.Value.UNKNOWN && !operation.getDone();
     boolean queue = stage == ExecutionStage.Value.QUEUED;
     boolean complete = !queue && operation.getDone();
     boolean publish = !queue && stage != ExecutionStage.Value.UNKNOWN;

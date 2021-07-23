@@ -56,7 +56,7 @@ public class RedisQueueTest {
   @Test
   public void redisQueueConstructsWithoutError() throws Exception {
     // ACT
-    RedisQueue queue = new RedisQueue("test");
+    new RedisQueue("test");
   }
 
   // Function under test: push

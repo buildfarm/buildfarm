@@ -1643,8 +1643,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     while (header.after == header) {
       int references = 0;
       int keys = 0;
-      int min = -1, max = 0;
-      String minkey = null, maxkey = null;
+      int min = -1;
+      int max = 0;
+      String minkey = null;
+      String maxkey = null;
       logger.log(
           Level.INFO,
           format(
@@ -2184,8 +2186,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         transformAsync(
             fetchFuture,
             (result) -> {
-              ImmutableList.Builder<Throwable> failures = ImmutableList.builder();
-              boolean failed = false;
               try {
                 disableAllWriteAccess(path);
               } catch (IOException e) {
@@ -2319,10 +2319,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private void copyExternalInput(Digest digest, CancellableOutputStream out)
       throws IOException, InterruptedException {
     logger.log(Level.FINE, format("downloading %s", DigestUtil.toString(digest)));
-    boolean complete = false;
     try (InputStream in = newExternalInput(digest, /* offset=*/ 0)) {
       ByteStreams.copy(in, out);
-      complete = true;
     } catch (IOException e) {
       out.cancel();
       logger.log(
@@ -2740,7 +2738,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @VisibleForTesting
   public static class Entry {
-    Entry before, after;
+    Entry before;
+    Entry after;
     final String key;
     final long size;
     int referenceCount;

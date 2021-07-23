@@ -193,7 +193,6 @@ public class Worker extends LoggingMain {
         throws IOException, InterruptedException, ExecutionException {
       // create a write for inserting into another CAS member.
       String workerName = getRandomWorker();
-      Instance casMember = workerStub(workerName);
       Write write = getCasMemberWrite(digest, workerName);
 
       streamIntoWriteFuture(in, write, digest).get();
@@ -698,7 +697,8 @@ public class Worker extends LoggingMain {
       throws ConfigurationException {
     ImmutableList.Builder<ContentAddressableStorage> storages = ImmutableList.builder();
     // must construct delegates first
-    ContentAddressableStorage storage = null, delegate = null;
+    ContentAddressableStorage storage = null;
+    ContentAddressableStorage delegate = null;
     for (ContentAddressableStorageConfig config : Lists.reverse(configs)) {
       storage =
           createStorage(

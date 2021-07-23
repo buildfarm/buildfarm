@@ -35,7 +35,7 @@ bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile> [<-p|--p
 Run via
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+bazel run //src/main/java/build/buildfarm:buildfarm-memory-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
 ```
 
 - **`configfile`** has to be in Protocol Buffer text format, corresponding to a [WorkerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L459) definition.
@@ -72,7 +72,7 @@ bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.
 and
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/worker.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-memory-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/worker.config.example
 ```
 
 To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
