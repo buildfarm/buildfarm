@@ -452,7 +452,8 @@ class Cat {
 
   private static void listOperations(Instance instance) {
     String pageToken = "";
-    int limit = 10, count = 0;
+    int limit = 10;
+    int count = 0;
     do {
       ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
       pageToken = instance.listOperations(1024, pageToken, "", operations);

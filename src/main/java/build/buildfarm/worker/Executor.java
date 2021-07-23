@@ -414,7 +414,8 @@ class Executor {
       environment.put(environmentVariable.getKey(), environmentVariable.getValue());
     }
 
-    final Write stdoutWrite, stderrWrite;
+    final Write stdoutWrite;
+    final Write stderrWrite;
 
     if (stdoutStreamName != null
         && !stdoutStreamName.isEmpty()
