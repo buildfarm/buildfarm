@@ -61,6 +61,14 @@ public class ResourceLimits {
   public boolean tmpFs = false;
 
   /**
+   * @field containerSettings
+   * @brief Some actions may need to run in a container. These settings are used to determine which
+   *     container to use and how to use it.
+   * @details This also provides compatibility with https://github.com/bazelbuild/bazel-toolchains
+   */
+  public ContainerSettings containerSettings = new ContainerSettings();
+
+  /**
    * @field cpu
    * @brief Resource limitations on CPUs.
    * @details Decides specific CPU limitations and whether to apply them for a given action.
