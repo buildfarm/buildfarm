@@ -26,7 +26,7 @@ jobs:
           token: ${{ secrets.GH_TOKEN }} # It's your Personal Access Token(PAT)
           repository: ''             # Default is current repository
           branch: 'gh-pages'         # Default is gh-pages for github provider
-          jekyll_src: '_site'           # Default is root directory
+          jekyll_src: '_site'        # Default is root directory
           jekyll_cfg: '_config.yml'  # Default is _config.yml
           jekyll_baseurl: ''         # Default is according to _config.yml
           bundler_ver: '>=0'         # Default is latest bundler version
