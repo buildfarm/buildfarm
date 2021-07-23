@@ -175,7 +175,6 @@ public class StubWriteOutputStreamTest {
             Functions.identity(),
             /* expectedSize=*/ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
             /* autoflush=*/ true);
-    ByteString content = ByteString.copyFromUtf8("Hello, World");
 
     boolean callbackTimedOut = false;
     try (OutputStream out =

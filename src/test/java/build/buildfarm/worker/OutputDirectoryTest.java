@@ -91,8 +91,7 @@ public class OutputDirectoryTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void duplicateDirectorySeparatorIsInvalid() {
-    OutputDirectory outputDirectory =
-        OutputDirectory.parse(ImmutableList.of(), ImmutableList.of("a//b"), ImmutableList.of());
+    OutputDirectory.parse(ImmutableList.of(), ImmutableList.of("a//b"), ImmutableList.of());
   }
 
   @Test

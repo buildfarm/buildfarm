@@ -56,7 +56,7 @@ public class RedisQueueMockTest {
   @Test
   public void redisQueueConstructsWithoutError() throws Exception {
     // ACT
-    RedisQueue queue = new RedisQueue("test");
+    new RedisQueue("test");
   }
 
   // Function under test: push
@@ -217,7 +217,7 @@ public class RedisQueueMockTest {
         new Thread(
             () -> {
               try {
-                String val = queue.dequeue(redis, 100000);
+                queue.dequeue(redis, 100000);
               } catch (Exception e) {
               }
             });

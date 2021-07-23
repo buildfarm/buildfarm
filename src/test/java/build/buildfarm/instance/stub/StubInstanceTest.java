@@ -292,7 +292,6 @@ public class StubInstanceTest {
   public void completedWriteBeforeCloseThrowsOnNextInteraction()
       throws IOException, InterruptedException {
     String resourceName = "early-completed-output-stream-test";
-    AtomicReference<ByteString> writtenContent = new AtomicReference<>();
     serviceRegistry.addService(
         new ByteStreamImplBase() {
           boolean completed = false;

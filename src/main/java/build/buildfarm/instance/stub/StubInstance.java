@@ -82,7 +82,6 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import build.buildfarm.v1test.ShutDownWorkerGrpc.ShutDownWorkerBlockingStub;
 import build.buildfarm.v1test.TakeOperationRequest;
@@ -870,11 +869,10 @@ public class StubInstance implements Instance {
   @Override
   public void deregisterWorker(String workerName) {
     throwIfStopped();
-    ShutDownWorkerGracefullyRequestResults proto =
-        adminBlockingStub
-            .get()
-            .shutDownWorkerGracefully(
-                ShutDownWorkerGracefullyRequest.newBuilder().setWorkerName(workerName).build());
+    adminBlockingStub
+        .get()
+        .shutDownWorkerGracefully(
+            ShutDownWorkerGracefullyRequest.newBuilder().setWorkerName(workerName).build());
   }
 
   @Override

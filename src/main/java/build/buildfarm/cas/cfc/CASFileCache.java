@@ -2184,8 +2184,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         transformAsync(
             fetchFuture,
             (result) -> {
-              ImmutableList.Builder<Throwable> failures = ImmutableList.builder();
-              boolean failed = false;
               try {
                 disableAllWriteAccess(path);
               } catch (IOException e) {
@@ -2319,10 +2317,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private void copyExternalInput(Digest digest, CancellableOutputStream out)
       throws IOException, InterruptedException {
     logger.log(Level.FINE, format("downloading %s", DigestUtil.toString(digest)));
-    boolean complete = false;
     try (InputStream in = newExternalInput(digest, /* offset=*/ 0)) {
       ByteStreams.copy(in, out);
-      complete = true;
     } catch (IOException e) {
       out.cancel();
       logger.log(

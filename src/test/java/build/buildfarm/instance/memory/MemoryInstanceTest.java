@@ -454,7 +454,6 @@ public class MemoryInstanceTest {
     Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder().setTimeout(timeout));
 
     Watcher watcher = mock(Watcher.class);
-    IllegalStateException timeoutInvalid = null;
     instance.execute(
         actionDigestWithExcessiveTimeout,
         /* skipCacheLookup=*/ true,
