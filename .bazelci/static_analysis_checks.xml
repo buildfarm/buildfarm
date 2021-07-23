@@ -19,7 +19,6 @@
     <exclude name="CheckResultSet"/>
     <exclude name="ConstantsInInterface"/>
     <exclude name="DefaultLabelNotLastInSwitchStmt"/>
-    <exclude name="DoubleBraceInitialization"/>
     <exclude name="ForLoopCanBeForeach"/>
     <exclude name="ForLoopVariableCount"/>
     <exclude name="GuardLogStatement"/>
