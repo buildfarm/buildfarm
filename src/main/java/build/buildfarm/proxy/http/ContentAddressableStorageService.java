@@ -79,7 +79,6 @@ public class ContentAddressableStorageService
   public void batchUpdateBlobs(
       BatchUpdateBlobsRequest batchRequest,
       StreamObserver<BatchUpdateBlobsResponse> responseObserver) {
-    ImmutableList.Builder<ByteString> validBlobsBuilder = new ImmutableList.Builder<>();
     ImmutableList.Builder<BatchUpdateBlobsResponse.Response> responses =
         new ImmutableList.Builder<>();
     Function<com.google.rpc.Code, com.google.rpc.Status> statusForCode =

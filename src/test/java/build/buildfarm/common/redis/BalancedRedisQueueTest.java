@@ -58,7 +58,7 @@ public class BalancedRedisQueueTest {
   @Test
   public void balancedRedisQueueCreateHashesConstructsWithoutError() throws Exception {
     // ACT
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
+    new BalancedRedisQueue("test", ImmutableList.of());
   }
 
   // Function under test: push

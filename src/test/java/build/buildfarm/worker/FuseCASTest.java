@@ -403,7 +403,6 @@ public class FuseCASTest {
     ByteString data = ByteString.copyFromUtf8("Hello, World\n");
     Pointer buf = pointerFromByteString(data);
     fuseCAS.write("/foo", buf, data.size(), /* offset=*/ 0, fi);
-    FileStat fileStat = createFileStat();
 
     byte[] readData = new byte[5];
     u8[] array = Struct.arrayOf(Runtime.getSystemRuntime(), u8.class, readData.length);

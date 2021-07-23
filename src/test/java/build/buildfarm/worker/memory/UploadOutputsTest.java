@@ -183,7 +183,6 @@ public class UploadOutputsTest {
   public void uploadOutputsIgnoresMissingOutputDirectories()
       throws IOException, StatusException, InterruptedException {
     uploadOutputs(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
-    Tree emptyTree = Tree.newBuilder().setRoot(Directory.getDefaultInstance()).build();
     verify(mockUploader, never()).uploadBlobs(any());
   }
 
