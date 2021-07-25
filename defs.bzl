@@ -10,6 +10,7 @@ load(
 )
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 
 IO_NETTY_MODULES = [
     "buffer",
@@ -118,6 +119,11 @@ def buildfarm_init(name = "buildfarm"):
     native.bind(
         name = "jar/redis/clients/jedis",
         actual = "@jedis//jar",
+    )
+
+    llvm_toolchain(
+        name = "llvm_toolchain",
+        llvm_version = "9.0.0",
     )
 
 def ensure_accurate_metadata():

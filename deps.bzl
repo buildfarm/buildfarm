@@ -59,6 +59,14 @@ def archive_dependencies(third_party):
             "url": "https://github.com/bazelbuild/remote-apis/archive/6345202a036a297b22b0a0e7531ef702d05f2130.zip",
         },
 
+        # Used to format proto files
+        {
+            "name": "com_grail_bazel_toolchain",
+            "sha256": "b3dec631fe2be45b3a7a8a4161dd07fadc68825842e8d6305ed35bc8560968ca",
+            "strip_prefix": "bazel-toolchain-0.5.1",
+            "url": "https://github.com/grailbio/bazel-toolchain/archive/0.5.1.tar.gz",
+        },
+
         # Ideally we would use the 0.14.4 release of rules_docker,
         # but that version introduced new pypi and pkg dependncies on tar-related targets making the upgrade difficult.
         # Those dependencies were then removed afterward.  We pick a stable commit after 0.14.4 instead of cherry-picking in the different changes.
