@@ -7,7 +7,9 @@ FORMAT_JAVA=true
 JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/google-java-format-1.7/google-java-format-1.7-all-deps.jar
 LOCAL_FORMATTER="java_formatter.jar"
 
-FORMAT_PROTO=false
+FORMAT_PROTO=true
+CLANG_FORMAT=@llvm_toolchain//:bin/clang-format
+BAZEL_WRAPPER=bazelw
 
 # Print an error such that it will surface in the context of buildkite
 print_error () {
@@ -21,7 +23,6 @@ handle_format_error_check () {
     if [ $? -eq 0 ]
     then
         echo "Files are correctly formatted."
-        exit 0
     else
         print_error 'Run ./.bazelci/format.sh to resolve formatting issues.'
         exit 1
@@ -44,6 +45,7 @@ run_java_formatter () {
     then
         java -jar $LOCAL_FORMATTER --dry-run --set-exit-if-changed $files
         handle_format_error_check
+        return
     fi
 
     # The formatter is lax on certain whitespace decisons.
@@ -62,13 +64,24 @@ run_java_formatter () {
 }
 
 run_proto_formatter () {
-echo "hi"
+
+    # Check whether any formatting changes need to be made.
+    # This is intended to be done by the CI.
+    if [[ "$@" == "--check" ]]
+    then
+        find . -name '*.proto' -exec $BAZEL_WRAPPER run $CLANG_FORMAT -- -i --dry-run --Werror {} +
+        handle_format_error_check
+        return
+    fi
+
+    # Fixes formatting issues
+    find . -name '*.proto' -exec $BAZEL_WRAPPER run $CLANG_FORMAT -- -i {} +
 }
 
 if [ "${FORMAT_JAVA:-false}" = true ]; then
-    run_java_formatter
+    run_java_formatter "$@"
 fi;
 
 if [ "${FORMAT_PROTO:-false}" = true ]; then
-    run_proto_formatter
+    run_proto_formatter "$@"
 fi;
