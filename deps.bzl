@@ -59,6 +59,13 @@ def archive_dependencies(third_party):
             "url": "https://github.com/bazelbuild/remote-apis/archive/6345202a036a297b22b0a0e7531ef702d05f2130.zip",
         },
 
+        {
+            "name": "rules_cc",
+            "sha256": "34b2ebd4f4289ebbc27c7a0d854dcd510160109bb0194c0ba331c9656ffcb556",
+            "strip_prefix": "rules_cc-daf6ace7cfeacd6a83e9ff2ed659f416537b6c74",
+            "url": "https://github.com/bazelbuild/rules_cc/archive/daf6ace7cfeacd6a83e9ff2ed659f416537b6c74.tar.gz",
+        },
+
         # Used to format proto files
         {
             "name": "com_grail_bazel_toolchain",
