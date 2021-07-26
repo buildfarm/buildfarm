@@ -58,7 +58,6 @@ def archive_dependencies(third_party):
             "strip_prefix": "remote-apis-6345202a036a297b22b0a0e7531ef702d05f2130",
             "url": "https://github.com/bazelbuild/remote-apis/archive/6345202a036a297b22b0a0e7531ef702d05f2130.zip",
         },
-
         {
             "name": "rules_cc",
             "sha256": "34b2ebd4f4289ebbc27c7a0d854dcd510160109bb0194c0ba331c9656ffcb556",
