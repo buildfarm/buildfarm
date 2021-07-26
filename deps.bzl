@@ -69,9 +69,9 @@ def archive_dependencies(third_party):
         # Used to format proto files
         {
             "name": "com_grail_bazel_toolchain",
-            "sha256": "b3dec631fe2be45b3a7a8a4161dd07fadc68825842e8d6305ed35bc8560968ca",
-            "strip_prefix": "bazel-toolchain-0.5.1",
-            "url": "https://github.com/grailbio/bazel-toolchain/archive/0.5.1.tar.gz",
+            "sha256": "54b54eedc71b93b278c44b6c056a737dc68545c6da75f63d0810676e1181f559",
+            "strip_prefix": "bazel-toolchain-76ce37e977a304acf8948eadabb82c516320e286",
+            "url": "https://github.com/grailbio/bazel-toolchain/archive/76ce37e977a304acf8948eadabb82c516320e286.tar.gz",
         },
 
         # Ideally we would use the 0.14.4 release of rules_docker,
