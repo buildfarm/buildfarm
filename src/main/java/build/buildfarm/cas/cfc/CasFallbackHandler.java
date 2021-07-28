@@ -30,7 +30,6 @@ import java.util.function.Consumer;
  * @details These methods are called by the primary CAS manager.
  */
 public class CasFallbackHandler {
-
   /**
    * @brief Start the CAS delegate.
    * @details Some delegates need started depending on the CAS type that they are.

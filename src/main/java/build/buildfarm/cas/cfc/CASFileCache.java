@@ -464,8 +464,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @Override
   public boolean contains(Digest digest, Digest.Builder result) {
-    boolean found = containsLocal(digest, result, (key) -> accessed(ImmutableList.of(key)));
-    if (found) {
+    if (containsLocal(digest, result, (key) -> accessed(ImmutableList.of(key)))) {
       return true;
     }
 
