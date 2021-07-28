@@ -481,7 +481,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     try {
       return newLocalInput(digest, offset);
     } catch (NoSuchFileException e) {
-      return newTransparentInputFallback(e, digest, offset);
+      return CasFallbackHandler.newTransparentInput(delegate, e, digest, offset);
     }
   }
 
@@ -1175,7 +1175,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   public StartupCacheResults start(
       Consumer<Digest> onStartPut, ExecutorService removeDirectoryService, boolean skipLoad)
       throws IOException, InterruptedException {
-    startFallback(onStartPut, removeDirectoryService, skipLoad);
+    CasFallbackHandler.start(delegate, onStartPut, removeDirectoryService, skipLoad);
 
     logger.log(Level.INFO, "Initializing cache at: " + root);
     Instant startTime = Instant.now();
@@ -2838,23 +2838,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throws IOException, InterruptedException;
 
   // CAS fallback methods
-  private void startFallback(
-      Consumer<Digest> onStartPut, ExecutorService removeDirectoryService, boolean skipLoad)
-      throws IOException, InterruptedException {
-    // start delegate if we specifically have a CASFileCache
-    if (delegate != null && delegate instanceof CASFileCache) {
-      CASFileCache fileCacheDelegate = (CASFileCache) delegate;
-      fileCacheDelegate.start(onStartPut, removeDirectoryService, skipLoad);
-    }
-  }
-
-  private InputStream newTransparentInputFallback(NoSuchFileException e, Digest digest, long offset)
-      throws IOException {
-    if (delegate == null) {
-      throw e;
-    }
-    return delegate.newInput(digest, offset);
-  }
 
   private InputStream newInputFallback(NoSuchFileException e, Digest digest, long offset)
       throws IOException {
