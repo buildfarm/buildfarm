@@ -34,7 +34,7 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.util.concurrent.TimeUnit;
 
-public class WorkerStubs {
+public final class WorkerStubs {
   private WorkerStubs() {}
 
   public static LoadingCache create(DigestUtil digestUtil, Duration timeout) {

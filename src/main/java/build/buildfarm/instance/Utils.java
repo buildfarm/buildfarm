@@ -36,7 +36,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /** Utility methods for the instance package. * */
-public class Utils {
+public final class Utils {
   private Utils() {}
 
   public static ByteString getBlob(
