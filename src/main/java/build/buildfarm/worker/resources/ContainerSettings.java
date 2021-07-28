@@ -44,7 +44,7 @@ public class ContainerSettings {
   /**
    * @field network
    * @brief Docker network.
-   * @details Whether or not the contianer should allow network (standard, off).
+   * @details Whether or not the container should allow network (standard, off).
    */
   public boolean network = false;
 
