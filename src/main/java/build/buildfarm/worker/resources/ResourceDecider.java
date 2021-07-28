@@ -113,6 +113,19 @@ public class ResourceDecider {
     limits.mem.limit = (limits.mem.min > 0 || limits.mem.max > 0);
     limits.mem.claimed = limits.mem.min;
 
+    // There's certain functionality that is NOT possible without using the linux sandbox.
+    // To avoid confusing users, we will enable the sandbox for them automatically if they request
+    // certain execution constraints. If these constraints can be enforced through other means in
+    // the future, than picking the sandbox automatically can be removed. For now however, its
+    // better to choose the sandbox in order to honor the user's request instead of silently
+    // ignoring the request due to a disabled sandbox.
+    if (limits.network.blockNetwork) {
+      limits.useLinuxSandbox = true;
+    }
+    if (limits.tmpFs) {
+      limits.useLinuxSandbox = true;
+    }
+
     // Avoid using the existing execution policies when using the linux sandbox.
     // Using these execution policies under the sandbox do not have the right permissions to work.
     // For the time being, we want to experiment with dynamically choosing the sandbox-
