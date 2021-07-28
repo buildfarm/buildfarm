@@ -459,7 +459,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       accessed(foundDigests);
     }
     ImmutableList<Digest> missingDigests = builder.build();
-    return findMissingBlobsFallback(missingDigests);
+    return CasFallbackHandler.findMissingBlobs(delegate, missingDigests);
   }
 
   @Override
@@ -469,7 +469,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return true;
     }
 
-    return containsFallback(digest, result);
+    return CasFallbackHandler.contains(delegate, digest, result);
   }
 
   @Override
@@ -2860,23 +2860,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         digest.getSizeBytes(),
         offset,
         write);
-  }
-
-  private Iterable<Digest> findMissingBlobsFallback(ImmutableList<Digest> missingDigests)
-      throws InterruptedException {
-    // skip calling the fallback CAS if it does not exist or we already found the digests
-    if (delegate == null || missingDigests.isEmpty()) {
-      return missingDigests;
-    }
-
-    return delegate.findMissingBlobs(missingDigests);
-  }
-
-  private boolean containsFallback(Digest digest, Digest.Builder result) {
-    if (delegate == null) {
-      return false;
-    }
-    return delegate.contains(digest, result);
   }
 
   private boolean expireEntryFallback(Entry e) throws IOException, InterruptedException {
