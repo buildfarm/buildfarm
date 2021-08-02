@@ -232,6 +232,10 @@ instances {
               value: "*"
             }
           }
+
+         # Whether actions with additional properties can still match to the provisioned queue
+         allow_unmatched: True
+
         }
       }
     }

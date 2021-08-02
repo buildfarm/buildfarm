@@ -53,6 +53,10 @@ dequeue_match_settings: {
     #   value: "value_string"
     # }
   }
+  
+  # Whether the worker should perform extra validation on the action it dequeues,
+  # or accept the action having already matched to a subqueue
+  accept_everything: True
 
 }
 
