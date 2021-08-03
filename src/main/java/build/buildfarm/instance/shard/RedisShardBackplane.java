@@ -557,7 +557,7 @@ public class RedisShardBackplane implements Backplane {
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
   }
 
-  static CasWorkerMap createCasWorkerMap(RedisShardBackplaneConfig config) throws IOException {
+  CasWorkerMap createCasWorkerMap(RedisShardBackplaneConfig config) throws IOException {
     if (config.getCacheCas()) {
       redissonClient = createRedissonClient(config);
       return new RedissonCasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire());
