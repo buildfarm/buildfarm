@@ -580,7 +580,6 @@ public class FuseCAS extends FuseStubFS {
     buf.put(0, target, 0, putsize);
     if (size > target.length) {
       buf.putByte(target.length, (byte) 0);
-      putsize++;
     }
     return 0;
   }

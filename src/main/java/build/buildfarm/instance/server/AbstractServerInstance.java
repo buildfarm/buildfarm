@@ -1609,12 +1609,6 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public String listOperations(
       int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
-    if (pageSize == 0) {
-      pageSize = getListOperationsDefaultPageSize();
-    } else if (getListOperationsMaxPageSize() > 0 && pageSize > getListOperationsMaxPageSize()) {
-      pageSize = getListOperationsMaxPageSize();
-    }
-
     // todo(luxe): add proper pagination
     FindOperationsResults results = findOperations(filter);
     if (results != null) {

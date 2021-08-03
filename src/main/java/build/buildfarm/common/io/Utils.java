@@ -453,7 +453,6 @@ public class Utils {
         }
         if (e.getCause() instanceof InterruptedException) {
           Thread.interrupted();
-          interrupted = true;
         }
         throw new UncheckedExecutionException(e.getCause());
       } catch (InterruptedException e) {
