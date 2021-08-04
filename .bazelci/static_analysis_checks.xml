@@ -40,7 +40,6 @@
     <exclude name="ReplaceVectorWithList"/>
     <exclude name="SwitchStmtsShouldHaveDefault"/>
     <exclude name="SystemPrintln"/>
-    <exclude name="UnusedAssignment"/>
     <exclude name="UnusedFormalParameter"/>
     <exclude name="UseAssertEqualsInsteadOfAssertTrue"/>
     <exclude name="UseAssertNullInsteadOfAssertTrue"/>

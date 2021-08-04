@@ -359,8 +359,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return null;
     }
 
-    boolean isExecutable = false;
-    boolean hasSizeComponent = false;
+    boolean isExecutable;
+    boolean hasSizeComponent;
     Digest digest;
     try {
       // Can be legacy: <hash>_<size>[_exec]
@@ -494,7 +494,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       String key = getKey(digest, isExecutable);
       Entry e = storage.get(key);
       if (e != null) {
-        InputStream input = null;
+        InputStream input;
         try {
           input = Files.newInputStream(getPath(key));
           input.skip(offset);
