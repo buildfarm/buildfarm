@@ -22,12 +22,19 @@ package build.buildfarm.worker;
  */
 public class DequeueMatchSettings {
   /**
-   * @field acceptEverything
-   * @brief Whether or not the worker should accept everything it gets off the queue.
-   * @details This will assume the worker can always execute operations from the queue it matches
-   *     with.
+   * @field refuseWhenExpiringCas
+   * @brief Whether or not the worker should refuse operation when it is expiring the CAS.
+   * @details This can be enabled for performance reasons when the disk is being heavily utilized
+   *     from CAS expiration.
    */
-  public boolean acceptEverything = false;
+  public boolean refuseWhenExpiringCas = false;
+
+  /**
+   * @field refuseOnMismatchedProperties
+   * @brief Whether or not the worker should refuse operation when properties mismatch.
+   * @details This is generally not needed as the workers already match with the correct queue.
+   */
+  public boolean refuseOnMismatchedProperties = false;
 
   /**
    * @field allowUnmatched

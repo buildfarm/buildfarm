@@ -2485,6 +2485,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  @Override
+  public boolean needsToExpire() {
+    return sizeInBytes > maxSizeInBytes;
+  }
+
   private boolean charge(String key, long blobSizeInBytes, AtomicBoolean requiresDischarge)
       throws IOException, InterruptedException {
     boolean interrupted = false;
@@ -2498,7 +2503,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       ImmutableList.Builder<ListenableFuture<Digest>> builder = ImmutableList.builder();
       try {
-        while (!interrupted && sizeInBytes > maxSizeInBytes) {
+        while (!interrupted && needsToExpire()) {
           ListenableFuture<Entry> expiredFuture = expireEntry(blobSizeInBytes, expireService);
           interrupted = Thread.interrupted();
           if (expiredFuture != null) {

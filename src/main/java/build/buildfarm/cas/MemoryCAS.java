@@ -154,6 +154,11 @@ public class MemoryCAS implements ContentAddressableStorage {
     return immediateFuture(getAll(digests));
   }
 
+  @Override
+  public boolean needsToExpire() {
+    return false;
+  }
+
   synchronized Iterable<Response> getAll(Iterable<Digest> digests) {
     return getAll(
         digests,

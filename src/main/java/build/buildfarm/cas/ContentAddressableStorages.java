@@ -183,6 +183,11 @@ public final class ContentAddressableStorages {
         }
       }
 
+      @Override
+      public boolean needsToExpire() {
+        return false;
+      }
+
       private ByteString getData(Digest digest) {
         if (digest.getSizeBytes() == 0) {
           return ByteString.EMPTY;

@@ -365,6 +365,11 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
+  public boolean needsToExpire() {
+    return contentAddressableStorage.needsToExpire();
+  }
+
+  @Override
   protected Logger getLogger() {
     return logger;
   }

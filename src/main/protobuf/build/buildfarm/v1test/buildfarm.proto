@@ -569,8 +569,11 @@ message ShardWorkerInstanceConfig {
 
 message DequeueMatchSettings {
   
-  // whether a worker should accept everything it gets off the queue.
-  bool accept_everything = 1;
+  // Whether or not the worker should refuse operation when it is expiring the CAS.
+  bool refuse_when_expiring_cas = 1;
+  
+  // Whether or not the worker should refuse operation when properties mismatch.
+  bool refuse_on_mismatched_properties = 4;
 
   // whether a worker should accept platform properties that it does not match with.
   bool allow_unmatched = 2;

@@ -408,7 +408,10 @@ public class Worker extends LoggingMain {
     }
 
     DequeueMatchSettings matchSettings = new DequeueMatchSettings();
-    matchSettings.acceptEverything = config.getDequeueMatchSettings().getAcceptEverything();
+    matchSettings.refuseWhenExpiringCas =
+        config.getDequeueMatchSettings().getRefuseWhenExpiringCas();
+    matchSettings.refuseOnMismatchedProperties =
+        config.getDequeueMatchSettings().getRefuseOnMismatchedProperties();
     matchSettings.allowUnmatched = config.getDequeueMatchSettings().getAllowUnmatched();
 
     ShardWorkerContext context =

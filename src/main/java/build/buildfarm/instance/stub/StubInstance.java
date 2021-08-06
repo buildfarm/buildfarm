@@ -853,6 +853,11 @@ public class StubInstance implements Instance {
   }
 
   @Override
+  public boolean needsToExpire() {
+    return false;
+  }
+
+  @Override
   public CasIndexResults reindexCas(String hostName) {
     throwIfStopped();
     ReindexCasRequestResults proto =

@@ -729,7 +729,8 @@ public class MemoryInstance extends AbstractServerInstance {
     synchronized (queue.workers) {
       while (!dispatched && !queue.workers.isEmpty()) {
         Worker worker = queue.workers.remove(0);
-        if (!DequeueMatchEvaluator.shouldKeepOperation(settings, worker.getProvisions(), command)) {
+        if (!DequeueMatchEvaluator.shouldKeepOperation(
+            settings, false, worker.getProvisions(), command)) {
           rejectedWorkers.add(worker);
         } else {
           QueueEntry queueEntry =
@@ -816,7 +817,7 @@ public class MemoryInstance extends AbstractServerInstance {
       DequeueMatchSettings settings = new DequeueMatchSettings();
       if (command == null) {
         cancelOperation(operationName);
-      } else if (DequeueMatchEvaluator.shouldKeepOperation(settings, provisions, command)) {
+      } else if (DequeueMatchEvaluator.shouldKeepOperation(settings, false, provisions, command)) {
         QueuedOperation queuedOperation =
             QueuedOperation.newBuilder()
                 .setAction(action)
@@ -948,6 +949,11 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected int getTreeMaxPageSize() {
     return config.getTreeMaxPageSize();
+  }
+
+  @Override
+  public boolean needsToExpire() {
+    return false;
   }
 
   @Override

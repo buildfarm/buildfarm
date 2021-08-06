@@ -224,6 +224,11 @@ public class AbstractServerInstanceTest {
     public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
       throw new UnsupportedOperationException();
     }
+
+    @Override
+    public boolean needsToExpire() {
+      throw new UnsupportedOperationException();
+    }
   }
 
   @Test

@@ -2420,6 +2420,11 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
+  public boolean needsToExpire() {
+    return false;
+  }
+
+  @Override
   public GetClientStartTimeResult getClientStartTime(String clientKey) {
     try {
       return backplane.getClientStartTime(clientKey);

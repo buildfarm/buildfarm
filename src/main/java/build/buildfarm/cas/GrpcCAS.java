@@ -263,6 +263,11 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
+  public boolean needsToExpire() {
+    return false;
+  }
+
+  @Override
   public void put(Blob blob) throws InterruptedException {
     Chunker chunker = Chunker.builder().setInput(blob.getData()).build();
     try {

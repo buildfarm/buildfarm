@@ -43,6 +43,7 @@ public class DequeueMatchEvaluator {
    * @brief Decide whether the worker should keep the operation or put it back on the queue.
    * @details Compares the platform properties of the worker to the operation's platform properties.
    * @param matchSettings The provisions of the worker.
+   * @param expiringCas whether the CAS is currently expiring data
    * @param workerProvisions The provisions of the worker.
    * @param queueEntry An entry recently removed from the queue.
    * @return Whether or not the worker should accept or reject the queue entry.
@@ -52,15 +53,18 @@ public class DequeueMatchEvaluator {
   @NotNull
   public static boolean shouldKeepOperation(
       DequeueMatchSettings matchSettings,
+      boolean expiringCas,
       SetMultimap<String, String> workerProvisions,
       QueueEntry queueEntry) {
-    return shouldKeepViaPlatform(matchSettings, workerProvisions, queueEntry.getPlatform());
+    return shouldKeepOperation(
+        matchSettings, expiringCas, workerProvisions, queueEntry.getPlatform());
   }
 
   /**
    * @brief Decide whether the worker should keep the operation or put it back on the queue.
    * @details Compares the platform properties of the worker to the operation's platform properties.
    * @param matchSettings The provisions of the worker.
+   * @param expiringCas whether the CAS is currently expiring data
    * @param workerProvisions The provisions of the worker.
    * @param command A command to evaluate.
    * @return Whether or not the worker should accept or reject the queue entry.
@@ -70,34 +74,45 @@ public class DequeueMatchEvaluator {
   @NotNull
   public static boolean shouldKeepOperation(
       DequeueMatchSettings matchSettings,
+      boolean expiringCas,
       SetMultimap<String, String> workerProvisions,
       Command command) {
-    return shouldKeepViaPlatform(matchSettings, workerProvisions, command.getPlatform());
+    return shouldKeepOperation(matchSettings, expiringCas, workerProvisions, command.getPlatform());
   }
 
   /**
-   * @brief Decide whether the worker should keep the operation via platform or put it back on the
-   *     queue.
-   * @details Compares the platform properties of the worker to the platform properties of the
-   *     operation.
+   * @brief Decide whether the worker should keep the operation or put it back on the queue.
+   * @details Performs various checks to decide whether to keep the operation.
    * @param matchSettings The provisions of the worker.
+   * @param expiringCas whether the CAS is currently expiring data
    * @param workerProvisions The provisions of the worker.
    * @param platform The platforms of operation.
    * @return Whether or not the worker should accept or reject the operation.
    * @note Suggested return identifier: shouldKeepOperation.
    */
   @NotNull
-  private static boolean shouldKeepViaPlatform(
+  private static boolean shouldKeepOperation(
       DequeueMatchSettings matchSettings,
+      boolean expiringCas,
       SetMultimap<String, String> workerProvisions,
       Platform platform) {
-    // attempt to execute everything the worker gets off the queue.
-    // this is a recommended configuration.
-    if (matchSettings.acceptEverything) {
-      return true;
+    // It may be undesirable for workers to take on work when their disk is busy expiring data.
+    // If the disk usage of deleting CAS data is causing performance issues on action execution,
+    // a worker could temporarily decide to let another worker in the pool perform the execution.
+    if (matchSettings.refuseWhenExpiringCas && expiringCas) {
+      return false;
     }
 
-    return satisfiesProperties(matchSettings, workerProvisions, platform);
+    // This is generally not needed as the workers already match with the correct queue.
+    // However, workers may want to match with certain queues but still require certain property
+    // matches.
+    if (matchSettings.refuseOnMismatchedProperties
+        && !satisfiesProperties(matchSettings, workerProvisions, platform)) {
+      return false;
+    }
+
+    // Otherwise accept the operation from the queue.
+    return true;
   }
 
   /**

@@ -49,12 +49,14 @@ public class DequeueMatchEvaluatorTest {
   public void shouldKeepOperationKeepEmptyQueueEntry() throws Exception {
     // ARRANGE
     DequeueMatchSettings settings = new DequeueMatchSettings();
+    settings.refuseOnMismatchedProperties = true;
+
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     QueueEntry entry = QueueEntry.newBuilder().setPlatform(Platform.newBuilder()).build();
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(settings, false, workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
@@ -69,6 +71,7 @@ public class DequeueMatchEvaluatorTest {
   public void shouldKeepOperationValidMinCoresQueueEntry() throws Exception {
     // ARRANGE
     DequeueMatchSettings settings = new DequeueMatchSettings();
+    settings.refuseOnMismatchedProperties = true;
 
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     workerProvisions.put("cores", "11");
@@ -83,7 +86,7 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(settings, false, workerProvisions, entry);
 
     // ASSERT
     // the worker accepts because it has more cores than the min-cores requested
@@ -99,6 +102,7 @@ public class DequeueMatchEvaluatorTest {
   public void shouldKeepOperationInvalidMinCoresQueueEntry() throws Exception {
     // ARRANGE
     DequeueMatchSettings settings = new DequeueMatchSettings();
+    settings.refuseOnMismatchedProperties = true;
 
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     workerProvisions.put("cores", "10");
@@ -113,7 +117,7 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(settings, false, workerProvisions, entry);
 
     // ASSERT
     // the worker rejects because it has less cores than the min-cores requested
@@ -127,6 +131,7 @@ public class DequeueMatchEvaluatorTest {
   public void shouldKeepOperationMaxCoresDoNotInfluenceAcceptance() throws Exception {
     // ARRANGE
     DequeueMatchSettings settings = new DequeueMatchSettings();
+    settings.refuseOnMismatchedProperties = true;
 
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     workerProvisions.put("cores", "10");
@@ -143,7 +148,7 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(settings, false, workerProvisions, entry);
 
     // ASSERT
     // the worker accepts because it has the same cores as the min-cores requested
@@ -158,6 +163,7 @@ public class DequeueMatchEvaluatorTest {
   public void shouldKeepOperationUnmatchedPropertiesRejectionAcceptance() throws Exception {
     // ARRANGE
     DequeueMatchSettings settings = new DequeueMatchSettings();
+    settings.refuseOnMismatchedProperties = true;
 
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
 
@@ -171,25 +177,17 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(settings, false, workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isFalse();
 
     // ARRANGE
-    settings.acceptEverything = true;
-
-    // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
-
-    // ASSERT
-    assertThat(shouldKeep).isTrue();
-
-    // ARRANGE
     settings.allowUnmatched = true;
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(settings, false, workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
