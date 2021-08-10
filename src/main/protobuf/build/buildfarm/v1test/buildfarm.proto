@@ -213,6 +213,11 @@ message BuildFarmServerConfig {
   PrometheusConfig prometheus_config = 7;
   
   BuildEventConfig build_event_config = 8;
+  // Absolute path to the PEM file containing both the required certificates and any
+
+  // associated private key.
+
+  optional string ssl_certificate_path = 9;
 }
 
 message MetricsConfig {
