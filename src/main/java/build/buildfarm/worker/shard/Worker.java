@@ -143,6 +143,8 @@ public class Worker extends LoggingMain {
   private final LoadingCache<String, Instance> workerStubs;
   private final PrometheusPublisher prometheusPublisher;
 
+  public class CasReplicationStage extends PipelineStage.NullStage {};
+
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
       insertStream(digest, () -> Files.newInputStream(file));
@@ -486,6 +488,9 @@ public class Worker extends LoggingMain {
       serverBuilder.addService(
           new WorkerProfileService(
               storage, inputFetchStage, executeActionStage, context, completeStage, backplane));
+    } else {
+      PipelineStage casReplicationStage = new CasReplicationStage();
+      pipeline.add(casReplicationStage, 1);
     }
 
     return serverBuilder.build();
