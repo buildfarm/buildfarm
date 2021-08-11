@@ -56,6 +56,7 @@ public class ExecutionPropertiesParser {
     parser.put(ExecutionProperties.ENV_VARS, ExecutionPropertiesParser::storeEnvVars);
     parser.put(ExecutionProperties.SKIP_SLEEP, ExecutionPropertiesParser::storeSkipSleep);
     parser.put(ExecutionProperties.TIME_SHIFT, ExecutionPropertiesParser::storeTimeShift);
+    parser.put(ExecutionProperties.CONTAINER_IMAGE, ExecutionPropertiesParser::storeContainerImage);
     parser.put(
         ExecutionProperties.DEBUG_BEFORE_EXECUTION,
         ExecutionPropertiesParser::storeBeforeExecutionDebug);
@@ -258,6 +259,18 @@ public class ExecutionPropertiesParser {
   private static void storeTimeShift(ResourceLimits limits, Property property) {
     limits.time.timeShift = Integer.parseInt(property.getValue());
     describeChange(limits.time.description, "time shift", property.getValue(), property);
+  }
+
+  /**
+   * @brief Store the property for an action's container name.
+   * @details Parses and stores a String.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeContainerImage(ResourceLimits limits, Property property) {
+    limits.containerSettings.containerImage = property.getValue();
+    describeChange(
+        limits.containerSettings.description, "container image", property.getValue(), property);
   }
 
   /**
