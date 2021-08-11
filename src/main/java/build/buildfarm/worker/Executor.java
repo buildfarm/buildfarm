@@ -424,6 +424,57 @@ class Executor {
     return envList;
   }
 
+  private Code runActionWithDocker(
+      Path execDir,
+      ResourceLimits limits,
+      Duration timeout,
+      List<String> arguments,
+      Map<String, String> envVars,
+      ActionResult.Builder resultBuilder)
+      throws InterruptedException {
+    // construct docker client
+    DockerClient dockerClient = DockerClientBuilder.getInstance().build();
+
+    // get image
+    fetchImageIfMissing(dockerClient, limits.containerSettings.containerImage);
+
+    // create container
+    CreateContainerCmd containerCmd =
+        dockerClient.createContainerCmd(limits.containerSettings.containerImage);
+
+    // prepare command
+    containerCmd.withCmd(arguments);
+    containerCmd.withAttachStderr(true);
+    containerCmd.withAttachStdout(true);
+    containerCmd.withEnv(envMapToList(envVars));
+    containerCmd.withNetworkDisabled(!limits.containerSettings.network);
+    containerCmd.withStopTimeout((int) timeout.getSeconds());
+    containerCmd.withVolumes(new Volume(execDir.toAbsolutePath().toString()));
+    containerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
+
+    // execute
+    String id = containerCmd.exec().getId();
+    try {
+      int exitCode =
+          dockerClient
+              .waitContainerCmd(id)
+              .start()
+              .awaitStatusCode(timeout.getSeconds(), TimeUnit.SECONDS);
+      resultBuilder.setExitCode(exitCode);
+    }
+
+    // cleanup
+    finally {
+      try {
+        dockerClient.removeContainerCmd(id).withRemoveVolumes(true).withForce(true).exec();
+      } catch (Exception e) {
+        logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
+      }
+    }
+
+    return Code.OK;
+  }
+
   private Code executeCommand(
       String operationName,
       Path execDir,
@@ -474,40 +525,7 @@ class Executor {
 
     // run the action under docker
     if (!limits.containerSettings.containerImage.isEmpty()) {
-      // construct docker client
-      DockerClient dockerClient = DockerClientBuilder.getInstance().build();
-
-      // get image
-      fetchImageIfMissing(dockerClient, limits.containerSettings.containerImage);
-
-      // create container
-      CreateContainerCmd containerCmd =
-          dockerClient.createContainerCmd(limits.containerSettings.containerImage);
-
-      // prepare command
-      containerCmd.withCmd(arguments);
-      containerCmd.withAttachStderr(true);
-      containerCmd.withAttachStdout(true);
-      containerCmd.withEnv(envMapToList(environment));
-      containerCmd.withNetworkDisabled(!limits.containerSettings.network);
-      containerCmd.withStopTimeout((int) timeout.getSeconds());
-      containerCmd.withVolumes(new Volume(execDir.toAbsolutePath().toString()));
-      containerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
-
-      // execute
-      String id = containerCmd.exec().getId();
-      try {
-        dockerClient.startContainerCmd(id).exec();
-      }
-
-      // cleanup
-      finally {
-        try {
-          dockerClient.removeContainerCmd(id).withRemoveVolumes(true).withForce(true).exec();
-        } catch (Exception e) {
-          logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
-        }
-      }
+      return runActionWithDocker(execDir, limits, timeout, arguments, environment, resultBuilder);
     }
 
     long startNanoTime = System.nanoTime();
