@@ -33,6 +33,12 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.resources.ResourceLimits;
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.CreateContainerCmd;
+import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.model.Volume;
+import com.github.dockerjava.core.DockerClientBuilder;
+import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
@@ -54,8 +60,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import com.github.dockerjava.core.DockerClientBuilder;
-import com.github.dockerjava.api.DockerClient;
 
 class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
@@ -391,6 +395,35 @@ class Executor {
     return arguments.build();
   }
 
+  private boolean isLocalImagePresent(DockerClient dockerClient, String imageName) {
+    try {
+      dockerClient.inspectImageCmd(imageName).exec();
+    } catch (NotFoundException e) {
+      return false;
+    }
+    return true;
+  }
+
+  private void fetchImageIfMissing(DockerClient dockerClient, String imageName)
+      throws InterruptedException {
+    // pull image if we don't already have it
+    if (!isLocalImagePresent(dockerClient, imageName)) {
+      dockerClient
+          .pullImageCmd(imageName)
+          .exec(new PullImageResultCallback())
+          .awaitCompletion(1, TimeUnit.MINUTES);
+    }
+  }
+
+  private List<String> envMapToList(Map<String, String> envVars) {
+    List<String> envList = new ArrayList<>();
+    for (Map.Entry<String, String> environmentVariable : envVars.entrySet()) {
+      envList.add(environmentVariable.getKey() + "=" + environmentVariable.getValue());
+    }
+
+    return envList;
+  }
+
   private Code executeCommand(
       String operationName,
       Path execDir,
@@ -438,8 +471,44 @@ class Executor {
     if (limits.debugBeforeExecution) {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
     }
-    
-    DockerClient dockerClient = DockerClientBuilder.getInstance().build();
+
+    // run the action under docker
+    if (!limits.containerSettings.containerImage.isEmpty()) {
+      // construct docker client
+      DockerClient dockerClient = DockerClientBuilder.getInstance().build();
+
+      // get image
+      fetchImageIfMissing(dockerClient, limits.containerSettings.containerImage);
+
+      // create container
+      CreateContainerCmd containerCmd =
+          dockerClient.createContainerCmd(limits.containerSettings.containerImage);
+
+      // prepare command
+      containerCmd.withCmd(arguments);
+      containerCmd.withAttachStderr(true);
+      containerCmd.withAttachStdout(true);
+      containerCmd.withEnv(envMapToList(environment));
+      containerCmd.withNetworkDisabled(!limits.containerSettings.network);
+      containerCmd.withStopTimeout((int) timeout.getSeconds());
+      containerCmd.withVolumes(new Volume(execDir.toAbsolutePath().toString()));
+      containerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
+
+      // execute
+      String id = containerCmd.exec().getId();
+      try {
+        dockerClient.startContainerCmd(id).exec();
+      }
+
+      // cleanup
+      finally {
+        try {
+          dockerClient.removeContainerCmd(id).withRemoveVolumes(true).withForce(true).exec();
+        } catch (Exception e) {
+          logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
+        }
+      }
+    }
 
     long startNanoTime = System.nanoTime();
     Process process;

@@ -32,5 +32,6 @@ java_library(
         "@maven//:org_jetbrains_annotations",
         "@maven//:com_github_docker_java_docker_java",
         "@maven//:com_github_docker_java_docker_java_api",
+        "@maven//:com_github_docker_java_docker_java_core",
     ],
 )
