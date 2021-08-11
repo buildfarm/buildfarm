@@ -26,7 +26,6 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
-import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.StringVisitor;
@@ -41,7 +40,6 @@ import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.Utils;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
@@ -49,15 +47,12 @@ import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
-import build.buildfarm.v1test.DispatchedOperationsStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.LabeledCount;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
@@ -74,7 +69,6 @@ import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
@@ -88,7 +82,6 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -107,7 +100,6 @@ import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
-import org.redisson.config.ClusterServersConfig;
 import org.redisson.config.Config;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
@@ -159,7 +151,6 @@ public class RedisShardBackplane implements Backplane {
   private RedisShardSubscriber subscriber = null;
   private RedisShardSubscription operationSubscription = null;
   private ExecutorService subscriberService = null;
-  private boolean poolStarted = false;
   private @Nullable RedisClient client = null;
   private @Nullable RedissonClient redissonClient = null;
 
@@ -251,7 +242,7 @@ public class RedisShardBackplane implements Backplane {
           protected void visit(ExecuteEntry executeEntry, String executeEntryJson) {
             String operationName = executeEntry.getOperationName();
             String value = processingOperations.get(jedis, operationName);
-            int defaultTimeout_ms = config.getProcessingTimeoutMillis();
+            long defaultTimeout_ms = config.getProcessingTimeoutMillis();
 
             // get the operation's expiration
             Instant expiresAt = convertToMilliInstant(value, operationName);
@@ -260,7 +251,7 @@ public class RedisShardBackplane implements Backplane {
             if (expiresAt == null) {
               expiresAt = now.plusMillis(defaultTimeout_ms);
               String keyValue = String.format("%d", expiresAt.toEpochMilli());
-              int timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
+              long timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
               processingOperations.insert(jedis, operationName, keyValue, timeout_s);
             }
 
@@ -284,7 +275,7 @@ public class RedisShardBackplane implements Backplane {
           protected void visit(QueueEntry queueEntry, String queueEntryJson) {
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             String value = dispatchedOperations.get(jedis, operationName);
-            int defaultTimeout_ms = config.getDispatchingTimeoutMillis();
+            long defaultTimeout_ms = config.getDispatchingTimeoutMillis();
 
             // get the operation's expiration
             Instant expiresAt = convertToMilliInstant(value, operationName);
@@ -293,7 +284,7 @@ public class RedisShardBackplane implements Backplane {
             if (expiresAt == null) {
               expiresAt = now.plusMillis(defaultTimeout_ms);
               String keyValue = String.format("%d", expiresAt.toEpochMilli());
-              int timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
+              long timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
               dispatchedOperations.insert(jedis, operationName, keyValue, timeout_s);
             }
 
@@ -545,7 +536,7 @@ public class RedisShardBackplane implements Backplane {
     client = new RedisClient(jedisClusterFactory.get());
 
     // Create containers that make up the backplane
-    casWorkerMap = createCasWorkerMap(redissonClient, config);
+    casWorkerMap = createCasWorkerMap(config);
     actionCache = createActionCache(client, config);
     prequeue = createPrequeue(client, config);
     operationQueue = createOperationQueue(client, config);
@@ -566,11 +557,10 @@ public class RedisShardBackplane implements Backplane {
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
   }
 
-  static CasWorkerMap createCasWorkerMap(RedissonClient client, RedisShardBackplaneConfig config)
-      throws IOException {
+  CasWorkerMap createCasWorkerMap(RedisShardBackplaneConfig config) throws IOException {
     if (config.getCacheCas()) {
-      client = createRedissonClient(config);
-      return new RedissonCasWorkerMap(client, config.getCasPrefix(), config.getCasExpire());
+      redissonClient = createRedissonClient(config);
+      return new RedissonCasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire());
     } else {
       return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
     }
@@ -578,15 +568,7 @@ public class RedisShardBackplane implements Backplane {
 
   static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) throws IOException {
     Config redissonConfig = new Config();
-
-    ClusterServersConfig finalConfig =
-        redissonConfig
-            .useClusterServers()
-            .addNodeAddress(config.getRedisUri())
-            .setCheckSlotsCoverage(false);
-
-    RedissonClient client = Redisson.create(redissonConfig);
-    return client;
+    return Redisson.create(redissonConfig);
   }
 
   static RedisMap createActionCache(RedisClient client, RedisShardBackplaneConfig config)
@@ -643,12 +625,10 @@ public class RedisShardBackplane implements Backplane {
   }
 
   static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
-    List<String> clusterHashes =
-        client.call(
-            jedis ->
-                RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(
-                    jedis, RedisHashtags.existingHash(queueName)));
-    return clusterHashes;
+    return client.call(
+        jedis ->
+            RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(
+                jedis, RedisHashtags.existingHash(queueName)));
   }
 
   @Override
@@ -785,7 +765,7 @@ public class RedisShardBackplane implements Backplane {
   // sophisticated in the future. But for now, we'll give back n random workers.
   public List<String> suggestedWorkersToScaleDown(int numWorkers) throws IOException {
     // get all workers
-    List<String> allWorkers = new ArrayList<String>();
+    List<String> allWorkers = new ArrayList<>();
     allWorkers.addAll(getWorkers());
 
     // ensure selection amount is in range [0 - size]
@@ -902,7 +882,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
     // convert action keys to strings
-    List<String> keyNames = new ArrayList<String>();
+    List<String> keyNames = new ArrayList<>();
     actionKeys.forEach(
         key -> {
           keyNames.add(asDigestStr(key));
@@ -931,8 +911,8 @@ public class RedisShardBackplane implements Backplane {
 
               List<Response<String>> actionResults = new ArrayList<>(keyResults.size());
               JedisClusterPipeline p = jedis.pipelined();
-              for (int i = 0; i < keyResults.size(); i++) {
-                actionResults.add(p.get(keyResults.get(i)));
+              for (String key : keyResults) {
+                actionResults.add(p.get(key));
               }
               p.sync();
               for (int i = 0; i < keyResults.size(); i++) {
@@ -1029,8 +1009,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private String getOperation(JedisCluster jedis, String operationName) {
-    String json = jedis.get(operationKey(operationName));
-    return json;
+    return jedis.get(operationKey(operationName));
   }
 
   @Override
@@ -1041,8 +1020,6 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public boolean putOperation(Operation operation, ExecutionStage.Value stage) throws IOException {
-    // FIXME queue and prequeue should no longer be passed to here
-    boolean prequeue = stage == ExecutionStage.Value.UNKNOWN && !operation.getDone();
     boolean queue = stage == ExecutionStage.Value.QUEUED;
     boolean complete = !queue && operation.getDone();
     boolean publish = !queue && stage != ExecutionStage.Value.UNKNOWN;
@@ -1447,243 +1424,13 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public BackplaneStatus backplaneStatus(Instance instance) throws IOException {
-    Set<String> workers = getWorkers();
-    return client.call(
-        jedis ->
-            BackplaneStatus.newBuilder()
-                .setPrequeue(prequeue.status(jedis))
-                .setOperationQueue(operationQueue.status(jedis))
-                .setBlockedActionsSize(blockedActions.size(jedis))
-                .setBlockedInvocationsSize(blockedInvocations.size(jedis))
-                .setDispatchedOperations(getDispatchedOperationsStatus(jedis, instance))
-                .addAllActiveWorkers(workers)
-                .build());
-  }
-
-  /**
-   * @brief Analyze the currently dispatched operations to derive statistics about the operations
-   *     workers are currently executing.
-   * @details This status message is intended to be used as metrics.
-   * @param cluster An established redis cluster.
-   * @param instance An instance is used to get additional information about the operation.
-   * @return Metrics about the currently dispatched operations.
-   */
-  private DispatchedOperationsStatus getDispatchedOperationsStatus(
-      JedisCluster jedis, Instance instance) {
-    // Metrics related to dispatched operations
-    ActionAmounts actionAmounts = new ActionAmounts();
-    Integer requeuedOperationsAmount = 0;
-    Set<String> uniqueToolInvocationIds = Sets.newHashSet();
-    Map<String, Integer> fromQueueAmounts = new HashMap();
-    Map<String, Integer> toolAmounts = new HashMap();
-    Map<String, Integer> commandTools = new HashMap();
-    Map<String, Integer> actionMnemonics = new HashMap();
-    Map<String, Integer> targetIds = new HashMap();
-    Map<String, Integer> configIds = new HashMap();
-    Map<String, Integer> platformProperties = new HashMap();
-
-    // Iterate over each dispatched operation, and accumulate metrics about buildfarm's ongoing
-    // executions.
-    try {
-      for (DispatchedOperation operation : getDispatchedOperations()) {
-        QueuedOperation queuedOperation =
-            resolveQueuedOperationDigest(
-                instance, operation.getQueueEntry().getQueuedOperationDigest());
-
-        // 1. Information about the client / caller.
-
-        // Record unique tool invocation ids (ex. d6d7bfbc-c61e-4cdd-abaf-d3ea779335bf)
-        // This will let us know how many unique clients are getting work processed.
-        // This correlates to the number of individuals using buildfarm.
-        // We will probably be able to get a similar number from the incoming build event streams.
-        // However, users will have the ability to disable BES on the client side.
-        // They cannot disable the fact that their actions are tagged with their invocation id.
-        // Therefore, this may be a more reliable metric for "active users".
-        uniqueToolInvocationIds.add(
-            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getToolInvocationId());
-
-        // Record the tool that the operation came from (ex. bazel-4.0.0, pants-v2).
-        // This will let us know if anyone is using an unexpected build tool or bazel version with
-        // buildfarm.  In the past, we've speculated that mixing bazel version with buildfarm might
-        // result in stability issues.
-        // Now we'll be able to match any issues with when unexpected build tools were used.
-        String toolName =
-            operation
-                    .getQueueEntry()
-                    .getExecuteEntry()
-                    .getRequestMetadata()
-                    .getToolDetails()
-                    .getToolName()
-                + "-"
-                + operation
-                    .getQueueEntry()
-                    .getExecuteEntry()
-                    .getRequestMetadata()
-                    .getToolDetails()
-                    .getToolVersion();
-        incrementValue(toolAmounts, toolName);
-
-        // Record the target Id that initiated the operation.
-        // Note: This metadata is not populated by bazel until 4.1.0
-        String targetId =
-            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getTargetId();
-        incrementValue(targetIds, targetId);
-
-        // Record the build configuration of the action.
-        // Note: This metadata is not populated by bazel until 4.1.0
-        String configId =
-            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getConfigurationId();
-        incrementValue(configIds, configId);
-
-        // 2. Information about where the worker fetched the operation.
-
-        // Record the queue where the operation came from (ex. cpu, gpu).
-        // Queues often drain quickly.  This will let us identify the on-going work by the queues
-        // where originated from.
-        // We can correlate queue spikes with the the saturation they cause to dispatched
-        // operations.
-        String queueName =
-            operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
-        incrementValue(fromQueueAmounts, queueName);
-
-        // Record whether the operation has been requeued before
-        if (operation.getQueueEntry().getRequeueAttempts() > 0) {
-          requeuedOperationsAmount++;
-        }
-
-        // 3. Information about the operation.
-
-        // Record the action type (ex. build, test).
-        // Generally speaking, there are "build" actions and "test" actions.
-        // This is useful for knowing if buildfarm has been saturated with test work due
-        // clients using --runs_per_test.  It is also relevant to distinguish actions this way
-        // because long-running actions are often tests.
-        incrementActionType(queuedOperation, actionAmounts);
-
-        // Record the action mnemonic of the operation (ex. CppCompile, GoLink).
-        // This will let us know what kind of work is occurring.
-        // Although we know the mnemonic characteristics by statically analyzing the repo,
-        // we don't know what kind of actions dominate buildfarm's compute under typical load.
-        // This let us know what toolchains and rules are used most heavily and perhaps how to
-        // optimize for them.
-        // Note: This metadata is not populated by bazel until 4.1.0
-        String actionMnemonic =
-            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getActionMnemonic();
-        incrementValue(actionMnemonics, actionMnemonic);
-
-        // Record the programs being run (ex. clang, bash).
-        // Not all actions have mnemonics, and some mnemonics are used for multiple program
-        // invocations.
-        // This help us identify what toolchains are running and how it correlates to existing
-        // operation information.
-        List<String> arguments = queuedOperation.getCommand().getArgumentsList();
-        if (!arguments.isEmpty()) {
-          incrementValue(commandTools, arguments.get(0));
-        }
-
-        // Record platform properties being used on dispatched operations.
-        // How we run actions can be influenced by users through platform properties.
-        // Detecting issues through an influx of specific platform properties can help diagnose.
-        // For example, we may see many dispatched operations using a high amount of cores.
-        for (Platform.Property property :
-            queuedOperation.getCommand().getPlatform().getPropertiesList()) {
-          incrementValue(platformProperties, property.getName() + "=" + property.getValue());
-        }
-      }
-
-    } catch (Exception e) {
-      logger.log(Level.SEVERE, "Unable to analyze dispatched operation: ", e);
-    }
-
-    DispatchedOperationsStatus status =
-        DispatchedOperationsStatus.newBuilder()
-            .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
-            .setBuildActionAmount(actionAmounts.build)
-            .setTestActionAmount(actionAmounts.test)
-            .setUnknownActionAmount(actionAmounts.unknown)
-            .setRequeuedOperationsAmount(requeuedOperationsAmount)
-            .addAllFromQueues(toLabeledCounts(fromQueueAmounts))
-            .addAllTools(toLabeledCounts(toolAmounts))
-            .addAllActionMnemonics(toLabeledCounts(actionMnemonics))
-            .addAllCommandTools(toLabeledCounts(commandTools))
-            .addAllTargetIds(toLabeledCounts(targetIds))
-            .addAllConfigIds(toLabeledCounts(configIds))
-            .addAllPlatformProperties(toLabeledCounts(platformProperties))
-            .setUniqueClientsAmount(uniqueToolInvocationIds.size())
-            .build();
-
-    return status;
-  }
-
-  /**
-   * @brief Convert a map of string counts into a similar proto metric type.
-   * @details Certain metrics represent a list of strings with a count.
-   * @param map The map to convert.
-   * @return The metric type for counted strings.
-   */
-  private List<LabeledCount> toLabeledCounts(Map<String, Integer> map) {
-    List<LabeledCount> counts = new ArrayList<>();
-    for (Map.Entry<String, Integer> entry : map.entrySet()) {
-      counts.add(
-          LabeledCount.newBuilder().setName(entry.getKey()).setSize(entry.getValue()).build());
-    }
-    return counts;
-  }
-
-  /**
-   * @brief Increment a stat about the kind of operation.
-   * @details It is either a build/test action, or unknown in the event of missing data.
-   * @param queuedOperation The operation to analyze.
-   * @param actionAmounts The counts for the types of operation (build, test, unknown)
-   */
-  private void incrementActionType(QueuedOperation queuedOperation, ActionAmounts actionAmounts) {
-    if (queuedOperation != null) {
-      if (CommandUtils.isTest(queuedOperation.getCommand())) {
-        actionAmounts.test++;
-      } else {
-        actionAmounts.build++;
-      }
-    } else {
-      actionAmounts.unknown++;
-    }
-  }
-
-  /**
-   * @brief Increment the value of any key.
-   * @details Add the key with value 1 if it does not previously exist.
-   * @param map The map to find and increment the key in.
-   * @param key The key to increment the value of.
-   */
-  private static <K> void incrementValue(Map<K, Integer> map, K key) {
-    Integer count = map.get(key);
-    if (count == null) {
-      map.put(key, 1);
-    } else {
-      map.put(key, count + 1);
-    }
-  }
-
-  /**
-   * @brief Get the queued operation based on the digest.
-   * @details Instance used to fetch the blob.
-   * @param instance An instance is used to get additional information about the queue entry.
-   * @param digest The queued operation digest.
-   * @return The queued operation from the provided digest.
-   * @note Suggested return identifier: queuedOperation.
-   */
-  private static QueuedOperation resolveQueuedOperationDigest(Instance instance, Digest digest) {
-    try {
-      ByteString blob = Utils.getBlob(instance, digest, RequestMetadata.getDefaultInstance());
-      QueuedOperation operation;
-      try {
-        operation = QueuedOperation.parseFrom(blob);
-        return operation;
-      } catch (InvalidProtocolBufferException e) {
-        return null;
-      }
-    } catch (Exception e) {
-      return null;
-    }
+    BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
+    builder.addAllActiveWorkers(client.call(jedis -> jedis.hkeys(config.getWorkersHashName())));
+    builder.setDispatchedSize(
+        client.call(jedis -> jedis.hlen(config.getDispatchedOperationsHashName())));
+    builder.setOperationQueue(operationQueue.status(client.call(jedis -> jedis)));
+    builder.setPrequeue(prequeue.status(client.call(jedis -> jedis)));
+    return builder.build();
   }
 
   @Override

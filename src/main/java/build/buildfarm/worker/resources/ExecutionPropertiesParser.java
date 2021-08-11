@@ -14,15 +14,14 @@
 
 package build.buildfarm.worker.resources;
 
-import static build.buildfarm.common.ExecutionProperties.*;
-
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.common.ExecutionProperties;
+import build.buildfarm.common.MapUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
@@ -44,23 +43,28 @@ public class ExecutionPropertiesParser {
   public static ResourceLimits Parse(Command command) {
     // Build parser for all exec properties
     Map<String, BiConsumer<ResourceLimits, Property>> parser = new HashMap<>();
-    parser.put(LINUX_SANDBOX, ExecutionPropertiesParser::storeLinuxSandbox);
-    parser.put(AS_NOBODY, ExecutionPropertiesParser::storeAsNobody);
-    parser.put(BLOCK_NETWORK, ExecutionPropertiesParser::storeBlockNetwork);
-    parser.put(TMPFS, ExecutionPropertiesParser::storeTmpFs);
-    parser.put(MIN_CORES, ExecutionPropertiesParser::storeMinCores);
-    parser.put(MAX_CORES, ExecutionPropertiesParser::storeMaxCores);
-    parser.put(CORES, ExecutionPropertiesParser::storeCores);
-    parser.put(MIN_MEM, ExecutionPropertiesParser::storeMinMem);
-    parser.put(MAX_MEM, ExecutionPropertiesParser::storeMaxMem);
-    parser.put(ENV_VAR, ExecutionPropertiesParser::storeEnvVar);
-    parser.put(ENV_VARS, ExecutionPropertiesParser::storeEnvVars);
-    parser.put(SKIP_SLEEP, ExecutionPropertiesParser::storeSkipSleep);
-    parser.put(TIME_SHIFT, ExecutionPropertiesParser::storeTimeShift);
-    parser.put(DEBUG_BEFORE_EXECUTION, ExecutionPropertiesParser::storeBeforeExecutionDebug);
-    parser.put(DEBUG_AFTER_EXECUTION, ExecutionPropertiesParser::storeAfterExecutionDebug);
-    parser.put(DEBUG_TESTS_ONLY, ExecutionPropertiesParser::storeDebugTestsOnly);
-    parser.put(DEBUG_TARGET, ExecutionPropertiesParser::storeDebugTarget);
+    parser.put(ExecutionProperties.LINUX_SANDBOX, ExecutionPropertiesParser::storeLinuxSandbox);
+    parser.put(ExecutionProperties.AS_NOBODY, ExecutionPropertiesParser::storeAsNobody);
+    parser.put(ExecutionProperties.BLOCK_NETWORK, ExecutionPropertiesParser::storeBlockNetwork);
+    parser.put(ExecutionProperties.TMPFS, ExecutionPropertiesParser::storeTmpFs);
+    parser.put(ExecutionProperties.MIN_CORES, ExecutionPropertiesParser::storeMinCores);
+    parser.put(ExecutionProperties.MAX_CORES, ExecutionPropertiesParser::storeMaxCores);
+    parser.put(ExecutionProperties.CORES, ExecutionPropertiesParser::storeCores);
+    parser.put(ExecutionProperties.MIN_MEM, ExecutionPropertiesParser::storeMinMem);
+    parser.put(ExecutionProperties.MAX_MEM, ExecutionPropertiesParser::storeMaxMem);
+    parser.put(ExecutionProperties.ENV_VAR, ExecutionPropertiesParser::storeEnvVar);
+    parser.put(ExecutionProperties.ENV_VARS, ExecutionPropertiesParser::storeEnvVars);
+    parser.put(ExecutionProperties.SKIP_SLEEP, ExecutionPropertiesParser::storeSkipSleep);
+    parser.put(ExecutionProperties.TIME_SHIFT, ExecutionPropertiesParser::storeTimeShift);
+    parser.put(
+        ExecutionProperties.DEBUG_BEFORE_EXECUTION,
+        ExecutionPropertiesParser::storeBeforeExecutionDebug);
+    parser.put(
+        ExecutionProperties.DEBUG_AFTER_EXECUTION,
+        ExecutionPropertiesParser::storeAfterExecutionDebug);
+    parser.put(
+        ExecutionProperties.DEBUG_TESTS_ONLY, ExecutionPropertiesParser::storeDebugTestsOnly);
+    parser.put(ExecutionProperties.DEBUG_TARGET, ExecutionPropertiesParser::storeDebugTarget);
 
     ResourceLimits limits = new ResourceLimits();
     command
@@ -214,7 +218,7 @@ public class ExecutionPropertiesParser {
       JSONParser parser = new JSONParser();
       Map<String, String> map = (Map<String, String>) parser.parse(property.getValue());
       limits.extraEnvironmentVariables = map;
-      describeChange(limits.description, "extra env vars added", toString(map), property);
+      describeChange(limits.description, "extra env vars added", MapUtils.toString(map), property);
     } catch (ParseException pe) {
       limits.description.add("extra env vars could not be added due to parsing error");
     }
@@ -298,22 +302,6 @@ public class ExecutionPropertiesParser {
   private static void storeDebugTarget(ResourceLimits limits, Property property) {
     limits.debugTarget = property.getValue();
     describeChange(limits.description, "debug target", property.getValue(), property);
-  }
-
-  /**
-   * @brief Convert map to printable string.
-   * @details Uses streams.
-   * @param map Map to convert to string.
-   * @return String representation of map.
-   * @note Overloaded.
-   * @note Suggested return identifier: str.
-   */
-  private static String toString(Map<String, ?> map) {
-    String mapAsString =
-        map.keySet().stream()
-            .map(key -> key + "=" + map.get(key))
-            .collect(Collectors.joining(", ", "{", "}"));
-    return mapAsString;
   }
 
   /**

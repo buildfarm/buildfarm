@@ -95,6 +95,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.redisson:redisson:3.13.1",
                         "org.threeten:threetenbp:1.3.3",
                         "org.xerial:sqlite-jdbc:3.34.0",
+                        "org.jetbrains:annotations:16.0.2",
                     ],
         generate_compat_repositories = True,
         repositories = [

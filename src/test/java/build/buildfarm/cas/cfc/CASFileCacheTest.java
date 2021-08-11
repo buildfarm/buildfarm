@@ -365,7 +365,6 @@ class CASFileCacheTest {
     Path invalidDigest = root.resolve("00").resolve("digest");
     ByteString validBlob = ByteString.copyFromUtf8("valid");
     Digest validDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("valid"));
-    String validHash = validDigest.getHash();
     Path invalidExec = fileCache.getPath(CASFileCache.getFileName(validDigest, false) + "_regular");
 
     Files.write(tooFewComponents, ImmutableList.of("Too Few Components"), StandardCharsets.UTF_8);
@@ -944,8 +943,7 @@ class CASFileCacheTest {
       if (Thread.interrupted()) {
         throw new RuntimeException(new InterruptedException());
       }
-      Path path = Files.createTempDirectory("native-cas-test");
-      return path;
+      return Files.createTempDirectory("native-cas-test");
     }
   }
 
@@ -959,8 +957,7 @@ class CASFileCacheTest {
       if (Thread.interrupted()) {
         throw new RuntimeException(new InterruptedException());
       }
-      Path path = Files.createTempDirectory("native-cas-test");
-      return path;
+      return Files.createTempDirectory("native-cas-test");
     }
   }
 

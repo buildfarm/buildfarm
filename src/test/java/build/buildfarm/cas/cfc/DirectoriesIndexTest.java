@@ -65,8 +65,6 @@ public class DirectoriesIndexTest {
     // create directory and file
     ByteString coolBlob = ByteString.copyFromUtf8("cool content");
     Digest digest = DIGEST_UTIL.compute(coolBlob);
-    String dirName = "cool_dir";
-    Path path = entryPathStrategy.getPath(dirName);
     ImmutableList.Builder<String> entriesBuilder = new ImmutableList.Builder<>();
     entriesBuilder.add(digest.getHash());
 

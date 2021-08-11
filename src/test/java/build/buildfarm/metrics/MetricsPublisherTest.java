@@ -31,14 +31,12 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
-import java.util.function.Consumer;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MetricsPublisherTest {
-  private Consumer<String> snsMetricsPublisher = requestMetadata -> {};
   private ExecuteOperationMetadata defaultExecuteOperationMetadata =
       ExecuteOperationMetadata.getDefaultInstance();
   private RequestMetadata defaultRequestMetadata =

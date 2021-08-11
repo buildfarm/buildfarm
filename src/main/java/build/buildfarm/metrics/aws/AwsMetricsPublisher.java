@@ -120,14 +120,14 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     AWSSecretsManager client = AWSSecretsManagerClientBuilder.standard().withRegion(region).build();
     GetSecretValueRequest getSecretValueRequest =
         new GetSecretValueRequest().withSecretId(secretName);
-    GetSecretValueResult getSecretValueResult = null;
+    GetSecretValueResult getSecretValueResult;
     try {
       getSecretValueResult = client.getSecretValue(getSecretValueRequest);
     } catch (Exception e) {
       logger.log(Level.SEVERE, String.format("Could not get secret %s from AWS.", secretName));
       return;
     }
-    String secret = null;
+    String secret;
     if (getSecretValueResult.getSecretString() != null) {
       secret = getSecretValueResult.getSecretString();
     } else {

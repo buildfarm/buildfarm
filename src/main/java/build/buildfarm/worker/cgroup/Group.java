@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
-public class Group {
+public final class Group {
   private static final Logger logger = Logger.getLogger(Group.class.getName());
   private static final Group root = new Group(/* name=*/ null, /* parent=*/ null);
   private static final Path rootPath = Paths.get("/sys/fs/cgroup");

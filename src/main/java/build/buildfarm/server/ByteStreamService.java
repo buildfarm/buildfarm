@@ -332,7 +332,8 @@ public class ByteStreamService extends ByteStreamImplBase {
   @Override
   public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
     String resourceName = request.getResourceName();
-    long offset = request.getReadOffset(), limit = request.getReadLimit();
+    long offset = request.getReadOffset();
+    long limit = request.getReadLimit();
     logger.log(
         Level.FINER,
         format("read resource_name=%s offset=%d limit=%d", resourceName, offset, limit));

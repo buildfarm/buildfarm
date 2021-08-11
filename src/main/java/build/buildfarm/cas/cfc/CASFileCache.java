@@ -359,8 +359,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return null;
     }
 
-    boolean isExecutable = false;
-    boolean hasSizeComponent = false;
+    boolean isExecutable;
+    boolean hasSizeComponent;
     Digest digest;
     try {
       // Can be legacy: <hash>_<size>[_exec]
@@ -494,7 +494,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       String key = getKey(digest, isExecutable);
       Entry e = storage.get(key);
       if (e != null) {
-        InputStream input = null;
+        InputStream input;
         try {
           input = Files.newInputStream(getPath(key));
           input.skip(offset);
@@ -1392,7 +1392,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           }
           storage.put(e.key, e);
           onStartPut.accept(fileEntryKey.getDigest());
-          synchronized (CASFileCache.this) {
+          synchronized (this) {
             if (e.decrementReference(header)) {
               unreferencedEntryCount++;
             }
@@ -1485,16 +1485,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         // decide if file is a directory or empty/non-empty file
         boolean isDirectory = dirent.getFileStatus().isDirectory();
         boolean isEmptyFile = false;
-        if (e == null) {
-          if (!isDirectory) {
-            if (dirent.getFileStatus().getSize() == 0) {
-              isEmptyFile = true;
-            } else {
-              // no entry, not a directory, will NPE
-              b.addFilesBuilder().setName(name + "-MISSING");
-              // continue here to hopefully result in invalid directory
-              break;
-            }
+        if (e == null && !isDirectory) {
+          if (dirent.getFileStatus().getSize() == 0) {
+            isEmptyFile = true;
+          } else {
+            // no entry, not a directory, will NPE
+            b.addFilesBuilder().setName(name + "-MISSING");
+            // continue here to hopefully result in invalid directory
+            break;
           }
         }
 
@@ -1645,8 +1643,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     while (header.after == header) {
       int references = 0;
       int keys = 0;
-      int min = -1, max = 0;
-      String minkey = null, maxkey = null;
+      int min = -1;
+      int max = 0;
+      String minkey = null;
+      String maxkey = null;
       logger.log(
           Level.INFO,
           format(
@@ -2186,8 +2186,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         transformAsync(
             fetchFuture,
             (result) -> {
-              ImmutableList.Builder<Throwable> failures = ImmutableList.builder();
-              boolean failed = false;
               try {
                 disableAllWriteAccess(path);
               } catch (IOException e) {
@@ -2321,10 +2319,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private void copyExternalInput(Digest digest, CancellableOutputStream out)
       throws IOException, InterruptedException {
     logger.log(Level.FINE, format("downloading %s", DigestUtil.toString(digest)));
-    boolean complete = false;
     try (InputStream in = newExternalInput(digest, /* offset=*/ 0)) {
       ByteStreams.copy(in, out);
-      complete = true;
     } catch (IOException e) {
       out.cancel();
       logger.log(
@@ -2742,7 +2738,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @VisibleForTesting
   public static class Entry {
-    Entry before, after;
+    Entry before;
+    Entry after;
     final String key;
     final long size;
     int referenceCount;

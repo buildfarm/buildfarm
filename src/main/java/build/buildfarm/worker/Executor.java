@@ -24,7 +24,6 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.Write;
@@ -97,7 +96,7 @@ class Executor {
     ExecuteOperationMetadata executingMetadata =
         metadata.toBuilder().setStage(ExecutionStage.Value.EXECUTING).build();
 
-    Iterable<ExecutionPolicy> policies = new ArrayList<ExecutionPolicy>();
+    Iterable<ExecutionPolicy> policies = new ArrayList<>();
     if (limits.useExecutionPolicies) {
       policies =
           ExecutionPolicies.forPlatform(
@@ -241,19 +240,18 @@ class Executor {
       // based on the exit code observed from the main process. The test runner may kill any stray
       // processes. Tests should not leak processes in this fashion.
       // Based on configuration, we will decide whether remaining resources should be an error.
-      if (workerContext.shouldErrorOperationOnRemainingResources() && resource.isReferenced()) {
+      if (workerContext.shouldErrorOperationOnRemainingResources()
+          && resource.isReferenced()
+          && statusCode == Code.OK) {
         // there should no longer be any references to the resource. Any references will be
         // killed upon close, but we must error the operation due to improper execution
-        ExecuteResponse executeResponse = operationContext.executeResponse.build();
-        if (statusCode == Code.OK) {
-          // per the gRPC spec: 'The operation was attempted past the valid range.' Seems
-          // appropriate
-          statusCode = Code.OUT_OF_RANGE;
-          operationContext
-              .executeResponse
-              .getStatusBuilder()
-              .setMessage("command resources were referenced after execution completed");
-        }
+        // per the gRPC spec: 'The operation was attempted past the valid range.' Seems
+        // appropriate
+        statusCode = Code.OUT_OF_RANGE;
+        operationContext
+            .executeResponse
+            .getStatusBuilder()
+            .setMessage("command resources were referenced after execution completed");
       }
     } catch (IOException e) {
       logger.log(Level.SEVERE, format("error executing operation %s", operationName), e);
@@ -416,7 +414,8 @@ class Executor {
       environment.put(environmentVariable.getKey(), environmentVariable.getValue());
     }
 
-    final Write stdoutWrite, stderrWrite;
+    final Write stdoutWrite;
+    final Write stderrWrite;
 
     if (stdoutStreamName != null
         && !stdoutStreamName.isEmpty()
@@ -544,7 +543,7 @@ class Executor {
       }
 
       return ExecutionDebugger.performAfterExecutionDebug(
-          processBuilder, limits, executionStatistics, resultBuilder);
+          processBuilder, exitCode, limits, executionStatistics, resultBuilder);
     }
 
     return statusCode;

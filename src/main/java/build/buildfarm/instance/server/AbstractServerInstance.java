@@ -81,6 +81,7 @@ import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -137,8 +138,6 @@ public abstract class AbstractServerInstance implements Instance {
   protected final OperationsMap completedOperations;
   protected final Map<Digest, ByteString> activeBlobWrites;
   protected final DigestUtil digestUtil;
-
-  private static int VALIDATE_TIMEOUT_SECONDS = 30;
 
   public static final String ACTION_INPUT_ROOT_DIRECTORY_PATH = "";
 
@@ -467,7 +466,7 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
       throws EntryLimitException, IOException, InterruptedException {
-    ImmutableList.Builder<Digest> blobDigestsBuilder = new ImmutableList.Builder<Digest>();
+    ImmutableList.Builder<Digest> blobDigestsBuilder = new ImmutableList.Builder<>();
     PutAllBlobsException exception = null;
     for (ByteString blob : blobs) {
       Digest digest = digestUtil.compute(blob);
@@ -686,6 +685,11 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
+  private static boolean isValidFilename(String fileName) {
+    // for now, assume all filenames are valid
+    return true;
+  }
+
   @VisibleForTesting
   public static void validateActionInputDirectory(
       String directoryPath,
@@ -715,11 +719,9 @@ public abstract class AbstractServerInstance implements Instance {
             .setSubject("/" + directoryPath + ": " + lastFileName + " > " + fileName)
             .setDescription(DIRECTORY_NOT_SORTED);
       }
-      /* FIXME serverside validity check? regex?
-      Preconditions.checkState(
-          isValidFilename(fileName),
-          INVALID_FILE_NAME);
-      */
+      // FIXME serverside validity check? regex?
+      Preconditions.checkState(isValidFilename(fileName), INVALID_FILE_NAME);
+
       lastFileName = fileName;
       entryNames.add(fileName);
 
@@ -930,14 +932,12 @@ public abstract class AbstractServerInstance implements Instance {
       PreconditionFailure.Builder preconditionFailure,
       RequestMetadata requestMetadata)
       throws StatusException, InterruptedException {
-    final ListenableFuture<Void> validatedFuture;
     if (!queuedOperation.hasAction()) {
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("blobs/" + DigestUtil.toString(actionDigest))
           .setDescription(MISSING_ACTION);
-      validatedFuture = Futures.immediateFuture(null);
     } else {
       ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
       validateAction(
@@ -1245,9 +1245,8 @@ public abstract class AbstractServerInstance implements Instance {
       RequestMetadata requestMetadata,
       Watcher watcher)
       throws InterruptedException {
-    Action action;
     try {
-      action = validateActionDigest("execute", actionDigest, requestMetadata);
+      validateActionDigest("execute", actionDigest, requestMetadata);
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {
@@ -1610,12 +1609,6 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public String listOperations(
       int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
-    if (pageSize == 0) {
-      pageSize = getListOperationsDefaultPageSize();
-    } else if (getListOperationsMaxPageSize() > 0 && pageSize > getListOperationsMaxPageSize()) {
-      pageSize = getListOperationsMaxPageSize();
-    }
-
     // todo(luxe): add proper pagination
     FindOperationsResults results = findOperations(filter);
     if (results != null) {

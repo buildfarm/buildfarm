@@ -22,7 +22,7 @@ import java.nio.file.FileStore;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 
-public class Utils {
+public final class Utils {
   private Utils() {}
 
   public static FileStatus statIfFound(Path path, boolean followSymlinks, FileStore fileStore) {

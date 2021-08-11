@@ -41,7 +41,7 @@ public class RedisMapMockTest {
   @Test
   public void redisMapConstructsWithoutError() throws Exception {
     // ARRANGE
-    RedisMap map = new RedisMap("test");
+    new RedisMap("test");
   }
 
   // Function under test: insert
