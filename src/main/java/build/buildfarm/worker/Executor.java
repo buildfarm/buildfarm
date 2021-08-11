@@ -54,6 +54,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import com.github.dockerjava.core.DockerClientBuilder;
+import com.github.dockerjava.api.DockerClient;
 
 class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
@@ -436,6 +438,8 @@ class Executor {
     if (limits.debugBeforeExecution) {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
     }
+    
+    DockerClient dockerClient = DockerClientBuilder.getInstance().build();
 
     long startNanoTime = System.nanoTime();
     Process process;

@@ -30,5 +30,7 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
         "@maven//:org_jetbrains_annotations",
+        "@maven//:com_github_docker_java_docker_java",
+        "@maven//:com_github_docker_java_docker_java_api",
     ],
 )
