@@ -34,8 +34,12 @@ import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.async.ResultCallback;
+import com.github.dockerjava.api.command.AttachContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.model.Frame;
+import com.github.dockerjava.api.model.StreamType;
 import com.github.dockerjava.api.model.Volume;
 import com.github.dockerjava.core.DockerClientBuilder;
 import com.github.dockerjava.core.command.PullImageResultCallback;
@@ -424,6 +428,31 @@ class Executor {
     return envList;
   }
 
+  private static class DockerResultCallback extends ResultCallback.Adapter<Frame> {
+    String stdout = "";
+    String stderr = "";
+
+    @Override
+    public void onNext(Frame item) {
+      if (item.getStreamType() == StreamType.STDOUT) {
+        stdout += new String(item.getPayload());
+      } else if (item.getStreamType() == StreamType.STDERR) {
+        stderr += new String(item.getPayload());
+      }
+    }
+
+    @Override
+    public void onComplete() {}
+
+    public String stdout() {
+      return stdout;
+    }
+
+    public String stderr() {
+      return stderr;
+    }
+  };
+
   private Code runActionWithDocker(
       Path execDir,
       ResourceLimits limits,
@@ -452,6 +481,15 @@ class Executor {
     containerCmd.withVolumes(new Volume(execDir.toAbsolutePath().toString()));
     containerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
 
+    // capture stdout and stderr
+    DockerResultCallback callback = new DockerResultCallback();
+
+    AttachContainerCmd attachCmd =
+        dockerClient.attachContainerCmd(limits.containerSettings.containerImage);
+    attachCmd.withStdOut(true);
+    attachCmd.withStdErr(true);
+    ResultCallback.Adapter<Frame> callback2 = attachCmd.exec(callback);
+
     // execute
     String id = containerCmd.exec().getId();
     try {
@@ -461,6 +499,8 @@ class Executor {
               .start()
               .awaitStatusCode(timeout.getSeconds(), TimeUnit.SECONDS);
       resultBuilder.setExitCode(exitCode);
+      resultBuilder.setStdoutRaw(ByteString.copyFromUtf8(callback.stdout()));
+      resultBuilder.setStderrRaw(ByteString.copyFromUtf8(callback.stderr()));
     }
 
     // cleanup
