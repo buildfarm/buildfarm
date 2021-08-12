@@ -1,5 +1,5 @@
-//“Copyright 2021 VMware, Inc.”
-//SPDX-License-Identifier: Apache-2.0
+// “Copyright 2021 VMware, Inc.”
+// SPDX-License-Identifier: Apache-2.0
 // Copyright 2017 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -94,8 +94,8 @@ public class BuildFarmServer extends LoggingMain {
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     if (config.getSslCertificatePath() != "") {
-	File ssl_certificate_path = new File(config.getSslCertificatePath());
-	serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
+      File ssl_certificate_path = new File(config.getSslCertificatePath());
+      serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }
     server =
         serverBuilder
