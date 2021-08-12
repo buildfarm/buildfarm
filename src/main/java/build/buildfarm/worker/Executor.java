@@ -435,6 +435,8 @@ class Executor {
     @Override
     public void onNext(Frame item) {
       if (item.getStreamType() == StreamType.STDOUT) {
+        System.out.println("frame stdout");
+        // System.out.println(item.getPayload());
         stdout += new String(item.getPayload());
       } else if (item.getStreamType() == StreamType.STDERR) {
         stderr += new String(item.getPayload());
@@ -465,9 +467,11 @@ class Executor {
     DockerClient dockerClient = DockerClientBuilder.getInstance().build();
 
     // get image
+    System.out.println("Getting image");
     fetchImageIfMissing(dockerClient, limits.containerSettings.containerImage);
 
     // create container
+    System.out.println("Creating container");
     CreateContainerCmd containerCmd =
         dockerClient.createContainerCmd(limits.containerSettings.containerImage);
 
@@ -481,37 +485,48 @@ class Executor {
     containerCmd.withVolumes(new Volume(execDir.toAbsolutePath().toString()));
     containerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
 
-    // capture stdout and stderr
-    DockerResultCallback callback = new DockerResultCallback();
-
-    AttachContainerCmd attachCmd =
-        dockerClient.attachContainerCmd(limits.containerSettings.containerImage);
-    attachCmd.withStdOut(true);
-    attachCmd.withStdErr(true);
-    ResultCallback.Adapter<Frame> callback2 = attachCmd.exec(callback);
-
     // execute
+    System.out.println("execute");
     String id = containerCmd.exec().getId();
     try {
+
+      // capture stdout and stderr
+      DockerResultCallback callback = new DockerResultCallback();
+      AttachContainerCmd attachCmd = dockerClient.attachContainerCmd(id);
+      attachCmd.withStdOut(true);
+      attachCmd.withStdErr(true);
+      attachCmd.withFollowStream(true);
+      attachCmd.exec(callback);
+
+      dockerClient.startContainerCmd(id).exec();
+
       int exitCode =
           dockerClient
               .waitContainerCmd(id)
               .start()
               .awaitStatusCode(timeout.getSeconds(), TimeUnit.SECONDS);
+
+      System.out.println("Setting");
       resultBuilder.setExitCode(exitCode);
       resultBuilder.setStdoutRaw(ByteString.copyFromUtf8(callback.stdout()));
       resultBuilder.setStderrRaw(ByteString.copyFromUtf8(callback.stderr()));
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, "running under container failed: ", e);
+      resultBuilder.setExitCode(-1);
+      resultBuilder.setStderrRaw(ByteString.copyFromUtf8(e.toString()));
     }
 
     // cleanup
     finally {
       try {
+        System.out.println("Cleanup");
         dockerClient.removeContainerCmd(id).withRemoveVolumes(true).withForce(true).exec();
       } catch (Exception e) {
         logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
       }
     }
 
+    System.out.println("Done");
     return Code.OK;
   }
 
