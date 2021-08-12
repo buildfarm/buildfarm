@@ -482,6 +482,7 @@ class Executor {
     // prepare command
     //createContainerCmd.withCmd(arguments);
     //createContainerCmd.withCmd("sh","-c","pwd;ls");
+    createContainerCmd.withCmd("sleep", "9999");
     createContainerCmd.withAttachStderr(true);
     createContainerCmd.withAttachStdout(true);
     createContainerCmd.withEnv(envMapToList(envVars));
@@ -530,6 +531,9 @@ dockerClient.execStartCmd(id2)
 .exec(new ExecStartResultCallback(System.out, System.err))
         .awaitCompletion();
         System.out.println(outputStream.toString());
+        
+        
+        
 
       //execute 4
       // System.out.println("execute 4");
