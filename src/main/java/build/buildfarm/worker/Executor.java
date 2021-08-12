@@ -37,6 +37,7 @@ import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.AttachContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerCmd;
+import com.github.dockerjava.api.command.ExecCreateCmd;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.StreamType;
@@ -64,6 +65,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.io.ByteArrayOutputStream;
+import com.github.dockerjava.core.command.ExecStartResultCallback;
 
 class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
@@ -472,25 +475,34 @@ class Executor {
 
     // create container
     System.out.println("Creating container");
-    CreateContainerCmd containerCmd =
+    CreateContainerCmd createContainerCmd =
         dockerClient.createContainerCmd(limits.containerSettings.containerImage);
+        
 
     // prepare command
-    containerCmd.withCmd(arguments);
-    containerCmd.withAttachStderr(true);
-    containerCmd.withAttachStdout(true);
-    containerCmd.withEnv(envMapToList(envVars));
-    containerCmd.withNetworkDisabled(!limits.containerSettings.network);
-    containerCmd.withStopTimeout((int) timeout.getSeconds());
-    containerCmd.withVolumes(new Volume(execDir.toAbsolutePath().toString()));
-    containerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
+    //createContainerCmd.withCmd(arguments);
+    //createContainerCmd.withCmd("sh","-c","pwd;ls");
+    createContainerCmd.withAttachStderr(true);
+    createContainerCmd.withAttachStdout(true);
+    createContainerCmd.withEnv(envMapToList(envVars));
+    createContainerCmd.withNetworkDisabled(!limits.containerSettings.network);
+    //createContainerCmd.withStopTimeout((int) timeout.getSeconds());
+    createContainerCmd.withVolumes(new Volume(execDir.toAbsolutePath().toString()));
+    createContainerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
+    
 
+    //start container
+    String id = createContainerCmd.exec().getId();
+    System.out.println("start container");
+      dockerClient.startContainerCmd(id).exec();
+      
+    
     // execute
     System.out.println("execute");
-    String id = containerCmd.exec().getId();
     try {
 
       // capture stdout and stderr
+      System.out.println("create callback");
       DockerResultCallback callback = new DockerResultCallback();
       AttachContainerCmd attachCmd = dockerClient.attachContainerCmd(id);
       attachCmd.withStdOut(true);
@@ -498,15 +510,38 @@ class Executor {
       attachCmd.withFollowStream(true);
       attachCmd.exec(callback);
 
-      dockerClient.startContainerCmd(id).exec();
+      
+      //LogContainerCmd
+      
+      
+    //execute 2
+      System.out.println("execute 2");
+      ExecCreateCmd execCmd = dockerClient.execCreateCmd(id);
+    execCmd.withCmd("sh","-c","pwd");
+    execCmd.withAttachStderr(true);
+    execCmd.withAttachStdout(true);
+    String id2 = execCmd.exec().getId();
+    
+    //execute 3
+    System.out.println("execute 3");
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+dockerClient.execStartCmd(id2)
+        //.exec(new ExecStartResultCallback(outputStream, null))
+.exec(new ExecStartResultCallback(System.out, System.err))
+        .awaitCompletion();
+        System.out.println(outputStream.toString());
 
-      int exitCode =
-          dockerClient
-              .waitContainerCmd(id)
-              .start()
-              .awaitStatusCode(timeout.getSeconds(), TimeUnit.SECONDS);
+      //execute 4
+      // System.out.println("execute 4");
+      // int exitCode =
+      //     dockerClient
+      //         .waitContainerCmd(id)
+      //         .start()
+      //         .awaitStatusCode(timeout.getSeconds(), TimeUnit.SECONDS);
 
       System.out.println("Setting");
+      System.out.println(callback.stdout());
+      System.out.println(callback.stderr());
       resultBuilder.setExitCode(exitCode);
       resultBuilder.setStdoutRaw(ByteString.copyFromUtf8(callback.stdout()));
       resultBuilder.setStderrRaw(ByteString.copyFromUtf8(callback.stderr()));
@@ -520,7 +555,7 @@ class Executor {
     finally {
       try {
         System.out.println("Cleanup");
-        dockerClient.removeContainerCmd(id).withRemoveVolumes(true).withForce(true).exec();
+        //dockerClient.removeContainerCmd(id).withRemoveVolumes(true).withForce(true).exec();
       } catch (Exception e) {
         logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
       }

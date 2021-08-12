@@ -122,6 +122,19 @@ public class ResourceDecider {
       limits.useExecutionPolicies = false;
       limits.description.add("configured execution policies skipped because of choosing sandbox");
     }
+    
+    if (!limits.containerSettings.containerImage.isEmpty()) {
+      
+    // Avoid using the existing execution policies when running actions under docker.
+    // The programs used in the execution policies likely won't exist in the container images.
+      limits.useExecutionPolicies = false;
+      limits.description.add("configured execution policies skipped because of choosing docker");
+      
+      //avoid limiting resources as cgroups may no be available in the container
+      limits.cpu.limit = false;
+      limits.mem.limit = false;
+      limits.description.add("resource limiting disabled because of choosing docker");
+    }
 
     // we choose to resolve variables after the other variable values have been decided
     resolveEnvironmentVariables(limits);
