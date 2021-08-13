@@ -40,6 +40,8 @@ import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.ExecCreateCmd;
 import com.github.dockerjava.api.command.ExecStartCmd;
 import com.github.dockerjava.api.command.CreateContainerResponse;
+import com.github.dockerjava.api.command.InspectExecCmd;
+import com.github.dockerjava.api.command.InspectExecResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.StreamType;
@@ -521,69 +523,89 @@ class Executor {
     //decide command to run
     System.out.println("create exec command");
     ExecCreateCmd execCmd = dockerClient.execCreateCmd(containerId);
-    execCmd.withCmd("/bin/bash","-c","ls /bin/");
+    execCmd.withCmd("/bin/bash","-c","cat /etc/os-release");
     execCmd.withAttachStderr(true);
     execCmd.withAttachStdout(true);
     String execId = execCmd.exec().getId();
     System.out.println(execId);
       
     
-    //execute 3
+    //execute command
     System.out.println("execute");
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    ExecStartCmd execStartcmd = dockerClient.execStartCmd(execId);
-    //execStartcmd.exec(new ExecStartResultCallback(outputStream, null));
-    execStartcmd.exec(new ExecStartResultCallback(System.out, System.err)).awaitCompletion();
-    System.out.println(outputStream.toString());
-            
-    try {
-
-      // capture stdout and stderr
-      System.out.println("create callback");
-      DockerResultCallback callback = new DockerResultCallback();
-      AttachContainerCmd attachCmd = dockerClient.attachContainerCmd(containerId);
-      attachCmd.withStdOut(true);
-      attachCmd.withStdErr(true);
-      attachCmd.withFollowStream(true);
-      attachCmd.exec(callback);
-
-      
-      //LogContainerCmd
-      
-      
-        
-        
-        
-
-      //execute 4
-      // System.out.println("execute 4");
-      // int exitCode =
-      //     dockerClient
-      //         .waitContainerCmd(id)
-      //         .start()
-      //         .awaitStatusCode(timeout.getSeconds(), TimeUnit.SECONDS);
-
-      System.out.println("Setting");
-      System.out.println(callback.stdout());
-      System.out.println(callback.stderr());
-      resultBuilder.setExitCode(exitCode);
-      resultBuilder.setStdoutRaw(ByteString.copyFromUtf8(callback.stdout()));
-      resultBuilder.setStderrRaw(ByteString.copyFromUtf8(callback.stderr()));
-    } catch (Exception e) {
-      logger.log(Level.SEVERE, "running under container failed: ", e);
-      resultBuilder.setExitCode(-1);
-      resultBuilder.setStderrRaw(ByteString.copyFromUtf8(e.toString()));
-    }
-
-    // cleanup
-    finally {
+    ExecStartCmd execStartCmd = dockerClient.execStartCmd(execId);
+    
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    ByteArrayOutputStream err = new ByteArrayOutputStream();
+    execStartCmd.exec(new ExecStartResultCallback(out, err)).awaitCompletion();
+    System.out.println(out.toString());
+    
+    //extract command exit code
+    InspectExecCmd inspectExecCmd = dockerClient.inspectExecCmd(execId);
+    InspectExecResponse response = inspectExecCmd.exec();
+    System.out.println(response.getExitCodeLong());
+    
+    
+    //build output
+    resultBuilder.setExitCode(response.getExitCodeLong().intValue());
+    resultBuilder.setStdoutRaw(ByteString.copyFromUtf8(out.toString()));
+    resultBuilder.setStderrRaw(ByteString.copyFromUtf8(err.toString()));
+    
+    
       try {
-        System.out.println("Cleanup");
-        //dockerClient.removeContainerCmd(id).withRemoveVolumes(true).withForce(true).exec();
+        System.out.println("Cleanup container");
+        dockerClient.removeContainerCmd(containerId).withRemoveVolumes(true).withForce(true).exec();
       } catch (Exception e) {
         logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
       }
-    }
+            
+    // try {
+
+    //   // capture stdout and stderr
+    //   System.out.println("create callback");
+    //   DockerResultCallback callback = new DockerResultCallback();
+    //   AttachContainerCmd attachCmd = dockerClient.attachContainerCmd(containerId);
+    //   attachCmd.withStdOut(true);
+    //   attachCmd.withStdErr(true);
+    //   attachCmd.withFollowStream(true);
+    //   attachCmd.exec(callback);
+
+      
+    //   //LogContainerCmd
+      
+      
+        
+        
+        
+
+    //   //execute 4
+    //   // System.out.println("execute 4");
+    //   // int exitCode =
+    //   //     dockerClient
+    //   //         .waitContainerCmd(id)
+    //   //         .start()
+    //   //         .awaitStatusCode(timeout.getSeconds(), TimeUnit.SECONDS);
+
+    //   System.out.println("Setting");
+    //   System.out.println(callback.stdout());
+    //   System.out.println(callback.stderr());
+    //   resultBuilder.setExitCode(exitCode);
+    //   resultBuilder.setStdoutRaw(ByteString.copyFromUtf8(callback.stdout()));
+    //   resultBuilder.setStderrRaw(ByteString.copyFromUtf8(callback.stderr()));
+    // } catch (Exception e) {
+    //   logger.log(Level.SEVERE, "running under container failed: ", e);
+    //   resultBuilder.setExitCode(-1);
+    //   resultBuilder.setStderrRaw(ByteString.copyFromUtf8(e.toString()));
+    // }
+
+    // // cleanup
+    // finally {
+    //   try {
+    //     System.out.println("Cleanup");
+    //     //dockerClient.removeContainerCmd(id).withRemoveVolumes(true).withForce(true).exec();
+    //   } catch (Exception e) {
+    //     logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
+    //   }
+    // }
 
     System.out.println("Done");
     return Code.OK;
