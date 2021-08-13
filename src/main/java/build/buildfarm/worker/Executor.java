@@ -43,6 +43,7 @@ import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.InspectExecCmd;
 import com.github.dockerjava.api.command.InspectExecResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.StreamType;
 import com.github.dockerjava.api.model.Volume;
@@ -486,7 +487,14 @@ class Executor {
     createContainerCmd.withEnv(envMapToList(envVars));
     createContainerCmd.withNetworkDisabled(!limits.containerSettings.network);
     //createContainerCmd.withStopTimeout((int) timeout.getSeconds());
-    createContainerCmd.withVolumes(new Volume(execDir.toAbsolutePath().toString()));
+    
+    String execDirStr = execDir.toAbsolutePath().toString();
+    //createContainerCmd.withVolumes(new Volume("/tmp:/tmp"));
+    
+    System.out.println(execDirStr);
+    createContainerCmd.withBinds(new Bind("/tmp",new Volume("/tmp")));
+    //createContainerCmd.withBinds(new Bind(execDirStr,new Volume(execDirStr)));
+    //createContainerCmd.withBinds(new Bind("/tmp",new Volume("/tmp")));
     createContainerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
     createContainerCmd.withTty(true);
     
@@ -523,7 +531,14 @@ class Executor {
     //decide command to run
     System.out.println("create exec command");
     ExecCreateCmd execCmd = dockerClient.execCreateCmd(containerId);
-    execCmd.withCmd("/bin/bash","-c","cat /etc/os-release");
+    //execCmd.withCmd(arguments.toArray(new String[0]));
+// for(int i=0;i<arguments.size();i++){
+//     System.out.println(arguments.get(i));
+// } 
+    //execCmd.withCmd("/bin/bash","-c","cat /etc/os-release");
+    //execCmd.withCmd("/bin/pwd");
+    //execCmd.withCmd("/bin/ls /tmp");
+    execCmd.withCmd("/bin/bash","-c","ls /tmp/worker2/shard/operations");
     execCmd.withAttachStderr(true);
     execCmd.withAttachStdout(true);
     String execId = execCmd.exec().getId();
@@ -557,6 +572,8 @@ class Executor {
       } catch (Exception e) {
         logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
       }
+      
+      //System.exit(0);
             
     // try {
 
