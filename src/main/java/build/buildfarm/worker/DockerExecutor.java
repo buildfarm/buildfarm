@@ -26,6 +26,7 @@ import com.github.dockerjava.api.command.InspectExecResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.Volume;
+import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.core.DockerClientBuilder;
 import com.github.dockerjava.core.command.ExecStartResultCallback;
 import com.github.dockerjava.core.command.PullImageResultCallback;
@@ -43,6 +44,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
 
 class DockerExecutor {
   private static final Logger logger = Logger.getLogger(DockerExecutor.class.getName());
@@ -74,7 +77,15 @@ class DockerExecutor {
     // decide command to run
     System.out.println("create exec command");
     ExecCreateCmd execCmd = dockerClient.execCreateCmd(containerId);
-    // execCmd.withCmd(arguments.toArray(new String[0]));
+    
+    List<String> args = new ArrayList<>();
+    args.add("/bin/bash");
+    args.add("-c");
+    args.add(String.join(" ", arguments));
+    execCmd.withCmd(args.toArray(new String[0]));
+    
+    
+    
     for (int i = 0; i < arguments.size(); i++) {
       System.out.println("cliArg: " + arguments.get(i));
     }
@@ -86,7 +97,7 @@ class DockerExecutor {
 
     try {
       ProcessBuilder builder = new ProcessBuilder();
-      builder.command("ls", "-al", execDir.toAbsolutePath().toString());
+      builder.command("ls", "-al", execDir.toAbsolutePath().toString() + "/external/bazel_tools/tools/test/");
       Process process = builder.start();
 
       StringBuilder output = new StringBuilder();
@@ -102,7 +113,12 @@ class DockerExecutor {
     } catch (Exception e) {
     }
 
-    execCmd.withCmd("/bin/bash", "-c", "ls -al " + execDir.toAbsolutePath().toString());
+    //execCmd.withCmd("/bin/bash", "-c", "ls -al " + execDir.toAbsolutePath().toString() + "/external/bazel_tools/tools/test/");
+    //execCmd.withCmd("/bin/bash", "-c", "ls -al /tmp");
+    //execCmd.withCmd("ls -al " + execDir.toAbsolutePath().toString());
+    execCmd.withWorkingDir(execDir.toAbsolutePath().toString());
+    
+    //execCmd.withWorkingDir("/");
     execCmd.withAttachStderr(true);
     execCmd.withAttachStdout(true);
     String execId = execCmd.exec().getId();
@@ -164,16 +180,63 @@ class DockerExecutor {
     // createContainerCmd.withVolumes(new Volume("/tmp:/tmp"));
 
     System.out.println("execDirStr: " + execDirStr);
-    createContainerCmd.withBinds(new Bind("/tmp", new Volume("/tmp"), true));
-    createContainerCmd.withVolumes(new Volume("/tmp"));
+    //createContainerCmd.withBinds(new Bind("/tmp", new Volume("/tmp")));
+    //createContainerCmd.withVolumes(new Volume("/tmp"));
     // createContainerCmd.withBinds(new Bind(execDirStr,new Volume(execDirStr)));
     // createContainerCmd.withBinds(new Bind("/tmp",new Volume("/tmp")));
-    createContainerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
+    
+    //createContainerCmd.withBinds(new Bind(execDirStr,new Volume(execDirStr)));
+    
+    createContainerCmd.withHostConfig(getHostConfig(execDir));
+    
+    
+    
+    //createContainerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
+    //createContainerCmd.withWorkingDir("/");
     createContainerCmd.withTty(true);
 
     CreateContainerResponse response = createContainerCmd.exec();
     System.out.println("warnings: " + Arrays.toString(response.getWarnings()));
     return response.getId();
+  }
+  
+  private static HostConfig getHostConfig(Path execDir) {
+    HostConfig config = new HostConfig();
+    
+    
+    //create binds
+    List<Bind> binds = new ArrayList<>();
+    
+    //add exec dir
+    //String execDirStr = execDir.toAbsolutePath().toString();
+    //binds.add(new Bind(execDirStr,new Volume(execDirStr)));
+    
+    
+    //add parts of exec dir
+    // try (DirectoryStream<Path> stream = Files.newDirectoryStream(execDir)) {
+    //   for (Path path : stream) {
+    //     System.out.println("mount this: " + path.toAbsolutePath().toString());
+    //     binds.add(new Bind(path.toAbsolutePath().toString(),new Volume(path.toAbsolutePath().toString())));
+    //   }
+    // }
+    // catch (Exception e){
+    // }
+    
+    //recursively add parts of exec dir
+    try {
+    Files.walk(execDir).forEach(path -> {
+        System.out.println("mount this: " + path.toAbsolutePath().toString());
+        binds.add(new Bind(path.toAbsolutePath().toString(),new Volume(path.toAbsolutePath().toString())));
+    });
+  }catch(Exception e){
+  }
+    
+    
+    //add binds
+    config.withBinds(binds);
+    
+    
+    return config;
   }
 
   private static void fetchImageIfMissing(DockerClient dockerClient, String imageName)
