@@ -38,11 +38,14 @@ import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.AttachContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.ExecCreateCmd;
+import com.github.dockerjava.api.command.ExecStartCmd;
+import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Frame;
 import com.github.dockerjava.api.model.StreamType;
 import com.github.dockerjava.api.model.Volume;
 import com.github.dockerjava.core.DockerClientBuilder;
+import java.util.Arrays;
 import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
@@ -457,6 +460,39 @@ class Executor {
       return stderr;
     }
   };
+  
+  
+  private String createContainer(
+      DockerClient dockerClient,
+      Path execDir,
+      ResourceLimits limits,
+      Duration timeout,
+      Map<String, String> envVars)
+      throws InterruptedException {
+        
+        
+    CreateContainerCmd createContainerCmd =
+        dockerClient.createContainerCmd(limits.containerSettings.containerImage);
+        
+
+    // prepare command
+    //createContainerCmd.withCmd(arguments);
+    //createContainerCmd.withCmd("sh","-c","pwd;ls");
+    //createContainerCmd.withCmd("sleep", "5");
+    createContainerCmd.withAttachStderr(true);
+    createContainerCmd.withAttachStdout(true);
+    createContainerCmd.withEnv(envMapToList(envVars));
+    createContainerCmd.withNetworkDisabled(!limits.containerSettings.network);
+    //createContainerCmd.withStopTimeout((int) timeout.getSeconds());
+    createContainerCmd.withVolumes(new Volume(execDir.toAbsolutePath().toString()));
+    createContainerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
+    createContainerCmd.withTty(true);
+    
+
+    CreateContainerResponse response = createContainerCmd.exec();
+    System.out.println(Arrays.toString(response.getWarnings()));
+    return response.getId();
+  }
 
   private Code runActionWithDocker(
       Path execDir,
@@ -475,37 +511,37 @@ class Executor {
 
     // create container
     System.out.println("Creating container");
-    CreateContainerCmd createContainerCmd =
-        dockerClient.createContainerCmd(limits.containerSettings.containerImage);
-        
-
-    // prepare command
-    //createContainerCmd.withCmd(arguments);
-    //createContainerCmd.withCmd("sh","-c","pwd;ls");
-    createContainerCmd.withCmd("sleep", "9999");
-    createContainerCmd.withAttachStderr(true);
-    createContainerCmd.withAttachStdout(true);
-    createContainerCmd.withEnv(envMapToList(envVars));
-    createContainerCmd.withNetworkDisabled(!limits.containerSettings.network);
-    //createContainerCmd.withStopTimeout((int) timeout.getSeconds());
-    createContainerCmd.withVolumes(new Volume(execDir.toAbsolutePath().toString()));
-    createContainerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
+    String containerId = createContainer(dockerClient,execDir,limits,timeout,envVars);
+    System.out.println(containerId);
     
-
     //start container
-    String id = createContainerCmd.exec().getId();
     System.out.println("start container");
-      dockerClient.startContainerCmd(id).exec();
+    dockerClient.startContainerCmd(containerId).exec();
+    
+    //decide command to run
+    System.out.println("create exec command");
+    ExecCreateCmd execCmd = dockerClient.execCreateCmd(containerId);
+    execCmd.withCmd("/bin/bash","-c","ls /bin/");
+    execCmd.withAttachStderr(true);
+    execCmd.withAttachStdout(true);
+    String execId = execCmd.exec().getId();
+    System.out.println(execId);
       
     
-    // execute
+    //execute 3
     System.out.println("execute");
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    ExecStartCmd execStartcmd = dockerClient.execStartCmd(execId);
+    //execStartcmd.exec(new ExecStartResultCallback(outputStream, null));
+    execStartcmd.exec(new ExecStartResultCallback(System.out, System.err)).awaitCompletion();
+    System.out.println(outputStream.toString());
+            
     try {
 
       // capture stdout and stderr
       System.out.println("create callback");
       DockerResultCallback callback = new DockerResultCallback();
-      AttachContainerCmd attachCmd = dockerClient.attachContainerCmd(id);
+      AttachContainerCmd attachCmd = dockerClient.attachContainerCmd(containerId);
       attachCmd.withStdOut(true);
       attachCmd.withStdErr(true);
       attachCmd.withFollowStream(true);
@@ -515,22 +551,6 @@ class Executor {
       //LogContainerCmd
       
       
-    //execute 2
-      System.out.println("execute 2");
-      ExecCreateCmd execCmd = dockerClient.execCreateCmd(id);
-    execCmd.withCmd("sh","-c","pwd");
-    execCmd.withAttachStderr(true);
-    execCmd.withAttachStdout(true);
-    String id2 = execCmd.exec().getId();
-    
-    //execute 3
-    System.out.println("execute 3");
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-dockerClient.execStartCmd(id2)
-        //.exec(new ExecStartResultCallback(outputStream, null))
-.exec(new ExecStartResultCallback(System.out, System.err))
-        .awaitCompletion();
-        System.out.println(outputStream.toString());
         
         
         
