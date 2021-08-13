@@ -33,23 +33,6 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.resources.ResourceLimits;
-import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.async.ResultCallback;
-import com.github.dockerjava.api.command.AttachContainerCmd;
-import com.github.dockerjava.api.command.CreateContainerCmd;
-import com.github.dockerjava.api.command.ExecCreateCmd;
-import com.github.dockerjava.api.command.ExecStartCmd;
-import com.github.dockerjava.api.command.CreateContainerResponse;
-import com.github.dockerjava.api.command.InspectExecCmd;
-import com.github.dockerjava.api.command.InspectExecResponse;
-import com.github.dockerjava.api.exception.NotFoundException;
-import com.github.dockerjava.api.model.Bind;
-import com.github.dockerjava.api.model.Frame;
-import com.github.dockerjava.api.model.StreamType;
-import com.github.dockerjava.api.model.Volume;
-import com.github.dockerjava.core.DockerClientBuilder;
-import java.util.Arrays;
-import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
@@ -71,8 +54,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.io.ByteArrayOutputStream;
-import com.github.dockerjava.core.command.ExecStartResultCallback;
 
 class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
@@ -408,226 +389,6 @@ class Executor {
     return arguments.build();
   }
 
-  private boolean isLocalImagePresent(DockerClient dockerClient, String imageName) {
-    try {
-      dockerClient.inspectImageCmd(imageName).exec();
-    } catch (NotFoundException e) {
-      return false;
-    }
-    return true;
-  }
-
-  private void fetchImageIfMissing(DockerClient dockerClient, String imageName)
-      throws InterruptedException {
-    // pull image if we don't already have it
-    if (!isLocalImagePresent(dockerClient, imageName)) {
-      dockerClient
-          .pullImageCmd(imageName)
-          .exec(new PullImageResultCallback())
-          .awaitCompletion(1, TimeUnit.MINUTES);
-    }
-  }
-
-  private List<String> envMapToList(Map<String, String> envVars) {
-    List<String> envList = new ArrayList<>();
-    for (Map.Entry<String, String> environmentVariable : envVars.entrySet()) {
-      envList.add(environmentVariable.getKey() + "=" + environmentVariable.getValue());
-    }
-
-    return envList;
-  }
-
-  private static class DockerResultCallback extends ResultCallback.Adapter<Frame> {
-    String stdout = "";
-    String stderr = "";
-
-    @Override
-    public void onNext(Frame item) {
-      if (item.getStreamType() == StreamType.STDOUT) {
-        System.out.println("frame stdout");
-        // System.out.println(item.getPayload());
-        stdout += new String(item.getPayload());
-      } else if (item.getStreamType() == StreamType.STDERR) {
-        stderr += new String(item.getPayload());
-      }
-    }
-
-    @Override
-    public void onComplete() {}
-
-    public String stdout() {
-      return stdout;
-    }
-
-    public String stderr() {
-      return stderr;
-    }
-  };
-  
-  
-  private String createContainer(
-      DockerClient dockerClient,
-      Path execDir,
-      ResourceLimits limits,
-      Duration timeout,
-      Map<String, String> envVars)
-      throws InterruptedException {
-        
-        
-    CreateContainerCmd createContainerCmd =
-        dockerClient.createContainerCmd(limits.containerSettings.containerImage);
-        
-
-    // prepare command
-    //createContainerCmd.withCmd(arguments);
-    //createContainerCmd.withCmd("sh","-c","pwd;ls");
-    //createContainerCmd.withCmd("sleep", "5");
-    createContainerCmd.withAttachStderr(true);
-    createContainerCmd.withAttachStdout(true);
-    createContainerCmd.withEnv(envMapToList(envVars));
-    createContainerCmd.withNetworkDisabled(!limits.containerSettings.network);
-    //createContainerCmd.withStopTimeout((int) timeout.getSeconds());
-    
-    String execDirStr = execDir.toAbsolutePath().toString();
-    //createContainerCmd.withVolumes(new Volume("/tmp:/tmp"));
-    
-    System.out.println(execDirStr);
-    createContainerCmd.withBinds(new Bind("/tmp",new Volume("/tmp")));
-    //createContainerCmd.withBinds(new Bind(execDirStr,new Volume(execDirStr)));
-    //createContainerCmd.withBinds(new Bind("/tmp",new Volume("/tmp")));
-    createContainerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
-    createContainerCmd.withTty(true);
-    
-
-    CreateContainerResponse response = createContainerCmd.exec();
-    System.out.println(Arrays.toString(response.getWarnings()));
-    return response.getId();
-  }
-
-  private Code runActionWithDocker(
-      Path execDir,
-      ResourceLimits limits,
-      Duration timeout,
-      List<String> arguments,
-      Map<String, String> envVars,
-      ActionResult.Builder resultBuilder)
-      throws InterruptedException {
-    // construct docker client
-    DockerClient dockerClient = DockerClientBuilder.getInstance().build();
-
-    // get image
-    System.out.println("Getting image");
-    fetchImageIfMissing(dockerClient, limits.containerSettings.containerImage);
-
-    // create container
-    System.out.println("Creating container");
-    String containerId = createContainer(dockerClient,execDir,limits,timeout,envVars);
-    System.out.println(containerId);
-    
-    //start container
-    System.out.println("start container");
-    dockerClient.startContainerCmd(containerId).exec();
-    
-    //decide command to run
-    System.out.println("create exec command");
-    ExecCreateCmd execCmd = dockerClient.execCreateCmd(containerId);
-    //execCmd.withCmd(arguments.toArray(new String[0]));
-// for(int i=0;i<arguments.size();i++){
-//     System.out.println(arguments.get(i));
-// } 
-    //execCmd.withCmd("/bin/bash","-c","cat /etc/os-release");
-    //execCmd.withCmd("/bin/pwd");
-    //execCmd.withCmd("/bin/ls /tmp");
-    execCmd.withCmd("/bin/bash","-c","ls /tmp/worker2/shard/operations");
-    execCmd.withAttachStderr(true);
-    execCmd.withAttachStdout(true);
-    String execId = execCmd.exec().getId();
-    System.out.println(execId);
-      
-    
-    //execute command
-    System.out.println("execute");
-    ExecStartCmd execStartCmd = dockerClient.execStartCmd(execId);
-    
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    ByteArrayOutputStream err = new ByteArrayOutputStream();
-    execStartCmd.exec(new ExecStartResultCallback(out, err)).awaitCompletion();
-    System.out.println(out.toString());
-    
-    //extract command exit code
-    InspectExecCmd inspectExecCmd = dockerClient.inspectExecCmd(execId);
-    InspectExecResponse response = inspectExecCmd.exec();
-    System.out.println(response.getExitCodeLong());
-    
-    
-    //build output
-    resultBuilder.setExitCode(response.getExitCodeLong().intValue());
-    resultBuilder.setStdoutRaw(ByteString.copyFromUtf8(out.toString()));
-    resultBuilder.setStderrRaw(ByteString.copyFromUtf8(err.toString()));
-    
-    
-      try {
-        System.out.println("Cleanup container");
-        dockerClient.removeContainerCmd(containerId).withRemoveVolumes(true).withForce(true).exec();
-      } catch (Exception e) {
-        logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
-      }
-      
-      //System.exit(0);
-            
-    // try {
-
-    //   // capture stdout and stderr
-    //   System.out.println("create callback");
-    //   DockerResultCallback callback = new DockerResultCallback();
-    //   AttachContainerCmd attachCmd = dockerClient.attachContainerCmd(containerId);
-    //   attachCmd.withStdOut(true);
-    //   attachCmd.withStdErr(true);
-    //   attachCmd.withFollowStream(true);
-    //   attachCmd.exec(callback);
-
-      
-    //   //LogContainerCmd
-      
-      
-        
-        
-        
-
-    //   //execute 4
-    //   // System.out.println("execute 4");
-    //   // int exitCode =
-    //   //     dockerClient
-    //   //         .waitContainerCmd(id)
-    //   //         .start()
-    //   //         .awaitStatusCode(timeout.getSeconds(), TimeUnit.SECONDS);
-
-    //   System.out.println("Setting");
-    //   System.out.println(callback.stdout());
-    //   System.out.println(callback.stderr());
-    //   resultBuilder.setExitCode(exitCode);
-    //   resultBuilder.setStdoutRaw(ByteString.copyFromUtf8(callback.stdout()));
-    //   resultBuilder.setStderrRaw(ByteString.copyFromUtf8(callback.stderr()));
-    // } catch (Exception e) {
-    //   logger.log(Level.SEVERE, "running under container failed: ", e);
-    //   resultBuilder.setExitCode(-1);
-    //   resultBuilder.setStderrRaw(ByteString.copyFromUtf8(e.toString()));
-    // }
-
-    // // cleanup
-    // finally {
-    //   try {
-    //     System.out.println("Cleanup");
-    //     //dockerClient.removeContainerCmd(id).withRemoveVolumes(true).withForce(true).exec();
-    //   } catch (Exception e) {
-    //     logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
-    //   }
-    // }
-
-    System.out.println("Done");
-    return Code.OK;
-  }
-
   private Code executeCommand(
       String operationName,
       Path execDir,
@@ -678,7 +439,8 @@ class Executor {
 
     // run the action under docker
     if (!limits.containerSettings.containerImage.isEmpty()) {
-      return runActionWithDocker(execDir, limits, timeout, arguments, environment, resultBuilder);
+      return DockerExecutor.runActionWithDocker(
+          execDir, limits, timeout, arguments, environment, resultBuilder);
     }
 
     long startNanoTime = System.nanoTime();
