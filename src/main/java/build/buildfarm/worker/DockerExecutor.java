@@ -19,7 +19,6 @@ import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CopyArchiveFromContainerCmd;
 import com.github.dockerjava.api.command.CopyArchiveToContainerCmd;
-import com.github.dockerjava.api.command.CopyFileFromContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.ExecCreateCmd;
@@ -37,6 +36,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.rpc.Code;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
@@ -51,10 +52,6 @@ import java.util.logging.Logger;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.IOUtils;
-import java.io.FileOutputStream;
-import java.io.File;
-import java.io.InputStream;
-import static org.apache.commons.io.FileUtils.copyInputStreamToFile;
 
 class DockerExecutor {
   private static final Logger logger = Logger.getLogger(DockerExecutor.class.getName());
@@ -78,7 +75,8 @@ class DockerExecutor {
     String execId =
         runActionInsideContainer(dockerClient, containerId, execDir, arguments, resultBuilder);
 
-    extractInformationFromContainer(dockerClient, operationContext, containerId, execId, execDir, resultBuilder);
+    extractInformationFromContainer(
+        dockerClient, operationContext, containerId, execId, execDir, resultBuilder);
 
     cleanUpContainer(dockerClient, containerId);
 
@@ -91,8 +89,8 @@ class DockerExecutor {
       String containerId,
       String execId,
       Path execDir,
-      ActionResult.Builder resultBuilder) throws IOException {
-    
+      ActionResult.Builder resultBuilder)
+      throws IOException {
     // extract action's exit code
     InspectExecCmd inspectExecCmd = dockerClient.inspectExecCmd(execId);
     InspectExecResponse response = inspectExecCmd.exec();
@@ -259,64 +257,50 @@ class DockerExecutor {
   }
 
   private static void copyOutputsOutOfContainer(
-      DockerClient dockerClient, OperationContext operationContext, String containerId, Path execDir) throws IOException{
-     String execDirStr = execDir.toAbsolutePath().toString();
-     
-     
-     
+      DockerClient dockerClient,
+      OperationContext operationContext,
+      String containerId,
+      Path execDir)
+      throws IOException {
+    String execDirStr = execDir.toAbsolutePath().toString();
+
     for (String outputFile : operationContext.command.getOutputFilesList()) {
       Path outputPath = operationContext.execDir.resolve(outputFile);
-        copyFileOutOfContainer(dockerClient,containerId,outputPath);
+      copyFileOutOfContainer(dockerClient, containerId, outputPath);
     }
     for (String outputDir : operationContext.command.getOutputDirectoriesList()) {
       Path outputDirPath = operationContext.execDir.resolve(outputDir);
       outputDirPath.toFile().mkdirs();
     }
-     
-    // CopyArchiveFromContainerCmd cmd =
-    //     dockerClient.copyArchiveFromContainerCmd(containerId, execDirStr);
-    // cmd.withHostPath(execDirStr);
-    
-        
-    //     try (TarArchiveInputStream tarStream = new TarArchiveInputStream(cmd.exec())) {
-    //         unTar(tarStream, new File(execDirStr));
-    //     }
-        
   }
-  
-  private static void copyFileOutOfContainer(DockerClient dockerClient, String containerId, Path path) throws IOException{
-    
-    CopyFileFromContainerCmd cmd = dockerClient.copyFileFromContainerCmd(containerId, path.toString());
+
+  private static void copyFileOutOfContainer(
+      DockerClient dockerClient, String containerId, Path path) throws IOException {
+    CopyArchiveFromContainerCmd cmd =
+        dockerClient.copyArchiveFromContainerCmd(containerId, path.toString());
     cmd.withHostPath(path.toString());
-    try (InputStream inputStream = cmd.exec()){
-      copyInputStreamToFile(inputStream, new File(path.toString()));
+    cmd.withResource(path.toString());
+
+    try (TarArchiveInputStream tarStream = new TarArchiveInputStream(cmd.exec())) {
+      unTar(tarStream, new File(path.toString()));
     }
   }
-  
-  
-  
-  
-  
-  
-  
-    public static void unTar(TarArchiveInputStream tis, File destFile)
-            throws IOException {
-        TarArchiveEntry tarEntry = null;
-        while ((tarEntry = tis.getNextTarEntry()) != null) {
-            if (tarEntry.isDirectory()) {
-                if (!destFile.exists()) {
-                    destFile.mkdirs();
-                }
-            } else {
-                if (tarEntry.getFile() != null){
-                  FileOutputStream fos = new FileOutputStream(tarEntry.getFile());
-                  IOUtils.copy(tis, fos);
-                  fos.close();
-                }
-            }
+
+  public static void unTar(TarArchiveInputStream tis, File destFile) throws IOException {
+    TarArchiveEntry tarEntry = null;
+    while ((tarEntry = tis.getNextTarEntry()) != null) {
+      if (tarEntry.isDirectory()) {
+        if (!destFile.exists()) {
+          destFile.mkdirs();
         }
-        tis.close();
+      } else {
+        FileOutputStream fos = new FileOutputStream(destFile);
+        IOUtils.copy(tis, fos);
+        fos.close();
+      }
     }
+    tis.close();
+  }
 
   private static void fetchImageIfMissing(DockerClient dockerClient, String imageName)
       throws InterruptedException {
