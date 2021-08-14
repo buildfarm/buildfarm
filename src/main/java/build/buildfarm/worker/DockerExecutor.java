@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.CopyArchiveFromContainerCmd;
 import com.github.dockerjava.api.command.CopyArchiveToContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerResponse;
@@ -189,9 +190,9 @@ class DockerExecutor {
   }
 
   private static void mountExecRoot(HostConfig config, Path execDir) {
-    // mount paths needed for the execution root
     List<Bind> binds = new ArrayList<>();
 
+    // mount paths needed for the execution root
     String execDirRoot = "/" + execDir.subpath(0, 1).toString();
     binds.add(new Bind(execDirRoot, new Volume(execDirRoot)));
 
@@ -218,10 +219,12 @@ class DockerExecutor {
                     Path reference = Files.readSymbolicLink(path);
                     paths.add(reference);
                   } catch (IOException e) {
+                    logger.log(Level.WARNING, "Could not derive symbolic link: ", e);
                   }
                 }
               });
     } catch (Exception e) {
+      logger.log(Level.WARNING, "Could not traverse execDir: ", e);
     }
 
     return paths;
@@ -246,7 +249,11 @@ class DockerExecutor {
 
   private static void copyFilesOutOfContainer(
       DockerClient dockerClient, String containerId, Path execDir) {
+    CopyArchiveFromContainerCmd cmd =
+        dockerClient.copyArchiveFromContainerCmd(containerId, execDir.toAbsolutePath().toString());
+    cmd.withHostPath(execDir.toAbsolutePath().toString());
     // TODO
+    // https://github.com/docker-java/docker-java/issues/991
   }
 
   private static void fetchImageIfMissing(DockerClient dockerClient, String imageName)
