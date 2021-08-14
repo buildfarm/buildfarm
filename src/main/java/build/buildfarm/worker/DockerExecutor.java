@@ -262,8 +262,6 @@ class DockerExecutor {
       String containerId,
       Path execDir)
       throws IOException {
-    String execDirStr = execDir.toAbsolutePath().toString();
-
     for (String outputFile : operationContext.command.getOutputFilesList()) {
       Path outputPath = operationContext.execDir.resolve(outputFile);
       copyFileOutOfContainer(dockerClient, containerId, outputPath);
