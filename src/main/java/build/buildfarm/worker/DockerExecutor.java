@@ -68,21 +68,21 @@ class DockerExecutor {
     String execId =
         runActionInsideContainer(dockerClient, containerId, execDir, arguments, resultBuilder);
 
+    // extractInformationFromContainer(dockerClient, containerId, execDir, resultBuilder);
+    // cleanUpContainer(dockerClient, containerId);
+
     // extract action's exit code
     InspectExecCmd inspectExecCmd = dockerClient.inspectExecCmd(execId);
     InspectExecResponse response = inspectExecCmd.exec();
-    System.out.println(response.getExitCodeLong());
     resultBuilder.setExitCode(response.getExitCodeLong().intValue());
 
     // clean up container
     try {
-      System.out.println("Cleanup container");
       dockerClient.removeContainerCmd(containerId).withRemoveVolumes(true).withForce(true).exec();
     } catch (Exception e) {
       logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
     }
 
-    System.out.println("Done");
     return Code.OK;
   }
 
@@ -94,20 +94,15 @@ class DockerExecutor {
       Map<String, String> envVars)
       throws InterruptedException {
     // get the image (network access)
-    System.out.println("Getting image");
     fetchImageIfMissing(dockerClient, limits.containerSettings.containerImage);
 
     // build container
-    System.out.println("Creating container");
     String containerId = createContainer(dockerClient, execDir, limits, timeout, envVars);
-    System.out.println("containerId: " + containerId);
 
     // start container
-    System.out.println("start container");
     dockerClient.startContainerCmd(containerId).exec();
 
     // copy files into container
-    System.out.println("copying files");
     copyFilesIntoContainer(dockerClient, containerId, execDir);
     copyCacheIntoContainer(dockerClient, containerId, execDir);
 
@@ -122,69 +117,21 @@ class DockerExecutor {
       List<String> arguments,
       ActionResult.Builder resultBuilder)
       throws InterruptedException {
-
     // decide command to run
-    System.out.println("create exec command");
     ExecCreateCmd execCmd = dockerClient.execCreateCmd(containerId);
     execCmd.withWorkingDir(execDir.toAbsolutePath().toString());
     execCmd.withAttachStderr(true);
     execCmd.withAttachStdout(true);
-
-    List<String> args = new ArrayList<>();
-    args.add("/bin/bash");
-    args.add("-c");
-    args.add(execDir.toAbsolutePath().toString() + "/" + String.join(" ", arguments));
-    execCmd.withCmd(args.toArray(new String[0]));
-
-    for (int i = 0; i < arguments.size(); i++) {
-      System.out.println("cliArg: " + arguments.get(i));
-    }
-    // execCmd.withCmd("/bin/bash","-c","cat /etc/os-release");
-    // execCmd.withCmd("/bin/pwd");
-    // execCmd.withCmd("/bin/ls /tmp");
-    // execCmd.withCmd("/bin/bash","-c","ls -al /tmp/worker/shard/operations
-    // /tmp/worker2/shard/operations");
-
-    // System.out.println("PEEKING");
-    // try {
-    //   ProcessBuilder builder = new ProcessBuilder();
-    //   builder.command("ls", "-al", execDir.toAbsolutePath().toString() +
-    // "/external/bazel_tools/tools/test/");
-    //   Process process = builder.start();
-
-    //   StringBuilder output = new StringBuilder();
-
-    //   BufferedReader reader = new BufferedReader(new
-    // InputStreamReader(process.getInputStream()));
-
-    //   String line;
-    //   while ((line = reader.readLine()) != null) {
-    //     output.append(line + "\n");
-    //   }
-    //   int exitVal = process.waitFor();
-    //   System.out.println("ls peek: " + output);
-    // } catch (Exception e) {
-    // }
-
-    // execCmd.withCmd("/bin/bash", "-c", "ls -alR " + execDir.toAbsolutePath().toString());
-    // execCmd.withCmd("/bin/bash", "-c", "ls -al /home/luxe/Desktop");
-    // execCmd.withCmd("/bin/bash", "-c", "ls -alR " + execDir.toAbsolutePath().toString());
-    // execCmd.withCmd("/bin/bash", "-c", "ls -alR /tmp");
-    // execCmd.withCmd("ls -al " + execDir.toAbsolutePath().toString());
-    // execCmd.withCmd("cat external/bazel_tools/tools/test/generate-xml.sh");
+    execCmd.withCmd(arguments.toArray(new String[0]));
 
     String execId = execCmd.exec().getId();
-    System.out.println("execId: " + execId);
 
     // execute command
-    System.out.println("execute");
     ExecStartCmd execStartCmd = dockerClient.execStartCmd(execId);
 
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     ByteArrayOutputStream err = new ByteArrayOutputStream();
     execStartCmd.exec(new ExecStartResultCallback(out, err)).awaitCompletion();
-    System.out.println("stdout: " + out.toString());
-    System.out.println("stderr: " + err.toString());
 
     // store results
     resultBuilder.setStdoutRaw(ByteString.copyFromUtf8(out.toString()));
@@ -204,86 +151,41 @@ class DockerExecutor {
         dockerClient.createContainerCmd(limits.containerSettings.containerImage);
 
     // prepare command
-    // createContainerCmd.withCmd(arguments);
-    // createContainerCmd.withCmd("sh","-c","pwd;ls");
-    // createContainerCmd.withCmd("sleep", "5");
     createContainerCmd.withAttachStderr(true);
     createContainerCmd.withAttachStdout(true);
+    createContainerCmd.withTty(true);
+    createContainerCmd.withHostConfig(getHostConfig(execDir));
     createContainerCmd.withEnv(envMapToList(envVars));
     createContainerCmd.withNetworkDisabled(!limits.containerSettings.network);
-    // createContainerCmd.withStopTimeout((int) timeout.getSeconds());
+    createContainerCmd.withStopTimeout((int) timeout.getSeconds());
 
-    String execDirStr = execDir.toAbsolutePath().toString();
-    // createContainerCmd.withVolumes(new Volume("/tmp:/tmp"));
-
-    System.out.println("execDirStr: " + execDirStr);
-    // createContainerCmd.withBinds(new Bind("/tmp", new Volume("/tmp")));
-    // createContainerCmd.withVolumes(new Volume("/tmp"));
-    // createContainerCmd.withBinds(new Bind(execDirStr,new Volume(execDirStr)));
-    // createContainerCmd.withBinds(new Bind("/tmp",new Volume("/tmp")));
-
-    // createContainerCmd.withBinds(new Bind(execDirStr,new Volume(execDirStr)));
-
-    createContainerCmd.withHostConfig(getHostConfig(execDir));
-
-    // createContainerCmd.withWorkingDir(execDir.toAbsolutePath().toString());
-    // createContainerCmd.withWorkingDir("/");
-    createContainerCmd.withTty(true);
-
+    // run container creation and log any warnings
     CreateContainerResponse response = createContainerCmd.exec();
-    System.out.println("warnings: " + Arrays.toString(response.getWarnings()));
+    if (response.getWarnings().length != 0) {
+      logger.log(Level.WARNING, Arrays.toString(response.getWarnings()));
+    }
+
+    // container is ready to be started
     return response.getId();
   }
 
   private static HostConfig getHostConfig(Path execDir) {
     HostConfig config = new HostConfig();
+    mountExecRoot(config, execDir);
+    return config;
+  }
 
-    // create binds
+  private static void mountExecRoot(HostConfig config, Path execDir) {
+    // mount paths needed for the execution root
     List<Bind> binds = new ArrayList<>();
 
-    // add exec dir
+    String execDirRoot = "/" + execDir.subpath(0, 1).toString();
+    binds.add(new Bind(execDirRoot, new Volume(execDirRoot)));
+
     String execDirStr = execDir.toAbsolutePath().toString();
     binds.add(new Bind(execDirStr, new Volume(execDirStr)));
 
-    // add parts of exec dir
-    // try (DirectoryStream<Path> stream = Files.newDirectoryStream(execDir)) {
-    //   for (Path path : stream) {
-    //     System.out.println("mount this: " + path.toAbsolutePath().toString());
-    //     binds.add(new Bind(path.toAbsolutePath().toString(),new
-    // Volume(path.toAbsolutePath().toString())));
-    //   }
-    // }
-    // catch (Exception e){
-    // }
-
-    // recursively add parts of exec dir
-    try {
-      Files.walk(execDir, FileVisitOption.FOLLOW_LINKS)
-          .forEach(
-              path -> {
-                // if (Files.isDirectory(path)){
-                //   System.out.println("mount this: " + path.toAbsolutePath().toString());
-                //   binds.add(new Bind(path.toAbsolutePath().toString(),new
-                // Volume(path.toAbsolutePath().toString())));
-                // }
-                if (Files.isSymbolicLink(path)) {
-                  System.out.println("SYMBOLIC LINK: " + path.toAbsolutePath().toString());
-                }
-              });
-    } catch (Exception e) {
-    }
-
-    // for (Path path: getSymbolicLinkReferences(execDir)){
-    //   binds.add(new Bind(path.toAbsolutePath().toString(),new
-    // Volume(path.toAbsolutePath().toString())));
-    // }
-
-    binds.add(new Bind("/tmp", new Volume("/tmp")));
-
-    // add binds
     config.withBinds(binds);
-
-    return config;
   }
 
   private static List<Path> getSymbolicLinkReferences(Path execDir) {
@@ -294,8 +196,6 @@ class DockerExecutor {
           .forEach(
               path -> {
                 if (Files.isSymbolicLink(path)) {
-                  // System.out.println("SYMBOLIC LINK: " + path.toAbsolutePath().toString());
-
                   try {
                     Path reference = Files.readSymbolicLink(path);
                     paths.add(reference);
@@ -320,8 +220,8 @@ class DockerExecutor {
       DockerClient dockerClient, String containerId, Path execDir) {
     CopyArchiveToContainerCmd cmd = dockerClient.copyArchiveToContainerCmd(containerId);
     cmd.withDirChildrenOnly(true);
-    cmd.withHostResource(execDir.toAbsolutePath().toString());
     cmd.withNoOverwriteDirNonDir(false);
+    cmd.withHostResource(execDir.toAbsolutePath().toString());
     cmd.withRemotePath(execDir.toAbsolutePath().toString());
     cmd.exec();
   }
@@ -338,6 +238,9 @@ class DockerExecutor {
   }
 
   private static boolean isLocalImagePresent(DockerClient dockerClient, String imageName) {
+    // Check if image is already downloaded.
+    // Is this the most efficient way?
+    // It would be better to not use exceptions for control flow.
     try {
       dockerClient.inspectImageCmd(imageName).exec();
     } catch (NotFoundException e) {
@@ -347,6 +250,7 @@ class DockerExecutor {
   }
 
   private static List<String> envMapToList(Map<String, String> envVars) {
+    // docker configuration needs the environment variables in the format VAR=VAL
     List<String> envList = new ArrayList<>();
     for (Map.Entry<String, String> environmentVariable : envVars.entrySet()) {
       envList.add(environmentVariable.getKey() + "=" + environmentVariable.getValue());
