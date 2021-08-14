@@ -198,6 +198,11 @@ class DockerExecutor {
     String execDirStr = execDir.toAbsolutePath().toString();
     binds.add(new Bind(execDirStr, new Volume(execDirStr)));
 
+    for (Path path : getSymbolicLinkReferences(execDir)) {
+      binds.add(
+          new Bind(path.toAbsolutePath().toString(), new Volume(path.toAbsolutePath().toString())));
+    }
+
     config.withBinds(binds);
   }
 
@@ -230,12 +235,12 @@ class DockerExecutor {
   }
 
   private static void copyFilesIntoContainer(
-      DockerClient dockerClient, String containerId, Path execDir) {
+      DockerClient dockerClient, String containerId, Path path) {
     CopyArchiveToContainerCmd cmd = dockerClient.copyArchiveToContainerCmd(containerId);
     cmd.withDirChildrenOnly(true);
     cmd.withNoOverwriteDirNonDir(false);
-    cmd.withHostResource(execDir.toAbsolutePath().toString());
-    cmd.withRemotePath(execDir.toAbsolutePath().toString());
+    cmd.withHostResource(path.toAbsolutePath().toString());
+    cmd.withRemotePath(path.toAbsolutePath().toString());
     cmd.exec();
   }
 
