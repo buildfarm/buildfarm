@@ -33,5 +33,6 @@ java_library(
         "@maven//:com_github_docker_java_docker_java",
         "@maven//:com_github_docker_java_docker_java_api",
         "@maven//:com_github_docker_java_docker_java_core",
+        "@maven//:org_apache_commons_commons_compress",
     ],
 )

@@ -87,6 +87,7 @@ def buildfarm_init(name = "buildfarm"):
                         "io.prometheus:simpleclient_httpserver:0.10.0",
                         "junit:junit:4.12",
                         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
+                        "org.apache.commons:commons-compress:1.21",
                         "org.apache.commons:commons-pool2:2.9.0",
                         "org.apache.tomcat:annotations-api:6.0.53",
                         "org.checkerframework:checker-qual:2.5.2",
