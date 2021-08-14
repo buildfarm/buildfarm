@@ -46,6 +46,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.FileVisitOption;
 
 class DockerExecutor {
   private static final Logger logger = Logger.getLogger(DockerExecutor.class.getName());
@@ -73,6 +75,10 @@ class DockerExecutor {
     // start container
     System.out.println("start container");
     dockerClient.startContainerCmd(containerId).exec();
+    
+    //copy files into container
+    System.out.println("copying files");
+    copyFilesIntoContainer(dockerClient, containerId, execDir);
 
     // decide command to run
     System.out.println("create exec command");
@@ -81,7 +87,7 @@ class DockerExecutor {
     List<String> args = new ArrayList<>();
     args.add("/bin/bash");
     args.add("-c");
-    args.add(String.join(" ", arguments));
+    args.add(execDir.toAbsolutePath().toString() + "/" + String.join(" ", arguments));
     execCmd.withCmd(args.toArray(new String[0]));
     
     
@@ -113,10 +119,16 @@ class DockerExecutor {
     } catch (Exception e) {
     }
 
-    //execCmd.withCmd("/bin/bash", "-c", "ls -al " + execDir.toAbsolutePath().toString() + "/external/bazel_tools/tools/test/");
+    execCmd.withCmd("/bin/bash", "-c", "ls -alR /tmp");
+    //execCmd.withCmd("/bin/bash", "-c", "ls -al /home/luxe/Desktop");
+    //execCmd.withCmd("/bin/bash", "-c", "ls -alR " + execDir.toAbsolutePath().toString());
     //execCmd.withCmd("/bin/bash", "-c", "ls -al /tmp");
     //execCmd.withCmd("ls -al " + execDir.toAbsolutePath().toString());
-    execCmd.withWorkingDir(execDir.toAbsolutePath().toString());
+    //execCmd.withCmd("cat external/bazel_tools/tools/test/generate-xml.sh");
+    
+    
+    
+    //execCmd.withWorkingDir(execDir.toAbsolutePath().toString());
     
     //execCmd.withWorkingDir("/");
     execCmd.withAttachStderr(true);
@@ -222,14 +234,23 @@ class DockerExecutor {
     // catch (Exception e){
     // }
     
+    
+    
+    
+    
     //recursively add parts of exec dir
-    try {
-    Files.walk(execDir).forEach(path -> {
-        System.out.println("mount this: " + path.toAbsolutePath().toString());
-        binds.add(new Bind(path.toAbsolutePath().toString(),new Volume(path.toAbsolutePath().toString())));
-    });
-  }catch(Exception e){
-  }
+  //   try {
+  //   Files.walk(execDir,FileVisitOption.FOLLOW_LINKS).forEach(path -> {
+  //       if (Files.isDirectory(path)){
+  //         System.out.println("mount this: " + path.toAbsolutePath().toString());
+  //         binds.add(new Bind(path.toAbsolutePath().toString(),new Volume(path.toAbsolutePath().toString())));
+  //       }
+  //   });
+  // }catch(Exception e){
+  // }
+  
+  
+  //binds.add(new Bind("/tmp",new Volume("/tmp")));
     
     
     //add binds
@@ -237,6 +258,9 @@ class DockerExecutor {
     
     
     return config;
+  }
+  
+  private static void copyFilesIntoContainer(DockerClient dockerClient, String containerId, Path execDir){
   }
 
   private static void fetchImageIfMissing(DockerClient dockerClient, String imageName)
