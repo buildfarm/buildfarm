@@ -440,7 +440,7 @@ class Executor {
     // run the action under docker
     if (!limits.containerSettings.containerImage.isEmpty()) {
       return DockerExecutor.runActionWithDocker(
-          execDir, limits, timeout, arguments, environment, resultBuilder);
+          operationContext, execDir, limits, timeout, arguments, environment, resultBuilder);
     }
 
     long startNanoTime = System.nanoTime();
