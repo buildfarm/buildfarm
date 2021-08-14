@@ -68,22 +68,35 @@ class DockerExecutor {
     String execId =
         runActionInsideContainer(dockerClient, containerId, execDir, arguments, resultBuilder);
 
-    // extractInformationFromContainer(dockerClient, containerId, execDir, resultBuilder);
-    // cleanUpContainer(dockerClient, containerId);
+    extractInformationFromContainer(dockerClient, containerId, execId, execDir, resultBuilder);
 
+    cleanUpContainer(dockerClient, containerId);
+
+    return Code.OK;
+  }
+
+  private static void extractInformationFromContainer(
+      DockerClient dockerClient,
+      String containerId,
+      String execId,
+      Path execDir,
+      ActionResult.Builder resultBuilder) {
     // extract action's exit code
     InspectExecCmd inspectExecCmd = dockerClient.inspectExecCmd(execId);
     InspectExecResponse response = inspectExecCmd.exec();
     resultBuilder.setExitCode(response.getExitCodeLong().intValue());
 
+    // export action outputs
+    copyFilesOutOfContainer(dockerClient, containerId, execDir);
+  }
+
+  private static void cleanUpContainer(DockerClient dockerClient, String containerId) {
     // clean up container
     try {
       dockerClient.removeContainerCmd(containerId).withRemoveVolumes(true).withForce(true).exec();
     } catch (Exception e) {
       logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
     }
-
-    return Code.OK;
   }
 
   private static String prepareRequestedContainer(
@@ -224,6 +237,11 @@ class DockerExecutor {
     cmd.withHostResource(execDir.toAbsolutePath().toString());
     cmd.withRemotePath(execDir.toAbsolutePath().toString());
     cmd.exec();
+  }
+
+  private static void copyFilesOutOfContainer(
+      DockerClient dockerClient, String containerId, Path execDir) {
+    // TODO
   }
 
   private static void fetchImageIfMissing(DockerClient dockerClient, String imageName)
