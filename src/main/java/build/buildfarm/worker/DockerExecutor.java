@@ -285,7 +285,7 @@ class DockerExecutor {
   }
 
   public static void unTar(TarArchiveInputStream tis, File destFile) throws IOException {
-    TarArchiveEntry tarEntry = null;
+    TarArchiveEntry tarEntry;
     while ((tarEntry = tis.getNextTarEntry()) != null) {
       if (tarEntry.isDirectory()) {
         if (!destFile.exists()) {
