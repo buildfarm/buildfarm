@@ -33,6 +33,8 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.resources.ResourceLimits;
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.core.DockerClientBuilder;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
@@ -439,8 +441,16 @@ class Executor {
 
     // run the action under docker
     if (!limits.containerSettings.containerImage.isEmpty()) {
+      DockerClient dockerClient = DockerClientBuilder.getInstance().build();
       return DockerExecutor.runActionWithDocker(
-          operationContext, execDir, limits, timeout, arguments, environment, resultBuilder);
+          dockerClient,
+          operationContext,
+          execDir,
+          limits,
+          timeout,
+          arguments,
+          environment,
+          resultBuilder);
     }
 
     long startNanoTime = System.nanoTime();

@@ -29,7 +29,6 @@ import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Bind;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.Volume;
-import com.github.dockerjava.core.DockerClientBuilder;
 import com.github.dockerjava.core.command.ExecStartResultCallback;
 import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.google.protobuf.ByteString;
@@ -42,6 +41,7 @@ import java.io.IOException;
 import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -57,6 +57,7 @@ class DockerExecutor {
   private static final Logger logger = Logger.getLogger(DockerExecutor.class.getName());
 
   public static Code runActionWithDocker(
+      DockerClient dockerClient,
       OperationContext operationContext,
       Path execDir,
       ResourceLimits limits,
@@ -65,9 +66,6 @@ class DockerExecutor {
       Map<String, String> envVars,
       ActionResult.Builder resultBuilder)
       throws InterruptedException, IOException {
-    // construct docker client
-    DockerClient dockerClient = DockerClientBuilder.getInstance().build();
-
     // prepare container for execution
     String containerId = prepareRequestedContainer(dockerClient, execDir, limits, timeout, envVars);
 
@@ -75,12 +73,61 @@ class DockerExecutor {
     String execId =
         runActionInsideContainer(dockerClient, containerId, execDir, arguments, resultBuilder);
 
+    // ensure output files are available on the host machine and that all relevant action results
+    // are extracted back to the caller
     extractInformationFromContainer(
         dockerClient, operationContext, containerId, execId, execDir, resultBuilder);
 
+    // possibly cleanup docker resources such as removing containers and images
     cleanUpContainer(dockerClient, containerId);
 
     return Code.OK;
+  }
+
+  private static String prepareRequestedContainer(
+      DockerClient dockerClient,
+      Path execDir,
+      ResourceLimits limits,
+      Duration timeout,
+      Map<String, String> envVars)
+      throws InterruptedException {
+    // this requires network access
+    // once complete, "docker image ls" will show the downloaded image
+    fetchImageIfMissing(dockerClient, limits.containerSettings.containerImage);
+
+    // build and start the container
+    // once complete, "docker container ls" will show the started container
+    String containerId = createContainer(dockerClient, execDir, limits, timeout, envVars);
+    dockerClient.startContainerCmd(containerId).exec();
+
+    // copy files into it
+    populateContainer(dockerClient, containerId, execDir);
+
+    // container is ready for running actions
+    return containerId;
+  }
+
+  private static void populateContainer(
+      DockerClient dockerClient, String containerId, Path execDir) {
+    // decide paths
+    List<Path> paths = new ArrayList<>();
+    paths.add(execDir);
+    paths.addAll(getSymbolicLinkReferences(execDir));
+
+    // copy files over
+    for (Path path : paths) {
+      copyFilesIntoContainer(dockerClient, containerId, path);
+    }
+  }
+
+  private static void copyFilesIntoContainer(
+      DockerClient dockerClient, String containerId, Path path) {
+    CopyArchiveToContainerCmd cmd = dockerClient.copyArchiveToContainerCmd(containerId);
+    cmd.withDirChildrenOnly(true);
+    cmd.withNoOverwriteDirNonDir(false);
+    cmd.withHostResource(path.toAbsolutePath().toString());
+    cmd.withRemotePath(path.toAbsolutePath().toString());
+    cmd.exec();
   }
 
   private static void extractInformationFromContainer(
@@ -109,30 +156,6 @@ class DockerExecutor {
     }
   }
 
-  private static String prepareRequestedContainer(
-      DockerClient dockerClient,
-      Path execDir,
-      ResourceLimits limits,
-      Duration timeout,
-      Map<String, String> envVars)
-      throws InterruptedException {
-    // get the image (network access)
-    fetchImageIfMissing(dockerClient, limits.containerSettings.containerImage);
-
-    // build container
-    String containerId = createContainer(dockerClient, execDir, limits, timeout, envVars);
-
-    // start container
-    dockerClient.startContainerCmd(containerId).exec();
-
-    // copy files into container
-    copyFilesIntoContainer(dockerClient, containerId, execDir);
-    copyCacheIntoContainer(dockerClient, containerId, execDir);
-
-    // container is ready for running actions
-    return containerId;
-  }
-
   private static String runActionInsideContainer(
       DockerClient dockerClient,
       String containerId,
@@ -149,9 +172,8 @@ class DockerExecutor {
 
     String execId = execCmd.exec().getId();
 
-    // execute command
+    // execute command (capture stdout / stderr)
     ExecStartCmd execStartCmd = dockerClient.execStartCmd(execId);
-
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     ByteArrayOutputStream err = new ByteArrayOutputStream();
     execStartCmd.exec(new ExecStartResultCallback(out, err)).awaitCompletion();
@@ -201,14 +223,14 @@ class DockerExecutor {
   private static void mountExecRoot(HostConfig config, Path execDir) {
     List<Bind> binds = new ArrayList<>();
 
+    // decide paths
+    List<Path> paths = new ArrayList<>();
+    paths.add(Paths.get("/" + execDir.subpath(0, 1)));
+    paths.add(execDir);
+    paths.addAll(getSymbolicLinkReferences(execDir));
+
     // mount paths needed for the execution root
-    String execDirRoot = "/" + execDir.subpath(0, 1).toString();
-    binds.add(new Bind(execDirRoot, new Volume(execDirRoot)));
-
-    String execDirStr = execDir.toAbsolutePath().toString();
-    binds.add(new Bind(execDirStr, new Volume(execDirStr)));
-
-    for (Path path : getSymbolicLinkReferences(execDir)) {
+    for (Path path : paths) {
       binds.add(
           new Bind(path.toAbsolutePath().toString(), new Volume(path.toAbsolutePath().toString())));
     }
@@ -239,23 +261,6 @@ class DockerExecutor {
     return paths;
   }
 
-  private static void copyCacheIntoContainer(
-      DockerClient dockerClient, String containerId, Path execDir) {
-    for (Path path : getSymbolicLinkReferences(execDir)) {
-      copyFilesIntoContainer(dockerClient, containerId, path);
-    }
-  }
-
-  private static void copyFilesIntoContainer(
-      DockerClient dockerClient, String containerId, Path path) {
-    CopyArchiveToContainerCmd cmd = dockerClient.copyArchiveToContainerCmd(containerId);
-    cmd.withDirChildrenOnly(true);
-    cmd.withNoOverwriteDirNonDir(false);
-    cmd.withHostResource(path.toAbsolutePath().toString());
-    cmd.withRemotePath(path.toAbsolutePath().toString());
-    cmd.exec();
-  }
-
   private static void copyOutputsOutOfContainer(
       DockerClient dockerClient,
       OperationContext operationContext,
@@ -274,13 +279,17 @@ class DockerExecutor {
 
   private static void copyFileOutOfContainer(
       DockerClient dockerClient, String containerId, Path path) throws IOException {
-    CopyArchiveFromContainerCmd cmd =
-        dockerClient.copyArchiveFromContainerCmd(containerId, path.toString());
-    cmd.withHostPath(path.toString());
-    cmd.withResource(path.toString());
+    try {
+      CopyArchiveFromContainerCmd cmd =
+          dockerClient.copyArchiveFromContainerCmd(containerId, path.toString());
+      cmd.withHostPath(path.toString());
+      cmd.withResource(path.toString());
 
-    try (TarArchiveInputStream tarStream = new TarArchiveInputStream(cmd.exec())) {
-      unTar(tarStream, new File(path.toString()));
+      try (TarArchiveInputStream tarStream = new TarArchiveInputStream(cmd.exec())) {
+        unTar(tarStream, new File(path.toString()));
+      }
+    } catch (Exception e) {
+      logger.log(Level.WARNING, "Could not extract file from container: ", e);
     }
   }
 
