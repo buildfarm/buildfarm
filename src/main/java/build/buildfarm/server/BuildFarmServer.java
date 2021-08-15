@@ -39,6 +39,7 @@ import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import io.prometheus.client.Counter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -90,7 +91,10 @@ public class BuildFarmServer extends LoggingMain {
     healthStatusManager = new HealthStatusManager();
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-
+    if (config.getSslCertificatePath() != "") {
+      File ssl_certificate_path = new File(config.getSslCertificatePath());
+      serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
+    }
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
