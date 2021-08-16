@@ -198,25 +198,23 @@ message PollOperationRequest {
 }
 
 message BuildFarmServerConfig {
-  repeated InstanceConfig instances = 1;
+  InstanceConfig instance = 1;
 
-  string default_instance_name = 2; // must be present in instances list or empty
+  int32 port = 2;
 
-  int32 port = 3;
+  int32 execute_keepalive_after_seconds = 3;
 
-  int32 execute_keepalive_after_seconds = 4;
+  MetricsConfig metrics_config = 4;
 
-  MetricsConfig metrics_config = 5;
+  AdminConfig admin_config = 5;
 
-  AdminConfig admin_config = 6;
-
-  PrometheusConfig prometheus_config = 7;
+  PrometheusConfig prometheus_config = 6;
   
-  BuildEventConfig build_event_config = 8;
+  BuildEventConfig build_event_config = 7;
   
   // Absolute path to the PEM file containing both the required certificates and any
   // associated private key.
-  optional string ssl_certificate_path = 9;
+  optional string ssl_certificate_path = 8;
 }
 
 message MetricsConfig {
