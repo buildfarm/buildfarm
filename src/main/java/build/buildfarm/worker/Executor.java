@@ -215,7 +215,7 @@ class Executor {
         if (argumentItr.hasNext()) {
           String exe = argumentItr.next(); // Get first element, this is the executable
           arguments.add(workingDirectory.resolve(exe).toAbsolutePath().normalize().toString());
-          argumentItr.forEachRemaining(arg -> arguments.add(arg));
+          argumentItr.forEachRemaining(arguments::add);
         }
       } else {
         arguments.addAll(command.getArgumentsList());
@@ -364,7 +364,7 @@ class Executor {
     Map<String, Property> properties =
         uniqueIndex(
             operationContext.command.getPlatform().getPropertiesList(),
-            (property) -> property.getName());
+                Property::getName);
 
     arguments.add(wrapper.getPath());
     for (String argument : wrapper.getArgumentsList()) {

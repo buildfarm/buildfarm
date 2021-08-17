@@ -148,7 +148,7 @@ public class Worker extends LoggingMain {
 
     public void insertBlob(Digest digest, ByteString content)
         throws IOException, InterruptedException {
-      insertStream(digest, () -> content.newInput());
+      insertStream(digest, content::newInput);
     }
 
     private Write getLocalWrite(Digest digest) throws IOException {
@@ -596,24 +596,20 @@ public class Worker extends LoggingMain {
         (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
 
     InputStreamFactory localPopulatingInputStreamFactory =
-        new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest blobDigest, long offset)
-              throws IOException, InterruptedException {
-            // FIXME use write
-            ByteString content =
-                ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
+            (blobDigest, offset) -> {
+              // FIXME use write
+              ByteString content =
+                  ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
 
-            if (offset == 0) {
-              // extra computations
-              Blob blob = new Blob(content, digestUtil);
-              // here's hoping that our digest matches...
-              storage.put(blob);
-            }
+              if (offset == 0) {
+                // extra computations
+                Blob blob = new Blob(content, digestUtil);
+                // here's hoping that our digest matches...
+                storage.put(blob);
+              }
 
-            return content.newInput();
-          }
-        };
+              return content.newInput();
+            };
     return new FuseExecFileSystem(
         root,
         new FuseCAS(

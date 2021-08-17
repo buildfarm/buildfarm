@@ -879,14 +879,10 @@ public class RedisShardBackplane implements Backplane {
     // convert action keys to strings
     List<String> keyNames = new ArrayList<>();
     actionKeys.forEach(
-        key -> {
-          keyNames.add(asDigestStr(key));
-        });
+        key -> keyNames.add(asDigestStr(key)));
 
     client.run(
-        jedis -> {
-          actionCache.remove(jedis, keyNames);
-        });
+        jedis -> actionCache.remove(jedis, keyNames));
   }
 
   @Override
@@ -1236,9 +1232,7 @@ public class RedisShardBackplane implements Backplane {
   public QueueEntry dispatchOperation(List<Platform.Property> provisions)
       throws IOException, InterruptedException {
     return client.blockingCall(
-        jedis -> {
-          return dispatchOperation(jedis, provisions);
-        });
+        jedis -> dispatchOperation(jedis, provisions));
   }
 
   String printPollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
@@ -1321,9 +1315,7 @@ public class RedisShardBackplane implements Backplane {
     Operation operation = keepaliveOperation(operationName);
     // publish so that watchers reset their timeout
     client.run(
-        jedis -> {
-          publishReset(jedis, operation);
-        });
+        jedis -> publishReset(jedis, operation));
   }
 
   @Override

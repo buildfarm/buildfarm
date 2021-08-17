@@ -41,12 +41,7 @@ public final class WorkerStubs {
     return CacheBuilder.newBuilder()
         .expireAfterAccess(10, TimeUnit.MINUTES)
         .removalListener(
-            new RemovalListener<String, Instance>() {
-              @Override
-              public void onRemoval(RemovalNotification<String, Instance> notification) {
-                stopInstance(notification.getValue());
-              }
-            })
+                (RemovalListener<String, Instance>) notification -> stopInstance(notification.getValue()))
         .build(
             new CacheLoader<String, Instance>() {
               @Override

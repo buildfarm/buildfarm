@@ -102,7 +102,7 @@ public final class Group {
     if (!pids.isEmpty()) {
       // TODO check arg limits, exit status, etc
       Runtime.getRuntime()
-          .exec("kill -SIGKILL " + pids.stream().map(pid -> pid.toString()).collect(joining(" ")));
+          .exec("kill -SIGKILL " + pids.stream().map(Object::toString).collect(joining(" ")));
       logger.warning("Killed processes with PIDs: " + pids);
       return false;
     }
@@ -114,7 +114,7 @@ public final class Group {
     Path procs = path.resolve("cgroup.procs");
     try {
       return Files.readAllLines(procs).stream()
-          .map(line -> Integer.parseInt(line))
+          .map(Integer::parseInt)
           .collect(ImmutableList.toImmutableList());
     } catch (IOException e) {
       if (Files.exists(path)) {

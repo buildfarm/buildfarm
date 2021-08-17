@@ -150,12 +150,7 @@ public class ContentAddressableStorageService
       ListenableFuture<Code> codeFuture, Digest digest) {
     return transform(
         codeFuture,
-        new Function<Code, Response>() {
-          @Override
-          public Response apply(Code code) {
-            return Response.newBuilder().setDigest(digest).setStatus(statusForCode(code)).build();
-          }
-        },
+            code -> Response.newBuilder().setDigest(digest).setStatus(statusForCode(code)).build(),
         directExecutor());
   }
 

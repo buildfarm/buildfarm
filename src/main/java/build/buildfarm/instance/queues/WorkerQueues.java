@@ -141,12 +141,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
 
   private void removeWorkerFromQueue(WorkerQueue queue, MatchListener listener) {
     synchronized (queue.workers) {
-      Iterator<Worker> iter = queue.workers.iterator();
-      while (iter.hasNext()) {
-        if (iter.next().getListener() == listener) {
-          iter.remove();
-        }
-      }
+      queue.workers.removeIf(worker -> worker.getListener() == listener);
     }
   }
 }

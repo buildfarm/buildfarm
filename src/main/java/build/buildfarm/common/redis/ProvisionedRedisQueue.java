@@ -189,7 +189,7 @@ public class ProvisionedRedisQueue {
             ? ImmutableSet.of()
             : filterProvisions.asMap().entrySet().stream()
                 .filter(e -> e.getValue().contains(ProvisionedRedisQueue.WILDCARD_VALUE))
-                .map(e -> e.getKey())
+                .map(Map.Entry::getKey)
                 .collect(ImmutableSet.toImmutableSet());
     provisions.required =
         isFullyWildcard

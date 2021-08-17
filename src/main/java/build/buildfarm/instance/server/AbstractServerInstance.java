@@ -32,29 +32,8 @@ import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.ActionCacheUpdateCapabilities;
-import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.*;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
-import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
-import build.bazel.remote.execution.v2.CacheCapabilities;
-import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.DirectoryNode;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteResponse;
-import build.bazel.remote.execution.v2.ExecutionCapabilities;
-import build.bazel.remote.execution.v2.ExecutionPolicy;
-import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.FileNode;
-import build.bazel.remote.execution.v2.OutputDirectory;
-import build.bazel.remote.execution.v2.Platform;
-import build.bazel.remote.execution.v2.RequestMetadata;
-import build.bazel.remote.execution.v2.ResultsCachePolicy;
-import build.bazel.remote.execution.v2.ServerCapabilities;
-import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
-import build.bazel.remote.execution.v2.SymlinkNode;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -244,7 +223,7 @@ public abstract class AbstractServerInstance implements Instance {
     // TODO Directories
     ImmutableList.Builder<Digest> digests = ImmutableList.builder();
     digests.addAll(
-        Iterables.transform(result.getOutputFilesList(), outputFile -> outputFile.getDigest()));
+        Iterables.transform(result.getOutputFilesList(), OutputFile::getDigest));
     // findMissingBlobs will weed out empties
     digests.add(result.getStdoutDigest());
     digests.add(result.getStderrDigest());
@@ -501,9 +480,7 @@ public abstract class AbstractServerInstance implements Instance {
       Iterable<Digest> digests, RequestMetadata requestMetadata) {
     Thread findingThread = Thread.currentThread();
     Context.CancellationListener cancellationListener =
-        (context) -> {
-          findingThread.interrupt();
-        };
+        (context) -> findingThread.interrupt();
     Context.current().addListener(cancellationListener, directExecutor());
     try {
       ListenableFuture<Iterable<Digest>> future =
@@ -652,7 +629,7 @@ public abstract class AbstractServerInstance implements Instance {
       PreconditionFailure.Builder preconditionFailure) {
     stringsUniqueAndSortedPrecondition(
         Iterables.transform(
-            environmentVariables, environmentVariable -> environmentVariable.getName()),
+            environmentVariables, Command.EnvironmentVariable::getName),
         DUPLICATE_ENVIRONMENT_VARIABLE,
         ENVIRONMENT_VARIABLES_NOT_SORTED,
         preconditionFailure);

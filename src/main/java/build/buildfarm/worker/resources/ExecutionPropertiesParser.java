@@ -71,9 +71,7 @@ public class ExecutionPropertiesParser {
         .getPlatform()
         .getPropertiesList()
         .forEach(
-            (property) -> {
-              evaluateProperty(parser, limits, property);
-            });
+            (property) -> evaluateProperty(parser, limits, property));
     return limits;
   }
 

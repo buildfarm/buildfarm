@@ -114,26 +114,23 @@ class Extract {
       AtomicLong outstandingOperations,
       ListeningScheduledExecutorService retryService) {
     if (digest.getSizeBytes() == 0) {
-      return () -> outstandingOperations.getAndDecrement();
+      return outstandingOperations::getAndDecrement;
     }
-    return new Runnable() {
-      @Override
-      public void run() {
-        Path file = root.resolve(digest.getHash());
-        try {
-          if (!Files.exists(file) || Files.size(file) != digest.getSizeBytes()) {
-            System.out.println("Getting blob " + digest.getHash() + "/" + digest.getSizeBytes());
-            try (OutputStream out = Files.newOutputStream(file)) {
-              try (InputStream in = newInput(instanceName, digest, bsStub, retryService)) {
-                ByteStreams.copy(in, out);
-              }
+    return () -> {
+      Path file = root.resolve(digest.getHash());
+      try {
+        if (!Files.exists(file) || Files.size(file) != digest.getSizeBytes()) {
+          System.out.println("Getting blob " + digest.getHash() + "/" + digest.getSizeBytes());
+          try (OutputStream out = Files.newOutputStream(file)) {
+            try (InputStream in = newInput(instanceName, digest, bsStub, retryService)) {
+              ByteStreams.copy(in, out);
             }
           }
-        } catch (IOException e) {
-          e.printStackTrace();
         }
-        outstandingOperations.getAndDecrement();
+      } catch (IOException e) {
+        e.printStackTrace();
       }
+      outstandingOperations.getAndDecrement();
     };
   }
 

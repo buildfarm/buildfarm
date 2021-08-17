@@ -185,13 +185,8 @@ public class Worker extends LoggingMain {
     uploader = createStubUploader(casInstance.getName(), casChannel);
     operationQueueInstance = newStubInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory =
-        new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest digest, long offset) throws IOException {
-            return casInstance.newBlobInput(
+            (digest, offset) -> casInstance.newBlobInput(
                 digest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
-          }
-        };
     fileCache =
         new InjectedCASFileCache(
             inputStreamFactory,

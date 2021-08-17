@@ -41,10 +41,7 @@ class ShardActionCache implements ReadThroughActionCache {
     this.backplane = backplane;
 
     AsyncCacheLoader<ActionKey, ActionResult> loader =
-        new AsyncCacheLoader<ActionKey, ActionResult>() {
-          @Override
-          public CompletableFuture<ActionResult> asyncLoad(ActionKey actionKey, Executor executor) {
-            return toCompletableFuture(
+            (actionKey, executor) -> toCompletableFuture(
                 catching(
                     service.submit(() -> backplane.getActionResult(actionKey)),
                     IOException.class,
@@ -52,8 +49,6 @@ class ShardActionCache implements ReadThroughActionCache {
                       throw Status.fromThrowable(e).asRuntimeException();
                     },
                     executor));
-          }
-        };
 
     actionResultCache = Caffeine.newBuilder().maximumSize(maxLocalCacheSize).buildAsync(loader);
   }

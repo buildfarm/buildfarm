@@ -139,20 +139,16 @@ public class MemoryInstance extends AbstractServerInstance {
       CacheBuilder.newBuilder()
           .expireAfterWrite(1, TimeUnit.HOURS)
           .removalListener(
-              new RemovalListener<String, ByteStringStreamSource>() {
-                @Override
-                public void onRemoval(
-                    RemovalNotification<String, ByteStringStreamSource> notification) {
-                  try {
-                    notification.getValue().getOutput().close();
-                  } catch (IOException e) {
-                    logger.log(
-                        Level.SEVERE,
-                        format("error closing stream source %s", notification.getKey()),
-                        e);
-                  }
-                }
-              })
+                  (RemovalListener<String, ByteStringStreamSource>) notification -> {
+                    try {
+                      notification.getValue().getOutput().close();
+                    } catch (IOException e) {
+                      logger.log(
+                          Level.SEVERE,
+                          format("error closing stream source %s", notification.getKey()),
+                          e);
+                    }
+                  })
           .build(
               new CacheLoader<String, ByteStringStreamSource>() {
                 @Override
@@ -241,7 +237,7 @@ public class MemoryInstance extends AbstractServerInstance {
             config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
         outstandingOperations,
         MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil),
-        /*activeBlobWrites=*/ new ConcurrentHashMap<Digest, ByteString>());
+        /*activeBlobWrites=*/ new ConcurrentHashMap<>());
     this.config = config;
     this.watchers = watchers;
     this.outstandingOperations = outstandingOperations;

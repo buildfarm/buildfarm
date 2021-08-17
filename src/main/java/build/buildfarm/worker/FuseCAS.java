@@ -471,9 +471,7 @@ public class FuseCAS extends FuseStubFS {
     resolveTopdir(
         topdir,
         root,
-        (currentDir, base) -> {
-          currentDir.removeChild(base);
-        });
+            DirectoryEntry::removeChild);
     decMounts();
   }
 

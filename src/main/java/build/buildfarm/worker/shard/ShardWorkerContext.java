@@ -564,8 +564,8 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     Directory toDirectory() {
-      Collections.sort(files, Comparator.comparing(node -> node.getName()));
-      Collections.sort(directories, Comparator.comparing(node -> node.getName()));
+      files.sort(Comparator.comparing(FileNode::getName));
+      directories.sort(Comparator.comparing(DirectoryNode::getName));
       return Directory.newBuilder().addAllFiles(files).addAllDirectories(directories).build();
     }
   }

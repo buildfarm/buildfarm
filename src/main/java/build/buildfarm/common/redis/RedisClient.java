@@ -82,13 +82,10 @@ public class RedisClient implements Closeable {
 
   public void run(Consumer<JedisCluster> withJedis) throws IOException {
     call(
-        new JedisContext<Void>() {
-          @Override
-          public Void run(JedisCluster jedis) throws JedisException {
-            withJedis.accept(jedis);
-            return null;
-          }
-        });
+            (JedisContext<Void>) jedis -> {
+              withJedis.accept(jedis);
+              return null;
+            });
   }
 
   public <T> T blockingCall(JedisInterruptibleContext<T> withJedis)

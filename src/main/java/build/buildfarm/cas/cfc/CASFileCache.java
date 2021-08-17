@@ -149,12 +149,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       CacheBuilder.newBuilder()
           .expireAfterAccess(1, HOURS)
           .removalListener(
-              new RemovalListener<BlobWriteKey, Write>() {
-                @Override
-                public void onRemoval(RemovalNotification<BlobWriteKey, Write> notification) {
-                  notification.getValue().reset();
-                }
-              })
+                  (RemovalListener<BlobWriteKey, Write>) notification -> notification.getValue().reset())
           .build(
               new CacheLoader<BlobWriteKey, Write>() {
                 @Override
@@ -166,14 +161,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       CacheBuilder.newBuilder()
           .expireAfterAccess(1, HOURS)
           .removalListener(
-              new RemovalListener<Digest, SettableFuture<Long>>() {
-                @Override
-                public void onRemoval(
-                    RemovalNotification<Digest, SettableFuture<Long>> notification) {
-                  // no effect if already done
-                  notification.getValue().setException(new IOException("write cancelled"));
-                }
-              })
+                  (RemovalListener<Digest, SettableFuture<Long>>) notification -> {
+                    // no effect if already done
+                    notification.getValue().setException(new IOException("write cancelled"));
+                  })
           .build(
               new CacheLoader<Digest, SettableFuture<Long>>() {
                 @Override
@@ -2251,9 +2242,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     return transformAsync(
         immediateFuture(null),
-        (result) -> {
-          return immediateFuture(putAndCopy(digest, isExecutable));
-        },
+        (result) -> immediateFuture(putAndCopy(digest, isExecutable)),
         executor);
   }
 

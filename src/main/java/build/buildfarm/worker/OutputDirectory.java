@@ -140,7 +140,7 @@ public class OutputDirectory {
         return OutputDirectory.getDefaultInstance();
       }
       return new OutputDirectory(
-          ImmutableMap.copyOf(Maps.transformValues(children, (v) -> v.build())));
+          ImmutableMap.copyOf(Maps.transformValues(children, Builder::build)));
     }
   }
 
