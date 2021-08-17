@@ -379,7 +379,7 @@ public abstract class AbstractServerInstance implements Instance {
     long endIndex = offset + count;
 
     return blob.getData()
-        .substring((int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
+        .substring((int) offset, (int) (Math.min(endIndex, blob.size())));
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(

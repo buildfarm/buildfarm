@@ -114,14 +114,12 @@ public class ContentAddressableStorageService
               missingBlobs.observe(request.getBlobDigestsList().size());
               logger.log(
                   Level.FINE,
-                  new StringBuilder()
-                      .append("FindMissingBlobs(")
-                      .append(instance.getName())
-                      .append(") for ")
-                      .append(request.getBlobDigestsList().size())
-                      .append(" blobs in ")
-                      .append(elapsedMicros / 1000.0)
-                      .toString());
+                      "FindMissingBlobs(" +
+                              instance.getName() +
+                              ") for " +
+                              request.getBlobDigestsList().size() +
+                              " blobs in " +
+                              elapsedMicros / 1000.0);
             } catch (Throwable t) {
               onFailure(t);
             }

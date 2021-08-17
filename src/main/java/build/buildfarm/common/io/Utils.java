@@ -268,15 +268,14 @@ public class Utils {
 
     @Override
     public String toString() {
-      StringBuilder sb = new StringBuilder(50);
-      sb.append("(volSerialNumber=")
-          .append(volSerialNumber)
-          .append(",fileIndexHigh=")
-          .append(fileIndexHigh)
-          .append(",fileIndexLow=")
-          .append(fileIndexLow)
-          .append(')');
-      return sb.toString();
+      String sb = "(volSerialNumber=" +
+              volSerialNumber +
+              ",fileIndexHigh=" +
+              fileIndexHigh +
+              ",fileIndexLow=" +
+              fileIndexLow +
+              ')';
+      return sb;
     }
   }
 

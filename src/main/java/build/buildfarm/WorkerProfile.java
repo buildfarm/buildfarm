@@ -64,11 +64,10 @@ class WorkerProfile {
    * @return
    */
   private static String workerStringTransformation(String worker) {
-    StringBuilder sb = new StringBuilder();
-    sb.append(worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", "."))
-        .append(':')
-        .append(worker.split(":")[1]);
-    return sb.toString();
+    String sb = worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".") +
+            ':' +
+            worker.split(":")[1];
+    return sb;
   }
 
   private static void analyzeMessage(String worker, WorkerProfileMessage response) {

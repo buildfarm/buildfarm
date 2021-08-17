@@ -38,10 +38,8 @@ public class FindOperationsResults {
    * @note Suggested return identifier: message.
    */
   public String toMessage() {
-    StringBuilder message = new StringBuilder();
-    message
-        .append(String.format("results: %d\n", operations.size()))
-        .append(String.join("\n", operations.keySet()));
-    return message.toString();
+      String message = String.format("results: %d\n", operations.size()) +
+              String.join("\n", operations.keySet());
+      return message;
   }
 }
