@@ -441,8 +441,9 @@ class Executor {
 
     // run the action under docker
     if (!limits.containerSettings.containerImage.isEmpty()) {
-      // create settings
       DockerClient dockerClient = DockerClientBuilder.getInstance().build();
+
+      // create settings
       DockerExecutorSettings settings = new DockerExecutorSettings();
       settings.operationContext = operationContext;
       settings.execDir = execDir;
