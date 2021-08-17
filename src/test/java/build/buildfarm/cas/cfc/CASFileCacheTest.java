@@ -141,12 +141,12 @@ class CASFileCacheTest {
             onExpire,
             delegate) {
           @Override
-          protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
+          protected InputStream newExternalInput(Digest digest) throws IOException {
             ByteString content = blobs.get(digest);
             if (content == null) {
-              return fileCache.newTransparentInput(digest, offset);
+              return fileCache.newTransparentInput(digest, 0);
             }
-            return content.substring((int) offset).newInput();
+            return content.substring((int) (long) 0).newInput();
           }
         };
     // do this so that we can remove the cache root dir

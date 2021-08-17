@@ -140,7 +140,6 @@ public class Worker extends LoggingMain {
   private final Pipeline pipeline;
   private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
-  private final PrometheusPublisher prometheusPublisher;
 
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
@@ -149,10 +148,10 @@ public class Worker extends LoggingMain {
 
     public void insertBlob(Digest digest, ByteString content)
         throws IOException, InterruptedException {
-      insertStream(digest, () -> content.newInput());
+      insertStream(digest, content::newInput);
     }
 
-    private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
+    private Write getLocalWrite(Digest digest) throws IOException {
       return execFileSystem
           .getStorage()
           .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
@@ -198,8 +197,7 @@ public class Worker extends LoggingMain {
       streamIntoWriteFuture(in, write, digest).get();
     }
 
-    private Write getCasMemberWrite(Digest digest, String workerName)
-        throws IOException, InterruptedException {
+    private Write getCasMemberWrite(Digest digest, String workerName) throws IOException {
       Instance casMember = workerStub(workerName);
 
       return casMember.getBlobWrite(
@@ -474,8 +472,6 @@ public class Worker extends LoggingMain {
             .addService(new ShutDownWorkerGracefully(this, config))
             .build();
 
-    prometheusPublisher = new PrometheusPublisher();
-
     logger.log(INFO, String.format("%s initialized", identifier));
   }
 
@@ -491,9 +487,7 @@ public class Worker extends LoggingMain {
     // return a default
     Duration defaultDuration = Durations.fromSeconds(60);
     logger.log(
-        INFO,
-        String.format(
-            "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s"));
+        INFO, "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
     return defaultDuration;
   }
 
@@ -598,23 +592,19 @@ public class Worker extends LoggingMain {
         (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
 
     InputStreamFactory localPopulatingInputStreamFactory =
-        new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest blobDigest, long offset)
-              throws IOException, InterruptedException {
-            // FIXME use write
-            ByteString content =
-                ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
+        (blobDigest, offset) -> {
+          // FIXME use write
+          ByteString content =
+              ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
 
-            if (offset == 0) {
-              // extra computations
-              Blob blob = new Blob(content, digestUtil);
-              // here's hoping that our digest matches...
-              storage.put(blob);
-            }
-
-            return content.newInput();
+          if (offset == 0) {
+            // extra computations
+            Blob blob = new Blob(content, digestUtil);
+            // here's hoping that our digest matches...
+            storage.put(blob);
           }
+
+          return content.newInput();
         };
     return new FuseExecFileSystem(
         root,
@@ -720,9 +710,9 @@ public class Worker extends LoggingMain {
         owner,
         config.getLinkInputDirectories(),
         removeDirectoryService,
-        accessRecorder,
-        /* deadlineAfter=*/ 1,
-        /* deadlineAfterUnits=*/ DAYS);
+        accessRecorder
+        /* deadlineAfter=*/
+        /* deadlineAfterUnits=*/ );
   }
 
   public void stop() throws InterruptedException {
@@ -908,7 +898,7 @@ public class Worker extends LoggingMain {
       server.start();
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-      prometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
+      PrometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
@@ -929,7 +919,7 @@ public class Worker extends LoggingMain {
   @Override
   protected void onShutdown() throws InterruptedException {
     logger.log(SEVERE, "*** shutting down gRPC server since JVM is shutting down");
-    prometheusPublisher.stopHttpServer();
+    PrometheusPublisher.stopHttpServer();
     stop();
     logger.log(SEVERE, "*** server shut down");
   }

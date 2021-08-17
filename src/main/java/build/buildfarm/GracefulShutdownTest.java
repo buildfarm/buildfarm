@@ -84,7 +84,7 @@ class GracefulShutdownTest {
     System.out.println("Request for " + instancePrivateIp + " sent");
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args) {
     if (args[0].equals("ShutDown")) {
       shutDownGracefully(args);
     } else if (args[0].equals("PrepareWorker")) {

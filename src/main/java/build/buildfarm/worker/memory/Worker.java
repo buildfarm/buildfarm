@@ -26,7 +26,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
@@ -133,9 +132,8 @@ public class Worker extends LoggingMain {
         retryScheduler);
   }
 
-  private static ByteStreamUploader createStubUploader(
-      String instanceName, Channel channel, Retrier retrier) {
-    return new ByteStreamUploader(instanceName, channel, null, 300, retrier);
+  private static ByteStreamUploader createStubUploader(String instanceName, Channel channel) {
+    return new ByteStreamUploader(instanceName, channel, null, 300, Worker.retrier);
   }
 
   private static Instance newStubInstance(
@@ -182,16 +180,12 @@ public class Worker extends LoggingMain {
             casChannel,
             digestUtil,
             casEndpoint.getDeadlineAfterSeconds());
-    uploader = createStubUploader(casInstance.getName(), casChannel, retrier);
+    uploader = createStubUploader(casInstance.getName(), casChannel);
     operationQueueInstance = newStubInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory =
-        new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest digest, long offset) throws IOException {
-            return casInstance.newBlobInput(
+        (digest, offset) ->
+            casInstance.newBlobInput(
                 digest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
-          }
-        };
     fileCache =
         new InjectedCASFileCache(
             inputStreamFactory,

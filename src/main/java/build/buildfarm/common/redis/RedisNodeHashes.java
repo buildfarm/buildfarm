@@ -122,14 +122,11 @@ public class RedisNodeHashes {
     JedisException nodeException = null;
     for (Map.Entry<String, JedisPool> node : jedis.getClusterNodes().entrySet()) {
       JedisPool pool = node.getValue();
-      Jedis resource = pool.getResource();
-      try {
+      try (Jedis resource = pool.getResource()) {
         return resource.clusterSlots();
       } catch (JedisException e) {
         nodeException = e;
         // log error with node
-      } finally {
-        resource.close();
       }
     }
     if (nodeException != null) {

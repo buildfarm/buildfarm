@@ -46,7 +46,7 @@ class RedisShardSubscriber extends JedisPubSub {
     private final TimedWatcher watcher;
 
     TimedWatchFuture(TimedWatcher watcher) {
-      super(watcher::observe);
+      super(watcher);
       this.watcher = watcher;
     }
 

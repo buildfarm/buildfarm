@@ -37,7 +37,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
     That way, all of the provision-requiring queues are considered first,
     before choosing the fallback queue last.
   */
-  public List<WorkerQueue> specificQueues = Lists.newArrayList();
+  public final List<WorkerQueue> specificQueues = Lists.newArrayList();
 
   @Override
   public Iterator<WorkerQueue> iterator() {
@@ -46,7 +46,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
 
   public int queueSize(String queueName) {
     for (WorkerQueue queue : specificQueues) {
-      if (queue.name == queueName) {
+      if (queue.name.equals(queueName)) {
         return queue.operations.size();
       }
     }
@@ -90,24 +90,21 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
     return true;
   }
 
-  public boolean AddWorker(SetMultimap<String, String> provisions, MatchListener listener) {
+  public void AddWorker(SetMultimap<String, String> provisions, MatchListener listener) {
     try {
       WorkerQueue queue = MatchEligibleQueue(provisions);
       queue.workers.add(new Worker(provisions, listener));
     } catch (Exception e) {
-      return false;
     }
-    return true;
   }
 
-  public boolean AddWorkers(String queueName, List<Worker> workers) {
+  public void AddWorkers(String queueName, List<Worker> workers) {
     for (WorkerQueue queue : specificQueues) {
-      if (queue.name == queueName) {
+      if (queue.name.equals(queueName)) {
         queue.workers.addAll(workers);
-        return true;
+        return;
       }
     }
-    return false;
   }
 
   /*
@@ -144,12 +141,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
 
   private void removeWorkerFromQueue(WorkerQueue queue, MatchListener listener) {
     synchronized (queue.workers) {
-      Iterator<Worker> iter = queue.workers.iterator();
-      while (iter.hasNext()) {
-        if (iter.next().getListener() == listener) {
-          iter.remove();
-        }
-      }
+      queue.workers.removeIf(worker -> worker.getListener() == listener);
     }
   }
 }

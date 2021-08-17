@@ -79,7 +79,7 @@ public class FuseCAS extends FuseStubFS {
     int size();
   }
 
-  class FileEntry implements Entry {
+  static class FileEntry implements Entry {
     final Digest digest;
     final boolean executable;
 
@@ -114,7 +114,7 @@ public class FuseCAS extends FuseStubFS {
     }
   }
 
-  class WriteFileEntry implements Entry {
+  static class WriteFileEntry implements Entry {
     boolean executable;
     ByteString content;
 
@@ -312,7 +312,7 @@ public class FuseCAS extends FuseStubFS {
     }
   }
 
-  class SymlinkEntry implements Entry {
+  static class SymlinkEntry implements Entry {
     final String target;
     final Supplier<Entry> resolve;
 
@@ -362,7 +362,7 @@ public class FuseCAS extends FuseStubFS {
 
   @FunctionalInterface
   interface DirectoryEntryPathConsumer {
-    void accept(DirectoryEntry entry, String path) throws IOException, InterruptedException;
+    void accept(DirectoryEntry entry, String path);
   }
 
   private static void resolveTopdir(
@@ -468,12 +468,7 @@ public class FuseCAS extends FuseStubFS {
   }
 
   public void destroyInputRoot(String topdir) throws IOException, InterruptedException {
-    resolveTopdir(
-        topdir,
-        root,
-        (currentDir, base) -> {
-          currentDir.removeChild(base);
-        });
+    resolveTopdir(topdir, root, DirectoryEntry::removeChild);
     decMounts();
   }
 

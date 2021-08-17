@@ -20,7 +20,7 @@ import java.nio.file.attribute.PosixFileAttributes;
 import java.util.Objects;
 import javax.annotation.Nullable;
 
-/** Directory entry representation returned by {@link Path#readdir}. */
+/** Directory entry representation returned by . */
 public final class PosixDirent implements Serializable, Comparable<PosixDirent> {
   private final String name;
   @Nullable private final PosixFileAttributes stat;

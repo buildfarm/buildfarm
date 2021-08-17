@@ -54,7 +54,7 @@ class Mount {
         new FuseCAS(
             cwd.resolve(args[3]),
             new InputStreamFactory() {
-              Map<Digest, ByteString> cache = new HashMap<>();
+              final Map<Digest, ByteString> cache = new HashMap<>();
 
               public synchronized InputStream newInput(Digest blobDigest, long offset) {
                 if (cache.containsKey(blobDigest)) {

@@ -98,7 +98,7 @@ public final class ContentAddressableStorages {
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor()) {
           @Override
-          protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
+          protected InputStream newExternalInput(Digest digest) throws IOException {
             throw new NoSuchFileException(digest.getHash());
           }
         };

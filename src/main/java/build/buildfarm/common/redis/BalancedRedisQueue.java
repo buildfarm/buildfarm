@@ -68,7 +68,7 @@ public class BalancedRedisQueue {
    * @details Although these are multiple queues, the balanced redis queue treats them as one in its
    *     interface.
    */
-  private List<RedisQueue> queues = new ArrayList<>();
+  private final List<RedisQueue> queues = new ArrayList<>();
 
   /**
    * @field currentPushQueue
@@ -337,7 +337,6 @@ public class BalancedRedisQueue {
   /**
    * @brief Create multiple queues for each of the hashes given.
    * @details Create the multiple queues that will act as a single balanced queue.
-   * @param client An established redis client.
    * @param name The global name of the queue.
    * @param hashtags Hashtags to distribute queue data.
    */
@@ -429,8 +428,7 @@ public class BalancedRedisQueue {
     // to improve cpu utilization, we can try randomizing
     // the order we traverse the internal queues for operations
     // that may return early
-    List<RedisQueue> randomQueues = new ArrayList<>();
-    randomQueues.addAll(queues);
+    List<RedisQueue> randomQueues = new ArrayList<>(queues);
     Collections.shuffle(randomQueues);
     return randomQueues;
   }

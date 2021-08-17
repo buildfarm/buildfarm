@@ -43,7 +43,9 @@ public class WorkerIndexer {
     // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
     // This prevents us from using the cluster's SCAN to traverse all of the CAS.
     // That's why we choose to scan each of the jedisNode's individually.
-    cluster.getClusterNodes().values().stream()
+    cluster
+        .getClusterNodes()
+        .values()
         .forEach(
             pool -> {
               try (Jedis node = pool.getResource()) {

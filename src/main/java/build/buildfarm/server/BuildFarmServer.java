@@ -73,7 +73,6 @@ public class BuildFarmServer extends LoggingMain {
   private final HealthStatusManager healthStatusManager;
   private final Server server;
   private boolean stopping = false;
-  private final PrometheusPublisher prometheusPublisher;
 
   public BuildFarmServer(String session, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
@@ -89,7 +88,7 @@ public class BuildFarmServer extends LoggingMain {
     healthStatusManager = new HealthStatusManager();
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-    if (config.getSslCertificatePath() != "") {
+    if (!config.getSslCertificatePath().equals("")) {
       File ssl_certificate_path = new File(config.getSslCertificatePath());
       serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }
@@ -122,8 +121,6 @@ public class BuildFarmServer extends LoggingMain {
             .intercept(headersInterceptor)
             .build();
 
-    prometheusPublisher = new PrometheusPublisher();
-
     logger.log(Level.INFO, String.format("%s initialized", session));
   }
 
@@ -154,7 +151,7 @@ public class BuildFarmServer extends LoggingMain {
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    prometheusPublisher.startHttpServer(prometheusPort);
+    PrometheusPublisher.startHttpServer(prometheusPort);
     healthCheckMetric.labels("start").inc();
   }
 
@@ -174,7 +171,7 @@ public class BuildFarmServer extends LoggingMain {
     }
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
-    prometheusPublisher.stopHttpServer();
+    PrometheusPublisher.stopHttpServer();
     healthCheckMetric.labels("stop").inc();
     try {
       if (server != null) {

@@ -20,7 +20,7 @@ import java.util.Objects;
 import javax.annotation.Nullable;
 import jnr.posix.FileStat;
 
-/** Directory entry representation returned by {@link Path#readdir}. */
+/** Directory entry representation returned by . */
 public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
   private final String name;
   @Nullable private final FileStat stat;

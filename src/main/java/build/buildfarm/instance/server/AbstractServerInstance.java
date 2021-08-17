@@ -49,6 +49,7 @@ import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputDirectory;
+import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
@@ -243,8 +244,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
     // TODO Directories
     ImmutableList.Builder<Digest> digests = ImmutableList.builder();
-    digests.addAll(
-        Iterables.transform(result.getOutputFilesList(), outputFile -> outputFile.getDigest()));
+    digests.addAll(Iterables.transform(result.getOutputFilesList(), OutputFile::getDigest));
     // findMissingBlobs will weed out empties
     digests.add(result.getStdoutDigest());
     digests.add(result.getStderrDigest());
@@ -350,13 +350,12 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ByteString getBlob(Digest blobDigest) throws InterruptedException {
-    return getBlob(blobDigest, /* offset=*/ 0, /* count=*/ blobDigest.getSizeBytes());
+    return getBlob(blobDigest, /* offset=*//* count=*/ blobDigest.getSizeBytes());
   }
 
-  ByteString getBlob(Digest blobDigest, long offset, long count)
-      throws IndexOutOfBoundsException, InterruptedException {
+  ByteString getBlob(Digest blobDigest, long count) throws IndexOutOfBoundsException {
     if (blobDigest.getSizeBytes() == 0) {
-      if (offset == 0 && count >= 0) {
+      if ((long) 0 == 0 && count >= 0) {
         return ByteString.EMPTY;
       } else {
         throw new IndexOutOfBoundsException();
@@ -369,31 +368,30 @@ public abstract class AbstractServerInstance implements Instance {
       return null;
     }
 
-    if (offset < 0
-        || (blob.isEmpty() && offset > 0)
-        || (!blob.isEmpty() && offset >= blob.size())
+    if ((long) 0 < 0
+        || (blob.isEmpty() && (long) 0 > 0)
+        || (!blob.isEmpty() && (long) 0 >= blob.size())
         || count < 0) {
       throw new IndexOutOfBoundsException();
     }
 
-    long endIndex = offset + count;
+    long endIndex = count;
 
-    return blob.getData()
-        .substring((int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
+    return blob.getData().substring((int) (long) 0, (int) (Math.min(endIndex, blob.size())));
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
       Digest blobDigest, RequestMetadata requestMetadata) {
     return getBlobFuture(
-        blobDigest, /* offset=*/ 0, /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
+        blobDigest, /* offset=*//* count=*/ blobDigest.getSizeBytes(), requestMetadata);
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
-      Digest blobDigest, long offset, long count, RequestMetadata requestMetadata) {
+      Digest blobDigest, long count, RequestMetadata requestMetadata) {
     SettableFuture<ByteString> future = SettableFuture.create();
     getBlob(
         blobDigest,
-        offset,
+        0,
         count,
         new ServerCallStreamObserver<ByteString>() {
           ByteString content = ByteString.EMPTY;
@@ -465,7 +463,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
-      throws EntryLimitException, IOException, InterruptedException {
+      throws IOException, InterruptedException {
     ImmutableList.Builder<Digest> blobDigestsBuilder = new ImmutableList.Builder<>();
     PutAllBlobsException exception = null;
     for (ByteString blob : blobs) {
@@ -500,10 +498,7 @@ public abstract class AbstractServerInstance implements Instance {
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
       Iterable<Digest> digests, RequestMetadata requestMetadata) {
     Thread findingThread = Thread.currentThread();
-    Context.CancellationListener cancellationListener =
-        (context) -> {
-          findingThread.interrupt();
-        };
+    Context.CancellationListener cancellationListener = (context) -> findingThread.interrupt();
     Context.current().addListener(cancellationListener, directExecutor());
     try {
       ListenableFuture<Iterable<Digest>> future =
@@ -651,8 +646,7 @@ public abstract class AbstractServerInstance implements Instance {
       Iterable<Command.EnvironmentVariable> environmentVariables,
       PreconditionFailure.Builder preconditionFailure) {
     stringsUniqueAndSortedPrecondition(
-        Iterables.transform(
-            environmentVariables, environmentVariable -> environmentVariable.getName()),
+        Iterables.transform(environmentVariables, Command.EnvironmentVariable::getName),
         DUPLICATE_ENVIRONMENT_VARIABLE,
         ENVIRONMENT_VARIABLES_NOT_SORTED,
         preconditionFailure);
@@ -926,7 +920,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  protected QueuedOperation validateQueuedOperationAndInputs(
+  protected void validateQueuedOperationAndInputs(
       Digest actionDigest,
       QueuedOperation queuedOperation,
       PreconditionFailure.Builder preconditionFailure,
@@ -949,10 +943,9 @@ public abstract class AbstractServerInstance implements Instance {
       validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
-    return queuedOperation;
   }
 
-  private Action validateActionDigest(
+  private void validateActionDigest(
       String operationName, Digest actionDigest, RequestMetadata requestMetadata)
       throws StatusException, InterruptedException {
     Action action = null;
@@ -982,7 +975,6 @@ public abstract class AbstractServerInstance implements Instance {
       }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
-    return action;
   }
 
   protected void validateAction(
@@ -1154,7 +1146,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setDescription(outputFile);
       }
       String currentPath = outputFile;
-      while (currentPath != "") {
+      while (!currentPath.equals("")) {
         final String dirname;
         if (currentPath.contains("/")) {
           dirname = currentPath.substring(0, currentPath.lastIndexOf('/'));
@@ -1177,7 +1169,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setDescription(OUTPUT_DIRECTORY_IS_INPUT_FILE);
       }
       String currentPath = outputDir;
-      while (currentPath != "") {
+      while (!currentPath.equals("")) {
         final String dirname;
         if (currentPath.contains("/")) {
           dirname = currentPath.substring(0, currentPath.lastIndexOf('/'));

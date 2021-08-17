@@ -79,7 +79,7 @@ public class InputFetcher implements Runnable {
         "InputFetcher",
         operationContext.queueEntry,
         QUEUED,
-        () -> fetcherThread.interrupt(),
+        fetcherThread::interrupt,
         Deadline.after(60, SECONDS));
     try {
       return fetchPolled(stopwatch);
@@ -88,8 +88,8 @@ public class InputFetcher implements Runnable {
     }
   }
 
-  private static String BAZEL_HOST_BIN_PREFIX = "bazel-out/host/bin/";
-  private static String BAZEL_RUNFILES_SUFFIX = ".runfiles/__main__/";
+  private static final String BAZEL_HOST_BIN_PREFIX = "bazel-out/host/bin/";
+  private static final String BAZEL_RUNFILES_SUFFIX = ".runfiles/__main__/";
 
   static String getExecutablePath(
       String programPath, Directory root, Map<Digest, Directory> directoriesIndex) {

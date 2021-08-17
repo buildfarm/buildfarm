@@ -61,7 +61,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.naming.ConfigurationException;
 
 public class ShardWorkerInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardWorkerInstance.class.getName());
@@ -73,8 +72,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       DigestUtil digestUtil,
       Backplane backplane,
       ContentAddressableStorage contentAddressableStorage,
-      ShardWorkerInstanceConfig config)
-      throws ConfigurationException {
+      ShardWorkerInstanceConfig config) {
     super(name, digestUtil, contentAddressableStorage, null, null, null, null);
     this.backplane = backplane;
   }
@@ -215,7 +213,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, MatchListener listener) throws InterruptedException {
+  public void match(Platform platform, MatchListener listener) {
     throw new UnsupportedOperationException();
   }
 

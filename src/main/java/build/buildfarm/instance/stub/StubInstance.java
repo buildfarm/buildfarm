@@ -29,6 +29,7 @@ import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheFutureStub;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
@@ -45,6 +46,7 @@ import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.GetCapabilitiesRequest;
 import build.bazel.remote.execution.v2.GetTreeRequest;
@@ -399,7 +401,7 @@ public class StubInstance implements Instance {
         deadlined(casFutureStub)
             .withInterceptors(attachMetadataInterceptor(requestMetadata))
             .findMissingBlobs(request),
-        (response) -> response.getMissingBlobDigestsList(),
+        FindMissingBlobsResponse::getMissingBlobDigestsList,
         directExecutor());
   }
 
@@ -501,7 +503,7 @@ public class StubInstance implements Instance {
     @GuardedBy("this")
     private boolean wasStarted = false;
     // Indicator for request completion, so that callbacks throw or are ignored
-    AtomicBoolean wasCompleted = new AtomicBoolean(false);
+    final AtomicBoolean wasCompleted = new AtomicBoolean(false);
 
     ReadBlobInterchange(ServerCallStreamObserver<ByteString> blobObserver) {
       this.blobObserver = blobObserver;
@@ -601,7 +603,7 @@ public class StubInstance implements Instance {
                     .setInstanceName(getName())
                     .addAllDigests(digests)
                     .build()),
-        (response) -> response.getResponsesList(),
+        BatchReadBlobsResponse::getResponsesList,
         directExecutor());
   }
 

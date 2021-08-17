@@ -20,6 +20,7 @@ import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
@@ -209,7 +210,7 @@ public class GrpcCAS implements ContentAddressableStorage {
                     .setInstanceName(instanceName)
                     .addAllDigests(digests)
                     .build()),
-        (response) -> response.getResponsesList(),
+        BatchReadBlobsResponse::getResponsesList,
         directExecutor());
   }
 

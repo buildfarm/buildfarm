@@ -85,7 +85,6 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -564,8 +563,8 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     Directory toDirectory() {
-      Collections.sort(files, Comparator.comparing(node -> node.getName()));
-      Collections.sort(directories, Comparator.comparing(node -> node.getName()));
+      files.sort(Comparator.comparing(FileNode::getName));
+      directories.sort(Comparator.comparing(DirectoryNode::getName));
       return Directory.newBuilder().addAllFiles(files).addAllDirectories(directories).build();
     }
   }
@@ -598,7 +597,7 @@ class ShardWorkerContext implements WorkerContext {
         outputDirPath,
         new SimpleFileVisitor<Path>() {
           OutputDirectoryContext currentDirectory = null;
-          Stack<OutputDirectoryContext> path = new Stack<>();
+          final Stack<OutputDirectoryContext> path = new Stack<>();
 
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
@@ -641,8 +640,7 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-              throws IOException {
+          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
             path.push(currentDirectory);
             if (dir.equals(outputDirPath)) {
               currentDirectory = outputRoot;
@@ -653,7 +651,7 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+          public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
             OutputDirectoryContext parentDirectory = path.pop();
             Directory directory = currentDirectory.toDirectory();
             if (parentDirectory == null) {

@@ -156,7 +156,7 @@ import javax.naming.ConfigurationException;
 public class ShardInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardInstance.class.getName());
 
-  private static ListenableFuture<Void> IMMEDIATE_VOID_FUTURE = Futures.immediateFuture(null);
+  private static final ListenableFuture<Void> IMMEDIATE_VOID_FUTURE = Futures.immediateFuture(null);
 
   private static final String TIMEOUT_OUT_OF_BOUNDS =
       "A timeout specified is out of bounds with a configured range";
@@ -218,7 +218,7 @@ public class ShardInstance extends AbstractServerInstance {
   private Thread operationQueuer;
   private boolean stopping = false;
   private boolean stopped = true;
-  private Thread prometheusMetricsThread;
+  private final Thread prometheusMetricsThread;
 
   // TODO: move to config
   private static final Duration queueTimeout = Durations.fromSeconds(60);
@@ -280,7 +280,7 @@ public class ShardInstance extends AbstractServerInstance {
       ShardInstanceConfig config,
       Runnable onStop,
       ListeningExecutorService actionCacheFetchService)
-      throws InterruptedException, ConfigurationException {
+      throws InterruptedException {
     this(
         name,
         digestUtil,
@@ -315,8 +315,7 @@ public class ShardInstance extends AbstractServerInstance {
       boolean useDenyList,
       Runnable onStop,
       com.google.common.cache.LoadingCache<String, Instance> workerStubs,
-      ListeningExecutorService actionCacheFetchService)
-      throws InterruptedException {
+      ListeningExecutorService actionCacheFetchService) {
     super(
         name,
         digestUtil,
@@ -353,7 +352,7 @@ public class ShardInstance extends AbstractServerInstance {
       operationQueuer =
           new Thread(
               new Runnable() {
-                Stopwatch stopwatch = Stopwatch.createUnstarted();
+                final Stopwatch stopwatch = Stopwatch.createUnstarted();
 
                 ListenableFuture<Void> iterate() throws IOException, InterruptedException {
                   ensureCanQueue(stopwatch); // wait for transition to canQueue state
@@ -1984,8 +1983,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout)
-      throws InterruptedException {
+  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout) {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(executeEntry.getActionDigest())
@@ -2294,21 +2292,17 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   protected TokenizableIterator<Operation> createOperationsIterator(String pageToken) {
     Iterator<Operation> iter;
-    try {
-      iter =
-          Iterables.transform(
-                  backplane.getOperations(),
-                  (operationName) -> {
-                    try {
-                      return backplane.getOperation(operationName);
-                    } catch (IOException e) {
-                      throw Status.fromThrowable(e).asRuntimeException();
-                    }
-                  })
-              .iterator();
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
+    iter =
+        Iterables.transform(
+                backplane.getOperations(),
+                (operationName) -> {
+                  try {
+                    return backplane.getOperation(operationName);
+                  } catch (IOException e) {
+                    throw Status.fromThrowable(e).asRuntimeException();
+                  }
+                })
+            .iterator();
     OperationIteratorToken token;
     if (!pageToken.isEmpty()) {
       try {
@@ -2379,11 +2373,7 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFuture(null);
     }
 
-    try {
-      return backplane.watchOperation(operation.getName(), watcher);
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
+    return backplane.watchOperation(operation.getName(), watcher);
   }
 
   @Override

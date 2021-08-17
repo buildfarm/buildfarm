@@ -53,7 +53,7 @@ public class Utils {
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
 
   // pretty poor check here, but avoiding apache commons for now
-  private static Supplier<Boolean> isMacOS =
+  private static final Supplier<Boolean> isMacOS =
       Suppliers.memoize(
           () -> {
             String osName = System.getProperty("os.name").toLowerCase();
@@ -268,17 +268,15 @@ public class Utils {
 
     @Override
     public String toString() {
-      StringBuilder sb = new StringBuilder(50);
-      sb.append("(volSerialNumber=")
-          .append(volSerialNumber)
-          .append(",fileIndexHigh=")
-          .append(fileIndexHigh)
-          .append(",fileIndexLow=")
-          .append(fileIndexLow)
-          .append(')');
-      return sb.toString();
+      return "(volSerialNumber="
+          + volSerialNumber
+          + ",fileIndexHigh="
+          + fileIndexHigh
+          + ",fileIndexLow="
+          + fileIndexLow
+          + ')';
     }
-  };
+  }
 
   public static FileStatus stat(final Path path, final boolean followSymlinks, FileStore fileStore)
       throws IOException {
@@ -312,12 +310,12 @@ public class Utils {
       }
 
       @Override
-      public long getSize() throws IOException {
+      public long getSize() {
         return attributes.size();
       }
 
       @Override
-      public long getLastModifiedTime() throws IOException {
+      public long getLastModifiedTime() {
         return attributes.lastModifiedTime().toMillis();
       }
 

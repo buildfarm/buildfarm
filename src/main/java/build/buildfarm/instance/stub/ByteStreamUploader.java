@@ -26,6 +26,7 @@ import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.ProgressiveBackoff;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamFutureStub;
+import com.google.bytestream.ByteStreamProto;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
@@ -332,7 +333,7 @@ public class ByteStreamUploader {
               bsFutureStub()
                   .queryWriteStatus(
                       QueryWriteStatusRequest.newBuilder().setResourceName(resourceName).build()),
-              (response) -> response.getCommittedSize(),
+              ByteStreamProto.QueryWriteStatusResponse::getCommittedSize,
               MoreExecutors.directExecutor());
       return Futures.transformAsync(
           committedSizeFuture,

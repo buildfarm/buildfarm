@@ -26,7 +26,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.protobuf.Duration;
 import io.grpc.ManagedChannel;
@@ -41,12 +40,8 @@ public final class WorkerStubs {
     return CacheBuilder.newBuilder()
         .expireAfterAccess(10, TimeUnit.MINUTES)
         .removalListener(
-            new RemovalListener<String, Instance>() {
-              @Override
-              public void onRemoval(RemovalNotification<String, Instance> notification) {
-                stopInstance(notification.getValue());
-              }
-            })
+            (RemovalListener<String, Instance>)
+                notification -> stopInstance(notification.getValue()))
         .build(
             new CacheLoader<String, Instance>() {
               @Override

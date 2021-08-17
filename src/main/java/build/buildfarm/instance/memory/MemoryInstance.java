@@ -82,7 +82,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Iterables;
@@ -139,20 +138,17 @@ public class MemoryInstance extends AbstractServerInstance {
       CacheBuilder.newBuilder()
           .expireAfterWrite(1, TimeUnit.HOURS)
           .removalListener(
-              new RemovalListener<String, ByteStringStreamSource>() {
-                @Override
-                public void onRemoval(
-                    RemovalNotification<String, ByteStringStreamSource> notification) {
-                  try {
-                    notification.getValue().getOutput().close();
-                  } catch (IOException e) {
-                    logger.log(
-                        Level.SEVERE,
-                        format("error closing stream source %s", notification.getKey()),
-                        e);
-                  }
-                }
-              })
+              (RemovalListener<String, ByteStringStreamSource>)
+                  notification -> {
+                    try {
+                      notification.getValue().getOutput().close();
+                    } catch (IOException e) {
+                      logger.log(
+                          Level.SEVERE,
+                          format("error closing stream source %s", notification.getKey()),
+                          e);
+                    }
+                  })
           .build(
               new CacheLoader<String, ByteStringStreamSource>() {
                 @Override
@@ -241,7 +237,7 @@ public class MemoryInstance extends AbstractServerInstance {
             config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
         outstandingOperations,
         MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil),
-        /*activeBlobWrites=*/ new ConcurrentHashMap<Digest, ByteString>());
+        /*activeBlobWrites=*/ new ConcurrentHashMap<>());
     this.config = config;
     this.watchers = watchers;
     this.outstandingOperations = outstandingOperations;
@@ -282,7 +278,7 @@ public class MemoryInstance extends AbstractServerInstance {
   private static ActionCache createDelegateCASActionCache(
       ContentAddressableStorage cas, DigestUtil digestUtil) {
     return new ActionCache() {
-      DelegateCASMap<ActionKey, ActionResult> map =
+      final DelegateCASMap<ActionKey, ActionResult> map =
           new DelegateCASMap<>(cas, ActionResult.parser(), digestUtil);
 
       @Override
@@ -304,7 +300,7 @@ public class MemoryInstance extends AbstractServerInstance {
   private static OperationsMap createCompletedOperationMap(
       ContentAddressableStorage cas, DigestUtil digestUtil) {
     return new OperationsMap() {
-      DelegateCASMap<String, Operation> map =
+      final DelegateCASMap<String, Operation> map =
           new DelegateCASMap<>(cas, Operation.parser(), digestUtil);
 
       @Override
@@ -1034,7 +1030,6 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected Object operationLock(String name) {
-    /** simple instance-wide locking on the completed operations */
     return completedOperations;
   }
 

@@ -15,7 +15,7 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
   private final Pattern pattern;
 
   private static long depthMaxCounter(int depth) {
-    return (1 << (depth * 8)) - 1;
+    return (1L << (depth * 8)) - 1;
   }
 
   HexBucketEntryPathStrategy(Path path, int levels) {
@@ -38,10 +38,8 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
 
   @Override
   public Iterable<Path> branchDirectories() {
-    return new Iterable<Path>() {
-      @Override
-      public Iterator<Path> iterator() {
-        return new Iterator<Path>() {
+    return () ->
+        new Iterator<Path>() {
           int depth = 0;
           int index = 0;
 
@@ -65,8 +63,6 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
             return nextPath;
           }
         };
-      }
-    };
   }
 
   @Override
