@@ -718,9 +718,9 @@ public class Worker extends LoggingMain {
         owner,
         config.getLinkInputDirectories(),
         removeDirectoryService,
-        accessRecorder,
-        /* deadlineAfter=*/ 1,
-        /* deadlineAfterUnits=*/ DAYS);
+        accessRecorder
+            /* deadlineAfter=*/
+            /* deadlineAfterUnits=*/);
   }
 
   public void stop() throws InterruptedException {

@@ -50,8 +50,8 @@ class InjectedCASFileCache extends CASFileCache {
   }
 
   @Override
-  protected InputStream newExternalInput(Digest digest, long offset)
+  protected InputStream newExternalInput(Digest digest)
       throws IOException, InterruptedException {
-    return inputStreamFactory.newInput(digest, offset);
+    return inputStreamFactory.newInput(digest, 0);
   }
 }

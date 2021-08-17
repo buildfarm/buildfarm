@@ -116,13 +116,13 @@ class Writes {
   }
 
   Writes(Supplier<Instance> instanceSupplier) {
-    this(instanceSupplier, /* writeExpiresAfter=*/ 1, /* writeExpiresUnit=*/ TimeUnit.HOURS);
+    this(instanceSupplier, /* writeExpiresAfter=*/ 1 /* writeExpiresUnit=*/);
   }
 
-  Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter, TimeUnit writeExpiresUnit) {
+  Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter) {
     blobWriteInstances =
         CacheBuilder.newBuilder()
-            .expireAfterWrite(writeExpiresAfter, writeExpiresUnit)
+            .expireAfterWrite(writeExpiresAfter, TimeUnit.HOURS)
             .build(
                 new CacheLoader<BlobWriteKey, Instance>() {
                   @Override

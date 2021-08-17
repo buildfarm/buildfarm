@@ -24,7 +24,7 @@ abstract class ChunkOutputStream extends OutputStream {
     buffer = new byte[size];
   }
 
-  abstract void onChunk(byte[] b, int off, int len);
+  abstract void onChunk(byte[] b, int len);
 
   @Override
   public void close() {
@@ -34,7 +34,7 @@ abstract class ChunkOutputStream extends OutputStream {
   @Override
   public void flush() {
     if (buflen > 0) {
-      onChunk(buffer, 0, buflen);
+      onChunk(buffer, buflen);
       buflen = 0;
     }
   }

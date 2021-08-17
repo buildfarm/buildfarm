@@ -350,13 +350,13 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ByteString getBlob(Digest blobDigest) throws InterruptedException {
-    return getBlob(blobDigest, /* offset=*/ 0, /* count=*/ blobDigest.getSizeBytes());
+    return getBlob(blobDigest, /* offset=*/  /* count=*/ blobDigest.getSizeBytes());
   }
 
-  ByteString getBlob(Digest blobDigest, long offset, long count)
+  ByteString getBlob(Digest blobDigest, long count)
       throws IndexOutOfBoundsException, InterruptedException {
     if (blobDigest.getSizeBytes() == 0) {
-      if (offset == 0 && count >= 0) {
+      if ((long) 0 == 0 && count >= 0) {
         return ByteString.EMPTY;
       } else {
         throw new IndexOutOfBoundsException();
@@ -369,31 +369,31 @@ public abstract class AbstractServerInstance implements Instance {
       return null;
     }
 
-    if (offset < 0
-        || (blob.isEmpty() && offset > 0)
-        || (!blob.isEmpty() && offset >= blob.size())
+    if ((long) 0 < 0
+        || (blob.isEmpty() && (long) 0 > 0)
+        || (!blob.isEmpty() && (long) 0 >= blob.size())
         || count < 0) {
       throw new IndexOutOfBoundsException();
     }
 
-    long endIndex = offset + count;
+    long endIndex = (long) 0 + count;
 
     return blob.getData()
-        .substring((int) offset, (int) (Math.min(endIndex, blob.size())));
+        .substring((int) (long) 0, (int) (Math.min(endIndex, blob.size())));
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
       Digest blobDigest, RequestMetadata requestMetadata) {
     return getBlobFuture(
-        blobDigest, /* offset=*/ 0, /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
+        blobDigest, /* offset=*/  /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
-      Digest blobDigest, long offset, long count, RequestMetadata requestMetadata) {
+          Digest blobDigest, long count, RequestMetadata requestMetadata) {
     SettableFuture<ByteString> future = SettableFuture.create();
     getBlob(
         blobDigest,
-        offset,
+            0,
         count,
         new ServerCallStreamObserver<ByteString>() {
           ByteString content = ByteString.EMPTY;

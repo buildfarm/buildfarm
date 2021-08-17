@@ -76,9 +76,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     OutputStream responseOut =
         new ChunkOutputStream(DEFAULT_CHUNK_SIZE) {
           @Override
-          public void onChunk(byte[] b, int off, int len) {
+          public void onChunk(byte[] b, int len) {
             responseObserver.onNext(
-                ReadResponse.newBuilder().setData(ByteString.copyFrom(b, off, len)).build());
+                ReadResponse.newBuilder().setData(ByteString.copyFrom(b, 0, len)).build());
           }
         };
 

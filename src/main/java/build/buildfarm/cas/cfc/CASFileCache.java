@@ -1316,7 +1316,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           });
     }
 
-    joinThreads(pool, "Scanning Cache Root...", 1, MINUTES);
+    joinThreads(pool, "Scanning Cache Root...");
 
     // log information from scanning cache root.
     CacheScanResults cacheScanResults = new CacheScanResults();
@@ -1450,7 +1450,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           });
     }
 
-    joinThreads(pool, "Populating Directories...", 1, MINUTES);
+    joinThreads(pool, "Populating Directories...");
 
     return invalidDirectories.build();
   }
@@ -1513,12 +1513,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return b.build();
   }
 
-  private void joinThreads(ExecutorService pool, String message, long timeout, TimeUnit unit)
+  private void joinThreads(ExecutorService pool, String message)
       throws InterruptedException {
     pool.shutdown();
     while (!pool.isTerminated()) {
       logger.log(Level.INFO, message);
-      pool.awaitTermination(timeout, unit);
+      pool.awaitTermination(1, TimeUnit.MINUTES);
     }
   }
 
@@ -2309,7 +2309,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private void copyExternalInput(Digest digest, CancellableOutputStream out)
       throws IOException, InterruptedException {
     logger.log(Level.FINE, format("downloading %s", DigestUtil.toString(digest)));
-    try (InputStream in = newExternalInput(digest, /* offset=*/ 0)) {
+    try (InputStream in = newExternalInput(digest /* offset=*/)) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       out.cancel();
@@ -2873,6 +2873,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  protected abstract InputStream newExternalInput(Digest digest, long offset)
+  protected abstract InputStream newExternalInput(Digest digest)
       throws IOException, InterruptedException;
 }

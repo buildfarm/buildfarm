@@ -230,8 +230,8 @@ class Executor {
               limits,
               timeout,
               isDefaultTimeout,
-              "", // executingMetadata.getStdoutStreamName(),
-              "", // executingMetadata.getStderrStreamName(),
+                  // executingMetadata.getStdoutStreamName(),
+                  // executingMetadata.getStderrStreamName(),
               resultBuilder);
 
       // From Bazel Test Encyclopedia:
@@ -390,16 +390,14 @@ class Executor {
   }
 
   private Code executeCommand(
-      String operationName,
-      Path execDir,
-      List<String> arguments,
-      List<EnvironmentVariable> environmentVariables,
-      ResourceLimits limits,
-      Duration timeout,
-      boolean isDefaultTimeout,
-      String stdoutStreamName,
-      String stderrStreamName,
-      ActionResult.Builder resultBuilder)
+          String operationName,
+          Path execDir,
+          List<String> arguments,
+          List<EnvironmentVariable> environmentVariables,
+          ResourceLimits limits,
+          Duration timeout,
+          boolean isDefaultTimeout,
+          ActionResult.Builder resultBuilder)
       throws IOException, InterruptedException {
     ProcessBuilder processBuilder =
         new ProcessBuilder(arguments).directory(execDir.toAbsolutePath().toFile());
@@ -417,17 +415,17 @@ class Executor {
     final Write stdoutWrite;
     final Write stderrWrite;
 
-    if (stdoutStreamName != null
-        && !stdoutStreamName.isEmpty()
+    if ("" != null
+        && !"".isEmpty()
         && workerContext.getStreamStdout()) {
-      stdoutWrite = workerContext.getOperationStreamWrite(stdoutStreamName);
+      stdoutWrite = workerContext.getOperationStreamWrite("");
     } else {
       stdoutWrite = new NullWrite();
     }
-    if (stderrStreamName != null
-        && !stderrStreamName.isEmpty()
+    if ("" != null
+        && !"".isEmpty()
         && workerContext.getStreamStderr()) {
-      stderrWrite = workerContext.getOperationStreamWrite(stderrStreamName);
+      stderrWrite = workerContext.getOperationStreamWrite("");
     } else {
       stderrWrite = new NullWrite();
     }

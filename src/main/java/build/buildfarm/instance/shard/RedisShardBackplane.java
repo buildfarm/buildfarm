@@ -374,7 +374,7 @@ public class RedisShardBackplane implements Backplane {
     for (String channel : expiringChannels) {
       Operation operation = parseOperationJson(getOperation(jedis, parseOperationChannel(channel)));
       if (operation == null || !operation.getDone()) {
-        publishExpiration(jedis, channel, now, /* force=*/ false);
+        publishExpiration(jedis, channel, now /* force=*/);
       } else {
         subscriber.onOperation(channel, onPublish.apply(operation), expiresAt);
       }
@@ -424,13 +424,13 @@ public class RedisShardBackplane implements Backplane {
         .build();
   }
 
-  void publishExpiration(JedisCluster jedis, String channel, Instant effectiveAt, boolean force) {
+  void publishExpiration(JedisCluster jedis, String channel, Instant effectiveAt) {
     publish(
         jedis,
         channel,
         effectiveAt,
         OperationChange.newBuilder()
-            .setExpire(OperationChange.Expire.newBuilder().setForce(force).build()));
+            .setExpire(OperationChange.Expire.newBuilder().setForce(false).build()));
   }
 
   public void updateWatchedIfDone(JedisCluster jedis) {

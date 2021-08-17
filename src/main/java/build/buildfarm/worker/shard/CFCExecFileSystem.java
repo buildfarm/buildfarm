@@ -54,7 +54,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -76,14 +75,12 @@ class CFCExecFileSystem implements ExecFileSystem {
   private final ExecutorService accessRecorder;
 
   CFCExecFileSystem(
-      Path root,
-      CASFileCache fileCache,
-      @Nullable UserPrincipal owner,
-      boolean linkInputDirectories,
-      ExecutorService removeDirectoryService,
-      ExecutorService accessRecorder,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits) {
+          Path root,
+          CASFileCache fileCache,
+          @Nullable UserPrincipal owner,
+          boolean linkInputDirectories,
+          ExecutorService removeDirectoryService,
+          ExecutorService accessRecorder) {
     this.root = root;
     this.fileCache = fileCache;
     this.owner = owner;

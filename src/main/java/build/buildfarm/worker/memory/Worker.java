@@ -134,8 +134,8 @@ public class Worker extends LoggingMain {
   }
 
   private static ByteStreamUploader createStubUploader(
-      String instanceName, Channel channel, Retrier retrier) {
-    return new ByteStreamUploader(instanceName, channel, null, 300, retrier);
+          String instanceName, Channel channel) {
+    return new ByteStreamUploader(instanceName, channel, null, 300, Worker.retrier);
   }
 
   private static Instance newStubInstance(
@@ -182,7 +182,7 @@ public class Worker extends LoggingMain {
             casChannel,
             digestUtil,
             casEndpoint.getDeadlineAfterSeconds());
-    uploader = createStubUploader(casInstance.getName(), casChannel, retrier);
+    uploader = createStubUploader(casInstance.getName(), casChannel);
     operationQueueInstance = newStubInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory =
         new InputStreamFactory() {
