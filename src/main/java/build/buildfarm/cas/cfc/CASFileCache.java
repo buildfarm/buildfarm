@@ -67,7 +67,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -149,7 +148,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       CacheBuilder.newBuilder()
           .expireAfterAccess(1, HOURS)
           .removalListener(
-                  (RemovalListener<BlobWriteKey, Write>) notification -> notification.getValue().reset())
+              (RemovalListener<BlobWriteKey, Write>)
+                  notification -> notification.getValue().reset())
           .build(
               new CacheLoader<BlobWriteKey, Write>() {
                 @Override
@@ -161,7 +161,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       CacheBuilder.newBuilder()
           .expireAfterAccess(1, HOURS)
           .removalListener(
-                  (RemovalListener<Digest, SettableFuture<Long>>) notification -> {
+              (RemovalListener<Digest, SettableFuture<Long>>)
+                  notification -> {
                     // no effect if already done
                     notification.getValue().setException(new IOException("write cancelled"));
                   })
@@ -1504,8 +1505,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return b.build();
   }
 
-  private void joinThreads(ExecutorService pool, String message)
-      throws InterruptedException {
+  private void joinThreads(ExecutorService pool, String message) throws InterruptedException {
     pool.shutdown();
     while (!pool.isTerminated()) {
       logger.log(Level.INFO, message);
@@ -1518,8 +1518,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   public static String getFileName(Digest digest, boolean isExecutable) {
-    return digestFilename(digest) +
-            (isExecutable ? "_exec" : "");
+    return digestFilename(digest) + (isExecutable ? "_exec" : "");
   }
 
   public String getKey(Digest digest, boolean isExecutable) {
@@ -2154,7 +2153,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     }
                     if (failed) {
                       return immediateFailedFuture(
-                              new PutDirectoryException(path, digest, failures.build()));
+                          new PutDirectoryException(path, digest, failures.build()));
                     }
                     return immediateFuture(null);
                   },
@@ -2297,7 +2296,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private void copyExternalInput(Digest digest, CancellableOutputStream out)
       throws IOException, InterruptedException {
     logger.log(Level.FINE, format("downloading %s", DigestUtil.toString(digest)));
-    try (InputStream in = newExternalInput(digest /* offset=*/)) {
+    try (InputStream in = newExternalInput(digest/* offset=*/ )) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       out.cancel();

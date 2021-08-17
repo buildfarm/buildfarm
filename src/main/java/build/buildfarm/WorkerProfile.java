@@ -64,9 +64,10 @@ class WorkerProfile {
    * @return
    */
   private static String workerStringTransformation(String worker) {
-    String sb = worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".") +
-            ':' +
-            worker.split(":")[1];
+    String sb =
+        worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".")
+            + ':'
+            + worker.split(":")[1];
     return sb;
   }
 
@@ -78,19 +79,22 @@ class WorkerProfile {
     long entryCount = response.getCasEntryCount();
     long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
     System.out.printf((strIntFormat) + "%n", "Current Total Entry Count", entryCount);
-    System.out.printf((strIntFormat) + "%n", "Current Unreferenced Entry Count", unreferencedEntryCount);
+    System.out.printf(
+        (strIntFormat) + "%n", "Current Unreferenced Entry Count", unreferencedEntryCount);
     if (entryCount != 0) {
       System.out.printf(
-              (strFloatFormat) + "%n",
+          (strFloatFormat) + "%n",
           "Percentage of Unreferenced Entry",
           1.0 * response.getCasEntryCount() / response.getCasUnreferencedEntryCount());
     }
     System.out.printf(
-            (strIntFormat) + "%n", "Current DirectoryEntry Count", response.getCasDirectoryEntryCount());
+        (strIntFormat) + "%n",
+        "Current DirectoryEntry Count",
+        response.getCasDirectoryEntryCount());
     System.out.printf(
-            (strIntFormat) + "%n", "Number of Evicted Entries", response.getCasEvictedEntryCount());
+        (strIntFormat) + "%n", "Number of Evicted Entries", response.getCasEvictedEntryCount());
     System.out.printf(
-            (strIntFormat) + "%n",
+        (strIntFormat) + "%n",
         "Total Evicted Entries size in Bytes",
         response.getCasEvictedEntrySize());
 

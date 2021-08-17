@@ -16,7 +16,6 @@ package build.buildfarm.instance.server;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
-import java.io.IOException;
 
 @FunctionalInterface
 public interface GetDirectoryFunction {

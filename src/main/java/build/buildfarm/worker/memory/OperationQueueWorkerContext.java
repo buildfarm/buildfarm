@@ -466,8 +466,7 @@ class OperationQueueWorkerContext implements WorkerContext {
         new UploadManifest(
             digestUtil, result, execRoot, /* allowSymlinks= */ true, inlineContentLimit);
 
-    manifest.addFiles(
-        Iterables.transform(outputFiles, execRoot::resolve), fileCasPolicy);
+    manifest.addFiles(Iterables.transform(outputFiles, execRoot::resolve), fileCasPolicy);
     manifest.addDirectories(Iterables.transform(outputDirs, execRoot::resolve));
 
     /* put together our outputs and update the result */

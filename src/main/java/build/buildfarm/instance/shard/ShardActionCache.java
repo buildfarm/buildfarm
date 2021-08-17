@@ -31,7 +31,6 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import io.grpc.Status;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 class ShardActionCache implements ReadThroughActionCache {
   private final Backplane backplane;
@@ -41,7 +40,8 @@ class ShardActionCache implements ReadThroughActionCache {
     this.backplane = backplane;
 
     AsyncCacheLoader<ActionKey, ActionResult> loader =
-            (actionKey, executor) -> toCompletableFuture(
+        (actionKey, executor) ->
+            toCompletableFuture(
                 catching(
                     service.submit(() -> backplane.getActionResult(actionKey)),
                     IOException.class,

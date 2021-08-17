@@ -182,7 +182,7 @@ public class ProvisionedRedisQueue {
    * @note Suggested return identifier: filteredProvisions.
    */
   private static FilteredProvisions filterProvisionsByWildcard(
-          SetMultimap<String, String> filterProvisions, boolean isFullyWildcard) {
+      SetMultimap<String, String> filterProvisions, boolean isFullyWildcard) {
     FilteredProvisions provisions = new FilteredProvisions();
     provisions.wildcard =
         isFullyWildcard

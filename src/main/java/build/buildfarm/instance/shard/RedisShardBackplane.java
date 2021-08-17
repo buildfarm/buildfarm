@@ -373,7 +373,7 @@ public class RedisShardBackplane implements Backplane {
     for (String channel : expiringChannels) {
       Operation operation = parseOperationJson(getOperation(jedis, parseOperationChannel(channel)));
       if (operation == null || !operation.getDone()) {
-        publishExpiration(jedis, channel, now /* force=*/);
+        publishExpiration(jedis, channel, now/* force=*/ );
       } else {
         subscriber.onOperation(channel, onPublish.apply(operation), expiresAt);
       }
@@ -683,15 +683,15 @@ public class RedisShardBackplane implements Backplane {
                     .setAdd(WorkerChange.Add.getDefaultInstance())
                     .build());
     client.call(
-            jedis -> {
-              // could rework with an hget to publish prior, but this seems adequate, and
-              // we are the only guaranteed source
-              if (jedis.hset(config.getWorkersHashName(), shardWorker.getEndpoint(), json) == 1) {
-                jedis.publish(config.getWorkerChannel(), workerChangeJson);
-                return true;
-              }
-              return false;
-            });
+        jedis -> {
+          // could rework with an hget to publish prior, but this seems adequate, and
+          // we are the only guaranteed source
+          if (jedis.hset(config.getWorkersHashName(), shardWorker.getEndpoint(), json) == 1) {
+            jedis.publish(config.getWorkerChannel(), workerChangeJson);
+            return true;
+          }
+          return false;
+        });
   }
 
   private boolean removeWorkerAndPublish(JedisCluster jedis, String name, String changeJson) {
@@ -878,11 +878,9 @@ public class RedisShardBackplane implements Backplane {
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
     // convert action keys to strings
     List<String> keyNames = new ArrayList<>();
-    actionKeys.forEach(
-        key -> keyNames.add(asDigestStr(key)));
+    actionKeys.forEach(key -> keyNames.add(asDigestStr(key)));
 
-    client.run(
-        jedis -> actionCache.remove(jedis, keyNames));
+    client.run(jedis -> actionCache.remove(jedis, keyNames));
   }
 
   @Override
@@ -1231,8 +1229,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public QueueEntry dispatchOperation(List<Platform.Property> provisions)
       throws IOException, InterruptedException {
-    return client.blockingCall(
-        jedis -> dispatchOperation(jedis, provisions));
+    return client.blockingCall(jedis -> dispatchOperation(jedis, provisions));
   }
 
   String printPollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
@@ -1314,8 +1311,7 @@ public class RedisShardBackplane implements Backplane {
   public void queueing(String operationName) throws IOException {
     Operation operation = keepaliveOperation(operationName);
     // publish so that watchers reset their timeout
-    client.run(
-        jedis -> publishReset(jedis, operation));
+    client.run(jedis -> publishReset(jedis, operation));
   }
 
   @Override

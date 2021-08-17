@@ -178,14 +178,14 @@ public class ContentAddressableStorageService
       return;
     }
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
-      String nextPageToken =
-          getTree(request.getRootDigest(), pageSize, request.getPageToken(), directories);
+    String nextPageToken =
+        getTree(request.getRootDigest(), pageSize, request.getPageToken(), directories);
 
-      responseObserver.onNext(
-          GetTreeResponse.newBuilder()
-              .addAllDirectories(directories.build())
-              .setNextPageToken(nextPageToken)
-              .build());
-      responseObserver.onCompleted();
+    responseObserver.onNext(
+        GetTreeResponse.newBuilder()
+            .addAllDirectories(directories.build())
+            .setNextPageToken(nextPageToken)
+            .build());
+    responseObserver.onCompleted();
   }
 }

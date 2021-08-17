@@ -70,8 +70,7 @@ public class ExecutionPropertiesParser {
     command
         .getPlatform()
         .getPropertiesList()
-        .forEach(
-            (property) -> evaluateProperty(parser, limits, property));
+        .forEach((property) -> evaluateProperty(parser, limits, property));
     return limits;
   }
 

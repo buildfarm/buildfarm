@@ -115,7 +115,7 @@ class Executor {
 
     void print(int code, String responseType, long micros) {
       System.out.printf(
-              "Action: %s -> %s: %s %s in %gms%n",
+          "Action: %s -> %s: %s %s in %gms%n",
           DigestUtil.toString(actionDigest),
           operationName,
           responseType,

@@ -87,8 +87,7 @@ public interface Instance {
 
   ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests);
 
-  String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree)
-          ;
+  String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree);
 
   Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException;

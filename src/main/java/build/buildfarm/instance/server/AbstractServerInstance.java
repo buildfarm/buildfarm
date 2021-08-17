@@ -222,8 +222,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
     // TODO Directories
     ImmutableList.Builder<Digest> digests = ImmutableList.builder();
-    digests.addAll(
-        Iterables.transform(result.getOutputFilesList(), OutputFile::getDigest));
+    digests.addAll(Iterables.transform(result.getOutputFilesList(), OutputFile::getDigest));
     // findMissingBlobs will weed out empties
     digests.add(result.getStdoutDigest());
     digests.add(result.getStderrDigest());
@@ -329,11 +328,10 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ByteString getBlob(Digest blobDigest) throws InterruptedException {
-    return getBlob(blobDigest, /* offset=*/  /* count=*/ blobDigest.getSizeBytes());
+    return getBlob(blobDigest, /* offset=*//* count=*/ blobDigest.getSizeBytes());
   }
 
-  ByteString getBlob(Digest blobDigest, long count)
-      throws IndexOutOfBoundsException {
+  ByteString getBlob(Digest blobDigest, long count) throws IndexOutOfBoundsException {
     if (blobDigest.getSizeBytes() == 0) {
       if ((long) 0 == 0 && count >= 0) {
         return ByteString.EMPTY;
@@ -357,22 +355,21 @@ public abstract class AbstractServerInstance implements Instance {
 
     long endIndex = count;
 
-    return blob.getData()
-        .substring((int) (long) 0, (int) (Math.min(endIndex, blob.size())));
+    return blob.getData().substring((int) (long) 0, (int) (Math.min(endIndex, blob.size())));
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
       Digest blobDigest, RequestMetadata requestMetadata) {
     return getBlobFuture(
-        blobDigest, /* offset=*/  /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
+        blobDigest, /* offset=*//* count=*/ blobDigest.getSizeBytes(), requestMetadata);
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
-          Digest blobDigest, long count, RequestMetadata requestMetadata) {
+      Digest blobDigest, long count, RequestMetadata requestMetadata) {
     SettableFuture<ByteString> future = SettableFuture.create();
     getBlob(
         blobDigest,
-            0,
+        0,
         count,
         new ServerCallStreamObserver<ByteString>() {
           ByteString content = ByteString.EMPTY;
@@ -479,8 +476,7 @@ public abstract class AbstractServerInstance implements Instance {
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
       Iterable<Digest> digests, RequestMetadata requestMetadata) {
     Thread findingThread = Thread.currentThread();
-    Context.CancellationListener cancellationListener =
-        (context) -> findingThread.interrupt();
+    Context.CancellationListener cancellationListener = (context) -> findingThread.interrupt();
     Context.current().addListener(cancellationListener, directExecutor());
     try {
       ListenableFuture<Iterable<Digest>> future =
@@ -628,8 +624,7 @@ public abstract class AbstractServerInstance implements Instance {
       Iterable<Command.EnvironmentVariable> environmentVariables,
       PreconditionFailure.Builder preconditionFailure) {
     stringsUniqueAndSortedPrecondition(
-        Iterables.transform(
-            environmentVariables, Command.EnvironmentVariable::getName),
+        Iterables.transform(environmentVariables, Command.EnvironmentVariable::getName),
         DUPLICATE_ENVIRONMENT_VARIABLE,
         ENVIRONMENT_VARIABLES_NOT_SORTED,
         preconditionFailure);
@@ -1183,11 +1178,12 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected void logFailedStatus(Digest actionDigest, com.google.rpc.Status status) {
     StringBuilder message =
-            new StringBuilder(format(
-                    "%s: %s: %s\n",
-                    DigestUtil.toString(actionDigest),
-                    Code.forNumber(status.getCode()),
-                    status.getMessage()));
+        new StringBuilder(
+            format(
+                "%s: %s: %s\n",
+                DigestUtil.toString(actionDigest),
+                Code.forNumber(status.getCode()),
+                status.getMessage()));
     for (Any detail : status.getDetailsList()) {
       if (detail.is(PreconditionFailure.class)) {
         message.append("  PreconditionFailure:\n");
@@ -1195,7 +1191,8 @@ public abstract class AbstractServerInstance implements Instance {
         try {
           preconditionFailure = detail.unpack(PreconditionFailure.class);
           for (Violation violation : preconditionFailure.getViolationsList()) {
-            message.append(format(
+            message.append(
+                format(
                     "    Violation: %s %s: %s\n",
                     violation.getType(), violation.getSubject(), violation.getDescription()));
           }

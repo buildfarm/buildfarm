@@ -14,15 +14,14 @@
 
 package build.buildfarm.common.io;
 
-import java.io.IOException;
 
 /**
  * File status: mode, mtime, size, etc.
  *
  * <p>The result of calling any {@code FileStatus} instance method is not guaranteed to result in
  * I/O to the file system at the moment of the call. The I/O providing the result (and hence the
- * throwing of an I/O exception, where applicable) may occur at any moment between the call to
- *  and the call of the {@code FileStatus} instance method.
+ * throwing of an I/O exception, where applicable) may occur at any moment between the call to and
+ * the call of the {@code FileStatus} instance method.
  *
  * <p>Callers therefore cannot assume that all the values are populated atomically, or that the
  * results of any two {@code FileStatus} methods correspond to state of the file system at a single

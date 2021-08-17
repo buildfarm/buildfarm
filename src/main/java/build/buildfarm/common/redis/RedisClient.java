@@ -82,7 +82,8 @@ public class RedisClient implements Closeable {
 
   public void run(Consumer<JedisCluster> withJedis) throws IOException {
     call(
-            (JedisContext<Void>) jedis -> {
+        (JedisContext<Void>)
+            jedis -> {
               withJedis.accept(jedis);
               return null;
             });

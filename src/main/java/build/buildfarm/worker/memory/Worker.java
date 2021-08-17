@@ -26,7 +26,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
@@ -133,8 +132,7 @@ public class Worker extends LoggingMain {
         retryScheduler);
   }
 
-  private static ByteStreamUploader createStubUploader(
-          String instanceName, Channel channel) {
+  private static ByteStreamUploader createStubUploader(String instanceName, Channel channel) {
     return new ByteStreamUploader(instanceName, channel, null, 300, Worker.retrier);
   }
 
@@ -185,7 +183,8 @@ public class Worker extends LoggingMain {
     uploader = createStubUploader(casInstance.getName(), casChannel);
     operationQueueInstance = newStubInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory =
-            (digest, offset) -> casInstance.newBlobInput(
+        (digest, offset) ->
+            casInstance.newBlobInput(
                 digest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
     fileCache =
         new InjectedCASFileCache(

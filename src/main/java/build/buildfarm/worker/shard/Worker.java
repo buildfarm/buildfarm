@@ -197,8 +197,7 @@ public class Worker extends LoggingMain {
       streamIntoWriteFuture(in, write, digest).get();
     }
 
-    private Write getCasMemberWrite(Digest digest, String workerName)
-        throws IOException {
+    private Write getCasMemberWrite(Digest digest, String workerName) throws IOException {
       Instance casMember = workerStub(workerName);
 
       return casMember.getBlobWrite(
@@ -490,8 +489,7 @@ public class Worker extends LoggingMain {
     // return a default
     Duration defaultDuration = Durations.fromSeconds(60);
     logger.log(
-        INFO,
-            "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
+        INFO, "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
     return defaultDuration;
   }
 
@@ -596,20 +594,20 @@ public class Worker extends LoggingMain {
         (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
 
     InputStreamFactory localPopulatingInputStreamFactory =
-            (blobDigest, offset) -> {
-              // FIXME use write
-              ByteString content =
-                  ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
+        (blobDigest, offset) -> {
+          // FIXME use write
+          ByteString content =
+              ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
 
-              if (offset == 0) {
-                // extra computations
-                Blob blob = new Blob(content, digestUtil);
-                // here's hoping that our digest matches...
-                storage.put(blob);
-              }
+          if (offset == 0) {
+            // extra computations
+            Blob blob = new Blob(content, digestUtil);
+            // here's hoping that our digest matches...
+            storage.put(blob);
+          }
 
-              return content.newInput();
-            };
+          return content.newInput();
+        };
     return new FuseExecFileSystem(
         root,
         new FuseCAS(
@@ -715,8 +713,8 @@ public class Worker extends LoggingMain {
         config.getLinkInputDirectories(),
         removeDirectoryService,
         accessRecorder
-            /* deadlineAfter=*/
-            /* deadlineAfterUnits=*/);
+        /* deadlineAfter=*/
+        /* deadlineAfterUnits=*/ );
   }
 
   public void stop() throws InterruptedException {

@@ -82,7 +82,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Iterables;
@@ -139,7 +138,8 @@ public class MemoryInstance extends AbstractServerInstance {
       CacheBuilder.newBuilder()
           .expireAfterWrite(1, TimeUnit.HOURS)
           .removalListener(
-                  (RemovalListener<String, ByteStringStreamSource>) notification -> {
+              (RemovalListener<String, ByteStringStreamSource>)
+                  notification -> {
                     try {
                       notification.getValue().getOutput().close();
                     } catch (IOException e) {

@@ -39,7 +39,6 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Tree;
-import com.google.common.base.Function;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -49,7 +48,6 @@ import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.stub.StreamObserver;
 import io.prometheus.client.Summary;
-import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -114,12 +112,12 @@ public class ContentAddressableStorageService
               missingBlobs.observe(request.getBlobDigestsList().size());
               logger.log(
                   Level.FINE,
-                      "FindMissingBlobs(" +
-                              instance.getName() +
-                              ") for " +
-                              request.getBlobDigestsList().size() +
-                              " blobs in " +
-                              elapsedMicros / 1000.0);
+                  "FindMissingBlobs("
+                      + instance.getName()
+                      + ") for "
+                      + request.getBlobDigestsList().size()
+                      + " blobs in "
+                      + elapsedMicros / 1000.0);
             } catch (Throwable t) {
               onFailure(t);
             }
@@ -150,7 +148,7 @@ public class ContentAddressableStorageService
       ListenableFuture<Code> codeFuture, Digest digest) {
     return transform(
         codeFuture,
-            code -> Response.newBuilder().setDigest(digest).setStatus(statusForCode(code)).build(),
+        code -> Response.newBuilder().setDigest(digest).setStatus(statusForCode(code)).build(),
         directExecutor());
   }
 

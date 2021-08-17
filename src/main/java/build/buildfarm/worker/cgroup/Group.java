@@ -30,10 +30,8 @@ public final class Group {
   private static final Group root = new Group(/* name=*/ null, /* parent=*/ null);
   private static final Path rootPath = Paths.get("/sys/fs/cgroup");
 
-  private @Nullable
-  final String name;
-  private @Nullable
-  final Group parent;
+  private @Nullable final String name;
+  private @Nullable final Group parent;
   private final Cpu cpu;
   private final Mem mem;
 

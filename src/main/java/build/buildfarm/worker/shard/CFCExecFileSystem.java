@@ -75,12 +75,12 @@ class CFCExecFileSystem implements ExecFileSystem {
   private final ExecutorService accessRecorder;
 
   CFCExecFileSystem(
-          Path root,
-          CASFileCache fileCache,
-          @Nullable UserPrincipal owner,
-          boolean linkInputDirectories,
-          ExecutorService removeDirectoryService,
-          ExecutorService accessRecorder) {
+      Path root,
+      CASFileCache fileCache,
+      @Nullable UserPrincipal owner,
+      boolean linkInputDirectories,
+      ExecutorService removeDirectoryService,
+      ExecutorService accessRecorder) {
     this.root = root;
     this.fileCache = fileCache;
     this.owner = owner;

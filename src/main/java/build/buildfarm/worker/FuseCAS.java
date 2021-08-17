@@ -468,10 +468,7 @@ public class FuseCAS extends FuseStubFS {
   }
 
   public void destroyInputRoot(String topdir) throws IOException, InterruptedException {
-    resolveTopdir(
-        topdir,
-        root,
-            DirectoryEntry::removeChild);
+    resolveTopdir(topdir, root, DirectoryEntry::removeChild);
     decMounts();
   }
 

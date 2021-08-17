@@ -333,7 +333,7 @@ public class ByteStreamUploader {
               bsFutureStub()
                   .queryWriteStatus(
                       QueryWriteStatusRequest.newBuilder().setResourceName(resourceName).build()),
-                  ByteStreamProto.QueryWriteStatusResponse::getCommittedSize,
+              ByteStreamProto.QueryWriteStatusResponse::getCommittedSize,
               MoreExecutors.directExecutor());
       return Futures.transformAsync(
           committedSizeFuture,

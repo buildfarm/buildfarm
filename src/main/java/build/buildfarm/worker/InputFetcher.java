@@ -79,7 +79,7 @@ public class InputFetcher implements Runnable {
         "InputFetcher",
         operationContext.queueEntry,
         QUEUED,
-            fetcherThread::interrupt,
+        fetcherThread::interrupt,
         Deadline.after(60, SECONDS));
     try {
       return fetchPolled(stopwatch);

@@ -48,11 +48,12 @@ public class CasIndexResults {
    * @note Suggested return identifier: message.
    */
   public String toMessage() {
-    String message = String.format("Total keys re-indexed: %d. ", totalKeys) +
-            String.format("Worker references removed: %d. ", removedHosts) +
-            String.format("CAS keys deleted: %d. ", removedKeys) +
-            String.format(
-                    "CAS lost: %.2f%%.", totalKeys == 0 ? 0 : (removedKeys / (float) totalKeys) * 100);
+    String message =
+        String.format("Total keys re-indexed: %d. ", totalKeys)
+            + String.format("Worker references removed: %d. ", removedHosts)
+            + String.format("CAS keys deleted: %d. ", removedKeys)
+            + String.format(
+                "CAS lost: %.2f%%.", totalKeys == 0 ? 0 : (removedKeys / (float) totalKeys) * 100);
     return message;
   }
 }

@@ -101,8 +101,7 @@ public class UploadManifest {
    * including the descendants, can be reconstructed and 2) uploading all the non-directory
    * descendant files.
    */
-  public void addDirectories(Iterable<Path> dirs)
-      throws IllegalStateException, IOException {
+  public void addDirectories(Iterable<Path> dirs) throws IllegalStateException, IOException {
     for (Path dir : dirs) {
       FileStatus stat = statIfFound(dir, /* followSymlinks= */ false, fileStore);
       if (stat == null) {

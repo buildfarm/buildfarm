@@ -205,7 +205,7 @@ public class GrpcCAS implements ContentAddressableStorage {
                     .setInstanceName(instanceName)
                     .addAllDigests(digests)
                     .build()),
-            BatchReadBlobsResponse::getResponsesList,
+        BatchReadBlobsResponse::getResponsesList,
         directExecutor());
   }
 

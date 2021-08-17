@@ -241,8 +241,7 @@ class Cat {
     boolean missing = false;
     for (Digest missingDigest : missingDigests) {
       System.out.printf(
-              "Missing: %s Took %gms%n",
-          DigestUtil.toString(missingDigest), elapsedMicros / 1000.0f);
+          "Missing: %s Took %gms%n", DigestUtil.toString(missingDigest), elapsedMicros / 1000.0f);
       missing = true;
     }
     if (!missing) {
@@ -836,6 +835,7 @@ class Cat {
       for (String operationName : args) {
         run(instance, operationName);
       }
+<<<<<<< HEAD
     }
 
     protected abstract void run(Instance instance, String operationName) throws Exception;
@@ -1099,6 +1099,80 @@ class Cat {
         if (command.name().equals(type)) {
           command.run(instance, args);
           return;
+=======
+      printFindMissing(instance, digests.build());
+    } else {
+      for (int i = 4; i < args.length; i++) {
+        if (type.equals("Operation")) {
+          printOperation(instance.getOperation(args[i]));
+        } else if (type.equals("Watch")) {
+          watchOperation(instance, args[i]);
+        } else {
+          Digest blobDigest = DigestUtil.parseDigest(args[i]);
+          switch (type) {
+            case "ActionResult":
+              printActionResult(
+                  instance
+                      .getActionResult(
+                          DigestUtil.asActionKey(blobDigest), RequestMetadata.getDefaultInstance())
+                      .get(),
+                  0);
+              break;
+            case "DirectoryTree":
+              printDirectoryTree(instance, blobDigest);
+              break;
+            case "TreeLayout":
+              Tree tree = fetchTree(instance, blobDigest);
+              printTreeLayout(DigestUtil.proxyDirectoriesIndex(tree.getDirectories()), blobDigest);
+              break;
+            default:
+              if (type.equals("File")) {
+                try (InputStream in =
+                    instance.newBlobInput(
+                        blobDigest,
+                        0,
+                        60,
+                        TimeUnit.SECONDS,
+                        RequestMetadata.getDefaultInstance())) {
+                  ByteStreams.copy(in, System.out);
+                }
+              } else {
+                ByteString blob =
+                    getBlob(instance, blobDigest, RequestMetadata.getDefaultInstance());
+                switch (type) {
+                  case "Action":
+                    printAction(blob);
+                    break;
+                  case "QueuedOperation":
+                    printQueuedOperation(blob, instance.getDigestUtil());
+                    break;
+                  case "DumpQueuedOperation":
+                    dumpQueuedOperation(blob, instance.getDigestUtil());
+                    break;
+                  case "REDirectoryTree":
+                    printREDirectoryTree(
+                        instance.getDigestUtil(),
+                        build.bazel.remote.execution.v2.Tree.parseFrom(blob));
+                    break;
+                  case "RETreeLayout":
+                    printRETreeLayout(
+                        instance.getDigestUtil(),
+                        build.bazel.remote.execution.v2.Tree.parseFrom(blob));
+                    break;
+                  case "Command":
+                    printCommand(blob);
+                    break;
+                  case "Directory":
+                    printDirectory(blob);
+                    break;
+                  default:
+                    System.err.println("Unknown type: " + type);
+                    break;
+                }
+              }
+              break;
+          }
+>>>>>>> 96182dba (Run buildfarm formatter)
         }
       }
       System.err.println(format("Unrecognized bf-cat type %s", type));

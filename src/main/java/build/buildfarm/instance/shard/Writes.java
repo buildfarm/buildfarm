@@ -116,7 +116,7 @@ class Writes {
   }
 
   Writes(Supplier<Instance> instanceSupplier) {
-    this(instanceSupplier, /* writeExpiresAfter=*/ 1 /* writeExpiresUnit=*/);
+    this(instanceSupplier, /* writeExpiresAfter=*/ 1/* writeExpiresUnit=*/ );
   }
 
   Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter) {
@@ -141,8 +141,8 @@ class Writes {
         BlobWriteKey.newBuilder().setDigest(digest).setIdentifier(uuid.toString()).build();
     try {
       return new InvalidatingWrite(
-              blobWriteInstances.get(key).getBlobWrite(digest, uuid, requestMetadata),
-              () -> blobWriteInstances.invalidate(key));
+          blobWriteInstances.get(key).getBlobWrite(digest, uuid, requestMetadata),
+          () -> blobWriteInstances.invalidate(key));
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       throwIfInstanceOf(cause, RuntimeException.class);

@@ -61,7 +61,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.naming.ConfigurationException;
 
 public class ShardWorkerInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardWorkerInstance.class.getName());

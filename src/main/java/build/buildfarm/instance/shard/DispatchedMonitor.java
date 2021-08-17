@@ -71,7 +71,8 @@ class DispatchedMonitor implements Runnable {
     // log that the dispatched operation is overdue in order to indicate that it should be requeued.
     String operationName = o.getQueueEntry().getExecuteEntry().getOperationName();
     long overdue_amount = now - o.getRequeueAt();
-    String message = String.format(
+    String message =
+        String.format(
             "DispatchedMonitor: Testing %s because %dms overdue (%d >= %d)",
             operationName, overdue_amount, now, o.getRequeueAt());
     logger.log(Level.INFO, message);

@@ -377,7 +377,7 @@ public class StubInstance implements Instance {
         deadlined(casFutureStub)
             .withInterceptors(attachMetadataInterceptor(requestMetadata))
             .findMissingBlobs(request),
-            FindMissingBlobsResponse::getMissingBlobDigestsList,
+        FindMissingBlobsResponse::getMissingBlobDigestsList,
         directExecutor());
   }
 
@@ -579,7 +579,7 @@ public class StubInstance implements Instance {
                     .setInstanceName(getName())
                     .addAllDigests(digests)
                     .build()),
-            BatchReadBlobsResponse::getResponsesList,
+        BatchReadBlobsResponse::getResponsesList,
         directExecutor());
   }
 

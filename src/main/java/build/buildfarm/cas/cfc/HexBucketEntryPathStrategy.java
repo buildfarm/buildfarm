@@ -38,30 +38,31 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
 
   @Override
   public Iterable<Path> branchDirectories() {
-    return () -> new Iterator<Path>() {
-      int depth = 0;
-      int index = 0;
+    return () ->
+        new Iterator<Path>() {
+          int depth = 0;
+          int index = 0;
 
-      @Override
-      public boolean hasNext() {
-        return depth != levels && index < depthMaxCounter(levels);
-      }
+          @Override
+          public boolean hasNext() {
+            return depth != levels && index < depthMaxCounter(levels);
+          }
 
-      @Override
-      public Path next() {
-        Path nextPath = path;
-        long nextIndex = index++;
-        for (int i = 0; i < depth; i++) {
-          nextPath = nextPath.resolve(format("%02x", nextIndex & 0xff));
-          nextIndex >>= 8;
-        }
-        if (depth == 0 || (depth <= levels && index > depthMaxCounter(depth))) {
-          depth++;
-          index = 0;
-        }
-        return nextPath;
-      }
-    };
+          @Override
+          public Path next() {
+            Path nextPath = path;
+            long nextIndex = index++;
+            for (int i = 0; i < depth; i++) {
+              nextPath = nextPath.resolve(format("%02x", nextIndex & 0xff));
+              nextIndex >>= 8;
+            }
+            if (depth == 0 || (depth <= levels && index > depthMaxCounter(depth))) {
+              depth++;
+              index = 0;
+            }
+            return nextPath;
+          }
+        };
   }
 
   @Override
