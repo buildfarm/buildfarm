@@ -72,8 +72,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    */
   @Override
   public void adjust(
-      RedisClient client, Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
-      throws IOException {
+      RedisClient client, Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) {
     String key = cacheMapCasKey(blobDigest);
     cacheMap.putAll(key, addWorkers);
     for (String workerName : removeWorkers) {
@@ -91,7 +90,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker to add for looking up the blob.
    */
   @Override
-  public void add(RedisClient client, Digest blobDigest, String workerName) throws IOException {
+  public void add(RedisClient client, Digest blobDigest, String workerName) {
     String key = cacheMapCasKey(blobDigest);
     cacheMap.put(key, workerName);
     cacheMap.expireKey(key, keyExpiration_s, TimeUnit.SECONDS);
@@ -106,8 +105,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker to add for looking up the blobs.
    */
   @Override
-  public void addAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
-      throws IOException {
+  public void addAll(RedisClient client, Iterable<Digest> blobDigests, String workerName) {
     for (Digest blobDigest : blobDigests) {
       String key = cacheMapCasKey(blobDigest);
       cacheMap.put(key, workerName);
@@ -123,7 +121,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker name to remove.
    */
   @Override
-  public void remove(RedisClient client, Digest blobDigest, String workerName) throws IOException {
+  public void remove(RedisClient client, Digest blobDigest, String workerName) {
     String key = cacheMapCasKey(blobDigest);
     cacheMap.remove(key, workerName);
   }
@@ -137,8 +135,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker name to remove.
    */
   @Override
-  public void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
-      throws IOException {
+  public void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName) {
     for (Digest blobDigest : blobDigests) {
       String key = cacheMapCasKey(blobDigest);
       cacheMap.remove(key, workerName);
@@ -154,7 +151,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @note Suggested return identifier: workerName.
    */
   @Override
-  public String getAny(RedisClient client, Digest blobDigest) throws IOException {
+  public String getAny(RedisClient client, Digest blobDigest) {
     String key = cacheMapCasKey(blobDigest);
     Set<String> all = cacheMap.get(key).readAll();
     return getRandomElement(all);
@@ -169,7 +166,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @note Suggested return identifier: workerNames.
    */
   @Override
-  public Set<String> get(RedisClient client, Digest blobDigest) throws IOException {
+  public Set<String> get(RedisClient client, Digest blobDigest) {
     String key = cacheMapCasKey(blobDigest);
     return cacheMap.get(key).readAll();
   }
@@ -183,8 +180,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @note Suggested return identifier: casWorkerMap.
    */
   @Override
-  public Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests)
-      throws IOException {
+  public Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests) {
     ImmutableMap.Builder<Digest, Set<String>> blobDigestsWorkers = new ImmutableMap.Builder<>();
     for (Digest blobDigest : blobDigests) {
       String key = cacheMapCasKey(blobDigest);
@@ -204,7 +200,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @return The size of the map.
    * @note Suggested return identifier: size.
    */
-  public int size(RedisClient client) throws IOException {
+  public int size(RedisClient client) {
     return cacheMap.size();
   }
 

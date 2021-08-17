@@ -73,8 +73,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       DigestUtil digestUtil,
       Backplane backplane,
       ContentAddressableStorage contentAddressableStorage,
-      ShardWorkerInstanceConfig config)
-      throws ConfigurationException {
+      ShardWorkerInstanceConfig config) {
     super(name, digestUtil, contentAddressableStorage, null, null, null, null);
     this.backplane = backplane;
   }
@@ -215,7 +214,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, MatchListener listener) throws InterruptedException {
+  public void match(Platform platform, MatchListener listener) {
     throw new UnsupportedOperationException();
   }
 

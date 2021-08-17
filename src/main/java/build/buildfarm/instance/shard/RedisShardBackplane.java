@@ -564,13 +564,12 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
-  static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) throws IOException {
+  static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) {
     Config redissonConfig = new Config();
     return Redisson.create(redissonConfig);
   }
 
-  static RedisMap createActionCache(RedisClient client, RedisShardBackplaneConfig config)
-      throws IOException {
+  static RedisMap createActionCache(RedisClient client, RedisShardBackplaneConfig config) {
     return new RedisMap(config.getActionCachePrefix());
   }
 
@@ -661,8 +660,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher)
-      throws IOException {
+  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
     TimedWatcher timedWatcher =
         new TimedWatcher(nextExpiresAt(Instant.now())) {
           @Override
@@ -1097,7 +1095,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public Iterable<String> getOperations() throws IOException {
+  public Iterable<String> getOperations() {
     throw new UnsupportedOperationException();
     /*
     return client.call(jedis -> {

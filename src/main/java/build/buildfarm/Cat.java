@@ -320,8 +320,7 @@ class Cat {
     printTreeLayout(DigestUtil.proxyDirectoriesIndex(tree.getDirectories()), tree.getRootDigest());
   }
 
-  private static void printTreeLayout(Map<Digest, Directory> directoriesIndex, Digest rootDigest)
-      throws IOException, InterruptedException {
+  private static void printTreeLayout(Map<Digest, Directory> directoriesIndex, Digest rootDigest) {
     Map<Digest, Long> directoryWeights = Maps.newHashMap();
     long totalWeight = computeDirectoryWeights(rootDigest, directoriesIndex, directoryWeights);
 
@@ -341,8 +340,7 @@ class Cat {
   }
 
   private static void printREDirectoryTree(
-      DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree)
-      throws IOException, InterruptedException {
+      DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree) {
     Tree tree = reTreeToTree(digestUtil, reTree);
     printTree(0, tree, tree.getRootDigest(), digestUtil);
   }

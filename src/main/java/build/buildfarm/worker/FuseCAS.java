@@ -362,7 +362,7 @@ public class FuseCAS extends FuseStubFS {
 
   @FunctionalInterface
   interface DirectoryEntryPathConsumer {
-    void accept(DirectoryEntry entry, String path) throws IOException, InterruptedException;
+    void accept(DirectoryEntry entry, String path);
   }
 
   private static void resolveTopdir(

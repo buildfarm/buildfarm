@@ -197,7 +197,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
-  private void initialize(WriteRequest request) throws EntryLimitException {
+  private void initialize(WriteRequest request) {
     String resourceName = request.getResourceName();
     if (resourceName.isEmpty()) {
       errorResponse(INVALID_ARGUMENT.withDescription("resource_name is empty").asException());

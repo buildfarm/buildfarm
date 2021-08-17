@@ -181,7 +181,7 @@ public class MatchStage extends PipelineStage {
   }
 
   @Override
-  public OperationContext take() throws InterruptedException {
+  public OperationContext take() {
     throw new UnsupportedOperationException();
   }
 

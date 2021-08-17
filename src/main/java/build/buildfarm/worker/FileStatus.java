@@ -50,7 +50,7 @@ public interface FileStatus {
   boolean isSpecialFile();
 
   /** Returns the total size, in bytes, of this file. */
-  long getSize() throws IOException;
+  long getSize();
 
   /**
    * Returns the last modified time of this file's data (milliseconds since UNIX epoch).
@@ -58,13 +58,13 @@ public interface FileStatus {
    * <p>TODO(bazel-team): Unix actually gives us nanosecond resolution for mtime and ctime. Consider
    * making use of this.
    */
-  long getLastModifiedTime() throws IOException;
+  long getLastModifiedTime();
 
   /**
    * Returns the last change time of this file, where change means any change to the file, including
    * metadata changes (milliseconds since UNIX epoch).
    */
-  long getLastChangeTime() throws IOException;
+  long getLastChangeTime();
 
   /** see BasicFileAttributes.fileKey() */
   Object fileKey();

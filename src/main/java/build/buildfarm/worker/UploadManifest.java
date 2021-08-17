@@ -76,7 +76,7 @@ public class UploadManifest {
 
   /** Add a collection of files to the UploadManifest. */
   public void addFiles(Iterable<Path> files, CASInsertionPolicy policy)
-      throws IllegalStateException, IOException, InterruptedException {
+      throws IllegalStateException, IOException {
     for (Path file : files) {
       FileStatus stat = statIfFound(file, /* followSymlinks= */ false, fileStore);
       if (stat == null) {
@@ -104,7 +104,7 @@ public class UploadManifest {
    * descendant files.
    */
   public void addDirectories(Iterable<Path> dirs)
-      throws IllegalStateException, IOException, InterruptedException {
+      throws IllegalStateException, IOException {
     for (Path dir : dirs) {
       FileStatus stat = statIfFound(dir, /* followSymlinks= */ false, fileStore);
       if (stat == null) {
@@ -215,7 +215,7 @@ public class UploadManifest {
     return b.build();
   }
 
-  private void mismatchedOutput(Path what) throws IllegalStateException, IOException {
+  private void mismatchedOutput(Path what) throws IllegalStateException {
     String kind =
         Files.isSymbolicLink(what)
             ? "symbolic link"
@@ -227,7 +227,7 @@ public class UploadManifest {
             execRoot.relativize(what), kind, expected));
   }
 
-  private void illegalOutput(Path what) throws IllegalStateException, IOException {
+  private void illegalOutput(Path what) throws IllegalStateException {
     String kind = Files.isSymbolicLink(what) ? "symbolic link" : "special file";
     throw new IllegalStateException(
         String.format(

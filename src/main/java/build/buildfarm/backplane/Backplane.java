@@ -268,7 +268,7 @@ public interface Backplane {
 
   /** Register a watcher for an operation */
   @ThreadSafe
-  ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) throws IOException;
+  ListenableFuture<Void> watchOperation(String operationName, Watcher watcher);
 
   /** Get all dispatched operations */
   @ThreadSafe
@@ -276,7 +276,7 @@ public interface Backplane {
 
   /** Get all operations */
   @ThreadSafe
-  Iterable<String> getOperations() throws IOException;
+  Iterable<String> getOperations();
 
   /** Requeue a dispatched operation */
   @ThreadSafe

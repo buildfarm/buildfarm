@@ -20,5 +20,5 @@ import java.io.IOException;
 
 @FunctionalInterface
 public interface GetDirectoryFunction {
-  Directory apply(Digest digest) throws IOException, InterruptedException;
+  Directory apply(Digest digest);
 }

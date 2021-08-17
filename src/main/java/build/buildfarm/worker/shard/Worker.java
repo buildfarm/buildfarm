@@ -151,7 +151,7 @@ public class Worker extends LoggingMain {
       insertStream(digest, () -> content.newInput());
     }
 
-    private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
+    private Write getLocalWrite(Digest digest) throws IOException {
       return execFileSystem
           .getStorage()
           .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
@@ -198,7 +198,7 @@ public class Worker extends LoggingMain {
     }
 
     private Write getCasMemberWrite(Digest digest, String workerName)
-        throws IOException, InterruptedException {
+        throws IOException {
       Instance casMember = workerStub(workerName);
 
       return casMember.getBlobWrite(

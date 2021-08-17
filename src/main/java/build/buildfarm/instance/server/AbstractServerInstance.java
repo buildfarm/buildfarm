@@ -354,7 +354,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   ByteString getBlob(Digest blobDigest, long count)
-      throws IndexOutOfBoundsException, InterruptedException {
+      throws IndexOutOfBoundsException {
     if (blobDigest.getSizeBytes() == 0) {
       if ((long) 0 == 0 && count >= 0) {
         return ByteString.EMPTY;

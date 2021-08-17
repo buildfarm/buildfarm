@@ -52,7 +52,7 @@ public final class Utils {
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
-      throws IOException, InterruptedException {
+      throws IOException {
     try (InputStream in =
         instance.newBlobInput(
             blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata)) {

@@ -236,24 +236,18 @@ public class ContentAddressableStorageService
       String pageToken,
       int pageSize,
       StreamObserver<GetTreeResponse> responseObserver) {
-    try {
-      do {
-        Tree.Builder builder = Tree.newBuilder().setRootDigest(rootDigest);
-        String nextPageToken = instance.getTree(rootDigest, pageSize, pageToken, builder);
-        Tree tree = builder.build();
+    do {
+      Tree.Builder builder = Tree.newBuilder().setRootDigest(rootDigest);
+      String nextPageToken = instance.getTree(rootDigest, pageSize, pageToken, builder);
+      Tree tree = builder.build();
 
-        GetTreeResponse.Builder response =
-            GetTreeResponse.newBuilder().setNextPageToken(nextPageToken);
-        response.addAllDirectories(tree.getDirectories().values());
-        responseObserver.onNext(response.build());
-        pageToken = nextPageToken;
-      } while (!pageToken.isEmpty());
-      responseObserver.onCompleted();
-    } catch (IOException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+      GetTreeResponse.Builder response =
+          GetTreeResponse.newBuilder().setNextPageToken(nextPageToken);
+      response.addAllDirectories(tree.getDirectories().values());
+      responseObserver.onNext(response.build());
+      pageToken = nextPageToken;
+    } while (!pageToken.isEmpty());
+    responseObserver.onCompleted();
   }
 
   void batchReadBlobs(

@@ -68,7 +68,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   }
 
   private void readBlob(ReadRequest request, StreamObserver<ReadResponse> responseObserver)
-      throws IOException, InterruptedException, InvalidResourceNameException {
+      throws InvalidResourceNameException {
     String resourceName = request.getResourceName();
 
     Digest digest = parseBlobDigest(resourceName);
@@ -137,10 +137,6 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     } catch (IllegalArgumentException | InvalidResourceNameException e) {
       String description = e.getLocalizedMessage();
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
-    } catch (IOException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
     }
   }
 

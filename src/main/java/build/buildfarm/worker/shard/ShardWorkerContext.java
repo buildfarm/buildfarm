@@ -641,8 +641,7 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-              throws IOException {
+          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
             path.push(currentDirectory);
             if (dir.equals(outputDirPath)) {
               currentDirectory = outputRoot;
@@ -653,7 +652,7 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+          public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
             OutputDirectoryContext parentDirectory = path.pop();
             Directory directory = currentDirectory.toDirectory();
             if (parentDirectory == null) {

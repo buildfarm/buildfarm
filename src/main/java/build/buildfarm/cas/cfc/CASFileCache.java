@@ -1333,7 +1333,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ImmutableList.Builder<Path> computeDirs,
       ImmutableList.Builder<Path> deleteFiles,
       ImmutableMap.Builder<Object, Entry> fileKeys)
-      throws IOException, InterruptedException {
+      throws IOException {
     String basename = file.getFileName().toString();
 
     FileStatus stat = stat(file, false, fileStore);
@@ -1396,7 +1396,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private List<Path> computeDirectories(CacheScanResults cacheScanResults)
-      throws IOException, InterruptedException {
+      throws InterruptedException {
     // create thread pool
     int nThreads = Runtime.getRuntime().availableProcessors();
     String threadNameFormat = "compute-cache-pool-%d";
@@ -1460,7 +1460,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       List<NamedFileKey> sortedDirent,
       Map<Object, Entry> fileKeys,
       ImmutableList.Builder<String> inputsBuilder)
-      throws IOException, InterruptedException {
+      throws IOException {
     Directory.Builder b = Directory.newBuilder();
 
     for (NamedFileKey dirent : sortedDirent) {
@@ -1887,8 +1887,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path path,
       ImmutableList.Builder<String> inputsBuilder,
       ImmutableList.Builder<ListenableFuture<Path>> putFutures,
-      ExecutorService service)
-      throws IOException, InterruptedException {
+      ExecutorService service) {
     for (FileNode fileNode : files) {
       Path filePath = path.resolve(fileNode.getName());
       final ListenableFuture<Path> putFuture;
@@ -1993,7 +1992,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     ListenableFuture<Path> putFuture;
     try {
       putFuture = putDirectorySynchronized(path, digest, directoriesIndex, service);
-    } catch (IOException | InterruptedException e) {
+    } catch (IOException e) {
       putFuture = immediateFailedFuture(e);
     }
     putFuture.addListener(
@@ -2073,7 +2072,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private ListenableFuture<Path> putDirectorySynchronized(
       Path path, Digest digest, Map<Digest, Directory> directoriesByDigest, ExecutorService service)
-      throws IOException, InterruptedException {
+      throws IOException {
     logger.log(Level.FINE, format("directory %s has been locked", path.getFileName()));
     ListenableFuture<Void> expireFuture;
     synchronized (this) {
