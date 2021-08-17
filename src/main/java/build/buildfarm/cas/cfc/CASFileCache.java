@@ -226,7 +226,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     public Map<Object, Entry> fileKeys = Collections.emptyMap();
   }
 
-  public class CacheLoadResults {
+  public static class CacheLoadResults {
     public boolean loadSkipped;
     public CacheScanResults scan = new CacheScanResults();
     public List<Path> invalidDirectories = Collections.emptyList();
