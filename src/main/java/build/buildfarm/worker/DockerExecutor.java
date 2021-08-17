@@ -15,7 +15,7 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.ActionResult;
-import build.buildfarm.worker.resources.ResourceLimits;
+import build.buildfarm.common.io.Utils;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CopyArchiveFromContainerCmd;
 import com.github.dockerjava.api.command.CopyArchiveToContainerCmd;
@@ -32,14 +32,10 @@ import com.github.dockerjava.api.model.Volume;
 import com.github.dockerjava.core.command.ExecStartResultCallback;
 import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Duration;
 import com.google.rpc.Code;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.FileVisitOption;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -49,78 +45,149 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.io.IOUtils;
 
-class DockerExecutor {
-  private static final Logger logger = Logger.getLogger(DockerExecutor.class.getName());
+/**
+ * @class DockerExecutor
+ * @brief Execute an action inside a specified container.
+ * @details There are different ways to execute an action. Historically, we've executed the action
+ *     on the same host machine as the worker. Doing this can limit the flexibility for actions that
+ *     require different operating systems or system dependencies. The inability to execute actions
+ *     under custom docker containers, creates the following issues. The deployment of different
+ *     workers (due to different worker images). Users that need to build in a container often
+ *     forfeit using remote execution / caching. Users are unable to test system changes without
+ *     re-deploying buildfarm workers. To resolve these issues, actions can specify their own
+ *     containers which buildfarm will fetch and use. This is known as the "bring your own
+ *     container" model for action execution. Bazel toolchains expects you to provide container
+ *     images when defining platform configurations in bazel.
+ */
+public class DockerExecutor {
+  /**
+   * @field logger
+   * @brief Logger for the context of the class.
+   * @details Used to log issues with action execution.
+   */
+  private static Logger logger = Logger.getLogger(DockerExecutor.class.getName());
 
+  /**
+   * @brief Run the action using the docker client and populate the results.
+   * @details This will fetch any images as needed, spawn a container for execution, and clean up
+   *     docker resources if requested.
+   * @param dockerClient Client used to interact with docker.
+   * @param settings Settings used to perform action execition.
+   * @param resultBuilder The action results to populate.
+   * @return Grpc code as to whether buildfarm was able to run the action.
+   * @note Suggested return identifier: code.
+   */
   public static Code runActionWithDocker(
       DockerClient dockerClient,
-      OperationContext operationContext,
-      Path execDir,
-      ResourceLimits limits,
-      Duration timeout,
-      List<String> arguments,
-      Map<String, String> envVars,
+      DockerExecutorSettings settings,
       ActionResult.Builder resultBuilder)
       throws InterruptedException, IOException {
-    // prepare container for execution
-    String containerId = prepareRequestedContainer(dockerClient, execDir, limits, timeout, envVars);
+    String containerId = prepareRequestedContainer(dockerClient, settings);
 
-    // run action inside the container
-    String execId =
-        runActionInsideContainer(dockerClient, containerId, execDir, arguments, resultBuilder);
+    String execId = runActionInsideContainer(dockerClient, settings, containerId, resultBuilder);
 
-    // ensure output files are available on the host machine and that all relevant action results
-    // are extracted back to the caller
-    extractInformationFromContainer(
-        dockerClient, operationContext, containerId, execId, execDir, resultBuilder);
+    extractInformationFromContainer(dockerClient, settings, containerId, execId, resultBuilder);
 
-    // possibly cleanup docker resources such as removing containers and images
     cleanUpContainer(dockerClient, containerId);
 
     return Code.OK;
   }
-
+  /**
+   * @brief Setup the container for the action.
+   * @details This ensures the image is fetched, the container is started, and that the container
+   *     has proper visibility to the action's execution root. After this call it should be safe to
+   *     spawn an action inside the container.
+   * @param dockerClient Client used to interact with docker.
+   * @param settings Settings used to perform action execition.
+   * @return The ID of the started container.
+   * @note Suggested return identifier: containerId.
+   */
   private static String prepareRequestedContainer(
-      DockerClient dockerClient,
-      Path execDir,
-      ResourceLimits limits,
-      Duration timeout,
-      Map<String, String> envVars)
-      throws InterruptedException {
-    // this requires network access
-    // once complete, "docker image ls" will show the downloaded image
-    fetchImageIfMissing(dockerClient, limits.containerSettings.containerImage);
+      DockerClient dockerClient, DockerExecutorSettings settings) throws InterruptedException {
+    // this requires network access.  Once complete, "docker image ls" will show the downloaded
+    // image
+    fetchImageIfMissing(dockerClient, settings.limits.containerSettings.containerImage);
 
-    // build and start the container
-    // once complete, "docker container ls" will show the started container
-    String containerId = createContainer(dockerClient, execDir, limits, timeout, envVars);
+    // build and start the container.  Oonce complete, "docker container ls" will show the started
+    // container
+    String containerId = createContainer(dockerClient, settings);
     dockerClient.startContainerCmd(containerId).exec();
 
     // copy files into it
-    populateContainer(dockerClient, containerId, execDir);
+    populateContainer(dockerClient, containerId, settings.execDir);
 
     // container is ready for running actions
     return containerId;
   }
-
-  private static void populateContainer(
-      DockerClient dockerClient, String containerId, Path execDir) {
-    // decide paths
-    List<Path> paths = new ArrayList<>();
-    paths.add(execDir);
-    paths.addAll(getSymbolicLinkReferences(execDir));
-
-    // copy files over
-    for (Path path : paths) {
-      copyFilesIntoContainer(dockerClient, containerId, path);
+  /**
+   * @brief Fetch the user requested image for running the action.
+   * @details The image will not be fetched if it already exists.
+   * @param dockerClient Client used to interact with docker.
+   * @param imageName The name of the image to fetch.
+   */
+  private static void fetchImageIfMissing(DockerClient dockerClient, String imageName)
+      throws InterruptedException {
+    if (!isLocalImagePresent(dockerClient, imageName)) {
+      dockerClient
+          .pullImageCmd(imageName)
+          .exec(new PullImageResultCallback())
+          .awaitCompletion(1, TimeUnit.MINUTES);
     }
   }
-
-  private static void copyFilesIntoContainer(
+  /**
+   * @brief Check to see if the image was already available.
+   * @details Checking to see if the image is already available can avoid having to re-fetch it.
+   * @param dockerClient Client used to interact with docker.
+   * @param imageName The name of the image to check for.
+   * @return Whether or not the container image is already present.
+   * @note Suggested return identifier: isPresent.
+   */
+  private static boolean isLocalImagePresent(DockerClient dockerClient, String imageName) {
+    // Check if image is already downloaded. Is this the most efficient way? It would be better to
+    // not use exceptions for control flow.
+    try {
+      dockerClient.inspectImageCmd(imageName).exec();
+    } catch (NotFoundException e) {
+      return false;
+    }
+    return true;
+  }
+  /**
+   * @brief Get all the host paths that should be populated into the container.
+   * @details Paths with use docker's copy archive API.
+   * @param execDir The execution root of the action.
+   * @return Paths to copy into the container.
+   * @note Suggested return identifier: paths.
+   */
+  private static List<Path> getPopulatePaths(Path execDir) {
+    List<Path> paths = new ArrayList<>();
+    paths.add(execDir);
+    paths.addAll(Utils.getSymbolicLinkReferences(execDir));
+    return paths;
+  }
+  /**
+   * @brief Populate the container as needed by copying files into it.
+   * @details This may or may not be necessary depending on mounts / volumes.
+   * @param dockerClient Client used to interact with docker.
+   * @param containerId The ID of the container.
+   * @param execDir Client used to interact with docker.
+   */
+  private static void populateContainer(
+      DockerClient dockerClient, String containerId, Path execDir) {
+    for (Path path : getPopulatePaths(execDir)) {
+      copyPathIntoContainer(dockerClient, containerId, path);
+    }
+  }
+  /**
+   * @brief Copies the file or directory into the container.
+   * @details Copies all folder descendants.
+   * @param dockerClient Client used to interact with docker.
+   * @param containerId The ID of the container.
+   * @param path Path to copy into container.
+   */
+  private static void copyPathIntoContainer(
       DockerClient dockerClient, String containerId, Path path) {
     CopyArchiveToContainerCmd cmd = dockerClient.copyArchiveToContainerCmd(containerId);
     cmd.withDirChildrenOnly(true);
@@ -129,107 +196,159 @@ class DockerExecutor {
     cmd.withRemotePath(path.toAbsolutePath().toString());
     cmd.exec();
   }
-
-  private static void extractInformationFromContainer(
-      DockerClient dockerClient,
-      OperationContext operationContext,
-      String containerId,
-      String execId,
-      Path execDir,
-      ActionResult.Builder resultBuilder)
-      throws IOException {
-    // extract action's exit code
+  /**
+   * @brief Get the exit code of the action that was executed inside the container.
+   * @details Docker stores the exit code after the execution and it can be queried with an execId.
+   * @param dockerClient Client used to interact with docker.
+   * @param execId The ID of the execution.
+   * @param resultBuilder The results to populate.
+   */
+  private static void extractExitCode(
+      DockerClient dockerClient, String execId, ActionResult.Builder resultBuilder) {
     InspectExecCmd inspectExecCmd = dockerClient.inspectExecCmd(execId);
     InspectExecResponse response = inspectExecCmd.exec();
     resultBuilder.setExitCode(response.getExitCodeLong().intValue());
-
-    // export action outputs
-    copyOutputsOutOfContainer(dockerClient, operationContext, containerId, execDir);
   }
-
+  /**
+   * @brief Extract information from the container after the action ran.
+   * @details This can include exit code, output artifacts, and various docker information.
+   * @param dockerClient Client used to interact with docker.
+   * @param settings Settings used to perform action execition.
+   * @param containerId The ID of the container.
+   * @param execId The ID of the execution.
+   * @param resultBuilder The results to populate.
+   */
+  private static void extractInformationFromContainer(
+      DockerClient dockerClient,
+      DockerExecutorSettings settings,
+      String containerId,
+      String execId,
+      ActionResult.Builder resultBuilder)
+      throws IOException {
+    extractExitCode(dockerClient, execId, resultBuilder);
+    copyOutputsOutOfContainer(dockerClient, settings, containerId);
+  }
+  /**
+   * @brief Copies action outputs out of the container.
+   * @details The outputs are known by the operation context.
+   * @param dockerClient Client used to interact with docker.
+   * @param settings Settings used to perform action execition.
+   * @param containerId The ID of the container.
+   */
+  private static void copyOutputsOutOfContainer(
+      DockerClient dockerClient, DockerExecutorSettings settings, String containerId)
+      throws IOException {
+    for (String outputFile : settings.operationContext.command.getOutputFilesList()) {
+      Path outputPath = settings.execDir.resolve(outputFile);
+      copyFileOutOfContainer(dockerClient, containerId, outputPath);
+    }
+    for (String outputDir : settings.operationContext.command.getOutputDirectoriesList()) {
+      Path outputDirPath = settings.execDir.resolve(outputDir);
+      outputDirPath.toFile().mkdirs();
+    }
+  }
+  /**
+   * @brief Delete the container.
+   * @details Forces container deletion.
+   * @param dockerClient Client used to interact with docker.
+   * @param containerId The ID of the container.
+   */
   private static void cleanUpContainer(DockerClient dockerClient, String containerId) {
-    // clean up container
     try {
       dockerClient.removeContainerCmd(containerId).withRemoveVolumes(true).withForce(true).exec();
     } catch (Exception e) {
       logger.log(Level.SEVERE, "couldn't shutdown container: ", e);
     }
   }
-
+  /**
+   * @brief Assuming the container is already created and properly populated/mounted with data, this
+   *     can be used to spawn an action inside of it.
+   * @details The stdout / stderr of the action execution are populated to the results.
+   * @param dockerClient Client used to interact with docker.
+   * @param settings Settings used to perform action execition.
+   * @param containerId The ID of the container.
+   * @param resultBuilder The results to populate.
+   * @return The ID of the container execution.
+   * @note Suggested return identifier: execId.
+   */
   private static String runActionInsideContainer(
       DockerClient dockerClient,
+      DockerExecutorSettings settings,
       String containerId,
-      Path execDir,
-      List<String> arguments,
       ActionResult.Builder resultBuilder)
       throws InterruptedException {
     // decide command to run
     ExecCreateCmd execCmd = dockerClient.execCreateCmd(containerId);
-    execCmd.withWorkingDir(execDir.toAbsolutePath().toString());
+    execCmd.withWorkingDir(settings.execDir.toAbsolutePath().toString());
     execCmd.withAttachStderr(true);
     execCmd.withAttachStdout(true);
-    execCmd.withCmd(arguments.toArray(new String[0]));
-
+    execCmd.withCmd(settings.arguments.toArray(new String[0]));
     String execId = execCmd.exec().getId();
-
     // execute command (capture stdout / stderr)
     ExecStartCmd execStartCmd = dockerClient.execStartCmd(execId);
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     ByteArrayOutputStream err = new ByteArrayOutputStream();
     execStartCmd.exec(new ExecStartResultCallback(out, err)).awaitCompletion();
-
     // store results
     resultBuilder.setStdoutRaw(ByteString.copyFromUtf8(out.toString()));
     resultBuilder.setStderrRaw(ByteString.copyFromUtf8(err.toString()));
 
     return execId;
   }
-
+  /**
+   * @brief Create a docker container for the action to run in.
+   * @details We can use a separate container per action or keep containers alive and re-use them.
+   * @param dockerClient Client used to interact with docker.
+   * @param settings Settings used to perform action execition.
+   * @return The created container id.
+   * @note Suggested return identifier: containerId.
+   */
   private static String createContainer(
-      DockerClient dockerClient,
-      Path execDir,
-      ResourceLimits limits,
-      Duration timeout,
-      Map<String, String> envVars)
-      throws InterruptedException {
-    CreateContainerCmd createContainerCmd =
-        dockerClient.createContainerCmd(limits.containerSettings.containerImage);
-
+      DockerClient dockerClient, DockerExecutorSettings settings) {
     // prepare command
+    CreateContainerCmd createContainerCmd =
+        dockerClient.createContainerCmd(settings.limits.containerSettings.containerImage);
     createContainerCmd.withAttachStderr(true);
     createContainerCmd.withAttachStdout(true);
     createContainerCmd.withTty(true);
-    createContainerCmd.withHostConfig(getHostConfig(execDir));
-    createContainerCmd.withEnv(envMapToList(envVars));
-    createContainerCmd.withNetworkDisabled(!limits.containerSettings.network);
-    createContainerCmd.withStopTimeout((int) timeout.getSeconds());
-
+    createContainerCmd.withHostConfig(getHostConfig(settings.execDir));
+    createContainerCmd.withEnv(envMapToList(settings.envVars));
+    createContainerCmd.withNetworkDisabled(!settings.limits.containerSettings.network);
+    createContainerCmd.withStopTimeout((int) settings.timeout.getSeconds());
     // run container creation and log any warnings
     CreateContainerResponse response = createContainerCmd.exec();
     if (response.getWarnings().length != 0) {
       logger.log(Level.WARNING, Arrays.toString(response.getWarnings()));
     }
-
-    // container is ready to be started
+    // container is ready and started
     return response.getId();
   }
-
+  /**
+   * @brief Create a host config used for container creation.
+   * @details This can determine container mounts and volumes.
+   * @param execDir The execution root of the action.
+   * @return A docker host configuration.
+   * @note Suggested return identifier: hostConfig.
+   */
   private static HostConfig getHostConfig(Path execDir) {
     HostConfig config = new HostConfig();
     mountExecRoot(config, execDir);
     return config;
   }
-
+  /**
+   * @brief Add paths needed to mount the exec root.
+   * @details These are added to the host config.
+   * @param config Docker host configuration to be populated.
+   * @param execDir The execution root of the action.
+   */
   private static void mountExecRoot(HostConfig config, Path execDir) {
-    List<Bind> binds = new ArrayList<>();
-
     // decide paths
     List<Path> paths = new ArrayList<>();
     paths.add(Paths.get("/" + execDir.subpath(0, 1)));
     paths.add(execDir);
-    paths.addAll(getSymbolicLinkReferences(execDir));
-
+    paths.addAll(Utils.getSymbolicLinkReferences(execDir));
     // mount paths needed for the execution root
+    List<Bind> binds = new ArrayList<>();
     for (Path path : paths) {
       binds.add(
           new Bind(path.toAbsolutePath().toString(), new Volume(path.toAbsolutePath().toString())));
@@ -237,46 +356,13 @@ class DockerExecutor {
 
     config.withBinds(binds);
   }
-
-  private static List<Path> getSymbolicLinkReferences(Path execDir) {
-    List<Path> paths = new ArrayList<>();
-
-    try {
-      Files.walk(execDir, FileVisitOption.FOLLOW_LINKS)
-          .forEach(
-              path -> {
-                if (Files.isSymbolicLink(path)) {
-                  try {
-                    Path reference = Files.readSymbolicLink(path);
-                    paths.add(reference);
-                  } catch (IOException e) {
-                    logger.log(Level.WARNING, "Could not derive symbolic link: ", e);
-                  }
-                }
-              });
-    } catch (Exception e) {
-      logger.log(Level.WARNING, "Could not traverse execDir: ", e);
-    }
-
-    return paths;
-  }
-
-  private static void copyOutputsOutOfContainer(
-      DockerClient dockerClient,
-      OperationContext operationContext,
-      String containerId,
-      Path execDir)
-      throws IOException {
-    for (String outputFile : operationContext.command.getOutputFilesList()) {
-      Path outputPath = operationContext.execDir.resolve(outputFile);
-      copyFileOutOfContainer(dockerClient, containerId, outputPath);
-    }
-    for (String outputDir : operationContext.command.getOutputDirectoriesList()) {
-      Path outputDirPath = operationContext.execDir.resolve(outputDir);
-      outputDirPath.toFile().mkdirs();
-    }
-  }
-
+  /**
+   * @brief Copy the given file out of the container to the same host path.
+   * @details The file is extracted as a tar and deserialized.
+   * @param dockerClient Client used to interact with docker.
+   * @param containerId The container id.
+   * @param path The file to extract out of the container.
+   */
   private static void copyFileOutOfContainer(
       DockerClient dockerClient, String containerId, Path path) throws IOException {
     try {
@@ -286,54 +372,20 @@ class DockerExecutor {
       cmd.withResource(path.toString());
 
       try (TarArchiveInputStream tarStream = new TarArchiveInputStream(cmd.exec())) {
-        unTar(tarStream, new File(path.toString()));
+        Utils.unTar(tarStream, new File(path.toString()));
       }
     } catch (Exception e) {
       logger.log(Level.WARNING, "Could not extract file from container: ", e);
     }
   }
-
-  public static void unTar(TarArchiveInputStream tis, File destFile) throws IOException {
-    TarArchiveEntry tarEntry;
-    while ((tarEntry = tis.getNextTarEntry()) != null) {
-      if (tarEntry.isDirectory()) {
-        if (!destFile.exists()) {
-          destFile.mkdirs();
-        }
-      } else {
-        FileOutputStream fos = new FileOutputStream(destFile);
-        IOUtils.copy(tis, fos);
-        fos.close();
-      }
-    }
-    tis.close();
-  }
-
-  private static void fetchImageIfMissing(DockerClient dockerClient, String imageName)
-      throws InterruptedException {
-    // pull image if we don't already have it
-    if (!isLocalImagePresent(dockerClient, imageName)) {
-      dockerClient
-          .pullImageCmd(imageName)
-          .exec(new PullImageResultCallback())
-          .awaitCompletion(1, TimeUnit.MINUTES);
-    }
-  }
-
-  private static boolean isLocalImagePresent(DockerClient dockerClient, String imageName) {
-    // Check if image is already downloaded.
-    // Is this the most efficient way?
-    // It would be better to not use exceptions for control flow.
-    try {
-      dockerClient.inspectImageCmd(imageName).exec();
-    } catch (NotFoundException e) {
-      return false;
-    }
-    return true;
-  }
-
+  /**
+   * @brief Convert map to docker env list.
+   * @details Docker configuration needs the environment variables in the format VAR=VAL.
+   * @param envVars Environment vars to make visible in the container.
+   * @return Enviornment vars in docker list format.
+   * @note Suggested return identifier: envList.
+   */
   private static List<String> envMapToList(Map<String, String> envVars) {
-    // docker configuration needs the environment variables in the format VAR=VAL
     List<String> envList = new ArrayList<>();
     for (Map.Entry<String, String> environmentVariable : envVars.entrySet()) {
       envList.add(environmentVariable.getKey() + "=" + environmentVariable.getValue());

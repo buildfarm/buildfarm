@@ -20,11 +20,13 @@ import com.google.common.base.Suppliers;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystem;
+import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
@@ -45,6 +47,9 @@ import jnr.ffi.LibraryLoader;
 import jnr.ffi.Pointer;
 import jnr.posix.FileStat;
 import jnr.posix.POSIX;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.io.IOUtils;
 
 public class Utils {
   private static final Logger logger = Logger.getLogger(Utils.class.getName());
@@ -468,5 +473,44 @@ public class Utils {
       return null;
     }
     return fileSystem.getUserPrincipalLookupService().lookupPrincipalByName(userName);
+  }
+
+  public static void unTar(TarArchiveInputStream tis, File destFile) throws IOException {
+    TarArchiveEntry tarEntry;
+    while ((tarEntry = tis.getNextTarEntry()) != null) {
+      if (tarEntry.isDirectory()) {
+        if (!destFile.exists()) {
+          destFile.mkdirs();
+        }
+      } else {
+        FileOutputStream fos = new FileOutputStream(destFile);
+        IOUtils.copy(tis, fos);
+        fos.close();
+      }
+    }
+    tis.close();
+  }
+
+  public static List<Path> getSymbolicLinkReferences(Path execDir) {
+    List<Path> paths = new ArrayList<>();
+
+    try {
+      Files.walk(execDir, FileVisitOption.FOLLOW_LINKS)
+          .forEach(
+              path -> {
+                if (Files.isSymbolicLink(path)) {
+                  try {
+                    Path reference = Files.readSymbolicLink(path);
+                    paths.add(reference);
+                  } catch (IOException e) {
+                    logger.log(Level.WARNING, "Could not derive symbolic link: ", e);
+                  }
+                }
+              });
+    } catch (Exception e) {
+      logger.log(Level.WARNING, "Could not traverse execDir: ", e);
+    }
+
+    return paths;
   }
 }

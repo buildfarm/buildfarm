@@ -441,16 +441,17 @@ class Executor {
 
     // run the action under docker
     if (!limits.containerSettings.containerImage.isEmpty()) {
+      // create settings
       DockerClient dockerClient = DockerClientBuilder.getInstance().build();
-      return DockerExecutor.runActionWithDocker(
-          dockerClient,
-          operationContext,
-          execDir,
-          limits,
-          timeout,
-          arguments,
-          environment,
-          resultBuilder);
+      DockerExecutorSettings settings = new DockerExecutorSettings();
+      settings.operationContext = operationContext;
+      settings.execDir = execDir;
+      settings.limits = limits;
+      settings.envVars = environment;
+      settings.timeout = timeout;
+      settings.arguments = arguments;
+
+      return DockerExecutor.runActionWithDocker(dockerClient, settings, resultBuilder);
     }
 
     long startNanoTime = System.nanoTime();
