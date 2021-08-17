@@ -491,11 +491,11 @@ public class Utils {
     tis.close();
   }
 
-  public static List<Path> getSymbolicLinkReferences(Path execDir) {
+  public static List<Path> getSymbolicLinkReferences(Path path) {
     List<Path> paths = new ArrayList<>();
 
     try {
-      Files.walk(execDir, FileVisitOption.FOLLOW_LINKS)
+      Files.walk(path, FileVisitOption.FOLLOW_LINKS)
           .forEach(
               path -> {
                 if (Files.isSymbolicLink(path)) {
@@ -508,7 +508,7 @@ public class Utils {
                 }
               });
     } catch (Exception e) {
-      logger.log(Level.WARNING, "Could not traverse execDir: ", e);
+      logger.log(Level.WARNING, "Could not traverse path: ", e);
     }
 
     return paths;
