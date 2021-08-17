@@ -152,7 +152,6 @@ public class RedisShardBackplane implements Backplane {
   private RedisShardSubscription operationSubscription = null;
   private ExecutorService subscriberService = null;
   private @Nullable RedisClient client = null;
-  private @Nullable RedissonClient redissonClient = null;
 
   private final Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
   private long workerSetExpiresAt = 0;
@@ -559,7 +558,7 @@ public class RedisShardBackplane implements Backplane {
 
   CasWorkerMap createCasWorkerMap(RedisShardBackplaneConfig config) throws IOException {
     if (config.getCacheCas()) {
-      redissonClient = createRedissonClient(config);
+      RedissonClient redissonClient = createRedissonClient(config);
       return new RedissonCasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire());
     } else {
       return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());

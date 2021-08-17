@@ -48,7 +48,6 @@ public class MatchStage extends PipelineStage {
     private final Poller poller = null;
     private final QueueEntry queueEntry = null;
     private boolean matched = false;
-    private Runnable onCancelHandler = null; // never called, only blocking stub used
 
     public MatchOperationListener(OperationContext operationContext, Stopwatch stopwatch) {
       this.operationContext = operationContext;
@@ -96,7 +95,7 @@ public class MatchStage extends PipelineStage {
 
     @Override
     public void setOnCancelHandler(Runnable onCancelHandler) {
-      this.onCancelHandler = onCancelHandler;
+      // never called, only blocking stub used
     }
 
     private boolean onOperationPolled() throws InterruptedException {

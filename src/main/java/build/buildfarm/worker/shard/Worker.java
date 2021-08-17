@@ -140,7 +140,6 @@ public class Worker extends LoggingMain {
   private final Pipeline pipeline;
   private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
-  private final PrometheusPublisher prometheusPublisher;
 
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
@@ -474,7 +473,7 @@ public class Worker extends LoggingMain {
             .addService(new ShutDownWorkerGracefully(this, config))
             .build();
 
-    prometheusPublisher = new PrometheusPublisher();
+    PrometheusPublisher prometheusPublisher = new PrometheusPublisher();
 
     logger.log(INFO, String.format("%s initialized", identifier));
   }

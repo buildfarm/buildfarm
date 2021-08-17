@@ -248,18 +248,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   public static class IncompleteBlobException extends IOException {
-    private final Path writePath;
-    private final String key;
-    private final long committed;
-    private final long expected;
 
     IncompleteBlobException(Path writePath, String key, long committed, long expected) {
       super(
           format("blob %s => %s: committed %d, expected %d", writePath, key, committed, expected));
-      this.writePath = writePath;
-      this.key = key;
-      this.committed = committed;
-      this.expected = expected;
     }
   }
 

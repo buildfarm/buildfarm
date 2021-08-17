@@ -73,7 +73,6 @@ public class BuildFarmServer extends LoggingMain {
   private final HealthStatusManager healthStatusManager;
   private final Server server;
   private boolean stopping = false;
-  private final PrometheusPublisher prometheusPublisher;
 
   public BuildFarmServer(String session, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
@@ -122,7 +121,7 @@ public class BuildFarmServer extends LoggingMain {
             .intercept(headersInterceptor)
             .build();
 
-    prometheusPublisher = new PrometheusPublisher();
+    PrometheusPublisher prometheusPublisher = new PrometheusPublisher();
 
     logger.log(Level.INFO, String.format("%s initialized", session));
   }
