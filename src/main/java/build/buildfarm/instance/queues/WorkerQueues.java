@@ -90,24 +90,21 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
     return true;
   }
 
-  public boolean AddWorker(SetMultimap<String, String> provisions, MatchListener listener) {
+  public void AddWorker(SetMultimap<String, String> provisions, MatchListener listener) {
     try {
       WorkerQueue queue = MatchEligibleQueue(provisions);
       queue.workers.add(new Worker(provisions, listener));
     } catch (Exception e) {
-      return false;
     }
-    return true;
   }
 
-  public boolean AddWorkers(String queueName, List<Worker> workers) {
+  public void AddWorkers(String queueName, List<Worker> workers) {
     for (WorkerQueue queue : specificQueues) {
       if (queue.name == queueName) {
         queue.workers.addAll(workers);
-        return true;
+        return;
       }
     }
-    return false;
   }
 
   /*

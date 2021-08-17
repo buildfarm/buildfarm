@@ -243,8 +243,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           }
 
           @Override
-          public WriteObserver remove(String resourceName) {
-            return writeObservers.remove(resourceName);
+          public void remove(String resourceName) {
+            writeObservers.remove(resourceName);
           }
         });
   }

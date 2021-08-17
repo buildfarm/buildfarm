@@ -25,7 +25,7 @@ public interface LibC {
 
   Pointer opendir(String s);
 
-  int closedir(Pointer dir);
+  void closedir(Pointer dir);
 
   Pointer readdir(Pointer d);
 }

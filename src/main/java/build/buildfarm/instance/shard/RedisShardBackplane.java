@@ -188,10 +188,9 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public InterruptingRunnable setOnUnsubscribe(InterruptingRunnable onUnsubscribe) {
+  public void setOnUnsubscribe(InterruptingRunnable onUnsubscribe) {
     InterruptingRunnable oldOnUnsubscribe = this.onUnsubscribe;
     this.onUnsubscribe = onUnsubscribe;
-    return oldOnUnsubscribe;
   }
 
   abstract static class QueueEntryListVisitor extends StringVisitor {
@@ -675,7 +674,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public boolean addWorker(ShardWorker shardWorker) throws IOException {
+  public void addWorker(ShardWorker shardWorker) throws IOException {
     String json = JsonFormat.printer().print(shardWorker);
     String workerChangeJson =
         JsonFormat.printer()
@@ -685,16 +684,16 @@ public class RedisShardBackplane implements Backplane {
                     .setName(shardWorker.getEndpoint())
                     .setAdd(WorkerChange.Add.getDefaultInstance())
                     .build());
-    return client.call(
-        jedis -> {
-          // could rework with an hget to publish prior, but this seems adequate, and
-          // we are the only guaranteed source
-          if (jedis.hset(config.getWorkersHashName(), shardWorker.getEndpoint(), json) == 1) {
-            jedis.publish(config.getWorkerChannel(), workerChangeJson);
-            return true;
-          }
-          return false;
-        });
+    client.call(
+            jedis -> {
+              // could rework with an hget to publish prior, but this seems adequate, and
+              // we are the only guaranteed source
+              if (jedis.hset(config.getWorkersHashName(), shardWorker.getEndpoint(), json) == 1) {
+                jedis.publish(config.getWorkerChannel(), workerChangeJson);
+                return true;
+              }
+              return false;
+            });
   }
 
   private boolean removeWorkerAndPublish(JedisCluster jedis, String name, String changeJson) {

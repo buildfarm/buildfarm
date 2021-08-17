@@ -926,7 +926,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  protected QueuedOperation validateQueuedOperationAndInputs(
+  protected void validateQueuedOperationAndInputs(
       Digest actionDigest,
       QueuedOperation queuedOperation,
       PreconditionFailure.Builder preconditionFailure,
@@ -949,10 +949,9 @@ public abstract class AbstractServerInstance implements Instance {
       validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
-    return queuedOperation;
   }
 
-  private Action validateActionDigest(
+  private void validateActionDigest(
       String operationName, Digest actionDigest, RequestMetadata requestMetadata)
       throws StatusException, InterruptedException {
     Action action = null;
@@ -982,7 +981,6 @@ public abstract class AbstractServerInstance implements Instance {
       }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
-    return action;
   }
 
   protected void validateAction(

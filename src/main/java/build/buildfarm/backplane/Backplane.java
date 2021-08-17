@@ -59,7 +59,7 @@ public interface Backplane {
    * <p>onSubscribe is called via the subscription thread, and is not called when operations are not
    * listened to
    */
-  InterruptingRunnable setOnUnsubscribe(InterruptingRunnable onUnsubscribe);
+  void setOnUnsubscribe(InterruptingRunnable onUnsubscribe);
 
   /** Start the backplane's operation */
   @ThreadSafe
@@ -79,7 +79,7 @@ public interface Backplane {
    * <p>Returns true if the worker was newly added, and false if it was already a member of the set.
    */
   @ThreadSafe
-  boolean addWorker(ShardWorker shardWorker) throws IOException;
+  void addWorker(ShardWorker shardWorker) throws IOException;
 
   /**
    * Removes a worker's name from the set of active workers.
