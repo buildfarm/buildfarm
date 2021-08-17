@@ -73,11 +73,7 @@ public interface Backplane {
   @ThreadSafe
   boolean isStopped();
 
-  /**
-   * Adds a worker to the set of active workers.
-   *
-   * <p>Returns true if the worker was newly added, and false if it was already a member of the set.
-   */
+  /** Adds a worker to the set of active workers. */
   @ThreadSafe
   void addWorker(ShardWorker shardWorker) throws IOException;
 
