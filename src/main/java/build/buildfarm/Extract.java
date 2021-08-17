@@ -160,7 +160,7 @@ class Extract {
     bsStub.read(
         ReadRequest.newBuilder().setResourceName(blobName(instanceName, digest)).build(),
         new StreamObserver<ReadResponse>() {
-          ByteString.Output out = ByteString.newOutput((int) digest.getSizeBytes());
+          final ByteString.Output out = ByteString.newOutput((int) digest.getSizeBytes());
 
           @Override
           public void onNext(ReadResponse response) {

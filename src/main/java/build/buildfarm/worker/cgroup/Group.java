@@ -30,10 +30,12 @@ public final class Group {
   private static final Group root = new Group(/* name=*/ null, /* parent=*/ null);
   private static final Path rootPath = Paths.get("/sys/fs/cgroup");
 
-  private @Nullable String name;
-  private @Nullable Group parent;
-  private Cpu cpu;
-  private Mem mem;
+  private @Nullable
+  final String name;
+  private @Nullable
+  final Group parent;
+  private final Cpu cpu;
+  private final Mem mem;
 
   public static Group getRoot() {
     return root;

@@ -94,7 +94,7 @@ public interface Instance {
       throws EntryLimitException;
 
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
-      throws EntryLimitException, IOException, IllegalArgumentException, InterruptedException;
+      throws IOException, IllegalArgumentException, InterruptedException;
 
   ListenableFuture<Digest> fetchBlob(
       Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata);

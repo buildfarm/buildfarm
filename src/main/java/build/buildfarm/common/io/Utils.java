@@ -53,7 +53,7 @@ public class Utils {
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
 
   // pretty poor check here, but avoiding apache commons for now
-  private static Supplier<Boolean> isMacOS =
+  private static final Supplier<Boolean> isMacOS =
       Suppliers.memoize(
           () -> {
             String osName = System.getProperty("os.name").toLowerCase();
@@ -278,7 +278,7 @@ public class Utils {
           .append(')');
       return sb.toString();
     }
-  };
+  }
 
   public static FileStatus stat(final Path path, final boolean followSymlinks, FileStore fileStore)
       throws IOException {

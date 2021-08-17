@@ -598,7 +598,7 @@ class ShardWorkerContext implements WorkerContext {
         outputDirPath,
         new SimpleFileVisitor<Path>() {
           OutputDirectoryContext currentDirectory = null;
-          Stack<OutputDirectoryContext> path = new Stack<>();
+          final Stack<OutputDirectoryContext> path = new Stack<>();
 
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)

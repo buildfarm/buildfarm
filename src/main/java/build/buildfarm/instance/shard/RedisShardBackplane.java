@@ -154,7 +154,7 @@ public class RedisShardBackplane implements Backplane {
   private @Nullable RedisClient client = null;
   private @Nullable RedissonClient redissonClient = null;
 
-  private Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
+  private final Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
   private long workerSetExpiresAt = 0;
 
   private RedisMap actionCache;

@@ -231,7 +231,7 @@ public class ExecutionPropertiesParser {
    * @param property The property to store.
    */
   private static void storeEnvVar(ResourceLimits limits, Property property) {
-    String keyValue[] = property.getName().split(":", 2);
+    String[] keyValue = property.getName().split(":", 2);
     String key = keyValue[1];
     String value = property.getValue();
     limits.extraEnvironmentVariables.put(key, value);

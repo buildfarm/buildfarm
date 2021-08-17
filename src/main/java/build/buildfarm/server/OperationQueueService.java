@@ -43,7 +43,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     private final Instance instance;
     private final InterruptingPredicate onMatch;
     private final Consumer<Runnable> setOnCancelHandler;
-    private QueueEntry queueEntry = null;
+    private final QueueEntry queueEntry = null;
 
     OperationQueueMatchListener(
         Instance instance, InterruptingPredicate onMatch, Consumer<Runnable> setOnCancelHandler) {

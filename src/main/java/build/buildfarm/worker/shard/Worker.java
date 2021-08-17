@@ -908,7 +908,7 @@ public class Worker extends LoggingMain {
       server.start();
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-      prometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
+      PrometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
@@ -929,7 +929,7 @@ public class Worker extends LoggingMain {
   @Override
   protected void onShutdown() throws InterruptedException {
     logger.log(SEVERE, "*** shutting down gRPC server since JVM is shutting down");
-    prometheusPublisher.stopHttpServer();
+    PrometheusPublisher.stopHttpServer();
     stop();
     logger.log(SEVERE, "*** server shut down");
   }

@@ -39,11 +39,11 @@ public class OutputDirectory {
   //
   // Per the test encyclopedia initial conditions:
   // https://docs.bazel.build/versions/master/test-encyclopedia.html#initial-conditions
-  private static Set<String> OUTPUT_DIRECTORY_ENV_VARS =
+  private static final Set<String> OUTPUT_DIRECTORY_ENV_VARS =
       ImmutableSet.of(
           "TEST_TMPDIR", "TEST_UNDECLARED_OUTPUTS_DIR", "TEST_UNDECLARED_OUTPUTS_ANNOTATIONS_DIR");
 
-  private static Set<String> OUTPUT_FILE_ENV_VARS =
+  private static final Set<String> OUTPUT_FILE_ENV_VARS =
       ImmutableSet.of(
           "TEST_PREMATURE_EXIT_FILE",
           "TEST_LOGSPLITTER_OUTPUT_FILE",

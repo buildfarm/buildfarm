@@ -42,11 +42,11 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   private static final Logger logger = Logger.getLogger(AwsMetricsPublisher.class.getName());
   private static AmazonSNSAsync snsClient;
 
-  private String snsTopicOperations;
+  private final String snsTopicOperations;
   private String accessKeyId = null;
   private String secretKey = null;
-  private String region;
-  private int snsClientMaxConnections;
+  private final String region;
+  private final int snsClientMaxConnections;
 
   public AwsMetricsPublisher(MetricsConfig metricsConfig) {
     super(metricsConfig.getClusterId());

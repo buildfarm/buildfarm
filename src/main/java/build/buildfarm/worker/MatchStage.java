@@ -42,11 +42,11 @@ public class MatchStage extends PipelineStage {
 
   class MatchOperationListener implements MatchListener {
     private OperationContext operationContext;
-    private Stopwatch stopwatch;
+    private final Stopwatch stopwatch;
     private long waitStart;
     private long waitDuration;
-    private Poller poller = null;
-    private QueueEntry queueEntry = null;
+    private final Poller poller = null;
+    private final QueueEntry queueEntry = null;
     private boolean matched = false;
     private Runnable onCancelHandler = null; // never called, only blocking stub used
 

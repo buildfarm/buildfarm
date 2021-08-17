@@ -152,7 +152,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
 
     return new CompleteWrite() {
-      long committedSize = digest.getSizeBytes();
+      final long committedSize = digest.getSizeBytes();
 
       @Override
       public long getCommittedSize() {

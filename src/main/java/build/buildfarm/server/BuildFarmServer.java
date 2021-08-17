@@ -154,7 +154,7 @@ public class BuildFarmServer extends LoggingMain {
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    prometheusPublisher.startHttpServer(prometheusPort);
+    PrometheusPublisher.startHttpServer(prometheusPort);
     healthCheckMetric.labels("start").inc();
   }
 
@@ -174,7 +174,7 @@ public class BuildFarmServer extends LoggingMain {
     }
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
-    prometheusPublisher.stopHttpServer();
+    PrometheusPublisher.stopHttpServer();
     healthCheckMetric.labels("stop").inc();
     try {
       if (server != null) {

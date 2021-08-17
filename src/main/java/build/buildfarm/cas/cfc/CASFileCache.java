@@ -188,7 +188,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private FileStore fileStore; // bound to root
   private transient long sizeInBytes = 0;
-  private transient Entry header = new SentinelEntry();
+  private final transient Entry header = new SentinelEntry();
   private volatile long unreferencedEntryCount = 0;
 
   @GuardedBy("this")
@@ -638,7 +638,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           blobObserver.onCompleted();
         }
       }
-    };
+    }
     blobObserver.setOnReadyHandler(new ReadOnReadyHandler());
   }
 
@@ -988,7 +988,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return null;
     }
     return new CancellableOutputStream(cancellableOut) {
-      AtomicBoolean closed = new AtomicBoolean(false);
+      final AtomicBoolean closed = new AtomicBoolean(false);
 
       @Override
       public void write(int b) throws IOException {
@@ -2596,7 +2596,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
     return new CancellableOutputStream(hashOut) {
       long written = committedSize;
-      Digest expectedDigest = keyToDigest(key, blobSizeInBytes, digestUtil);
+      final Digest expectedDigest = keyToDigest(key, blobSizeInBytes, digestUtil);
 
       @Override
       public long getWritten() {

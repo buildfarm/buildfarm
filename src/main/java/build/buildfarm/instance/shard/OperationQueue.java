@@ -46,7 +46,7 @@ public class OperationQueue {
    * @brief Different queues based on platform execution requirements.
    * @details The appropriate queues are chosen based on given properties.
    */
-  private List<ProvisionedRedisQueue> queues;
+  private final List<ProvisionedRedisQueue> queues;
 
   /**
    * @brief Constructor.

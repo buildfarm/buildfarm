@@ -46,7 +46,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @brief A memory cached redis container to serve as the cas lookup.
    * @details This is only used if the object is configured to use a memory cache.
    */
-  private RSetMultimapCache<String, String> cacheMap;
+  private final RSetMultimapCache<String, String> cacheMap;
 
   /**
    * @brief Constructor.

@@ -68,7 +68,7 @@ public class BalancedRedisQueue {
    * @details Although these are multiple queues, the balanced redis queue treats them as one in its
    *     interface.
    */
-  private List<RedisQueue> queues = new ArrayList<>();
+  private final List<RedisQueue> queues = new ArrayList<>();
 
   /**
    * @field currentPushQueue

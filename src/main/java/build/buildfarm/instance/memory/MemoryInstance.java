@@ -282,7 +282,7 @@ public class MemoryInstance extends AbstractServerInstance {
   private static ActionCache createDelegateCASActionCache(
       ContentAddressableStorage cas, DigestUtil digestUtil) {
     return new ActionCache() {
-      DelegateCASMap<ActionKey, ActionResult> map =
+      final DelegateCASMap<ActionKey, ActionResult> map =
           new DelegateCASMap<>(cas, ActionResult.parser(), digestUtil);
 
       @Override
@@ -304,7 +304,7 @@ public class MemoryInstance extends AbstractServerInstance {
   private static OperationsMap createCompletedOperationMap(
       ContentAddressableStorage cas, DigestUtil digestUtil) {
     return new OperationsMap() {
-      DelegateCASMap<String, Operation> map =
+      final DelegateCASMap<String, Operation> map =
           new DelegateCASMap<>(cas, Operation.parser(), digestUtil);
 
       @Override

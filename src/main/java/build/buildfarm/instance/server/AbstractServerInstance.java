@@ -465,7 +465,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
-      throws EntryLimitException, IOException, InterruptedException {
+      throws IOException, InterruptedException {
     ImmutableList.Builder<Digest> blobDigestsBuilder = new ImmutableList.Builder<>();
     PutAllBlobsException exception = null;
     for (ByteString blob : blobs) {
