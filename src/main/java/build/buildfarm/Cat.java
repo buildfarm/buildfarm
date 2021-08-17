@@ -80,6 +80,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 class Cat {
   private static ManagedChannel createChannel(String target) {
@@ -249,8 +251,7 @@ class Cat {
     }
   }
 
-  private static Tree fetchTree(Instance instance, Digest rootDigest)
-      throws IOException, InterruptedException {
+  private static Tree fetchTree(Instance instance, Digest rootDigest) {
     Tree.Builder tree = Tree.newBuilder();
     String pageToken = "";
 
@@ -341,15 +342,15 @@ class Cat {
   private static void printREDirectoryTree(
       DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree) {
     Tree tree = reTreeToTree(digestUtil, reTree);
-    printTree(0, tree, tree.getRootDigest(), digestUtil);
+    printTree(0, tree, tree.getRootDigest());
   }
 
   private static void printDirectoryTree(Instance instance, Digest rootDigest)
       throws IOException, InterruptedException {
-    printTree(0, fetchTree(instance, rootDigest), rootDigest, instance.getDigestUtil());
+    printTree(0, fetchTree(instance, rootDigest), rootDigest);
   }
 
-  private static void printTree(int level, Tree tree, Digest rootDigest, DigestUtil digestUtil) {
+  private static void printTree(int level, Tree tree, Digest rootDigest) {
     indentOut(level, "Directory (Root): " + rootDigest);
     for (Map.Entry<String, Directory> entry : tree.getDirectories().entrySet()) {
       System.out.println("Directory: " + entry.getKey());
@@ -372,7 +373,7 @@ class Cat {
     System.out.println("  Command:");
     printCommand(2, queuedOperation.getCommand());
     System.out.println("  Tree:");
-    printTree(2, queuedOperation.getTree(), queuedOperation.getTree().getRootDigest(), digestUtil);
+    printTree(2, queuedOperation.getTree(), queuedOperation.getTree().getRootDigest());
   }
 
   private static void dumpQueuedOperation(ByteString blob, DigestUtil digestUtil)
@@ -611,12 +612,12 @@ class Cat {
     String strFloatFormat = "%-50s : %2.1f";
     long entryCount = response.getCasEntryCount();
     long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
-    System.out.println(format(strIntFormat, "Current Total Entry Count", entryCount));
-    System.out.println(format(strIntFormat, "Current Total Size", response.getCasSize()));
-    System.out.println(format(strIntFormat, "Max Size", response.getCasMaxSize()));
-    System.out.println(format(strIntFormat, "Max Entry Size", response.getCasMaxEntrySize()));
-    System.out.println(
-        format(strIntFormat, "Current Unreferenced Entry Count", unreferencedEntryCount));
+    System.out.printf((strIntFormat) + "%n", "Current Total Entry Count", entryCount);
+    System.out.printf((strIntFormat) + "%n", "Current Total Size", response.getCasSize());
+    System.out.printf((strIntFormat) + "%n", "Max Size", response.getCasMaxSize());
+    System.out.printf((strIntFormat) + "%n", "Max Entry Size", response.getCasMaxEntrySize());
+    System.out.printf(
+        (strIntFormat) + "%n", "Current Unreferenced Entry Count", unreferencedEntryCount);
     if (entryCount != 0) {
       System.out.println(
           format(
@@ -625,15 +626,16 @@ class Cat {
                   100.0f * response.getCasEntryCount() / response.getCasUnreferencedEntryCount())
               + "%");
     }
-    System.out.println(
-        format(strIntFormat, "Current DirectoryEntry Count", response.getCasDirectoryEntryCount()));
-    System.out.println(
-        format(strIntFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
-    System.out.println(
-        format(
-            strIntFormat,
-            "Total Evicted Entries size in Bytes",
-            response.getCasEvictedEntrySize()));
+    System.out.printf(
+        (strIntFormat) + "%n",
+        "Current DirectoryEntry Count",
+        response.getCasDirectoryEntryCount());
+    System.out.printf(
+        (strIntFormat) + "%n", "Number of Evicted Entries", response.getCasEvictedEntryCount());
+    System.out.printf(
+        (strIntFormat) + "%n",
+        "Total Evicted Entries size in Bytes",
+        response.getCasEvictedEntrySize());
 
     List<StageInformation> stages = response.getStagesList();
     for (StageInformation stage : stages) {
@@ -647,9 +649,8 @@ class Cat {
   }
 
   private static void printStageInformation(StageInformation stage) {
-    System.out.println(
-        format("%s slots configured: %d", stage.getName(), stage.getSlotsConfigured()));
-    System.out.println(format("%s slots used %d", stage.getName(), stage.getSlotsUsed()));
+    System.out.printf("%s slots configured: %d%n", stage.getName(), stage.getSlotsConfigured());
+    System.out.printf("%s slots used %d%n", stage.getName(), stage.getSlotsUsed());
   }
 
   private static void printOperationTime(OperationTimesBetweenStages time) {
@@ -680,44 +681,41 @@ class Cat {
     System.out.println(periodInfo);
     System.out.println("Number of operations completed: " + time.getOperationCount());
     String strStrNumFormat = "%-28s -> %-28s : %12.2f ms";
-    System.out.println(
-        format(strStrNumFormat, "Queued", "MatchStage", durationToMillis(time.getQueuedToMatch())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "MatchStage",
-            "InputFetchStage start",
-            durationToMillis(time.getMatchToInputFetchStart())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "InputFetchStage Start",
-            "InputFetchStage Complete",
-            durationToMillis(time.getInputFetchStartToComplete())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "InputFetchStage Complete",
-            "ExecutionStage Start",
-            durationToMillis(time.getInputFetchCompleteToExecutionStart())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "ExecutionStage Start",
-            "ExecutionStage Complete",
-            durationToMillis(time.getExecutionStartToComplete())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "ExecutionStage Complete",
-            "ReportResultStage Start",
-            durationToMillis(time.getExecutionCompleteToOutputUploadStart())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "OutputUploadStage Start",
-            "OutputUploadStage Complete",
-            durationToMillis(time.getOutputUploadStartToComplete())));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "Queued",
+        "MatchStage",
+        durationToMillis(time.getQueuedToMatch()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "MatchStage",
+        "InputFetchStage start",
+        durationToMillis(time.getMatchToInputFetchStart()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "InputFetchStage Start",
+        "InputFetchStage Complete",
+        durationToMillis(time.getInputFetchStartToComplete()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "InputFetchStage Complete",
+        "ExecutionStage Start",
+        durationToMillis(time.getInputFetchCompleteToExecutionStart()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "ExecutionStage Start",
+        "ExecutionStage Complete",
+        durationToMillis(time.getExecutionStartToComplete()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "ExecutionStage Complete",
+        "ReportResultStage Start",
+        durationToMillis(time.getExecutionCompleteToOutputUploadStart()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "OutputUploadStage Start",
+        "OutputUploadStage Complete",
+        durationToMillis(time.getOutputUploadStartToComplete()));
     System.out.println();
   }
 
@@ -825,7 +823,11 @@ class Cat {
 
     @Override
     public void run(Instance instance, Iterable<String> args) throws Exception {
-      printFindMissing(instance, Iterables.transform(args, arg -> DigestUtil.parseDigest(arg)));
+      printFindMissing(
+          instance,
+          StreamSupport.stream(args.spliterator(), false)
+              .map(DigestUtil::parseDigest)
+              .collect(Collectors.toList()));
     }
   }
 
@@ -835,7 +837,6 @@ class Cat {
       for (String operationName : args) {
         run(instance, operationName);
       }
-<<<<<<< HEAD
     }
 
     protected abstract void run(Instance instance, String operationName) throws Exception;
@@ -873,7 +874,10 @@ class Cat {
   abstract static class DigestsCommand extends CatCommand {
     @Override
     public void run(Instance instance, Iterable<String> args) throws Exception {
-      for (Digest digest : Iterables.transform(args, arg -> DigestUtil.parseDigest(arg))) {
+      for (Digest digest :
+          StreamSupport.stream(args.spliterator(), false)
+              .map(DigestUtil::parseDigest)
+              .collect(Collectors.toList())) {
         run(instance, digest);
       }
     }
@@ -1058,7 +1062,7 @@ class Cat {
     }
   }
 
-  static CatCommand[] commands = {
+  static final CatCommand[] commands = {
     new WorkerProfile(),
     new Capabilities(),
     new Operations(),
@@ -1083,7 +1087,7 @@ class Cat {
     System.err.println("Usage: bf-cat <host:port> <instance-name> <digest-type> <type>");
     System.err.println("\nRequest, retrieve, and display information related to REAPI services:");
     for (CatCommand command : commands) {
-      System.err.println(format("\t%s\t%s", command.name(), command.description()));
+      System.err.printf("\t%s\t%s%n", command.name(), command.description());
     }
   }
 
@@ -1099,83 +1103,9 @@ class Cat {
         if (command.name().equals(type)) {
           command.run(instance, args);
           return;
-=======
-      printFindMissing(instance, digests.build());
-    } else {
-      for (int i = 4; i < args.length; i++) {
-        if (type.equals("Operation")) {
-          printOperation(instance.getOperation(args[i]));
-        } else if (type.equals("Watch")) {
-          watchOperation(instance, args[i]);
-        } else {
-          Digest blobDigest = DigestUtil.parseDigest(args[i]);
-          switch (type) {
-            case "ActionResult":
-              printActionResult(
-                  instance
-                      .getActionResult(
-                          DigestUtil.asActionKey(blobDigest), RequestMetadata.getDefaultInstance())
-                      .get(),
-                  0);
-              break;
-            case "DirectoryTree":
-              printDirectoryTree(instance, blobDigest);
-              break;
-            case "TreeLayout":
-              Tree tree = fetchTree(instance, blobDigest);
-              printTreeLayout(DigestUtil.proxyDirectoriesIndex(tree.getDirectories()), blobDigest);
-              break;
-            default:
-              if (type.equals("File")) {
-                try (InputStream in =
-                    instance.newBlobInput(
-                        blobDigest,
-                        0,
-                        60,
-                        TimeUnit.SECONDS,
-                        RequestMetadata.getDefaultInstance())) {
-                  ByteStreams.copy(in, System.out);
-                }
-              } else {
-                ByteString blob =
-                    getBlob(instance, blobDigest, RequestMetadata.getDefaultInstance());
-                switch (type) {
-                  case "Action":
-                    printAction(blob);
-                    break;
-                  case "QueuedOperation":
-                    printQueuedOperation(blob, instance.getDigestUtil());
-                    break;
-                  case "DumpQueuedOperation":
-                    dumpQueuedOperation(blob, instance.getDigestUtil());
-                    break;
-                  case "REDirectoryTree":
-                    printREDirectoryTree(
-                        instance.getDigestUtil(),
-                        build.bazel.remote.execution.v2.Tree.parseFrom(blob));
-                    break;
-                  case "RETreeLayout":
-                    printRETreeLayout(
-                        instance.getDigestUtil(),
-                        build.bazel.remote.execution.v2.Tree.parseFrom(blob));
-                    break;
-                  case "Command":
-                    printCommand(blob);
-                    break;
-                  case "Directory":
-                    printDirectory(blob);
-                    break;
-                  default:
-                    System.err.println("Unknown type: " + type);
-                    break;
-                }
-              }
-              break;
-          }
->>>>>>> 96182dba (Run buildfarm formatter)
         }
       }
-      System.err.println(format("Unrecognized bf-cat type %s", type));
+      System.err.printf("Unrecognized bf-cat type %s%n", type);
       usage();
     } finally {
       instance.stop();
