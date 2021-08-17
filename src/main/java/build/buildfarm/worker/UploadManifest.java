@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** UploadManifest adds output metadata to a {@link ActionResult}. */
 /** FIXME move into worker implementation and implement 'fast add' with this for sharding */
 public class UploadManifest {
   private final DigestUtil digestUtil;
@@ -52,7 +51,7 @@ public class UploadManifest {
 
   /**
    * Create an UploadManifest from an ActionResult builder and an exec root. The ActionResult
-   * builder is populated through a call to {@link #addFile(Digest, Path)}.
+   * builder is populated through a call to .
    */
   public UploadManifest(
       DigestUtil digestUtil,
@@ -88,7 +87,6 @@ public class UploadManifest {
       } else if (stat.isFile()) {
         addFile(file, policy);
       } else if (allowSymlinks && stat.isSymbolicLink()) {
-        /** FIXME symlink to directory? */
         // is the stat correct?
         addFile(file, policy);
       } else {

@@ -19,7 +19,7 @@ import java.io.Serializable;
 import java.util.Objects;
 import javax.annotation.Nullable;
 
-/** Directory entry representation returned by {@link Path#readdir}. */
+/** Directory entry representation returned by . */
 public final class Dirent implements Serializable, Comparable<Dirent> {
   /** Type of the directory entry */
   public enum Type {

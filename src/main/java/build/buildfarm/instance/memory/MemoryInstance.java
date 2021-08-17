@@ -1030,7 +1030,6 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected Object operationLock(String name) {
-    /** simple instance-wide locking on the completed operations */
     return completedOperations;
   }
 

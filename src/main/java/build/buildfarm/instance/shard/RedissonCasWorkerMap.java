@@ -54,7 +54,6 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @param client The redisson client used to initialize the cache container.
    * @param name The global name of the map.
    * @param keyExpiration_s When to have keys expire automatically. (units: seconds (s))
-   * @param useMemoryCache Whether some of the data should be stored in memory.
    * @note Overloaded.
    */
   public RedissonCasWorkerMap(RedissonClient client, String name, int keyExpiration_s) {

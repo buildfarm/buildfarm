@@ -337,7 +337,6 @@ public class BalancedRedisQueue {
   /**
    * @brief Create multiple queues for each of the hashes given.
    * @details Create the multiple queues that will act as a single balanced queue.
-   * @param client An established redis client.
    * @param name The global name of the queue.
    * @param hashtags Hashtags to distribute queue data.
    */
