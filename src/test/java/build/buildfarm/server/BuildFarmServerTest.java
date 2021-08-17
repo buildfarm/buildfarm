@@ -124,7 +124,7 @@ public class BuildFarmServerTest {
 
     BuildFarmServerConfig.Builder configBuilder = BuildFarmServerConfig.newBuilder().setPort(0);
     configBuilder
-        .addInstancesBuilder()
+        .getInstanceBuilder()
         .setName(INSTANCE_NAME)
         .setDigestFunction(DigestFunction.Value.SHA256)
         .setMemoryInstanceConfig(memoryInstanceConfig);
