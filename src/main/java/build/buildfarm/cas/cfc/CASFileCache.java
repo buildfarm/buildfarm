@@ -232,7 +232,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     public List<Path> invalidDirectories = Collections.emptyList();
   }
 
-  public class StartupCacheResults {
+  public static class StartupCacheResults {
     public Path cacheDirectory;
     public CacheLoadResults load;
     public Duration startupTime;
