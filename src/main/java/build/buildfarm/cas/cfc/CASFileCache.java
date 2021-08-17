@@ -522,7 +522,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         return input;
       }
       isExecutable = !isExecutable;
-    } while (isExecutable != false);
+    } while (isExecutable);
     throw new NoSuchFileException(DigestUtil.toString(digest));
   }
 

@@ -37,7 +37,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
     That way, all of the provision-requiring queues are considered first,
     before choosing the fallback queue last.
   */
-  public List<WorkerQueue> specificQueues = Lists.newArrayList();
+  public final List<WorkerQueue> specificQueues = Lists.newArrayList();
 
   @Override
   public Iterator<WorkerQueue> iterator() {

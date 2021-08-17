@@ -117,7 +117,7 @@ public class OutputDirectory {
   }
 
   private static class Builder {
-    Map<String, Builder> children = new HashMap<>();
+    final Map<String, Builder> children = new HashMap<>();
     boolean isRecursive = false;
 
     public Builder addChild(String name) {

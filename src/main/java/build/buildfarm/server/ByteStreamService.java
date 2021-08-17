@@ -60,7 +60,7 @@ import java.util.logging.Logger;
 public class ByteStreamService extends ByteStreamImplBase {
   private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());
 
-  static int CHUNK_SIZE = 64 * 1024;
+  static final int CHUNK_SIZE = 64 * 1024;
 
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;

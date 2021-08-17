@@ -15,7 +15,7 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
   private final Pattern pattern;
 
   private static long depthMaxCounter(int depth) {
-    return (1 << (depth * 8)) - 1;
+    return (1L << (depth * 8)) - 1;
   }
 
   HexBucketEntryPathStrategy(Path path, int levels) {

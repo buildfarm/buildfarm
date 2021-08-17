@@ -501,7 +501,7 @@ public class StubInstance implements Instance {
     @GuardedBy("this")
     private boolean wasStarted = false;
     // Indicator for request completion, so that callbacks throw or are ignored
-    AtomicBoolean wasCompleted = new AtomicBoolean(false);
+    final AtomicBoolean wasCompleted = new AtomicBoolean(false);
 
     ReadBlobInterchange(ServerCallStreamObserver<ByteString> blobObserver) {
       this.blobObserver = blobObserver;

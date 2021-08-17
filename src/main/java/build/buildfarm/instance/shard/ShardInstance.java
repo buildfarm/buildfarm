@@ -156,7 +156,7 @@ import javax.naming.ConfigurationException;
 public class ShardInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardInstance.class.getName());
 
-  private static ListenableFuture<Void> IMMEDIATE_VOID_FUTURE = Futures.immediateFuture(null);
+  private static final ListenableFuture<Void> IMMEDIATE_VOID_FUTURE = Futures.immediateFuture(null);
 
   private static final String TIMEOUT_OUT_OF_BOUNDS =
       "A timeout specified is out of bounds with a configured range";
@@ -218,7 +218,7 @@ public class ShardInstance extends AbstractServerInstance {
   private Thread operationQueuer;
   private boolean stopping = false;
   private boolean stopped = true;
-  private Thread prometheusMetricsThread;
+  private final Thread prometheusMetricsThread;
 
   // TODO: move to config
   private static final Duration queueTimeout = Durations.fromSeconds(60);
@@ -353,7 +353,7 @@ public class ShardInstance extends AbstractServerInstance {
       operationQueuer =
           new Thread(
               new Runnable() {
-                Stopwatch stopwatch = Stopwatch.createUnstarted();
+                final Stopwatch stopwatch = Stopwatch.createUnstarted();
 
                 ListenableFuture<Void> iterate() throws IOException, InterruptedException {
                   ensureCanQueue(stopwatch); // wait for transition to canQueue state
