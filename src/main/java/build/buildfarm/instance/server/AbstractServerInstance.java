@@ -355,7 +355,7 @@ public abstract class AbstractServerInstance implements Instance {
       throw new IndexOutOfBoundsException();
     }
 
-    long endIndex = (long) 0 + count;
+    long endIndex = count;
 
     return blob.getData()
         .substring((int) (long) 0, (int) (Math.min(endIndex, blob.size())));
