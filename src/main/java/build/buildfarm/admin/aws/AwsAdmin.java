@@ -89,10 +89,10 @@ public class AwsAdmin implements Admin {
         ec2.describeInstances(
             new DescribeInstancesRequest()
                 .withFilters(new Filter().withName("tag-value").withValues(filter)));
-    Long hostNum = 1L;
+    long hostNum = 1L;
     for (Reservation r : instancesResult.getReservations()) {
       for (Instance e : r.getInstances()) {
-        Long uptime = getHostUptimeInMinutes(e.getLaunchTime());
+        long uptime = getHostUptimeInMinutes(e.getLaunchTime());
         if (e.getPrivateIpAddress() != null
             && uptime > ageInMinutes
             && status.equalsIgnoreCase(e.getState().getName())) {

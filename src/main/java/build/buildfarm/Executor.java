@@ -114,14 +114,13 @@ class Executor {
     }
 
     void print(int code, String responseType, long micros) {
-      System.out.println(
-          String.format(
-              "Action: %s -> %s: %s %s in %gms",
-              DigestUtil.toString(actionDigest),
-              operationName,
-              responseType,
-              Code.forNumber(code),
-              micros / 1000.0f));
+      System.out.printf(
+              "Action: %s -> %s: %s %s in %gms%n",
+          DigestUtil.toString(actionDigest),
+          operationName,
+          responseType,
+          Code.forNumber(code),
+          micros / 1000.0f);
     }
 
     void printStillWaiting() {

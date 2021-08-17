@@ -87,7 +87,7 @@ class BlobWriteObserver implements WriteObserver {
           String.format(
               "ByteStreamServer:write:%s: write received after finish_write specified",
               resourceName));
-      throw new IllegalArgumentException(String.format("request sent after finish_write request"));
+      throw new IllegalArgumentException("request sent after finish_write request");
     }
     long committedSize = getCommittedSize();
     if (request.getWriteOffset() != committedSize) {

@@ -78,27 +78,22 @@ class WorkerProfile {
     String strFloatFormat = "%-50s : %2.1f";
     long entryCount = response.getCasEntryCount();
     long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
-    System.out.println(String.format(strIntFormat, "Current Total Entry Count", entryCount));
-    System.out.println(
-        String.format(strIntFormat, "Current Unreferenced Entry Count", unreferencedEntryCount));
+    System.out.printf((strIntFormat) + "%n", "Current Total Entry Count", entryCount);
+    System.out.printf((strIntFormat) + "%n", "Current Unreferenced Entry Count", unreferencedEntryCount);
     if (entryCount != 0) {
-      System.out.println(
-          String.format(
-              strFloatFormat,
-              "Percentage of Unreferenced Entry",
-              1.0 * response.getCasEntryCount() / response.getCasUnreferencedEntryCount()));
+      System.out.printf(
+              (strFloatFormat) + "%n",
+          "Percentage of Unreferenced Entry",
+          1.0 * response.getCasEntryCount() / response.getCasUnreferencedEntryCount());
     }
-    System.out.println(
-        String.format(
-            strIntFormat, "Current DirectoryEntry Count", response.getCasDirectoryEntryCount()));
-    System.out.println(
-        String.format(
-            strIntFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
-    System.out.println(
-        String.format(
-            strIntFormat,
-            "Total Evicted Entries size in Bytes",
-            response.getCasEvictedEntrySize()));
+    System.out.printf(
+            (strIntFormat) + "%n", "Current DirectoryEntry Count", response.getCasDirectoryEntryCount());
+    System.out.printf(
+            (strIntFormat) + "%n", "Number of Evicted Entries", response.getCasEvictedEntryCount());
+    System.out.printf(
+            (strIntFormat) + "%n",
+        "Total Evicted Entries size in Bytes",
+        response.getCasEvictedEntrySize());
 
     List<StageInformation> stages = response.getStagesList();
     for (StageInformation stage : stages) {

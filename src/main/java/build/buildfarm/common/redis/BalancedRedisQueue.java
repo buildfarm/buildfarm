@@ -429,8 +429,7 @@ public class BalancedRedisQueue {
     // to improve cpu utilization, we can try randomizing
     // the order we traverse the internal queues for operations
     // that may return early
-    List<RedisQueue> randomQueues = new ArrayList<>();
-    randomQueues.addAll(queues);
+    List<RedisQueue> randomQueues = new ArrayList<>(queues);
     Collections.shuffle(randomQueues);
     return randomQueues;
   }

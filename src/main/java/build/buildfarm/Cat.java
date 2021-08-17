@@ -240,14 +240,13 @@ class Cat {
 
     boolean missing = false;
     for (Digest missingDigest : missingDigests) {
-      System.out.println(
-          format(
-              "Missing: %s Took %gms",
-              DigestUtil.toString(missingDigest), elapsedMicros / 1000.0f));
+      System.out.printf(
+              "Missing: %s Took %gms%n",
+          DigestUtil.toString(missingDigest), elapsedMicros / 1000.0f);
       missing = true;
     }
     if (!missing) {
-      System.out.println(format("Took %gms", elapsedMicros / 1000.0f));
+      System.out.printf("Took %gms%n", elapsedMicros / 1000.0f);
     }
   }
 

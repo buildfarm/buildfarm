@@ -765,8 +765,7 @@ public class RedisShardBackplane implements Backplane {
   // sophisticated in the future. But for now, we'll give back n random workers.
   public List<String> suggestedWorkersToScaleDown(int numWorkers) throws IOException {
     // get all workers
-    List<String> allWorkers = new ArrayList<>();
-    allWorkers.addAll(getWorkers());
+    List<String> allWorkers = new ArrayList<>(getWorkers());
 
     // ensure selection amount is in range [0 - size]
     numWorkers = Math.max(0, Math.min(numWorkers, allWorkers.size()));

@@ -492,8 +492,7 @@ public class Worker extends LoggingMain {
     Duration defaultDuration = Durations.fromSeconds(60);
     logger.log(
         INFO,
-        String.format(
-            "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s"));
+            "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
     return defaultDuration;
   }
 
