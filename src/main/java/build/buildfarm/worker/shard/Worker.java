@@ -472,8 +472,6 @@ public class Worker extends LoggingMain {
             .addService(new ShutDownWorkerGracefully(this, config))
             .build();
 
-    PrometheusPublisher prometheusPublisher = new PrometheusPublisher();
-
     logger.log(INFO, String.format("%s initialized", identifier));
   }
 

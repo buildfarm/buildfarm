@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-
 /**
  * File status: mode, mtime, size, etc.
  *

@@ -14,7 +14,6 @@
 
 package build.buildfarm.common.io;
 
-
 /**
  * File status: mode, mtime, size, etc.
  *

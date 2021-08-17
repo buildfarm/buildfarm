@@ -189,7 +189,6 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public void setOnUnsubscribe(InterruptingRunnable onUnsubscribe) {
-    InterruptingRunnable oldOnUnsubscribe = this.onUnsubscribe;
     this.onUnsubscribe = onUnsubscribe;
   }
 

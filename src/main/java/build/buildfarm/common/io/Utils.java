@@ -268,15 +268,13 @@ public class Utils {
 
     @Override
     public String toString() {
-      String sb =
-          "(volSerialNumber="
-              + volSerialNumber
-              + ",fileIndexHigh="
-              + fileIndexHigh
-              + ",fileIndexLow="
-              + fileIndexLow
-              + ')';
-      return sb;
+      return "(volSerialNumber="
+          + volSerialNumber
+          + ",fileIndexHigh="
+          + fileIndexHigh
+          + ",fileIndexLow="
+          + fileIndexLow
+          + ')';
     }
   }
 

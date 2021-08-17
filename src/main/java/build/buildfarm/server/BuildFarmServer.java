@@ -121,8 +121,6 @@ public class BuildFarmServer extends LoggingMain {
             .intercept(headersInterceptor)
             .build();
 
-    PrometheusPublisher prometheusPublisher = new PrometheusPublisher();
-
     logger.log(Level.INFO, String.format("%s initialized", session));
   }
 
