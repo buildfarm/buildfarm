@@ -42,7 +42,7 @@ import java.util.function.Supplier;
 class Writes {
   private final LoadingCache<BlobWriteKey, Instance> blobWriteInstances;
 
-  private class InvalidatingWrite implements Write {
+  private static class InvalidatingWrite implements Write {
     private final Write delegate;
     private final Runnable onInvalidation;
 
@@ -141,8 +141,8 @@ class Writes {
         BlobWriteKey.newBuilder().setDigest(digest).setIdentifier(uuid.toString()).build();
     try {
       return new InvalidatingWrite(
-          blobWriteInstances.get(key).getBlobWrite(digest, uuid, requestMetadata),
-          () -> blobWriteInstances.invalidate(key));
+              blobWriteInstances.get(key).getBlobWrite(digest, uuid, requestMetadata),
+              () -> blobWriteInstances.invalidate(key));
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       throwIfInstanceOf(cause, RuntimeException.class);

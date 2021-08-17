@@ -79,7 +79,7 @@ public class FuseCAS extends FuseStubFS {
     int size();
   }
 
-  class FileEntry implements Entry {
+  static class FileEntry implements Entry {
     final Digest digest;
     final boolean executable;
 
@@ -114,7 +114,7 @@ public class FuseCAS extends FuseStubFS {
     }
   }
 
-  class WriteFileEntry implements Entry {
+  static class WriteFileEntry implements Entry {
     boolean executable;
     ByteString content;
 
@@ -312,7 +312,7 @@ public class FuseCAS extends FuseStubFS {
     }
   }
 
-  class SymlinkEntry implements Entry {
+  static class SymlinkEntry implements Entry {
     final String target;
     final Supplier<Entry> resolve;
 

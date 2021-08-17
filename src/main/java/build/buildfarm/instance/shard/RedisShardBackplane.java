@@ -133,7 +133,7 @@ public class RedisShardBackplane implements Backplane {
                   .add(PreconditionFailure.getDescriptor())
                   .build());
 
-  private class ActionAmounts {
+  private static class ActionAmounts {
     Integer build = 0;
     Integer test = 0;
     Integer unknown = 0;

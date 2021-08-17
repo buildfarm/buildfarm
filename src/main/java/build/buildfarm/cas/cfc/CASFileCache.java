@@ -229,7 +229,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return size;
   }
 
-  public class CacheScanResults {
+  public static class CacheScanResults {
     public List<Path> computeDirs = Collections.emptyList();
     public List<Path> deleteFiles = Collections.emptyList();
     public Map<Object, Entry> fileKeys = Collections.emptyMap();
@@ -2051,7 +2051,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return false;
   }
 
-  class PutDirectoryException extends IOException {
+  static class PutDirectoryException extends IOException {
     private final Path path;
     private final Digest digest;
     private final List<Throwable> exceptions;
@@ -2172,7 +2172,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     }
                     if (failed) {
                       return immediateFailedFuture(
-                          new PutDirectoryException(path, digest, failures.build()));
+                              new PutDirectoryException(path, digest, failures.build()));
                     }
                     return immediateFuture(null);
                   },
