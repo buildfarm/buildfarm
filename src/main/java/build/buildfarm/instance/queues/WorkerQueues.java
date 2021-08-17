@@ -46,7 +46,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
 
   public int queueSize(String queueName) {
     for (WorkerQueue queue : specificQueues) {
-      if (queue.name == queueName) {
+      if (queue.name.equals(queueName)) {
         return queue.operations.size();
       }
     }
@@ -100,7 +100,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
 
   public void AddWorkers(String queueName, List<Worker> workers) {
     for (WorkerQueue queue : specificQueues) {
-      if (queue.name == queueName) {
+      if (queue.name.equals(queueName)) {
         queue.workers.addAll(workers);
         return;
       }

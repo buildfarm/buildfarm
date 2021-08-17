@@ -1129,7 +1129,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setDescription(outputFile);
       }
       String currentPath = outputFile;
-      while (currentPath != "") {
+      while (!currentPath.equals("")) {
         final String dirname;
         if (currentPath.contains("/")) {
           dirname = currentPath.substring(0, currentPath.lastIndexOf('/'));
@@ -1152,7 +1152,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setDescription(OUTPUT_DIRECTORY_IS_INPUT_FILE);
       }
       String currentPath = outputDir;
-      while (currentPath != "") {
+      while (!currentPath.equals("")) {
         final String dirname;
         if (currentPath.contains("/")) {
           dirname = currentPath.substring(0, currentPath.lastIndexOf('/'));

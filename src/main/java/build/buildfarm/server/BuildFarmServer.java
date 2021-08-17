@@ -88,7 +88,7 @@ public class BuildFarmServer extends LoggingMain {
     healthStatusManager = new HealthStatusManager();
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-    if (config.getSslCertificatePath() != "") {
+    if (!config.getSslCertificatePath().equals("")) {
       File ssl_certificate_path = new File(config.getSslCertificatePath());
       serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }
