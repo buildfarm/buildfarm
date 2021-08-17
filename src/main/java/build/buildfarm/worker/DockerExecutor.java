@@ -85,13 +85,9 @@ public class DockerExecutor {
       ActionResult.Builder resultBuilder)
       throws InterruptedException, IOException {
     String containerId = prepareRequestedContainer(dockerClient, settings);
-
     String execId = runActionInsideContainer(dockerClient, settings, containerId, resultBuilder);
-
     extractInformationFromContainer(dockerClient, settings, containerId, execId, resultBuilder);
-
     cleanUpContainer(dockerClient, containerId);
-
     return Code.OK;
   }
   /**
