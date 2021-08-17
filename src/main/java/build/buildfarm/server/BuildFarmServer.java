@@ -84,9 +84,7 @@ public class BuildFarmServer extends LoggingMain {
       String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
-    String defaultInstanceName = config.getDefaultInstanceName();
-    instances =
-        new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
+    instances = new BuildFarmInstances(session, config.getInstance(), this::stop);
 
     healthStatusManager = new HealthStatusManager();
 
