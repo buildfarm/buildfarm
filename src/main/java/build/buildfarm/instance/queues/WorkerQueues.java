@@ -121,7 +121,9 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
   private void enqueueOperation(List<Operation> operations, Operation operation) {
     synchronized (operations) {
       Preconditions.checkState(
-              operations.stream().noneMatch((queuedOperation) -> queuedOperation.getName().equals(operation.getName())));
+          operations.stream()
+              .noneMatch(
+                  (queuedOperation) -> queuedOperation.getName().equals(operation.getName())));
       operations.add(operation);
     }
   }

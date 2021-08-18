@@ -371,8 +371,7 @@ public abstract class AbstractServerInstance implements Instance {
       return null;
     }
 
-    if ((!blob.isEmpty() && (long) 0 >= blob.size())
-            || count < 0) {
+    if ((!blob.isEmpty() && (long) 0 >= blob.size()) || count < 0) {
       throw new IndexOutOfBoundsException();
     }
 
@@ -880,12 +879,15 @@ public abstract class AbstractServerInstance implements Instance {
             findMissingBlobs(inputDigests, requestMetadata),
             (missingBlobDigests) -> {
               preconditionFailure.addAllViolations(
-                      StreamSupport.stream(missingBlobDigests.spliterator(), false).map((digest) ->
+                  StreamSupport.stream(missingBlobDigests.spliterator(), false)
+                      .map(
+                          (digest) ->
                               Violation.newBuilder()
-                                      .setType(VIOLATION_TYPE_MISSING)
-                                      .setSubject("blobs/" + DigestUtil.toString(digest))
-                                      .setDescription(MISSING_INPUT)
-                                      .build()).collect(Collectors.toList()));
+                                  .setType(VIOLATION_TYPE_MISSING)
+                                  .setSubject("blobs/" + DigestUtil.toString(digest))
+                                  .setDescription(MISSING_INPUT)
+                                  .build())
+                      .collect(Collectors.toList()));
               return null;
             },
             directExecutor());
@@ -1199,11 +1201,12 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected void logFailedStatus(Digest actionDigest, com.google.rpc.Status status) {
     StringBuilder message =
-            new StringBuilder(format(
-                    "%s: %s: %s\n",
-                    DigestUtil.toString(actionDigest),
-                    Code.forNumber(status.getCode()),
-                    status.getMessage()));
+        new StringBuilder(
+            format(
+                "%s: %s: %s\n",
+                DigestUtil.toString(actionDigest),
+                Code.forNumber(status.getCode()),
+                status.getMessage()));
     for (Any detail : status.getDetailsList()) {
       if (detail.is(PreconditionFailure.class)) {
         message.append("  PreconditionFailure:\n");
@@ -1211,7 +1214,8 @@ public abstract class AbstractServerInstance implements Instance {
         try {
           preconditionFailure = detail.unpack(PreconditionFailure.class);
           for (Violation violation : preconditionFailure.getViolationsList()) {
-            message.append(format(
+            message.append(
+                format(
                     "    Violation: %s %s: %s\n",
                     violation.getType(), violation.getSubject(), violation.getDescription()));
           }

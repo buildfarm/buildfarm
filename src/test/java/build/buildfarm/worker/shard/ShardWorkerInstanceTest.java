@@ -41,7 +41,6 @@ import java.io.IOException;
 import java.net.SocketException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -62,13 +61,7 @@ public class ShardWorkerInstanceTest {
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    instance =
-        new ShardWorkerInstance(
-            "test",
-            DIGEST_UTIL,
-            backplane,
-            storage
-        );
+    instance = new ShardWorkerInstance("test", DIGEST_UTIL, backplane, storage);
   }
 
   @SuppressWarnings("unchecked")
@@ -150,8 +143,7 @@ public class ShardWorkerInstanceTest {
         /* name=*/ null,
         /* offset=*/ 0,
         /* deadlineAfter=*/
-            /* deadlineAfterUnits=*/
-            RequestMetadata.getDefaultInstance());
+        /* deadlineAfterUnits=*/ RequestMetadata.getDefaultInstance());
   }
 
   @Test(expected = UnsupportedOperationException.class)

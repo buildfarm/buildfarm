@@ -70,7 +70,6 @@ import com.google.longrunning.OperationsGrpc;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
@@ -102,7 +101,8 @@ public class BuildFarmServerTest {
   public void setUp() throws Exception {
     String uniqueServerName = "in-process server for " + getClass();
 
-    MemoryInstanceConfig memoryInstanceConfig = MemoryInstanceConfig.newBuilder()
+    MemoryInstanceConfig memoryInstanceConfig =
+        MemoryInstanceConfig.newBuilder()
             .setListOperationsDefaultPageSize(1024)
             .setListOperationsMaxPageSize(16384)
             .setTreeDefaultPageSize(1024)
@@ -110,12 +110,12 @@ public class BuildFarmServerTest {
             .setOperationPollTimeout(Durations.fromSeconds(10))
             .setOperationCompletedDelay(Durations.fromSeconds(10))
             .setCasConfig(
-                    ContentAddressableStorageConfig.newBuilder()
-                            .setMemory(MemoryCASConfig.newBuilder().setMaxSizeBytes(640 * 1024)))
+                ContentAddressableStorageConfig.newBuilder()
+                    .setMemory(MemoryCASConfig.newBuilder().setMaxSizeBytes(640 * 1024)))
             .setActionCacheConfig(
-                    ActionCacheConfig.newBuilder()
-                            .setDelegateCas(DelegateCASConfig.getDefaultInstance())
-                            .build())
+                ActionCacheConfig.newBuilder()
+                    .setDelegateCas(DelegateCASConfig.getDefaultInstance())
+                    .build())
             .setDefaultActionTimeout(Durations.fromSeconds(600))
             .setMaximumActionTimeout(Durations.fromSeconds(3600))
             .build();
@@ -250,8 +250,7 @@ public class BuildFarmServerTest {
   }
 
   @Test
-  public void cancelledOperationHasCancelledState()
-      throws IOException, InterruptedException {
+  public void cancelledOperationHasCancelledState() throws IOException, InterruptedException {
     Operation operation = executeAction(createSimpleAction());
 
     OperationsGrpc.OperationsBlockingStub operationsStub =
@@ -277,8 +276,7 @@ public class BuildFarmServerTest {
   }
 
   @Test
-  public void cancellingExecutingOperationFailsPoll()
-      throws IOException, InterruptedException {
+  public void cancellingExecutingOperationFailsPoll() throws IOException, InterruptedException {
     Operation operation = executeAction(createSimpleAction());
 
     // take our operation from the queue
@@ -345,8 +343,7 @@ public class BuildFarmServerTest {
   }
 
   @Test
-  public void actionWithExcessiveTimeoutFailsValidation()
-      throws IOException, InterruptedException {
+  public void actionWithExcessiveTimeoutFailsValidation() throws IOException, InterruptedException {
     Digest actionDigestWithExcessiveTimeout =
         createAction(Action.newBuilder().setTimeout(Duration.newBuilder().setSeconds(9000)));
 

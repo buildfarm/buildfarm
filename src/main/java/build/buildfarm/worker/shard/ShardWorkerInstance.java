@@ -66,10 +66,10 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   private final Backplane backplane;
 
   public ShardWorkerInstance(
-          String name,
-          DigestUtil digestUtil,
-          Backplane backplane,
-          ContentAddressableStorage contentAddressableStorage) {
+      String name,
+      DigestUtil digestUtil,
+      Backplane backplane,
+      ContentAddressableStorage contentAddressableStorage) {
     super(name, digestUtil, contentAddressableStorage, null, null, null, null);
     this.backplane = backplane;
   }
@@ -168,9 +168,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   public InputStream newOperationStreamInput(
-          String name,
-          long offset,
-          RequestMetadata requestMetadata) {
+      String name, long offset, RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 

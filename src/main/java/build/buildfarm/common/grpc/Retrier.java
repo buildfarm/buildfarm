@@ -178,14 +178,18 @@ public class Retrier {
 
   @SuppressWarnings("Guava")
   public static final Predicate<Status> RETRY_ALL = Predicates.alwaysTrue();
+
   @SuppressWarnings("Guava")
   public static final Predicate<Status> RETRY_NONE = Predicates.alwaysFalse();
+
   public static final Retrier NO_RETRIES = new Retrier(Backoff.NO_RETRIES, RETRY_NONE);
 
   @SuppressWarnings("Guava")
   private final Supplier<Backoff> backoffSupplier;
+
   @SuppressWarnings("Guava")
   private final Predicate<Status> isRetriable;
+
   private final ListeningScheduledExecutorService retryScheduler;
 
   @SuppressWarnings("Guava")
@@ -299,6 +303,7 @@ public class Retrier {
   public static class ProgressiveBackoff implements Backoff {
     @SuppressWarnings("Guava")
     private final Supplier<Backoff> backoffSupplier;
+
     private Backoff currentBackoff;
     private int retries = 0;
 

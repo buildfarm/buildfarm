@@ -45,8 +45,10 @@ public class DigestUtil {
   // The underlying HashFunctions are immutable and thread safe.
   @SuppressWarnings("ImmutableEnumChecker")
   public enum HashFunction {
-    @SuppressWarnings("deprecation") MD5(Hashing.md5()),
-    @SuppressWarnings("deprecation") SHA1(Hashing.sha1()),
+    @SuppressWarnings("deprecation")
+    MD5(Hashing.md5()),
+    @SuppressWarnings("deprecation")
+    SHA1(Hashing.sha1()),
     SHA256(Hashing.sha256());
 
     private final com.google.common.hash.HashFunction hash;

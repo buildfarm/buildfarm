@@ -121,7 +121,7 @@ public class RedisShardSubscriberTest {
     }
   }
 
-    RedisShardSubscriber createSubscriber(
+  RedisShardSubscriber createSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers, Executor executor) {
     return new RedisShardSubscriber(watchers, /* workers=*/ null, "worker-channel", executor);
   }

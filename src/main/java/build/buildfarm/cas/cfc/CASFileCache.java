@@ -825,7 +825,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 Path blobKeyPath = getPath(blobKey);
                 try {
                   fileCommittedSize =
-                          Files.size(blobKeyPath.resolveSibling(blobKey + "." + key.getIdentifier()));
+                      Files.size(blobKeyPath.resolveSibling(blobKey + "." + key.getIdentifier()));
                 } catch (IOException e) {
                   fileCommittedSize = 0;
                 }

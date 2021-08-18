@@ -21,8 +21,10 @@ import java.util.logging.Level;
 
 abstract class SuperscalarPipelineStage extends PipelineStage {
   protected final int width;
+
   @SuppressWarnings("rawtypes")
   protected final BlockingQueue claims;
+
   private volatile boolean catastrophic = false;
 
   // ensure that only a single claim waits for available slots for core count

@@ -391,10 +391,7 @@ public class MemoryInstance extends AbstractServerInstance {
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public InputStream newOperationStreamInput(
-          String name,
-          long offset,
-          RequestMetadata requestMetadata)
-      throws IOException {
+      String name, long offset, RequestMetadata requestMetadata) throws IOException {
     InputStream in = getStreamSource(name).openStream();
     in.skip(offset);
     return in;

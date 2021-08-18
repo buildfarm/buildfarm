@@ -100,10 +100,7 @@ public interface Instance {
 
   Write getOperationStreamWrite(String name);
 
-  InputStream newOperationStreamInput(
-          String name,
-          long offset,
-          RequestMetadata requestMetadata)
+  InputStream newOperationStreamInput(String name, long offset, RequestMetadata requestMetadata)
       throws IOException;
 
   ListenableFuture<Void> execute(

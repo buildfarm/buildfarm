@@ -83,11 +83,7 @@ public class Util {
     synchronized (workerSet) {
       foundFuture =
           correctMissingBlobSynchronized(
-                  workerSet,
-                  workerInstanceFactory,
-              digest,
-              foundWorkers,
-              requestMetadata);
+              workerSet, workerInstanceFactory, digest, foundWorkers, requestMetadata);
     }
     return transform(
         foundFuture,
@@ -112,11 +108,11 @@ public class Util {
   }
 
   static ListenableFuture<Void> correctMissingBlobSynchronized(
-          Set<String> workerSet,
-          Function<String, Instance> workerInstanceFactory,
-          Digest digest,
-          Set<String> foundWorkers,
-          RequestMetadata requestMetadata) {
+      Set<String> workerSet,
+      Function<String, Instance> workerInstanceFactory,
+      Digest digest,
+      Set<String> foundWorkers,
+      RequestMetadata requestMetadata) {
     SettableFuture<Void> foundFuture = SettableFuture.create();
     AggregateCallback<String> foundCallback =
         new AggregateCallback<String>(workerSet.size() + 1) {

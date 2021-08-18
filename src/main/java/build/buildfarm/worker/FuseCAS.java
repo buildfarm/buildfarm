@@ -423,8 +423,7 @@ public class FuseCAS extends FuseStubFS {
     }
   }
 
-  private Map<String, Entry> fetchChildren(Digest digest)
-      throws IOException, InterruptedException {
+  private Map<String, Entry> fetchChildren(Digest digest) throws IOException, InterruptedException {
     Map<String, Entry> children = childrenCache.get(digest);
     if (children == null) {
       try {

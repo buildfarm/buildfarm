@@ -53,7 +53,7 @@ public class UploadOutputsTest {
 
   private final Configuration config;
 
-    private Path root;
+  private Path root;
   private ActionResult.Builder resultBuilder;
 
   @Mock private ByteStreamUploader mockUploader;
@@ -66,7 +66,7 @@ public class UploadOutputsTest {
   public void setUp() throws ConfigurationException {
     MockitoAnnotations.initMocks(this);
 
-      FileSystem fileSystem = Jimfs.newFileSystem(config);
+    FileSystem fileSystem = Jimfs.newFileSystem(config);
     root = Iterables.getFirst(fileSystem.getRootDirectories(), null);
 
     resultBuilder = ActionResult.newBuilder();
@@ -198,7 +198,7 @@ public class UploadOutputsTest {
         directories,
         mockUploader,
         /* inlineContentLimit=*/ 0,
-            CASInsertionPolicy.ALWAYS_INSERT,
+        CASInsertionPolicy.ALWAYS_INSERT,
         CASInsertionPolicy.ALWAYS_INSERT);
   }
 

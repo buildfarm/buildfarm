@@ -134,7 +134,10 @@ public class GrpcCAS implements ContentAddressableStorage {
 
   @Override
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
-    digests = StreamSupport.stream(digests.spliterator(), false).filter(digest -> digest.getSizeBytes() != 0).collect(Collectors.toList());
+    digests =
+        StreamSupport.stream(digests.spliterator(), false)
+            .filter(digest -> digest.getSizeBytes() != 0)
+            .collect(Collectors.toList());
     if (Iterables.isEmpty(digests)) {
       return ImmutableList.of();
     }

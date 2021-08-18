@@ -57,7 +57,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -141,10 +140,11 @@ public class ByteStreamServiceTest {
 
     Write write = mock(Write.class);
     doAnswer(
-            (Answer<Void>) invocation -> {
-              output.reset();
-              return null;
-            })
+            (Answer<Void>)
+                invocation -> {
+                  output.reset();
+                  return null;
+                })
         .when(write)
         .reset();
     when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
@@ -358,6 +358,10 @@ public class ByteStreamServiceTest {
     assertThat(readObserver.getData()).isEqualTo(content);
     List<Integer> sizes = readObserver.getSizesList();
     assertThat(sizes.size()).isEqualTo(11); // 10 + 1 incomplete chunk
-    assertThat(sizes.stream().filter((responseSize) -> responseSize > CHUNK_SIZE).collect(Collectors.toList())).isEmpty();
+    assertThat(
+            sizes.stream()
+                .filter((responseSize) -> responseSize > CHUNK_SIZE)
+                .collect(Collectors.toList()))
+        .isEmpty();
   }
 }

@@ -31,6 +31,7 @@ public class CommandUtils {
    */
   public static boolean isTest(Command command) {
     // only tests are setting this currently - other mechanisms are unreliable
-    return command.getEnvironmentVariablesList().stream().anyMatch((envVar) -> envVar.getName().equals("XML_OUTPUT_FILE"));
+    return command.getEnvironmentVariablesList().stream()
+        .anyMatch((envVar) -> envVar.getName().equals("XML_OUTPUT_FILE"));
   }
 }

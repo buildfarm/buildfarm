@@ -138,25 +138,25 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   ShardWorkerContext(
-          String name,
-          DequeueMatchSettings matchSettings,
-          Platform platform,
-          Duration operationPollPeriod,
-          OperationPoller operationPoller,
-          int inputFetchStageWidth,
-          int executeStageWidth,
-          Backplane backplane,
-          ExecFileSystem execFileSystem,
-          InputStreamFactory inputStreamFactory,
-          Iterable<ExecutionPolicy> policies,
-          Instance instance,
-          Duration defaultActionTimeout,
-          Duration maximumActionTimeout,
-          boolean limitExecution,
-          boolean limitGlobalExecution,
-          boolean onlyMulticoreTests,
-          boolean errorOperationRemainingResources,
-          CasWriter writer) {
+      String name,
+      DequeueMatchSettings matchSettings,
+      Platform platform,
+      Duration operationPollPeriod,
+      OperationPoller operationPoller,
+      int inputFetchStageWidth,
+      int executeStageWidth,
+      Backplane backplane,
+      ExecFileSystem execFileSystem,
+      InputStreamFactory inputStreamFactory,
+      Iterable<ExecutionPolicy> policies,
+      Instance instance,
+      Duration defaultActionTimeout,
+      Duration maximumActionTimeout,
+      boolean limitExecution,
+      boolean limitGlobalExecution,
+      boolean onlyMulticoreTests,
+      boolean errorOperationRemainingResources,
+      CasWriter writer) {
     this.name = name;
     this.matchSettings = matchSettings;
     this.platform = platform;
@@ -699,8 +699,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation)
-      throws IOException, InterruptedException {
+  public boolean putOperation(Operation operation) throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
       completedOperations.inc();

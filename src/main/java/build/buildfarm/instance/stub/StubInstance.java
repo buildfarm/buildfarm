@@ -473,17 +473,11 @@ public class StubInstance implements Instance {
 
   @Override
   public InputStream newOperationStreamInput(
-          String resourceName,
-          long offset,
-          RequestMetadata requestMetadata)
-      throws IOException {
+      String resourceName, long offset, RequestMetadata requestMetadata) throws IOException {
     return newInput(resourceName, offset, requestMetadata);
   }
 
-  InputStream newInput(
-          String resourceName,
-          long offset,
-          RequestMetadata requestMetadata)
+  InputStream newInput(String resourceName, long offset, RequestMetadata requestMetadata)
       throws IOException {
     return ByteStreamHelper.newInput(
         resourceName,
@@ -601,8 +595,7 @@ public class StubInstance implements Instance {
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
       throws IOException {
-    return newInput(
-        getBlobName(digest), offset, requestMetadata);
+    return newInput(getBlobName(digest), offset, requestMetadata);
   }
 
   @Override

@@ -59,8 +59,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @SuppressWarnings("Guava")
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub;
+
   @SuppressWarnings("Guava")
   private final Supplier<ByteStreamStub> bsStub;
+
   private final String resourceName;
   private final Function<Throwable, Throwable> exceptionTranslator;
   private final long expectedSize;
@@ -68,6 +70,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private final byte[] buf;
   private final SettableFuture<Long> writeFuture = SettableFuture.create();
   private boolean wasReset = false;
+
   @SuppressWarnings({"unchecked", "rawtypes", "Guava"})
   private final Supplier<QueryWriteStatusResponse> writeStatus =
       Suppliers.memoize(
@@ -98,6 +101,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
               }
             }
           });
+
   private boolean sentResourceName = false;
   private int offset = 0;
   private long writtenBytes = 0;

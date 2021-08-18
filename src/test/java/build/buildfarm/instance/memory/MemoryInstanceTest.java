@@ -153,7 +153,7 @@ public class MemoryInstanceTest {
             outstandingOperations,
             workers,
             requeuers,
-                operationTimeoutDelays);
+            operationTimeoutDelays);
   }
 
   @After
@@ -279,10 +279,10 @@ public class MemoryInstanceTest {
 
     // as a result of the initial verified test, change the operation to done
     Answer<Void> initialAnswer =
-            invocation -> {
-              outstandingOperations.put(operation.getName(), doneOperation);
-              return null;
-            };
+        invocation -> {
+          outstandingOperations.put(operation.getName(), doneOperation);
+          return null;
+        };
     Watcher watcher = mock(Watcher.class);
     doAnswer(initialAnswer).when(watcher).observe(eq(operation));
 

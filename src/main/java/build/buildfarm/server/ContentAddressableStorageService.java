@@ -65,9 +65,7 @@ public class ContentAddressableStorageService
   private final TimeUnit writeDeadlineAfterUnits;
 
   public ContentAddressableStorageService(
-          Instances instances,
-          long writeDeadlineAfter,
-          TimeUnit writeDeadlineAfterUnits) {
+      Instances instances, long writeDeadlineAfter, TimeUnit writeDeadlineAfterUnits) {
     this.instances = instances;
     this.writeDeadlineAfter = writeDeadlineAfter;
     this.writeDeadlineAfterUnits = writeDeadlineAfterUnits;
@@ -197,11 +195,16 @@ public class ContentAddressableStorageService
     ListenableFuture<BatchUpdateBlobsResponse> responseFuture =
         transform(
             allAsList(
-                    StreamSupport.stream(putAllBlobs(
-                            instance,
-                            batchRequest.getRequestsList(),
-                            writeDeadlineAfter,
-                            writeDeadlineAfterUnits).spliterator(), false).map((future) -> transform(future, response::addResponses, directExecutor())).collect(Collectors.toList())),
+                StreamSupport.stream(
+                        putAllBlobs(
+                                instance,
+                                batchRequest.getRequestsList(),
+                                writeDeadlineAfter,
+                                writeDeadlineAfterUnits)
+                            .spliterator(),
+                        false)
+                    .map((future) -> transform(future, response::addResponses, directExecutor()))
+                    .collect(Collectors.toList())),
             (result) -> response.build(),
             directExecutor());
 

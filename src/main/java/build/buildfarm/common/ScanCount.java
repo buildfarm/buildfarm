@@ -67,8 +67,7 @@ public class ScanCount {
    * @param scanCount The count per scan.
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
-  private static void addKeys(
-          Jedis node, Set<String> keys, String query, int scanCount) {
+  private static void addKeys(Jedis node, Set<String> keys, String query, int scanCount) {
     // construct query
     ScanParams params = new ScanParams();
     params.match(query);

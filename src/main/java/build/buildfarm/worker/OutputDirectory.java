@@ -108,10 +108,20 @@ public class OutputDirectory {
       Iterable<EnvironmentVariable> envVars) {
     return parseDirectories(
         Iterables.concat(
-                StreamSupport.stream(outputFiles.spliterator(), false).filter((file) -> file.contains("/")).collect(Collectors.toList()).stream().map((file) ->
+            StreamSupport.stream(outputFiles.spliterator(), false)
+                .filter((file) -> file.contains("/"))
+                .collect(Collectors.toList())
+                .stream()
+                .map(
+                    (file) ->
                         new OutputDirectoryEntry(
-                                "/" + file.substring(0, file.lastIndexOf('/') + 1), false)).collect(Collectors.toList()),
-                StreamSupport.stream(outputDirs.spliterator(), false).map((dir) -> new OutputDirectoryEntry(dir.isEmpty() ? "/" : ("/" + dir + "/"), true)).collect(Collectors.toList()),
+                            "/" + file.substring(0, file.lastIndexOf('/') + 1), false))
+                .collect(Collectors.toList()),
+            StreamSupport.stream(outputDirs.spliterator(), false)
+                .map(
+                    (dir) ->
+                        new OutputDirectoryEntry(dir.isEmpty() ? "/" : ("/" + dir + "/"), true))
+                .collect(Collectors.toList()),
             envVarOutputDirectoryEntries(envVars)));
   }
 

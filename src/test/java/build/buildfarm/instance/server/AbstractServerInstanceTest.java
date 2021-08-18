@@ -180,9 +180,7 @@ public class AbstractServerInstanceTest {
 
     @Override
     public InputStream newOperationStreamInput(
-            String name,
-            long offset,
-            RequestMetadata requestMetadata) {
+        String name, long offset, RequestMetadata requestMetadata) {
       throw new UnsupportedOperationException();
     }
 
@@ -470,13 +468,14 @@ public class AbstractServerInstanceTest {
       ByteString content,
       RequestMetadata requestMetadata) {
     doAnswer(
-            (Answer<Void>) invocation -> {
-              StreamObserver<ByteString> blobObserver =
-                  (StreamObserver) invocation.getArguments()[3];
-              blobObserver.onNext(content);
-              blobObserver.onCompleted();
-              return null;
-            })
+            (Answer<Void>)
+                invocation -> {
+                  StreamObserver<ByteString> blobObserver =
+                      (StreamObserver) invocation.getArguments()[3];
+                  blobObserver.onNext(content);
+                  blobObserver.onCompleted();
+                  return null;
+                })
         .when(contentAddressableStorage)
         .get(
             eq(digest),
@@ -506,7 +505,7 @@ public class AbstractServerInstanceTest {
     ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
     ActionCache actionCache = mock(ActionCache.class);
     AbstractServerInstance instance =
-            new DummyServerInstance(contentAddressableStorage, actionCache);
+        new DummyServerInstance(contentAddressableStorage, actionCache);
 
     Tree tree =
         Tree.newBuilder()

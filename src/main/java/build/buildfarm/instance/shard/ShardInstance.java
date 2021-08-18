@@ -293,27 +293,27 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaxBlobSize(),
         config.getMaxCpu(),
         config.getMaximumActionTimeout(),
-            config.getUseDenyList(),
+        config.getUseDenyList(),
         onStop,
         WorkerStubs.create(digestUtil, getGrpcTimeout(config)),
         actionCacheFetchService);
   }
 
   public ShardInstance(
-          String name,
-          DigestUtil digestUtil,
-          Backplane backplane,
-          ReadThroughActionCache readThroughActionCache,
-          boolean runDispatchedMonitor,
-          int dispatchedMonitorIntervalSeconds,
-          boolean runOperationQueuer,
-          long maxBlobSize,
-          int maxCpu,
-          Duration maxActionTimeout,
-          boolean useDenyList,
-          Runnable onStop,
-          LoadingCache<String, Instance> workerStubs,
-          ListeningExecutorService actionCacheFetchService) {
+      String name,
+      DigestUtil digestUtil,
+      Backplane backplane,
+      ReadThroughActionCache readThroughActionCache,
+      boolean runDispatchedMonitor,
+      int dispatchedMonitorIntervalSeconds,
+      boolean runOperationQueuer,
+      long maxBlobSize,
+      int maxCpu,
+      Duration maxActionTimeout,
+      boolean useDenyList,
+      Runnable onStop,
+      LoadingCache<String, Instance> workerStubs,
+      ListeningExecutorService actionCacheFetchService) {
     super(
         name,
         digestUtil,
@@ -1068,9 +1068,7 @@ public class ShardInstance extends AbstractServerInstance {
           try {
             return catching(
                     expectDirectory(
-                        reason,
-                        directoryBlobDigest,
-                            RequestMetadata.getDefaultInstance()),
+                        reason, directoryBlobDigest, RequestMetadata.getDefaultInstance()),
                     Exception.class,
                     (t) -> {
                       logger.log(
@@ -1182,9 +1180,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   ListenableFuture<Directory> expectDirectory(
-          String reason,
-          Digest directoryBlobDigest,
-          RequestMetadata requestMetadata) {
+      String reason, Digest directoryBlobDigest, RequestMetadata requestMetadata) {
     if (directoryBlobDigest.getSizeBytes() == 0) {
       return immediateFuture(Directory.getDefaultInstance());
     }
@@ -1229,7 +1225,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   ListenableFuture<Command> expectCommand(
-          Digest commandBlobDigest, RequestMetadata requestMetadata) {
+      Digest commandBlobDigest, RequestMetadata requestMetadata) {
     BiFunction<Digest, Executor, CompletableFuture<Command>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Command>>() {
           @Override
@@ -1245,8 +1241,7 @@ public class ShardInstance extends AbstractServerInstance {
     return toListenableFuture(commandCache.get(commandBlobDigest, getCallback));
   }
 
-  ListenableFuture<Action> expectAction(
-          Digest actionBlobDigest, RequestMetadata requestMetadata) {
+  ListenableFuture<Action> expectAction(Digest actionBlobDigest, RequestMetadata requestMetadata) {
     BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
           @Override
@@ -1284,9 +1279,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public InputStream newOperationStreamInput(
-          String name,
-          long offset,
-          RequestMetadata requestMetadata) {
+      String name, long offset, RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 

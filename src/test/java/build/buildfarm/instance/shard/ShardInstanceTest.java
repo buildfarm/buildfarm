@@ -97,7 +97,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -147,7 +146,7 @@ public class ShardInstanceTest {
             /* maxBlobSize=*/ 0,
             /* maxCpu=*/ 1,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
-                /* useDenyList=*/ true,
+            /* useDenyList=*/ true,
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
             /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()));
@@ -199,11 +198,14 @@ public class ShardInstanceTest {
     }
 
     doAnswer(
-            (Answer<ListenableFuture<Iterable<Digest>>>) invocation -> {
-              Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
-              return immediateFuture(
-                      StreamSupport.stream(digests.spliterator(), false).filter((digest) -> !blobDigests.contains(digest)).collect(Collectors.toList()));
-            })
+            (Answer<ListenableFuture<Iterable<Digest>>>)
+                invocation -> {
+                  Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
+                  return immediateFuture(
+                      StreamSupport.stream(digests.spliterator(), false)
+                          .filter((digest) -> !blobDigests.contains(digest))
+                          .collect(Collectors.toList()));
+                })
         .when(mockWorkerInstance)
         .findMissingBlobs(any(Iterable.class), any(RequestMetadata.class));
 
@@ -220,17 +222,18 @@ public class ShardInstanceTest {
     }
 
     doAnswer(
-            (Answer<Void>) invocation -> {
-              StreamObserver<ByteString> blobObserver =
-                  (StreamObserver) invocation.getArguments()[3];
-              if (provideAction) {
-                blobObserver.onNext(action.toByteString());
-                blobObserver.onCompleted();
-              } else {
-                blobObserver.onError(Status.NOT_FOUND.asException());
-              }
-              return null;
-            })
+            (Answer<Void>)
+                invocation -> {
+                  StreamObserver<ByteString> blobObserver =
+                      (StreamObserver) invocation.getArguments()[3];
+                  if (provideAction) {
+                    blobObserver.onNext(action.toByteString());
+                    blobObserver.onCompleted();
+                  } else {
+                    blobObserver.onError(Status.NOT_FOUND.asException());
+                  }
+                  return null;
+                })
         .when(mockWorkerInstance)
         .getBlob(
             eq(actionDigest),
@@ -751,13 +754,14 @@ public class ShardInstanceTest {
     blobDigests.add(digest);
     // FIXME use better answer definitions, without indexes
     doAnswer(
-            (Answer<Void>) invocation -> {
-              StreamObserver<ByteString> blobObserver =
-                  (StreamObserver) invocation.getArguments()[3];
-              blobObserver.onNext(content);
-              blobObserver.onCompleted();
-              return null;
-            })
+            (Answer<Void>)
+                invocation -> {
+                  StreamObserver<ByteString> blobObserver =
+                      (StreamObserver) invocation.getArguments()[3];
+                  blobObserver.onNext(content);
+                  blobObserver.onCompleted();
+                  return null;
+                })
         .when(mockWorkerInstance)
         .getBlob(
             eq(digest),
@@ -950,12 +954,10 @@ public class ShardInstanceTest {
   @Test
   public void cacheReturnsNullWhenMissing() throws Exception {
     // create cache
-    AsyncCache<String, String> cache =
-        Caffeine.newBuilder().maximumSize(64).buildAsync();
+    AsyncCache<String, String> cache = Caffeine.newBuilder().maximumSize(64).buildAsync();
 
     // ensure callback returns null
-    Function<String, String> getCallback =
-            s -> null;
+    Function<String, String> getCallback = s -> null;
 
     // check that result is null (i.e. no exceptions thrown)
     CompletableFuture<String> result = cache.get("missing", getCallback);

@@ -51,25 +51,25 @@ public class FuseCASTest {
     fuseCAS =
         new FuseCAS(
             null,
-                (blobDigest, offset) -> {
-                  if (blobDigest.getHash().equals("/test")) {
-                    return Directory.newBuilder()
-                        .addFiles(
-                            FileNode.newBuilder()
-                                .setName("file")
-                                .setDigest(
-                                    Digest.newBuilder()
-                                        .setHash("/test/file")
-                                        .setSizeBytes(content.size()))
-                                .build())
-                        .build()
-                        .toByteString()
-                        .newInput();
-                  } else if (blobDigest.getHash().equals("/test/file")) {
-                    return content.newInput();
-                  }
-                  throw new UnsupportedOperationException();
-                });
+            (blobDigest, offset) -> {
+              if (blobDigest.getHash().equals("/test")) {
+                return Directory.newBuilder()
+                    .addFiles(
+                        FileNode.newBuilder()
+                            .setName("file")
+                            .setDigest(
+                                Digest.newBuilder()
+                                    .setHash("/test/file")
+                                    .setSizeBytes(content.size()))
+                            .build())
+                    .build()
+                    .toByteString()
+                    .newInput();
+              } else if (blobDigest.getHash().equals("/test/file")) {
+                return content.newInput();
+              }
+              throw new UnsupportedOperationException();
+            });
   }
 
   private FileStat createFileStat() {
@@ -162,7 +162,7 @@ public class FuseCASTest {
     }
   }
 
-    private static String stringFromPointer(Pointer buf) {
+  private static String stringFromPointer(Pointer buf) {
     return StringResultConverter.getInstance(Charset.defaultCharset()).fromNative(buf, null);
   }
 
@@ -449,7 +449,7 @@ public class FuseCASTest {
                 /* FALLOC_FL_PUNCH_HOLE */ 2,
                 /* off=*/ -1,
                 /* length=*/ -1,
-                    new SystemFuseFileInfo()))
+                new SystemFuseFileInfo()))
         .isEqualTo(-ErrorCodes.EOPNOTSUPP());
   }
 
@@ -471,7 +471,7 @@ public class FuseCASTest {
                 /* mode=*/ 0,
                 /* off=*/ -1,
                 /* length=*/ -1,
-                    new SystemFuseFileInfo()))
+                new SystemFuseFileInfo()))
         .isEqualTo(-ErrorCodes.EPERM());
   }
 

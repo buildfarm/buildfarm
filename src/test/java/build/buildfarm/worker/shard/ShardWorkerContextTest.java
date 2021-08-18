@@ -86,7 +86,7 @@ public class ShardWorkerContextTest {
         /* operationPollPeriod=*/ Duration.getDefaultInstance(),
         /* operationPoller=*/ (queueEntry, stage, requeueAt) -> false,
         /* inlineContentLimit=*/
-            /* inputFetchStageWidth=*/ 0,
+        /* inputFetchStageWidth=*/ 0,
         /* executeStageWidth=*/ 0,
         backplane,
         execFileSystem,
@@ -94,8 +94,8 @@ public class ShardWorkerContextTest {
         policies,
         instance,
         /* deadlineAfter=*/
-            /* deadlineAfterUnits=*/
-            /* defaultActionTimeout=*/ Duration.getDefaultInstance(),
+        /* deadlineAfterUnits=*/
+        /* defaultActionTimeout=*/ Duration.getDefaultInstance(),
         /* maximumActionTimeout=*/ Duration.getDefaultInstance(),
         /* limitExecution=*/ false,
         /* limitGlobalExecution=*/ false,

@@ -318,7 +318,8 @@ class Cat {
       DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree)
       throws IOException, InterruptedException {
     Tree tree = reTreeToTree(digestUtil, reTree);
-    printTreeLayout(DigestUtil.proxyDirectoriesIndex(tree.getDirectoriesMap()), tree.getRootDigest());
+    printTreeLayout(
+        DigestUtil.proxyDirectoriesIndex(tree.getDirectoriesMap()), tree.getRootDigest());
   }
 
   private static void printTreeLayout(Map<Digest, Directory> directoriesIndex, Digest rootDigest) {

@@ -413,14 +413,14 @@ class CASFileCacheTest {
     ExecutorService service = newSingleThreadExecutor();
     Future<Void> putFuture =
         service.submit(
-                () -> {
-                  started.set(true);
-                  ByteString content = ByteString.copyFromUtf8("CAS Would Exceed Max Size");
-                  Digest digest = DIGEST_UTIL.compute(content);
-                  blobs.put(digest, content);
-                  fileCache.put(digest, /* isExecutable=*/ false);
-                  return null;
-                });
+            () -> {
+              started.set(true);
+              ByteString content = ByteString.copyFromUtf8("CAS Would Exceed Max Size");
+              Digest digest = DIGEST_UTIL.compute(content);
+              blobs.put(digest, content);
+              fileCache.put(digest, /* isExecutable=*/ false);
+              return null;
+            });
     while (!started.get()) {
       MICROSECONDS.sleep(1);
     }

@@ -40,11 +40,12 @@ public class OperationQueueClientTest {
   public void matchPlatformContainsExecutionPolicies() throws InterruptedException {
     Instance instance = mock(Instance.class);
     doAnswer(
-            (Answer<Void>) invocation -> {
-              MatchListener listener = (MatchListener) invocation.getArguments()[1];
-              listener.onEntry(null);
-              return null;
-            })
+            (Answer<Void>)
+                invocation -> {
+                  MatchListener listener = (MatchListener) invocation.getArguments()[1];
+                  listener.onEntry(null);
+                  return null;
+                })
         .when(instance)
         .match(any(Platform.class), any(MatchListener.class));
     OperationQueueClient client =
