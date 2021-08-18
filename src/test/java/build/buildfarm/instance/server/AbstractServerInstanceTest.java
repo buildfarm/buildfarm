@@ -86,7 +86,7 @@ public class AbstractServerInstanceTest {
 
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
-  class DummyServerInstance extends AbstractServerInstance {
+  static class DummyServerInstance extends AbstractServerInstance {
     DummyServerInstance(
         ContentAddressableStorage contentAddressableStorage, ActionCache actionCache) {
       super(
@@ -356,10 +356,10 @@ public class AbstractServerInstanceTest {
   public void nestedOutputDirectoriesAreInvalid() {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     AbstractServerInstance.validateOutputs(
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of("foo", "foo/bar"),
+        ImmutableSet.of(),
+        ImmutableSet.of(),
+        ImmutableSet.of(),
+        ImmutableSet.of("foo", "foo/bar"),
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -373,10 +373,10 @@ public class AbstractServerInstanceTest {
   public void outputDirectoriesContainingOutputFilesAreInvalid() {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     AbstractServerInstance.validateOutputs(
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of("foo/bar"),
-        ImmutableSet.<String>of("foo"),
+        ImmutableSet.of(),
+        ImmutableSet.of(),
+        ImmutableSet.of("foo/bar"),
+        ImmutableSet.of("foo"),
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -390,10 +390,10 @@ public class AbstractServerInstanceTest {
   public void outputFilesAsOutputDirectoryAncestorsAreInvalid() {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     AbstractServerInstance.validateOutputs(
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of("foo"),
-        ImmutableSet.<String>of("foo/bar"),
+        ImmutableSet.of(),
+        ImmutableSet.of(),
+        ImmutableSet.of("foo"),
+        ImmutableSet.of("foo/bar"),
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -481,7 +481,7 @@ public class AbstractServerInstanceTest {
         .when(contentAddressableStorage)
         .get(
             eq(digest),
-            /* offset=*/ eq(0l),
+            /* offset=*/ eq(0L),
             eq(digest.getSizeBytes()),
             any(ServerCallStreamObserver.class),
             eq(requestMetadata));
@@ -507,7 +507,7 @@ public class AbstractServerInstanceTest {
     ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
     ActionCache actionCache = mock(ActionCache.class);
     AbstractServerInstance instance =
-        new DummyServerInstance(contentAddressableStorage, actionCache);
+            new DummyServerInstance(contentAddressableStorage, actionCache);
 
     Tree tree =
         Tree.newBuilder()
@@ -550,7 +550,7 @@ public class AbstractServerInstanceTest {
     verify(contentAddressableStorage, times(1))
         .get(
             eq(treeDigest),
-            /* offset=*/ eq(0l),
+            /* offset=*/ eq(0L),
             eq(treeDigest.getSizeBytes()),
             any(ServerCallStreamObserver.class),
             eq(requestMetadata));

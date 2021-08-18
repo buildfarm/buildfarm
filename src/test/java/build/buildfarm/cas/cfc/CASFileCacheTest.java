@@ -845,13 +845,13 @@ class CASFileCacheTest {
   public void readThroughSwitchesToLocalOnComplete() throws IOException, InterruptedException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Blob blob = new Blob(content, DIGEST_UTIL);
-    when(delegate.newInput(eq(blob.getDigest()), eq(0l))).thenReturn(content.newInput());
+    when(delegate.newInput(eq(blob.getDigest()), eq(0L))).thenReturn(content.newInput());
     InputStream in = fileCache.newInput(blob.getDigest(), 0);
     byte[] buf = new byte[content.size()];
     // advance to the middle of the content
     assertThat(in.read(buf, 0, 6)).isEqualTo(6);
     assertThat(ByteString.copyFrom(buf, 0, 6)).isEqualTo(content.substring(0, 6));
-    verify(delegate, times(1)).newInput(blob.getDigest(), 0l);
+    verify(delegate, times(1)).newInput(blob.getDigest(), 0L);
     // trigger the read through to complete immediately by supplying the blob
     fileCache.put(blob);
     // read the remaining content
@@ -905,17 +905,17 @@ class CASFileCacheTest {
         };
     when(delegate.getWrite(eq(blob.getDigest()), any(UUID.class), any(RequestMetadata.class)))
         .thenReturn(write);
-    when(delegate.newInput(eq(blob.getDigest()), eq(0l))).thenReturn(content.newInput());
+    when(delegate.newInput(eq(blob.getDigest()), eq(0L))).thenReturn(content.newInput());
     // the switch will reset to this point
     InputStream switchedIn = content.newInput();
     switchedIn.skip(6);
-    when(delegate.newInput(eq(blob.getDigest()), eq(6l))).thenReturn(switchedIn);
+    when(delegate.newInput(eq(blob.getDigest()), eq(6L))).thenReturn(switchedIn);
     InputStream in = fileCache.newReadThroughInput(blob.getDigest(), 0, write);
     byte[] buf = new byte[content.size()];
     // advance to the middle of the content
     assertThat(in.read(buf, 0, 6)).isEqualTo(6);
     assertThat(ByteString.copyFrom(buf, 0, 6)).isEqualTo(content.substring(0, 6));
-    verify(delegate, times(1)).newInput(blob.getDigest(), 0l);
+    verify(delegate, times(1)).newInput(blob.getDigest(), 0L);
     // read the remaining content
     int remaining = content.size() - 6;
     assertThat(in.read(buf, 6, remaining)).isEqualTo(remaining);

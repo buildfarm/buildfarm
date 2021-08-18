@@ -270,7 +270,7 @@ public class ByteStreamServiceTest {
     verify(write, times(2)).getFuture();
   }
 
-  class CountingReadObserver implements StreamObserver<ReadResponse> {
+  static class CountingReadObserver implements StreamObserver<ReadResponse> {
     private final List<Integer> sizes = Lists.newArrayList();
     private final ByteString.Output sink = ByteString.newOutput();
     private boolean completed = false;

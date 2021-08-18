@@ -65,7 +65,7 @@ public class RedisShardBackplaneTest {
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
     when(jedisCluster.hgetAll(config.getWorkersHashName()))
         .thenReturn(ImmutableMap.of("foo", "foo"));
-    when(jedisCluster.hdel(config.getWorkersHashName(), "foo")).thenReturn(1l);
+    when(jedisCluster.hdel(config.getWorkersHashName(), "foo")).thenReturn(1L);
     backplane =
         new RedisShardBackplane(
             config,
@@ -163,7 +163,7 @@ public class RedisShardBackplaneTest {
     backplane.start("startTime/test:0000");
 
     final String opName = "op";
-    when(jedisCluster.hdel(config.getDispatchedOperationsHashName(), opName)).thenReturn(1l);
+    when(jedisCluster.hdel(config.getDispatchedOperationsHashName(), opName)).thenReturn(1L);
 
     QueueEntry queueEntry =
         QueueEntry.newBuilder()

@@ -232,7 +232,7 @@ public class ShardInstanceTest {
         .when(mockWorkerInstance)
         .getBlob(
             eq(actionDigest),
-            eq(0l),
+            eq(0L),
             eq(actionDigest.getSizeBytes()),
             any(ServerCallStreamObserver.class),
             any(RequestMetadata.class));
@@ -759,7 +759,7 @@ public class ShardInstanceTest {
         .when(mockWorkerInstance)
         .getBlob(
             eq(digest),
-            eq(0l),
+            eq(0L),
             eq(digest.getSizeBytes()),
             any(ServerCallStreamObserver.class),
             any(RequestMetadata.class));

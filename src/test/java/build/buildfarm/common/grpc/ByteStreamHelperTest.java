@@ -75,12 +75,11 @@ public class ByteStreamHelperTest {
     String resourceName = "not/found/resource";
     ReadRequest readRequest = ReadRequest.newBuilder().setResourceName(resourceName).build();
     doAnswer(
-            (Answer)
-                invocation -> {
-                  StreamObserver<ReadResponse> observer = invocation.getArgument(1);
-                  observer.onError(Status.NOT_FOUND.asException());
-                  return null;
-                })
+            invocation -> {
+              StreamObserver<ReadResponse> observer = invocation.getArgument(1);
+              observer.onError(Status.NOT_FOUND.asException());
+              return null;
+            })
         .when(serviceImpl)
         .read(eq(readRequest), any(StreamObserver.class));
 

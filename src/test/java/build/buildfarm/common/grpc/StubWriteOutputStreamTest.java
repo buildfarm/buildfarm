@@ -95,12 +95,11 @@ public class StubWriteOutputStreamTest {
     QueryWriteStatusRequest unimplementedRequest =
         QueryWriteStatusRequest.newBuilder().setResourceName(unimplementedResourceName).build();
     doAnswer(
-            (Answer)
-                invocation -> {
-                  StreamObserver<QueryWriteStatusResponse> observer = invocation.getArgument(1);
-                  observer.onError(Status.UNIMPLEMENTED.asException());
-                  return null;
-                })
+            invocation -> {
+              StreamObserver<QueryWriteStatusResponse> observer = invocation.getArgument(1);
+              observer.onError(Status.UNIMPLEMENTED.asException());
+              return null;
+            })
         .when(serviceImpl)
         .queryWriteStatus(eq(unimplementedRequest), any(StreamObserver.class));
 
@@ -108,12 +107,11 @@ public class StubWriteOutputStreamTest {
     QueryWriteStatusRequest notFoundRequest =
         QueryWriteStatusRequest.newBuilder().setResourceName(notFoundResourceName).build();
     doAnswer(
-            (Answer)
-                invocation -> {
-                  StreamObserver<QueryWriteStatusResponse> observer = invocation.getArgument(1);
-                  observer.onError(Status.NOT_FOUND.asException());
-                  return null;
-                })
+            invocation -> {
+              StreamObserver<QueryWriteStatusResponse> observer = invocation.getArgument(1);
+              observer.onError(Status.NOT_FOUND.asException());
+              return null;
+            })
         .when(serviceImpl)
         .queryWriteStatus(eq(notFoundRequest), any(StreamObserver.class));
 

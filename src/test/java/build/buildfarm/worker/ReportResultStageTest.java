@@ -54,7 +54,7 @@ import org.mockito.ArgumentCaptor;
 public class ReportResultStageTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
-  class SingleOutputSink extends PipelineStage {
+  static class SingleOutputSink extends PipelineStage {
     OperationContext operationContext = null;
 
     public SingleOutputSink() {

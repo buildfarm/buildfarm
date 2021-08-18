@@ -187,7 +187,7 @@ public class FuseCASTest {
     assertThat(value).isEqualTo("foo");
   }
 
-  class SystemFuseFileInfo extends FuseFileInfo {
+  static class SystemFuseFileInfo extends FuseFileInfo {
     public SystemFuseFileInfo() {
       super(Runtime.getSystemRuntime());
     }
@@ -195,12 +195,14 @@ public class FuseCASTest {
 
   @Test
   public void createNoEntry() {
+    //noinspection OctalInteger
     assertThat(fuseCAS.create("/foo/bar", 0644, new SystemFuseFileInfo()))
         .isEqualTo(-ErrorCodes.ENOENT());
   }
 
   @Test
   public void createEntryExists() {
+    //noinspection OctalInteger
     assertThat(fuseCAS.create("/foo", 0644, new SystemFuseFileInfo())).isEqualTo(0);
     FileStat fileStat = createFileStat();
     assertThat(fuseCAS.getattr("/foo", fileStat)).isEqualTo(0);
@@ -215,6 +217,7 @@ public class FuseCASTest {
 
   @Test
   public void mkdirCreatesDirectory() {
+    //noinspection OctalInteger
     assertThat(fuseCAS.mkdir("/foo", 0755)).isEqualTo(0);
     FileStat fileStat = createFileStat();
     assertThat(fuseCAS.getattr("/foo", fileStat)).isEqualTo(0);
@@ -223,23 +226,27 @@ public class FuseCASTest {
 
   @Test
   public void mkdirNoEntry() {
+    //noinspection OctalInteger
     assertThat(fuseCAS.mkdir("/foo/bar", 0755)).isEqualTo(-ErrorCodes.ENOENT());
   }
 
   @Test
   public void mkdirExists() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().setHash("/test").build());
+    //noinspection OctalInteger
     assertThat(fuseCAS.mkdir("/test", 0755)).isEqualTo(-ErrorCodes.EEXIST());
   }
 
   @Test
   public void unlinkDirectory() {
+    //noinspection OctalInteger
     fuseCAS.mkdir("/foo", 0755);
     assertThat(fuseCAS.unlink("/foo")).isEqualTo(-ErrorCodes.EISDIR());
   }
 
   @Test
   public void unlinkRemovesFile() {
+    //noinspection OctalInteger
     assertThat(fuseCAS.create("/foo", 0644, new SystemFuseFileInfo())).isEqualTo(0);
     assertThat(fuseCAS.unlink("/foo")).isEqualTo(0);
     assertThat(fuseCAS.getattr("/foo", createFileStat())).isEqualTo(-ErrorCodes.ENOENT());
@@ -254,6 +261,7 @@ public class FuseCASTest {
 
   @Test
   public void renameCreatesNewAndRemovesOld() {
+    //noinspection OctalInteger
     fuseCAS.create("/foo", 0644, new SystemFuseFileInfo());
     assertThat(fuseCAS.rename("/foo", "/bar")).isEqualTo(0);
     assertThat(fuseCAS.getattr("/bar", createFileStat())).isEqualTo(0);
@@ -267,12 +275,14 @@ public class FuseCASTest {
 
   @Test
   public void chownNop() {
+    //noinspection OctalInteger
     fuseCAS.create("/foo", 0644, new SystemFuseFileInfo());
     assertThat(fuseCAS.chown("/foo", -1, -1)).isEqualTo(0);
   }
 
   @Test
   public void chownValidId() {
+    //noinspection OctalInteger
     fuseCAS.create("/foo", 0644, new SystemFuseFileInfo());
     assertThat(fuseCAS.chown("/foo", -1, 0)).isEqualTo(-ErrorCodes.EPERM());
     assertThat(fuseCAS.chown("/foo", 0, -1)).isEqualTo(-ErrorCodes.EPERM());
@@ -285,6 +295,7 @@ public class FuseCASTest {
 
   @Test
   public void truncateExtends() {
+    //noinspection OctalInteger
     fuseCAS.create("/foo", 0644, new SystemFuseFileInfo());
     assertThat(fuseCAS.truncate("/foo", 1024)).isEqualTo(0);
     FileStat fileStat = createFileStat();
@@ -294,6 +305,7 @@ public class FuseCASTest {
 
   @Test
   public void truncateShortens() {
+    //noinspection OctalInteger
     fuseCAS.create("/foo", 0644, new SystemFuseFileInfo());
     assertThat(fuseCAS.truncate("/foo", 1024)).isEqualTo(0);
     assertThat(fuseCAS.truncate("/foo", 10)).isEqualTo(0);
@@ -321,6 +333,7 @@ public class FuseCASTest {
 
   @Test
   public void openForRead() {
+    //noinspection OctalInteger
     fuseCAS.create("/foo", 0644, new SystemFuseFileInfo());
     SystemFuseFileInfo fi = new SystemFuseFileInfo();
     fi.flags.set(0);
@@ -354,6 +367,7 @@ public class FuseCASTest {
   public void writeExtendsAndOverwrites() {
     FuseFileInfo fi = new SystemFuseFileInfo();
     fi.flags.set(OpenFlags.O_CREAT.intValue() | OpenFlags.O_TRUNC.intValue());
+    //noinspection OctalInteger
     fuseCAS.create("/foo", 0644, fi);
 
     ByteString data = ByteString.copyFromUtf8("Hello, World\n");
@@ -378,6 +392,7 @@ public class FuseCASTest {
 
   @Test
   public void readDirectory() {
+    //noinspection OctalInteger
     fuseCAS.mkdir("/foo", 0755);
     SystemFuseFileInfo fi = new SystemFuseFileInfo();
     fi.flags.set(OpenFlags.O_DIRECTORY.intValue());
@@ -388,6 +403,7 @@ public class FuseCASTest {
   @Test
   public void readAtEndIsEmpty() {
     FuseFileInfo fi = new SystemFuseFileInfo();
+    //noinspection OctalInteger
     fuseCAS.create("/foo", 0644, fi);
     assertThat(fuseCAS.read("/foo", /* buf=*/ null, /* size=*/ 1, /* offset=*/ 0, fi)).isEqualTo(0);
   }
@@ -395,6 +411,7 @@ public class FuseCASTest {
   @Test
   public void readWritten() {
     FuseFileInfo fi = new SystemFuseFileInfo();
+    //noinspection OctalInteger
     fuseCAS.create("/foo", 0644, fi);
 
     ByteString data = ByteString.copyFromUtf8("Hello, World\n");
@@ -434,7 +451,7 @@ public class FuseCASTest {
                 /* FALLOC_FL_PUNCH_HOLE */ 2,
                 /* off=*/ -1,
                 /* length=*/ -1,
-                new SystemFuseFileInfo()))
+                    new SystemFuseFileInfo()))
         .isEqualTo(-ErrorCodes.EOPNOTSUPP());
   }
 
@@ -456,12 +473,13 @@ public class FuseCASTest {
                 /* mode=*/ 0,
                 /* off=*/ -1,
                 /* length=*/ -1,
-                new SystemFuseFileInfo()))
+                    new SystemFuseFileInfo()))
         .isEqualTo(-ErrorCodes.EPERM());
   }
 
   @Test
   public void fallocateResize() {
+    //noinspection OctalInteger
     fuseCAS.create("/foo", 0644, new SystemFuseFileInfo());
     assertThat(
             fuseCAS.fallocate(

@@ -23,6 +23,8 @@ import static com.google.protobuf.ByteString.copyFromUtf8;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -99,9 +101,7 @@ public class ByteStringQueueInputStreamTest {
     data2[1] = 3;
 
     byte[] buffer = new byte[6];
-    for (int i = 0; i < buffer.length; i++) {
-      buffer[i] = 42;
-    }
+      Arrays.fill(buffer, (byte) 42);
 
     byte[] expected = new byte[6];
     expected[0] = 42;
