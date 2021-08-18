@@ -94,8 +94,8 @@ class CASFileCacheTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   private CASFileCache fileCache;
-  private Path root;
-  private boolean storeFileDirsIndexInMemory;
+  private final Path root;
+  private final boolean storeFileDirsIndexInMemory;
   private Map<Digest, ByteString> blobs;
   private ExecutorService putService;
 
@@ -747,6 +747,7 @@ class CASFileCacheTest {
     assertThat(Files.exists(fileCache.getPath(expiringKey))).isFalse();
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void interruptDeferredDuringExpirations() throws IOException, InterruptedException {
     Blob expiringBlob;

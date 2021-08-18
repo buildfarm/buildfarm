@@ -71,6 +71,7 @@ public class ShardWorkerInstanceTest {
         );
   }
 
+  @SuppressWarnings("unchecked")
   @Test(expected = SocketException.class)
   public void dispatchOperationThrowsOnSocketException() throws IOException, InterruptedException {
     when(backplane.dispatchOperation(any(List.class))).thenThrow(SocketException.class);
@@ -78,6 +79,7 @@ public class ShardWorkerInstanceTest {
     instance.dispatchOperation(listener);
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void dispatchOperationIgnoresNull() throws IOException, InterruptedException {
     QueueEntry queueEntry =

@@ -443,6 +443,7 @@ public class StubInstanceTest {
     instance.stop();
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void readBlobInterchangeDoesNotRequestUntilStarted() {
     ServerCallStreamObserver<ByteString> mockBlobObserver = mock(ServerCallStreamObserver.class);

@@ -118,6 +118,7 @@ public class ShardWorkerContextTest {
         ImmutableList.of());
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void queueEntryWithExecutionPolicyPlatformMatches() throws Exception {
     WorkerContext context =

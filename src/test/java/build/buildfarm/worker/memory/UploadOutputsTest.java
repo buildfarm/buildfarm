@@ -53,8 +53,7 @@ public class UploadOutputsTest {
 
   private final Configuration config;
 
-  private FileSystem fileSystem;
-  private Path root;
+    private Path root;
   private ActionResult.Builder resultBuilder;
 
   @Mock private ByteStreamUploader mockUploader;
@@ -67,12 +66,13 @@ public class UploadOutputsTest {
   public void setUp() throws ConfigurationException {
     MockitoAnnotations.initMocks(this);
 
-    fileSystem = Jimfs.newFileSystem(config);
+      FileSystem fileSystem = Jimfs.newFileSystem(config);
     root = Iterables.getFirst(fileSystem.getRootDirectories(), null);
 
     resultBuilder = ActionResult.newBuilder();
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void uploadOutputsUploadsEmptyOutputDirectories()
       throws IOException, StatusException, InterruptedException {
@@ -94,6 +94,7 @@ public class UploadOutputsTest {
                 .build());
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void uploadOutputsUploadsFiles()
       throws IOException, StatusException, InterruptedException {
@@ -131,6 +132,7 @@ public class UploadOutputsTest {
                 .build());
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void uploadOutputsUploadsNestedDirectories()
       throws IOException, StatusException, InterruptedException {

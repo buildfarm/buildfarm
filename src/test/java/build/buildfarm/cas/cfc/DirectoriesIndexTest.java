@@ -36,14 +36,14 @@ import org.junit.runners.JUnit4;
 public class DirectoriesIndexTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
-  private final String jdbcIndexUrl = "jdbc:sqlite::memory:";
-  private final EntryPathStrategy entryPathStrategy;
+    private final EntryPathStrategy entryPathStrategy;
   private final DirectoriesIndex directoriesIndex;
 
   protected DirectoriesIndexTest(Path root, DirectoriesIndexType type) {
     entryPathStrategy = new HexBucketEntryPathStrategy(root, /*levels=*/ 0);
     if (type == DirectoriesIndexType.Sqlite) {
-      directoriesIndex = new SqliteFileDirectoriesIndex(jdbcIndexUrl, entryPathStrategy);
+        String jdbcIndexUrl = "jdbc:sqlite::memory:";
+        directoriesIndex = new SqliteFileDirectoriesIndex(jdbcIndexUrl, entryPathStrategy);
     } else if (type == DirectoriesIndexType.HashMap) {
       directoriesIndex = new MemoryFileDirectoriesIndex(entryPathStrategy);
     } else if (type == DirectoriesIndexType.SetMultimap) {

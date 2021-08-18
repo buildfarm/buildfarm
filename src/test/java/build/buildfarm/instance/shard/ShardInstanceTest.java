@@ -179,6 +179,7 @@ public class ShardInstanceTest {
     return createAction(provideAction, provideCommand, inputRootDigest, command);
   }
 
+  @SuppressWarnings("unchecked")
   private Action createAction(
       boolean provideAction, boolean provideCommand, Digest inputRootDigest, Command command)
       throws Exception {
@@ -197,6 +198,7 @@ public class ShardInstanceTest {
 
     doAnswer(
             new Answer<ListenableFuture<Iterable<Digest>>>() {
+              @SuppressWarnings("unchecked")
               @Override
               public ListenableFuture<Iterable<Digest>> answer(InvocationOnMock invocation) {
                 Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
@@ -221,6 +223,7 @@ public class ShardInstanceTest {
 
     doAnswer(
             new Answer<Void>() {
+              @SuppressWarnings("unchecked")
               @Override
               public Void answer(InvocationOnMock invocation) {
                 StreamObserver<ByteString> blobObserver =
@@ -503,6 +506,7 @@ public class ShardInstanceTest {
     verify(poller, atLeastOnce()).pause();
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void queueOperationPutFailureCancelsOperation() throws Exception {
     Action action = createAction();
@@ -748,11 +752,13 @@ public class ShardInstanceTest {
     assertThat(status).isEqualTo(expectedStatus);
   }
 
+  @SuppressWarnings("unchecked")
   private void provideBlob(Digest digest, ByteString content) {
     blobDigests.add(digest);
     // FIXME use better answer definitions, without indexes
     doAnswer(
             new Answer<Void>() {
+              @SuppressWarnings("unchecked")
               @Override
               public Void answer(InvocationOnMock invocation) {
                 StreamObserver<ByteString> blobObserver =

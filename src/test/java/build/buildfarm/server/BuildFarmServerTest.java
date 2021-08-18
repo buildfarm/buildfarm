@@ -97,14 +97,12 @@ public class BuildFarmServerTest {
 
   private BuildFarmServer server;
   private ManagedChannel inProcessChannel;
-  private MemoryInstanceConfig memoryInstanceConfig;
 
   @Before
   public void setUp() throws Exception {
     String uniqueServerName = "in-process server for " + getClass();
 
-    memoryInstanceConfig =
-        MemoryInstanceConfig.newBuilder()
+    MemoryInstanceConfig memoryInstanceConfig = MemoryInstanceConfig.newBuilder()
             .setListOperationsDefaultPageSize(1024)
             .setListOperationsMaxPageSize(16384)
             .setTreeDefaultPageSize(1024)
@@ -112,12 +110,12 @@ public class BuildFarmServerTest {
             .setOperationPollTimeout(Durations.fromSeconds(10))
             .setOperationCompletedDelay(Durations.fromSeconds(10))
             .setCasConfig(
-                ContentAddressableStorageConfig.newBuilder()
-                    .setMemory(MemoryCASConfig.newBuilder().setMaxSizeBytes(640 * 1024)))
+                    ContentAddressableStorageConfig.newBuilder()
+                            .setMemory(MemoryCASConfig.newBuilder().setMaxSizeBytes(640 * 1024)))
             .setActionCacheConfig(
-                ActionCacheConfig.newBuilder()
-                    .setDelegateCas(DelegateCASConfig.getDefaultInstance())
-                    .build())
+                    ActionCacheConfig.newBuilder()
+                            .setDelegateCas(DelegateCASConfig.getDefaultInstance())
+                            .build())
             .setDefaultActionTimeout(Durations.fromSeconds(600))
             .setMaximumActionTimeout(Durations.fromSeconds(3600))
             .build();

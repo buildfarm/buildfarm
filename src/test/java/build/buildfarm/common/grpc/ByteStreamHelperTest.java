@@ -69,6 +69,7 @@ public class ByteStreamHelperTest {
         grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build());
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void newInputThrowsOnNotFound() {
     String resourceName = "not/found/resource";

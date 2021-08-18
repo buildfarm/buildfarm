@@ -310,6 +310,7 @@ public class ByteStreamServiceTest {
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void readSlicesLargeChunksFromInstance() throws Exception {
     // pick a large chunk size

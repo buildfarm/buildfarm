@@ -55,6 +55,7 @@ import org.mockito.stubbing.Answer;
 public class StubWriteOutputStreamTest {
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
 
+  @SuppressWarnings("unchecked")
   private final StreamObserver<WriteRequest> writeObserver = mock(StreamObserver.class);
 
   private final ByteStreamImplBase serviceImpl =
@@ -87,6 +88,7 @@ public class StubWriteOutputStreamTest {
         grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build());
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void resetExceptionsAreInterpreted() {
     String unimplementedResourceName = "unimplemented-resource";
@@ -139,6 +141,7 @@ public class StubWriteOutputStreamTest {
     verify(serviceImpl, times(1)).queryWriteStatus(eq(notFoundRequest), any(StreamObserver.class));
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void resetIsRespectedOnSubsequentWrite() throws IOException {
     String resourceName = "reset-resource";

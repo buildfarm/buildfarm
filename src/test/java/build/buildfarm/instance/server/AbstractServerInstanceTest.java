@@ -464,6 +464,7 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getDescription()).isEqualTo("working directory is not an input directory");
   }
 
+  @SuppressWarnings("unchecked")
   private static void doBlob(
       ContentAddressableStorage contentAddressableStorage,
       Digest digest,
@@ -471,6 +472,7 @@ public class AbstractServerInstanceTest {
       RequestMetadata requestMetadata) {
     doAnswer(
             new Answer<Void>() {
+              @SuppressWarnings("unchecked")
               @Override
               public Void answer(InvocationOnMock invocation) {
                 StreamObserver<ByteString> blobObserver =
@@ -489,6 +491,7 @@ public class AbstractServerInstanceTest {
             eq(requestMetadata));
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void outputDirectoriesFilesAreEnsuredPresent() throws Exception {
     // our test subjects - these should appear in the findMissingBlobs request

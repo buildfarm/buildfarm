@@ -165,9 +165,9 @@ public class FuseCASTest {
     public u8(Runtime runtime) {
       super(runtime);
     }
-  };
+  }
 
-  private static String stringFromPointer(Pointer buf) {
+    private static String stringFromPointer(Pointer buf) {
     return StringResultConverter.getInstance(Charset.defaultCharset()).fromNative(buf, null);
   }
 

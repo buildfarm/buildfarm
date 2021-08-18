@@ -114,7 +114,6 @@ public class MemoryInstanceTest {
   private Map<String, ByteString> storage;
   private List<Worker> workers;
   private Map<String, Watchdog> requeuers;
-  private Map<String, Watchdog> operationTimeoutDelays;
 
   @Before
   public void setUp() throws Exception {
@@ -142,7 +141,7 @@ public class MemoryInstanceTest {
     storage = Maps.newHashMap();
     workers = Lists.newArrayList();
     requeuers = Maps.newHashMap();
-    operationTimeoutDelays = Maps.newHashMap();
+    Map<String, Watchdog> operationTimeoutDelays = Maps.newHashMap();
     instance =
         new MemoryInstance(
             "memory",
@@ -154,7 +153,7 @@ public class MemoryInstanceTest {
             outstandingOperations,
             workers,
             requeuers,
-            operationTimeoutDelays);
+                operationTimeoutDelays);
   }
 
   @After
