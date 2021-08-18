@@ -1416,13 +1416,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               Path dirPath = path;
               String basename = path.getFileName().toString();
               if (basename.equals(digest.getHash() + "_" + digest.getSizeBytes() + "_dir")) {
-                Path legacyPath = path;
                 dirPath = getDirectoryPath(digest);
                 if (Files.exists(dirPath)) {
                   // destroy this directory if the destination already exists
                   digest = null;
                 } else {
-                  Files.move(legacyPath, dirPath);
+                  Files.move(path, dirPath);
                 }
               }
               // end legacy support, drop modified dirPath

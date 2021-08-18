@@ -153,7 +153,7 @@ public final class Chunker {
    * Returns {@code true} if a subsequent call to {@link #next()} returns a {@link Chunk} object;
    */
   public boolean hasNext() {
-    return data != null || !initialized;
+    return data == null && initialized;
   }
 
   /**
@@ -166,7 +166,7 @@ public final class Chunker {
    * returned.
    */
   public Chunk next() throws IOException {
-    if (!hasNext()) {
+    if (hasNext()) {
       throw new NoSuchElementException();
     }
 

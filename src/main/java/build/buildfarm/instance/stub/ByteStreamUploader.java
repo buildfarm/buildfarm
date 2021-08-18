@@ -413,7 +413,7 @@ public class ByteStreamUploader {
             @Override
             public void onReady() {
               while (call.isReady()) {
-                if (!chunker.hasNext()) {
+                if (chunker.hasNext()) {
                   halfClose();
                   return;
                 }
@@ -431,7 +431,7 @@ public class ByteStreamUploader {
                     requestBuilder.setResourceName(resourceName);
                   }
 
-                  boolean isLastChunk = !chunker.hasNext();
+                  boolean isLastChunk = chunker.hasNext();
                   WriteRequest request =
                       requestBuilder
                           .setData(chunk.getData())

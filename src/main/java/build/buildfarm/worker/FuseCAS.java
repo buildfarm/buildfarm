@@ -680,8 +680,7 @@ public class FuseCAS extends FuseStubFS {
     }
 
     WriteFileEntry writeFileEntry = (WriteFileEntry) entry;
-    boolean executable = (mode & 0111) != 0;
-    writeFileEntry.executable = executable;
+    writeFileEntry.executable = (mode & 0111) != 0;
 
     return 0;
   }

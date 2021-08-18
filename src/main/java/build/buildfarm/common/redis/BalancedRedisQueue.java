@@ -171,7 +171,6 @@ public class BalancedRedisQueue {
     boolean blocking = false;
     // try each of the internal queues with exponential backoff
     int currentTimeout_s = START_TIMEOUT_SECONDS;
-    int maxTimeout_s = MAX_TIMEOUT_SECONDS;
     while (true) {
       final String val;
       RedisQueue queue = queues.get(roundRobinPopIndex());
@@ -188,7 +187,7 @@ public class BalancedRedisQueue {
       if (currentPopQueue == startQueue) {
         // advance timeout if blocking on queue and not at max each queue cycle
         if (blocking) {
-          currentTimeout_s = Math.min(currentTimeout_s * 2, maxTimeout_s);
+          currentTimeout_s = Math.min(currentTimeout_s * 2, MAX_TIMEOUT_SECONDS);
         } else {
           blocking = true;
         }

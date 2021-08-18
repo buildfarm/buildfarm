@@ -440,13 +440,12 @@ public class Worker extends LoggingMain {
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));
-    PipelineStage errorStage = completeStage; /* new ErrorStage(); */
-    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
+    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, completeStage);
     PipelineStage executeActionStage =
-        new ExecuteActionStage(context, reportResultStage, errorStage);
+        new ExecuteActionStage(context, reportResultStage, completeStage);
     PipelineStage inputFetchStage =
         new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
-    PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
+    PipelineStage matchStage = new MatchStage(context, inputFetchStage, completeStage);
 
     pipeline = new Pipeline();
     // pipeline.add(errorStage, 0);

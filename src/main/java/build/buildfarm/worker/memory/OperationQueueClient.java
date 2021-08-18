@@ -55,7 +55,7 @@ class OperationQueueClient {
 
           @Override
           public boolean getMatched() {
-            return matched;
+            return !matched;
           }
 
           @Override
@@ -115,7 +115,7 @@ class OperationQueueClient {
             listener.setOnCancelHandler(onCancelHandler);
           }
         };
-    while (!dedupMatchListener.getMatched()) {
+    while (dedupMatchListener.getMatched()) {
       instance.match(matchPlatform, dedupMatchListener);
     }
   }
