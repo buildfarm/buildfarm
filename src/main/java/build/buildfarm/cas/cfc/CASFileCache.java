@@ -815,20 +815,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
           synchronized long getCommittedSizeFromOut() {
             if (out == null) {
-              if (fileCommittedSize >= 0) {
-                return fileCommittedSize;
-              } else {
+              if (fileCommittedSize < 0) {
                 // we need to cache this from disk until an out stream is acquired
                 String blobKey = getKey(key.getDigest(), false);
                 Path blobKeyPath = getPath(blobKey);
                 try {
                   fileCommittedSize =
-                      Files.size(blobKeyPath.resolveSibling(blobKey + "." + key.getIdentifier()));
+                          Files.size(blobKeyPath.resolveSibling(blobKey + "." + key.getIdentifier()));
                 } catch (IOException e) {
                   fileCommittedSize = 0;
                 }
-                return fileCommittedSize;
               }
+              return fileCommittedSize;
             }
             return out.getWritten();
           }
