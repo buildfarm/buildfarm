@@ -88,15 +88,20 @@ class GracefulShutdownTest {
   }
 
   public static void main(String[] args) {
-    if (args[0].equals("ShutDown")) {
-      shutDownGracefully(args);
-    } else if (args[0].equals("PrepareWorker")) {
-      prepareWorkerForShutDown(args);
-    } else if (args[0].equals("DisableProtection")) {
-      disableScaleInProtection(args);
-    } else {
-      System.out.println(
-          "The action your choose is wrong. Please choose one from ShutDown, PrepareWorker, and DisableProtection");
-    }
+      switch (args[0]) {
+          case "ShutDown":
+              shutDownGracefully(args);
+              break;
+          case "PrepareWorker":
+              prepareWorkerForShutDown(args);
+              break;
+          case "DisableProtection":
+              disableScaleInProtection(args);
+              break;
+          default:
+              System.out.println(
+                      "The action your choose is wrong. Please choose one from ShutDown, PrepareWorker, and DisableProtection");
+              break;
+      }
   }
 }
