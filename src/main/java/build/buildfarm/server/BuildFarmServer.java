@@ -55,6 +55,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
+@SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
   // collected, which would cause us to loose their configuration.

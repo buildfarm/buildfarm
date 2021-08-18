@@ -340,6 +340,7 @@ public class MemoryInstance extends AbstractServerInstance {
     try {
       return streams.get(name);
     } catch (ExecutionException e) {
+      //noinspection deprecation
       Throwables.propagateIfInstanceOf(e.getCause(), RuntimeException.class);
       throw new UncheckedExecutionException(e.getCause());
     }

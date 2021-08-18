@@ -236,7 +236,7 @@ public class ContentAddressableStorageService
 
       GetTreeResponse.Builder response =
           GetTreeResponse.newBuilder().setNextPageToken(nextPageToken);
-      response.addAllDirectories(tree.getDirectories().values());
+      response.addAllDirectories(tree.getDirectoriesMap().values());
       responseObserver.onNext(response.build());
       pageToken = nextPageToken;
     } while (!pageToken.isEmpty());

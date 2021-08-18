@@ -1090,13 +1090,6 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public Iterable<String> getOperations() {
     throw new UnsupportedOperationException();
-    /*
-    return client.call(jedis -> {
-      Iterable<String> dispatchedOperations = jedis.hkeys(config.getDispatchedOperationsHashName());
-      Iterable<String> queuedOperations = jedis.lrange(config.getQueuedOperationsListName(), 0, -1);
-      return Iterables.concat(queuedOperations, dispatchedOperations, getCompletedOperations(jedis));
-    });
-    */
   }
 
   @Override

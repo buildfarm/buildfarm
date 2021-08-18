@@ -132,6 +132,7 @@ public class Worker extends LoggingMain {
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
+  @SuppressWarnings("deprecation")
   private final HealthStatusManager healthStatusManager;
   private final Server server;
   private final Path root;
@@ -337,6 +338,7 @@ public class Worker extends LoggingMain {
     return instance.stripQueuedOperation(operation);
   }
 
+  @SuppressWarnings("deprecation")
   public Worker(String session, ServerBuilder<?> serverBuilder, ShardWorkerConfig config)
       throws ConfigurationException {
     super("BuildFarmShardWorker");
@@ -715,6 +717,7 @@ public class Worker extends LoggingMain {
         /* deadlineAfterUnits=*/ );
   }
 
+  @SuppressWarnings("deprecation")
   public void stop() throws InterruptedException {
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
@@ -885,6 +888,7 @@ public class Worker extends LoggingMain {
         .start();
   }
 
+  @SuppressWarnings("deprecation")
   public void start() throws InterruptedException {
     try {
       backplane.start(config.getPublicName());

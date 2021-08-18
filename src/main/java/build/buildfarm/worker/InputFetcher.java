@@ -168,7 +168,7 @@ public class InputFetcher implements Runnable {
 
       if (queuedOperation.hasTree()) {
         directoriesIndex =
-            DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories());
+            DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap());
       } else {
         // TODO remove legacy interpretation and field after transition
         directoriesIndex =

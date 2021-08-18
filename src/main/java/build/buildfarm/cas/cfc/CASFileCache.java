@@ -2278,6 +2278,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 Level.SEVERE,
                 format("could not close stream for %s", DigestUtil.toString(digest)),
                 e);
+            //noinspection deprecation
             Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
             throw new InterruptedException();
           } else {

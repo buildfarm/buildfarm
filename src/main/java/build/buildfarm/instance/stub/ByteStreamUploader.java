@@ -152,6 +152,7 @@ public class ByteStreamUploader {
       }
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
+      //noinspection deprecation
       propagateIfInstanceOf(cause, IOException.class);
       throwIfUnchecked(cause);
       throw new RuntimeException(cause);

@@ -937,7 +937,7 @@ public abstract class AbstractServerInstance implements Instance {
       validateAction(
           queuedOperation.getAction(),
           queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
-          DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories()),
+          DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap()),
           inputDigestsBuilder::add,
           preconditionFailure);
       validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
@@ -991,7 +991,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateAction(
         action,
         getUnchecked(expect(action.getCommandDigest(), Command.parser(), service, requestMetadata)),
-        DigestUtil.proxyDirectoriesIndex(tree.getDirectories()),
+        DigestUtil.proxyDirectoriesIndex(tree.getDirectoriesMap()),
         inputDigestsBuilder::add,
         preconditionFailure);
     validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
@@ -1003,7 +1003,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateAction(
         queuedOperation.getAction(),
         queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
-        DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories()),
+        DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap()),
         digest -> {},
         preconditionFailure);
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
