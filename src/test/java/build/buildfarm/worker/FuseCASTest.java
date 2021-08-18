@@ -53,28 +53,25 @@ public class FuseCASTest {
     fuseCAS =
         new FuseCAS(
             null,
-            new InputStreamFactory() {
-              @Override
-              public InputStream newInput(Digest blobDigest, long offset) {
-                if (blobDigest.getHash().equals("/test")) {
-                  return Directory.newBuilder()
-                      .addFiles(
-                          FileNode.newBuilder()
-                              .setName("file")
-                              .setDigest(
-                                  Digest.newBuilder()
-                                      .setHash("/test/file")
-                                      .setSizeBytes(content.size()))
-                              .build())
-                      .build()
-                      .toByteString()
-                      .newInput();
-                } else if (blobDigest.getHash().equals("/test/file")) {
-                  return content.newInput();
-                }
-                throw new UnsupportedOperationException();
-              }
-            });
+                (blobDigest, offset) -> {
+                  if (blobDigest.getHash().equals("/test")) {
+                    return Directory.newBuilder()
+                        .addFiles(
+                            FileNode.newBuilder()
+                                .setName("file")
+                                .setDigest(
+                                    Digest.newBuilder()
+                                        .setHash("/test/file")
+                                        .setSizeBytes(content.size()))
+                                .build())
+                        .build()
+                        .toByteString()
+                        .newInput();
+                  } else if (blobDigest.getHash().equals("/test/file")) {
+                    return content.newInput();
+                  }
+                  throw new UnsupportedOperationException();
+                });
   }
 
   private FileStat createFileStat() {

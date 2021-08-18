@@ -37,20 +37,14 @@ public class FailoverInputStreamFactoryTest {
     Digest contentDigest = DIGEST_UTIL.compute(content);
     FailoverInputStreamFactory failoverFactory =
         new FailoverInputStreamFactory(
-            /* primary=*/ new InputStreamFactory() {
-              @Override
-              public InputStream newInput(Digest digest, long offset) throws IOException {
-                if (digest.equals(contentDigest)) {
-                  return content.newInput();
-                }
-                throw new NoSuchFileException(DigestUtil.toString(digest));
+            /* primary=*/ (digest, offset) -> {
+              if (digest.equals(contentDigest)) {
+                return content.newInput();
               }
+              throw new NoSuchFileException(DigestUtil.toString(digest));
             },
-            /* failover=*/ new InputStreamFactory() {
-              @Override
-              public InputStream newInput(Digest digest, long offset) throws IOException {
-                throw new IOException("invalid");
-              }
+            /* failover=*/ (digest, offset) -> {
+              throw new IOException("invalid");
             });
     InputStream in = failoverFactory.newInput(contentDigest, /* offset=*/ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);
@@ -62,20 +56,14 @@ public class FailoverInputStreamFactoryTest {
     Digest contentDigest = DIGEST_UTIL.compute(content);
     FailoverInputStreamFactory failoverFactory =
         new FailoverInputStreamFactory(
-            /* primary=*/ new InputStreamFactory() {
-              @Override
-              public InputStream newInput(Digest digest, long offset) throws IOException {
-                throw new NoSuchFileException(DigestUtil.toString(digest));
-              }
+            /* primary=*/ (digest, offset) -> {
+              throw new NoSuchFileException(DigestUtil.toString(digest));
             },
-            /* failover=*/ new InputStreamFactory() {
-              @Override
-              public InputStream newInput(Digest digest, long offset) throws IOException {
-                if (digest.equals(contentDigest)) {
-                  return content.newInput();
-                }
-                throw new IOException("invalid");
+            /* failover=*/ (digest, offset) -> {
+              if (digest.equals(contentDigest)) {
+                return content.newInput();
               }
+              throw new IOException("invalid");
             });
     InputStream in = failoverFactory.newInput(contentDigest, /* offset=*/ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);

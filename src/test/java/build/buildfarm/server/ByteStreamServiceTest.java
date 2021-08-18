@@ -57,6 +57,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -141,12 +143,9 @@ public class ByteStreamServiceTest {
 
     Write write = mock(Write.class);
     doAnswer(
-            new Answer<Void>() {
-              @Override
-              public Void answer(InvocationOnMock invocation) {
-                output.reset();
-                return null;
-              }
+            (Answer<Void>) invocation -> {
+              output.reset();
+              return null;
             })
         .when(write)
         .reset();
@@ -361,6 +360,6 @@ public class ByteStreamServiceTest {
     assertThat(readObserver.getData()).isEqualTo(content);
     List<Integer> sizes = readObserver.getSizesList();
     assertThat(sizes.size()).isEqualTo(11); // 10 + 1 incomplete chunk
-    assertThat(Iterables.filter(sizes, (responseSize) -> responseSize > CHUNK_SIZE)).isEmpty();
+    assertThat(sizes.stream().filter((responseSize) -> responseSize > CHUNK_SIZE).collect(Collectors.toList())).isEmpty();
   }
 }

@@ -471,16 +471,12 @@ public class AbstractServerInstanceTest {
       ByteString content,
       RequestMetadata requestMetadata) {
     doAnswer(
-            new Answer<Void>() {
-              @SuppressWarnings("unchecked")
-              @Override
-              public Void answer(InvocationOnMock invocation) {
-                StreamObserver<ByteString> blobObserver =
-                    (StreamObserver) invocation.getArguments()[3];
-                blobObserver.onNext(content);
-                blobObserver.onCompleted();
-                return null;
-              }
+            (Answer<Void>) invocation -> {
+              StreamObserver<ByteString> blobObserver =
+                  (StreamObserver) invocation.getArguments()[3];
+              blobObserver.onNext(content);
+              blobObserver.onCompleted();
+              return null;
             })
         .when(contentAddressableStorage)
         .get(

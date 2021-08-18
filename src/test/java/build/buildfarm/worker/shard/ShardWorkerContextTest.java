@@ -84,9 +84,7 @@ public class ShardWorkerContextTest {
         matchSettings,
         platform,
         /* operationPollPeriod=*/ Duration.getDefaultInstance(),
-        /* operationPoller=*/ (queueEntry, stage, requeueAt) -> {
-          return false;
-        },
+        /* operationPoller=*/ (queueEntry, stage, requeueAt) -> false,
         /* inlineContentLimit=*/
             /* inputFetchStageWidth=*/ 0,
         /* executeStageWidth=*/ 0,

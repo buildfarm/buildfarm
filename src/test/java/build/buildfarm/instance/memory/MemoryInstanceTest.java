@@ -279,13 +279,10 @@ public class MemoryInstanceTest {
 
     // as a result of the initial verified test, change the operation to done
     Answer<Void> initialAnswer =
-        new Answer<Void>() {
-          @Override
-          public Void answer(InvocationOnMock invocation) throws Throwable {
-            outstandingOperations.put(operation.getName(), doneOperation);
-            return null;
-          }
-        };
+            invocation -> {
+              outstandingOperations.put(operation.getName(), doneOperation);
+              return null;
+            };
     Watcher watcher = mock(Watcher.class);
     doAnswer(initialAnswer).when(watcher).observe(eq(operation));
 

@@ -66,6 +66,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -270,10 +272,8 @@ public class StubInstanceTest {
             responseObserver.onNext(
                 BatchUpdateBlobsResponse.newBuilder()
                     .addAllResponses(
-                        Iterables.transform(
-                            batchRequest.getRequestsList(),
-                            request ->
-                                Response.newBuilder().setDigest(request.getDigest()).build()))
+                            batchRequest.getRequestsList().stream().map(request ->
+                                    Response.newBuilder().setDigest(request.getDigest()).build()).collect(Collectors.toList()))
                     .build());
             responseObserver.onCompleted();
           }

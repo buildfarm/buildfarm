@@ -197,14 +197,10 @@ public class ShardInstanceTest {
     }
 
     doAnswer(
-            new Answer<ListenableFuture<Iterable<Digest>>>() {
-              @SuppressWarnings("unchecked")
-              @Override
-              public ListenableFuture<Iterable<Digest>> answer(InvocationOnMock invocation) {
-                Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
-                return immediateFuture(
-                    Iterables.filter(digests, (digest) -> !blobDigests.contains(digest)));
-              }
+            (Answer<ListenableFuture<Iterable<Digest>>>) invocation -> {
+              Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
+              return immediateFuture(
+                  Iterables.filter(digests, (digest) -> !blobDigests.contains(digest)));
             })
         .when(mockWorkerInstance)
         .findMissingBlobs(any(Iterable.class), any(RequestMetadata.class));
@@ -222,20 +218,16 @@ public class ShardInstanceTest {
     }
 
     doAnswer(
-            new Answer<Void>() {
-              @SuppressWarnings("unchecked")
-              @Override
-              public Void answer(InvocationOnMock invocation) {
-                StreamObserver<ByteString> blobObserver =
-                    (StreamObserver) invocation.getArguments()[3];
-                if (provideAction) {
-                  blobObserver.onNext(action.toByteString());
-                  blobObserver.onCompleted();
-                } else {
-                  blobObserver.onError(Status.NOT_FOUND.asException());
-                }
-                return null;
+            (Answer<Void>) invocation -> {
+              StreamObserver<ByteString> blobObserver =
+                  (StreamObserver) invocation.getArguments()[3];
+              if (provideAction) {
+                blobObserver.onNext(action.toByteString());
+                blobObserver.onCompleted();
+              } else {
+                blobObserver.onError(Status.NOT_FOUND.asException());
               }
+              return null;
             })
         .when(mockWorkerInstance)
         .getBlob(
@@ -757,16 +749,12 @@ public class ShardInstanceTest {
     blobDigests.add(digest);
     // FIXME use better answer definitions, without indexes
     doAnswer(
-            new Answer<Void>() {
-              @SuppressWarnings("unchecked")
-              @Override
-              public Void answer(InvocationOnMock invocation) {
-                StreamObserver<ByteString> blobObserver =
-                    (StreamObserver) invocation.getArguments()[3];
-                blobObserver.onNext(content);
-                blobObserver.onCompleted();
-                return null;
-              }
+            (Answer<Void>) invocation -> {
+              StreamObserver<ByteString> blobObserver =
+                  (StreamObserver) invocation.getArguments()[3];
+              blobObserver.onNext(content);
+              blobObserver.onCompleted();
+              return null;
             })
         .when(mockWorkerInstance)
         .getBlob(
@@ -965,12 +953,7 @@ public class ShardInstanceTest {
 
     // ensure callback returns null
     Function<String, String> getCallback =
-        new Function<String, String>() {
-          @Override
-          public String apply(String s) {
-            return null;
-          }
-        };
+            s -> null;
 
     // check that result is null (i.e. no exceptions thrown)
     CompletableFuture<String> result = cache.get("missing", getCallback);

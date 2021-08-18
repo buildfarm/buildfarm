@@ -235,7 +235,7 @@ public class BuildFarmServerTest {
 
     ListOperationsResponse listResponse = operationsStub.listOperations(listRequest);
 
-    assertThat(Iterables.transform(listResponse.getOperationsList(), o -> o.getName()))
+    assertThat(Iterables.transform(listResponse.getOperationsList(), Operation::getName))
         .containsExactly(operation.getName());
 
     CancelOperationRequest cancelRequest =
