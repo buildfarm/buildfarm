@@ -431,6 +431,7 @@ public class RedisShardBackplane implements Backplane {
             .setExpire(OperationChange.Expire.newBuilder().setForce(false).build()));
   }
 
+  @SuppressWarnings("unchecked")
   public void updateWatchedIfDone(JedisCluster jedis) {
     List<String> operationChannels = subscriber.watchedOperationChannels();
     if (operationChannels.isEmpty()) {
@@ -581,6 +582,7 @@ public class RedisShardBackplane implements Backplane {
         config.getMaxPreQueueDepth());
   }
 
+  @SuppressWarnings("unchecked")
   static OperationQueue createOperationQueue(RedisClient client, RedisShardBackplaneConfig config)
       throws IOException {
     // Construct an operation queue based on configuration.

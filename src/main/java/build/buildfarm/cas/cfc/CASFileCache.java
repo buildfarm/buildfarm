@@ -1251,6 +1251,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  @SuppressWarnings("unchecked")
   private void logCacheScanResults(CacheScanResults cacheScanResults) {
     JSONObject obj = new JSONObject();
     obj.put("dirs", cacheScanResults.computeDirs.size());
@@ -1259,6 +1260,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     logger.log(Level.INFO, obj.toString());
   }
 
+  @SuppressWarnings("unchecked")
   private void logComputeDirectoriesResults(List<Path> invalidDirectories) {
     JSONObject obj = new JSONObject();
     obj.put("invalid dirs", invalidDirectories.size());

@@ -338,7 +338,7 @@ public class Worker extends LoggingMain {
     return instance.stripQueuedOperation(operation);
   }
 
-  @SuppressWarnings("deprecation")
+  @SuppressWarnings({"deprecation", "unchecked"})
   public Worker(String session, ServerBuilder<?> serverBuilder, ShardWorkerConfig config)
       throws ConfigurationException {
     super("BuildFarmShardWorker");

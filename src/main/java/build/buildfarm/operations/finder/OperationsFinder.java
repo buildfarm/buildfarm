@@ -90,6 +90,7 @@ public class OperationsFinder {
    * @param settings Settings on what operations to find and keep.
    * @param results Accumulating results from performing a search.
    */
+  @SuppressWarnings("unchecked")
   private static void findOperationNode(
       JedisCluster cluster,
       Jedis node,

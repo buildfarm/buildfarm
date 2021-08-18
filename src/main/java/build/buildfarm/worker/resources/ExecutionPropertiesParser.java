@@ -210,6 +210,7 @@ public class ExecutionPropertiesParser {
    * @param limits Current limits to apply changes to.
    * @param property The property to store.
    */
+  @SuppressWarnings("unchecked")
   private static void storeEnvVars(ResourceLimits limits, Property property) {
     try {
       JSONParser parser = new JSONParser();

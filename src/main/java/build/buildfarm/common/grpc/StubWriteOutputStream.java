@@ -66,6 +66,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private final byte[] buf;
   private final SettableFuture<Long> writeFuture = SettableFuture.create();
   private boolean wasReset = false;
+  @SuppressWarnings("unchecked")
   private final Supplier<QueryWriteStatusResponse> writeStatus =
       Suppliers.memoize(
           new Supplier() {

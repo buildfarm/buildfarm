@@ -120,6 +120,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
     return String.format("%s/%d", size, width);
   }
 
+  @SuppressWarnings("unchecked")
   private boolean claim(int count) throws InterruptedException {
     Object handle = new Object();
     int claimed = 0;

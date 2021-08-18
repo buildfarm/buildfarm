@@ -64,6 +64,7 @@ public class WorkerIndexer {
    * @param settings Settings on how to traverse the CAS and which worker to remove.
    * @param results Accumulating results from performing reindexing.
    */
+  @SuppressWarnings("unchecked")
   private static void reindexNode(
       JedisCluster cluster, Jedis node, CasIndexSettings settings, CasIndexResults results) {
     // iterate over all CAS entries via scanning
