@@ -75,6 +75,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 
 class OperationQueueWorkerContext implements WorkerContext {
@@ -467,8 +469,8 @@ class OperationQueueWorkerContext implements WorkerContext {
         new UploadManifest(
             digestUtil, result, execRoot, /* allowSymlinks= */ true, inlineContentLimit);
 
-    manifest.addFiles(Iterables.transform(outputFiles, execRoot::resolve), fileCasPolicy);
-    manifest.addDirectories(Iterables.transform(outputDirs, execRoot::resolve));
+    manifest.addFiles(StreamSupport.stream(outputFiles.spliterator(), false).map(execRoot::resolve).collect(Collectors.toList()), fileCasPolicy);
+    manifest.addDirectories(StreamSupport.stream(outputDirs.spliterator(), false).map(execRoot::resolve).collect(Collectors.toList()));
 
     /* put together our outputs and update the result */
     if (result.getStdoutRaw().size() > 0) {

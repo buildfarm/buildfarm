@@ -442,7 +442,7 @@ public class RedisShardBackplane implements Backplane {
     List<Map.Entry<String, Response<String>>> operations = new ArrayList(operationChannels.size());
     JedisClusterPipeline p = jedis.pipelined();
     for (String operationName :
-        Iterables.transform(operationChannels, RedisShardBackplane::parseOperationChannel)) {
+            operationChannels.stream().map(RedisShardBackplane::parseOperationChannel).collect(Collectors.toList())) {
       operations.add(
           new AbstractMap.SimpleEntry<>(operationName, p.get(operationKey(operationName))));
     }
@@ -920,11 +920,9 @@ public class RedisShardBackplane implements Backplane {
             });
     return new ActionCacheScanResult(
         token,
-        Iterables.transform(
-            results.build(),
-            (entry) ->
-                new AbstractMap.SimpleEntry<>(
-                    entry.getKey(), parseActionResult(entry.getValue()))));
+            results.build().stream().map((entry) ->
+                    new AbstractMap.SimpleEntry<>(
+                            entry.getKey(), parseActionResult(entry.getValue()))).collect(Collectors.toList()));
   }
 
   @Override

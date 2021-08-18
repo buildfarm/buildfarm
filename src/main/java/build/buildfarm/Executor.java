@@ -276,9 +276,7 @@ class Executor {
           BatchUpdateBlobsResponse batchResponse = casStub.batchUpdateBlobs(batchRequest);
           long usecs = stopwatch.elapsed(MICROSECONDS);
           checkState(
-              all(
-                  batchResponse.getResponsesList(),
-                  response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
+                  batchResponse.getResponsesList().stream().allMatch(response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
           System.out.println(
               "Updated "
                   + batchRequest.getRequestsCount()
@@ -350,9 +348,7 @@ class Executor {
         BatchUpdateBlobsResponse batchResponse = casStub.batchUpdateBlobs(batchRequest);
         long usecs = stopwatch.elapsed(MICROSECONDS);
         checkState(
-            all(
-                batchResponse.getResponsesList(),
-                response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
+                batchResponse.getResponsesList().stream().allMatch(response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
         System.out.println(
             "Updated " + batchRequest.getRequestsCount() + " blobs in " + (usecs / 1000.0) + "ms");
       }

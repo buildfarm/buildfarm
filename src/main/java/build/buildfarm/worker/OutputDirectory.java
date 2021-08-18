@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 public class OutputDirectory {
   private static final OutputDirectory defaultInstance = new OutputDirectory(ImmutableMap.of());
@@ -106,14 +108,10 @@ public class OutputDirectory {
       Iterable<EnvironmentVariable> envVars) {
     return parseDirectories(
         Iterables.concat(
-            Iterables.transform(
-                Iterables.filter(outputFiles, (file) -> file.contains("/")),
-                (file) ->
-                    new OutputDirectoryEntry(
-                        "/" + file.substring(0, file.lastIndexOf('/') + 1), false)),
-            Iterables.transform(
-                outputDirs,
-                (dir) -> new OutputDirectoryEntry(dir.isEmpty() ? "/" : ("/" + dir + "/"), true)),
+                StreamSupport.stream(outputFiles.spliterator(), false).filter((file) -> file.contains("/")).collect(Collectors.toList()).stream().map((file) ->
+                        new OutputDirectoryEntry(
+                                "/" + file.substring(0, file.lastIndexOf('/') + 1), false)).collect(Collectors.toList()),
+                StreamSupport.stream(outputDirs.spliterator(), false).map((dir) -> new OutputDirectoryEntry(dir.isEmpty() ? "/" : ("/" + dir + "/"), true)).collect(Collectors.toList()),
             envVarOutputDirectoryEntries(envVars)));
   }
 

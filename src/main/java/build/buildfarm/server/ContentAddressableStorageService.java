@@ -51,6 +51,8 @@ import io.prometheus.client.Summary;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
@@ -196,13 +198,11 @@ public class ContentAddressableStorageService
     ListenableFuture<BatchUpdateBlobsResponse> responseFuture =
         transform(
             allAsList(
-                Iterables.transform(
-                    putAllBlobs(
-                        instance,
-                        batchRequest.getRequestsList(),
-                        writeDeadlineAfter,
-                        writeDeadlineAfterUnits),
-                    (future) -> transform(future, response::addResponses, directExecutor()))),
+                    StreamSupport.stream(putAllBlobs(
+                            instance,
+                            batchRequest.getRequestsList(),
+                            writeDeadlineAfter,
+                            writeDeadlineAfterUnits).spliterator(), false).map((future) -> transform(future, response::addResponses, directExecutor())).collect(Collectors.toList())),
             (result) -> response.build(),
             directExecutor());
 

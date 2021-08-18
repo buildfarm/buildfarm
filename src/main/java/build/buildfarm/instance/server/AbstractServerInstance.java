@@ -127,6 +127,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 
 public abstract class AbstractServerInstance implements Instance {
@@ -877,14 +879,12 @@ public abstract class AbstractServerInstance implements Instance {
             findMissingBlobs(inputDigests, requestMetadata),
             (missingBlobDigests) -> {
               preconditionFailure.addAllViolations(
-                  Iterables.transform(
-                      missingBlobDigests,
-                      (digest) ->
-                          Violation.newBuilder()
-                              .setType(VIOLATION_TYPE_MISSING)
-                              .setSubject("blobs/" + DigestUtil.toString(digest))
-                              .setDescription(MISSING_INPUT)
-                              .build()));
+                      StreamSupport.stream(missingBlobDigests.spliterator(), false).map((digest) ->
+                              Violation.newBuilder()
+                                      .setType(VIOLATION_TYPE_MISSING)
+                                      .setSubject("blobs/" + DigestUtil.toString(digest))
+                                      .setDescription(MISSING_INPUT)
+                                      .build()).collect(Collectors.toList()));
               return null;
             },
             directExecutor());

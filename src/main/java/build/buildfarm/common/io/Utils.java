@@ -49,10 +49,12 @@ import jnr.posix.POSIX;
 public class Utils {
   private static final Logger logger = Logger.getLogger(Utils.class.getName());
 
+  @SuppressWarnings("Guava")
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
 
   // pretty poor check here, but avoiding apache commons for now
+  @SuppressWarnings("Guava")
   private static final Supplier<Boolean> isMacOS =
       Suppliers.memoize(
           () -> {
