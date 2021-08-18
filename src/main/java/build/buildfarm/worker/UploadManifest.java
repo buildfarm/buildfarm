@@ -128,6 +128,7 @@ public class UploadManifest {
    * transmitted through {@link #getDigestToFile()}. When it is a directory, it is transmitted as a
    * {@link Tree} protobuf message through {@link #getDigestToChunkers()}.
    */
+  @SuppressWarnings("JavaDoc")
   public Map<Digest, Chunker> getDigestToChunkers() {
     return digestToChunkers;
   }

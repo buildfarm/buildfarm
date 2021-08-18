@@ -419,6 +419,7 @@ public class Utils {
     return f.isDirectory();
   }
 
+  @SuppressWarnings("OctalInteger")
   public static Boolean jnrIsDir(POSIX posix, String path) {
     int fd = posix.open(path, OpenFlags.O_DIRECTORY.intValue(), 0444);
     return fd > 0;

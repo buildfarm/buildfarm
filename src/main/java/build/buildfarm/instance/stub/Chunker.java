@@ -165,6 +165,7 @@ public final class Chunker {
    * on the first call to {@link #next()}, a {@link Chunk} with an empty {@link ByteString} is
    * returned.
    */
+  @SuppressWarnings("JavaDoc")
   public Chunk next() throws IOException {
     if (hasNext()) {
       throw new NoSuchElementException();

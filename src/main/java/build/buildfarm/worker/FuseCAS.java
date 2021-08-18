@@ -536,6 +536,7 @@ public class FuseCAS extends FuseStubFS {
     return path.substring(path.lastIndexOf('/') + 1);
   }
 
+  @SuppressWarnings("OctalInteger")
   @Override
   public int getattr(String path, FileStat stat) {
     Entry entry = resolve(path);
@@ -750,6 +751,7 @@ public class FuseCAS extends FuseStubFS {
     return -ErrorCodes.EOPNOTSUPP();
   }
 
+  @SuppressWarnings("OctalInteger")
   private Entry createImpl(String path, long mode, FuseFileInfo fi) {
     // assume no intersection for now
     DirectoryEntry dirEntry = containingDirectoryForCreate(path);
@@ -786,6 +788,7 @@ public class FuseCAS extends FuseStubFS {
     return 0;
   }
 
+  @SuppressWarnings("OctalInteger")
   @Override
   public int open(String path, FuseFileInfo fi) {
     // FIXME check for WRONLY/RDWR/TRUNC/DIRECTORY

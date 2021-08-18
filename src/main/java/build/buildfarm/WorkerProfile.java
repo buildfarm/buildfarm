@@ -63,6 +63,7 @@ class WorkerProfile {
    * @param worker
    * @return
    */
+  @SuppressWarnings("JavaDoc")
   private static String workerStringTransformation(String worker) {
     return worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".")
         + ':'

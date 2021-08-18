@@ -40,6 +40,7 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
    * @param request
    * @param responseObserver
    */
+  @SuppressWarnings("JavaDoc")
   @Override
   public void prepareWorkerForGracefulShutdown(
       PrepareWorkerForGracefulShutDownRequest request,

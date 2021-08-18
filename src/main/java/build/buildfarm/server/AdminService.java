@@ -241,6 +241,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
    * @param hostPrivateIp the private dns should be trimmed.
    * @return
    */
+  @SuppressWarnings("JavaDoc")
   private String trimHostPrivateDns(String hostPrivateIp) {
     String portSeparator = ":";
     if (hostPrivateIp.contains(portSeparator)) {
