@@ -77,7 +77,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
@@ -228,7 +227,7 @@ public class AbstractServerInstanceTest {
     AbstractServerInstance instance = new DummyServerInstance();
 
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    instance.validateActionInputDirectory(
+    AbstractServerInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllFiles(
@@ -256,7 +255,7 @@ public class AbstractServerInstanceTest {
     AbstractServerInstance instance = new DummyServerInstance();
 
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    instance.validateActionInputDirectory(
+    AbstractServerInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllFiles(
@@ -286,7 +285,7 @@ public class AbstractServerInstanceTest {
     Directory emptyDirectory = Directory.getDefaultInstance();
     Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    instance.validateActionInputDirectory(
+    AbstractServerInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllDirectories(
@@ -323,7 +322,7 @@ public class AbstractServerInstanceTest {
     Directory emptyDirectory = Directory.getDefaultInstance();
     Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    instance.validateActionInputDirectory(
+    AbstractServerInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllDirectories(

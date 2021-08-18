@@ -57,6 +57,7 @@ import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.queues.Worker;
+import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.instance.server.OperationsMap;
 import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.v1test.ActionCacheConfig;
@@ -92,7 +93,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
@@ -539,7 +539,7 @@ public class MemoryInstanceTest {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     assertThat(requeuers).isNotEmpty();
     Operation queuedOperation = outstandingOperations.get(operationName);
-    assertThat(instance.isQueued(queuedOperation)).isTrue();
+    assertThat(AbstractServerInstance.isQueued(queuedOperation)).isTrue();
     instance.putOperation(queuedOperation); // requeue
     assertThat(requeuers).isEmpty();
     assertThat(outstandingOperations.get(operationName)).isEqualTo(queuedOperation);
@@ -563,6 +563,6 @@ public class MemoryInstanceTest {
     String operationName = operation.get().getName();
     assertThat(outstandingOperations.contains(operationName)).isTrue();
     Operation queuedOperation = outstandingOperations.get(operationName);
-    assertThat(instance.isQueued(queuedOperation)).isTrue();
+    assertThat(AbstractServerInstance.isQueued(queuedOperation)).isTrue();
   }
 }

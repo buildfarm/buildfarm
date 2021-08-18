@@ -251,7 +251,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void cancelledOperationHasCancelledState()
-      throws IOException, InterruptedException, InvalidProtocolBufferException {
+      throws IOException, InterruptedException {
     Operation operation = executeAction(createSimpleAction());
 
     OperationsGrpc.OperationsBlockingStub operationsStub =
@@ -278,7 +278,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void cancellingExecutingOperationFailsPoll()
-      throws IOException, InterruptedException, InvalidProtocolBufferException {
+      throws IOException, InterruptedException {
     Operation operation = executeAction(createSimpleAction());
 
     // take our operation from the queue
@@ -346,7 +346,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void actionWithExcessiveTimeoutFailsValidation()
-      throws IOException, InterruptedException, InvalidProtocolBufferException {
+      throws IOException, InterruptedException {
     Digest actionDigestWithExcessiveTimeout =
         createAction(Action.newBuilder().setTimeout(Duration.newBuilder().setSeconds(9000)));
 

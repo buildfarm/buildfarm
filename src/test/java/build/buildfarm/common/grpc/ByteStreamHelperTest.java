@@ -43,7 +43,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class ByteStreamHelperTest {

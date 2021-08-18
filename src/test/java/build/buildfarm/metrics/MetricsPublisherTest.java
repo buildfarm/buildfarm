@@ -78,7 +78,7 @@ public class MetricsPublisherTest {
 
     AwsMetricsPublisher metricsPublisher = new AwsMetricsPublisher(metricsConfig);
     assertThat(
-            metricsPublisher.formatRequestMetadataToJson(
+            AbstractMetricsPublisher.formatRequestMetadataToJson(
                 metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata)))
         .isNotNull();
 
@@ -94,7 +94,7 @@ public class MetricsPublisherTest {
             .build();
 
     assertThat(
-            metricsPublisher.formatRequestMetadataToJson(
+            AbstractMetricsPublisher.formatRequestMetadataToJson(
                 metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata)))
         .isEqualTo(
             JsonFormat.printer().omittingInsignificantWhitespace().print(operationRequestMetadata));

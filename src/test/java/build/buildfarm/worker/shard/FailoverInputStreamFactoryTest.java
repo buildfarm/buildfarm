@@ -18,7 +18,6 @@ import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.InputStreamFactory;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;

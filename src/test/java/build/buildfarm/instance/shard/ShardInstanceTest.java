@@ -105,7 +105,6 @@ import org.mockito.ArgumentMatcher;
 import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
@@ -949,7 +948,7 @@ public class ShardInstanceTest {
   public void cacheReturnsNullWhenMissing() throws Exception {
     // create cache
     AsyncCache<String, String> cache =
-        Caffeine.newBuilder().newBuilder().maximumSize(64).buildAsync();
+        Caffeine.newBuilder().maximumSize(64).buildAsync();
 
     // ensure callback returns null
     Function<String, String> getCallback =

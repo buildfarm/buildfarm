@@ -7,6 +7,7 @@ java_test(
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/metrics/aws",
         "//src/main/java/build/buildfarm/metrics/log",
+        "//src/main/java/build/buildfarm/metrics",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "@googleapis//:google_rpc_error_details_java_proto",
