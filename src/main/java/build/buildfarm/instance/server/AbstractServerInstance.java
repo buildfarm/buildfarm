@@ -675,6 +675,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
+  @SuppressWarnings("SameReturnValue")
   private static boolean isValidFilename(String fileName) {
     // for now, assume all filenames are valid
     return true;

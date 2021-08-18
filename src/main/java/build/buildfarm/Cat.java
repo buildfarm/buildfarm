@@ -736,6 +736,7 @@ class Cat {
     }
   }
 
+  @SuppressWarnings("ThrowFromFinallyBlock")
   private static void main(
       String host, String instanceName, DigestUtil digestUtil, String type, Iterable<String> args)
       throws Exception {

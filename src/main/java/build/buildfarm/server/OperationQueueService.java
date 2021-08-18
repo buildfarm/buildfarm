@@ -40,10 +40,12 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   }
 
   private static class OperationQueueMatchListener implements MatchListener {
+    @SuppressWarnings("rawtypes")
     private final InterruptingPredicate onMatch;
     private final Consumer<Runnable> setOnCancelHandler;
     private final QueueEntry queueEntry = null;
 
+    @SuppressWarnings("rawtypes")
     OperationQueueMatchListener(
         Instance instance, InterruptingPredicate onMatch, Consumer<Runnable> setOnCancelHandler) {
       this.onMatch = onMatch;

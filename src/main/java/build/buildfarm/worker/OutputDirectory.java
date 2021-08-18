@@ -52,6 +52,7 @@ public class OutputDirectory {
 
   private final Map<String, OutputDirectory> children;
 
+  @SuppressWarnings("SameReturnValue")
   private static OutputDirectory getDefaultInstance() {
     return defaultInstance;
   }

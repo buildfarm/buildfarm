@@ -2244,6 +2244,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         executor);
   }
 
+  @SuppressWarnings("ThrowFromFinallyBlock")
   Path putAndCopy(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
     String key = getKey(digest, isExecutable);
     CancellableOutputStream out =

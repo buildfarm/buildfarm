@@ -67,7 +67,7 @@ public class ScanCount {
    * @param query The query to perform.
    * @param scanCount The count per scan.
    */
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings({"unchecked", "rawtypes"})
   private static void addKeys(
       JedisCluster cluster, Jedis node, Set<String> keys, String query, int scanCount) {
     // construct query

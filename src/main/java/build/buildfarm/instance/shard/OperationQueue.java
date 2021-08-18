@@ -130,6 +130,7 @@ public class OperationQueue {
    * @note Overloaded.
    * @note Suggested return identifier: name.
    */
+  @SuppressWarnings("SameReturnValue")
   public String getDequeueName() {
     return "operation_dequeue";
   }

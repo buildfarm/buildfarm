@@ -201,7 +201,7 @@ public class Utils {
         path.getFileName().toString(), fileStatus, getFileKey(path, fileStatus));
   }
 
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings({"unchecked", "rawtypes"})
   private static List<NamedFileKey> listNIOdirentSorted(Path path, FileStore fileStore)
       throws IOException {
     List<NamedFileKey> dirents = new ArrayList();

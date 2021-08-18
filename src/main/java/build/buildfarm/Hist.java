@@ -50,6 +50,7 @@ class Hist {
     System.out.println(s.toString());
   }
 
+  @SuppressWarnings("CatchMayIgnoreException")
   private static void printHistogram(Instance instance) {
     int executing = 0;
     int queued = 0;

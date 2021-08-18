@@ -101,7 +101,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
     abstract void deliver(Operation operation);
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     KeepaliveWatcher(ServerCallStreamObserver serverCallStreamObserver) {
       this.serverCallStreamObserver = serverCallStreamObserver;
       serverCallStreamObserver.setOnCancelHandler(this::cancel);

@@ -90,6 +90,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
     return true;
   }
 
+  @SuppressWarnings("CatchMayIgnoreException")
   public void AddWorker(SetMultimap<String, String> provisions, MatchListener listener) {
     try {
       WorkerQueue queue = MatchEligibleQueue(provisions);
