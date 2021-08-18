@@ -20,7 +20,7 @@ abstract class ChunkOutputStream extends OutputStream {
   private final byte[] buffer;
   int buflen = 0;
 
-  ChunkOutputStream(int size) {
+  ChunkOutputStream(@SuppressWarnings("SameParameterValue") int size) {
     buffer = new byte[size];
   }
 

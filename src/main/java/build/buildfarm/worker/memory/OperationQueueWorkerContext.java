@@ -93,6 +93,7 @@ class OperationQueueWorkerContext implements WorkerContext {
   private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
 
+  @SuppressWarnings("SameParameterValue")
   OperationQueueWorkerContext(
       WorkerConfig config,
       Instance casInstance,
