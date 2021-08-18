@@ -423,7 +423,7 @@ public class FuseCAS extends FuseStubFS {
     }
   }
 
-  private Map<String, Entry> fetchChildren(DirectoryEntry dirEntry, Digest digest)
+  private Map<String, Entry> fetchChildren(Digest digest)
       throws IOException, InterruptedException {
     Map<String, Entry> children = childrenCache.get(digest);
     if (children == null) {
@@ -453,7 +453,7 @@ public class FuseCAS extends FuseStubFS {
   }
 
   private DirectoryEntryChildrenFetcher fetchChildrenFunction(Digest digest) {
-    return (dirEntry) -> fetchChildren(dirEntry, digest);
+    return (dirEntry) -> fetchChildren(digest);
   }
 
   public void createInputRoot(String topdir, Digest inputRoot)
@@ -754,7 +754,7 @@ public class FuseCAS extends FuseStubFS {
   }
 
   @SuppressWarnings("OctalInteger")
-  private Entry createImpl(String path, long mode, FuseFileInfo fi) {
+  private Entry createImpl(String path, FuseFileInfo fi) {
     // assume no intersection for now
     DirectoryEntry dirEntry = containingDirectoryForCreate(path);
 
@@ -779,7 +779,7 @@ public class FuseCAS extends FuseStubFS {
 
   @Override
   public int create(String path, @mode_t long mode, FuseFileInfo fi) {
-    Entry entry = createImpl(path, mode, fi);
+    Entry entry = createImpl(path, fi);
 
     if (entry == null) {
       return -ErrorCodes.ENOENT();
@@ -797,7 +797,7 @@ public class FuseCAS extends FuseStubFS {
     Entry entry;
     if ((fi.flags.intValue() & OpenFlags.O_CREAT.intValue()) == OpenFlags.O_CREAT.intValue()
         && (fi.flags.intValue() & OpenFlags.O_TRUNC.intValue()) == OpenFlags.O_TRUNC.intValue()) {
-      entry = createImpl(path, fi.flags.intValue() & 0777, fi);
+      entry = createImpl(path, fi);
     } else {
       entry = resolve(path);
     }

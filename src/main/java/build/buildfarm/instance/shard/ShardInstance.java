@@ -79,7 +79,6 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
-import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
@@ -92,6 +91,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -293,29 +293,27 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaxBlobSize(),
         config.getMaxCpu(),
         config.getMaximumActionTimeout(),
-        config.getRedisShardBackplaneConfig().getProvisionedQueues().getQueuesList(),
-        config.getUseDenyList(),
+            config.getUseDenyList(),
         onStop,
         WorkerStubs.create(digestUtil, getGrpcTimeout(config)),
         actionCacheFetchService);
   }
 
   public ShardInstance(
-      String name,
-      DigestUtil digestUtil,
-      Backplane backplane,
-      ReadThroughActionCache readThroughActionCache,
-      boolean runDispatchedMonitor,
-      int dispatchedMonitorIntervalSeconds,
-      boolean runOperationQueuer,
-      long maxBlobSize,
-      int maxCpu,
-      Duration maxActionTimeout,
-      List<ProvisionedQueue> queues,
-      boolean useDenyList,
-      Runnable onStop,
-      com.google.common.cache.LoadingCache<String, Instance> workerStubs,
-      ListeningExecutorService actionCacheFetchService) {
+          String name,
+          DigestUtil digestUtil,
+          Backplane backplane,
+          ReadThroughActionCache readThroughActionCache,
+          boolean runDispatchedMonitor,
+          int dispatchedMonitorIntervalSeconds,
+          boolean runOperationQueuer,
+          long maxBlobSize,
+          int maxCpu,
+          Duration maxActionTimeout,
+          boolean useDenyList,
+          Runnable onStop,
+          LoadingCache<String, Instance> workerStubs,
+          ListeningExecutorService actionCacheFetchService) {
     super(
         name,
         digestUtil,
@@ -1072,8 +1070,7 @@ public class ShardInstance extends AbstractServerInstance {
                     expectDirectory(
                         reason,
                         directoryBlobDigest,
-                        directExecutor(),
-                        RequestMetadata.getDefaultInstance()),
+                            RequestMetadata.getDefaultInstance()),
                     Exception.class,
                     (t) -> {
                       logger.log(
@@ -1156,7 +1153,7 @@ public class ShardInstance extends AbstractServerInstance {
                   () ->
                       addCallback(
                           transform(
-                              expectDirectory(reason, nextDigest, service, requestMetadata),
+                              expectDirectory(reason, nextDigest, requestMetadata),
                               directory -> new DirectoryEntry(nextDigest, directory),
                               service),
                           this,
@@ -1185,10 +1182,9 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   ListenableFuture<Directory> expectDirectory(
-      String reason,
-      Digest directoryBlobDigest,
-      Executor executor,
-      RequestMetadata requestMetadata) {
+          String reason,
+          Digest directoryBlobDigest,
+          RequestMetadata requestMetadata) {
     if (directoryBlobDigest.getSizeBytes() == 0) {
       return immediateFuture(Directory.getDefaultInstance());
     }
@@ -1233,7 +1229,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   ListenableFuture<Command> expectCommand(
-      Digest commandBlobDigest, Executor executor, RequestMetadata requestMetadata) {
+          Digest commandBlobDigest, RequestMetadata requestMetadata) {
     BiFunction<Digest, Executor, CompletableFuture<Command>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Command>>() {
           @Override
@@ -1250,7 +1246,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   ListenableFuture<Action> expectAction(
-      Digest actionBlobDigest, Executor executor, RequestMetadata requestMetadata) {
+          Digest actionBlobDigest, RequestMetadata requestMetadata) {
     BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
           @Override
@@ -1335,7 +1331,7 @@ public class ShardInstance extends AbstractServerInstance {
     return transform(
         allAsList(
             transform(
-                expectCommand(commandDigest, service, requestMetadata),
+                expectCommand(commandDigest, requestMetadata),
                 (command) -> {
                   logger.log(
                       Level.FINE,
@@ -1440,7 +1436,7 @@ public class ShardInstance extends AbstractServerInstance {
       ExecutorService service,
       RequestMetadata requestMetadata) {
     return transformAsync(
-        expectAction(actionDigest, service, requestMetadata),
+        expectAction(actionDigest, requestMetadata),
         (action) -> {
           if (action == null) {
             return immediateFuture(QueuedOperation.getDefaultInstance());
@@ -2048,7 +2044,7 @@ public class ShardInstance extends AbstractServerInstance {
     ListenableFuture<Action> actionFuture =
         catchingAsync(
             transformAsync(
-                expectAction(actionDigest, operationTransformService, requestMetadata),
+                expectAction(actionDigest, requestMetadata),
                 (action) -> {
                   if (action == null) {
                     throw Status.NOT_FOUND.asException();
@@ -2244,7 +2240,7 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   public BackplaneStatus backplaneStatus() {
     try {
-      return backplane.backplaneStatus(this);
+      return backplane.backplaneStatus();
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
@@ -2270,7 +2266,7 @@ public class ShardInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  protected Object operationLock(String operationName) {
+  protected Object operationLock() {
     throw new UnsupportedOperationException();
   }
 

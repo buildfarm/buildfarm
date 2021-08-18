@@ -51,7 +51,7 @@ public class ScanCount {
         .forEach(
             pool -> {
               try (Jedis node = pool.getResource()) {
-                addKeys(cluster, node, keys, query, scanCount);
+                addKeys(node, keys, query, scanCount);
               }
             });
 
@@ -61,7 +61,6 @@ public class ScanCount {
   /**
    * @brief Scan all entires on node to get key count.
    * @details Keys are accumulated onto.
-   * @param cluster An established redis cluster.
    * @param node A node of the cluster.
    * @param keys Keys to accumulate.
    * @param query The query to perform.
@@ -69,7 +68,7 @@ public class ScanCount {
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static void addKeys(
-      JedisCluster cluster, Jedis node, Set<String> keys, String query, int scanCount) {
+          Jedis node, Set<String> keys, String query, int scanCount) {
     // construct query
     ScanParams params = new ScanParams();
     params.match(query);

@@ -33,7 +33,7 @@ class Hist {
   }
 
   @SuppressWarnings("ConstantConditions")
-  private static void printHistogramValue(int executing, int queued) {
+  private static void printHistogramValue(int executing) {
     StringBuilder s = new StringBuilder();
     int p = 0;
     int n = 5;
@@ -85,7 +85,7 @@ class Hist {
         }
       }
     } while (!pageToken.equals(""));
-    printHistogramValue(executing, queued);
+    printHistogramValue(executing);
   }
 
   @SuppressWarnings("BusyWait")

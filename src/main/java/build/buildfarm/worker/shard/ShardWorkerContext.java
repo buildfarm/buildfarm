@@ -89,7 +89,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -139,28 +138,25 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   ShardWorkerContext(
-      String name,
-      DequeueMatchSettings matchSettings,
-      Platform platform,
-      Duration operationPollPeriod,
-      OperationPoller operationPoller,
-      int inlineContentLimit,
-      int inputFetchStageWidth,
-      int executeStageWidth,
-      Backplane backplane,
-      ExecFileSystem execFileSystem,
-      InputStreamFactory inputStreamFactory,
-      Iterable<ExecutionPolicy> policies,
-      Instance instance,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      Duration defaultActionTimeout,
-      Duration maximumActionTimeout,
-      boolean limitExecution,
-      boolean limitGlobalExecution,
-      boolean onlyMulticoreTests,
-      boolean errorOperationRemainingResources,
-      CasWriter writer) {
+          String name,
+          DequeueMatchSettings matchSettings,
+          Platform platform,
+          Duration operationPollPeriod,
+          OperationPoller operationPoller,
+          int inputFetchStageWidth,
+          int executeStageWidth,
+          Backplane backplane,
+          ExecFileSystem execFileSystem,
+          InputStreamFactory inputStreamFactory,
+          Iterable<ExecutionPolicy> policies,
+          Instance instance,
+          Duration defaultActionTimeout,
+          Duration maximumActionTimeout,
+          boolean limitExecution,
+          boolean limitGlobalExecution,
+          boolean onlyMulticoreTests,
+          boolean errorOperationRemainingResources,
+          CasWriter writer) {
     this.name = name;
     this.matchSettings = matchSettings;
     this.platform = platform;
@@ -703,7 +699,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action)
+  public boolean putOperation(Operation operation)
       throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {

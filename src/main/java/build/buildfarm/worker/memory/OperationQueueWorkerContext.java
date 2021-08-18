@@ -344,7 +344,7 @@ class OperationQueueWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action) throws InterruptedException {
+  public boolean putOperation(Operation operation) throws InterruptedException {
     return oq.put(operation);
   }
 

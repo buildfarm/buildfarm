@@ -479,15 +479,13 @@ public class StubInstance implements Instance {
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
       throws IOException {
-    return newInput(resourceName, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
+    return newInput(resourceName, offset, requestMetadata);
   }
 
   InputStream newInput(
-      String resourceName,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata)
+          String resourceName,
+          long offset,
+          RequestMetadata requestMetadata)
       throws IOException {
     return ByteStreamHelper.newInput(
         resourceName,
@@ -606,7 +604,7 @@ public class StubInstance implements Instance {
       RequestMetadata requestMetadata)
       throws IOException {
     return newInput(
-        getBlobName(digest), offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
+        getBlobName(digest), offset, requestMetadata);
   }
 
   @Override
@@ -896,7 +894,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
+  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
     throwIfStopped();
     return shutDownWorkerBlockingStub
         .get()

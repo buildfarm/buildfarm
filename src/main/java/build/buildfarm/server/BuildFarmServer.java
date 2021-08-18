@@ -102,8 +102,8 @@ public class BuildFarmServer extends LoggingMain {
                 new ContentAddressableStorageService(
                     instances,
                     /* deadlineAfter=*/ 1,
-                    TimeUnit.DAYS,
-                    /* requestLogLevel=*/ Level.INFO))
+                    TimeUnit.DAYS
+                        /* requestLogLevel=*/))
             .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
             .addService(
                 new ExecutionService(

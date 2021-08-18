@@ -536,7 +536,7 @@ public class RedisShardBackplane implements Backplane {
 
     // Create containers that make up the backplane
     casWorkerMap = createCasWorkerMap(config);
-    actionCache = createActionCache(client, config);
+    actionCache = createActionCache(config);
     prequeue = createPrequeue(client, config);
     operationQueue = createOperationQueue(client, config);
     blockedActions = new RedisMap(config.getActionBlacklistPrefix());
@@ -558,19 +558,19 @@ public class RedisShardBackplane implements Backplane {
 
   CasWorkerMap createCasWorkerMap(RedisShardBackplaneConfig config) throws IOException {
     if (config.getCacheCas()) {
-      RedissonClient redissonClient = createRedissonClient(config);
+      RedissonClient redissonClient = createRedissonClient();
       return new RedissonCasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire());
     } else {
       return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
     }
   }
 
-  static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) {
+  static RedissonClient createRedissonClient() {
     Config redissonConfig = new Config();
     return Redisson.create(redissonConfig);
   }
 
-  static RedisMap createActionCache(RedisClient client, RedisShardBackplaneConfig config) {
+  static RedisMap createActionCache(RedisShardBackplaneConfig config) {
     return new RedisMap(config.getActionCachePrefix());
   }
 
@@ -1245,7 +1245,7 @@ public class RedisShardBackplane implements Backplane {
     return client.blockingCall(jedis -> dispatchOperation(jedis, provisions));
   }
 
-  String printPollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
+  String printPollOperation(QueueEntry queueEntry, long requeueAt)
       throws InvalidProtocolBufferException {
     DispatchedOperation o =
         DispatchedOperation.newBuilder().setQueueEntry(queueEntry).setRequeueAt(requeueAt).build();
@@ -1257,7 +1257,7 @@ public class RedisShardBackplane implements Backplane {
   public void rejectOperation(QueueEntry queueEntry) throws IOException {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    String dispatchedEntryJson = printPollOperation(queueEntry, ExecutionStage.Value.QUEUED, 0);
+    String dispatchedEntryJson = printPollOperation(queueEntry, 0);
     client.run(
         jedis -> {
           if (isBlacklisted(jedis, queueEntry.getExecuteEntry().getRequestMetadata())) {
@@ -1283,7 +1283,7 @@ public class RedisShardBackplane implements Backplane {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     String json;
     try {
-      json = printPollOperation(queueEntry, stage, requeueAt);
+      json = printPollOperation(queueEntry, requeueAt);
     } catch (InvalidProtocolBufferException e) {
       logger.log(Level.SEVERE, "error printing dispatched operation " + operationName, e);
       return false;
@@ -1430,7 +1430,7 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public BackplaneStatus backplaneStatus(Instance instance) throws IOException {
+  public BackplaneStatus backplaneStatus() throws IOException {
     BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
     builder.addAllActiveWorkers(client.call(jedis -> jedis.hkeys(config.getWorkersHashName())));
     builder.setDispatchedSize(

@@ -159,7 +159,7 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action) {
+  public boolean putOperation(Operation operation) {
     throw new UnsupportedOperationException();
   }
 

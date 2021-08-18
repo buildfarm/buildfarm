@@ -1033,7 +1033,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected Object operationLock(String name) {
+  protected Object operationLock() {
     return completedOperations;
   }
 

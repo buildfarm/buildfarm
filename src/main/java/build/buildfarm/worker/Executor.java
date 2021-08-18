@@ -120,7 +120,7 @@ class Executor {
 
     boolean operationUpdateSuccess = false;
     try {
-      operationUpdateSuccess = workerContext.putOperation(operation, operationContext.action);
+      operationUpdateSuccess = workerContext.putOperation(operation);
     } catch (IOException e) {
       logger.log(
           Level.SEVERE, format("error putting operation %s as EXECUTING", operation.getName()), e);

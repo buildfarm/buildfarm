@@ -43,7 +43,6 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
-import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -68,11 +67,10 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   private final Backplane backplane;
 
   public ShardWorkerInstance(
-      String name,
-      DigestUtil digestUtil,
-      Backplane backplane,
-      ContentAddressableStorage contentAddressableStorage,
-      ShardWorkerInstanceConfig config) {
+          String name,
+          DigestUtil digestUtil,
+          Backplane backplane,
+          ContentAddressableStorage contentAddressableStorage) {
     super(name, digestUtil, contentAddressableStorage, null, null, null, null);
     this.backplane = backplane;
   }
@@ -249,7 +247,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected Object operationLock(String operationName) {
+  protected Object operationLock() {
     throw new UnsupportedOperationException();
   }
 

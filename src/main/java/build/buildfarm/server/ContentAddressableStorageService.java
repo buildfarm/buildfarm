@@ -65,10 +65,9 @@ public class ContentAddressableStorageService
   private final TimeUnit writeDeadlineAfterUnits;
 
   public ContentAddressableStorageService(
-      Instances instances,
-      long writeDeadlineAfter,
-      TimeUnit writeDeadlineAfterUnits,
-      Level requestLogLevel) {
+          Instances instances,
+          long writeDeadlineAfter,
+          TimeUnit writeDeadlineAfterUnits) {
     this.instances = instances;
     this.writeDeadlineAfter = writeDeadlineAfter;
     this.writeDeadlineAfterUnits = writeDeadlineAfterUnits;

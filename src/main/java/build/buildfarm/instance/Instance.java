@@ -144,7 +144,7 @@ public interface Instance {
 
   WorkerListMessage getWorkerList();
 
-  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker);
+  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully();
 
   GetClientStartTimeResult getClientStartTime(String clientKey);
 

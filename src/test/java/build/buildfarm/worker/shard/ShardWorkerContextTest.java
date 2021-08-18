@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker.shard;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -88,17 +87,17 @@ public class ShardWorkerContextTest {
         /* operationPoller=*/ (queueEntry, stage, requeueAt) -> {
           return false;
         },
-        /* inlineContentLimit=*/ 0,
-        /* inputFetchStageWidth=*/ 0,
+        /* inlineContentLimit=*/
+            /* inputFetchStageWidth=*/ 0,
         /* executeStageWidth=*/ 0,
         backplane,
         execFileSystem,
         inputStreamFactory,
         policies,
         instance,
-        /* deadlineAfter=*/ 0,
-        /* deadlineAfterUnits=*/ SECONDS,
-        /* defaultActionTimeout=*/ Duration.getDefaultInstance(),
+        /* deadlineAfter=*/
+            /* deadlineAfterUnits=*/
+            /* defaultActionTimeout=*/ Duration.getDefaultInstance(),
         /* maximumActionTimeout=*/ Duration.getDefaultInstance(),
         /* limitExecution=*/ false,
         /* limitGlobalExecution=*/ false,

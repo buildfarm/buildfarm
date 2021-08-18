@@ -31,7 +31,6 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import build.buildfarm.v1test.Tree;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -68,8 +67,8 @@ public class ShardWorkerInstanceTest {
             "test",
             DIGEST_UTIL,
             backplane,
-            storage,
-            ShardWorkerInstanceConfig.getDefaultInstance());
+            storage
+        );
   }
 
   @Test(expected = SocketException.class)

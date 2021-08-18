@@ -85,10 +85,10 @@ public class UploadManifest {
       if (stat.isDirectory()) {
         mismatchedOutput(file);
       } else if (stat.isFile()) {
-        addFile(file, policy);
+        addFile(file);
       } else if (allowSymlinks && stat.isSymbolicLink()) {
         // is the stat correct?
-        addFile(file, policy);
+        addFile(file);
       } else {
         illegalOutput(file);
       }
@@ -154,7 +154,7 @@ public class UploadManifest {
     }
   }
 
-  private void addFile(Path file, CASInsertionPolicy policy) throws IOException {
+  private void addFile(Path file) throws IOException {
     Digest digest = digestUtil.compute(file);
     result
         .addOutputFilesBuilder()

@@ -679,7 +679,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @SuppressWarnings("SameReturnValue")
-  private static boolean isValidFilename(String fileName) {
+  private static boolean isValidFilename() {
     // for now, assume all filenames are valid
     return true;
   }
@@ -714,7 +714,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setDescription(DIRECTORY_NOT_SORTED);
       }
       // FIXME serverside validity check? regex?
-      Preconditions.checkState(isValidFilename(fileName), INVALID_FILE_NAME);
+      Preconditions.checkState(isValidFilename(), INVALID_FILE_NAME);
 
       lastFileName = fileName;
       entryNames.add(fileName);
@@ -1572,11 +1572,11 @@ public abstract class AbstractServerInstance implements Instance {
    * <p>the lock retrieved for an operation will guard against races during
    * transfers/retrievals/removals
    */
-  protected abstract Object operationLock(String operationName);
+  protected abstract Object operationLock();
 
   protected void updateOperationWatchers(Operation operation) throws InterruptedException {
     if (operation.getDone()) {
-      synchronized (operationLock(operation.getName())) {
+      synchronized (operationLock()) {
         completedOperations.put(operation.getName(), operation);
         outstandingOperations.remove(operation.getName());
       }
@@ -1587,7 +1587,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Operation getOperation(String name) {
-    synchronized (operationLock(name)) {
+    synchronized (operationLock()) {
       Operation operation = completedOperations.get(name);
       if (operation == null) {
         operation = outstandingOperations.get(name);
@@ -1618,7 +1618,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void deleteOperation(String name) {
-    synchronized (operationLock(name)) {
+    synchronized (operationLock()) {
       Operation deletedOperation = completedOperations.remove(name);
       if (deletedOperation == null && outstandingOperations.contains(name)) {
         throw new IllegalStateException();
@@ -1819,7 +1819,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
+  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
     throw new UnsupportedOperationException(
         "AbstractServerInstance doesn't support drainWorkerPipeline() method.");
   }

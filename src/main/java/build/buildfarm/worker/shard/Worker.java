@@ -23,7 +23,6 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
@@ -395,8 +394,8 @@ public class Worker extends LoggingMain {
             config.getPublicName(),
             digestUtil,
             backplane,
-            storage,
-            config.getShardWorkerInstanceConfig());
+            storage
+        );
 
     Instances instances = Instances.singular(instance);
 
@@ -419,8 +418,7 @@ public class Worker extends LoggingMain {
             config.getDequeueMatchSettings().getPlatform(),
             config.getOperationPollPeriod(),
             backplane::pollOperation,
-            config.getInlineContentLimit(),
-            config.getInputFetchStageWidth(),
+                config.getInputFetchStageWidth(),
             config.getExecuteStageWidth(),
             backplane,
             execFileSystem,
@@ -429,9 +427,9 @@ public class Worker extends LoggingMain {
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
             config.getExecutionPoliciesList(),
             instance,
-            /* deadlineAfter=*/ 1,
-            /* deadlineAfterUnits=*/ DAYS,
-            config.getDefaultActionTimeout(),
+            /* deadlineAfter=*/
+                /* deadlineAfterUnits=*/
+                config.getDefaultActionTimeout(),
             config.getMaximumActionTimeout(),
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
@@ -461,7 +459,7 @@ public class Worker extends LoggingMain {
             .addService(healthStatusManager.getHealthService())
             .addService(
                 new ContentAddressableStorageService(
-                    instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
+                    instances, /* deadlineAfter=*/ 1, DAYS /* requestLogLevel=*/))
             .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
             .addService(
                 new WorkerProfileService(

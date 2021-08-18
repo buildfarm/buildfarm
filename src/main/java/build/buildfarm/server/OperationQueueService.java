@@ -47,7 +47,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
     @SuppressWarnings("rawtypes")
     OperationQueueMatchListener(
-        Instance instance, InterruptingPredicate onMatch, Consumer<Runnable> setOnCancelHandler) {
+            InterruptingPredicate onMatch, Consumer<Runnable> setOnCancelHandler) {
       this.onMatch = onMatch;
       this.setOnCancelHandler = setOnCancelHandler;
     }
@@ -111,8 +111,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       instance.match(
           request.getPlatform(),
           new OperationQueueMatchListener(
-              instance,
-              createOnMatch(instance, responseObserver),
+                  createOnMatch(instance, responseObserver),
               callObserver::setOnCancelHandler));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

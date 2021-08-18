@@ -141,7 +141,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    protected Object operationLock(String operationName) {
+    protected Object operationLock() {
       throw new UnsupportedOperationException();
     }
 
@@ -221,7 +221,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
+    public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
       throw new UnsupportedOperationException();
     }
   }
