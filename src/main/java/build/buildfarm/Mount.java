@@ -80,6 +80,7 @@ class Mount {
     fuse.createInputRoot(args[5], DigestUtil.parseDigest(args[4]));
 
     try {
+      //noinspection InfiniteLoopStatement
       for (; ; ) {
         Thread.sleep(1000);
       }

@@ -170,6 +170,7 @@ class WorkerProfile {
     HashMap<String, Instance> workersToChannels = new HashMap<>();
     String type = args[1];
 
+    //noinspection InfiniteLoopStatement
     while (true) {
       // update worker list
       if (workers == null) {

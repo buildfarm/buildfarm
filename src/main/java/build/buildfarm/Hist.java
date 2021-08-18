@@ -93,7 +93,8 @@ class Hist {
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
     try {
-      for (; ; ) {
+        //noinspection InfiniteLoopStatement
+        for (; ; ) {
         printHistogram(instance);
         Thread.sleep(500);
       }
