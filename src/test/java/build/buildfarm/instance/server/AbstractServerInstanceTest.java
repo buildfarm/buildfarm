@@ -72,7 +72,6 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
 import java.util.Stack;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -182,11 +181,9 @@ public class AbstractServerInstanceTest {
 
     @Override
     public InputStream newOperationStreamInput(
-        String name,
-        long offset,
-        long deadlineAfter,
-        TimeUnit deadlineAfterUnits,
-        RequestMetadata requestMetadata) {
+            String name,
+            long offset,
+            RequestMetadata requestMetadata) {
       throw new UnsupportedOperationException();
     }
 

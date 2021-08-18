@@ -101,11 +101,9 @@ public interface Instance {
   Write getOperationStreamWrite(String name);
 
   InputStream newOperationStreamInput(
-      String name,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata)
+          String name,
+          long offset,
+          RequestMetadata requestMetadata)
       throws IOException;
 
   ListenableFuture<Void> execute(

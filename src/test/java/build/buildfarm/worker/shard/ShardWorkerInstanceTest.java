@@ -41,7 +41,7 @@ import java.io.IOException;
 import java.net.SocketException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -147,9 +147,9 @@ public class ShardWorkerInstanceTest {
     instance.newOperationStreamInput(
         /* name=*/ null,
         /* offset=*/ 0,
-        /* deadlineAfter=*/ 0,
-        /* deadlineAfterUnits=*/ TimeUnit.SECONDS,
-        RequestMetadata.getDefaultInstance());
+        /* deadlineAfter=*/
+            /* deadlineAfterUnits=*/
+            RequestMetadata.getDefaultInstance());
   }
 
   @Test(expected = UnsupportedOperationException.class)

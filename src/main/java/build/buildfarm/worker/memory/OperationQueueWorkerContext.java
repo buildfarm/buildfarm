@@ -248,8 +248,7 @@ class OperationQueueWorkerContext implements WorkerContext {
         outputDirs,
         uploader,
         config.getInlineContentLimit(),
-        config.getFileCasPolicy(),
-        config.getStdoutCasPolicy(),
+            config.getStdoutCasPolicy(),
         config.getStderrCasPolicy());
   }
 
@@ -454,21 +453,20 @@ class OperationQueueWorkerContext implements WorkerContext {
   }
 
   private static UploadManifest createManifest(
-      ActionResult.Builder result,
-      DigestUtil digestUtil,
-      Path execRoot,
-      Iterable<String> outputFiles,
-      Iterable<String> outputDirs,
-      int inlineContentLimit,
-      CASInsertionPolicy fileCasPolicy,
-      CASInsertionPolicy stdoutCasPolicy,
-      CASInsertionPolicy stderrCasPolicy)
+          ActionResult.Builder result,
+          DigestUtil digestUtil,
+          Path execRoot,
+          Iterable<String> outputFiles,
+          Iterable<String> outputDirs,
+          int inlineContentLimit,
+          CASInsertionPolicy stdoutCasPolicy,
+          CASInsertionPolicy stderrCasPolicy)
       throws IOException, InterruptedException {
     UploadManifest manifest =
         new UploadManifest(
             digestUtil, result, execRoot, /* allowSymlinks= */ true, inlineContentLimit);
 
-    manifest.addFiles(StreamSupport.stream(outputFiles.spliterator(), false).map(execRoot::resolve).collect(Collectors.toList()), fileCasPolicy);
+    manifest.addFiles(StreamSupport.stream(outputFiles.spliterator(), false).map(execRoot::resolve).collect(Collectors.toList()));
     manifest.addDirectories(StreamSupport.stream(outputDirs.spliterator(), false).map(execRoot::resolve).collect(Collectors.toList()));
 
     /* put together our outputs and update the result */
@@ -486,16 +484,15 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @VisibleForTesting
   static void uploadOutputs(
-      ActionResult.Builder resultBuilder,
-      DigestUtil digestUtil,
-      Path actionRoot,
-      Iterable<String> outputFiles,
-      Iterable<String> outputDirs,
-      ByteStreamUploader uploader,
-      int inlineContentLimit,
-      CASInsertionPolicy fileCasPolicy,
-      CASInsertionPolicy stdoutCasPolicy,
-      CASInsertionPolicy stderrCasPolicy)
+          ActionResult.Builder resultBuilder,
+          DigestUtil digestUtil,
+          Path actionRoot,
+          Iterable<String> outputFiles,
+          Iterable<String> outputDirs,
+          ByteStreamUploader uploader,
+          int inlineContentLimit,
+          CASInsertionPolicy stdoutCasPolicy,
+          CASInsertionPolicy stderrCasPolicy)
       throws IOException, InterruptedException {
     uploadManifest(
         createManifest(
@@ -505,8 +502,7 @@ class OperationQueueWorkerContext implements WorkerContext {
             outputFiles,
             outputDirs,
             inlineContentLimit,
-            fileCasPolicy,
-            stdoutCasPolicy,
+                stdoutCasPolicy,
             stderrCasPolicy),
         uploader);
   }

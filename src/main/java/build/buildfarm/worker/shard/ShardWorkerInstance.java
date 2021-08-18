@@ -57,7 +57,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -169,11 +168,9 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   public InputStream newOperationStreamInput(
-      String name,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) {
+          String name,
+          long offset,
+          RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 

@@ -1284,11 +1284,9 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public InputStream newOperationStreamInput(
-      String name,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) {
+          String name,
+          long offset,
+          RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 

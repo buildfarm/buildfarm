@@ -281,9 +281,7 @@ public class ByteStreamService extends ByteStreamImplBase {
           instance.newOperationStreamInput(
               resourceName,
               offset,
-              deadlineAfter,
-              deadlineAfterUnits,
-              TracingMetadataUtils.fromCurrentContext());
+                  TracingMetadataUtils.fromCurrentContext());
       ServerCallStreamObserver<ReadResponse> target =
           (ServerCallStreamObserver<ReadResponse>) responseObserver;
       target.setOnCancelHandler(

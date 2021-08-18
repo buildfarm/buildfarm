@@ -473,11 +473,9 @@ public class StubInstance implements Instance {
 
   @Override
   public InputStream newOperationStreamInput(
-      String resourceName,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata)
+          String resourceName,
+          long offset,
+          RequestMetadata requestMetadata)
       throws IOException {
     return newInput(resourceName, offset, requestMetadata);
   }

@@ -196,8 +196,7 @@ public class UploadOutputsTest {
         directories,
         mockUploader,
         /* inlineContentLimit=*/ 0,
-        CASInsertionPolicy.ALWAYS_INSERT,
-        CASInsertionPolicy.ALWAYS_INSERT,
+            CASInsertionPolicy.ALWAYS_INSERT,
         CASInsertionPolicy.ALWAYS_INSERT);
   }
 

@@ -790,7 +790,6 @@ public class FuseCAS extends FuseStubFS {
     return 0;
   }
 
-  @SuppressWarnings("OctalInteger")
   @Override
   public int open(String path, FuseFileInfo fi) {
     // FIXME check for WRONLY/RDWR/TRUNC/DIRECTORY

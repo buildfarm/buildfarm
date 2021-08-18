@@ -74,7 +74,7 @@ public class UploadManifest {
   }
 
   /** Add a collection of files to the UploadManifest. */
-  public void addFiles(Iterable<Path> files, CASInsertionPolicy policy)
+  public void addFiles(Iterable<Path> files)
       throws IllegalStateException, IOException {
     for (Path file : files) {
       FileStatus stat = statIfFound(file, /* followSymlinks= */ false, fileStore);
