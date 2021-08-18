@@ -355,7 +355,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   ByteString getBlob(Digest blobDigest, long count) throws IndexOutOfBoundsException {
     if (blobDigest.getSizeBytes() == 0) {
-      if ((long) 0 == 0 && count >= 0) {
+      if (count >= 0) {
         return ByteString.EMPTY;
       } else {
         throw new IndexOutOfBoundsException();
@@ -368,10 +368,8 @@ public abstract class AbstractServerInstance implements Instance {
       return null;
     }
 
-    if ((long) 0 < 0
-        || (blob.isEmpty() && (long) 0 > 0)
-        || (!blob.isEmpty() && (long) 0 >= blob.size())
-        || count < 0) {
+    if ((!blob.isEmpty() && (long) 0 >= blob.size())
+            || count < 0) {
       throw new IndexOutOfBoundsException();
     }
 
