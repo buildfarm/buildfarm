@@ -53,7 +53,6 @@ public class UploadOutputsTest {
 
   private final Configuration config;
 
-  private FileSystem fileSystem;
   private Path root;
   private ActionResult.Builder resultBuilder;
 
@@ -67,18 +66,19 @@ public class UploadOutputsTest {
   public void setUp() throws ConfigurationException {
     MockitoAnnotations.initMocks(this);
 
-    fileSystem = Jimfs.newFileSystem(config);
+    FileSystem fileSystem = Jimfs.newFileSystem(config);
     root = Iterables.getFirst(fileSystem.getRootDirectories(), null);
 
     resultBuilder = ActionResult.newBuilder();
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void uploadOutputsUploadsEmptyOutputDirectories()
       throws IOException, StatusException, InterruptedException {
     Files.createDirectory(root.resolve("foo"));
     // maybe make some files...
-    uploadOutputs(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
+    uploadOutputs(ImmutableList.of(), ImmutableList.of("foo"));
     Tree emptyTree = Tree.newBuilder().setRoot(Directory.getDefaultInstance()).build();
     ByteString emptyTreeBlob = emptyTree.toByteString();
     ArgumentCaptor<Map<HashCode, Chunker>> uploadCaptor = ArgumentCaptor.forClass(Map.class);
@@ -94,6 +94,7 @@ public class UploadOutputsTest {
                 .build());
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void uploadOutputsUploadsFiles()
       throws IOException, StatusException, InterruptedException {
@@ -102,7 +103,7 @@ public class UploadOutputsTest {
     Path file = topdir.resolve("bar");
     Files.createFile(file);
     // maybe make some files...
-    uploadOutputs(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
+    uploadOutputs(ImmutableList.of(), ImmutableList.of("foo"));
     Tree tree =
         Tree.newBuilder()
             .setRoot(
@@ -131,6 +132,7 @@ public class UploadOutputsTest {
                 .build());
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void uploadOutputsUploadsNestedDirectories()
       throws IOException, StatusException, InterruptedException {
@@ -141,7 +143,7 @@ public class UploadOutputsTest {
     Path file = subdir.resolve("baz");
     Files.createFile(file);
     // maybe make some files...
-    uploadOutputs(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
+    uploadOutputs(ImmutableList.of(), ImmutableList.of("foo"));
     Directory subDirectory =
         Directory.newBuilder()
             .addFiles(
@@ -182,7 +184,7 @@ public class UploadOutputsTest {
   @Test
   public void uploadOutputsIgnoresMissingOutputDirectories()
       throws IOException, StatusException, InterruptedException {
-    uploadOutputs(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
+    uploadOutputs(ImmutableList.of(), ImmutableList.of("foo"));
     verify(mockUploader, never()).uploadBlobs(any());
   }
 
@@ -197,7 +199,6 @@ public class UploadOutputsTest {
         mockUploader,
         /* inlineContentLimit=*/ 0,
         CASInsertionPolicy.ALWAYS_INSERT,
-        CASInsertionPolicy.ALWAYS_INSERT,
         CASInsertionPolicy.ALWAYS_INSERT);
   }
 
@@ -205,13 +206,13 @@ public class UploadOutputsTest {
   public void uploadOutputsThrowsIllegalStateExceptionWhenOutputFileIsDirectory()
       throws IOException, InterruptedException {
     Files.createDirectory(root.resolve("foo"));
-    uploadOutputs(ImmutableList.<String>of("foo"), ImmutableList.<String>of());
+    uploadOutputs(ImmutableList.of("foo"), ImmutableList.of());
   }
 
   @Test(expected = IllegalStateException.class)
   public void uploadOutputsThrowsIllegalStateExceptionWhenOutputDirectoryIsFile()
       throws IOException, InterruptedException {
     Files.createFile(root.resolve("foo"));
-    uploadOutputs(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
+    uploadOutputs(ImmutableList.of(), ImmutableList.of("foo"));
   }
 }

@@ -55,6 +55,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
+@SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
   // collected, which would cause us to loose their configuration.
@@ -99,10 +100,8 @@ public class BuildFarmServer extends LoggingMain {
             .addService(new CapabilitiesService(instances))
             .addService(
                 new ContentAddressableStorageService(
-                    instances,
-                    /* deadlineAfter=*/ 1,
-                    TimeUnit.DAYS,
-                    /* requestLogLevel=*/ Level.INFO))
+                    instances, /* deadlineAfter=*/ 1, TimeUnit.DAYS
+                    /* requestLogLevel=*/ ))
             .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
             .addService(
                 new ExecutionService(
@@ -162,6 +161,7 @@ public class BuildFarmServer extends LoggingMain {
     System.err.println("*** server shut down");
   }
 
+  @SuppressWarnings("ConstantConditions")
   public void stop() {
     synchronized (this) {
       if (stopping) {
@@ -203,6 +203,7 @@ public class BuildFarmServer extends LoggingMain {
   }
 
   /** returns success or failure */
+  @SuppressWarnings("ConstantConditions")
   static boolean serverMain(String[] args) {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //

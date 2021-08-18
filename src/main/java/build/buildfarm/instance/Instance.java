@@ -100,12 +100,7 @@ public interface Instance {
 
   Write getOperationStreamWrite(String name);
 
-  InputStream newOperationStreamInput(
-      String name,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata)
+  InputStream newOperationStreamInput(String name, long offset, RequestMetadata requestMetadata)
       throws IOException;
 
   ListenableFuture<Void> execute(
@@ -144,7 +139,7 @@ public interface Instance {
 
   WorkerListMessage getWorkerList();
 
-  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker);
+  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully();
 
   GetClientStartTimeResult getClientStartTime(String clientKey);
 

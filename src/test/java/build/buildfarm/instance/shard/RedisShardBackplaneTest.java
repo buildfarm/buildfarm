@@ -65,7 +65,7 @@ public class RedisShardBackplaneTest {
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
     when(jedisCluster.hgetAll(config.getWorkersHashName()))
         .thenReturn(ImmutableMap.of("foo", "foo"));
-    when(jedisCluster.hdel(config.getWorkersHashName(), "foo")).thenReturn(1l);
+    when(jedisCluster.hdel(config.getWorkersHashName(), "foo")).thenReturn(1L);
     backplane =
         new RedisShardBackplane(
             config,
@@ -87,12 +87,12 @@ public class RedisShardBackplaneTest {
     assertThat(workerChange.getTypeCase()).isEqualTo(WorkerChange.TypeCase.REMOVE);
   }
 
-  void verifyChangePublished(JedisCluster jedis, String opName) throws IOException {
+  void verifyChangePublished(JedisCluster jedis) throws IOException {
     ArgumentCaptor<String> changeCaptor = ArgumentCaptor.forClass(String.class);
-    verify(jedis, times(1)).publish(eq(backplane.operationChannel(opName)), changeCaptor.capture());
+    verify(jedis, times(1)).publish(eq(backplane.operationChannel("op")), changeCaptor.capture());
     OperationChange opChange = parseOperationChange(changeCaptor.getValue());
     assertThat(opChange.hasReset()).isTrue();
-    assertThat(opChange.getReset().getOperation().getName()).isEqualTo(opName);
+    assertThat(opChange.getReset().getOperation().getName()).isEqualTo("op");
   }
 
   @Test
@@ -124,7 +124,7 @@ public class RedisShardBackplaneTest {
             RedisShardBackplane.operationPrinter.print(op));
     verify(jedisCluster, times(1))
         .lpush(config.getPreQueuedOperationsListName(), JsonFormat.printer().print(executeEntry));
-    verifyChangePublished(jedisCluster, opName);
+    verifyChangePublished(jedisCluster);
   }
 
   @Test
@@ -144,7 +144,7 @@ public class RedisShardBackplaneTest {
     backplane.queueing(opName);
 
     verify(mockJedisClusterFactory, times(1)).get();
-    verifyChangePublished(jedisCluster, opName);
+    verifyChangePublished(jedisCluster);
   }
 
   @Test
@@ -163,7 +163,7 @@ public class RedisShardBackplaneTest {
     backplane.start("startTime/test:0000");
 
     final String opName = "op";
-    when(jedisCluster.hdel(config.getDispatchedOperationsHashName(), opName)).thenReturn(1l);
+    when(jedisCluster.hdel(config.getDispatchedOperationsHashName(), opName)).thenReturn(1L);
 
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
@@ -175,7 +175,7 @@ public class RedisShardBackplaneTest {
     verify(jedisCluster, times(1)).hdel(config.getDispatchedOperationsHashName(), opName);
     verify(jedisCluster, times(1))
         .lpush(config.getQueuedOperationsListName(), JsonFormat.printer().print(queueEntry));
-    verifyChangePublished(jedisCluster, opName);
+    verifyChangePublished(jedisCluster);
   }
 
   @Test
@@ -222,7 +222,7 @@ public class RedisShardBackplaneTest {
     verify(mockJedisClusterFactory, times(1)).get();
     verify(jedisCluster, times(1)).hdel(config.getDispatchedOperationsHashName(), opName);
     verify(jedisCluster, times(1)).del(backplane.operationKey(opName));
-    verifyChangePublished(jedisCluster, opName);
+    verifyChangePublished(jedisCluster);
   }
 
   @Test

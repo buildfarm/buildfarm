@@ -103,6 +103,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             try {

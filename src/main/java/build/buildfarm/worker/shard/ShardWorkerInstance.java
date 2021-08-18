@@ -43,7 +43,6 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
-import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -58,7 +57,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -71,8 +69,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       String name,
       DigestUtil digestUtil,
       Backplane backplane,
-      ContentAddressableStorage contentAddressableStorage,
-      ShardWorkerInstanceConfig config) {
+      ContentAddressableStorage contentAddressableStorage) {
     super(name, digestUtil, contentAddressableStorage, null, null, null, null);
     this.backplane = backplane;
   }
@@ -171,11 +168,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   public InputStream newOperationStreamInput(
-      String name,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) {
+      String name, long offset, RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 
@@ -222,6 +215,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean putOperation(Operation operation) {
     try {
@@ -248,7 +242,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected Object operationLock(String operationName) {
+  protected Object operationLock() {
     throw new UnsupportedOperationException();
   }
 

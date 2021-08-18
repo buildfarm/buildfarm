@@ -95,6 +95,7 @@ public final class Utils {
               future.set(digest);
             }
 
+            @SuppressWarnings("NullableProblems")
             @Override
             public void onFailure(Throwable t) {
               future.setException(t);

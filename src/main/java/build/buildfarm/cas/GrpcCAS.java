@@ -56,6 +56,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 public class GrpcCAS implements ContentAddressableStorage {
   private final String instanceName;
@@ -74,6 +76,7 @@ public class GrpcCAS implements ContentAddressableStorage {
     this.onExpirations = onExpirations;
   }
 
+  @SuppressWarnings("Guava")
   private final Supplier<ContentAddressableStorageBlockingStub> casBlockingStub =
       Suppliers.memoize(
           new Supplier<ContentAddressableStorageBlockingStub>() {
@@ -83,6 +86,7 @@ public class GrpcCAS implements ContentAddressableStorage {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ContentAddressableStorageFutureStub> casFutureStub =
       Suppliers.memoize(
           new Supplier<ContentAddressableStorageFutureStub>() {
@@ -92,6 +96,7 @@ public class GrpcCAS implements ContentAddressableStorage {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ByteStreamStub> bsStub =
       Suppliers.memoize(
           new Supplier<ByteStreamStub>() {
@@ -129,7 +134,10 @@ public class GrpcCAS implements ContentAddressableStorage {
 
   @Override
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
-    digests = Iterables.filter(digests, digest -> digest.getSizeBytes() != 0);
+    digests =
+        StreamSupport.stream(digests.spliterator(), false)
+            .filter(digest -> digest.getSizeBytes() != 0)
+            .collect(Collectors.toList());
     if (Iterables.isEmpty(digests)) {
       return ImmutableList.of();
     }
@@ -230,6 +238,7 @@ public class GrpcCAS implements ContentAddressableStorage {
     }
   }
 
+  @SuppressWarnings("Guava")
   public static Write newWrite(
       Channel channel,
       String instanceName,

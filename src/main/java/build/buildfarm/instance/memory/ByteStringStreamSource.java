@@ -138,6 +138,7 @@ class ByteStringStreamSource {
         return read(b, 0, b.length);
       }
 
+      @SuppressWarnings("deprecation")
       @Override
       public int read(byte[] b, int off, int len) {
         try {

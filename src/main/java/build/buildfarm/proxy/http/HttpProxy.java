@@ -95,6 +95,7 @@ public class HttpProxy extends LoggingMain {
         parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
+  @SuppressWarnings("ConstantConditions")
   public static void main(String[] args) throws Exception {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //

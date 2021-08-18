@@ -82,6 +82,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             logger.log(

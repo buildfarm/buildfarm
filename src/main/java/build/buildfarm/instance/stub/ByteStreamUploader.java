@@ -152,6 +152,7 @@ public class ByteStreamUploader {
       }
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
+      //noinspection deprecation
       propagateIfInstanceOf(cause, IOException.class);
       throwIfUnchecked(cause);
       throw new RuntimeException(cause);
@@ -299,6 +300,7 @@ public class ByteStreamUploader {
           MoreExecutors.directExecutor());
     }
 
+    @SuppressWarnings("ConstantConditions")
     private ListenableFuture<Void> guardQueryWithSuppression(
         Exception e, AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
       // we are destined to return this, avoid recreating it
@@ -326,6 +328,7 @@ public class ByteStreamUploader {
           suppressedQueryFuture, (result) -> exceptionFuture, MoreExecutors.directExecutor());
     }
 
+    @SuppressWarnings("ConstantConditions")
     private ListenableFuture<Void> query(
         AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
       ListenableFuture<Long> committedSizeFuture =
@@ -412,7 +415,7 @@ public class ByteStreamUploader {
             @Override
             public void onReady() {
               while (call.isReady()) {
-                if (!chunker.hasNext()) {
+                if (chunker.hasNext()) {
                   halfClose();
                   return;
                 }
@@ -430,7 +433,7 @@ public class ByteStreamUploader {
                     requestBuilder.setResourceName(resourceName);
                   }
 
-                  boolean isLastChunk = !chunker.hasNext();
+                  boolean isLastChunk = chunker.hasNext();
                   WriteRequest request =
                       requestBuilder
                           .setData(chunk.getData())

@@ -41,7 +41,6 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Tree;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Status;
@@ -51,6 +50,8 @@ import io.prometheus.client.Summary;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
@@ -64,10 +65,7 @@ public class ContentAddressableStorageService
   private final TimeUnit writeDeadlineAfterUnits;
 
   public ContentAddressableStorageService(
-      Instances instances,
-      long writeDeadlineAfter,
-      TimeUnit writeDeadlineAfterUnits,
-      Level requestLogLevel) {
+      Instances instances, long writeDeadlineAfter, TimeUnit writeDeadlineAfterUnits) {
     this.instances = instances;
     this.writeDeadlineAfter = writeDeadlineAfter;
     this.writeDeadlineAfterUnits = writeDeadlineAfterUnits;
@@ -123,6 +121,7 @@ public class ContentAddressableStorageService
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
@@ -196,13 +195,16 @@ public class ContentAddressableStorageService
     ListenableFuture<BatchUpdateBlobsResponse> responseFuture =
         transform(
             allAsList(
-                Iterables.transform(
-                    putAllBlobs(
-                        instance,
-                        batchRequest.getRequestsList(),
-                        writeDeadlineAfter,
-                        writeDeadlineAfterUnits),
-                    (future) -> transform(future, response::addResponses, directExecutor()))),
+                StreamSupport.stream(
+                        putAllBlobs(
+                                instance,
+                                batchRequest.getRequestsList(),
+                                writeDeadlineAfter,
+                                writeDeadlineAfterUnits)
+                            .spliterator(),
+                        false)
+                    .map((future) -> transform(future, response::addResponses, directExecutor()))
+                    .collect(Collectors.toList())),
             (result) -> response.build(),
             directExecutor());
 
@@ -215,6 +217,7 @@ public class ContentAddressableStorageService
             responseObserver.onCompleted();
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             responseObserver.onError(t);
@@ -236,7 +239,7 @@ public class ContentAddressableStorageService
 
       GetTreeResponse.Builder response =
           GetTreeResponse.newBuilder().setNextPageToken(nextPageToken);
-      response.addAllDirectories(tree.getDirectories().values());
+      response.addAllDirectories(tree.getDirectoriesMap().values());
       responseObserver.onNext(response.build());
       pageToken = nextPageToken;
     } while (!pageToken.isEmpty());
@@ -260,6 +263,7 @@ public class ContentAddressableStorageService
             responseObserver.onCompleted();
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             responseObserver.onError(Status.fromThrowable(t).asException());

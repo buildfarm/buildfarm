@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker.shard;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -85,10 +84,8 @@ public class ShardWorkerContextTest {
         matchSettings,
         platform,
         /* operationPollPeriod=*/ Duration.getDefaultInstance(),
-        /* operationPoller=*/ (queueEntry, stage, requeueAt) -> {
-          return false;
-        },
-        /* inlineContentLimit=*/ 0,
+        /* operationPoller=*/ (queueEntry, stage, requeueAt) -> false,
+        /* inlineContentLimit=*/
         /* inputFetchStageWidth=*/ 0,
         /* executeStageWidth=*/ 0,
         backplane,
@@ -96,8 +93,8 @@ public class ShardWorkerContextTest {
         inputStreamFactory,
         policies,
         instance,
-        /* deadlineAfter=*/ 0,
-        /* deadlineAfterUnits=*/ SECONDS,
+        /* deadlineAfter=*/
+        /* deadlineAfterUnits=*/
         /* defaultActionTimeout=*/ Duration.getDefaultInstance(),
         /* maximumActionTimeout=*/ Duration.getDefaultInstance(),
         /* limitExecution=*/ false,
@@ -119,6 +116,7 @@ public class ShardWorkerContextTest {
         ImmutableList.of());
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void queueEntryWithExecutionPolicyPlatformMatches() throws Exception {
     WorkerContext context =

@@ -49,10 +49,12 @@ import jnr.posix.POSIX;
 public class Utils {
   private static final Logger logger = Logger.getLogger(Utils.class.getName());
 
+  @SuppressWarnings("Guava")
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
 
   // pretty poor check here, but avoiding apache commons for now
+  @SuppressWarnings("Guava")
   private static final Supplier<Boolean> isMacOS =
       Suppliers.memoize(
           () -> {
@@ -201,6 +203,7 @@ public class Utils {
         path.getFileName().toString(), fileStatus, getFileKey(path, fileStatus));
   }
 
+  @SuppressWarnings({"unchecked", "rawtypes"})
   private static List<NamedFileKey> listNIOdirentSorted(Path path, FileStore fileStore)
       throws IOException {
     List<NamedFileKey> dirents = new ArrayList();
@@ -416,6 +419,7 @@ public class Utils {
     return f.isDirectory();
   }
 
+  @SuppressWarnings("OctalInteger")
   public static Boolean jnrIsDir(POSIX posix, String path) {
     int fd = posix.open(path, OpenFlags.O_DIRECTORY.intValue(), 0444);
     return fd > 0;
@@ -436,6 +440,7 @@ public class Utils {
     }
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   public static <T> T getOrIOException(ListenableFuture<T> future) throws IOException {
     boolean interrupted = false;
     for (; ; ) {

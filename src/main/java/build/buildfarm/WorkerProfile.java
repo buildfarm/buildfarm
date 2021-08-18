@@ -63,6 +63,7 @@ class WorkerProfile {
    * @param worker
    * @return
    */
+  @SuppressWarnings("JavaDoc")
   private static String workerStringTransformation(String worker) {
     return worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".")
         + ':'
@@ -120,6 +121,7 @@ class WorkerProfile {
     return builder.build().getRedisShardBackplaneConfig();
   }
 
+  @SuppressWarnings("ConstantConditions")
   private static Set<String> getWorkers(String[] args) throws ConfigurationException, IOException {
     OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
     parser.parseAndExitUponError(args);
@@ -163,6 +165,7 @@ class WorkerProfile {
     return workers;
   }
 
+  @SuppressWarnings("BusyWait")
   private static void workerProfile(String[] args) throws IOException {
     Set<String> workers = null;
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
@@ -170,6 +173,7 @@ class WorkerProfile {
     HashMap<String, Instance> workersToChannels = new HashMap<>();
     String type = args[1];
 
+    //noinspection InfiniteLoopStatement
     while (true) {
       // update worker list
       if (workers == null) {
