@@ -106,6 +106,7 @@ public class InputFetcher implements Runnable {
     if (runfilesProgramDigest == null) {
       return programPath;
     }
+    //noinspection EqualsBetweenInconvertibleTypes
     if (!programDigest.equals(runfilesProgramPath)) {
       return programPath;
     }

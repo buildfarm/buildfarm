@@ -257,6 +257,7 @@ public class Worker extends LoggingMain {
     stop();
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   private void stop() throws InterruptedException {
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
@@ -299,6 +300,7 @@ public class Worker extends LoggingMain {
   }
 
   /** returns success or failure */
+  @SuppressWarnings("ConstantConditions")
   static boolean workerMain(String[] args) {
     OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
     parser.parseAndExitUponError(args);

@@ -41,6 +41,7 @@ class Mount {
     return builder.build();
   }
 
+  @SuppressWarnings("BusyWait")
   public static void main(String[] args) throws Exception {
     String host = args[0];
     String instanceName = args[1];

@@ -71,6 +71,7 @@ public class MatchStage extends PipelineStage {
       waitStart = elapsedUSecs;
     }
 
+    @SuppressWarnings("ConstantConditions")
     @Override
     public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
       if (queueEntry == null) {

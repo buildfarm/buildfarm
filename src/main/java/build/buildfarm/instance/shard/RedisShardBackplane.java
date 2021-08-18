@@ -187,6 +187,7 @@ public class RedisShardBackplane implements Backplane {
     this.jedisClusterFactory = jedisClusterFactory;
   }
 
+  @SuppressWarnings("NullableProblems")
   @Override
   public void setOnUnsubscribe(InterruptingRunnable onUnsubscribe) {
     this.onUnsubscribe = onUnsubscribe;
@@ -497,6 +498,7 @@ public class RedisShardBackplane implements Backplane {
     subscriptionThread.start();
   }
 
+  @SuppressWarnings("ConstantConditions")
   private void startFailsafeOperationThread() {
     failsafeOperationThread =
         new Thread(
@@ -629,6 +631,7 @@ public class RedisShardBackplane implements Backplane {
                 jedis, RedisHashtags.existingHash(queueName)));
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public synchronized void stop() throws InterruptedException {
     if (failsafeOperationThread != null) {
@@ -655,6 +658,7 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean isStopped() {
     return client.isClosed();
@@ -672,6 +676,7 @@ public class RedisShardBackplane implements Backplane {
     return subscriber.watch(operationChannel(operationName), timedWatcher);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void addWorker(ShardWorker shardWorker) throws IOException {
     String json = JsonFormat.printer().print(shardWorker);
@@ -703,6 +708,7 @@ public class RedisShardBackplane implements Backplane {
     return false;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean removeWorker(String name, String reason) throws IOException {
     WorkerChange workerChange =
@@ -715,6 +721,7 @@ public class RedisShardBackplane implements Backplane {
         && client.call(jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public CasIndexResults reindexCas(String hostName) throws IOException {
     CasIndexSettings settings = new CasIndexSettings();
@@ -724,6 +731,7 @@ public class RedisShardBackplane implements Backplane {
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public FindOperationsResults findOperations(Instance instance, String filterPredicate)
       throws IOException {
@@ -739,6 +747,7 @@ public class RedisShardBackplane implements Backplane {
     removeWorker(workerName, "Requested shutdown");
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public synchronized Set<String> getWorkers() throws IOException {
     long now = System.currentTimeMillis();
@@ -837,6 +846,7 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public ActionResult getActionResult(ActionKey actionKey) throws IOException {
     String json = client.call(jedis -> actionCache.get(jedis, asDigestStr(actionKey)));
@@ -852,12 +862,14 @@ public class RedisShardBackplane implements Backplane {
   }
 
   // we do this by action hash only, so that we can use RequestMetadata to filter
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void blacklistAction(String actionId) throws IOException {
     client.run(
         jedis -> blockedActions.insert(jedis, actionId, "", config.getActionBlacklistExpire()));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
     String json = JsonFormat.printer().print(actionResult);
@@ -870,11 +882,13 @@ public class RedisShardBackplane implements Backplane {
     actionCache.remove(jedis, asDigestStr(actionKey));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void removeActionResult(ActionKey actionKey) throws IOException {
     client.run(jedis -> removeActionResult(jedis, actionKey));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
     // convert action keys to strings
@@ -884,6 +898,7 @@ public class RedisShardBackplane implements Backplane {
     client.run(jedis -> actionCache.remove(jedis, keyNames));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public ActionCacheScanResult scanActionCache(String scanToken, int count) throws IOException {
     final String jedisScanToken = scanToken == null ? SCAN_POINTER_START : scanToken;
@@ -1000,12 +1015,14 @@ public class RedisShardBackplane implements Backplane {
     return jedis.get(operationKey(operationName));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public Operation getOperation(String operationName) throws IOException {
     String json = client.call(jedis -> getOperation(jedis, operationName));
     return parseOperationJson(json);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean putOperation(Operation operation, ExecutionStage.Value stage) throws IOException {
     boolean queue = stage == ExecutionStage.Value.QUEUED;
@@ -1057,6 +1074,7 @@ public class RedisShardBackplane implements Backplane {
     operationQueue.push(jedis, provisions, queueEntryJson);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void queue(QueueEntry queueEntry, Operation operation) throws IOException {
     String operationName = operation.getName();
@@ -1075,6 +1093,7 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
+  @SuppressWarnings("ConstantConditions")
   public Map<String, Operation> getOperationsMap() throws IOException {
     ImmutableMap.Builder<String, String> builder = new ImmutableMap.Builder<>();
     client.run(
@@ -1092,6 +1111,7 @@ public class RedisShardBackplane implements Backplane {
     throw new UnsupportedOperationException();
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public ImmutableList<DispatchedOperation> getDispatchedOperations() throws IOException {
     ImmutableList.Builder<DispatchedOperation> builder = new ImmutableList.Builder<>();
@@ -1161,6 +1181,7 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public ExecuteEntry deprequeueOperation() throws IOException, InterruptedException {
     return client.blockingCall(this::deprequeueOperation);
@@ -1218,6 +1239,7 @@ public class RedisShardBackplane implements Backplane {
     return null;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public QueueEntry dispatchOperation(List<Platform.Property> provisions)
       throws IOException, InterruptedException {
@@ -1231,6 +1253,7 @@ public class RedisShardBackplane implements Backplane {
     return JsonFormat.printer().print(o);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void rejectOperation(QueueEntry queueEntry) throws IOException {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
@@ -1254,6 +1277,7 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
       throws IOException {
@@ -1281,6 +1305,7 @@ public class RedisShardBackplane implements Backplane {
     return false;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException {
     String operationName = operation.getName();
@@ -1299,6 +1324,7 @@ public class RedisShardBackplane implements Backplane {
     return Operation.newBuilder().setName(operationName).build();
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void queueing(String operationName) throws IOException {
     Operation operation = keepaliveOperation(operationName);
@@ -1306,6 +1332,7 @@ public class RedisShardBackplane implements Backplane {
     client.run(jedis -> publishReset(jedis, operation));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException {
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
@@ -1322,11 +1349,13 @@ public class RedisShardBackplane implements Backplane {
     jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void completeOperation(String operationName) throws IOException {
     client.run(jedis -> completeOperation(jedis, operationName));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void deleteOperation(String operationName) throws IOException {
     Operation o =
@@ -1368,6 +1397,7 @@ public class RedisShardBackplane implements Backplane {
     return operationQueue.isEligible(provisions);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException {
     if (requestMetadata.getToolInvocationId().isEmpty()
@@ -1387,16 +1417,19 @@ public class RedisShardBackplane implements Backplane {
     return isActionBlocked || isInvocationBlocked;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean canQueue() throws IOException {
     return client.call(jedis -> operationQueue.canQueue(jedis));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean canPrequeue() throws IOException {
     return client.call(jedis -> prequeue.canQueue(jedis));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public BackplaneStatus backplaneStatus(Instance instance) throws IOException {
     BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
@@ -1408,6 +1441,7 @@ public class RedisShardBackplane implements Backplane {
     return builder.build();
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public GetClientStartTimeResult getClientStartTime(String clientKey) throws IOException {
     try {

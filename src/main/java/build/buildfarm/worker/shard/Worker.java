@@ -284,6 +284,7 @@ public class Worker extends LoggingMain {
    * @param clusterEndpoint the current Buildfarm endpoint.
    * @param instanceIp Ip of the the instance that we want to disable scale in protection.
    */
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   private void disableScaleInProtection(String clusterEndpoint, String instanceIp) {
     ManagedChannel channel = null;
     try {
@@ -560,6 +561,7 @@ public class Worker extends LoggingMain {
     return false;
   }
 
+  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   private String getRandomWorker() throws IOException {
     Set<String> workerSet = backplane.getWorkers();
     synchronized (workerSet) {
@@ -716,7 +718,7 @@ public class Worker extends LoggingMain {
         /* deadlineAfterUnits=*/ );
   }
 
-  @SuppressWarnings("deprecation")
+  @SuppressWarnings({"deprecation", "ResultOfMethodCallIgnored"})
   public void stop() throws InterruptedException {
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
@@ -955,6 +957,7 @@ public class Worker extends LoggingMain {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   public static void startWorker(String[] args) throws Exception {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //

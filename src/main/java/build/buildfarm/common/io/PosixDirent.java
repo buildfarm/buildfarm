@@ -26,6 +26,7 @@ public final class PosixDirent implements Serializable, Comparable<PosixDirent> 
   @Nullable private final PosixFileAttributes stat;
 
   /** Creates a new posix dirent with the given name */
+  @SuppressWarnings("NullableProblems")
   public PosixDirent(String name, PosixFileAttributes stat) {
     this.name = Preconditions.checkNotNull(name);
     this.stat = stat;

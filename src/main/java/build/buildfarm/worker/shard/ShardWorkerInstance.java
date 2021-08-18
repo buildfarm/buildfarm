@@ -222,6 +222,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean putOperation(Operation operation) {
     try {

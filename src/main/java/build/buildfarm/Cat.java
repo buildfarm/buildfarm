@@ -154,6 +154,7 @@ class Cat {
     System.out.println(Strings.repeat("  ", level) + msg);
   }
 
+  @SuppressWarnings("ConstantConditions")
   private static void printActionResult(ActionResult result, int indentLevel) {
     for (OutputFile outputFile : result.getOutputFilesList()) {
       String attrs = "";

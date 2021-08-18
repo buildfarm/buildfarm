@@ -127,6 +127,7 @@ public class FuseCAS extends FuseStubFS {
       content = content.concat(value);
     }
 
+    @SuppressWarnings("ConstantConditions")
     public synchronized void write(ByteString value, long offset) {
       int size = value.size();
       int contentSize = content.size();
@@ -945,6 +946,7 @@ public class FuseCAS extends FuseStubFS {
     return 0;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public int fallocate(
       String path, int mode, @off_t long off, @off_t long length, FuseFileInfo fi) {

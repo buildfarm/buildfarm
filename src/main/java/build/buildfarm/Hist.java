@@ -32,6 +32,7 @@ class Hist {
     return builder.build();
   }
 
+  @SuppressWarnings("ConstantConditions")
   private static void printHistogramValue(int executing, int queued) {
     StringBuilder s = new StringBuilder();
     int p = 0;
@@ -87,6 +88,7 @@ class Hist {
     printHistogramValue(executing, queued);
   }
 
+  @SuppressWarnings("BusyWait")
   public static void main(String[] args) throws Exception {
     String instanceName = args[0];
     String host = args[1];

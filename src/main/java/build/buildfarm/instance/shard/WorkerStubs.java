@@ -45,6 +45,7 @@ public final class WorkerStubs {
                 notification -> stopInstance(notification.getValue()))
         .build(
             new CacheLoader<String, Instance>() {
+              @SuppressWarnings("NullableProblems")
               @Override
               public Instance load(String worker) {
                 return newStubInstance(worker, digestUtil, timeout);

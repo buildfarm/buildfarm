@@ -89,6 +89,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     this.accessRecorder = accessRecorder;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void start(Consumer<List<Digest>> onDigests, boolean skipLoad)
       throws IOException, InterruptedException {
@@ -164,6 +165,7 @@ class CFCExecFileSystem implements ExecFileSystem {
             });
   }
 
+  @SuppressWarnings("ConstantConditions")
   private ListenableFuture<Void> put(
       Path path, FileNode fileNode, ImmutableList.Builder<String> inputFiles) {
     Path filePath = path.resolve(fileNode.getName());
@@ -266,6 +268,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     return downloads;
   }
 
+  @SuppressWarnings("ConstantConditions")
   private ListenableFuture<Void> linkDirectory(
       Path execPath, Digest digest, Map<Digest, Directory> directoriesIndex) {
     return transformAsync(

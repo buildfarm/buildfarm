@@ -290,6 +290,7 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     listener.onWaitStart();
     QueueEntry queueEntry = null;

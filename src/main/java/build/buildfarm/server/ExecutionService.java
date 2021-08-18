@@ -83,6 +83,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             if (isCancelled() && !(t instanceof CancellationException)) {

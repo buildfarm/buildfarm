@@ -198,6 +198,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
    *
    * @param host the host that should be prepared for shutdown.
    */
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   private void informWorkerToPrepareForShutdown(String host) {
     ManagedChannel channel = null;
     try {

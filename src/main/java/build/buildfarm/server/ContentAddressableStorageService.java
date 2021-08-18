@@ -125,6 +125,7 @@ public class ContentAddressableStorageService
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
@@ -215,6 +216,7 @@ public class ContentAddressableStorageService
             responseObserver.onCompleted();
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             responseObserver.onError(t);
@@ -260,6 +262,7 @@ public class ContentAddressableStorageService
             responseObserver.onCompleted();
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             responseObserver.onError(Status.fromThrowable(t).asException());

@@ -39,6 +39,7 @@ public final class Group {
     return root;
   }
 
+  @SuppressWarnings("NullableProblems")
   private Group(String name, Group parent) {
     this.name = name;
     this.parent = parent;
@@ -50,6 +51,7 @@ public final class Group {
     return new Group(name, this);
   }
 
+  @SuppressWarnings("NullableProblems")
   public String getName() {
     return name;
   }
@@ -123,6 +125,7 @@ public final class Group {
     }
   }
 
+  @SuppressWarnings("StatementWithEmptyBody")
   public void killUntilEmpty(String controllerName) throws IOException {
     while (!killAllProcs(controllerName)) ;
   }

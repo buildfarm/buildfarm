@@ -136,6 +136,7 @@ public final class Chunker {
    *
    * <p>Closes any open resources (file handles, ...).
    */
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   public void seek(long toOffset) throws IOException {
     if (toOffset < offset) {
       reset();

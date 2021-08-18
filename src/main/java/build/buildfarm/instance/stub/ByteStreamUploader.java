@@ -300,6 +300,7 @@ public class ByteStreamUploader {
           MoreExecutors.directExecutor());
     }
 
+    @SuppressWarnings("ConstantConditions")
     private ListenableFuture<Void> guardQueryWithSuppression(
         Exception e, AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
       // we are destined to return this, avoid recreating it
@@ -327,6 +328,7 @@ public class ByteStreamUploader {
           suppressedQueryFuture, (result) -> exceptionFuture, MoreExecutors.directExecutor());
     }
 
+    @SuppressWarnings("ConstantConditions")
     private ListenableFuture<Void> query(
         AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
       ListenableFuture<Long> committedSizeFuture =

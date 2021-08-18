@@ -272,6 +272,7 @@ public class DigestUtil {
         return directoriesIndex.containsValue(value);
       }
 
+      @SuppressWarnings("NullableProblems")
       @Override
       public Set<Map.Entry<Digest, Directory>> entrySet() {
         throw new UnsupportedOperationException();
@@ -301,6 +302,7 @@ public class DigestUtil {
         return directoriesIndex.isEmpty();
       }
 
+      @SuppressWarnings("NullableProblems")
       @Override
       public Set<Digest> keySet() {
         throw new UnsupportedOperationException();
@@ -311,6 +313,7 @@ public class DigestUtil {
         throw new UnsupportedOperationException();
       }
 
+      @SuppressWarnings("NullableProblems")
       @Override
       public void putAll(Map<? extends Digest, ? extends Directory> m) {
         throw new UnsupportedOperationException();
@@ -326,6 +329,7 @@ public class DigestUtil {
         return directoriesIndex.size();
       }
 
+      @SuppressWarnings("NullableProblems")
       @Override
       public Collection<Directory> values() {
         return directoriesIndex.values();

@@ -39,6 +39,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
   */
   public final List<WorkerQueue> specificQueues = Lists.newArrayList();
 
+  @SuppressWarnings("NullableProblems")
   @Override
   public Iterator<WorkerQueue> iterator() {
     return specificQueues.iterator();
@@ -117,6 +118,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
     }
   }
 
+  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   private void enqueueOperation(List<Operation> operations, Operation operation) {
     synchronized (operations) {
       Preconditions.checkState(

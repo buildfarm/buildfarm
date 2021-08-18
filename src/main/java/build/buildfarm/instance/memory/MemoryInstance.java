@@ -151,6 +151,7 @@ public class MemoryInstance extends AbstractServerInstance {
                   })
           .build(
               new CacheLoader<String, ByteStringStreamSource>() {
+                @SuppressWarnings("NullableProblems")
                 @Override
                 public ByteStringStreamSource load(String name) {
                   return newStreamSource(name);
@@ -387,6 +388,7 @@ public class MemoryInstance extends AbstractServerInstance {
     };
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public InputStream newOperationStreamInput(
       String name,
@@ -779,6 +781,7 @@ public class MemoryInstance extends AbstractServerInstance {
     return createProvisions(command.getPlatform());
   }
 
+  @SuppressWarnings("ConstantConditions")
   private void matchSynchronized(Platform platform, MatchListener listener)
       throws InterruptedException {
     ImmutableList.Builder<Operation> rejectedOperations = ImmutableList.builder();

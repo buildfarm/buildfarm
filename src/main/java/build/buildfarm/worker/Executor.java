@@ -387,6 +387,7 @@ class Executor {
     return arguments.build();
   }
 
+  @SuppressWarnings("ConstantConditions")
   private Code executeCommand(
       String operationName,
       Path execDir,

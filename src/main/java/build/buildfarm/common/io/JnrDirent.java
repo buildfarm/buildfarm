@@ -26,6 +26,7 @@ public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
   @Nullable private final FileStat stat;
 
   /** Creates a new jnr dirent with the given name */
+  @SuppressWarnings("NullableProblems")
   public JnrDirent(String name, FileStat stat) {
     this.name = Preconditions.checkNotNull(name);
     this.stat = stat;

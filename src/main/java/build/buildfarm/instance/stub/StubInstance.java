@@ -176,6 +176,7 @@ public class StubInstance implements Instance {
     this(name, identifier, digestUtil, channel, grpcTimeout, NO_RETRIES, /* retryService=*/ null);
   }
 
+  @SuppressWarnings("NullableProblems")
   public StubInstance(
       String name,
       String identifier,
@@ -322,7 +323,7 @@ public class StubInstance implements Instance {
             }
           });
 
-  @SuppressWarnings("Guava")
+  @SuppressWarnings({"Guava", "ConstantConditions"})
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
     if (grpcTimeout.getSeconds() > 0 || grpcTimeout.getNanos() > 0) {
@@ -382,6 +383,7 @@ public class StubInstance implements Instance {
         directExecutor());
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
     throwIfStopped();
@@ -830,6 +832,7 @@ public class StubInstance implements Instance {
         .getOperation(GetOperationRequest.newBuilder().setName(operationName).build());
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void deleteOperation(String operationName) {
     throwIfStopped();
@@ -837,6 +840,7 @@ public class StubInstance implements Instance {
         .deleteOperation(DeleteOperationRequest.newBuilder().setName(operationName).build());
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void cancelOperation(String operationName) {
     throwIfStopped();
@@ -881,6 +885,7 @@ public class StubInstance implements Instance {
     return results;
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void deregisterWorker(String workerName) {
     throwIfStopped();

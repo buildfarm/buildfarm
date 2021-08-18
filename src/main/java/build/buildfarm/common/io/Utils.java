@@ -440,6 +440,7 @@ public class Utils {
     }
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   public static <T> T getOrIOException(ListenableFuture<T> future) throws IOException {
     boolean interrupted = false;
     for (; ; ) {

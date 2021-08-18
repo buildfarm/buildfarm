@@ -163,6 +163,7 @@ public class BuildFarmServer extends LoggingMain {
     System.err.println("*** server shut down");
   }
 
+  @SuppressWarnings("ConstantConditions")
   public void stop() {
     synchronized (this) {
       if (stopping) {
@@ -204,6 +205,7 @@ public class BuildFarmServer extends LoggingMain {
   }
 
   /** returns success or failure */
+  @SuppressWarnings("ConstantConditions")
   static boolean serverMain(String[] args) {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //

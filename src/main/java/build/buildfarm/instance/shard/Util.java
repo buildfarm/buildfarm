@@ -142,6 +142,7 @@ public class Util {
             complete();
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             fail(Status.fromThrowable(t).asRuntimeException());
@@ -164,6 +165,7 @@ public class Util {
               foundCallback.onSuccess(found ? worker : null);
             }
 
+            @SuppressWarnings("NullableProblems")
             @Override
             public void onFailure(Throwable t) {
               foundCallback.onFailure(t);
@@ -197,6 +199,7 @@ public class Util {
             foundCallback.onSuccess(found);
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);

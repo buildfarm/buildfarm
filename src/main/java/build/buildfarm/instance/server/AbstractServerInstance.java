@@ -274,6 +274,7 @@ public abstract class AbstractServerInstance implements Instance {
         digestsCompleteFuture, v -> findMissingBlobs(digests.build(), requestMetadata), executor);
   }
 
+  @SuppressWarnings("ConstantConditions")
   protected ListenableFuture<ActionResult> ensureOutputsPresent(
       ListenableFuture<ActionResult> resultFuture, RequestMetadata requestMetadata) {
     ListenableFuture<Iterable<Digest>> missingOutputsFuture =
@@ -974,6 +975,7 @@ public abstract class AbstractServerInstance implements Instance {
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
   }
 
+  @SuppressWarnings("ConstantConditions")
   protected void validateAction(
       String operationName,
       Action action,
@@ -1224,6 +1226,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   // this deserves a real async execute, but not now
+  @SuppressWarnings("ConstantConditions")
   @Override
   public ListenableFuture<Void> execute(
       Digest actionDigest,
@@ -1295,6 +1298,7 @@ public abstract class AbstractServerInstance implements Instance {
     Futures.addCallback(
         actionResultFuture,
         new FutureCallback<ActionResult>() {
+          @SuppressWarnings("ConstantConditions")
           void onCompleted(@Nullable ActionResult actionResult) {
             final ExecuteOperationMetadata nextMetadata;
             if (actionResult == null) {
@@ -1336,6 +1340,7 @@ public abstract class AbstractServerInstance implements Instance {
             onCompleted(actionResult);
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             logger.log(
@@ -1451,6 +1456,7 @@ public abstract class AbstractServerInstance implements Instance {
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             logger.log(
@@ -1462,6 +1468,7 @@ public abstract class AbstractServerInstance implements Instance {
     return future;
   }
 
+  @SuppressWarnings("ConstantConditions")
   protected static boolean isErrored(Operation operation) {
     return operation.getDone()
         && operation.getResultCase() == Operation.ResultCase.RESPONSE
@@ -1478,6 +1485,7 @@ public abstract class AbstractServerInstance implements Instance {
     return isStage(operation, ExecutionStage.Value.UNKNOWN);
   }
 
+  @SuppressWarnings("ConstantConditions")
   protected boolean isCancelled(Operation operation) {
     return operation.getDone()
         && operation.getResultCase() == Operation.ResultCase.RESPONSE

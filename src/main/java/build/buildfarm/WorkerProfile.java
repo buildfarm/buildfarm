@@ -121,6 +121,7 @@ class WorkerProfile {
     return builder.build().getRedisShardBackplaneConfig();
   }
 
+  @SuppressWarnings("ConstantConditions")
   private static Set<String> getWorkers(String[] args) throws ConfigurationException, IOException {
     OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
     parser.parseAndExitUponError(args);
@@ -164,6 +165,7 @@ class WorkerProfile {
     return workers;
   }
 
+  @SuppressWarnings("BusyWait")
   private static void workerProfile(String[] args) throws IOException {
     Set<String> workers = null;
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
