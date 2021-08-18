@@ -258,7 +258,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
                 Channel ch = channelAcquired.getNow();
                 ChannelPipeline p = ch.pipeline();
 
-                if (isChannelPipelineEmpty(p)) {
+                if (!isChannelPipelineEmpty(p)) {
                   channelReady.setFailure(
                       new IllegalStateException("Channel pipeline is not empty."));
                   return;
@@ -332,7 +332,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
                 Channel ch = channelAcquired.getNow();
                 ChannelPipeline p = ch.pipeline();
 
-                if (isChannelPipelineEmpty(p)) {
+                if (!isChannelPipelineEmpty(p)) {
                   channelReady.setFailure(
                       new IllegalStateException("Channel pipeline is not empty."));
                   return;
@@ -374,10 +374,10 @@ public final class HttpBlobStore implements SimpleBlobStore {
   }
 
   private boolean isChannelPipelineEmpty(ChannelPipeline pipeline) {
-    return (pipeline.first() != null)
-        && (!useTls
-            || !"ssl-handler".equals(pipeline.firstContext().name())
-            || pipeline.first() != pipeline.last());
+    return (pipeline.first() == null)
+        || (useTls
+            && "ssl-handler".equals(pipeline.firstContext().name())
+            && pipeline.first() == pipeline.last());
   }
 
   @Override

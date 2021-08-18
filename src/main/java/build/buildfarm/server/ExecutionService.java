@@ -69,12 +69,12 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
         future,
         new FutureCallback<Void>() {
           boolean isCancelled() {
-            return !serverCallStreamObserver.isCancelled() && !Context.current().isCancelled();
+            return serverCallStreamObserver.isCancelled() || Context.current().isCancelled();
           }
 
           @Override
           public void onSuccess(Void result) {
-            if (isCancelled()) {
+            if (!isCancelled()) {
               try {
                 serverCallStreamObserver.onCompleted();
               } catch (Exception e) {
@@ -86,7 +86,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
           @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
-            if (isCancelled() && !(t instanceof CancellationException)) {
+            if (!isCancelled() && !(t instanceof CancellationException)) {
               logger.log(Level.WARNING, "error occurred during execution", t);
               serverCallStreamObserver.onError(Status.fromThrowable(t).asException());
             }

@@ -15,6 +15,7 @@
 package build.buildfarm;
 
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
@@ -70,12 +71,8 @@ class Hist {
         try {
           ExecuteOperationMetadata metadata =
               operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-          switch (metadata.getStage()) {
-            case EXECUTING:
-              executing++;
-              break;
-            default:
-              break;
+          if (metadata.getStage().equals(ExecutionStage.Value.EXECUTING)) {
+            executing++;
           }
         } catch (InvalidProtocolBufferException e) {
         }
