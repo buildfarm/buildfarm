@@ -95,6 +95,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -199,7 +202,7 @@ public class ShardInstanceTest {
             (Answer<ListenableFuture<Iterable<Digest>>>) invocation -> {
               Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
               return immediateFuture(
-                  Iterables.filter(digests, (digest) -> !blobDigests.contains(digest)));
+                      StreamSupport.stream(digests.spliterator(), false).filter((digest) -> !blobDigests.contains(digest)).collect(Collectors.toList()));
             })
         .when(mockWorkerInstance)
         .findMissingBlobs(any(Iterable.class), any(RequestMetadata.class));
