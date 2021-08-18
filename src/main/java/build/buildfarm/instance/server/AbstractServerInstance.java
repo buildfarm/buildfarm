@@ -1200,33 +1200,32 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected void logFailedStatus(Digest actionDigest, com.google.rpc.Status status) {
-    StringBuilder message =
-        new StringBuilder(
-            format(
-                "%s: %s: %s\n",
-                DigestUtil.toString(actionDigest),
-                Code.forNumber(status.getCode()),
-                status.getMessage()));
+    String message =
+        format(
+            "%s: %s: %s\n",
+            DigestUtil.toString(actionDigest),
+            Code.forNumber(status.getCode()),
+            status.getMessage());
     for (Any detail : status.getDetailsList()) {
       if (detail.is(PreconditionFailure.class)) {
-        message.append("  PreconditionFailure:\n");
+        message += "  PreconditionFailure:\n";
         PreconditionFailure preconditionFailure;
         try {
           preconditionFailure = detail.unpack(PreconditionFailure.class);
           for (Violation violation : preconditionFailure.getViolationsList()) {
-            message.append(
+            message +=
                 format(
                     "    Violation: %s %s: %s\n",
-                    violation.getType(), violation.getSubject(), violation.getDescription()));
+                    violation.getType(), violation.getSubject(), violation.getDescription());
           }
         } catch (InvalidProtocolBufferException e) {
-          message.append("  ").append(e.getMessage());
+          message += "  " + e.getMessage();
         }
       } else {
-        message.append("  Unknown Detail\n");
+        message += "  Unknown Detail\n";
       }
     }
-    getLogger().info(message.toString());
+    getLogger().info(message);
   }
 
   // this deserves a real async execute, but not now

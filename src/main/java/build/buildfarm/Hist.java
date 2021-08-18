@@ -54,7 +54,6 @@ class Hist {
   @SuppressWarnings("CatchMayIgnoreException")
   private static void printHistogram(Instance instance) {
     int executing = 0;
-    int queued = 0;
 
     String pageToken = "";
     do {
@@ -72,9 +71,6 @@ class Hist {
           ExecuteOperationMetadata metadata =
               operation.getMetadata().unpack(ExecuteOperationMetadata.class);
           switch (metadata.getStage()) {
-            case QUEUED:
-              queued++;
-              break;
             case EXECUTING:
               executing++;
               break;

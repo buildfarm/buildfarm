@@ -222,8 +222,6 @@ public class AbstractServerInstanceTest {
 
   @Test
   public void duplicateFileInputIsInvalid() {
-    AbstractServerInstance instance = new DummyServerInstance();
-
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     AbstractServerInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
@@ -250,8 +248,6 @@ public class AbstractServerInstanceTest {
 
   @Test
   public void unsortedFileInputIsInvalid() {
-    AbstractServerInstance instance = new DummyServerInstance();
-
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     AbstractServerInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
@@ -278,8 +274,6 @@ public class AbstractServerInstanceTest {
 
   @Test
   public void duplicateDirectoryInputIsInvalid() {
-    AbstractServerInstance instance = new DummyServerInstance();
-
     Directory emptyDirectory = Directory.getDefaultInstance();
     Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
@@ -315,8 +309,6 @@ public class AbstractServerInstanceTest {
 
   @Test
   public void unsortedDirectoryInputIsInvalid() {
-    AbstractServerInstance instance = new DummyServerInstance();
-
     Directory emptyDirectory = Directory.getDefaultInstance();
     Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
