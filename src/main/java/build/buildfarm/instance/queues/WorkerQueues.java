@@ -17,7 +17,6 @@ package build.buildfarm.instance.queues;
 import build.buildfarm.instance.MatchListener;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.SetMultimap;
 import com.google.longrunning.Operation;
@@ -122,7 +121,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
   private void enqueueOperation(List<Operation> operations, Operation operation) {
     synchronized (operations) {
       Preconditions.checkState(
-          !operations.stream().anyMatch((queuedOperation) -> queuedOperation.getName().equals(operation.getName())));
+              operations.stream().noneMatch((queuedOperation) -> queuedOperation.getName().equals(operation.getName())));
       operations.add(operation);
     }
   }

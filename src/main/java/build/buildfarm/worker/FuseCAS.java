@@ -682,6 +682,7 @@ public class FuseCAS extends FuseStubFS {
     }
 
     WriteFileEntry writeFileEntry = (WriteFileEntry) entry;
+    //noinspection OctalInteger
     writeFileEntry.executable = (mode & 0111) != 0;
 
     return 0;

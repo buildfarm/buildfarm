@@ -15,7 +15,6 @@
 package build.buildfarm.common;
 
 import build.bazel.remote.execution.v2.Command;
-import com.google.common.collect.Iterables;
 
 /**
  * @class Command

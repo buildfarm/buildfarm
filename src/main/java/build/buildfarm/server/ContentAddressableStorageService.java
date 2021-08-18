@@ -41,7 +41,6 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Tree;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Status;
