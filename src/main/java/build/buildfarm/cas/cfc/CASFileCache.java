@@ -248,7 +248,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   public static class IncompleteBlobException extends IOException {
-
     IncompleteBlobException(Path writePath, String key, long committed, long expected) {
       super(
           format("blob %s => %s: committed %d, expected %d", writePath, key, committed, expected));
