@@ -128,7 +128,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private static final Gauge casSizeMetric =
       Gauge.build().name("cas_size").help("CAS size.").register();
   private static final Gauge casEntryCountMetric =
-      Gauge.build().name("cas_entry_count").help("number of entries in the CAS.").register();
+      Gauge.build().name("cas_entry_count").help("Number of entries in the CAS.").register();
 
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
@@ -1226,7 +1226,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 try {
                   casSizeMetric.set(size());
                   casEntryCountMetric.set(entryCount());
-                  TimeUnit.SECONDS.sleep(30);
+                  TimeUnit.MINUTES.sleep(5);
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
