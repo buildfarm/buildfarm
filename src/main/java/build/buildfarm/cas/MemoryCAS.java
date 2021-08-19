@@ -108,6 +108,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     return missing;
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public synchronized InputStream newInput(Digest digest, long offset) throws IOException {
     // implicit int bounds compare against size bytes

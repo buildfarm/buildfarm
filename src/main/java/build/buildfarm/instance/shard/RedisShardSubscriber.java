@@ -46,7 +46,7 @@ class RedisShardSubscriber extends JedisPubSub {
     private final TimedWatcher watcher;
 
     TimedWatchFuture(TimedWatcher watcher) {
-      super(watcher::observe);
+      super(watcher);
       this.watcher = watcher;
     }
 
@@ -129,18 +129,8 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   @Override
-  public synchronized void punsubscribe() {
-    super.punsubscribe();
-  }
-
-  @Override
   public synchronized void punsubscribe(String... patterns) {
     super.punsubscribe(patterns);
-  }
-
-  @Override
-  public synchronized void ping() {
-    super.ping();
   }
 
   public ListenableFuture<Void> watch(String channel, TimedWatcher watcher) {

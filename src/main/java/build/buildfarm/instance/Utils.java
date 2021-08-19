@@ -52,7 +52,7 @@ public final class Utils {
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
-      throws IOException, InterruptedException {
+      throws IOException {
     try (InputStream in =
         instance.newBlobInput(
             blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata)) {
@@ -95,6 +95,7 @@ public final class Utils {
               future.set(digest);
             }
 
+            @SuppressWarnings("NullableProblems")
             @Override
             public void onFailure(Throwable t) {
               future.setException(t);

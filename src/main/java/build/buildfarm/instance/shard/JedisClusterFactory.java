@@ -101,7 +101,8 @@ public class JedisClusterFactory {
    * @param node An established jedis client to operate on a redis node.
    * @note Overloaded.
    */
-  private static void deleteExistingKeys(Jedis node) throws Exception {
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static void deleteExistingKeys(Jedis node) {
     String nextCursor = "0";
     Set<String> matchingKeys = new HashSet<>();
     ScanParams params = new ScanParams();

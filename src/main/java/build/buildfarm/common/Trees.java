@@ -19,6 +19,7 @@ import static com.google.common.collect.Iterables.transform;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Tree;
 
 // Convenience methods for interacting with Trees
@@ -26,7 +27,7 @@ public final class Trees {
   private Trees() {}
 
   public static Iterable<Digest> directoryFileDigests(Directory directory) {
-    return transform(directory.getFilesList(), fileNode -> fileNode.getDigest());
+    return transform(directory.getFilesList(), FileNode::getDigest);
   }
 
   public static Iterable<Digest> enumerateTreeFileDigests(Tree tree) {
