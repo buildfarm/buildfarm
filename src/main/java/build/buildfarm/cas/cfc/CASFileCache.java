@@ -83,6 +83,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.prometheus.client.Counter;
+import io.prometheus.client.Gauge;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -125,6 +126,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   // Prometheus metrics
   private static final Counter expiredKeyCounter =
       Counter.build().name("expired_key").help("Number of key expirations.").register();
+  private static final Gauge casSizeMetric =
+      Gauge.build().name("cas_size").help("CAS size.").register();
+  private static final Gauge casEntryCountMetric =
+      Gauge.build().name("cas_entry_count").help("number of entries in the CAS.").register();
 
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
@@ -139,6 +144,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Consumer<Iterable<Digest>> onExpire;
   private final Executor accessRecorder;
   private final ExecutorService expireService;
+  private Thread prometheusMetricsThread;
 
   private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newConcurrentMap();
   private final DirectoriesIndex directoriesIndex;
@@ -1224,6 +1230,26 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Instant endTime = Instant.now();
     Duration startupTime = Duration.between(startTime, endTime);
     logger.log(Level.INFO, "Startup Time: " + startupTime.getSeconds() + "s");
+
+    // Start metrics collection thread
+    prometheusMetricsThread =
+        new Thread(
+            () -> {
+              while (!Thread.currentThread().isInterrupted()) {
+                try {
+                  casSizeMetric.set(size());
+                  casEntryCountMetric.set(entryCount());
+                  TimeUnit.SECONDS.sleep(30);
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  break;
+                } catch (Exception e) {
+                  logger.log(Level.SEVERE, "Could not update CasFileCache metrics", e);
+                }
+              }
+            },
+            "Prometheus CAS Metrics Collector");
+    prometheusMetricsThread.start();
 
     // return information about the cache startup.
     StartupCacheResults startupResults = new StartupCacheResults();
