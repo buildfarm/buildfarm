@@ -1239,9 +1239,7 @@ public class RedisShardBackplane implements Backplane {
       dispatchedOperations.remove(jedis, operationName);
 
       // Return an entry so that if it needs re-queued, it will have the correct "requeue attempts".
-      QueueEntry entryForRequeue =
-          queueEntryBuilder.setRequeueAttempts(queueEntry.getRequeueAttempts() + 1).build();
-      return entryForRequeue;
+      return queueEntryBuilder.setRequeueAttempts(queueEntry.getRequeueAttempts() + 1).build();
     }
     return null;
   }
