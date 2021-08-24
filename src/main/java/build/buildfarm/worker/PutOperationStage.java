@@ -26,7 +26,7 @@ import java.util.Arrays;
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
 
-  private volatile AverageTimeCostOfLastPeriod[] averagesWithinDifferentPeriods;
+  private final AverageTimeCostOfLastPeriod[] averagesWithinDifferentPeriods;
 
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
     this.onPut = onPut;
@@ -61,10 +61,10 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
   private static class AverageTimeCostOfLastPeriod {
     static final int NumOfSlots = 100;
-    private OperationStageDurations[] buckets;
+    private final OperationStageDurations[] buckets;
     private int lastUsedSlot = -1;
-    private Duration period;
-    private OperationStageDurations nextOperation;
+    private final Duration period;
+    private final OperationStageDurations nextOperation;
     private OperationStageDurations averageTimeCosts;
     private Timestamp lastOperationCompleteTime;
 

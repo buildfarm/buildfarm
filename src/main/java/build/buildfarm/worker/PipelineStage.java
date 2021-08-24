@@ -67,6 +67,10 @@ public abstract class PipelineStage implements Runnable {
     }
   }
 
+  public String name() {
+    return name;
+  }
+
   protected void cancelTick() {
     // if we are not in a tick, this has no effect
     // if we are in a tick, set the cancel flag, interrupt the tick thread

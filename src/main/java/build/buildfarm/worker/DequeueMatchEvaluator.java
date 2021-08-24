@@ -20,6 +20,7 @@ import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @class DequeueMatchEvaluator
@@ -48,16 +49,12 @@ public class DequeueMatchEvaluator {
    * @note Overloaded.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
+  @NotNull
   public static boolean shouldKeepOperation(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       QueueEntry queueEntry) {
-    // if the queue entry was not actually dequeued, should we still accept it?
-    // TODO(luxe): find out why its currently like this, and if that still makes sense.
-    if (queueEntry == null) {
-      return true;
-    }
-
     return shouldKeepViaPlatform(matchSettings, workerProvisions, queueEntry.getPlatform());
   }
 
@@ -71,6 +68,8 @@ public class DequeueMatchEvaluator {
    * @note Overloaded.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
+  @NotNull
   public static boolean shouldKeepOperation(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
@@ -89,11 +88,14 @@ public class DequeueMatchEvaluator {
    * @return Whether or not the worker should accept or reject the operation.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
+  @NotNull
   private static boolean shouldKeepViaPlatform(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       Platform platform) {
-    // attempt to execute everything it gets off the queue.
+    // attempt to execute everything the worker gets off the queue.
+    // this is a recommended configuration.
     if (matchSettings.acceptEverything) {
       return true;
     }
@@ -111,6 +113,8 @@ public class DequeueMatchEvaluator {
    * @return Whether or not the worker should accept or reject the queue entry.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
+  @NotNull
   private static boolean satisfiesProperties(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
@@ -133,6 +137,8 @@ public class DequeueMatchEvaluator {
    * @return Whether or not the worker should accept or reject the queue entry.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
+  @NotNull
   private static boolean satisfiesProperty(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,

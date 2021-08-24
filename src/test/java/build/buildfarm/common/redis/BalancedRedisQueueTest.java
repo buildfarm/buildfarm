@@ -21,6 +21,7 @@ import build.buildfarm.instance.shard.JedisClusterFactory;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.junit.After;
 import org.junit.Before;
@@ -58,7 +59,7 @@ public class BalancedRedisQueueTest {
   @Test
   public void balancedRedisQueueCreateHashesConstructsWithoutError() throws Exception {
     // ACT
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
+    new BalancedRedisQueue("test", ImmutableList.of());
   }
 
   // Function under test: push
@@ -360,7 +361,7 @@ public class BalancedRedisQueueTest {
     queue.push(redis, "element 8");
 
     // ACT
-    List<String> visited = new ArrayList<String>();
+    List<String> visited = new ArrayList<>();
     StringVisitor visitor =
         new StringVisitor() {
           public void visit(String entry) {
@@ -444,7 +445,7 @@ public class BalancedRedisQueueTest {
   @Test
   public void isEvenlyDistributedSingleNodeAlwaysEvenlyDistributes() throws Exception {
     // ARRANGE
-    List<String> hashtags = Arrays.asList("single_node");
+    List<String> hashtags = Collections.singletonList("single_node");
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
 
     // ACT / ASSERT

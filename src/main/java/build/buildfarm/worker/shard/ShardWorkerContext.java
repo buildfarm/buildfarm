@@ -29,7 +29,6 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
-import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.backplane.Backplane;
@@ -86,12 +85,10 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -146,7 +143,6 @@ class ShardWorkerContext implements WorkerContext {
       Platform platform,
       Duration operationPollPeriod,
       OperationPoller operationPoller,
-      int inlineContentLimit,
       int inputFetchStageWidth,
       int executeStageWidth,
       Backplane backplane,
@@ -154,8 +150,6 @@ class ShardWorkerContext implements WorkerContext {
       InputStreamFactory inputStreamFactory,
       Iterable<ExecutionPolicy> policies,
       Instance instance,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
       Duration defaultActionTimeout,
       Duration maximumActionTimeout,
       boolean limitExecution,
@@ -292,6 +286,7 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
@@ -331,7 +326,7 @@ class ShardWorkerContext implements WorkerContext {
 
           @Override
           public boolean getMatched() {
-            return matched;
+            return !matched;
           }
 
           @Override
@@ -374,7 +369,7 @@ class ShardWorkerContext implements WorkerContext {
             listener.setOnCancelHandler(onCancelHandler);
           }
         };
-    while (!dedupMatchListener.getMatched()) {
+    while (dedupMatchListener.getMatched()) {
       try {
         matchInterruptible(dedupMatchListener);
       } catch (IOException e) {
@@ -533,12 +528,12 @@ class ShardWorkerContext implements WorkerContext {
       return;
     }
 
-    OutputFile.Builder outputFileBuilder =
-        resultBuilder
-            .addOutputFilesBuilder()
-            .setPath(outputFile)
-            .setDigest(digest)
-            .setIsExecutable(Files.isExecutable(outputPath));
+    resultBuilder
+        .addOutputFilesBuilder()
+        .setPath(outputFile)
+        .setDigest(digest)
+        .setIsExecutable(Files.isExecutable(outputPath));
+
     try {
       insertFile(digest, outputPath);
     } catch (EntryLimitException e) {
@@ -565,8 +560,8 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     Directory toDirectory() {
-      Collections.sort(files, Comparator.comparing(node -> node.getName()));
-      Collections.sort(directories, Comparator.comparing(node -> node.getName()));
+      files.sort(Comparator.comparing(FileNode::getName));
+      directories.sort(Comparator.comparing(DirectoryNode::getName));
       return Directory.newBuilder().addAllFiles(files).addAllDirectories(directories).build();
     }
   }
@@ -599,7 +594,7 @@ class ShardWorkerContext implements WorkerContext {
         outputDirPath,
         new SimpleFileVisitor<Path>() {
           OutputDirectoryContext currentDirectory = null;
-          Stack<OutputDirectoryContext> path = new Stack<>();
+          final Stack<OutputDirectoryContext> path = new Stack<>();
 
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
@@ -642,8 +637,7 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-              throws IOException {
+          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
             path.push(currentDirectory);
             if (dir.equals(outputDirPath)) {
               currentDirectory = outputRoot;
@@ -654,7 +648,7 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+          public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
             OutputDirectoryContext parentDirectory = path.pop();
             Directory directory = currentDirectory.toDirectory();
             if (parentDirectory == null) {
@@ -705,8 +699,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action)
-      throws IOException, InterruptedException {
+  public boolean putOperation(Operation operation) throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
       completedOperations.inc();
@@ -816,15 +809,12 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public int commandExecutionClaims(Command command) {
-    ResourceLimits limits = commandExecutionSettings(command);
-    return limits.cpu.claimed;
+    return commandExecutionSettings(command).cpu.claimed;
   }
 
   public ResourceLimits commandExecutionSettings(Command command) {
-    ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(
-            command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
-    return limits;
+    return ResourceDecider.decideResourceLimitations(
+        command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
   }
 
   @Override
@@ -861,8 +851,8 @@ class ShardWorkerContext implements WorkerContext {
     // and collect group names to use on the CLI.
     String operationId = getOperationId(operationName);
     final Group group = operationsGroup.getChild(operationId);
-    ArrayList<IOResource> resources = new ArrayList<IOResource>();
-    ArrayList<String> usedGroups = new ArrayList<String>();
+    ArrayList<IOResource> resources = new ArrayList<>();
+    ArrayList<String> usedGroups = new ArrayList<>();
 
     // Possibly set core restrictions.
     if (limits.cpu.limit) {

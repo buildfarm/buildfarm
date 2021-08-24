@@ -76,8 +76,7 @@ class ShardCASFileCache extends CASFileCache {
   }
 
   @Override
-  protected InputStream newExternalInput(Digest digest, long offset)
-      throws IOException, InterruptedException {
-    return inputStreamFactory.newInput(digest, offset);
+  protected InputStream newExternalInput(Digest digest) throws IOException, InterruptedException {
+    return inputStreamFactory.newInput(digest, 0);
   }
 }

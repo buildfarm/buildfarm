@@ -57,8 +57,12 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private static final QueryWriteStatusResponse resetResponse =
       QueryWriteStatusResponse.newBuilder().setCommittedSize(0).setComplete(false).build();
 
+  @SuppressWarnings("Guava")
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub;
+
+  @SuppressWarnings("Guava")
   private final Supplier<ByteStreamStub> bsStub;
+
   private final String resourceName;
   private final Function<Throwable, Throwable> exceptionTranslator;
   private final long expectedSize;
@@ -66,6 +70,8 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private final byte[] buf;
   private final SettableFuture<Long> writeFuture = SettableFuture.create();
   private boolean wasReset = false;
+
+  @SuppressWarnings({"unchecked", "rawtypes", "Guava"})
   private final Supplier<QueryWriteStatusResponse> writeStatus =
       Suppliers.memoize(
           new Supplier() {
@@ -95,6 +101,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
               }
             }
           });
+
   private boolean sentResourceName = false;
   private int offset = 0;
   private long writtenBytes = 0;
@@ -108,6 +115,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   static class WriteCompleteException extends IOException {}
 
+  @SuppressWarnings("Guava")
   public StubWriteOutputStream(
       Supplier<ByteStreamBlockingStub> bsBlockingStub,
       Supplier<ByteStreamStub> bsStub,
@@ -165,11 +173,9 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public void flush() throws IOException {
-    if (!checkComplete()) {
-      if (offset != 0) {
-        initiateWrite();
-        flushSome(getCommittedSize() + offset == expectedSize);
-      }
+    if (!checkComplete() && offset != 0) {
+      initiateWrite();
+      flushSome(getCommittedSize() + offset == expectedSize);
     }
   }
 

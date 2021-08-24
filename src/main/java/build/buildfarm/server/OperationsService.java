@@ -51,7 +51,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       return;
     }
 
-    ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<Operation>();
+    ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
 
     String nextPageToken =
         instance.listOperations(pageSize, request.getPageToken(), request.getFilter(), operations);

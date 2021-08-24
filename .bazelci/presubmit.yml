@@ -75,8 +75,9 @@ tasks:
     name: "Integration Test (Memory)"
     platform: ubuntu1804
     shell_commands:
-    - export TEST_SHARD=true
+    - export TEST_SHARD=false
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - ./.bazelci/integration_test.sh
   integration_test_many_shard:
     name: "Integration Test (Shard)"
     platform: ubuntu1804
@@ -84,13 +85,19 @@ tasks:
     - export TEST_SHARD=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - ./.bazelci/integration_test.sh
-  integration_test_abseil:
-    name: "Abseil Test (Memory)"
-    platform: ubuntu1804
-    shell_commands:
-    - export TEST_SHARD=true
-    - export RUN_TEST=./.bazelci/run_abseil_test.sh
-    - ./.bazelci/integration_test.sh
+    
+  # Memory integration test is too slow.
+  # We can re-enable it if memory instance becomes faster or we build less targets.
+  # It is preserved here for offline testing.
+  
+  # integration_test_abseil:
+  #   name: "Abseil Test (Memory)"
+  #   platform: ubuntu1804
+  #   shell_commands:
+  #   - export TEST_SHARD=false
+  #   - export RUN_TEST=./.bazelci/run_abseil_test.sh
+  #   - ./.bazelci/integration_test.sh
+  
   integration_test_abseil_shard:
     name: "Abseil Test (Shard)"
     platform: ubuntu1804

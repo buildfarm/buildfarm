@@ -50,7 +50,6 @@ import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
-import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
@@ -80,6 +79,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
@@ -89,13 +89,14 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -106,13 +107,13 @@ import org.mockito.ArgumentMatcher;
 import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class ShardInstanceTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
   private static final long QUEUE_TEST_TIMEOUT_SECONDS = 3;
+  private static final Duration DEFAULT_TIMEOUT = Durations.fromSeconds(60);
   private static final Command SIMPLE_COMMAND =
       Command.newBuilder().addAllArguments(ImmutableList.of("true")).build();
 
@@ -145,7 +146,6 @@ public class ShardInstanceTest {
             /* maxBlobSize=*/ 0,
             /* maxCpu=*/ 1,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
-            new ArrayList<>(),
             /* useDenyList=*/ true,
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
@@ -180,6 +180,7 @@ public class ShardInstanceTest {
     return createAction(provideAction, provideCommand, inputRootDigest, command);
   }
 
+  @SuppressWarnings("unchecked")
   private Action createAction(
       boolean provideAction, boolean provideCommand, Digest inputRootDigest, Command command)
       throws Exception {
@@ -197,14 +198,14 @@ public class ShardInstanceTest {
     }
 
     doAnswer(
-            new Answer<ListenableFuture<Iterable<Digest>>>() {
-              @Override
-              public ListenableFuture<Iterable<Digest>> answer(InvocationOnMock invocation) {
-                Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
-                return immediateFuture(
-                    Iterables.filter(digests, (digest) -> !blobDigests.contains(digest)));
-              }
-            })
+            (Answer<ListenableFuture<Iterable<Digest>>>)
+                invocation -> {
+                  Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
+                  return immediateFuture(
+                      StreamSupport.stream(digests.spliterator(), false)
+                          .filter((digest) -> !blobDigests.contains(digest))
+                          .collect(Collectors.toList()));
+                })
         .when(mockWorkerInstance)
         .findMissingBlobs(any(Iterable.class), any(RequestMetadata.class));
 
@@ -221,24 +222,22 @@ public class ShardInstanceTest {
     }
 
     doAnswer(
-            new Answer<Void>() {
-              @Override
-              public Void answer(InvocationOnMock invocation) {
-                StreamObserver<ByteString> blobObserver =
-                    (StreamObserver) invocation.getArguments()[3];
-                if (provideAction) {
-                  blobObserver.onNext(action.toByteString());
-                  blobObserver.onCompleted();
-                } else {
-                  blobObserver.onError(Status.NOT_FOUND.asException());
-                }
-                return null;
-              }
-            })
+            (Answer<Void>)
+                invocation -> {
+                  StreamObserver<ByteString> blobObserver =
+                      (StreamObserver) invocation.getArguments()[3];
+                  if (provideAction) {
+                    blobObserver.onNext(action.toByteString());
+                    blobObserver.onCompleted();
+                  } else {
+                    blobObserver.onError(Status.NOT_FOUND.asException());
+                  }
+                  return null;
+                })
         .when(mockWorkerInstance)
         .getBlob(
             eq(actionDigest),
-            eq(0l),
+            eq(0L),
             eq(actionDigest.getSizeBytes()),
             any(ServerCallStreamObserver.class),
             any(RequestMetadata.class));
@@ -288,7 +287,9 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance
+          .queue(executeEntry, poller, DEFAULT_TIMEOUT)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -321,14 +322,6 @@ public class ShardInstanceTest {
 
   @Test
   public void queueActionFailsQueueEligibility() throws Exception {
-    ByteString foo = ByteString.copyFromUtf8("foo");
-    Digest fooDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("foo"));
-    // no need to provide foo, just want to make a non-default directory
-    Directory subdir =
-        Directory.newBuilder()
-            .addFiles(FileNode.newBuilder().setName("foo").setDigest(fooDigest))
-            .build();
-    Digest subdirDigest = DIGEST_UTIL.compute(foo);
     Directory inputRoot = Directory.newBuilder().build();
     ByteString inputRootContent = inputRoot.toByteString();
     Digest inputRootDigest = DIGEST_UTIL.compute(inputRootContent);
@@ -351,7 +344,9 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance
+          .queue(executeEntry, poller, DEFAULT_TIMEOUT)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -400,7 +395,9 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance
+          .queue(executeEntry, poller, DEFAULT_TIMEOUT)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -446,12 +443,6 @@ public class ShardInstanceTest {
   @Test
   public void queueDirectoryMissingErrorsOperation() throws Exception {
     ByteString foo = ByteString.copyFromUtf8("foo");
-    Digest fooDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("foo"));
-    // no need to provide foo, just want to make a non-default directory
-    Directory subdir =
-        Directory.newBuilder()
-            .addFiles(FileNode.newBuilder().setName("foo").setDigest(fooDigest))
-            .build();
     Digest subdirDigest = DIGEST_UTIL.compute(foo);
     Directory inputRoot =
         Directory.newBuilder()
@@ -479,7 +470,9 @@ public class ShardInstanceTest {
 
     boolean failedPreconditionExceptionCaught = false;
     try {
-      instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance
+          .queue(executeEntry, poller, DEFAULT_TIMEOUT)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -510,6 +503,7 @@ public class ShardInstanceTest {
     verify(poller, atLeastOnce()).pause();
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void queueOperationPutFailureCancelsOperation() throws Exception {
     Action action = createAction();
@@ -546,7 +540,9 @@ public class ShardInstanceTest {
     boolean unavailableExceptionCaught = false;
     try {
       // anything more would be unreasonable
-      instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance
+          .queue(executeEntry, poller, DEFAULT_TIMEOUT)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.UNAVAILABLE.getNumber()) {
@@ -583,7 +579,7 @@ public class ShardInstanceTest {
 
     Poller poller = mock(Poller.class);
 
-    instance.queue(executeEntry, poller).get();
+    instance.queue(executeEntry, poller, DEFAULT_TIMEOUT).get();
 
     verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(CACHE_CHECK));
     verify(mockBackplane, never()).putOperation(any(Operation.class), eq(QUEUED));
@@ -605,17 +601,6 @@ public class ShardInstanceTest {
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
-    ActionResult actionResult =
-        ActionResult.newBuilder()
-            .addOutputFiles(
-                OutputFile.newBuilder()
-                    .setPath("output/path")
-                    .setDigest(
-                        Digest.newBuilder()
-                            .setHash("find-missing-blobs-causes-resource-exhausted")
-                            .setSizeBytes(1)))
-            .build();
-
     when(mockBackplane.getActionResult(eq(actionKey)))
         .thenThrow(new IOException(Status.UNAVAILABLE.asException()));
 
@@ -625,7 +610,7 @@ public class ShardInstanceTest {
 
     Poller poller = mock(Poller.class);
 
-    instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+    instance.queue(executeEntry, poller, DEFAULT_TIMEOUT).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
 
     verify(mockBackplane, times(1)).queue(any(QueueEntry.class), any(Operation.class));
     verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(CACHE_CHECK));
@@ -676,7 +661,9 @@ public class ShardInstanceTest {
             .setRequestMetadata(requestMetadata)
             .build();
     Poller poller = mock(Poller.class);
-    instance.queue(cacheServedExecuteEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+    instance
+        .queue(cacheServedExecuteEntry, poller, DEFAULT_TIMEOUT)
+        .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
 
     verify(poller, times(1)).pause();
     verify(mockBackplane, never()).queue(any(QueueEntry.class), any(Operation.class));
@@ -738,7 +725,7 @@ public class ShardInstanceTest {
                     .setSkipCacheLookup(true)
                     .setActionDigest(actionDigest))
             .build();
-    instance.requeueOperation(queueEntry).get();
+    instance.requeueOperation(queueEntry, Durations.fromSeconds(60)).get();
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(mockBackplane, times(1)).putOperation(operationCaptor.capture(), eq(COMPLETED));
     Operation operation = operationCaptor.getValue();
@@ -762,24 +749,23 @@ public class ShardInstanceTest {
     assertThat(status).isEqualTo(expectedStatus);
   }
 
+  @SuppressWarnings("unchecked")
   private void provideBlob(Digest digest, ByteString content) {
     blobDigests.add(digest);
     // FIXME use better answer definitions, without indexes
     doAnswer(
-            new Answer<Void>() {
-              @Override
-              public Void answer(InvocationOnMock invocation) {
-                StreamObserver<ByteString> blobObserver =
-                    (StreamObserver) invocation.getArguments()[3];
-                blobObserver.onNext(content);
-                blobObserver.onCompleted();
-                return null;
-              }
-            })
+            (Answer<Void>)
+                invocation -> {
+                  StreamObserver<ByteString> blobObserver =
+                      (StreamObserver) invocation.getArguments()[3];
+                  blobObserver.onNext(content);
+                  blobObserver.onCompleted();
+                  return null;
+                })
         .when(mockWorkerInstance)
         .getBlob(
             eq(digest),
-            eq(0l),
+            eq(0L),
             eq(digest.getSizeBytes()),
             any(ServerCallStreamObserver.class),
             any(RequestMetadata.class));
@@ -809,7 +795,7 @@ public class ShardInstanceTest {
                     .setActionDigest(actionDigest))
             .setQueuedOperationDigest(queuedOperationDigest)
             .build();
-    instance.requeueOperation(queueEntry).get();
+    instance.requeueOperation(queueEntry, Durations.fromSeconds(60)).get();
   }
 
   @Test
@@ -968,17 +954,10 @@ public class ShardInstanceTest {
   @Test
   public void cacheReturnsNullWhenMissing() throws Exception {
     // create cache
-    AsyncCache<String, String> cache =
-        Caffeine.newBuilder().newBuilder().maximumSize(64).buildAsync();
+    AsyncCache<String, String> cache = Caffeine.newBuilder().maximumSize(64).buildAsync();
 
     // ensure callback returns null
-    Function<String, String> getCallback =
-        new Function<String, String>() {
-          @Override
-          public String apply(String s) {
-            return null;
-          }
-        };
+    Function<String, String> getCallback = s -> null;
 
     // check that result is null (i.e. no exceptions thrown)
     CompletableFuture<String> result = cache.get("missing", getCallback);

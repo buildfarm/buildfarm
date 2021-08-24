@@ -56,7 +56,7 @@ public class RedisQueueTest {
   @Test
   public void redisQueueConstructsWithoutError() throws Exception {
     // ACT
-    RedisQueue queue = new RedisQueue("test");
+    new RedisQueue("test");
   }
 
   // Function under test: push
@@ -226,7 +226,7 @@ public class RedisQueueTest {
     queue.push(redis, "element 8");
 
     // ACT
-    List<String> visited = new ArrayList<String>();
+    List<String> visited = new ArrayList<>();
     StringVisitor visitor =
         new StringVisitor() {
           public void visit(String entry) {
@@ -259,7 +259,7 @@ public class RedisQueueTest {
     }
 
     // ACT
-    List<String> visited = new ArrayList<String>();
+    List<String> visited = new ArrayList<>();
     StringVisitor visitor =
         new StringVisitor() {
           public void visit(String entry) {

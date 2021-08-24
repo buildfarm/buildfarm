@@ -105,7 +105,7 @@ public interface WorkerContext {
       Iterable<String> outputDirs)
       throws IOException, InterruptedException, StatusException;
 
-  boolean putOperation(Operation operation, Action Action) throws IOException, InterruptedException;
+  boolean putOperation(Operation operation) throws IOException, InterruptedException;
 
   void blacklistAction(String actionId) throws IOException, InterruptedException;
 
