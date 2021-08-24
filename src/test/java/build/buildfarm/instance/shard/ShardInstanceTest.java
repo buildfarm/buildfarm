@@ -145,6 +145,7 @@ public class ShardInstanceTest {
             /* runOperationQueuer=*/ false,
             /* maxBlobSize=*/ 0,
             /* maxCpu=*/ 1,
+            /* maxRequeueAttempts=*/ 1,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
             /* useDenyList=*/ true,
             mockOnStop,
