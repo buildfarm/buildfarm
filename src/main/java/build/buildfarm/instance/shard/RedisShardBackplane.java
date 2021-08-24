@@ -1240,7 +1240,7 @@ public class RedisShardBackplane implements Backplane {
 
       // Return an entry so that if it needs re-queued, it will have the correct "requeue attempts".
       QueueEntry entryForRequeue =
-          queueEntryBuilder.setRequeueAttempts(queueEntryBuilder.getRequeueAttempts() + 1).build();
+          queueEntryBuilder.setRequeueAttempts(queueEntry.getRequeueAttempts() + 1).build();
       return entryForRequeue;
     }
     return null;
