@@ -14,15 +14,13 @@
 
 package build.buildfarm.worker;
 
-import java.io.IOException;
-
 /**
  * File status: mode, mtime, size, etc.
  *
  * <p>The result of calling any {@code FileStatus} instance method is not guaranteed to result in
  * I/O to the file system at the moment of the call. The I/O providing the result (and hence the
- * throwing of an I/O exception, where applicable) may occur at any moment between the call to
- * {@link FileSystem#stat} and the call of the {@code FileStatus} instance method.
+ * throwing of an I/O exception, where applicable) may occur at any moment between the call to and
+ * the call of the {@code FileStatus} instance method.
  *
  * <p>Callers therefore cannot assume that all the values are populated atomically, or that the
  * results of any two {@code FileStatus} methods correspond to state of the file system at a single
@@ -50,7 +48,7 @@ public interface FileStatus {
   boolean isSpecialFile();
 
   /** Returns the total size, in bytes, of this file. */
-  long getSize() throws IOException;
+  long getSize();
 
   /**
    * Returns the last modified time of this file's data (milliseconds since UNIX epoch).
@@ -58,13 +56,13 @@ public interface FileStatus {
    * <p>TODO(bazel-team): Unix actually gives us nanosecond resolution for mtime and ctime. Consider
    * making use of this.
    */
-  long getLastModifiedTime() throws IOException;
+  long getLastModifiedTime();
 
   /**
    * Returns the last change time of this file, where change means any change to the file, including
    * metadata changes (milliseconds since UNIX epoch).
    */
-  long getLastChangeTime() throws IOException;
+  long getLastChangeTime();
 
   /** see BasicFileAttributes.fileKey() */
   Object fileKey();

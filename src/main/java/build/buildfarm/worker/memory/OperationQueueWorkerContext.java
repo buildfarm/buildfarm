@@ -55,7 +55,6 @@ import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.hash.HashCode;
@@ -75,6 +74,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 
 class OperationQueueWorkerContext implements WorkerContext {
@@ -93,6 +94,7 @@ class OperationQueueWorkerContext implements WorkerContext {
   private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
 
+  @SuppressWarnings("SameParameterValue")
   OperationQueueWorkerContext(
       WorkerConfig config,
       Instance casInstance,
@@ -246,7 +248,6 @@ class OperationQueueWorkerContext implements WorkerContext {
         outputDirs,
         uploader,
         config.getInlineContentLimit(),
-        config.getFileCasPolicy(),
         config.getStdoutCasPolicy(),
         config.getStderrCasPolicy());
   }
@@ -342,7 +343,7 @@ class OperationQueueWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action) throws InterruptedException {
+  public boolean putOperation(Operation operation) throws InterruptedException {
     return oq.put(operation);
   }
 
@@ -458,7 +459,6 @@ class OperationQueueWorkerContext implements WorkerContext {
       Iterable<String> outputFiles,
       Iterable<String> outputDirs,
       int inlineContentLimit,
-      CASInsertionPolicy fileCasPolicy,
       CASInsertionPolicy stdoutCasPolicy,
       CASInsertionPolicy stderrCasPolicy)
       throws IOException, InterruptedException {
@@ -467,8 +467,13 @@ class OperationQueueWorkerContext implements WorkerContext {
             digestUtil, result, execRoot, /* allowSymlinks= */ true, inlineContentLimit);
 
     manifest.addFiles(
-        Iterables.transform(outputFiles, (file) -> execRoot.resolve(file)), fileCasPolicy);
-    manifest.addDirectories(Iterables.transform(outputDirs, (dir) -> execRoot.resolve(dir)));
+        StreamSupport.stream(outputFiles.spliterator(), false)
+            .map(execRoot::resolve)
+            .collect(Collectors.toList()));
+    manifest.addDirectories(
+        StreamSupport.stream(outputDirs.spliterator(), false)
+            .map(execRoot::resolve)
+            .collect(Collectors.toList()));
 
     /* put together our outputs and update the result */
     if (result.getStdoutRaw().size() > 0) {
@@ -492,7 +497,6 @@ class OperationQueueWorkerContext implements WorkerContext {
       Iterable<String> outputDirs,
       ByteStreamUploader uploader,
       int inlineContentLimit,
-      CASInsertionPolicy fileCasPolicy,
       CASInsertionPolicy stdoutCasPolicy,
       CASInsertionPolicy stderrCasPolicy)
       throws IOException, InterruptedException {
@@ -504,7 +508,6 @@ class OperationQueueWorkerContext implements WorkerContext {
             outputFiles,
             outputDirs,
             inlineContentLimit,
-            fileCasPolicy,
             stdoutCasPolicy,
             stderrCasPolicy),
         uploader);

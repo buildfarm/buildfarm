@@ -25,7 +25,7 @@ import java.util.function.BooleanSupplier;
 
 public class Poller {
   private final long periodMicros;
-  private Deadline periodDeadline = null;
+  private Deadline periodDeadline;
   private ActivePoller activePoller = null;
 
   private class ActivePoller implements Runnable {

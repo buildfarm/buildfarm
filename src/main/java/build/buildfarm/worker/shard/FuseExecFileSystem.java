@@ -59,7 +59,7 @@ class FuseExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException {
+  public InputStream newInput(Digest digest, long offset) throws IOException {
     return storage.newInput(digest, offset);
   }
 

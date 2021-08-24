@@ -29,40 +29,40 @@ public class TestSizeResourceOverrides {
    * @details If false, this data is not considered and resources won't be changed based on test
    *     size.
    */
-  public boolean enabled = false;
+  public final boolean enabled = false;
 
   /**
    * @field small
    * @brief Resource overrides for small tests.
    * @details Applied to test actions.
    */
-  public TestSizeResourceOverride small = new TestSizeResourceOverride();
+  public final TestSizeResourceOverride small = new TestSizeResourceOverride();
 
   /**
    * @field medium
    * @brief Resource overrides for medium tests.
    * @details Applied to test actions.
    */
-  public TestSizeResourceOverride medium = new TestSizeResourceOverride();
+  public final TestSizeResourceOverride medium = new TestSizeResourceOverride();
 
   /**
    * @field large
    * @brief Resource overrides for large tests.
    * @details Applied to test actions.
    */
-  public TestSizeResourceOverride large = new TestSizeResourceOverride();
+  public final TestSizeResourceOverride large = new TestSizeResourceOverride();
 
   /**
    * @field enormous
    * @brief Resource overrides for enormous tests.
    * @details Applied to test actions.
    */
-  public TestSizeResourceOverride enormous = new TestSizeResourceOverride();
+  public final TestSizeResourceOverride enormous = new TestSizeResourceOverride();
 
   /**
    * @field unknown
    * @brief Resource overrides for unknown test sizes.
    * @details Applied to test actions.
    */
-  public TestSizeResourceOverride unknown = new TestSizeResourceOverride();
+  public final TestSizeResourceOverride unknown = new TestSizeResourceOverride();
 }
