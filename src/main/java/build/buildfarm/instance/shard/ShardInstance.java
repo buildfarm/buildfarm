@@ -205,7 +205,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
   private final int maxCpu;
-  private final int maxRequeueAttempts = 5; // TODO: get from config
+  private final int maxRequeueAttempts;
 
   private final ListeningExecutorService operationTransformService =
       listeningDecorator(newFixedThreadPool(24));
@@ -292,6 +292,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getRunOperationQueuer(),
         config.getMaxBlobSize(),
         config.getMaxCpu(),
+        config.getMaxRequeueAttempts(),
         config.getMaximumActionTimeout(),
         config.getUseDenyList(),
         onStop,
@@ -309,6 +310,7 @@ public class ShardInstance extends AbstractServerInstance {
       boolean runOperationQueuer,
       long maxBlobSize,
       int maxCpu,
+      int maxRequeueAttempts,
       Duration maxActionTimeout,
       boolean useDenyList,
       Runnable onStop,
@@ -328,6 +330,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.onStop = onStop;
     this.maxBlobSize = maxBlobSize;
     this.maxCpu = maxCpu;
+    this.maxRequeueAttempts = maxRequeueAttempts;
     this.maxActionTimeout = maxActionTimeout;
     this.useDenyList = useDenyList;
     this.actionCacheFetchService = actionCacheFetchService;
