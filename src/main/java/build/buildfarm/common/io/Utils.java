@@ -54,11 +54,13 @@ import org.apache.commons.io.IOUtils;
 public class Utils {
   private static final Logger logger = Logger.getLogger(Utils.class.getName());
 
+  @SuppressWarnings("Guava")
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
 
   // pretty poor check here, but avoiding apache commons for now
-  private static Supplier<Boolean> isMacOS =
+  @SuppressWarnings("Guava")
+  private static final Supplier<Boolean> isMacOS =
       Suppliers.memoize(
           () -> {
             String osName = System.getProperty("os.name").toLowerCase();
@@ -206,6 +208,7 @@ public class Utils {
         path.getFileName().toString(), fileStatus, getFileKey(path, fileStatus));
   }
 
+  @SuppressWarnings({"unchecked", "rawtypes"})
   private static List<NamedFileKey> listNIOdirentSorted(Path path, FileStore fileStore)
       throws IOException {
     List<NamedFileKey> dirents = new ArrayList();
@@ -273,17 +276,15 @@ public class Utils {
 
     @Override
     public String toString() {
-      StringBuilder sb = new StringBuilder(50);
-      sb.append("(volSerialNumber=")
-          .append(volSerialNumber)
-          .append(",fileIndexHigh=")
-          .append(fileIndexHigh)
-          .append(",fileIndexLow=")
-          .append(fileIndexLow)
-          .append(')');
-      return sb.toString();
+      return "(volSerialNumber="
+          + volSerialNumber
+          + ",fileIndexHigh="
+          + fileIndexHigh
+          + ",fileIndexLow="
+          + fileIndexLow
+          + ')';
     }
-  };
+  }
 
   public static FileStatus stat(final Path path, final boolean followSymlinks, FileStore fileStore)
       throws IOException {
@@ -317,12 +318,12 @@ public class Utils {
       }
 
       @Override
-      public long getSize() throws IOException {
+      public long getSize() {
         return attributes.size();
       }
 
       @Override
-      public long getLastModifiedTime() throws IOException {
+      public long getLastModifiedTime() {
         return attributes.lastModifiedTime().toMillis();
       }
 
@@ -423,6 +424,7 @@ public class Utils {
     return f.isDirectory();
   }
 
+  @SuppressWarnings("OctalInteger")
   public static Boolean jnrIsDir(POSIX posix, String path) {
     int fd = posix.open(path, OpenFlags.O_DIRECTORY.intValue(), 0444);
     return fd > 0;
@@ -443,6 +445,7 @@ public class Utils {
     }
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   public static <T> T getOrIOException(ListenableFuture<T> future) throws IOException {
     boolean interrupted = false;
     for (; ; ) {

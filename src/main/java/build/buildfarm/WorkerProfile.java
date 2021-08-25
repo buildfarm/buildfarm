@@ -63,12 +63,11 @@ class WorkerProfile {
    * @param worker
    * @return
    */
+  @SuppressWarnings("JavaDoc")
   private static String workerStringTransformation(String worker) {
-    StringBuilder sb = new StringBuilder();
-    sb.append(worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", "."))
-        .append(':')
-        .append(worker.split(":")[1]);
-    return sb.toString();
+    return worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".")
+        + ':'
+        + worker.split(":")[1];
   }
 
   private static void analyzeMessage(String worker, WorkerProfileMessage response) {
@@ -78,27 +77,25 @@ class WorkerProfile {
     String strFloatFormat = "%-50s : %2.1f";
     long entryCount = response.getCasEntryCount();
     long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
-    System.out.println(String.format(strIntFormat, "Current Total Entry Count", entryCount));
-    System.out.println(
-        String.format(strIntFormat, "Current Unreferenced Entry Count", unreferencedEntryCount));
+    System.out.printf((strIntFormat) + "%n", "Current Total Entry Count", entryCount);
+    System.out.printf(
+        (strIntFormat) + "%n", "Current Unreferenced Entry Count", unreferencedEntryCount);
     if (entryCount != 0) {
-      System.out.println(
-          String.format(
-              strFloatFormat,
-              "Percentage of Unreferenced Entry",
-              1.0 * response.getCasEntryCount() / response.getCasUnreferencedEntryCount()));
+      System.out.printf(
+          (strFloatFormat) + "%n",
+          "Percentage of Unreferenced Entry",
+          1.0 * response.getCasEntryCount() / response.getCasUnreferencedEntryCount());
     }
-    System.out.println(
-        String.format(
-            strIntFormat, "Current DirectoryEntry Count", response.getCasDirectoryEntryCount()));
-    System.out.println(
-        String.format(
-            strIntFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
-    System.out.println(
-        String.format(
-            strIntFormat,
-            "Total Evicted Entries size in Bytes",
-            response.getCasEvictedEntrySize()));
+    System.out.printf(
+        (strIntFormat) + "%n",
+        "Current DirectoryEntry Count",
+        response.getCasDirectoryEntryCount());
+    System.out.printf(
+        (strIntFormat) + "%n", "Number of Evicted Entries", response.getCasEvictedEntryCount());
+    System.out.printf(
+        (strIntFormat) + "%n",
+        "Total Evicted Entries size in Bytes",
+        response.getCasEvictedEntrySize());
 
     List<StageInformation> stages = response.getStagesList();
     for (StageInformation stage : stages) {
@@ -124,6 +121,7 @@ class WorkerProfile {
     return builder.build().getRedisShardBackplaneConfig();
   }
 
+  @SuppressWarnings("ConstantConditions")
   private static Set<String> getWorkers(String[] args) throws ConfigurationException, IOException {
     OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
     parser.parseAndExitUponError(args);
@@ -167,6 +165,7 @@ class WorkerProfile {
     return workers;
   }
 
+  @SuppressWarnings("BusyWait")
   private static void workerProfile(String[] args) throws IOException {
     Set<String> workers = null;
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
@@ -174,6 +173,7 @@ class WorkerProfile {
     HashMap<String, Instance> workersToChannels = new HashMap<>();
     String type = args[1];
 
+    //noinspection InfiniteLoopStatement
     while (true) {
       // update worker list
       if (workers == null) {

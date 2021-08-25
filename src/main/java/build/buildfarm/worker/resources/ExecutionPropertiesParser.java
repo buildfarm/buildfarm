@@ -71,10 +71,7 @@ public class ExecutionPropertiesParser {
     command
         .getPlatform()
         .getPropertiesList()
-        .forEach(
-            (property) -> {
-              evaluateProperty(parser, limits, property);
-            });
+        .forEach((property) -> evaluateProperty(parser, limits, property));
     return limits;
   }
 
@@ -214,6 +211,7 @@ public class ExecutionPropertiesParser {
    * @param limits Current limits to apply changes to.
    * @param property The property to store.
    */
+  @SuppressWarnings("unchecked")
   private static void storeEnvVars(ResourceLimits limits, Property property) {
     try {
       JSONParser parser = new JSONParser();
@@ -232,7 +230,7 @@ public class ExecutionPropertiesParser {
    * @param property The property to store.
    */
   private static void storeEnvVar(ResourceLimits limits, Property property) {
-    String keyValue[] = property.getName().split(":", 2);
+    String[] keyValue = property.getName().split(":", 2);
     String key = keyValue[1];
     String value = property.getValue();
     limits.extraEnvironmentVariables.put(key, value);

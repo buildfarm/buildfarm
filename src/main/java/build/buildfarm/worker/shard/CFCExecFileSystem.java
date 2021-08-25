@@ -54,7 +54,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -81,9 +80,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       @Nullable UserPrincipal owner,
       boolean linkInputDirectories,
       ExecutorService removeDirectoryService,
-      ExecutorService accessRecorder,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits) {
+      ExecutorService accessRecorder) {
     this.root = root;
     this.fileCache = fileCache;
     this.owner = owner;
@@ -92,6 +89,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     this.accessRecorder = accessRecorder;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void start(Consumer<List<Digest>> onDigests, boolean skipLoad)
       throws IOException, InterruptedException {
@@ -151,7 +149,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException {
+  public InputStream newInput(Digest digest, long offset) throws IOException {
     return fileCache.newInput(digest, offset);
   }
 
@@ -167,6 +165,7 @@ class CFCExecFileSystem implements ExecFileSystem {
             });
   }
 
+  @SuppressWarnings("ConstantConditions")
   private ListenableFuture<Void> put(
       Path path, FileNode fileNode, ImmutableList.Builder<String> inputFiles) {
     Path filePath = path.resolve(fileNode.getName());
@@ -269,6 +268,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     return downloads;
   }
 
+  @SuppressWarnings("ConstantConditions")
   private ListenableFuture<Void> linkDirectory(
       Path execPath, Digest digest, Map<Digest, Directory> directoriesIndex) {
     return transformAsync(

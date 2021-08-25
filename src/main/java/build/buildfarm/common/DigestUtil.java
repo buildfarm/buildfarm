@@ -45,7 +45,9 @@ public class DigestUtil {
   // The underlying HashFunctions are immutable and thread safe.
   @SuppressWarnings("ImmutableEnumChecker")
   public enum HashFunction {
+    @SuppressWarnings("deprecation")
     MD5(Hashing.md5()),
+    @SuppressWarnings("deprecation")
     SHA1(Hashing.sha1()),
     SHA256(Hashing.sha256());
 
@@ -272,6 +274,7 @@ public class DigestUtil {
         return directoriesIndex.containsValue(value);
       }
 
+      @SuppressWarnings("NullableProblems")
       @Override
       public Set<Map.Entry<Digest, Directory>> entrySet() {
         throw new UnsupportedOperationException();
@@ -301,6 +304,7 @@ public class DigestUtil {
         return directoriesIndex.isEmpty();
       }
 
+      @SuppressWarnings("NullableProblems")
       @Override
       public Set<Digest> keySet() {
         throw new UnsupportedOperationException();
@@ -311,6 +315,7 @@ public class DigestUtil {
         throw new UnsupportedOperationException();
       }
 
+      @SuppressWarnings("NullableProblems")
       @Override
       public void putAll(Map<? extends Digest, ? extends Directory> m) {
         throw new UnsupportedOperationException();
@@ -326,6 +331,7 @@ public class DigestUtil {
         return directoriesIndex.size();
       }
 
+      @SuppressWarnings("NullableProblems")
       @Override
       public Collection<Directory> values() {
         return directoriesIndex.values();

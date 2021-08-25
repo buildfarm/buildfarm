@@ -197,7 +197,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
-  private void initialize(WriteRequest request) throws EntryLimitException {
+  private void initialize(WriteRequest request) {
     String resourceName = request.getResourceName();
     if (resourceName.isEmpty()) {
       errorResponse(INVALID_ARGUMENT.withDescription("resource_name is empty").asException());
@@ -218,6 +218,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
                 commit(committedSize);
               }
 
+              @SuppressWarnings("NullableProblems")
               @Override
               public void onFailure(Throwable t) {
                 errorResponse(t);
@@ -232,17 +233,17 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         errorResponse(e);
       } catch (InstanceNotFoundException e) {
         if (errorResponse(BuildFarmInstances.toStatusException(e))) {
-          logWriteRequest(Level.WARNING, request, e);
+          logWriteRequest(request, e);
         }
       } catch (Exception e) {
         if (errorResponse(Status.fromThrowable(e).asException())) {
-          logWriteRequest(Level.WARNING, request, e);
+          logWriteRequest(request, e);
         }
       }
     }
   }
 
-  private void logWriteRequest(Level level, WriteRequest request, Exception e) {
+  private void logWriteRequest(WriteRequest request, Exception e) {
     logger.log(
         Level.WARNING,
         format(

@@ -122,7 +122,7 @@ class Executor {
 
     boolean operationUpdateSuccess = false;
     try {
-      operationUpdateSuccess = workerContext.putOperation(operation, operationContext.action);
+      operationUpdateSuccess = workerContext.putOperation(operation);
     } catch (IOException e) {
       logger.log(
           Level.SEVERE, format("error putting operation %s as EXECUTING", operation.getName()), e);
@@ -217,7 +217,7 @@ class Executor {
         if (argumentItr.hasNext()) {
           String exe = argumentItr.next(); // Get first element, this is the executable
           arguments.add(workingDirectory.resolve(exe).toAbsolutePath().normalize().toString());
-          argumentItr.forEachRemaining(arg -> arguments.add(arg));
+          argumentItr.forEachRemaining(arguments::add);
         }
       } else {
         arguments.addAll(command.getArgumentsList());
@@ -232,8 +232,8 @@ class Executor {
               limits,
               timeout,
               isDefaultTimeout,
-              "", // executingMetadata.getStdoutStreamName(),
-              "", // executingMetadata.getStderrStreamName(),
+              // executingMetadata.getStdoutStreamName(),
+              // executingMetadata.getStderrStreamName(),
               resultBuilder);
 
       // From Bazel Test Encyclopedia:
@@ -364,9 +364,7 @@ class Executor {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
     Map<String, Property> properties =
-        uniqueIndex(
-            operationContext.command.getPlatform().getPropertiesList(),
-            (property) -> property.getName());
+        uniqueIndex(operationContext.command.getPlatform().getPropertiesList(), Property::getName);
 
     arguments.add(wrapper.getPath());
     for (String argument : wrapper.getArgumentsList()) {
@@ -391,6 +389,7 @@ class Executor {
     return arguments.build();
   }
 
+  @SuppressWarnings("ConstantConditions")
   private Code executeCommand(
       String operationName,
       Path execDir,
@@ -399,8 +398,6 @@ class Executor {
       ResourceLimits limits,
       Duration timeout,
       boolean isDefaultTimeout,
-      String stdoutStreamName,
-      String stderrStreamName,
       ActionResult.Builder resultBuilder)
       throws IOException, InterruptedException {
     ProcessBuilder processBuilder =
@@ -419,17 +416,13 @@ class Executor {
     final Write stdoutWrite;
     final Write stderrWrite;
 
-    if (stdoutStreamName != null
-        && !stdoutStreamName.isEmpty()
-        && workerContext.getStreamStdout()) {
-      stdoutWrite = workerContext.getOperationStreamWrite(stdoutStreamName);
+    if ("" != null && !"".isEmpty() && workerContext.getStreamStdout()) {
+      stdoutWrite = workerContext.getOperationStreamWrite("");
     } else {
       stdoutWrite = new NullWrite();
     }
-    if (stderrStreamName != null
-        && !stderrStreamName.isEmpty()
-        && workerContext.getStreamStderr()) {
-      stderrWrite = workerContext.getOperationStreamWrite(stderrStreamName);
+    if ("" != null && !"".isEmpty() && workerContext.getStreamStderr()) {
+      stderrWrite = workerContext.getOperationStreamWrite("");
     } else {
       stderrWrite = new NullWrite();
     }

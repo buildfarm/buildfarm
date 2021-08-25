@@ -21,8 +21,8 @@ import java.io.IOException;
 final class HttpException extends IOException {
   private final HttpResponse response;
 
-  HttpException(HttpResponse response, String message, Throwable cause) {
-    super(message, cause);
+  HttpException(HttpResponse response, String message) {
+    super(message, null);
     this.response = response;
   }
 

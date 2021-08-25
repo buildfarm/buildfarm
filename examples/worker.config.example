@@ -10,7 +10,7 @@ operation_queue: {
 
   # the instance domain that this worker will execute work in
   # all requests will be tagged with this instance name
-  instance_name: "default_memory_instance"
+  instance_name: "memory"
 
   # the deadline in seconds for requests (default or <= 0 is unlimited)
   deadline_after_seconds: 60
@@ -22,7 +22,7 @@ content_addressable_storage: {
 
   # the instance domain that this worker will make resource requests in
   # all requests will be tagged with this instance name
-  instance_name: "default_memory_instance"
+  instance_name: "memory"
 
   # the deadline in seconds for requests (default or <= 0 is unlimited)
   deadline_after_seconds: 60
@@ -34,7 +34,7 @@ action_cache: {
 
   # the instance domain that this worker will make resource requests in
   # all requests will be tagged with this instance name
-  instance_name: "default_memory_instance"
+  instance_name: "memory"
 
   # the deadline in seconds for requests (default or <= 0 is unlimited)
   deadline_after_seconds: 60
