@@ -162,7 +162,9 @@ public class InputFetcher implements Runnable {
     try {
       queuedOperation = workerContext.getQueuedOperation(operationContext.queueEntry);
       if (queuedOperation == null || !isQueuedOperationValid(queuedOperation)) {
-        logger.log(Level.SEVERE, format("invalid queued operation: %s", operationName));
+        if (queuedOperation != null) {
+          logger.log(Level.SEVERE, format("invalid queued operation: %s", operationName));
+        }
         owner.error().put(operationContext);
         return 0;
       }
