@@ -15,6 +15,7 @@
 package build.buildfarm;
 
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
@@ -32,7 +33,8 @@ class Hist {
     return builder.build();
   }
 
-  private static void printHistogramValue(int executing, int queued) {
+  @SuppressWarnings("ConstantConditions")
+  private static void printHistogramValue(int executing) {
     StringBuilder s = new StringBuilder();
     int p = 0;
     int n = 5;
@@ -50,9 +52,9 @@ class Hist {
     System.out.println(s.toString());
   }
 
+  @SuppressWarnings("CatchMayIgnoreException")
   private static void printHistogram(Instance instance) {
     int executing = 0;
-    int queued = 0;
 
     String pageToken = "";
     do {
@@ -69,23 +71,17 @@ class Hist {
         try {
           ExecuteOperationMetadata metadata =
               operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-          switch (metadata.getStage()) {
-            case QUEUED:
-              queued++;
-              break;
-            case EXECUTING:
-              executing++;
-              break;
-            default:
-              break;
+          if (metadata.getStage().equals(ExecutionStage.Value.EXECUTING)) {
+            executing++;
           }
         } catch (InvalidProtocolBufferException e) {
         }
       }
     } while (!pageToken.equals(""));
-    printHistogramValue(executing, queued);
+    printHistogramValue(executing);
   }
 
+  @SuppressWarnings("BusyWait")
   public static void main(String[] args) throws Exception {
     String instanceName = args[0];
     String host = args[1];
@@ -93,6 +89,7 @@ class Hist {
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
     try {
+      //noinspection InfiniteLoopStatement
       for (; ; ) {
         printHistogram(instance);
         Thread.sleep(500);

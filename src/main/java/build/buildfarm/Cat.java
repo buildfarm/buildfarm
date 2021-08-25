@@ -154,6 +154,7 @@ class Cat {
     System.out.println(Strings.repeat("  ", level) + msg);
   }
 
+  @SuppressWarnings("ConstantConditions")
   private static void printActionResult(ActionResult result, int indentLevel) {
     for (OutputFile outputFile : result.getOutputFilesList()) {
       String attrs = "";
@@ -317,7 +318,8 @@ class Cat {
       DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree)
       throws IOException, InterruptedException {
     Tree tree = reTreeToTree(digestUtil, reTree);
-    printTreeLayout(DigestUtil.proxyDirectoriesIndex(tree.getDirectories()), tree.getRootDigest());
+    printTreeLayout(
+        DigestUtil.proxyDirectoriesIndex(tree.getDirectoriesMap()), tree.getRootDigest());
   }
 
   private static void printTreeLayout(Map<Digest, Directory> directoriesIndex, Digest rootDigest) {
@@ -352,7 +354,7 @@ class Cat {
 
   private static void printTree(int level, Tree tree, Digest rootDigest) {
     indentOut(level, "Directory (Root): " + rootDigest);
-    for (Map.Entry<String, Directory> entry : tree.getDirectories().entrySet()) {
+    for (Map.Entry<String, Directory> entry : tree.getDirectoriesMap().entrySet()) {
       System.out.println("Directory: " + entry.getKey());
       printDirectory(1, entry.getValue());
     }
@@ -388,7 +390,7 @@ class Cat {
     ImmutableList.Builder<Message> messages = ImmutableList.builder();
     messages.add(queuedOperation.getAction());
     messages.add(queuedOperation.getCommand());
-    messages.addAll(queuedOperation.getTree().getDirectories().values());
+    messages.addAll(queuedOperation.getTree().getDirectoriesMap().values());
     Path blobs = Paths.get("blobs");
     for (Message message : messages.build()) {
       Digest digest = digestUtil.compute(message);
@@ -736,6 +738,7 @@ class Cat {
     }
   }
 
+  @SuppressWarnings("ThrowFromFinallyBlock")
   private static void main(
       String host, String instanceName, DigestUtil digestUtil, String type, Iterable<String> args)
       throws Exception {
@@ -927,7 +930,7 @@ class Cat {
     @Override
     protected void run(Instance instance, Digest digest) throws Exception {
       Tree tree = fetchTree(instance, digest);
-      printTreeLayout(DigestUtil.proxyDirectoriesIndex(tree.getDirectories()), digest);
+      printTreeLayout(DigestUtil.proxyDirectoriesIndex(tree.getDirectoriesMap()), digest);
     }
   }
 

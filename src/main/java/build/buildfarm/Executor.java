@@ -18,7 +18,6 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.buildfarm.common.io.Utils.stat;
 import static build.buildfarm.instance.stub.ByteStreamUploader.uploadResourceName;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.Iterables.all;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -276,9 +275,8 @@ class Executor {
           BatchUpdateBlobsResponse batchResponse = casStub.batchUpdateBlobs(batchRequest);
           long usecs = stopwatch.elapsed(MICROSECONDS);
           checkState(
-              all(
-                  batchResponse.getResponsesList(),
-                  response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
+              batchResponse.getResponsesList().stream()
+                  .allMatch(response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
           System.out.println(
               "Updated "
                   + batchRequest.getRequestsCount()
@@ -350,9 +348,8 @@ class Executor {
         BatchUpdateBlobsResponse batchResponse = casStub.batchUpdateBlobs(batchRequest);
         long usecs = stopwatch.elapsed(MICROSECONDS);
         checkState(
-            all(
-                batchResponse.getResponsesList(),
-                response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
+            batchResponse.getResponsesList().stream()
+                .allMatch(response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
         System.out.println(
             "Updated " + batchRequest.getRequestsCount() + " blobs in " + (usecs / 1000.0) + "ms");
       }

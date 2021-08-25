@@ -127,6 +127,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 
 public abstract class AbstractServerInstance implements Instance {
@@ -272,6 +274,7 @@ public abstract class AbstractServerInstance implements Instance {
         digestsCompleteFuture, v -> findMissingBlobs(digests.build(), requestMetadata), executor);
   }
 
+  @SuppressWarnings("ConstantConditions")
   protected ListenableFuture<ActionResult> ensureOutputsPresent(
       ListenableFuture<ActionResult> resultFuture, RequestMetadata requestMetadata) {
     ListenableFuture<Iterable<Digest>> missingOutputsFuture =
@@ -355,7 +358,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   ByteString getBlob(Digest blobDigest, long count) throws IndexOutOfBoundsException {
     if (blobDigest.getSizeBytes() == 0) {
-      if ((long) 0 == 0 && count >= 0) {
+      if (count >= 0) {
         return ByteString.EMPTY;
       } else {
         throw new IndexOutOfBoundsException();
@@ -368,16 +371,11 @@ public abstract class AbstractServerInstance implements Instance {
       return null;
     }
 
-    if ((long) 0 < 0
-        || (blob.isEmpty() && (long) 0 > 0)
-        || (!blob.isEmpty() && (long) 0 >= blob.size())
-        || count < 0) {
+    if ((!blob.isEmpty() && (long) 0 >= blob.size()) || count < 0) {
       throw new IndexOutOfBoundsException();
     }
 
-    long endIndex = count;
-
-    return blob.getData().substring((int) (long) 0, (int) (Math.min(endIndex, blob.size())));
+    return blob.getData().substring((int) (long) 0, (int) (Math.min(count, blob.size())));
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
@@ -679,7 +677,8 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  private static boolean isValidFilename(String fileName) {
+  @SuppressWarnings("SameReturnValue")
+  private static boolean isValidFilename() {
     // for now, assume all filenames are valid
     return true;
   }
@@ -714,7 +713,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setDescription(DIRECTORY_NOT_SORTED);
       }
       // FIXME serverside validity check? regex?
-      Preconditions.checkState(isValidFilename(fileName), INVALID_FILE_NAME);
+      Preconditions.checkState(isValidFilename(), INVALID_FILE_NAME);
 
       lastFileName = fileName;
       entryNames.add(fileName);
@@ -880,14 +879,15 @@ public abstract class AbstractServerInstance implements Instance {
             findMissingBlobs(inputDigests, requestMetadata),
             (missingBlobDigests) -> {
               preconditionFailure.addAllViolations(
-                  Iterables.transform(
-                      missingBlobDigests,
-                      (digest) ->
-                          Violation.newBuilder()
-                              .setType(VIOLATION_TYPE_MISSING)
-                              .setSubject("blobs/" + DigestUtil.toString(digest))
-                              .setDescription(MISSING_INPUT)
-                              .build()));
+                  StreamSupport.stream(missingBlobDigests.spliterator(), false)
+                      .map(
+                          (digest) ->
+                              Violation.newBuilder()
+                                  .setType(VIOLATION_TYPE_MISSING)
+                                  .setSubject("blobs/" + DigestUtil.toString(digest))
+                                  .setDescription(MISSING_INPUT)
+                                  .build())
+                      .collect(Collectors.toList()));
               return null;
             },
             directExecutor());
@@ -937,7 +937,7 @@ public abstract class AbstractServerInstance implements Instance {
       validateAction(
           queuedOperation.getAction(),
           queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
-          DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories()),
+          DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap()),
           inputDigestsBuilder::add,
           preconditionFailure);
       validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
@@ -977,6 +977,7 @@ public abstract class AbstractServerInstance implements Instance {
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
   }
 
+  @SuppressWarnings("ConstantConditions")
   protected void validateAction(
       String operationName,
       Action action,
@@ -991,7 +992,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateAction(
         action,
         getUnchecked(expect(action.getCommandDigest(), Command.parser(), service, requestMetadata)),
-        DigestUtil.proxyDirectoriesIndex(tree.getDirectories()),
+        DigestUtil.proxyDirectoriesIndex(tree.getDirectoriesMap()),
         inputDigestsBuilder::add,
         preconditionFailure);
     validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
@@ -1003,7 +1004,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateAction(
         queuedOperation.getAction(),
         queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
-        DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories()),
+        DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap()),
         digest -> {},
         preconditionFailure);
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
@@ -1228,6 +1229,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   // this deserves a real async execute, but not now
+  @SuppressWarnings("ConstantConditions")
   @Override
   public ListenableFuture<Void> execute(
       Digest actionDigest,
@@ -1299,6 +1301,7 @@ public abstract class AbstractServerInstance implements Instance {
     Futures.addCallback(
         actionResultFuture,
         new FutureCallback<ActionResult>() {
+          @SuppressWarnings("ConstantConditions")
           void onCompleted(@Nullable ActionResult actionResult) {
             final ExecuteOperationMetadata nextMetadata;
             if (actionResult == null) {
@@ -1340,6 +1343,7 @@ public abstract class AbstractServerInstance implements Instance {
             onCompleted(actionResult);
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             logger.log(
@@ -1455,6 +1459,7 @@ public abstract class AbstractServerInstance implements Instance {
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             logger.log(
@@ -1466,6 +1471,7 @@ public abstract class AbstractServerInstance implements Instance {
     return future;
   }
 
+  @SuppressWarnings("ConstantConditions")
   protected static boolean isErrored(Operation operation) {
     return operation.getDone()
         && operation.getResultCase() == Operation.ResultCase.RESPONSE
@@ -1482,6 +1488,7 @@ public abstract class AbstractServerInstance implements Instance {
     return isStage(operation, ExecutionStage.Value.UNKNOWN);
   }
 
+  @SuppressWarnings("ConstantConditions")
   protected boolean isCancelled(Operation operation) {
     return operation.getDone()
         && operation.getResultCase() == Operation.ResultCase.RESPONSE
@@ -1568,11 +1575,11 @@ public abstract class AbstractServerInstance implements Instance {
    * <p>the lock retrieved for an operation will guard against races during
    * transfers/retrievals/removals
    */
-  protected abstract Object operationLock(String operationName);
+  protected abstract Object operationLock();
 
   protected void updateOperationWatchers(Operation operation) throws InterruptedException {
     if (operation.getDone()) {
-      synchronized (operationLock(operation.getName())) {
+      synchronized (operationLock()) {
         completedOperations.put(operation.getName(), operation);
         outstandingOperations.remove(operation.getName());
       }
@@ -1583,7 +1590,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Operation getOperation(String name) {
-    synchronized (operationLock(name)) {
+    synchronized (operationLock()) {
       Operation operation = completedOperations.get(name);
       if (operation == null) {
         operation = outstandingOperations.get(name);
@@ -1614,7 +1621,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void deleteOperation(String name) {
-    synchronized (operationLock(name)) {
+    synchronized (operationLock()) {
       Operation deletedOperation = completedOperations.remove(name);
       if (deletedOperation == null && outstandingOperations.contains(name)) {
         throw new IllegalStateException();
@@ -1815,7 +1822,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
+  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
     throw new UnsupportedOperationException(
         "AbstractServerInstance doesn't support drainWorkerPipeline() method.");
   }

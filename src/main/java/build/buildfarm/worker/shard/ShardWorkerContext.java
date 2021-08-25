@@ -89,7 +89,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -144,7 +143,6 @@ class ShardWorkerContext implements WorkerContext {
       Platform platform,
       Duration operationPollPeriod,
       OperationPoller operationPoller,
-      int inlineContentLimit,
       int inputFetchStageWidth,
       int executeStageWidth,
       Backplane backplane,
@@ -152,8 +150,6 @@ class ShardWorkerContext implements WorkerContext {
       InputStreamFactory inputStreamFactory,
       Iterable<ExecutionPolicy> policies,
       Instance instance,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
       Duration defaultActionTimeout,
       Duration maximumActionTimeout,
       boolean limitExecution,
@@ -275,6 +271,12 @@ class ShardWorkerContext implements WorkerContext {
     Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
     ByteString queuedOperationBlob = getBlob(queuedOperationDigest);
     if (queuedOperationBlob == null) {
+      logger.log(
+          Level.WARNING,
+          format(
+              "missing queued operation: %s(%s)",
+              queueEntry.getExecuteEntry().getOperationName(),
+              DigestUtil.toString(queuedOperationDigest)));
       return null;
     }
     try {
@@ -290,6 +292,7 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
@@ -311,7 +314,8 @@ class ShardWorkerContext implements WorkerContext {
     }
     listener.onWaitEnd();
 
-    if (DequeueMatchEvaluator.shouldKeepOperation(matchSettings, matchProvisions, queueEntry)) {
+    if (queueEntry == null
+        || DequeueMatchEvaluator.shouldKeepOperation(matchSettings, matchProvisions, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -329,7 +333,7 @@ class ShardWorkerContext implements WorkerContext {
 
           @Override
           public boolean getMatched() {
-            return matched;
+            return !matched;
           }
 
           @Override
@@ -372,7 +376,7 @@ class ShardWorkerContext implements WorkerContext {
             listener.setOnCancelHandler(onCancelHandler);
           }
         };
-    while (!dedupMatchListener.getMatched()) {
+    while (dedupMatchListener.getMatched()) {
       try {
         matchInterruptible(dedupMatchListener);
       } catch (IOException e) {
@@ -702,8 +706,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action)
-      throws IOException, InterruptedException {
+  public boolean putOperation(Operation operation) throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
       completedOperations.inc();

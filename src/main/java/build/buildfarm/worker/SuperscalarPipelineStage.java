@@ -21,12 +21,16 @@ import java.util.logging.Level;
 
 abstract class SuperscalarPipelineStage extends PipelineStage {
   protected final int width;
+
+  @SuppressWarnings("rawtypes")
   protected final BlockingQueue claims;
+
   private volatile boolean catastrophic = false;
 
   // ensure that only a single claim waits for available slots for core count
   private final Object claimLock = new Object();
 
+  @SuppressWarnings("rawtypes")
   public SuperscalarPipelineStage(
       String name,
       WorkerContext workerContext,
@@ -120,6 +124,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
     return String.format("%s/%d", size, width);
   }
 
+  @SuppressWarnings("unchecked")
   private boolean claim(int count) throws InterruptedException {
     Object handle = new Object();
     int claimed = 0;

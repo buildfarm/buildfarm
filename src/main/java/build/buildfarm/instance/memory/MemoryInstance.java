@@ -151,6 +151,7 @@ public class MemoryInstance extends AbstractServerInstance {
                   })
           .build(
               new CacheLoader<String, ByteStringStreamSource>() {
+                @SuppressWarnings("NullableProblems")
                 @Override
                 public ByteStringStreamSource load(String name) {
                   return newStreamSource(name);
@@ -340,6 +341,7 @@ public class MemoryInstance extends AbstractServerInstance {
     try {
       return streams.get(name);
     } catch (ExecutionException e) {
+      //noinspection deprecation
       Throwables.propagateIfInstanceOf(e.getCause(), RuntimeException.class);
       throw new UncheckedExecutionException(e.getCause());
     }
@@ -386,14 +388,10 @@ public class MemoryInstance extends AbstractServerInstance {
     };
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public InputStream newOperationStreamInput(
-      String name,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata)
-      throws IOException {
+      String name, long offset, RequestMetadata requestMetadata) throws IOException {
     InputStream in = getStreamSource(name).openStream();
     in.skip(offset);
     return in;
@@ -778,6 +776,7 @@ public class MemoryInstance extends AbstractServerInstance {
     return createProvisions(command.getPlatform());
   }
 
+  @SuppressWarnings("ConstantConditions")
   private void matchSynchronized(Platform platform, MatchListener listener)
       throws InterruptedException {
     ImmutableList.Builder<Operation> rejectedOperations = ImmutableList.builder();
@@ -1029,7 +1028,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected Object operationLock(String name) {
+  protected Object operationLock() {
     return completedOperations;
   }
 

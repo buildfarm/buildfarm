@@ -156,6 +156,7 @@ public final class ContentAddressableStorages {
         return writes.get(digest, uuid);
       }
 
+      @SuppressWarnings("ResultOfMethodCallIgnored")
       @Override
       public InputStream newInput(Digest digest, long offset) throws IOException {
         ByteString data = getData(digest);

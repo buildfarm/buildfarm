@@ -218,6 +218,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
                 commit(committedSize);
               }
 
+              @SuppressWarnings("NullableProblems")
               @Override
               public void onFailure(Throwable t) {
                 errorResponse(t);

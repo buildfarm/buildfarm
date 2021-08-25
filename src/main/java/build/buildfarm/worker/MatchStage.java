@@ -71,6 +71,7 @@ public class MatchStage extends PipelineStage {
       waitStart = elapsedUSecs;
     }
 
+    @SuppressWarnings("ConstantConditions")
     @Override
     public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
       if (queueEntry == null) {
@@ -98,6 +99,7 @@ public class MatchStage extends PipelineStage {
       // never called, only blocking stub used
     }
 
+    @SuppressWarnings("SameReturnValue")
     private boolean onOperationPolled() throws InterruptedException {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
       logStart(operationName);

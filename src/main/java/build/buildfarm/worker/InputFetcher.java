@@ -106,6 +106,7 @@ public class InputFetcher implements Runnable {
     if (runfilesProgramDigest == null) {
       return programPath;
     }
+    //noinspection EqualsBetweenInconvertibleTypes
     if (!programDigest.equals(runfilesProgramPath)) {
       return programPath;
     }
@@ -161,14 +162,16 @@ public class InputFetcher implements Runnable {
     try {
       queuedOperation = workerContext.getQueuedOperation(operationContext.queueEntry);
       if (queuedOperation == null || !isQueuedOperationValid(queuedOperation)) {
-        logger.log(Level.SEVERE, format("invalid queued operation: %s", operationName));
+        if (queuedOperation != null) {
+          logger.log(Level.SEVERE, format("invalid queued operation: %s", operationName));
+        }
         owner.error().put(operationContext);
         return 0;
       }
 
       if (queuedOperation.hasTree()) {
         directoriesIndex =
-            DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories());
+            DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap());
       } else {
         // TODO remove legacy interpretation and field after transition
         directoriesIndex =

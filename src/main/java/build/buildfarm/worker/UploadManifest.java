@@ -74,8 +74,7 @@ public class UploadManifest {
   }
 
   /** Add a collection of files to the UploadManifest. */
-  public void addFiles(Iterable<Path> files, CASInsertionPolicy policy)
-      throws IllegalStateException, IOException {
+  public void addFiles(Iterable<Path> files) throws IllegalStateException, IOException {
     for (Path file : files) {
       FileStatus stat = statIfFound(file, /* followSymlinks= */ false, fileStore);
       if (stat == null) {
@@ -85,10 +84,10 @@ public class UploadManifest {
       if (stat.isDirectory()) {
         mismatchedOutput(file);
       } else if (stat.isFile()) {
-        addFile(file, policy);
+        addFile(file);
       } else if (allowSymlinks && stat.isSymbolicLink()) {
         // is the stat correct?
-        addFile(file, policy);
+        addFile(file);
       } else {
         illegalOutput(file);
       }
@@ -128,6 +127,7 @@ public class UploadManifest {
    * transmitted through {@link #getDigestToFile()}. When it is a directory, it is transmitted as a
    * {@link Tree} protobuf message through {@link #getDigestToChunkers()}.
    */
+  @SuppressWarnings("JavaDoc")
   public Map<Digest, Chunker> getDigestToChunkers() {
     return digestToChunkers;
   }
@@ -153,7 +153,7 @@ public class UploadManifest {
     }
   }
 
-  private void addFile(Path file, CASInsertionPolicy policy) throws IOException {
+  private void addFile(Path file) throws IOException {
     Digest digest = digestUtil.compute(file);
     result
         .addOutputFilesBuilder()

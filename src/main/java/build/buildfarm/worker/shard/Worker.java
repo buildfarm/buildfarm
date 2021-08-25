@@ -23,7 +23,6 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
@@ -132,7 +131,10 @@ public class Worker extends LoggingMain {
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
+
+  @SuppressWarnings("deprecation")
   private final HealthStatusManager healthStatusManager;
+
   private final Server server;
   private final Path root;
   private final DigestUtil digestUtil;
@@ -283,6 +285,7 @@ public class Worker extends LoggingMain {
    * @param clusterEndpoint the current Buildfarm endpoint.
    * @param instanceIp Ip of the the instance that we want to disable scale in protection.
    */
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   private void disableScaleInProtection(String clusterEndpoint, String instanceIp) {
     ManagedChannel channel = null;
     try {
@@ -337,6 +340,7 @@ public class Worker extends LoggingMain {
     return instance.stripQueuedOperation(operation);
   }
 
+  @SuppressWarnings({"deprecation", "unchecked"})
   public Worker(String session, ServerBuilder<?> serverBuilder, ShardWorkerConfig config)
       throws ConfigurationException {
     super("BuildFarmShardWorker");
@@ -387,13 +391,7 @@ public class Worker extends LoggingMain {
         createExecFileSystem(
             remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
 
-    instance =
-        new ShardWorkerInstance(
-            config.getPublicName(),
-            digestUtil,
-            backplane,
-            storage,
-            config.getShardWorkerInstanceConfig());
+    instance = new ShardWorkerInstance(config.getPublicName(), digestUtil, backplane, storage);
 
     Instances instances = Instances.singular(instance);
 
@@ -416,7 +414,6 @@ public class Worker extends LoggingMain {
             config.getDequeueMatchSettings().getPlatform(),
             config.getOperationPollPeriod(),
             backplane::pollOperation,
-            config.getInlineContentLimit(),
             config.getInputFetchStageWidth(),
             config.getExecuteStageWidth(),
             backplane,
@@ -426,9 +423,8 @@ public class Worker extends LoggingMain {
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
             config.getExecutionPoliciesList(),
             instance,
-            /* deadlineAfter=*/ 1,
-            /* deadlineAfterUnits=*/ DAYS,
-            config.getDefaultActionTimeout(),
+            /* deadlineAfter=*/
+            /* deadlineAfterUnits=*/ config.getDefaultActionTimeout(),
             config.getMaximumActionTimeout(),
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
@@ -438,13 +434,12 @@ public class Worker extends LoggingMain {
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));
-    PipelineStage errorStage = completeStage; /* new ErrorStage(); */
-    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
+    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, completeStage);
     PipelineStage executeActionStage =
-        new ExecuteActionStage(context, reportResultStage, errorStage);
+        new ExecuteActionStage(context, reportResultStage, completeStage);
     PipelineStage inputFetchStage =
         new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
-    PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
+    PipelineStage matchStage = new MatchStage(context, inputFetchStage, completeStage);
 
     pipeline = new Pipeline();
     // pipeline.add(errorStage, 0);
@@ -459,7 +454,8 @@ public class Worker extends LoggingMain {
             .addService(healthStatusManager.getHealthService())
             .addService(
                 new ContentAddressableStorageService(
-                    instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
+                    instances, /* deadlineAfter=*/ 1, DAYS
+                    /* requestLogLevel=*/ ))
             .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
             .addService(
                 new WorkerProfileService(
@@ -559,6 +555,7 @@ public class Worker extends LoggingMain {
     return false;
   }
 
+  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   private String getRandomWorker() throws IOException {
     Set<String> workerSet = backplane.getWorkers();
     synchronized (workerSet) {
@@ -715,6 +712,7 @@ public class Worker extends LoggingMain {
         /* deadlineAfterUnits=*/ );
   }
 
+  @SuppressWarnings({"deprecation", "ResultOfMethodCallIgnored"})
   public void stop() throws InterruptedException {
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
@@ -885,6 +883,7 @@ public class Worker extends LoggingMain {
         .start();
   }
 
+  @SuppressWarnings("deprecation")
   public void start() throws InterruptedException {
     try {
       backplane.start(config.getPublicName());
@@ -952,6 +951,7 @@ public class Worker extends LoggingMain {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   public static void startWorker(String[] args) throws Exception {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //

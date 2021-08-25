@@ -30,7 +30,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 class DirectoriesTest {
-  protected Path root;
+  protected final Path root;
 
   protected DirectoriesTest(Path root) {
     this.root = root;

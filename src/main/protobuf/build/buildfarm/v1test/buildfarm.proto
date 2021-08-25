@@ -544,6 +544,8 @@ message ShardInstanceConfig {
   
   // Whether the instance should consult a denylist when looking up actions & invocations.
   bool use_deny_list = 10;
+
+  int32 max_requeue_attempts = 11;
 }
 
 message ShardWorkerInstanceConfig {

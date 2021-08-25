@@ -38,6 +38,7 @@ public final class Dirent implements Serializable, Comparable<Dirent> {
   @Nullable private final FileStatus stat;
 
   /** Creates a new dirent with the given name and type, both of which must be non-null. */
+  @SuppressWarnings("NullableProblems")
   public Dirent(String name, Type type, FileStatus stat) {
     this.name = Preconditions.checkNotNull(name);
     this.type = Preconditions.checkNotNull(type);

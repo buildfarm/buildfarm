@@ -17,7 +17,6 @@ package build.buildfarm.instance.queues;
 import build.buildfarm.instance.MatchListener;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.SetMultimap;
 import com.google.longrunning.Operation;
@@ -39,6 +38,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
   */
   public final List<WorkerQueue> specificQueues = Lists.newArrayList();
 
+  @SuppressWarnings("NullableProblems")
   @Override
   public Iterator<WorkerQueue> iterator() {
     return specificQueues.iterator();
@@ -90,6 +90,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
     return true;
   }
 
+  @SuppressWarnings("CatchMayIgnoreException")
   public void AddWorker(SetMultimap<String, String> provisions, MatchListener listener) {
     try {
       WorkerQueue queue = MatchEligibleQueue(provisions);
@@ -116,12 +117,13 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
     }
   }
 
+  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   private void enqueueOperation(List<Operation> operations, Operation operation) {
     synchronized (operations) {
       Preconditions.checkState(
-          !Iterables.any(
-              operations,
-              (queuedOperation) -> queuedOperation.getName().equals(operation.getName())));
+          operations.stream()
+              .noneMatch(
+                  (queuedOperation) -> queuedOperation.getName().equals(operation.getName())));
       operations.add(operation);
     }
   }

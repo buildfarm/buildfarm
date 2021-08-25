@@ -109,6 +109,7 @@ public class RedisClient implements Closeable {
     return result;
   }
 
+  @SuppressWarnings("ConstantConditions")
   public <T> T call(JedisContext<T> withJedis) throws IOException {
     throwIfClosed();
     try {

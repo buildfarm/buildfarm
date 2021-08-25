@@ -40,12 +40,15 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   }
 
   private static class OperationQueueMatchListener implements MatchListener {
+    @SuppressWarnings("rawtypes")
     private final InterruptingPredicate onMatch;
+
     private final Consumer<Runnable> setOnCancelHandler;
     private final QueueEntry queueEntry = null;
 
+    @SuppressWarnings("rawtypes")
     OperationQueueMatchListener(
-        Instance instance, InterruptingPredicate onMatch, Consumer<Runnable> setOnCancelHandler) {
+        InterruptingPredicate onMatch, Consumer<Runnable> setOnCancelHandler) {
       this.onMatch = onMatch;
       this.setOnCancelHandler = setOnCancelHandler;
     }
@@ -56,6 +59,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     @Override
     public void onWaitEnd() {}
 
+    @SuppressWarnings("unchecked")
     @Override
     public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
       return onMatch.testInterruptibly(queueEntry);
@@ -108,9 +112,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       instance.match(
           request.getPlatform(),
           new OperationQueueMatchListener(
-              instance,
-              createOnMatch(instance, responseObserver),
-              callObserver::setOnCancelHandler));
+              createOnMatch(instance, responseObserver), callObserver::setOnCancelHandler));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }

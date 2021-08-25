@@ -132,6 +132,7 @@ public class EnrichedOperationBuilder {
    * @return The extracted digest.
    * @note Suggested return identifier: digest.
    */
+  @SuppressWarnings("ConstantConditions")
   private static Digest operationToActionDigest(Operation operation) {
     ExecuteOperationMetadata metadata;
 

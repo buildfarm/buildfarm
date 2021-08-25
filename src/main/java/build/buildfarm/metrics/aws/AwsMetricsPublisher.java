@@ -116,6 +116,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     throw new UnsupportedOperationException();
   }
 
+  @SuppressWarnings("unchecked")
   private void getAwsSecret(String secretName) {
     AWSSecretsManager client = AWSSecretsManagerClientBuilder.standard().withRegion(region).build();
     GetSecretValueRequest getSecretValueRequest =

@@ -260,6 +260,7 @@ class Extract {
     };
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   static void downloadActionContents(
       Path root, String instanceName, Set<Digest> actionDigests, Channel channel)
       throws IOException, InterruptedException {
