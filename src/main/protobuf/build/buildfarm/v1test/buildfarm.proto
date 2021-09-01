@@ -668,6 +668,9 @@ message ShardWorkerConfig {
   AdminConfig admin_config = 35;
 
   PrometheusConfig prometheus_config = 37;
+
+  // a limit on time (in seconds) for input fetch stage to fetch inputs
+  int32 input_fetch_deadline = 39;
   
 }
 
@@ -1062,6 +1065,9 @@ message WorkerConfig {
 
   // user principal name for executions
   string exec_owner = 29;
+
+  // a limit on time (in seconds) for input fetch stage to fetch inputs
+  int32 input_fetch_deadline = 30;
 }
 
 message TreeIteratorToken {
