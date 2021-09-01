@@ -43,6 +43,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import io.grpc.Deadline;
@@ -438,6 +439,7 @@ class Executor {
 
       // create settings
       DockerExecutorSettings settings = new DockerExecutorSettings();
+      settings.fetchTimeout = Durations.fromMinutes(1);
       settings.operationContext = operationContext;
       settings.execDir = execDir;
       settings.limits = limits;

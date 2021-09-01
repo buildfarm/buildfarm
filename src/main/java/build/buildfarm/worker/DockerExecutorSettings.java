@@ -64,6 +64,13 @@ public class DockerExecutorSettings {
   public Duration timeout;
 
   /**
+   * @field fetchTimeout
+   * @brief How long image fetching can take before timing out.
+   * @details This waits on docker pull <image>.
+   */
+  public Duration fetchTimeout;
+
+  /**
    * @field arguments
    * @brief The arguments that represent the action.
    * @details This will be spawned as is from inside the container.

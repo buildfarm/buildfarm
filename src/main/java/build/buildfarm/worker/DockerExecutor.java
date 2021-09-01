@@ -32,6 +32,7 @@ import com.github.dockerjava.api.model.Volume;
 import com.github.dockerjava.core.command.ExecStartResultCallback;
 import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
 import com.google.rpc.Code;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -104,7 +105,8 @@ public class DockerExecutor {
       DockerClient dockerClient, DockerExecutorSettings settings) throws InterruptedException {
     // this requires network access.  Once complete, "docker image ls" will show the downloaded
     // image
-    fetchImageIfMissing(dockerClient, settings.limits.containerSettings.containerImage);
+    fetchImageIfMissing(
+        dockerClient, settings.limits.containerSettings.containerImage, settings.fetchTimeout);
 
     // build and start the container.  Oonce complete, "docker container ls" will show the started
     // container
@@ -122,14 +124,16 @@ public class DockerExecutor {
    * @details The image will not be fetched if it already exists.
    * @param dockerClient Client used to interact with docker.
    * @param imageName The name of the image to fetch.
+   * @param fetchTimeout When to timeout on fetching the container image.
    */
-  private static void fetchImageIfMissing(DockerClient dockerClient, String imageName)
+  private static void fetchImageIfMissing(
+      DockerClient dockerClient, String imageName, Duration fetchTimeout)
       throws InterruptedException {
     if (!isLocalImagePresent(dockerClient, imageName)) {
       dockerClient
           .pullImageCmd(imageName)
           .exec(new PullImageResultCallback())
-          .awaitCompletion(1, TimeUnit.MINUTES);
+          .awaitCompletion(fetchTimeout.getSeconds(), TimeUnit.SECONDS);
     }
   }
   /**
