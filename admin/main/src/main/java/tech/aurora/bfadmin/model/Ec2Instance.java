@@ -39,7 +39,12 @@ public class Ec2Instance implements Serializable {
   }
 
   public String getContainerUptimeStr() {
-    return getFormattedTimestamp(containerStartTime);
+    if getFormattedTimestamp(containerStartTime) > getFormattedTimestamp(uptime / 1000) {
+      return "N/A"
+    } else {
+      return getFormattedTimestamp(containerStartTime)
+    }
+    return ;
   }
 
   public Long getUptimeInHours() {
