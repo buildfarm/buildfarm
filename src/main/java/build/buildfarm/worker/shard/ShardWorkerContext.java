@@ -271,6 +271,12 @@ class ShardWorkerContext implements WorkerContext {
     Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
     ByteString queuedOperationBlob = getBlob(queuedOperationDigest);
     if (queuedOperationBlob == null) {
+      logger.log(
+          Level.WARNING,
+          format(
+              "missing queued operation: %s(%s)",
+              queueEntry.getExecuteEntry().getOperationName(),
+              DigestUtil.toString(queuedOperationDigest)));
       return null;
     }
     try {
@@ -308,7 +314,8 @@ class ShardWorkerContext implements WorkerContext {
     }
     listener.onWaitEnd();
 
-    if (DequeueMatchEvaluator.shouldKeepOperation(matchSettings, matchProvisions, queueEntry)) {
+    if (queueEntry == null
+        || DequeueMatchEvaluator.shouldKeepOperation(matchSettings, matchProvisions, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
