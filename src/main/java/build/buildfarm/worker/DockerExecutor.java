@@ -108,7 +108,7 @@ public class DockerExecutor {
     fetchImageIfMissing(
         dockerClient, settings.limits.containerSettings.containerImage, settings.fetchTimeout);
 
-    // build and start the container.  Oonce complete, "docker container ls" will show the started
+    // build and start the container.  Once complete, "docker container ls" will show the started
     // container
     String containerId = createContainer(dockerClient, settings);
     dockerClient.startContainerCmd(containerId).exec();
