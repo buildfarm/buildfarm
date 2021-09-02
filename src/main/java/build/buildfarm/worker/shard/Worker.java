@@ -416,6 +416,7 @@ public class Worker extends LoggingMain {
             backplane::pollOperation,
             config.getInputFetchStageWidth(),
             config.getExecuteStageWidth(),
+            config.getInputFetchDeadline(),
             backplane,
             execFileSystem,
             new EmptyInputStreamFactory(
