@@ -10,7 +10,7 @@ pkg_rpm(
     ],
     release = "0",
     spec_file = "buildfarm-worker.spec",
-    version = "0.1",
+    version = "1.10.0",
 )
 
 filegroup(

@@ -1,11 +1,11 @@
 Name:           buildfarm-server
-Version:        0.1
+Version:        1.10.0
 Release:        0
 Summary:        Bazel Buildfarm Server
 
 License:        Apache License, v2.0
 
-Requires:       java-11-openjdk
+Requires:       java-11-openjdk-headless
 BuildRequires:  systemd
 %{?systemd_requires}
 
