@@ -81,6 +81,7 @@ class FetchService extends FetchImplBase {
               responseObserver.onCompleted();
             }
 
+            @SuppressWarnings("NullableProblems")
             @Override
             public void onFailure(Throwable t) {
               // handle NoSuchFileException

@@ -52,7 +52,7 @@ public class AdminServiceImpl implements AdminService {
   @Value("${buildfarm.worker.port}")
   private int workerPort;
 
-  @Value("aws.region")
+  @Value("${aws.region}")
   private String region;
 
   private AmazonEC2 ec2;
@@ -60,6 +60,7 @@ public class AdminServiceImpl implements AdminService {
 
   @PostConstruct
   public void init() {
+    logger.info("Using AWS region: {}", region);
     ec2 = AmazonEC2ClientBuilder.standard().withRegion(region).build();
     autoScale = AmazonAutoScalingClientBuilder.standard().withRegion(region).build();
   }

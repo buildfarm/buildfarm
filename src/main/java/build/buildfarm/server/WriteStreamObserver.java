@@ -40,7 +40,7 @@ import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import io.prometheus.client.Summary;
+import io.prometheus.client.Histogram;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -51,8 +51,8 @@ import javax.annotation.concurrent.GuardedBy;
 
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Logger logger = Logger.getLogger(WriteStreamObserver.class.getName());
-  private static final Summary ioMetric =
-      Summary.build().name("io_bytes_write").help("I/O (bytes)").register();
+  private static final Histogram ioMetric =
+      Histogram.build().name("io_bytes_write").help("I/O (bytes)").register();
 
   private final Instances instances;
   private final long deadlineAfter;
@@ -197,7 +197,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
-  private void initialize(WriteRequest request) throws EntryLimitException {
+  private void initialize(WriteRequest request) {
     String resourceName = request.getResourceName();
     if (resourceName.isEmpty()) {
       errorResponse(INVALID_ARGUMENT.withDescription("resource_name is empty").asException());
@@ -218,6 +218,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
                 commit(committedSize);
               }
 
+              @SuppressWarnings("NullableProblems")
               @Override
               public void onFailure(Throwable t) {
                 errorResponse(t);
@@ -232,17 +233,17 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         errorResponse(e);
       } catch (InstanceNotFoundException e) {
         if (errorResponse(BuildFarmInstances.toStatusException(e))) {
-          logWriteRequest(Level.WARNING, request, e);
+          logWriteRequest(request, e);
         }
       } catch (Exception e) {
         if (errorResponse(Status.fromThrowable(e).asException())) {
-          logWriteRequest(Level.WARNING, request, e);
+          logWriteRequest(request, e);
         }
       }
     }
   }
 
-  private void logWriteRequest(Level level, WriteRequest request, Exception e) {
+  private void logWriteRequest(WriteRequest request, Exception e) {
     logger.log(
         Level.WARNING,
         format(

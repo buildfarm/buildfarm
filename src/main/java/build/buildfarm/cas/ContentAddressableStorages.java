@@ -98,7 +98,7 @@ public final class ContentAddressableStorages {
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor()) {
           @Override
-          protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
+          protected InputStream newExternalInput(Digest digest) throws IOException {
             throw new NoSuchFileException(digest.getHash());
           }
         };
@@ -156,6 +156,7 @@ public final class ContentAddressableStorages {
         return writes.get(digest, uuid);
       }
 
+      @SuppressWarnings("ResultOfMethodCallIgnored")
       @Override
       public InputStream newInput(Digest digest, long offset) throws IOException {
         ByteString data = getData(digest);

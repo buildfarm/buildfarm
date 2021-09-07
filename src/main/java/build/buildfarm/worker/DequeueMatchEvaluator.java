@@ -49,6 +49,7 @@ public class DequeueMatchEvaluator {
    * @note Overloaded.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
   @NotNull
   public static boolean shouldKeepOperation(
       DequeueMatchSettings matchSettings,
@@ -67,6 +68,7 @@ public class DequeueMatchEvaluator {
    * @note Overloaded.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
   @NotNull
   public static boolean shouldKeepOperation(
       DequeueMatchSettings matchSettings,
@@ -86,6 +88,7 @@ public class DequeueMatchEvaluator {
    * @return Whether or not the worker should accept or reject the operation.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean shouldKeepViaPlatform(
       DequeueMatchSettings matchSettings,
@@ -110,6 +113,7 @@ public class DequeueMatchEvaluator {
    * @return Whether or not the worker should accept or reject the queue entry.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean satisfiesProperties(
       DequeueMatchSettings matchSettings,
@@ -133,6 +137,7 @@ public class DequeueMatchEvaluator {
    * @return Whether or not the worker should accept or reject the queue entry.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean satisfiesProperty(
       DequeueMatchSettings matchSettings,

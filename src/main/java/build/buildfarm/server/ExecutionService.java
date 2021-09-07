@@ -83,6 +83,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             if (!isCancelled() && !(t instanceof CancellationException)) {
@@ -101,6 +102,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
     abstract void deliver(Operation operation);
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     KeepaliveWatcher(ServerCallStreamObserver serverCallStreamObserver) {
       this.serverCallStreamObserver = serverCallStreamObserver;
       serverCallStreamObserver.setOnCancelHandler(this::cancel);

@@ -16,6 +16,7 @@ package build.buildfarm.common;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
 import build.buildfarm.v1test.TreeIteratorToken;
 import com.google.common.collect.Iterators;
 import com.google.common.io.BaseEncoding;
@@ -70,10 +71,7 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
         }
         iter =
             Iterators.transform(
-                directory.getDirectoriesList().iterator(),
-                directoryNode -> {
-                  return directoryNode.getDigest();
-                });
+                directory.getDirectoriesList().iterator(), DirectoryNode::getDigest);
       }
     }
     pointers.push(iter);
@@ -136,9 +134,7 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
       parentPath.addLast(digest);
       path = parentPath.clone();
       pointers.push(
-          Iterators.transform(
-              directory.getDirectoriesList().iterator(),
-              directoryNode -> directoryNode.getDigest()));
+          Iterators.transform(directory.getDirectoriesList().iterator(), DirectoryNode::getDigest));
     }
     advanceIterator();
     return new DirectoryEntry(digest, directory);
