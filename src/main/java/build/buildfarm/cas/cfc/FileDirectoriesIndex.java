@@ -7,6 +7,7 @@ import build.bazel.remote.execution.v2.Digest;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -18,7 +19,7 @@ import java.util.Set;
  * <p>Provides file backed mappings for directories -> entries.
  */
 abstract class FileDirectoriesIndex implements DirectoriesIndex {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
+  private static final Charset UTF_8 = StandardCharsets.UTF_8;
 
   final EntryPathStrategy entryPathStrategy;
 

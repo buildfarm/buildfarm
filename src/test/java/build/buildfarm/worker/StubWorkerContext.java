@@ -100,6 +100,11 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
+  public int getInputFetchDeadline() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public boolean hasDefaultActionTimeout() {
     throw new UnsupportedOperationException();
   }
@@ -159,7 +164,7 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action) {
+  public boolean putOperation(Operation operation) {
     throw new UnsupportedOperationException();
   }
 

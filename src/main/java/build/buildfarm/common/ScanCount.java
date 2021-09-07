@@ -45,11 +45,13 @@ public class ScanCount {
     // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
     // This prevents us from using the cluster's SCAN to traverse all existing keys.
     // That's why we choose to scan each of the jedisNode's individually.
-    cluster.getClusterNodes().values().stream()
+    cluster
+        .getClusterNodes()
+        .values()
         .forEach(
             pool -> {
               try (Jedis node = pool.getResource()) {
-                addKeys(cluster, node, keys, query, scanCount);
+                addKeys(node, keys, query, scanCount);
               }
             });
 
@@ -59,14 +61,13 @@ public class ScanCount {
   /**
    * @brief Scan all entires on node to get key count.
    * @details Keys are accumulated onto.
-   * @param cluster An established redis cluster.
    * @param node A node of the cluster.
    * @param keys Keys to accumulate.
    * @param query The query to perform.
    * @param scanCount The count per scan.
    */
-  private static void addKeys(
-      JedisCluster cluster, Jedis node, Set<String> keys, String query, int scanCount) {
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static void addKeys(Jedis node, Set<String> keys, String query, int scanCount) {
     // construct query
     ScanParams params = new ScanParams();
     params.match(query);

@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 public class OutputDirectory {
   private static final OutputDirectory defaultInstance = new OutputDirectory(ImmutableMap.of());
@@ -39,11 +41,11 @@ public class OutputDirectory {
   //
   // Per the test encyclopedia initial conditions:
   // https://docs.bazel.build/versions/master/test-encyclopedia.html#initial-conditions
-  private static Set<String> OUTPUT_DIRECTORY_ENV_VARS =
+  private static final Set<String> OUTPUT_DIRECTORY_ENV_VARS =
       ImmutableSet.of(
           "TEST_TMPDIR", "TEST_UNDECLARED_OUTPUTS_DIR", "TEST_UNDECLARED_OUTPUTS_ANNOTATIONS_DIR");
 
-  private static Set<String> OUTPUT_FILE_ENV_VARS =
+  private static final Set<String> OUTPUT_FILE_ENV_VARS =
       ImmutableSet.of(
           "TEST_PREMATURE_EXIT_FILE",
           "TEST_LOGSPLITTER_OUTPUT_FILE",
@@ -52,6 +54,7 @@ public class OutputDirectory {
 
   private final Map<String, OutputDirectory> children;
 
+  @SuppressWarnings("SameReturnValue")
   private static OutputDirectory getDefaultInstance() {
     return defaultInstance;
   }
@@ -105,19 +108,25 @@ public class OutputDirectory {
       Iterable<EnvironmentVariable> envVars) {
     return parseDirectories(
         Iterables.concat(
-            Iterables.transform(
-                Iterables.filter(outputFiles, (file) -> file.contains("/")),
-                (file) ->
-                    new OutputDirectoryEntry(
-                        "/" + file.substring(0, file.lastIndexOf('/') + 1), false)),
-            Iterables.transform(
-                outputDirs,
-                (dir) -> new OutputDirectoryEntry(dir.isEmpty() ? "/" : ("/" + dir + "/"), true)),
+            StreamSupport.stream(outputFiles.spliterator(), false)
+                .filter((file) -> file.contains("/"))
+                .collect(Collectors.toList())
+                .stream()
+                .map(
+                    (file) ->
+                        new OutputDirectoryEntry(
+                            "/" + file.substring(0, file.lastIndexOf('/') + 1), false))
+                .collect(Collectors.toList()),
+            StreamSupport.stream(outputDirs.spliterator(), false)
+                .map(
+                    (dir) ->
+                        new OutputDirectoryEntry(dir.isEmpty() ? "/" : ("/" + dir + "/"), true))
+                .collect(Collectors.toList()),
             envVarOutputDirectoryEntries(envVars)));
   }
 
   private static class Builder {
-    Map<String, Builder> children = new HashMap<>();
+    final Map<String, Builder> children = new HashMap<>();
     boolean isRecursive = false;
 
     public Builder addChild(String name) {
@@ -140,7 +149,7 @@ public class OutputDirectory {
         return OutputDirectory.getDefaultInstance();
       }
       return new OutputDirectory(
-          ImmutableMap.copyOf(Maps.transformValues(children, (v) -> v.build())));
+          ImmutableMap.copyOf(Maps.transformValues(children, Builder::build)));
     }
   }
 
