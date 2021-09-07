@@ -65,7 +65,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     addCallback(
         resultFuture,
         new FutureCallback<ActionResult>() {
-          ServerCallStreamObserver<ActionResult> call =
+          final ServerCallStreamObserver<ActionResult> call =
               (ServerCallStreamObserver<ActionResult>) responseObserver;
 
           @Override
@@ -82,6 +82,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             logger.log(

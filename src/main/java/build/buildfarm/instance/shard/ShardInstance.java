@@ -79,7 +79,6 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
-import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
@@ -92,6 +91,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -121,7 +121,7 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
-import io.prometheus.client.Summary;
+import io.prometheus.client.Histogram;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -156,7 +156,7 @@ import javax.naming.ConfigurationException;
 public class ShardInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardInstance.class.getName());
 
-  private static ListenableFuture<Void> IMMEDIATE_VOID_FUTURE = Futures.immediateFuture(null);
+  private static final ListenableFuture<Void> IMMEDIATE_VOID_FUTURE = Futures.immediateFuture(null);
 
   private static final String TIMEOUT_OUT_OF_BOUNDS =
       "A timeout specified is out of bounds with a configured range";
@@ -182,8 +182,8 @@ public class ShardInstance extends AbstractServerInstance {
   private static final Gauge queueSize =
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
 
-  private static final Summary ioMetric =
-      Summary.build().name("io_bytes_read").help("I/O (bytes)").register();
+  private static final Histogram ioMetric =
+      Histogram.build().name("io_bytes_read").help("I/O (bytes)").register();
 
   private final Runnable onStop;
   private final long maxBlobSize;
@@ -205,7 +205,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
   private final int maxCpu;
-  private final int maxRequeueAttempts = 5; // TODO: get from config
+  private final int maxRequeueAttempts;
 
   private final ListeningExecutorService operationTransformService =
       listeningDecorator(newFixedThreadPool(24));
@@ -218,7 +218,7 @@ public class ShardInstance extends AbstractServerInstance {
   private Thread operationQueuer;
   private boolean stopping = false;
   private boolean stopped = true;
-  private Thread prometheusMetricsThread;
+  private final Thread prometheusMetricsThread;
 
   // TODO: move to config
   private static final Duration queueTimeout = Durations.fromSeconds(60);
@@ -280,7 +280,7 @@ public class ShardInstance extends AbstractServerInstance {
       ShardInstanceConfig config,
       Runnable onStop,
       ListeningExecutorService actionCacheFetchService)
-      throws InterruptedException, ConfigurationException {
+      throws InterruptedException {
     this(
         name,
         digestUtil,
@@ -292,8 +292,8 @@ public class ShardInstance extends AbstractServerInstance {
         config.getRunOperationQueuer(),
         config.getMaxBlobSize(),
         config.getMaxCpu(),
+        config.getMaxRequeueAttempts(),
         config.getMaximumActionTimeout(),
-        config.getRedisShardBackplaneConfig().getProvisionedQueues().getQueuesList(),
         config.getUseDenyList(),
         onStop,
         WorkerStubs.create(digestUtil, getGrpcTimeout(config)),
@@ -310,13 +310,12 @@ public class ShardInstance extends AbstractServerInstance {
       boolean runOperationQueuer,
       long maxBlobSize,
       int maxCpu,
+      int maxRequeueAttempts,
       Duration maxActionTimeout,
-      List<ProvisionedQueue> queues,
       boolean useDenyList,
       Runnable onStop,
-      com.google.common.cache.LoadingCache<String, Instance> workerStubs,
-      ListeningExecutorService actionCacheFetchService)
-      throws InterruptedException {
+      LoadingCache<String, Instance> workerStubs,
+      ListeningExecutorService actionCacheFetchService) {
     super(
         name,
         digestUtil,
@@ -331,6 +330,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.onStop = onStop;
     this.maxBlobSize = maxBlobSize;
     this.maxCpu = maxCpu;
+    this.maxRequeueAttempts = maxRequeueAttempts;
     this.maxActionTimeout = maxActionTimeout;
     this.useDenyList = useDenyList;
     this.actionCacheFetchService = actionCacheFetchService;
@@ -353,7 +353,7 @@ public class ShardInstance extends AbstractServerInstance {
       operationQueuer =
           new Thread(
               new Runnable() {
-                Stopwatch stopwatch = Stopwatch.createUnstarted();
+                final Stopwatch stopwatch = Stopwatch.createUnstarted();
 
                 ListenableFuture<Void> iterate() throws IOException, InterruptedException {
                   ensureCanQueue(stopwatch); // wait for transition to canQueue state
@@ -1071,10 +1071,7 @@ public class ShardInstance extends AbstractServerInstance {
           try {
             return catching(
                     expectDirectory(
-                        reason,
-                        directoryBlobDigest,
-                        directExecutor(),
-                        RequestMetadata.getDefaultInstance()),
+                        reason, directoryBlobDigest, RequestMetadata.getDefaultInstance()),
                     Exception.class,
                     (t) -> {
                       logger.log(
@@ -1157,7 +1154,7 @@ public class ShardInstance extends AbstractServerInstance {
                   () ->
                       addCallback(
                           transform(
-                              expectDirectory(reason, nextDigest, service, requestMetadata),
+                              expectDirectory(reason, nextDigest, requestMetadata),
                               directory -> new DirectoryEntry(nextDigest, directory),
                               service),
                           this,
@@ -1186,10 +1183,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   ListenableFuture<Directory> expectDirectory(
-      String reason,
-      Digest directoryBlobDigest,
-      Executor executor,
-      RequestMetadata requestMetadata) {
+      String reason, Digest directoryBlobDigest, RequestMetadata requestMetadata) {
     if (directoryBlobDigest.getSizeBytes() == 0) {
       return immediateFuture(Directory.getDefaultInstance());
     }
@@ -1234,7 +1228,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   ListenableFuture<Command> expectCommand(
-      Digest commandBlobDigest, Executor executor, RequestMetadata requestMetadata) {
+      Digest commandBlobDigest, RequestMetadata requestMetadata) {
     BiFunction<Digest, Executor, CompletableFuture<Command>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Command>>() {
           @Override
@@ -1250,8 +1244,7 @@ public class ShardInstance extends AbstractServerInstance {
     return toListenableFuture(commandCache.get(commandBlobDigest, getCallback));
   }
 
-  ListenableFuture<Action> expectAction(
-      Digest actionBlobDigest, Executor executor, RequestMetadata requestMetadata) {
+  ListenableFuture<Action> expectAction(Digest actionBlobDigest, RequestMetadata requestMetadata) {
     BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
           @Override
@@ -1289,11 +1282,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public InputStream newOperationStreamInput(
-      String name,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) {
+      String name, long offset, RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 
@@ -1336,7 +1325,7 @@ public class ShardInstance extends AbstractServerInstance {
     return transform(
         allAsList(
             transform(
-                expectCommand(commandDigest, service, requestMetadata),
+                expectCommand(commandDigest, requestMetadata),
                 (command) -> {
                   logger.log(
                       Level.FINE,
@@ -1441,7 +1430,7 @@ public class ShardInstance extends AbstractServerInstance {
       ExecutorService service,
       RequestMetadata requestMetadata) {
     return transformAsync(
-        expectAction(actionDigest, service, requestMetadata),
+        expectAction(actionDigest, requestMetadata),
         (action) -> {
           if (action == null) {
             return immediateFuture(QueuedOperation.getDefaultInstance());
@@ -1984,8 +1973,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout)
-      throws InterruptedException {
+  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout) {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(executeEntry.getActionDigest())
@@ -2050,7 +2038,7 @@ public class ShardInstance extends AbstractServerInstance {
     ListenableFuture<Action> actionFuture =
         catchingAsync(
             transformAsync(
-                expectAction(actionDigest, operationTransformService, requestMetadata),
+                expectAction(actionDigest, requestMetadata),
                 (action) -> {
                   if (action == null) {
                     throw Status.NOT_FOUND.asException();
@@ -2246,7 +2234,7 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   public BackplaneStatus backplaneStatus() {
     try {
-      return backplane.backplaneStatus(this);
+      return backplane.backplaneStatus();
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
@@ -2272,7 +2260,7 @@ public class ShardInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  protected Object operationLock(String operationName) {
+  protected Object operationLock() {
     throw new UnsupportedOperationException();
   }
 
@@ -2294,21 +2282,17 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   protected TokenizableIterator<Operation> createOperationsIterator(String pageToken) {
     Iterator<Operation> iter;
-    try {
-      iter =
-          Iterables.transform(
-                  backplane.getOperations(),
-                  (operationName) -> {
-                    try {
-                      return backplane.getOperation(operationName);
-                    } catch (IOException e) {
-                      throw Status.fromThrowable(e).asRuntimeException();
-                    }
-                  })
-              .iterator();
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
+    iter =
+        Iterables.transform(
+                backplane.getOperations(),
+                (operationName) -> {
+                  try {
+                    return backplane.getOperation(operationName);
+                  } catch (IOException e) {
+                    throw Status.fromThrowable(e).asRuntimeException();
+                  }
+                })
+            .iterator();
     OperationIteratorToken token;
     if (!pageToken.isEmpty()) {
       try {
@@ -2379,11 +2363,7 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFuture(null);
     }
 
-    try {
-      return backplane.watchOperation(operation.getName(), watcher);
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
+    return backplane.watchOperation(operation.getName(), watcher);
   }
 
   @Override

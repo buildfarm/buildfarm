@@ -28,7 +28,7 @@ import java.io.OutputStreamWriter;
 public class ByteStringWriteReader implements Runnable {
   private final InputStream input;
   private final Write write;
-  private ByteString.Output data = ByteString.newOutput();
+  private final ByteString.Output data = ByteString.newOutput();
   private boolean completed;
   private IOException exception = null;
 

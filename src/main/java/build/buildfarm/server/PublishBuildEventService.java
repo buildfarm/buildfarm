@@ -29,7 +29,7 @@ import java.util.logging.Logger;
 
 public class PublishBuildEventService extends PublishBuildEventImplBase {
   public static final Logger logger = Logger.getLogger(PublishBuildEventService.class.getName());
-  private BuildEventConfig config;
+  private final BuildEventConfig config;
 
   public PublishBuildEventService(BuildEventConfig config) {
     this.config = config;

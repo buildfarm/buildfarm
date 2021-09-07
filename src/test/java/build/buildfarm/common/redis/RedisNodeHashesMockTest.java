@@ -19,6 +19,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +47,7 @@ public class RedisNodeHashesMockTest {
   public void getEvenlyDistributedHashesCanRetrieveDistributedHashes() throws Exception {
     // ARRANGE
     Jedis node = mock(Jedis.class);
-    when(node.clusterSlots()).thenReturn(Arrays.asList(Arrays.asList(0L, 100L)));
+    when(node.clusterSlots()).thenReturn(Collections.singletonList(Arrays.asList(0L, 100L)));
 
     JedisPool pool = mock(JedisPool.class);
     when(pool.getResource()).thenReturn(node);

@@ -32,12 +32,12 @@ class WorkerProfilePrinter {
     String strFloatFormat = "%-50s : %2.1f";
     long entryCount = response.getCasEntryCount();
     long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
-    System.out.println(format(strIntFormat, "Current Total Entry Count", entryCount));
-    System.out.println(format(strIntFormat, "Current Total Size", response.getCasSize()));
-    System.out.println(format(strIntFormat, "Max Size", response.getCasMaxSize()));
-    System.out.println(format(strIntFormat, "Max Entry Size", response.getCasMaxEntrySize()));
-    System.out.println(
-        format(strIntFormat, "Current Unreferenced Entry Count", unreferencedEntryCount));
+    System.out.printf((strIntFormat) + "%n", "Current Total Entry Count", entryCount);
+    System.out.printf((strIntFormat) + "%n", "Current Total Size", response.getCasSize());
+    System.out.printf((strIntFormat) + "%n", "Max Size", response.getCasMaxSize());
+    System.out.printf((strIntFormat) + "%n", "Max Entry Size", response.getCasMaxEntrySize());
+    System.out.printf(
+        (strIntFormat) + "%n", "Current Unreferenced Entry Count", unreferencedEntryCount);
     if (entryCount != 0) {
       System.out.println(
           format(
@@ -46,15 +46,16 @@ class WorkerProfilePrinter {
                   100.0f * response.getCasEntryCount() / response.getCasUnreferencedEntryCount())
               + "%");
     }
-    System.out.println(
-        format(strIntFormat, "Current DirectoryEntry Count", response.getCasDirectoryEntryCount()));
-    System.out.println(
-        format(strIntFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
-    System.out.println(
-        format(
-            strIntFormat,
-            "Total Evicted Entries size in Bytes",
-            response.getCasEvictedEntrySize()));
+    System.out.printf(
+        (strIntFormat) + "%n",
+        "Current DirectoryEntry Count",
+        response.getCasDirectoryEntryCount());
+    System.out.printf(
+        (strIntFormat) + "%n", "Number of Evicted Entries", response.getCasEvictedEntryCount());
+    System.out.printf(
+        (strIntFormat) + "%n",
+        "Total Evicted Entries size in Bytes",
+        response.getCasEvictedEntrySize());
 
     List<StageInformation> stages = response.getStagesList();
     for (StageInformation stage : stages) {
@@ -68,9 +69,8 @@ class WorkerProfilePrinter {
   }
 
   public static void printStageInformation(StageInformation stage) {
-    System.out.println(
-        format("%s slots configured: %d", stage.getName(), stage.getSlotsConfigured()));
-    System.out.println(format("%s slots used %d", stage.getName(), stage.getSlotsUsed()));
+    System.out.printf("%s slots configured: %d%n", stage.getName(), stage.getSlotsConfigured());
+    System.out.printf("%s slots used %d%n", stage.getName(), stage.getSlotsUsed());
   }
 
   public static void printOperationTime(OperationTimesBetweenStages time) {
@@ -101,44 +101,41 @@ class WorkerProfilePrinter {
     System.out.println(periodInfo);
     System.out.println("Number of operations completed: " + time.getOperationCount());
     String strStrNumFormat = "%-28s -> %-28s : %12.2f ms";
-    System.out.println(
-        format(strStrNumFormat, "Queued", "MatchStage", durationToMillis(time.getQueuedToMatch())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "MatchStage",
-            "InputFetchStage start",
-            durationToMillis(time.getMatchToInputFetchStart())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "InputFetchStage Start",
-            "InputFetchStage Complete",
-            durationToMillis(time.getInputFetchStartToComplete())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "InputFetchStage Complete",
-            "ExecutionStage Start",
-            durationToMillis(time.getInputFetchCompleteToExecutionStart())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "ExecutionStage Start",
-            "ExecutionStage Complete",
-            durationToMillis(time.getExecutionStartToComplete())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "ExecutionStage Complete",
-            "ReportResultStage Start",
-            durationToMillis(time.getExecutionCompleteToOutputUploadStart())));
-    System.out.println(
-        format(
-            strStrNumFormat,
-            "OutputUploadStage Start",
-            "OutputUploadStage Complete",
-            durationToMillis(time.getOutputUploadStartToComplete())));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "Queued",
+        "MatchStage",
+        durationToMillis(time.getQueuedToMatch()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "MatchStage",
+        "InputFetchStage start",
+        durationToMillis(time.getMatchToInputFetchStart()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "InputFetchStage Start",
+        "InputFetchStage Complete",
+        durationToMillis(time.getInputFetchStartToComplete()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "InputFetchStage Complete",
+        "ExecutionStage Start",
+        durationToMillis(time.getInputFetchCompleteToExecutionStart()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "ExecutionStage Start",
+        "ExecutionStage Complete",
+        durationToMillis(time.getExecutionStartToComplete()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "ExecutionStage Complete",
+        "ReportResultStage Start",
+        durationToMillis(time.getExecutionCompleteToOutputUploadStart()));
+    System.out.printf(
+        (strStrNumFormat) + "%n",
+        "OutputUploadStage Start",
+        "OutputUploadStage Complete",
+        durationToMillis(time.getOutputUploadStartToComplete()));
     System.out.println();
   }
 
