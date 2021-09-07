@@ -24,12 +24,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 /**
- * @class CasFallbackHandler
+ * @class CasFallbackDelegate
  * @brief The CasFileCache provides a fallback mechanism to store CAS data in another data source.
  *     This module handles the various fallback behaviors.
  * @details These methods are called by the primary CAS manager.
  */
-public class CasFallbackHandler {
+public class CasFallbackDelegate {
   /**
    * @brief Start the CAS delegate.
    * @details Some delegates need started depending on the CAS type that they are.
@@ -97,9 +97,6 @@ public class CasFallbackHandler {
    */
   public static boolean contains(
       ContentAddressableStorage delegate, Digest digest, Digest.Builder result) {
-    if (delegate == null) {
-      return false;
-    }
-    return delegate.contains(digest, result);
+    return delegate != null && delegate.contains(digest, result);
   }
 }

@@ -450,16 +450,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       accessed(foundDigests);
     }
     ImmutableList<Digest> missingDigests = builder.build();
-    return CasFallbackHandler.findMissingBlobs(delegate, missingDigests);
+    return CasFallbackDelegate.findMissingBlobs(delegate, missingDigests);
   }
 
   @Override
   public boolean contains(Digest digest, Digest.Builder result) {
-    if (containsLocal(digest, result, (key) -> accessed(ImmutableList.of(key)))) {
-      return true;
-    }
-
-    return CasFallbackHandler.contains(delegate, digest, result);
+    return containsLocal(digest, result, (key) -> accessed(ImmutableList.of(key)))
+        || CasFallbackDelegate.contains(delegate, digest, result);
   }
 
   @Override
@@ -471,7 +468,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     try {
       return newLocalInput(digest, offset);
     } catch (NoSuchFileException e) {
-      return CasFallbackHandler.newTransparentInput(delegate, e, digest, offset);
+      return CasFallbackDelegate.newTransparentInput(delegate, e, digest, offset);
     }
   }
 
@@ -1166,7 +1163,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   public StartupCacheResults start(
       Consumer<Digest> onStartPut, ExecutorService removeDirectoryService, boolean skipLoad)
       throws IOException, InterruptedException {
-    CasFallbackHandler.start(delegate, onStartPut, removeDirectoryService, skipLoad);
+    CasFallbackDelegate.start(delegate, onStartPut, removeDirectoryService, skipLoad);
 
     logger.log(Level.INFO, "Initializing cache at: " + root);
     Instant startTime = Instant.now();
