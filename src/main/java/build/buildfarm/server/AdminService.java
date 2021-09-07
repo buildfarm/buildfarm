@@ -198,6 +198,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
    *
    * @param host the host that should be prepared for shutdown.
    */
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   private void informWorkerToPrepareForShutdown(String host) {
     ManagedChannel channel = null;
     try {
@@ -241,6 +242,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
    * @param hostPrivateIp the private dns should be trimmed.
    * @return
    */
+  @SuppressWarnings("JavaDoc")
   private String trimHostPrivateDns(String hostPrivateIp) {
     String portSeparator = ":";
     if (hostPrivateIp.contains(portSeparator)) {

@@ -45,6 +45,7 @@ public class ExecutionServiceTest {
     instances = mock(Instances.class);
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void keepaliveIsCancelledWithContext() throws Exception {
     ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();

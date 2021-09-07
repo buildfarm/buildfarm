@@ -52,7 +52,7 @@ class CacheLoad {
     }
 
     @Override
-    protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
+    protected InputStream newExternalInput(Digest digest) throws IOException {
       throw new IOException();
     }
   }

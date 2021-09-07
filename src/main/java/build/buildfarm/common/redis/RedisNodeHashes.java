@@ -38,6 +38,7 @@ public class RedisNodeHashes {
    * @return Hashtags that will each has to a slot on a different node.
    * @note Suggested return identifier: hashtags.
    */
+  @SuppressWarnings({"unchecked", "rawtypes"})
   public static List<String> getEvenlyDistributedHashes(JedisCluster jedis) {
     try {
       List<List<Long>> slotRanges = getSlotRanges(jedis);
@@ -61,6 +62,7 @@ public class RedisNodeHashes {
    * @return Hashtags that will each has to a slot on a different node.
    * @note Suggested return identifier: hashtags.
    */
+  @SuppressWarnings({"unchecked", "rawtypes"})
   public static List<String> getEvenlyDistributedHashesWithPrefix(
       JedisCluster jedis, String prefix) {
     try {
@@ -85,6 +87,7 @@ public class RedisNodeHashes {
    * @return Slot ranges for all of the nodes in the cluster.
    * @note Suggested return identifier: slotRanges.
    */
+  @SuppressWarnings("unchecked")
   private static List<List<Long>> getSlotRanges(JedisCluster jedis) {
     // get slot information for each node
     List<Object> slots = getClusterSlots(jedis);
@@ -122,14 +125,11 @@ public class RedisNodeHashes {
     JedisException nodeException = null;
     for (Map.Entry<String, JedisPool> node : jedis.getClusterNodes().entrySet()) {
       JedisPool pool = node.getValue();
-      Jedis resource = pool.getResource();
-      try {
+      try (Jedis resource = pool.getResource()) {
         return resource.clusterSlots();
       } catch (JedisException e) {
         nodeException = e;
         // log error with node
-      } finally {
-        resource.close();
       }
     }
     if (nodeException != null) {

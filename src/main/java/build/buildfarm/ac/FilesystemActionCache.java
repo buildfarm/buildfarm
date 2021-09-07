@@ -31,7 +31,7 @@ public class FilesystemActionCache implements ActionCache {
   }
 
   @Override
-  public void put(ActionKey actionKey, ActionResult actionResult) throws InterruptedException {
+  public void put(ActionKey actionKey, ActionResult actionResult) {
     String hash = actionKey.getDigest().getHash();
     Path resultPath = path.resolve(hash);
     try (OutputStream out = Files.newOutputStream(resultPath)) {
