@@ -100,11 +100,6 @@ gh_edit_view_mode: "edit" # "tree" or "edit" if you want the user to jump into t
 # Color scheme currently only supports "dark", "light"/nil (default), or a custom scheme that you define
 color_scheme: light
 
-# Google Analytics Tracking (optional)
-# e.g, UA-1234567-89
-ga_tracking: UA-2709176-10
-ga_tracking_anonymize_ip: true # Use GDPR compliant Google Analytics settings (true/nil by default)
-
 plugins:
   - jekyll-seo-tag
 
