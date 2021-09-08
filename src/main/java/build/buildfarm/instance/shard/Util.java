@@ -35,6 +35,7 @@ import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
+import io.prometheus.client.Counter;
 import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -45,10 +46,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Util {
+  private static final Counter casHitCounter =
+      Counter.build().name("w2w_cas_hit").help("Number of successful CAS hits from worker-worker.").register();
+  private static final Counter casMissCounter =
+      Counter.build().name("w2w_cas_miss").help("Number of CAS misses from worker-worker.").register();
   private static final Logger logger = Logger.getLogger(Util.class.getName());
   public static final Predicate<Status> SHARD_IS_RETRIABLE =
       st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.apply(st);
-
   private Util() {}
 
   abstract static class AggregateCallback<T> implements FutureCallback<T> {
@@ -183,6 +187,7 @@ public class Util {
           @Override
           public void onSuccess(Iterable<Digest> missingDigests) {
             boolean found = Iterables.isEmpty(missingDigests);
+            casHitCounter.inc();
             logger.log(
                 Level.FINE,
                 format(
@@ -194,6 +199,7 @@ public class Util {
           @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
+            casMissCounter.inc();
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.UNAVAILABLE) {
               logger.log(
