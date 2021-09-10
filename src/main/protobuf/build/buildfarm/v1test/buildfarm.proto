@@ -215,6 +215,12 @@ message BuildFarmServerConfig {
   // Absolute path to the PEM file containing both the required certificates and any
   // associated private key.
   optional string ssl_certificate_path = 8;
+
+  // CAS write deadline
+  google.protobuf.Duration cas_write_timeout = 9;
+
+  // Bytestream upload blob deadline
+  google.protobuf.Duration bytestream_timeout = 10;
 }
 
 message MetricsConfig {
