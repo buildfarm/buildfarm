@@ -243,3 +243,15 @@ instance {
 
 # the listening port of the buildfarm grpc server
 port: 8980
+
+# cas write timeout
+cas_write_timeout: {
+  seconds: 3600
+  nanos: 0
+}
+
+# bytestream timeout
+bytestream_timeout: {
+  seconds: 3600
+  nanos: 0
+}
