@@ -48,7 +48,7 @@ instance {
     # a transient UNAVAILABLE response, which, in bazel's case, induces
     # a fallback to non-remote recovery, rather than a catastrophic
     # failure.
-    max_blob_size: 4294967296
+    max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
 
     # Maximum number of requeue attempts for an operation
     max_requeue_attempts: 5

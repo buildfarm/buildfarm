@@ -536,7 +536,7 @@ message ShardInstanceConfig {
     RedisShardBackplaneConfig redis_shard_backplane_config = 4;
   }
 
-  int64 max_blob_size = 5;
+  int64 max_entry_size_bytes = 5;
   
   int32 max_cpu = 9;
 
