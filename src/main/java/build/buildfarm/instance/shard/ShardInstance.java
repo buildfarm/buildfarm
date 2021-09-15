@@ -174,10 +174,7 @@ public class ShardInstance extends AbstractServerInstance {
           .help("Number of successful CAS hits from worker-worker.")
           .register();
   private static final Counter casMissCounter =
-      Counter.build()
-          .name("cas_miss")
-          .help("Number of CAS misses from worker-worker.")
-          .register();
+      Counter.build().name("cas_miss").help("Number of CAS misses from worker-worker.").register();
   // Metrics about the dispatched operations
   private static final Gauge dispatchedOperationsSize =
       Gauge.build()
