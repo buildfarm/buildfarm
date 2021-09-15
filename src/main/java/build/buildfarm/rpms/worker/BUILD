@@ -10,6 +10,7 @@ pkg_rpm(
     ],
     release = "0",
     spec_file = "buildfarm-worker.spec",
+    tags = ["manual"],
     version = "1.10.0",
 )
 
