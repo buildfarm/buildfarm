@@ -48,7 +48,7 @@ instance {
     # a transient UNAVAILABLE response, which, in bazel's case, induces
     # a fallback to non-remote recovery, rather than a catastrophic
     # failure.
-    max_blob_size: 4294967296
+    max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
 
     # Maximum number of requeue attempts for an operation
     max_requeue_attempts: 5
@@ -243,3 +243,15 @@ instance {
 
 # the listening port of the buildfarm grpc server
 port: 8980
+
+# cas write timeout
+cas_write_timeout: {
+  seconds: 3600
+  nanos: 0
+}
+
+# bytestream timeout
+bytestream_timeout: {
+  seconds: 3600
+  nanos: 0
+}
