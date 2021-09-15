@@ -58,6 +58,20 @@ def archive_dependencies(third_party):
             "strip_prefix": "remote-apis-6345202a036a297b22b0a0e7531ef702d05f2130",
             "url": "https://github.com/bazelbuild/remote-apis/archive/6345202a036a297b22b0a0e7531ef702d05f2130.zip",
         },
+        {
+            "name": "rules_cc",
+            "sha256": "34b2ebd4f4289ebbc27c7a0d854dcd510160109bb0194c0ba331c9656ffcb556",
+            "strip_prefix": "rules_cc-daf6ace7cfeacd6a83e9ff2ed659f416537b6c74",
+            "url": "https://github.com/bazelbuild/rules_cc/archive/daf6ace7cfeacd6a83e9ff2ed659f416537b6c74.tar.gz",
+        },
+
+        # Used to format proto files
+        {
+            "name": "com_grail_bazel_toolchain",
+            "sha256": "54b54eedc71b93b278c44b6c056a737dc68545c6da75f63d0810676e1181f559",
+            "strip_prefix": "bazel-toolchain-76ce37e977a304acf8948eadabb82c516320e286",
+            "url": "https://github.com/grailbio/bazel-toolchain/archive/76ce37e977a304acf8948eadabb82c516320e286.tar.gz",
+        },
 
         # Ideally we would use the 0.14.4 release of rules_docker,
         # but that version introduced new pypi and pkg dependncies on tar-related targets making the upgrade difficult.

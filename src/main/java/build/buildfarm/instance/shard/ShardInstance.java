@@ -121,7 +121,7 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
-import io.prometheus.client.Summary;
+import io.prometheus.client.Histogram;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -182,11 +182,11 @@ public class ShardInstance extends AbstractServerInstance {
   private static final Gauge queueSize =
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
 
-  private static final Summary ioMetric =
-      Summary.build().name("io_bytes_read").help("I/O (bytes)").register();
+  private static final Histogram ioMetric =
+      Histogram.build().name("io_bytes_read").help("I/O (bytes)").register();
 
   private final Runnable onStop;
-  private final long maxBlobSize;
+  private final long maxEntrySizeBytes;
   private final Backplane backplane;
   private final ReadThroughActionCache readThroughActionCache;
   private final RemoteInputStreamFactory remoteInputStreamFactory;
@@ -290,7 +290,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getRunDispatchedMonitor(),
         config.getDispatchedMonitorIntervalSeconds(),
         config.getRunOperationQueuer(),
-        config.getMaxBlobSize(),
+        config.getMaxEntrySizeBytes(),
         config.getMaxCpu(),
         config.getMaxRequeueAttempts(),
         config.getMaximumActionTimeout(),
@@ -308,7 +308,7 @@ public class ShardInstance extends AbstractServerInstance {
       boolean runDispatchedMonitor,
       int dispatchedMonitorIntervalSeconds,
       boolean runOperationQueuer,
-      long maxBlobSize,
+      long maxEntrySizeBytes,
       int maxCpu,
       int maxRequeueAttempts,
       Duration maxActionTimeout,
@@ -328,7 +328,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.readThroughActionCache = readThroughActionCache;
     this.workerStubs = workerStubs;
     this.onStop = onStop;
-    this.maxBlobSize = maxBlobSize;
+    this.maxEntrySizeBytes = maxEntrySizeBytes;
     this.maxCpu = maxCpu;
     this.maxRequeueAttempts = maxRequeueAttempts;
     this.maxActionTimeout = maxActionTimeout;
@@ -1049,8 +1049,8 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
-    if (maxBlobSize > 0 && digest.getSizeBytes() > maxBlobSize) {
-      throw new EntryLimitException(digest.getSizeBytes(), maxBlobSize);
+    if (maxEntrySizeBytes > 0 && digest.getSizeBytes() > maxEntrySizeBytes) {
+      throw new EntryLimitException(digest.getSizeBytes(), maxEntrySizeBytes);
     }
     // FIXME small blob write to proto cache
     return writes.get(digest, uuid, requestMetadata);
