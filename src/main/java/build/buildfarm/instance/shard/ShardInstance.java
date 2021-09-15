@@ -168,7 +168,16 @@ public class ShardInstance extends AbstractServerInstance {
       Counter.build().name("execution_success").help("Execution success.").register();
   private static final Gauge preQueueSize =
       Gauge.build().name("pre_queue_size").help("Pre queue size.").register();
-
+  private static final Counter casHitCounter =
+      Counter.build()
+          .name("cas_hit")
+          .help("Number of successful CAS hits from worker-worker.")
+          .register();
+  private static final Counter casMissCounter =
+      Counter.build()
+          .name("cas_miss")
+          .help("Number of CAS misses from worker-worker.")
+          .register();
   // Metrics about the dispatched operations
   private static final Gauge dispatchedOperationsSize =
       Gauge.build()
@@ -762,6 +771,7 @@ public class ShardInstance extends AbstractServerInstance {
                 blobObserver.onNext(nextChunk);
                 received += nextChunk.size();
                 ioMetric.observe(received);
+                casHitCounter.inc();
               }
 
               @Override
@@ -772,6 +782,7 @@ public class ShardInstance extends AbstractServerInstance {
                   removeMalfunctioningWorker(
                       worker, t, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
                 } else if (status.getCode() == Code.NOT_FOUND) {
+                  casMissCounter.inc();
                   logger.log(
                       Level.FINE, worker + " did not contain " + DigestUtil.toString(blobDigest));
                   // ignore this, the worker will update the backplane eventually
