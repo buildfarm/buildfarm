@@ -58,7 +58,7 @@ tasks:
     - "..."
     test_targets:
     - "..."
-  ubuntu1804:
+  rpm_builds:
     name: "Rpm Builds"
     platform: centos7
     shell_commands:
@@ -67,7 +67,7 @@ tasks:
   # We want to run the unit tests again inside of a docker container.
   # This is because test cases may behave different while in docker due to user permissions.
   # This is more of a sanity check between a defined docker file and running tests directly on the host.
-  ubuntu1604:
+  docker_unit_tests:
     name: "Docker Unit Tests"
     platform: ubuntu1804
     shell_commands:
