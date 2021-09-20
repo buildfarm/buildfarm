@@ -62,7 +62,7 @@ tasks:
     name: "Rpm Builds"
     platform: ubuntu1804
     shell_commands:
-    - /usr/bin/sudo apt-get install rpm
+    - ./rpm_build.sh
 
   # We want to run the unit tests again inside of a docker container.
   # This is because test cases may behave different while in docker due to user permissions.
