@@ -62,7 +62,7 @@ tasks:
     name: "Rpm Builds"
     platform: centos7
     shell_commands:
-    - ./bazelw build --host_force_python=PY2 //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
+    - ./bazelw build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
 
   # We want to run the unit tests again inside of a docker container.
   # This is because test cases may behave different while in docker due to user permissions.
