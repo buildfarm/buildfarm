@@ -31,6 +31,7 @@ public class MapUtilsTest {
   // Function under test: incrementValue
   // Reason for testing: empty map goes to 1
   // Failure explanation: increment value not as expected
+  @SuppressWarnings("unchecked")
   @Test
   public void incrementValueEmptyToOne() throws Exception {
     // ARRANGE
@@ -47,6 +48,7 @@ public class MapUtilsTest {
   // Function under test: incrementValue
   // Reason for testing: empty map can be incremented
   // Failure explanation: incrementing not working as expected
+  @SuppressWarnings("unchecked")
   @Test
   public void incrementValueEmptyIncrementThree() throws Exception {
     // ARRANGE
@@ -65,6 +67,7 @@ public class MapUtilsTest {
   // Function under test: incrementValue
   // Reason for testing: nonempty map can be incremented
   // Failure explanation: incrementing not working as expected
+  @SuppressWarnings("unchecked")
   @Test
   public void incrementValueNonEmptyIncrement() throws Exception {
     // ARRANGE
@@ -82,6 +85,7 @@ public class MapUtilsTest {
   // Function under test: toString
   // Reason for testing: empty map can be printed
   // Failure explanation: empty map not printed as expected
+  @SuppressWarnings("unchecked")
   @Test
   public void toStringEmpty() throws Exception {
     // ARRANGE
@@ -97,6 +101,7 @@ public class MapUtilsTest {
   // Function under test: toString
   // Reason for testing: single element map can be printed
   // Failure explanation: map not printed as expected
+  @SuppressWarnings("unchecked")
   @Test
   public void toStringSingleElement() throws Exception {
     // ARRANGE
@@ -113,6 +118,7 @@ public class MapUtilsTest {
   // Function under test: toString
   // Reason for testing: multiple element map can be printed
   // Failure explanation: map not printed as expected
+  @SuppressWarnings("unchecked")
   @Test
   public void toStringMultiElement() throws Exception {
     // ARRANGE

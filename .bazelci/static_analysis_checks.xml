@@ -40,8 +40,6 @@
     <exclude name="ReplaceVectorWithList"/>
     <exclude name="SwitchStmtsShouldHaveDefault"/>
     <exclude name="SystemPrintln"/>
-    <exclude name="UnusedAssignment"/>
-    <exclude name="UnusedFormalParameter"/>
     <exclude name="UseAssertEqualsInsteadOfAssertTrue"/>
     <exclude name="UseAssertNullInsteadOfAssertTrue"/>
     <exclude name="UseAssertSameInsteadOfAssertTrue"/>
@@ -72,11 +70,8 @@
     <exclude name="ExtendsObject"/>
     <exclude name="FieldDeclarationsShouldBeAtStartOfClass"/>
     <exclude name="FieldNamingConventions"/>
-    <exclude name="ForLoopShouldBeWhileLoop"/>
-    <exclude name="ForLoopsMustUseBraces"/>
     <exclude name="FormalParameterNamingConventions"/>
     <exclude name="GenericsNaming"/>
-    <exclude name="IdenticalCatchBranches"/>
     <exclude name="LinguisticNaming"/>
     <exclude name="LocalHomeNamingConvention"/>
     <exclude name="LocalInterfaceSessionNamingConvention"/>
@@ -96,7 +91,6 @@
     <exclude name="SuspiciousConstantFieldName"/>
     <exclude name="TooManyStaticImports"/>
     <exclude name="UnnecessaryAnnotationValueElement"/>
-    <exclude name="UnnecessaryCast"/>
     <exclude name="UnnecessaryConstructor"/>
     <exclude name="UnnecessaryFullyQualifiedName"/>
     <exclude name="UselessParentheses"/>

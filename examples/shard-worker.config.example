@@ -116,6 +116,9 @@ execute_stage_width: 1
 # the number of concurrently available slots in the input fetch phase
 input_fetch_stage_width: 1
 
+# a limit on time (in seconds) for input fetch stage to fetch inputs
+input_fetch_deadline: 60
+
 # Use an input directory creation strategy which creates a single
 # directory tree at the highest level of the input tree containing
 # no output paths of any kind, and symlinks that directory into an

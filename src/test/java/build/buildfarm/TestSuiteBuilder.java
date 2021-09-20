@@ -32,7 +32,7 @@ final class TestSuiteBuilder {
     }
   }
 
-  private Set<Class<?>> testClasses = Sets.newTreeSet(new TestClassNameComparator());
+  private final Set<Class<?>> testClasses = Sets.newTreeSet(new TestClassNameComparator());
 
   /**
    * Adds the tests found (directly) in class {@code c} to the set of tests this builder will

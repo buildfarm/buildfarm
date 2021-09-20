@@ -39,6 +39,7 @@ import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import io.prometheus.client.Counter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -54,6 +55,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
+@SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
   // collected, which would cause us to loose their configuration.
@@ -72,7 +74,6 @@ public class BuildFarmServer extends LoggingMain {
   private final HealthStatusManager healthStatusManager;
   private final Server server;
   private boolean stopping = false;
-  private final PrometheusPublisher prometheusPublisher;
 
   public BuildFarmServer(String session, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
@@ -83,14 +84,15 @@ public class BuildFarmServer extends LoggingMain {
       String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
-    String defaultInstanceName = config.getDefaultInstanceName();
-    instances =
-        new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
+    instances = new BuildFarmInstances(session, config.getInstance(), this::stop);
 
     healthStatusManager = new HealthStatusManager();
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-
+    if (!config.getSslCertificatePath().equals("")) {
+      File ssl_certificate_path = new File(config.getSslCertificatePath());
+      serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
+    }
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
@@ -99,10 +101,14 @@ public class BuildFarmServer extends LoggingMain {
             .addService(
                 new ContentAddressableStorageService(
                     instances,
-                    /* deadlineAfter=*/ 1,
-                    TimeUnit.DAYS,
-                    /* requestLogLevel=*/ Level.INFO))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
+                    /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
+                    TimeUnit.SECONDS
+                    /* requestLogLevel=*/ ))
+            .addService(
+                new ByteStreamService(
+                    instances,
+                    /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
+                    TimeUnit.SECONDS))
             .addService(
                 new ExecutionService(
                     instances,
@@ -119,8 +125,6 @@ public class BuildFarmServer extends LoggingMain {
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
             .intercept(headersInterceptor)
             .build();
-
-    prometheusPublisher = new PrometheusPublisher();
 
     logger.log(Level.INFO, String.format("%s initialized", session));
   }
@@ -152,7 +156,7 @@ public class BuildFarmServer extends LoggingMain {
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    prometheusPublisher.startHttpServer(prometheusPort);
+    PrometheusPublisher.startHttpServer(prometheusPort);
     healthCheckMetric.labels("start").inc();
   }
 
@@ -163,6 +167,7 @@ public class BuildFarmServer extends LoggingMain {
     System.err.println("*** server shut down");
   }
 
+  @SuppressWarnings("ConstantConditions")
   public void stop() {
     synchronized (this) {
       if (stopping) {
@@ -172,7 +177,7 @@ public class BuildFarmServer extends LoggingMain {
     }
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
-    prometheusPublisher.stopHttpServer();
+    PrometheusPublisher.stopHttpServer();
     healthCheckMetric.labels("stop").inc();
     try {
       if (server != null) {
@@ -204,6 +209,7 @@ public class BuildFarmServer extends LoggingMain {
   }
 
   /** returns success or failure */
+  @SuppressWarnings("ConstantConditions")
   static boolean serverMain(String[] args) {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //

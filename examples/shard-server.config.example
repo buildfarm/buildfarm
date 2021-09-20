@@ -1,5 +1,5 @@
 # an instance specification
-instances {
+instance {
   name: "shard"
 
   # the digest function for this instance, required
@@ -48,7 +48,10 @@ instances {
     # a transient UNAVAILABLE response, which, in bazel's case, induces
     # a fallback to non-remote recovery, rather than a catastrophic
     # failure.
-    max_blob_size: 4294967296
+    max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
+
+    # Maximum number of requeue attempts for an operation
+    max_requeue_attempts: 5
     
     # Whether the instance should consult a denylist when looking up actions & invocations.
     # For cache-only systems users may want to disable this check.
@@ -245,9 +248,14 @@ instances {
 # the listening port of the buildfarm grpc server
 port: 8980
 
-# the instance to which all requests with an empty/missing
-# instance name are routed
-#
-# this can be empty as well, to indicate that there is no
-# default instance
-default_instance_name: "shard"
+# cas write timeout
+cas_write_timeout: {
+  seconds: 3600
+  nanos: 0
+}
+
+# bytestream timeout
+bytestream_timeout: {
+  seconds: 3600
+  nanos: 0
+}

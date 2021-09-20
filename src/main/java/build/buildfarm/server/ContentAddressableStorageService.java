@@ -39,37 +39,33 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Tree;
-import com.google.common.base.Function;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.stub.StreamObserver;
-import io.prometheus.client.Summary;
-import java.io.IOException;
+import io.prometheus.client.Histogram;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
   private static final Logger logger =
       Logger.getLogger(ContentAddressableStorageService.class.getName());
-  private static final Summary missingBlobs =
-      Summary.build().name("missing_blobs").help("Find missing blobs.").register();
+  private static final Histogram missingBlobs =
+      Histogram.build().name("missing_blobs").help("Find missing blobs.").register();
 
   private final Instances instances;
   private final long writeDeadlineAfter;
   private final TimeUnit writeDeadlineAfterUnits;
 
   public ContentAddressableStorageService(
-      Instances instances,
-      long writeDeadlineAfter,
-      TimeUnit writeDeadlineAfterUnits,
-      Level requestLogLevel) {
+      Instances instances, long writeDeadlineAfter, TimeUnit writeDeadlineAfterUnits) {
     this.instances = instances;
     this.writeDeadlineAfter = writeDeadlineAfter;
     this.writeDeadlineAfterUnits = writeDeadlineAfterUnits;
@@ -114,19 +110,18 @@ public class ContentAddressableStorageService
               missingBlobs.observe(request.getBlobDigestsList().size());
               logger.log(
                   Level.FINE,
-                  new StringBuilder()
-                      .append("FindMissingBlobs(")
-                      .append(instance.getName())
-                      .append(") for ")
-                      .append(request.getBlobDigestsList().size())
-                      .append(" blobs in ")
-                      .append(elapsedMicros / 1000.0)
-                      .toString());
+                  "FindMissingBlobs("
+                      + instance.getName()
+                      + ") for "
+                      + request.getBlobDigestsList().size()
+                      + " blobs in "
+                      + elapsedMicros / 1000.0);
             } catch (Throwable t) {
               onFailure(t);
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
@@ -152,12 +147,7 @@ public class ContentAddressableStorageService
       ListenableFuture<Code> codeFuture, Digest digest) {
     return transform(
         codeFuture,
-        new Function<Code, Response>() {
-          @Override
-          public Response apply(Code code) {
-            return Response.newBuilder().setDigest(digest).setStatus(statusForCode(code)).build();
-          }
-        },
+        code -> Response.newBuilder().setDigest(digest).setStatus(statusForCode(code)).build(),
         directExecutor());
   }
 
@@ -205,13 +195,16 @@ public class ContentAddressableStorageService
     ListenableFuture<BatchUpdateBlobsResponse> responseFuture =
         transform(
             allAsList(
-                Iterables.transform(
-                    putAllBlobs(
-                        instance,
-                        batchRequest.getRequestsList(),
-                        writeDeadlineAfter,
-                        writeDeadlineAfterUnits),
-                    (future) -> transform(future, response::addResponses, directExecutor()))),
+                StreamSupport.stream(
+                        putAllBlobs(
+                                instance,
+                                batchRequest.getRequestsList(),
+                                writeDeadlineAfter,
+                                writeDeadlineAfterUnits)
+                            .spliterator(),
+                        false)
+                    .map((future) -> transform(future, response::addResponses, directExecutor()))
+                    .collect(Collectors.toList())),
             (result) -> response.build(),
             directExecutor());
 
@@ -224,6 +217,7 @@ public class ContentAddressableStorageService
             responseObserver.onCompleted();
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             responseObserver.onError(t);
@@ -238,24 +232,18 @@ public class ContentAddressableStorageService
       String pageToken,
       int pageSize,
       StreamObserver<GetTreeResponse> responseObserver) {
-    try {
-      do {
-        Tree.Builder builder = Tree.newBuilder().setRootDigest(rootDigest);
-        String nextPageToken = instance.getTree(rootDigest, pageSize, pageToken, builder);
-        Tree tree = builder.build();
+    do {
+      Tree.Builder builder = Tree.newBuilder().setRootDigest(rootDigest);
+      String nextPageToken = instance.getTree(rootDigest, pageSize, pageToken, builder);
+      Tree tree = builder.build();
 
-        GetTreeResponse.Builder response =
-            GetTreeResponse.newBuilder().setNextPageToken(nextPageToken);
-        response.addAllDirectories(tree.getDirectories().values());
-        responseObserver.onNext(response.build());
-        pageToken = nextPageToken;
-      } while (!pageToken.isEmpty());
-      responseObserver.onCompleted();
-    } catch (IOException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+      GetTreeResponse.Builder response =
+          GetTreeResponse.newBuilder().setNextPageToken(nextPageToken);
+      response.addAllDirectories(tree.getDirectoriesMap().values());
+      responseObserver.onNext(response.build());
+      pageToken = nextPageToken;
+    } while (!pageToken.isEmpty());
+    responseObserver.onCompleted();
   }
 
   void batchReadBlobs(
@@ -275,6 +263,7 @@ public class ContentAddressableStorageService
             responseObserver.onCompleted();
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             responseObserver.onError(Status.fromThrowable(t).asException());
