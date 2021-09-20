@@ -44,6 +44,12 @@ tasks:
     - "..."
     test_targets:
     - "..."
+  centos7:
+    name: "Unit Tests"
+    build_targets:
+    - "..."
+    test_targets:
+    - "..."
   macos:
     name: "Unit Tests"
     build_targets:
