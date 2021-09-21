@@ -39,7 +39,12 @@ public class Ec2Instance implements Serializable {
   }
 
   public String getContainerUptimeStr() {
-    return getFormattedTimestamp(containerStartTime);
+    // Do not report container uptime if it hasn't been updated yet
+    if (getContainerUptimeInHours() > getUptimeInHours()) {
+      return "N/A";
+    } else {
+      return getFormattedTimestamp(containerStartTime);
+    }
   }
 
   public Long getUptimeInHours() {

@@ -80,7 +80,7 @@ public class InputFetcher implements Runnable {
         operationContext.queueEntry,
         QUEUED,
         fetcherThread::interrupt,
-        Deadline.after(60, SECONDS));
+        Deadline.after(workerContext.getInputFetchDeadline(), SECONDS));
     try {
       return fetchPolled(stopwatch);
     } finally {
@@ -162,7 +162,9 @@ public class InputFetcher implements Runnable {
     try {
       queuedOperation = workerContext.getQueuedOperation(operationContext.queueEntry);
       if (queuedOperation == null || !isQueuedOperationValid(queuedOperation)) {
-        logger.log(Level.SEVERE, format("invalid queued operation: %s", operationName));
+        if (queuedOperation != null) {
+          logger.log(Level.SEVERE, format("invalid queued operation: %s", operationName));
+        }
         owner.error().put(operationContext);
         return 0;
       }

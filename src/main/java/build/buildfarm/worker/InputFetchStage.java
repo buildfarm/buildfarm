@@ -16,7 +16,7 @@ package build.buildfarm.worker;
 
 import com.google.common.collect.Sets;
 import io.prometheus.client.Gauge;
-import io.prometheus.client.Summary;
+import io.prometheus.client.Histogram;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -26,10 +26,10 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   private static final Logger logger = Logger.getLogger(InputFetchStage.class.getName());
   private static final Gauge inputFetchSlotUsage =
       Gauge.build().name("input_fetch_slot_usage").help("Input fetch slot Usage.").register();
-  private static final Summary inputFetchTime =
-      Summary.build().name("input_fetch_time_ms").help("Input fetch time in ms.").register();
-  private static final Summary inputFetchStallTime =
-      Summary.build()
+  private static final Histogram inputFetchTime =
+      Histogram.build().name("input_fetch_time_ms").help("Input fetch time in ms.").register();
+  private static final Histogram inputFetchStallTime =
+      Histogram.build()
           .name("input_fetch_stall_time_ms")
           .help("Input fetch stall time in ms.")
           .register();

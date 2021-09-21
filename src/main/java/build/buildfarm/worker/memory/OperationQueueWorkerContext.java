@@ -203,6 +203,11 @@ class OperationQueueWorkerContext implements WorkerContext {
   }
 
   @Override
+  public int getInputFetchDeadline() {
+    return config.getInputFetchDeadline();
+  }
+
+  @Override
   public boolean hasDefaultActionTimeout() {
     return config.hasDefaultActionTimeout();
   }

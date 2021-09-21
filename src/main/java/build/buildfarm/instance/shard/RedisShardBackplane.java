@@ -1191,8 +1191,8 @@ public class RedisShardBackplane implements Backplane {
     return client.blockingCall(this::deprequeueOperation);
   }
 
-  private QueueEntry dispatchOperation(JedisCluster jedis, List<Platform.Property> provisions)
-      throws InterruptedException {
+  private @Nullable QueueEntry dispatchOperation(
+      JedisCluster jedis, List<Platform.Property> provisions) throws InterruptedException {
     String queueEntryJson = operationQueue.dequeue(jedis, provisions);
     if (queueEntryJson == null) {
       return null;
