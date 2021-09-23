@@ -100,9 +100,15 @@ public class BuildFarmServer extends LoggingMain {
             .addService(new CapabilitiesService(instances))
             .addService(
                 new ContentAddressableStorageService(
-                    instances, /* deadlineAfter=*/ 1, TimeUnit.DAYS
+                    instances,
+                    /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
+                    TimeUnit.SECONDS
                     /* requestLogLevel=*/ ))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
+            .addService(
+                new ByteStreamService(
+                    instances,
+                    /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
+                    TimeUnit.SECONDS))
             .addService(
                 new ExecutionService(
                     instances,
