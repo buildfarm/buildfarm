@@ -330,7 +330,7 @@ public class BuildFarmServerTest {
                         .setOperationName(executingOperation.getName())
                         .build())
                 .getCode())
-        .isEqualTo(Code.UNAVAILABLE.getNumber());
+        .isNotEqualTo(Code.OK.getNumber());
   }
 
   private Operation getOperation(String name) {
