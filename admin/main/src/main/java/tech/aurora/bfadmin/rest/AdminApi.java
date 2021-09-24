@@ -7,7 +7,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tech.aurora.bfadmin.model.ClusterDetails;
+import tech.aurora.bfadmin.model.ClusterInfo;
 import tech.aurora.bfadmin.service.AdminService;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @RestController
 @RequestMapping("admin")
@@ -20,26 +25,26 @@ public class AdminApi {
   @Value("${deployment.domain}")
   private String deploymentDomain;
 
-  @Value("${deployment.port}")
+  @Value("${buildfarm.public.port}")
   private int deploymentPort;
 
-  @Value("${buildfarm.run.docker.regex}")
+  @Value("${buildfarm.docker.name.regex}")
   private String containerRegex;
 
-  @RequestMapping("/restart/worker/{instanceId}")
-  public int restartWorker(@PathVariable String instanceId) {
-    if (instanceId.contains("ip")) {
-      instanceId = adminService.getInstanceIdByPrivateDnsName(instanceId);
-      logger.info("Retrieved instance id {}", instanceId);
-    }
-    return adminService.stopDockerContainer(instanceId, containerRegex, deploymentDomain, deploymentPort);
+  @RequestMapping("/cluster/info")
+  public ClusterInfo getClusterInfo(@PathVariable String clusterId) {
+    return adminService.getClusterInfo(clusterId);
   }
 
-  @RequestMapping("/restart/server/{instanceId}")
-  public int restartScheduler(@PathVariable String instanceId) {
+  @RequestMapping("/cluster/details")
+  public ClusterDetails getClusterDetails(@PathVariable String clusterId) {
+    return adminService.getClusterDetails(clusterId);
+  }
+
+  @RequestMapping("/restart/{instanceId}")
+  public int restartContainer(@PathVariable String instanceId) {
     if (instanceId.contains("ip")) {
       instanceId = adminService.getInstanceIdByPrivateDnsName(instanceId);
-      logger.info("Retrieved instance id {}", instanceId);
     }
     return adminService.stopDockerContainer(instanceId, containerRegex, deploymentDomain, deploymentPort);
   }
@@ -48,14 +53,13 @@ public class AdminApi {
   public int terminateInstance(@PathVariable String instanceId) {
     if (instanceId.contains("ip")) {
       instanceId = adminService.getInstanceIdByPrivateDnsName(instanceId);
-      logger.info("Retrieved instance id {}", instanceId);
     }
     return adminService.terminateInstance(instanceId, deploymentDomain, deploymentPort);
   }
 
-  @RequestMapping("/scale/{autoScaleGroup}/{numInstances}")
-  public String scaleWorkers(@PathVariable String autoScaleGroup,
+  @RequestMapping("/scale/{asgName}/{numInstances}")
+  public String scaleGroup(@PathVariable String asgName,
       @PathVariable Integer numInstances) {
-    return adminService.scaleGroup(autoScaleGroup, numInstances);
+    return adminService.scaleGroup(asgName, numInstances);
   }
 }
