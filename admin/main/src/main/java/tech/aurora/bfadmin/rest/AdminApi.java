@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import tech.aurora.bfadmin.model.ClusterDetails;
 import tech.aurora.bfadmin.model.ClusterInfo;
@@ -15,7 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RestController
-@RequestMapping("admin")
+@RequestMapping(value = "admin", method = RequestMethod.POST)
 public class AdminApi {
   private static final Logger logger = LoggerFactory.getLogger(AdminApi.class);
   
