@@ -42,6 +42,9 @@ import javax.annotation.PostConstruct;
 public class AdminServiceImpl implements AdminService {
   private static final Logger logger = LoggerFactory.getLogger(AdminServiceImpl.class);
 
+  @Value("${buildfarm.cluster.name}")
+  private String clusterId;
+
   @Value("${buildfarm.worker.port}")
   private int workerPort;
 
@@ -65,7 +68,7 @@ public class AdminServiceImpl implements AdminService {
   }
 
   @Override
-  public ClusterInfo getClusterInfo(String clusterId) {
+  public ClusterInfo getClusterInfo() {
     ClusterInfo clusterInfo = new ClusterInfo();
     clusterInfo.setClusterId(clusterId);
     Asg serverAsg = new Asg();
@@ -85,7 +88,7 @@ public class AdminServiceImpl implements AdminService {
   }
 
   @Override
-  public ClusterDetails getClusterDetails(String clusterId) {
+  public ClusterDetails getClusterDetails() {
     ClusterDetails clusterDetails = new ClusterDetails();
     clusterDetails.setClusterId(clusterId);
     clusterDetails.setServers(getInstances(clusterId,"server"));

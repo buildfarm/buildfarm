@@ -33,13 +33,13 @@ public class AdminApi {
   private String containerRegex;
 
   @RequestMapping("/cluster/info")
-  public ClusterInfo getClusterInfo(@PathVariable String clusterId) {
-    return adminService.getClusterInfo(clusterId);
+  public ClusterInfo getClusterInfo() {
+    return adminService.getClusterInfo();
   }
 
   @RequestMapping("/cluster/details")
-  public ClusterDetails getClusterDetails(@PathVariable String clusterId) {
-    return adminService.getClusterDetails(clusterId);
+  public ClusterDetails getClusterDetails() {
+    return adminService.getClusterDetails();
   }
 
   @RequestMapping("/restart/{instanceId}")

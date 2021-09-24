@@ -44,7 +44,7 @@ public class AdminController {
   @RequestMapping("/dashboard")
   public String getDashboard(Model model) {
     model.addAttribute("clusterInfo", clusterInfo);
-    model.addAttribute("clusterDetails", adminService.getClusterDetails(clusterId));
+    model.addAttribute("clusterDetails", adminService.getClusterDetails());
     model.addAttribute("awsRegion", region);
     return "dashboard";
   }
@@ -53,7 +53,7 @@ public class AdminController {
   public void init() {
     logger.info("Initializing aws sdk for region {}", region);
     ec2 = AmazonEC2ClientBuilder.standard().withRegion(region).build();
-    clusterInfo = adminService.getClusterInfo(clusterId);
+    clusterInfo = adminService.getClusterInfo();
     logger.info("Found Buildfarm deployment in AWS account: clusterInfo [ number of servers: {}, number of worker groups: {}, grpc endpoint: {}:{}",
             clusterInfo.getServers().getAsg().getInstances().size(), clusterInfo.getWorkers().size(), deploymentDomain, deploymentPort);
   }

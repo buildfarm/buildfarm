@@ -7,9 +7,9 @@ import java.util.List;
 
 public interface AdminService {
 
-  ClusterInfo getClusterInfo(String clusterId);
+  ClusterInfo getClusterInfo();
 
-  ClusterDetails getClusterDetails(String clusterId);
+  ClusterDetails getClusterDetails();
 
   String scaleGroup(String asgName, Integer desiredInstances);
 
