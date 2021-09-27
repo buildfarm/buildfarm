@@ -768,7 +768,6 @@ public class ShardInstance extends AbstractServerInstance {
                 blobObserver.onNext(nextChunk);
                 received += nextChunk.size();
                 ioMetric.observe(received);
-                casHitCounter.inc();
               }
 
               @Override
@@ -824,6 +823,7 @@ public class ShardInstance extends AbstractServerInstance {
               @Override
               public void onCompleted() {
                 blobObserver.onCompleted();
+                casHitCounter.inc();
               }
             },
             requestMetadata);
