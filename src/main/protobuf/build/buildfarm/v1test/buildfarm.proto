@@ -215,6 +215,12 @@ message BuildFarmServerConfig {
   // Absolute path to the PEM file containing both the required certificates and any
   // associated private key.
   optional string ssl_certificate_path = 8;
+
+  // CAS write deadline
+  google.protobuf.Duration cas_write_timeout = 9;
+
+  // Bytestream upload blob deadline
+  google.protobuf.Duration bytestream_timeout = 10;
 }
 
 message MetricsConfig {
@@ -530,7 +536,7 @@ message ShardInstanceConfig {
     RedisShardBackplaneConfig redis_shard_backplane_config = 4;
   }
 
-  int64 max_blob_size = 5;
+  int64 max_entry_size_bytes = 5;
   
   int32 max_cpu = 9;
 
