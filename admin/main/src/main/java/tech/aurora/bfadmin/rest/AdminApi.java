@@ -12,9 +12,6 @@ import tech.aurora.bfadmin.model.ClusterDetails;
 import tech.aurora.bfadmin.model.ClusterInfo;
 import tech.aurora.bfadmin.service.AdminService;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @RestController
 @RequestMapping(value = "admin", method = RequestMethod.POST)
 public class AdminApi {

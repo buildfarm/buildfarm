@@ -5,6 +5,7 @@ import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import tech.aurora.bfadmin.config.SecurityConfig;
 import tech.aurora.bfadmin.model.ClusterInfo;
 import tech.aurora.bfadmin.service.AdminService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import javax.annotation.PostConstruct;
+import java.util.UUID;
 
 @Controller
 public class AdminController {
@@ -33,6 +35,9 @@ public class AdminController {
   @Value("${aws.region}")
   private String region;
 
+  @Value("${ui.enable}")
+  private boolean ui;
+
   private AmazonEC2 ec2;
   private ClusterInfo clusterInfo;
 
@@ -43,10 +48,19 @@ public class AdminController {
   
   @RequestMapping("/dashboard")
   public String getDashboard(Model model) {
-    model.addAttribute("clusterInfo", clusterInfo);
-    model.addAttribute("clusterDetails", adminService.getClusterDetails());
-    model.addAttribute("awsRegion", region);
-    return "dashboard";
+    if (ui) {
+      generateSecurityKey();
+      model.addAttribute("clusterInfo", clusterInfo);
+      model.addAttribute("clusterDetails", adminService.getClusterDetails());
+      model.addAttribute("awsRegion", region);
+      model.addAttribute("securityKey", SecurityConfig.securityKey);
+      return "dashboard";
+    } else {
+      model.addAttribute("status", "999");
+      model.addAttribute("error", "Not Enabled");
+      model.addAttribute("message", "UI is not enabled. Set ui.enable=true in application.properties");
+      return "error";
+    }
   }
 
   @PostConstruct
@@ -54,11 +68,19 @@ public class AdminController {
     logger.info("Initializing aws sdk for region {}", region);
     ec2 = AmazonEC2ClientBuilder.standard().withRegion(region).build();
     clusterInfo = adminService.getClusterInfo();
+    generateSecurityKey();
     logger.info("Found Buildfarm deployment in AWS account: clusterInfo [ number of servers: {}, number of worker groups: {}, grpc endpoint: {}:{}",
             clusterInfo.getServers().getAsg().getInstances().size(), clusterInfo.getWorkers().size(), deploymentDomain, deploymentPort);
   }
 
   public String getBaseClusterId() {
     return clusterId.replace("buildfarm-", "");
+  }
+
+  /**
+   * Generate a new security key valid for a single request from UI
+   */
+  private void generateSecurityKey() {
+    SecurityConfig.securityKey = UUID.randomUUID().toString();
   }
 }

@@ -2,8 +2,6 @@ package tech.aurora.bfadmin.service;
 
 import tech.aurora.bfadmin.model.ClusterDetails;
 import tech.aurora.bfadmin.model.ClusterInfo;
-import tech.aurora.bfadmin.model.Instance;
-import java.util.List;
 
 public interface AdminService {
 
