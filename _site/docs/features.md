@@ -14,3 +14,8 @@ Most notably, buildfarm has universal support for:
 * progressive and flow controlled CAS reads and writes
 * pluggable external CAS endpoints
 * RequestMetadata behavior attribution
+
+Bazel Client Feature Usage:
+
+## [Fetch API](https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_remote_downloader) - [Planned](https://github.com/bazelbuild/bazel-buildfarm/pull/605)
+## [Builds Without The Bytes](https://github.com/bazelbuild/bazel/issues/6862) [Read This](https://github.com/bazelbuild/docs/execution/builds-without-the-bytes/)
