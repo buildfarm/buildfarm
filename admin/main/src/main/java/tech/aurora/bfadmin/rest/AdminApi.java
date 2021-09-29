@@ -31,9 +31,14 @@ public class AdminApi {
   @Value("${buildfarm.docker.name.regex}")
   private String containerRegex;
 
-  @RequestMapping("/clusters")
+  @RequestMapping("/clusters/info")
   public List<String> getAllClusters() {
     return adminService.getAllClusters();
+  }
+
+  @RequestMapping("/clusters/details")
+  public List<ClusterInfo> getAllClustersWithDetails() {
+    return adminService.getAllClustersWithDetails();
   }
 
   @RequestMapping("/cluster/info")

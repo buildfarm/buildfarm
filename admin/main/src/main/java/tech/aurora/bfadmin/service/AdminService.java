@@ -7,9 +7,13 @@ import java.util.List;
 
 public interface AdminService {
 
+  List<ClusterInfo> getAllClustersWithDetails();
+
   List<String> getAllClusters();
 
   ClusterInfo getClusterInfo();
+
+  ClusterInfo getClusterInfo(String clusterId);
 
   ClusterDetails getClusterDetails();
 
