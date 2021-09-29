@@ -16,7 +16,7 @@
 title: Buildfarm
 description: Remote Execution for Bazel
 baseurl: "/bazel-buildfarm" # the subpath of your site, e.g. /blog
-url: "http://bazelbuild.github.io" # the base hostname & protocol for your site, e.g. http://example.com
+url: "https://bazelbuild.github.io" # the base hostname & protocol for your site, e.g. http://example.com
 
 permalink: pretty
 exclude: ["node_modules/", "*.gemspec", "*.gem", "Gemfile", "Gemfile.lock", "package.json", "package-lock.json",  "script/", "LICENSE.txt", "lib/", "bin/", "README.md", "Rakefile"
@@ -93,7 +93,7 @@ last_edit_time_format: "%b %e %Y at %I:%M %p" # uses ruby's time format: https:/
 gh_edit_link: true # show or hide edit this page link
 gh_edit_link_text: "Edit on GitHub"
 gh_edit_repository: "https://github.com/bazelbuild/bazel-buildfarm" # the github URL for your repo
-gh_edit_branch: "gh-pages" # the branch that your docs is served from
+gh_edit_branch: "main" # the branch that your docs is served from
 # gh_edit_source: docs # the source that your files originate from
 gh_edit_view_mode: "edit" # "tree" or "edit" if you want the user to jump into the editor immediately
 
