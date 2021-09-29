@@ -68,6 +68,18 @@ public class AdminServiceImpl implements AdminService {
   }
 
   @Override
+  public List<String> getAllClusters() {
+    List<String> clusters = new ArrayList<>();
+    for (AutoScalingGroup asg : autoScale.describeAutoScalingGroups(new DescribeAutoScalingGroupsRequest().withMaxRecords(100)).getAutoScalingGroups()) {
+      String clusterId = getAsgTagValue("buildfarm.cluster_id", asg.getTags());
+      if (!"".equals(clusterId) && !clusters.contains(clusterId)) {
+        clusters.add(clusterId);
+      }
+    }
+    return clusters;
+  }
+
+  @Override
   public ClusterInfo getClusterInfo() {
     ClusterInfo clusterInfo = new ClusterInfo();
     clusterInfo.setClusterId(clusterId);
