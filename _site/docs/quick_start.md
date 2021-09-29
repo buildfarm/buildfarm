@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Quick Start
-nav_order: 3
+nav_order: 2
 ---
 
 # Quick Start
@@ -16,8 +16,7 @@ Create a new directory for our workspace and add the following files:
 ```
 #include <iostream>
 
-int
-main( int argc, char *argv[] )
+int main( int argc, char *argv[] )
 {
   std::cout << "Hello, World!" << std::endl;
 }
