@@ -3,9 +3,17 @@ package tech.aurora.bfadmin.service;
 import tech.aurora.bfadmin.model.ClusterDetails;
 import tech.aurora.bfadmin.model.ClusterInfo;
 
+import java.util.List;
+
 public interface AdminService {
 
+  List<ClusterInfo> getAllClustersWithDetails();
+
+  List<String> getAllClusters();
+
   ClusterInfo getClusterInfo();
+
+  ClusterInfo getClusterInfo(String clusterId);
 
   ClusterDetails getClusterDetails();
 

@@ -12,6 +12,8 @@ import tech.aurora.bfadmin.model.ClusterDetails;
 import tech.aurora.bfadmin.model.ClusterInfo;
 import tech.aurora.bfadmin.service.AdminService;
 
+import java.util.List;
+
 @RestController
 @RequestMapping(value = "admin", method = RequestMethod.POST)
 public class AdminApi {
@@ -28,6 +30,16 @@ public class AdminApi {
 
   @Value("${buildfarm.docker.name.regex}")
   private String containerRegex;
+
+  @RequestMapping("/clusters/info")
+  public List<String> getAllClusters() {
+    return adminService.getAllClusters();
+  }
+
+  @RequestMapping("/clusters/details")
+  public List<ClusterInfo> getAllClustersWithDetails() {
+    return adminService.getAllClustersWithDetails();
+  }
 
   @RequestMapping("/cluster/info")
   public ClusterInfo getClusterInfo() {
