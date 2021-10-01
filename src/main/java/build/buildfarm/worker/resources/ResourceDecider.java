@@ -24,7 +24,7 @@ import build.buildfarm.common.CommandUtils;
  * @details Platform properties from specified exec_properties are taken into account as well as
  *     global buildfarm configuration.
  */
-public class ResourceDecider {
+public final class ResourceDecider {
   /**
    * @brief Decide resource limitations for the given command.
    * @details Platform properties from specified exec_properties are taken into account as well as
@@ -123,8 +123,27 @@ public class ResourceDecider {
       limits.description.add("configured execution policies skipped because of choosing sandbox");
     }
 
+    // Adjust flags for when a container image is chosen for the action.
+    adjustContainerFlags(limits);
+
     // we choose to resolve variables after the other variable values have been decided
     resolveEnvironmentVariables(limits);
+  }
+
+  private static void adjustContainerFlags(ResourceLimits limits) {
+    if (!limits.containerSettings.containerImage.isEmpty()) {
+      // Avoid using the existing execution policies when running actions under docker.
+      // The programs used in the execution policies likely won't exist in the container images.
+      limits.useExecutionPolicies = false;
+      limits.description.add("configured execution policies skipped because of choosing docker");
+
+      // avoid limiting resources as cgroups may not be available in the container.
+      // in fact, we will use docker's cgroup settings explicitly.
+      // TODO(thickey): use docker's cgroup settings given existing resource limitations.
+      limits.cpu.limit = false;
+      limits.mem.limit = false;
+      limits.description.add("resource limiting disabled because of choosing docker");
+    }
   }
 
   private static void adjustDebugFlags(Command command, ResourceLimits limits) {
