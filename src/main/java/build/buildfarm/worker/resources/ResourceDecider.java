@@ -129,7 +129,7 @@ public class ResourceDecider {
       limits.useExecutionPolicies = false;
       limits.description.add("configured execution policies skipped because of choosing docker");
 
-      // avoid limiting resources as cgroups may no be available in the container.
+      // avoid limiting resources as cgroups may not be available in the container.
       // in fact, we will use docker's cgroup settings explicitly.
       // TODO(thickey): use docker's cgroup settings given existing resource limitations.
       limits.cpu.limit = false;
