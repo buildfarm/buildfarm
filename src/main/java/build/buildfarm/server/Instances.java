@@ -37,34 +37,32 @@ public interface Instances {
   static Instances singular(Instance instance) {
     return new Instances() {
       @Override
-      public Instance getFromBlob(String blobName) throws InstanceNotFoundException {
+      public Instance getFromBlob(String blobName) {
         return instance;
       }
 
       @Override
-      public Instance getFromUploadBlob(String uploadBlobName) throws InstanceNotFoundException {
+      public Instance getFromUploadBlob(String uploadBlobName) {
         return instance;
       }
 
       @Override
-      public Instance getFromOperationsCollectionName(String operationsCollectionName)
-          throws InstanceNotFoundException {
+      public Instance getFromOperationsCollectionName(String operationsCollectionName) {
         return instance;
       }
 
       @Override
-      public Instance getFromOperationName(String operationName) throws InstanceNotFoundException {
+      public Instance getFromOperationName(String operationName) {
         return instance;
       }
 
       @Override
-      public Instance getFromOperationStream(String operationStream)
-          throws InstanceNotFoundException {
+      public Instance getFromOperationStream(String operationStream) {
         return instance;
       }
 
       @Override
-      public Instance get(String name) throws InstanceNotFoundException {
+      public Instance get(String name) {
         return instance;
       }
 

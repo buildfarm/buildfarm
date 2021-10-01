@@ -30,19 +30,20 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
+import io.prometheus.client.Counter;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   public static final Logger logger = Logger.getLogger(ActionCacheService.class.getName());
+  private static final Counter actionResultsMetric =
+      Counter.build().name("action_results").help("Action results.").register();
 
   private final Instances instances;
-  private final Runnable onRequest;
 
-  public ActionCacheService(Instances instances, Runnable onRequest) {
+  public ActionCacheService(Instances instances) {
     this.instances = instances;
-    this.onRequest = onRequest;
   }
 
   @Override
@@ -64,7 +65,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     addCallback(
         resultFuture,
         new FutureCallback<ActionResult>() {
-          ServerCallStreamObserver<ActionResult> call =
+          final ServerCallStreamObserver<ActionResult> call =
               (ServerCallStreamObserver<ActionResult>) responseObserver;
 
           @Override
@@ -81,6 +82,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             logger.log(
@@ -100,7 +102,8 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
           }
         },
         directExecutor());
-    onRequest.run();
+    actionResultsMetric.inc();
+    logger.log(Level.FINE, String.format("GetActionResult %d Requests", 1));
   }
 
   @Override

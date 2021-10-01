@@ -5,7 +5,7 @@ cd buildfarm;
 
 #Various targets to be tested
 BUILDFARM_SERVER_TARGET="//src/main/java/build/buildfarm:buildfarm-server"
-BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-operationqueue-worker"
+BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-memory-worker"
 BUILDFARM_SHARD_WORKER_TAERGET="//src/main/java/build/buildfarm:buildfarm-shard-worker"
 
 #The configs used by the targets
@@ -102,6 +102,5 @@ cat server.log
 
 check_for_crashes &
 
-# Build bazel targets with buildfarm
-cd src/test/many;
-MANY_CC_BINARIES=50 MANY_CC_LIBRARIES=2 MANY_CC_LIBRARY_SOURCES=1 ./../../../bazelw build :cc --remote_executor=grpc://localhost:8980
+#Run a test against the cluster
+$RUN_TEST

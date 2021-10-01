@@ -20,6 +20,7 @@ import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @class DequeueMatchEvaluator
@@ -39,14 +40,6 @@ import com.google.common.collect.SetMultimap;
  */
 public class DequeueMatchEvaluator {
   /**
-   * @field WORKER_PLATFORM_CORES_PROPERTY
-   * @brief A platform property decided and assigned to a worker.
-   * @details This often correlates to execute width of the workers (the max amount of cores it is
-   *     willing to give an operation).
-   */
-  private static final String WORKER_PLATFORM_CORES_PROPERTY = "cores";
-
-  /**
    * @brief Decide whether the worker should keep the operation or put it back on the queue.
    * @details Compares the platform properties of the worker to the operation's platform properties.
    * @param matchSettings The provisions of the worker.
@@ -56,16 +49,12 @@ public class DequeueMatchEvaluator {
    * @note Overloaded.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
+  @NotNull
   public static boolean shouldKeepOperation(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       QueueEntry queueEntry) {
-    // if the queue entry was not actually dequeued, should we still accept it?
-    // TODO(luxe): find out why its currently like this, and if that still makes sense.
-    if (queueEntry == null) {
-      return true;
-    }
-
     return shouldKeepViaPlatform(matchSettings, workerProvisions, queueEntry.getPlatform());
   }
 
@@ -79,6 +68,8 @@ public class DequeueMatchEvaluator {
    * @note Overloaded.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
+  @NotNull
   public static boolean shouldKeepOperation(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
@@ -97,11 +88,14 @@ public class DequeueMatchEvaluator {
    * @return Whether or not the worker should accept or reject the operation.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
+  @NotNull
   private static boolean shouldKeepViaPlatform(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       Platform platform) {
-    // attempt to execute everything it gets off the queue.
+    // attempt to execute everything the worker gets off the queue.
+    // this is a recommended configuration.
     if (matchSettings.acceptEverything) {
       return true;
     }
@@ -119,6 +113,8 @@ public class DequeueMatchEvaluator {
    * @return Whether or not the worker should accept or reject the queue entry.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
+  @NotNull
   private static boolean satisfiesProperties(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
@@ -141,20 +137,22 @@ public class DequeueMatchEvaluator {
    * @return Whether or not the worker should accept or reject the queue entry.
    * @note Suggested return identifier: shouldKeepOperation.
    */
+  @SuppressWarnings("NullableProblems")
+  @NotNull
   private static boolean satisfiesProperty(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       Platform.Property property) {
     // validate min cores
     if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
-      if (!workerProvisions.containsKey(WORKER_PLATFORM_CORES_PROPERTY)) {
+      if (!workerProvisions.containsKey(ExecutionProperties.CORES)) {
         return false;
       }
 
       int coresRequested = Integer.parseInt(property.getValue());
       int possibleCores =
           Integer.parseInt(
-              Iterables.getOnlyElement(workerProvisions.get(WORKER_PLATFORM_CORES_PROPERTY)));
+              Iterables.getOnlyElement(workerProvisions.get(ExecutionProperties.CORES)));
       return possibleCores >= coresRequested;
     }
 

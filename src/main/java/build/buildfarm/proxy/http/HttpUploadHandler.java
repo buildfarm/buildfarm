@@ -59,7 +59,7 @@ final class HttpUploadHandler extends AbstractHttpHandler<FullHttpResponse> {
           response.content().readBytes(data);
           errorMsg += "\n" + new String(data, HttpUtil.getCharset(response));
         }
-        failAndResetUserPromise(new HttpException(response, errorMsg, null));
+        failAndResetUserPromise(new HttpException(response, errorMsg));
       } else {
         succeedAndResetUserPromise();
       }

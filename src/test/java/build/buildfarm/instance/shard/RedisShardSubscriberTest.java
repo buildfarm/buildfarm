@@ -119,7 +119,7 @@ public class RedisShardSubscriberTest {
     public void flush() {
       pendingReplies.drainTo(replyQueue);
     }
-  };
+  }
 
   RedisShardSubscriber createSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers, Executor executor) {
@@ -133,7 +133,7 @@ public class RedisShardSubscriberTest {
   @Test
   public void novelChannelWatcherSubscribes() throws InterruptedException {
     ListMultimap<String, TimedWatchFuture> watchers =
-        Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
+        Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 
@@ -224,7 +224,7 @@ public class RedisShardSubscriberTest {
   public void doneResetOperationIsObservedAndUnsubscribed()
       throws InterruptedException, InvalidProtocolBufferException {
     ListMultimap<String, TimedWatchFuture> watchers =
-        Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
+        Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 

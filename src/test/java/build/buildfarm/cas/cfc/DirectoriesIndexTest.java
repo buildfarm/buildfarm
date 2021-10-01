@@ -36,13 +36,13 @@ import org.junit.runners.JUnit4;
 public class DirectoriesIndexTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
-  private final String jdbcIndexUrl = "jdbc:sqlite::memory:";
   private final EntryPathStrategy entryPathStrategy;
   private final DirectoriesIndex directoriesIndex;
 
   protected DirectoriesIndexTest(Path root, DirectoriesIndexType type) {
     entryPathStrategy = new HexBucketEntryPathStrategy(root, /*levels=*/ 0);
     if (type == DirectoriesIndexType.Sqlite) {
+      String jdbcIndexUrl = "jdbc:sqlite::memory:";
       directoriesIndex = new SqliteFileDirectoriesIndex(jdbcIndexUrl, entryPathStrategy);
     } else if (type == DirectoriesIndexType.HashMap) {
       directoriesIndex = new MemoryFileDirectoriesIndex(entryPathStrategy);
@@ -65,8 +65,6 @@ public class DirectoriesIndexTest {
     // create directory and file
     ByteString coolBlob = ByteString.copyFromUtf8("cool content");
     Digest digest = DIGEST_UTIL.compute(coolBlob);
-    String dirName = "cool_dir";
-    Path path = entryPathStrategy.getPath(dirName);
     ImmutableList.Builder<String> entriesBuilder = new ImmutableList.Builder<>();
     entriesBuilder.add(digest.getHash());
 

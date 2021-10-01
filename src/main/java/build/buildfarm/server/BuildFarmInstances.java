@@ -23,9 +23,6 @@ import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.v1test.InstanceConfig;
 import io.grpc.Status;
 import io.grpc.StatusException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import javax.naming.ConfigurationException;
 
 public class BuildFarmInstances implements Instances {
@@ -34,25 +31,30 @@ public class BuildFarmInstances implements Instances {
     return Status.NOT_FOUND.withDescription(errorMessage).asException();
   }
 
-  private final Map<String, Instance> instances;
   private final Instance defaultInstance;
 
-  public BuildFarmInstances(
-      String session,
-      List<InstanceConfig> instanceConfigs,
-      String defaultInstanceName,
-      Runnable onStop)
+  public BuildFarmInstances(String session, InstanceConfig instanceConfig, Runnable onStop)
       throws InterruptedException, ConfigurationException {
-    instances = new HashMap<String, Instance>();
-    createInstances(session, instanceConfigs, onStop);
-    if (!defaultInstanceName.isEmpty()) {
-      if (!instances.containsKey(defaultInstanceName)) {
-        throw new ConfigurationException(
-            defaultInstanceName + " not specified in instance configs.");
-      }
-      defaultInstance = instances.get(defaultInstanceName);
-    } else {
-      defaultInstance = null;
+    String name = instanceConfig.getName();
+    HashFunction hashFunction = getValidHashFunction(instanceConfig);
+    DigestUtil digestUtil = new DigestUtil(hashFunction);
+    switch (instanceConfig.getTypeCase()) {
+      default:
+      case TYPE_NOT_SET:
+        throw new IllegalArgumentException("Instance type not set in config");
+      case MEMORY_INSTANCE_CONFIG:
+        defaultInstance =
+            new MemoryInstance(name, digestUtil, instanceConfig.getMemoryInstanceConfig());
+        break;
+      case SHARD_INSTANCE_CONFIG:
+        defaultInstance =
+            new ShardInstance(
+                name,
+                session + "-" + name,
+                digestUtil,
+                instanceConfig.getShardInstanceConfig(),
+                onStop);
+        break;
     }
   }
 
@@ -62,16 +64,11 @@ public class BuildFarmInstances implements Instances {
 
   @Override
   public Instance get(String name) throws InstanceNotFoundException {
-    Instance instance;
-    if (name == null || name.isEmpty()) {
-      instance = getDefault();
-    } else {
-      instance = instances.get(name);
-    }
-    if (instance == null) {
+    if (defaultInstance == null) {
       throw new InstanceNotFoundException(name);
+    } else {
+      return getDefault();
     }
-    return instance;
   }
 
   @Override
@@ -114,46 +111,13 @@ public class BuildFarmInstances implements Instances {
     }
   }
 
-  private void createInstances(
-      String session, List<InstanceConfig> instanceConfigs, Runnable onStop)
-      throws InterruptedException, ConfigurationException {
-    for (InstanceConfig instanceConfig : instanceConfigs) {
-      String name = instanceConfig.getName();
-      HashFunction hashFunction = getValidHashFunction(instanceConfig);
-      DigestUtil digestUtil = new DigestUtil(hashFunction);
-      switch (instanceConfig.getTypeCase()) {
-        default:
-        case TYPE_NOT_SET:
-          throw new IllegalArgumentException("Instance type not set in config");
-        case MEMORY_INSTANCE_CONFIG:
-          instances.put(
-              name, new MemoryInstance(name, digestUtil, instanceConfig.getMemoryInstanceConfig()));
-          break;
-        case SHARD_INSTANCE_CONFIG:
-          instances.put(
-              name,
-              new ShardInstance(
-                  name,
-                  session + "-" + name,
-                  digestUtil,
-                  instanceConfig.getShardInstanceConfig(),
-                  onStop));
-          break;
-      }
-    }
-  }
-
   @Override
   public void start(String publicName) {
-    for (Instance instance : instances.values()) {
-      instance.start(publicName);
-    }
+    defaultInstance.start(publicName);
   }
 
   @Override
   public void stop() throws InterruptedException {
-    for (Instance instance : instances.values()) {
-      instance.stop();
-    }
+    defaultInstance.stop();
   }
 }

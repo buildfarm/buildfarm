@@ -10,6 +10,7 @@ load(
 )
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 
 IO_NETTY_MODULES = [
     "buffer",
@@ -78,7 +79,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.truth:truth:0.44",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
-                    ] + ["io.netty:netty-%s:4.1.48.Final" % module for module in IO_NETTY_MODULES] +
+                    ] + ["io.netty:netty-%s:4.1.65.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
                     [
                         "io.prometheus:simpleclient:0.10.0",
@@ -95,6 +96,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.redisson:redisson:3.13.1",
                         "org.threeten:threetenbp:1.3.3",
                         "org.xerial:sqlite-jdbc:3.34.0",
+                        "org.jetbrains:annotations:16.0.2",
                     ],
         generate_compat_repositories = True,
         repositories = [
@@ -117,6 +119,11 @@ def buildfarm_init(name = "buildfarm"):
     native.bind(
         name = "jar/redis/clients/jedis",
         actual = "@jedis//jar",
+    )
+
+    llvm_toolchain(
+        name = "llvm_toolchain",
+        llvm_version = "10.0.0",
     )
 
 def ensure_accurate_metadata():

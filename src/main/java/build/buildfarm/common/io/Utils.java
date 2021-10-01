@@ -49,18 +49,20 @@ import jnr.posix.POSIX;
 public class Utils {
   private static final Logger logger = Logger.getLogger(Utils.class.getName());
 
+  @SuppressWarnings("Guava")
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
 
   // pretty poor check here, but avoiding apache commons for now
-  private static Supplier<Boolean> isMacOS =
+  @SuppressWarnings("Guava")
+  private static final Supplier<Boolean> isMacOS =
       Suppliers.memoize(
           () -> {
             String osName = System.getProperty("os.name").toLowerCase();
             return osName.startsWith("mac");
           });
 
-  private static final jnr.ffi.Runtime runtime() {
+  private static jnr.ffi.Runtime runtime() {
     return jnr.ffi.Runtime.getRuntime(libc.get());
   }
 
@@ -100,8 +102,7 @@ public class Utils {
 
   private static final LinkOption[] NO_LINK_OPTION = new LinkOption[0];
   // This isn't generally safe; we rely on the file system APIs not modifying the array.
-  private static final LinkOption[] NOFOLLOW_LINKS_OPTION =
-      new LinkOption[] {LinkOption.NOFOLLOW_LINKS};
+  private static final LinkOption[] NOFOLLOW_LINKS_OPTION = {LinkOption.NOFOLLOW_LINKS};
 
   private static LinkOption[] linkOpts(boolean followSymlinks) {
     return followSymlinks ? NO_LINK_OPTION : NOFOLLOW_LINKS_OPTION;
@@ -173,7 +174,7 @@ public class Utils {
       direntPtr = libc.readdir(DIR);
     }
 
-    int return_value = libc.closedir(DIR);
+    libc.closedir(DIR);
     return dirents;
   }
 
@@ -202,6 +203,7 @@ public class Utils {
         path.getFileName().toString(), fileStatus, getFileKey(path, fileStatus));
   }
 
+  @SuppressWarnings({"unchecked", "rawtypes"})
   private static List<NamedFileKey> listNIOdirentSorted(Path path, FileStore fileStore)
       throws IOException {
     List<NamedFileKey> dirents = new ArrayList();
@@ -269,17 +271,15 @@ public class Utils {
 
     @Override
     public String toString() {
-      StringBuilder sb = new StringBuilder(50);
-      sb.append("(volSerialNumber=")
-          .append(volSerialNumber)
-          .append(",fileIndexHigh=")
-          .append(fileIndexHigh)
-          .append(",fileIndexLow=")
-          .append(fileIndexLow)
-          .append(')');
-      return sb.toString();
+      return "(volSerialNumber="
+          + volSerialNumber
+          + ",fileIndexHigh="
+          + fileIndexHigh
+          + ",fileIndexLow="
+          + fileIndexLow
+          + ')';
     }
-  };
+  }
 
   public static FileStatus stat(final Path path, final boolean followSymlinks, FileStore fileStore)
       throws IOException {
@@ -291,70 +291,67 @@ public class Utils {
     } catch (java.nio.file.FileSystemException e) {
       throw new NoSuchFileException(path + ERR_NO_SUCH_FILE_OR_DIR);
     }
-    FileStatus status =
-        new FileStatus() {
-          @Override
-          public boolean isFile() {
-            return attributes.isRegularFile() || isSpecialFile();
-          }
+    return new FileStatus() {
+      @Override
+      public boolean isFile() {
+        return attributes.isRegularFile() || isSpecialFile();
+      }
 
-          @Override
-          public boolean isSpecialFile() {
-            return attributes.isOther();
-          }
+      @Override
+      public boolean isSpecialFile() {
+        return attributes.isOther();
+      }
 
-          @Override
-          public boolean isDirectory() {
-            return attributes.isDirectory();
-          }
+      @Override
+      public boolean isDirectory() {
+        return attributes.isDirectory();
+      }
 
-          @Override
-          public boolean isSymbolicLink() {
-            return attributes.isSymbolicLink();
-          }
+      @Override
+      public boolean isSymbolicLink() {
+        return attributes.isSymbolicLink();
+      }
 
-          @Override
-          public long getSize() throws IOException {
-            return attributes.size();
-          }
+      @Override
+      public long getSize() {
+        return attributes.size();
+      }
 
-          @Override
-          public long getLastModifiedTime() throws IOException {
-            return attributes.lastModifiedTime().toMillis();
-          }
+      @Override
+      public long getLastModifiedTime() {
+        return attributes.lastModifiedTime().toMillis();
+      }
 
-          @Override
-          public long getLastChangeTime() {
-            // This is the best we can do with Java NIO...
-            return attributes.lastModifiedTime().toMillis();
-          }
+      @Override
+      public long getLastChangeTime() {
+        // This is the best we can do with Java NIO...
+        return attributes.lastModifiedTime().toMillis();
+      }
 
-          @Override
-          public Object fileKey() {
-            if (attributes instanceof DosFileAttributes) {
-              return new WindowsFileKey((DosFileAttributes) attributes);
-            }
-            // UnixFileKeys will correspond to a supported "posix" FileAttributeView
-            // This will mean that NamedFileKeys are populated with inodes
-            // We cannot construct UnixFileKeys, so this is our best option to use
-            // fast directory reads.
-            // Windows will leave the fileKey verbatim via NIO for comparison and hashing
-            try {
-              String keyStr = attributes.fileKey().toString();
-              String inode = keyStr.substring(keyStr.indexOf("ino=") + 4, keyStr.indexOf(")"));
-              return Long.parseLong(inode);
-            } catch (Exception e) {
-              return attributes.fileKey();
-            }
-          }
+      @Override
+      public Object fileKey() {
+        if (attributes instanceof DosFileAttributes) {
+          return new WindowsFileKey((DosFileAttributes) attributes);
+        }
+        // UnixFileKeys will correspond to a supported "posix" FileAttributeView
+        // This will mean that NamedFileKeys are populated with inodes
+        // We cannot construct UnixFileKeys, so this is our best option to use
+        // fast directory reads.
+        // Windows will leave the fileKey verbatim via NIO for comparison and hashing
+        try {
+          String keyStr = attributes.fileKey().toString();
+          String inode = keyStr.substring(keyStr.indexOf("ino=") + 4, keyStr.indexOf(')'));
+          return Long.parseLong(inode);
+        } catch (Exception e) {
+          return attributes.fileKey();
+        }
+      }
 
-          @Override
-          public boolean isReadOnlyExecutable() {
-            return isReadOnlyExecutable;
-          }
-        };
-
-    return status;
+      @Override
+      public boolean isReadOnlyExecutable() {
+        return isReadOnlyExecutable;
+      }
+    };
   }
 
   /* other */
@@ -422,6 +419,7 @@ public class Utils {
     return f.isDirectory();
   }
 
+  @SuppressWarnings("OctalInteger")
   public static Boolean jnrIsDir(POSIX posix, String path) {
     int fd = posix.open(path, OpenFlags.O_DIRECTORY.intValue(), 0444);
     return fd > 0;
@@ -442,6 +440,7 @@ public class Utils {
     }
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   public static <T> T getOrIOException(ListenableFuture<T> future) throws IOException {
     boolean interrupted = false;
     for (; ; ) {
@@ -457,7 +456,6 @@ public class Utils {
         }
         if (e.getCause() instanceof InterruptedException) {
           Thread.interrupted();
-          interrupted = true;
         }
         throw new UncheckedExecutionException(e.getCause());
       } catch (InterruptedException e) {
@@ -469,7 +467,6 @@ public class Utils {
 
   public static @Nullable UserPrincipal getUser(String userName, FileSystem fileSystem)
       throws IOException {
-    final @Nullable UserPrincipal user;
     if (Strings.isNullOrEmpty(userName)) {
       return null;
     }

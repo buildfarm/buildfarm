@@ -43,7 +43,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class ByteStreamHelperTest {
@@ -69,17 +68,17 @@ public class ByteStreamHelperTest {
         grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build());
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void newInputThrowsOnNotFound() {
     String resourceName = "not/found/resource";
     ReadRequest readRequest = ReadRequest.newBuilder().setResourceName(resourceName).build();
     doAnswer(
-            (Answer)
-                invocation -> {
-                  StreamObserver<ReadResponse> observer = invocation.getArgument(1);
-                  observer.onError(Status.NOT_FOUND.asException());
-                  return null;
-                })
+            invocation -> {
+              StreamObserver<ReadResponse> observer = invocation.getArgument(1);
+              observer.onError(Status.NOT_FOUND.asException());
+              return null;
+            })
         .when(serviceImpl)
         .read(eq(readRequest), any(StreamObserver.class));
 

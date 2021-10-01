@@ -30,7 +30,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import io.grpc.stub.ServerCallStreamObserver;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.Consumer;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -46,10 +45,10 @@ public class ExecutionServiceTest {
     instances = mock(Instances.class);
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void keepaliveIsCancelledWithContext() throws Exception {
     ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-    Consumer<String> snsMetricsPublisher = requestMetadata -> {};
     ExecutionService service =
         new ExecutionService(
             instances,

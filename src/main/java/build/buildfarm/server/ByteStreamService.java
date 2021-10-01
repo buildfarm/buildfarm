@@ -60,7 +60,7 @@ import java.util.logging.Logger;
 public class ByteStreamService extends ByteStreamImplBase {
   private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());
 
-  static int CHUNK_SIZE = 64 * 1024;
+  static final int CHUNK_SIZE = 64 * 1024;
 
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
@@ -279,11 +279,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     try {
       InputStream in =
           instance.newOperationStreamInput(
-              resourceName,
-              offset,
-              deadlineAfter,
-              deadlineAfterUnits,
-              TracingMetadataUtils.fromCurrentContext());
+              resourceName, offset, TracingMetadataUtils.fromCurrentContext());
       ServerCallStreamObserver<ReadResponse> target =
           (ServerCallStreamObserver<ReadResponse>) responseObserver;
       target.setOnCancelHandler(
@@ -332,7 +328,8 @@ public class ByteStreamService extends ByteStreamImplBase {
   @Override
   public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
     String resourceName = request.getResourceName();
-    long offset = request.getReadOffset(), limit = request.getReadLimit();
+    long offset = request.getReadOffset();
+    long limit = request.getReadLimit();
     logger.log(
         Level.FINER,
         format("read resource_name=%s offset=%d limit=%d", resourceName, offset, limit));

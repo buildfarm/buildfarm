@@ -18,7 +18,6 @@ import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.redis.RedisClient;
 import com.google.common.collect.ImmutableMap;
-import java.io.IOException;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -34,14 +33,6 @@ import org.redisson.api.RedissonClient;
  */
 public class RedissonCasWorkerMap implements CasWorkerMap {
   /**
-   * @field name
-   * @brief The unique name of the map.
-   * @details The name is used in redis to store/access the data. If two maps had the same name,
-   *     they would be instances of the same underlying redis map.
-   */
-  private final String name;
-
-  /**
    * @field keyExpiration_s
    * @brief When keys will expire automatically.
    * @details This is currently the same for every key added or adjusted.
@@ -54,7 +45,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @brief A memory cached redis container to serve as the cas lookup.
    * @details This is only used if the object is configured to use a memory cache.
    */
-  private RSetMultimapCache<String, String> cacheMap;
+  private final RSetMultimapCache<String, String> cacheMap;
 
   /**
    * @brief Constructor.
@@ -62,11 +53,9 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @param client The redisson client used to initialize the cache container.
    * @param name The global name of the map.
    * @param keyExpiration_s When to have keys expire automatically. (units: seconds (s))
-   * @param useMemoryCache Whether some of the data should be stored in memory.
    * @note Overloaded.
    */
   public RedissonCasWorkerMap(RedissonClient client, String name, int keyExpiration_s) {
-    this.name = name;
     this.keyExpiration_s = keyExpiration_s;
     this.cacheMap = client.getSetMultimapCache(name);
   }
@@ -81,8 +70,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    */
   @Override
   public void adjust(
-      RedisClient client, Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
-      throws IOException {
+      RedisClient client, Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) {
     String key = cacheMapCasKey(blobDigest);
     cacheMap.putAll(key, addWorkers);
     for (String workerName : removeWorkers) {
@@ -100,7 +88,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker to add for looking up the blob.
    */
   @Override
-  public void add(RedisClient client, Digest blobDigest, String workerName) throws IOException {
+  public void add(RedisClient client, Digest blobDigest, String workerName) {
     String key = cacheMapCasKey(blobDigest);
     cacheMap.put(key, workerName);
     cacheMap.expireKey(key, keyExpiration_s, TimeUnit.SECONDS);
@@ -115,8 +103,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker to add for looking up the blobs.
    */
   @Override
-  public void addAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
-      throws IOException {
+  public void addAll(RedisClient client, Iterable<Digest> blobDigests, String workerName) {
     for (Digest blobDigest : blobDigests) {
       String key = cacheMapCasKey(blobDigest);
       cacheMap.put(key, workerName);
@@ -132,7 +119,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker name to remove.
    */
   @Override
-  public void remove(RedisClient client, Digest blobDigest, String workerName) throws IOException {
+  public void remove(RedisClient client, Digest blobDigest, String workerName) {
     String key = cacheMapCasKey(blobDigest);
     cacheMap.remove(key, workerName);
   }
@@ -146,8 +133,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker name to remove.
    */
   @Override
-  public void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
-      throws IOException {
+  public void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName) {
     for (Digest blobDigest : blobDigests) {
       String key = cacheMapCasKey(blobDigest);
       cacheMap.remove(key, workerName);
@@ -163,7 +149,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @note Suggested return identifier: workerName.
    */
   @Override
-  public String getAny(RedisClient client, Digest blobDigest) throws IOException {
+  public String getAny(RedisClient client, Digest blobDigest) {
     String key = cacheMapCasKey(blobDigest);
     Set<String> all = cacheMap.get(key).readAll();
     return getRandomElement(all);
@@ -178,7 +164,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @note Suggested return identifier: workerNames.
    */
   @Override
-  public Set<String> get(RedisClient client, Digest blobDigest) throws IOException {
+  public Set<String> get(RedisClient client, Digest blobDigest) {
     String key = cacheMapCasKey(blobDigest);
     return cacheMap.get(key).readAll();
   }
@@ -192,8 +178,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @note Suggested return identifier: casWorkerMap.
    */
   @Override
-  public Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests)
-      throws IOException {
+  public Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests) {
     ImmutableMap.Builder<Digest, Set<String>> blobDigestsWorkers = new ImmutableMap.Builder<>();
     for (Digest blobDigest : blobDigests) {
       String key = cacheMapCasKey(blobDigest);
@@ -213,7 +198,7 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    * @return The size of the map.
    * @note Suggested return identifier: size.
    */
-  public int size(RedisClient client) throws IOException {
+  public int size(RedisClient client) {
     return cacheMap.size();
   }
 

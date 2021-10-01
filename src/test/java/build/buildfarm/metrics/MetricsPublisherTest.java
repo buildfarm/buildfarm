@@ -31,38 +31,36 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
-import java.util.function.Consumer;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MetricsPublisherTest {
-  private Consumer<String> snsMetricsPublisher = requestMetadata -> {};
-  private ExecuteOperationMetadata defaultExecuteOperationMetadata =
+  private final ExecuteOperationMetadata defaultExecuteOperationMetadata =
       ExecuteOperationMetadata.getDefaultInstance();
-  private RequestMetadata defaultRequestMetadata =
+  private final RequestMetadata defaultRequestMetadata =
       RequestMetadata.getDefaultInstance()
           .toBuilder()
           .setCorrelatedInvocationsId(
               "http://user@host-name?uuid_source\\u003d%2Fproc%2Fsys%2Fkernel%2Frandom%2Fuuid\\u0026OSTYPE\\u003dlinux-gnu#c09a5efa-f015-4d7b-b889-8ee0d097dff7")
           .build();
-  private Operation defaultOperation =
+  private final Operation defaultOperation =
       Operation.getDefaultInstance()
           .toBuilder()
           .setDone(true)
           .setName("shard/operations/123")
           .build();
-  private ExecuteResponse defaultExecuteResponse = ExecuteResponse.getDefaultInstance();
-  private PreconditionFailure.Violation defaultViolation =
+  private final ExecuteResponse defaultExecuteResponse = ExecuteResponse.getDefaultInstance();
+  private final PreconditionFailure.Violation defaultViolation =
       PreconditionFailure.Violation.newBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("TEST")
           .setDescription("TEST")
           .build();
-  private PreconditionFailure preconditionFailure =
+  private final PreconditionFailure preconditionFailure =
       PreconditionFailure.getDefaultInstance().toBuilder().addViolations(defaultViolation).build();
-  private MetricsConfig metricsConfig =
+  private final MetricsConfig metricsConfig =
       MetricsConfig.newBuilder()
           .setClusterId("buildfarm-test")
           .setMetricsDestination("aws")
@@ -80,7 +78,7 @@ public class MetricsPublisherTest {
 
     AwsMetricsPublisher metricsPublisher = new AwsMetricsPublisher(metricsConfig);
     assertThat(
-            metricsPublisher.formatRequestMetadataToJson(
+            AbstractMetricsPublisher.formatRequestMetadataToJson(
                 metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata)))
         .isNotNull();
 
@@ -96,7 +94,7 @@ public class MetricsPublisherTest {
             .build();
 
     assertThat(
-            metricsPublisher.formatRequestMetadataToJson(
+            AbstractMetricsPublisher.formatRequestMetadataToJson(
                 metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata)))
         .isEqualTo(
             JsonFormat.printer().omittingInsignificantWhitespace().print(operationRequestMetadata));

@@ -38,13 +38,14 @@ import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
+import io.prometheus.client.Counter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -54,20 +55,25 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
+@SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
   // collected, which would cause us to loose their configuration.
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
   private static final Logger logger = Logger.getLogger(BuildFarmServer.class.getName());
+  private static final Counter healthCheckMetric =
+      Counter.build()
+          .name("health_check")
+          .labelNames("lifecycle")
+          .help("Service health check.")
+          .register();
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-  private final ActionCacheRequestCounter actionCacheRequestCounter;
   private final Instances instances;
   private final HealthStatusManager healthStatusManager;
   private final Server server;
   private boolean stopping = false;
-  private final PrometheusPublisher prometheusPublisher;
 
   public BuildFarmServer(String session, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
@@ -78,28 +84,31 @@ public class BuildFarmServer extends LoggingMain {
       String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
-    String defaultInstanceName = config.getDefaultInstanceName();
-    instances =
-        new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
+    instances = new BuildFarmInstances(session, config.getInstance(), this::stop);
 
     healthStatusManager = new HealthStatusManager();
-    actionCacheRequestCounter =
-        new ActionCacheRequestCounter(ActionCacheService.logger, Duration.ofSeconds(10));
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-
+    if (!config.getSslCertificatePath().equals("")) {
+      File ssl_certificate_path = new File(config.getSslCertificatePath());
+      serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
+    }
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instances, actionCacheRequestCounter::increment))
+            .addService(new ActionCacheService(instances))
             .addService(new CapabilitiesService(instances))
             .addService(
                 new ContentAddressableStorageService(
                     instances,
-                    /* deadlineAfter=*/ 1,
-                    TimeUnit.DAYS,
-                    /* requestLogLevel=*/ Level.INFO))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
+                    /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
+                    TimeUnit.SECONDS
+                    /* requestLogLevel=*/ ))
+            .addService(
+                new ByteStreamService(
+                    instances,
+                    /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
+                    TimeUnit.SECONDS))
             .addService(
                 new ExecutionService(
                     instances,
@@ -116,8 +125,6 @@ public class BuildFarmServer extends LoggingMain {
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
             .intercept(headersInterceptor)
             .build();
-
-    prometheusPublisher = new PrometheusPublisher();
 
     logger.log(Level.INFO, String.format("%s initialized", session));
   }
@@ -145,12 +152,12 @@ public class BuildFarmServer extends LoggingMain {
 
   public synchronized void start(String publicName, int prometheusPort) throws IOException {
     checkState(!stopping, "must not call start after stop");
-    actionCacheRequestCounter.start();
     instances.start(publicName);
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    prometheusPublisher.startHttpServer(prometheusPort);
+    PrometheusPublisher.startHttpServer(prometheusPort);
+    healthCheckMetric.labels("start").inc();
   }
 
   @Override
@@ -160,6 +167,7 @@ public class BuildFarmServer extends LoggingMain {
     System.err.println("*** server shut down");
   }
 
+  @SuppressWarnings("ConstantConditions")
   public void stop() {
     synchronized (this) {
       if (stopping) {
@@ -169,7 +177,8 @@ public class BuildFarmServer extends LoggingMain {
     }
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
-    prometheusPublisher.stopHttpServer();
+    PrometheusPublisher.stopHttpServer();
+    healthCheckMetric.labels("stop").inc();
     try {
       if (server != null) {
         server.shutdown();
@@ -183,9 +192,6 @@ public class BuildFarmServer extends LoggingMain {
     }
     if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
       logger.log(Level.WARNING, "could not shut down keepalive scheduler");
-    }
-    if (!actionCacheRequestCounter.stop()) {
-      logger.log(Level.WARNING, "count not shut down action cache request counter");
     }
   }
 
@@ -203,6 +209,7 @@ public class BuildFarmServer extends LoggingMain {
   }
 
   /** returns success or failure */
+  @SuppressWarnings("ConstantConditions")
   static boolean serverMain(String[] args) {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //

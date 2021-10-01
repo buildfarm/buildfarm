@@ -79,7 +79,7 @@ public class FuseCAS extends FuseStubFS {
     int size();
   }
 
-  class FileEntry implements Entry {
+  static class FileEntry implements Entry {
     final Digest digest;
     final boolean executable;
 
@@ -114,7 +114,7 @@ public class FuseCAS extends FuseStubFS {
     }
   }
 
-  class WriteFileEntry implements Entry {
+  static class WriteFileEntry implements Entry {
     boolean executable;
     ByteString content;
 
@@ -127,6 +127,7 @@ public class FuseCAS extends FuseStubFS {
       content = content.concat(value);
     }
 
+    @SuppressWarnings("ConstantConditions")
     public synchronized void write(ByteString value, long offset) {
       int size = value.size();
       int contentSize = content.size();
@@ -312,7 +313,7 @@ public class FuseCAS extends FuseStubFS {
     }
   }
 
-  class SymlinkEntry implements Entry {
+  static class SymlinkEntry implements Entry {
     final String target;
     final Supplier<Entry> resolve;
 
@@ -362,7 +363,7 @@ public class FuseCAS extends FuseStubFS {
 
   @FunctionalInterface
   interface DirectoryEntryPathConsumer {
-    void accept(DirectoryEntry entry, String path) throws IOException, InterruptedException;
+    void accept(DirectoryEntry entry, String path);
   }
 
   private static void resolveTopdir(
@@ -396,7 +397,7 @@ public class FuseCAS extends FuseStubFS {
       }
       if (!mounted) {
         logger.log(Level.INFO, "Mounting FuseCAS");
-        String[] fuseOpts = new String[] {"-o", "max_write=131072", "-o", "big_writes"};
+        String[] fuseOpts = {"-o", "max_write=131072", "-o", "big_writes"};
         try {
           mount(mountPath, /* blocking=*/ false, /* debug=*/ false, /* fuseOpts=*/ fuseOpts);
         } catch (FuseException e) {
@@ -422,8 +423,7 @@ public class FuseCAS extends FuseStubFS {
     }
   }
 
-  private Map<String, Entry> fetchChildren(DirectoryEntry dirEntry, Digest digest)
-      throws IOException, InterruptedException {
+  private Map<String, Entry> fetchChildren(Digest digest) throws IOException, InterruptedException {
     Map<String, Entry> children = childrenCache.get(digest);
     if (children == null) {
       try {
@@ -452,7 +452,7 @@ public class FuseCAS extends FuseStubFS {
   }
 
   private DirectoryEntryChildrenFetcher fetchChildrenFunction(Digest digest) {
-    return (dirEntry) -> fetchChildren(dirEntry, digest);
+    return (dirEntry) -> fetchChildren(digest);
   }
 
   public void createInputRoot(String topdir, Digest inputRoot)
@@ -468,21 +468,8 @@ public class FuseCAS extends FuseStubFS {
   }
 
   public void destroyInputRoot(String topdir) throws IOException, InterruptedException {
-    resolveTopdir(
-        topdir,
-        root,
-        (currentDir, base) -> {
-          currentDir.removeChild(base);
-        });
+    resolveTopdir(topdir, root, DirectoryEntry::removeChild);
     decMounts();
-  }
-
-  private DirectoryEntry containingDirectoryForPath(String path) {
-    int endIndex = path.lastIndexOf('/');
-    if (endIndex == 0) {
-      endIndex = 1;
-    }
-    return directoryForPath(path.substring(0, endIndex));
   }
 
   private DirectoryEntry containingDirectoryForCreate(String path) {
@@ -546,9 +533,10 @@ public class FuseCAS extends FuseStubFS {
   }
 
   private String basename(String path) {
-    return path.substring(path.lastIndexOf("/") + 1);
+    return path.substring(path.lastIndexOf('/') + 1);
   }
 
+  @SuppressWarnings("OctalInteger")
   @Override
   public int getattr(String path, FileStat stat) {
     Entry entry = resolve(path);
@@ -588,7 +576,6 @@ public class FuseCAS extends FuseStubFS {
     buf.put(0, target, 0, putsize);
     if (size > target.length) {
       buf.putByte(target.length, (byte) 0);
-      putsize++;
     }
     return 0;
   }
@@ -694,8 +681,8 @@ public class FuseCAS extends FuseStubFS {
     }
 
     WriteFileEntry writeFileEntry = (WriteFileEntry) entry;
-    boolean executable = (mode & 0111) != 0;
-    writeFileEntry.executable = executable;
+    //noinspection OctalInteger
+    writeFileEntry.executable = (mode & 0111) != 0;
 
     return 0;
   }
@@ -765,7 +752,8 @@ public class FuseCAS extends FuseStubFS {
     return -ErrorCodes.EOPNOTSUPP();
   }
 
-  private Entry createImpl(String path, long mode, FuseFileInfo fi) {
+  @SuppressWarnings("OctalInteger")
+  private Entry createImpl(String path, FuseFileInfo fi) {
     // assume no intersection for now
     DirectoryEntry dirEntry = containingDirectoryForCreate(path);
 
@@ -790,7 +778,7 @@ public class FuseCAS extends FuseStubFS {
 
   @Override
   public int create(String path, @mode_t long mode, FuseFileInfo fi) {
-    Entry entry = createImpl(path, mode, fi);
+    Entry entry = createImpl(path, fi);
 
     if (entry == null) {
       return -ErrorCodes.ENOENT();
@@ -807,7 +795,7 @@ public class FuseCAS extends FuseStubFS {
     Entry entry;
     if ((fi.flags.intValue() & OpenFlags.O_CREAT.intValue()) == OpenFlags.O_CREAT.intValue()
         && (fi.flags.intValue() & OpenFlags.O_TRUNC.intValue()) == OpenFlags.O_TRUNC.intValue()) {
-      entry = createImpl(path, fi.flags.intValue() & 0777, fi);
+      entry = createImpl(path, fi);
     } else {
       entry = resolve(path);
     }
@@ -957,6 +945,7 @@ public class FuseCAS extends FuseStubFS {
     return 0;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public int fallocate(
       String path, int mode, @off_t long off, @off_t long length, FuseFileInfo fi) {

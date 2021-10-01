@@ -20,8 +20,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 public interface CasWriter {
-  public void write(Digest digest, Path file) throws IOException, InterruptedException;
+  void write(Digest digest, Path file) throws IOException, InterruptedException;
 
-  public void insertBlob(Digest digest, ByteString content)
-      throws IOException, InterruptedException;
+  void insertBlob(Digest digest, ByteString content) throws IOException, InterruptedException;
 }

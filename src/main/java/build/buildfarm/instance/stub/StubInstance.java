@@ -29,6 +29,7 @@ import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheFutureStub;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
@@ -45,6 +46,7 @@ import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.GetCapabilitiesRequest;
 import build.bazel.remote.execution.v2.GetTreeRequest;
@@ -82,7 +84,6 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import build.buildfarm.v1test.ShutDownWorkerGrpc.ShutDownWorkerBlockingStub;
 import build.buildfarm.v1test.TakeOperationRequest;
@@ -124,6 +125,7 @@ import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.AbstractStub;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
@@ -175,6 +177,7 @@ public class StubInstance implements Instance {
     this(name, identifier, digestUtil, channel, grpcTimeout, NO_RETRIES, /* retryService=*/ null);
   }
 
+  @SuppressWarnings("NullableProblems")
   public StubInstance(
       String name,
       String identifier,
@@ -201,6 +204,7 @@ public class StubInstance implements Instance {
     return ExecutionGrpc.newStub(channel);
   }
 
+  @SuppressWarnings("Guava")
   private final Supplier<ActionCacheBlockingStub> actionCacheBlockingStub =
       Suppliers.memoize(
           new Supplier<ActionCacheBlockingStub>() {
@@ -210,6 +214,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ActionCacheFutureStub> actionCacheFutureStub =
       Suppliers.memoize(
           new Supplier<ActionCacheFutureStub>() {
@@ -219,6 +224,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<CapabilitiesBlockingStub> capsBlockingStub =
       Suppliers.memoize(
           new Supplier<CapabilitiesBlockingStub>() {
@@ -228,6 +234,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<AdminBlockingStub> adminBlockingStub =
       Suppliers.memoize(
           new Supplier<AdminBlockingStub>() {
@@ -237,6 +244,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ContentAddressableStorageFutureStub> casFutureStub =
       Suppliers.memoize(
           new Supplier<ContentAddressableStorageFutureStub>() {
@@ -246,6 +254,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ContentAddressableStorageBlockingStub> casBlockingStub =
       Suppliers.memoize(
           new Supplier<ContentAddressableStorageBlockingStub>() {
@@ -255,6 +264,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ByteStreamStub> bsStub =
       Suppliers.memoize(
           new Supplier<ByteStreamStub>() {
@@ -264,6 +274,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub =
       Suppliers.memoize(
           new Supplier<ByteStreamBlockingStub>() {
@@ -273,6 +284,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<OperationsBlockingStub> operationsBlockingStub =
       Suppliers.memoize(
           new Supplier<OperationsBlockingStub>() {
@@ -282,6 +294,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<OperationQueueBlockingStub> operationQueueBlockingStub =
       Suppliers.memoize(
           new Supplier<OperationQueueBlockingStub>() {
@@ -291,6 +304,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<WorkerProfileBlockingStub> workerProfileBlockingStub =
       Suppliers.memoize(
           new Supplier<WorkerProfileBlockingStub>() {
@@ -300,6 +314,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ShutDownWorkerBlockingStub> shutDownWorkerBlockingStub =
       Suppliers.memoize(
           new Supplier<ShutDownWorkerBlockingStub>() {
@@ -309,6 +324,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings({"Guava", "ConstantConditions"})
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
     if (grpcTimeout.getSeconds() > 0 || grpcTimeout.getNanos() > 0) {
@@ -368,6 +384,7 @@ public class StubInstance implements Instance {
         directExecutor());
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
     throwIfStopped();
@@ -400,7 +417,7 @@ public class StubInstance implements Instance {
         deadlined(casFutureStub)
             .withInterceptors(attachMetadataInterceptor(requestMetadata))
             .findMissingBlobs(request),
-        (response) -> response.getMissingBlobDigestsList(),
+        FindMissingBlobsResponse::getMissingBlobDigestsList,
         directExecutor());
   }
 
@@ -436,7 +453,7 @@ public class StubInstance implements Instance {
       throw exception;
     }
     return Iterables.transform(
-        batchResponse.getResponsesList(), (response) -> response.getDigest());
+        batchResponse.getResponsesList(), BatchUpdateBlobsResponse.Response::getDigest);
   }
 
   @Override
@@ -457,21 +474,11 @@ public class StubInstance implements Instance {
 
   @Override
   public InputStream newOperationStreamInput(
-      String resourceName,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata)
-      throws IOException {
-    return newInput(resourceName, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
+      String resourceName, long offset, RequestMetadata requestMetadata) throws IOException {
+    return newInput(resourceName, offset, requestMetadata);
   }
 
-  InputStream newInput(
-      String resourceName,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata)
+  InputStream newInput(String resourceName, long offset, RequestMetadata requestMetadata)
       throws IOException {
     return ByteStreamHelper.newInput(
         resourceName,
@@ -502,7 +509,7 @@ public class StubInstance implements Instance {
     @GuardedBy("this")
     private boolean wasStarted = false;
     // Indicator for request completion, so that callbacks throw or are ignored
-    AtomicBoolean wasCompleted = new AtomicBoolean(false);
+    final AtomicBoolean wasCompleted = new AtomicBoolean(false);
 
     ReadBlobInterchange(ServerCallStreamObserver<ByteString> blobObserver) {
       this.blobObserver = blobObserver;
@@ -589,8 +596,7 @@ public class StubInstance implements Instance {
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
       throws IOException {
-    return newInput(
-        getBlobName(digest), offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
+    return newInput(getBlobName(digest), offset, requestMetadata);
   }
 
   @Override
@@ -602,7 +608,7 @@ public class StubInstance implements Instance {
                     .setInstanceName(getName())
                     .addAllDigests(digests)
                     .build()),
-        (response) -> response.getResponsesList(),
+        BatchReadBlobsResponse::getResponsesList,
         directExecutor());
   }
 
@@ -745,7 +751,15 @@ public class StubInstance implements Instance {
   @Override
   public boolean putOperation(Operation operation) {
     throwIfStopped();
-    return deadlined(operationQueueBlockingStub).put(operation).getCode() == Code.OK.getNumber();
+    com.google.rpc.Status status = deadlined(operationQueueBlockingStub).put(operation);
+    int code = status.getCode();
+    if (code != Code.OK.getNumber() && code != Code.INVALID_ARGUMENT.getNumber()) {
+      logger.log(
+          Level.SEVERE,
+          format("putOperation(%s) response was unexpected", operation.getName()),
+          StatusProto.toStatusException(status));
+    }
+    return code == Code.OK.getNumber();
   }
 
   @Override
@@ -756,14 +770,21 @@ public class StubInstance implements Instance {
   @Override
   public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
     throwIfStopped();
-    return deadlined(operationQueueBlockingStub)
+    com.google.rpc.Status status =
+        deadlined(operationQueueBlockingStub)
             .poll(
                 PollOperationRequest.newBuilder()
                     .setOperationName(operationName)
                     .setStage(stage)
-                    .build())
-            .getCode()
-        == Code.OK.getNumber();
+                    .build());
+    int code = status.getCode();
+    if (code != Code.OK.getNumber() && code != Code.INVALID_ARGUMENT.getNumber()) {
+      logger.log(
+          Level.SEVERE,
+          format("pollOperation(%s) response was unexpected", operationName),
+          StatusProto.toStatusException(status));
+    }
+    return code == Code.OK.getNumber();
   }
 
   @Override
@@ -816,6 +837,7 @@ public class StubInstance implements Instance {
         .getOperation(GetOperationRequest.newBuilder().setName(operationName).build());
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void deleteOperation(String operationName) {
     throwIfStopped();
@@ -823,6 +845,7 @@ public class StubInstance implements Instance {
         .deleteOperation(DeleteOperationRequest.newBuilder().setName(operationName).build());
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void cancelOperation(String operationName) {
     throwIfStopped();
@@ -867,18 +890,18 @@ public class StubInstance implements Instance {
     return results;
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void deregisterWorker(String workerName) {
     throwIfStopped();
-    ShutDownWorkerGracefullyRequestResults proto =
-        adminBlockingStub
-            .get()
-            .shutDownWorkerGracefully(
-                ShutDownWorkerGracefullyRequest.newBuilder().setWorkerName(workerName).build());
+    adminBlockingStub
+        .get()
+        .shutDownWorkerGracefully(
+            ShutDownWorkerGracefullyRequest.newBuilder().setWorkerName(workerName).build());
   }
 
   @Override
-  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
+  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
     throwIfStopped();
     return shutDownWorkerBlockingStub
         .get()
