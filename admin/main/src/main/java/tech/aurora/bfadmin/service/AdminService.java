@@ -1,28 +1,27 @@
 package tech.aurora.bfadmin.service;
 
-import com.amazonaws.services.autoscaling.model.AutoScalingGroup;
-import tech.aurora.bfadmin.model.Ec2Instance;
+import tech.aurora.bfadmin.model.ClusterDetails;
+import tech.aurora.bfadmin.model.ClusterInfo;
+
 import java.util.List;
 
 public interface AdminService {
 
-  List<Ec2Instance> getInstances(String asgName, int ageInMinutes, String grpcEndpoint, int grpcPort);
+  List<ClusterInfo> getAllClustersWithDetails();
 
-  String scaleGroup(String autoScaleGroup, Integer desiredInstances);
+  List<String> getAllClusters();
+
+  ClusterInfo getClusterInfo();
+
+  ClusterInfo getClusterInfo(String clusterId);
+
+  ClusterDetails getClusterDetails();
+
+  String scaleGroup(String asgName, Integer desiredInstances);
 
   int terminateInstance(String instanceId, String grpcEndpoint, int grpcPort);
 
-  void gracefullyShutDownWorker(String workerName, String grpcEndpoint, int grpcPort);
-
   String getInstanceIdByPrivateDnsName(String dnsName);
 
-  String resizeGroup(String autoScaleGroup, Integer minInstances, Integer maxInstances);
-
-  AutoScalingGroup describeAutoScalingGroup(String autoScaleGroup);
-
   int stopDockerContainer(String instanceId, String containerType, String grpcEndpoint, int grpcPort);
-
-  String scaleOnDemandTargetPercentage(String autoScaleGroup, Integer onDemandTargetPercentage, Integer minPercentage);
-
-  String setOnDemandTargetPercentage(String autoScaleGroup, Integer onDemandTargetPercentage, Integer minPercentage);
 }

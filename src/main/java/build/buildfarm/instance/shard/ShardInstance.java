@@ -168,7 +168,13 @@ public class ShardInstance extends AbstractServerInstance {
       Counter.build().name("execution_success").help("Execution success.").register();
   private static final Gauge preQueueSize =
       Gauge.build().name("pre_queue_size").help("Pre queue size.").register();
-
+  private static final Counter casHitCounter =
+      Counter.build()
+          .name("cas_hit")
+          .help("Number of successful CAS hits from worker-worker.")
+          .register();
+  private static final Counter casMissCounter =
+      Counter.build().name("cas_miss").help("Number of CAS misses from worker-worker.").register();
   // Metrics about the dispatched operations
   private static final Gauge dispatchedOperationsSize =
       Gauge.build()
@@ -186,7 +192,7 @@ public class ShardInstance extends AbstractServerInstance {
       Histogram.build().name("io_bytes_read").help("I/O (bytes)").register();
 
   private final Runnable onStop;
-  private final long maxBlobSize;
+  private final long maxEntrySizeBytes;
   private final Backplane backplane;
   private final ReadThroughActionCache readThroughActionCache;
   private final RemoteInputStreamFactory remoteInputStreamFactory;
@@ -290,7 +296,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getRunDispatchedMonitor(),
         config.getDispatchedMonitorIntervalSeconds(),
         config.getRunOperationQueuer(),
-        config.getMaxBlobSize(),
+        config.getMaxEntrySizeBytes(),
         config.getMaxCpu(),
         config.getMaxRequeueAttempts(),
         config.getMaximumActionTimeout(),
@@ -308,7 +314,7 @@ public class ShardInstance extends AbstractServerInstance {
       boolean runDispatchedMonitor,
       int dispatchedMonitorIntervalSeconds,
       boolean runOperationQueuer,
-      long maxBlobSize,
+      long maxEntrySizeBytes,
       int maxCpu,
       int maxRequeueAttempts,
       Duration maxActionTimeout,
@@ -328,7 +334,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.readThroughActionCache = readThroughActionCache;
     this.workerStubs = workerStubs;
     this.onStop = onStop;
-    this.maxBlobSize = maxBlobSize;
+    this.maxEntrySizeBytes = maxEntrySizeBytes;
     this.maxCpu = maxCpu;
     this.maxRequeueAttempts = maxRequeueAttempts;
     this.maxActionTimeout = maxActionTimeout;
@@ -772,6 +778,7 @@ public class ShardInstance extends AbstractServerInstance {
                   removeMalfunctioningWorker(
                       worker, t, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
                 } else if (status.getCode() == Code.NOT_FOUND) {
+                  casMissCounter.inc();
                   logger.log(
                       Level.FINE, worker + " did not contain " + DigestUtil.toString(blobDigest));
                   // ignore this, the worker will update the backplane eventually
@@ -816,6 +823,7 @@ public class ShardInstance extends AbstractServerInstance {
               @Override
               public void onCompleted() {
                 blobObserver.onCompleted();
+                casHitCounter.inc();
               }
             },
             requestMetadata);
@@ -1049,8 +1057,8 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
-    if (maxBlobSize > 0 && digest.getSizeBytes() > maxBlobSize) {
-      throw new EntryLimitException(digest.getSizeBytes(), maxBlobSize);
+    if (maxEntrySizeBytes > 0 && digest.getSizeBytes() > maxEntrySizeBytes) {
+      throw new EntryLimitException(digest.getSizeBytes(), maxEntrySizeBytes);
     }
     // FIXME small blob write to proto cache
     return writes.get(digest, uuid, requestMetadata);

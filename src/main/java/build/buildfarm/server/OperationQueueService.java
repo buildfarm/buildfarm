@@ -149,7 +149,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
     try {
       boolean ok = instance.putAndValidateOperation(operation);
-      Code code = ok ? Code.OK : Code.UNAVAILABLE;
+      Code code = ok ? Code.OK : Code.INVALID_ARGUMENT;
       responseObserver.onNext(com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build());
       responseObserver.onCompleted();
     } catch (IllegalStateException e) {
@@ -173,7 +173,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     }
 
     boolean ok = instance.pollOperation(request.getOperationName(), request.getStage());
-    Code code = ok ? Code.OK : Code.UNAVAILABLE;
+    Code code = ok ? Code.OK : Code.INVALID_ARGUMENT;
     responseObserver.onNext(com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build());
     responseObserver.onCompleted();
   }
