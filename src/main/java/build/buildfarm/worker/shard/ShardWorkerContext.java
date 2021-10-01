@@ -108,6 +108,7 @@ class ShardWorkerContext implements WorkerContext {
   private final SetMultimap<String, String> matchProvisions;
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
+  private final int inputFetchDeadline;
   private final int inputFetchStageWidth;
   private final int executeStageWidth;
   private final Backplane backplane;
@@ -145,6 +146,7 @@ class ShardWorkerContext implements WorkerContext {
       OperationPoller operationPoller,
       int inputFetchStageWidth,
       int executeStageWidth,
+      int inputFetchDeadline,
       Backplane backplane,
       ExecFileSystem execFileSystem,
       InputStreamFactory inputStreamFactory,
@@ -165,6 +167,7 @@ class ShardWorkerContext implements WorkerContext {
     this.operationPoller = operationPoller;
     this.inputFetchStageWidth = inputFetchStageWidth;
     this.executeStageWidth = executeStageWidth;
+    this.inputFetchDeadline = inputFetchDeadline;
     this.backplane = backplane;
     this.execFileSystem = execFileSystem;
     this.inputStreamFactory = inputStreamFactory;
@@ -426,6 +429,11 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public int getExecuteStageWidth() {
     return executeStageWidth;
+  }
+
+  @Override
+  public int getInputFetchDeadline() {
+    return inputFetchDeadline;
   }
 
   @Override
