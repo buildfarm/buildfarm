@@ -24,7 +24,7 @@ import build.buildfarm.common.CommandUtils;
  * @details Platform properties from specified exec_properties are taken into account as well as
  *     global buildfarm configuration.
  */
-public class ResourceDecider {
+public final class ResourceDecider {
   /**
    * @brief Decide resource limitations for the given command.
    * @details Platform properties from specified exec_properties are taken into account as well as
@@ -130,7 +130,7 @@ public class ResourceDecider {
     resolveEnvironmentVariables(limits);
   }
 
-  private adjustContainerFlags(ResourceLimits limits) {
+  private static void adjustContainerFlags(ResourceLimits limits) {
     if (!limits.containerSettings.containerImage.isEmpty()) {
       // Avoid using the existing execution policies when running actions under docker.
       // The programs used in the execution policies likely won't exist in the container images.
