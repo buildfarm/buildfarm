@@ -3,6 +3,7 @@ package tech.aurora.bfadmin.service.impl;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
@@ -239,7 +240,7 @@ public class AdminServiceImpl implements AdminService {
     Map<String, Long> AllContainerUptime =new HashMap<String, Long>();
     GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder().setInstanceName("shard").build();
     GetClientStartTimeResult result = stub.getClientStartTime(request);
-    for (GetClientstartTime ClientStartTime : GetClientStartTimeResult){
+    for (GetClientStartTime ClientStartTime : result){
       if (ClientStartTime.hasClientStartTime()) {
         AllContainerUptime.put(ClientStartTime.getInstanceName(),ClientStartTime.getClientStartTime().getSeconds());
       } else {
