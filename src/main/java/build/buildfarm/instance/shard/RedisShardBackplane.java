@@ -49,6 +49,7 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
@@ -1447,13 +1448,21 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) throws IOException {
+  public GetClientStartTimeResult getClientStartTime() throws IOException {
     try {
-      return client.call(
-          jedis ->
-              GetClientStartTimeResult.newBuilder()
-                  .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(clientKey))))
-                  .build());
+      List<String> allUptimeKeys = new ArrayList<>();
+      allUptimeKeys.addAll(client.call(jedis -> jedis.keys("startTime/*")));
+      List<GetClientStartTime> startTimes = new ArrayList<>();
+      for (String key : allUptimeKeys) {
+        startTimes.add(
+            client.call(
+                jedis ->
+                    GetClientStartTime.newBuilder()
+                        .setInstanceName(key)
+                        .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(key))))
+                        .build()));
+      }
+      return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
     } catch (NumberFormatException nfe) {
       return GetClientStartTimeResult.newBuilder().build();
     }
