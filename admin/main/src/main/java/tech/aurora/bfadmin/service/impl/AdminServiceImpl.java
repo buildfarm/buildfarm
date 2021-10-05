@@ -177,7 +177,7 @@ public class AdminServiceImpl implements AdminService {
     ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
     AdminGrpc.AdminBlockingStub stub = AdminGrpc.newBlockingStub(channel);
     Map<String, Long> AllContainerUptime =new HashMap<String, Long>();
-    AllContainerUptime=getAllContainerUptime(clusterId, type, stub);
+    AllContainerUptime=getAllContainerUptime(stub);
     for (com.amazonaws.services.ec2.model.Instance e : getEc2Instances(clusterId, type)) {
       Instance instance = new Instance();
       instance.setEc2Instance(e);
