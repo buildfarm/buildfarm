@@ -901,11 +901,15 @@ class Cat {
 
     @Override
     protected void run(Instance instance, Digest digest) throws Exception {
-      printActionResult(
+      ActionResult actionResult =
           instance
               .getActionResult(DigestUtil.asActionKey(digest), RequestMetadata.getDefaultInstance())
-              .get(),
-          0);
+              .get();
+      if (actionResult != null) {
+        printActionResult(actionResult, 0);
+      } else {
+        System.out.println("ActionResult not found for " + DigestUtil.toString(digest));
+      }
     }
   }
 
