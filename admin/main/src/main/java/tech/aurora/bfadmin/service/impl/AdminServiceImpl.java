@@ -3,7 +3,6 @@ package tech.aurora.bfadmin.service.impl;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
