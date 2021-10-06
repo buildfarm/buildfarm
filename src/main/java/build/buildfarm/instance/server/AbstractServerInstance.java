@@ -21,6 +21,7 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.common.Trees.enumerateTreeFileDigests;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
@@ -244,13 +245,14 @@ public abstract class AbstractServerInstance implements Instance {
     if (result == null) {
       return immediateFuture(ImmutableList.of());
     }
-    // TODO Directories
     ImmutableList.Builder<Digest> digests = ImmutableList.builder();
     digests.addAll(Iterables.transform(result.getOutputFilesList(), OutputFile::getDigest));
     // findMissingBlobs will weed out empties
     digests.add(result.getStdoutDigest());
     digests.add(result.getStderrDigest());
     ListenableFuture<Void> digestsCompleteFuture = immediateFuture(null);
+
+    Executor contextExecutor = Context.current().fixedContextExecutor(executor);
     for (OutputDirectory directory : result.getOutputDirectoriesList()) {
       // TODO make tree cache
       // create an async function here to avoid initiating the calls to expect immediately
@@ -271,7 +273,24 @@ public abstract class AbstractServerInstance implements Instance {
       digestsCompleteFuture = transformAsync(digestsCompleteFuture, next, executor);
     }
     return transformAsync(
-        digestsCompleteFuture, v -> findMissingBlobs(digests.build(), requestMetadata), executor);
+        digestsCompleteFuture,
+        v -> findMissingBlobs(digests.build(), requestMetadata),
+        contextExecutor);
+  }
+
+  private ListenableFuture<ActionResult> notFoundNullActionResult(
+      ListenableFuture<ActionResult> actionResultFuture) {
+    return catchingAsync(
+        actionResultFuture,
+        Exception.class,
+        e -> {
+          Status status = Status.fromThrowable(e);
+          if (status.getCode() == io.grpc.Status.Code.NOT_FOUND) {
+            return immediateFuture(null);
+          }
+          return immediateFailedFuture(e);
+        },
+        directExecutor());
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -282,15 +301,16 @@ public abstract class AbstractServerInstance implements Instance {
             resultFuture,
             result -> findMissingActionResultOutputs(result, directExecutor(), requestMetadata),
             directExecutor());
-    return transformAsync(
-        missingOutputsFuture,
-        missingOutputs -> {
-          if (Iterables.isEmpty(missingOutputs)) {
-            return resultFuture;
-          }
-          return immediateFuture(null);
-        },
-        directExecutor());
+    return notFoundNullActionResult(
+        transformAsync(
+            missingOutputsFuture,
+            missingOutputs -> {
+              if (Iterables.isEmpty(missingOutputs)) {
+                return resultFuture;
+              }
+              return immediateFuture(null);
+            },
+            directExecutor()));
   }
 
   private static boolean shouldEnsureOutputsPresent(RequestMetadata requestMetadata) {
@@ -1462,8 +1482,12 @@ public abstract class AbstractServerInstance implements Instance {
           @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
-            logger.log(
-                Level.WARNING, format("expect for %s failed", DigestUtil.toString(digest)), t);
+            Status status = Status.fromThrowable(t);
+            // NOT_FOUNDs are not notable enough to log independently
+            if (status.getCode() != io.grpc.Status.Code.NOT_FOUND) {
+              logger.log(
+                  Level.WARNING, format("expect for %s failed", DigestUtil.toString(digest)), t);
+            }
             future.setException(t);
           }
         },
