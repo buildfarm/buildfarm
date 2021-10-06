@@ -116,13 +116,13 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     }
 
     try {
-      GetClientStartTimeResult result = instance.getClientStartTime(request.getClientKey());
+      GetClientStartTimeResult result = instance.getClientStartTime(request);
       responseObserver.onNext(result);
       responseObserver.onCompleted();
     } catch (Exception e) {
       logger.log(
           Level.SEVERE,
-          String.format("Could not get client start time for %s.", request.getClientKey()),
+          String.format("Could not get client start time for %s.", request.getInstanceName),
           e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
