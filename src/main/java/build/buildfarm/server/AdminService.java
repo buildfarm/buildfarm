@@ -116,7 +116,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     }
 
     try {
-      GetClientStartTimeResult result = instance.getClientStartTime();
+      GetClientStartTimeResult result = instance.getClientStartTime(request.getInstanceName());
       responseObserver.onNext(result);
       responseObserver.onCompleted();
     } catch (Exception e) {

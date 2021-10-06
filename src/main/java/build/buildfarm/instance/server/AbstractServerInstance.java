@@ -1852,7 +1852,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public abstract GetClientStartTimeResult getClientStartTime(String clientKey);
+  public abstract GetClientStartTimeResult getClientStartTime();
 
   @Override
   public abstract CasIndexResults reindexCas(String hostName);
