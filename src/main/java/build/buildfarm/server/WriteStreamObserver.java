@@ -53,6 +53,9 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Logger logger = Logger.getLogger(WriteStreamObserver.class.getName());
   private static final Histogram ioMetric =
       Histogram.build().name("io_bytes_write").help("I/O (bytes)").register();
+  
+  private static final Histogram ioMetric2 =
+    Histogram.build().name("io_bytes_write2").help("I/O (bytes)").register();
 
   private final Instances instances;
   private final long deadlineAfter;
