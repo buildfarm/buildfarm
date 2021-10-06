@@ -1038,7 +1038,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+  public GetClientStartTimeResult getClientStartTime() {
     throw new UnsupportedOperationException();
   }
 

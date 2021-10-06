@@ -141,7 +141,7 @@ public interface Instance {
 
   PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully();
 
-  GetClientStartTimeResult getClientStartTime(String clientKey);
+  GetClientStartTimeResult getClientStartTime();
 
   CasIndexResults reindexCas(String hostName);
 

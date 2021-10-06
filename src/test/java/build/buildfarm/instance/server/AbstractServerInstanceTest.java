@@ -159,7 +159,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public GetClientStartTimeResult getClientStartTime(String clientKey) {
+    public GetClientStartTimeResult getClientStartTime() {
       throw new UnsupportedOperationException();
     }
 
