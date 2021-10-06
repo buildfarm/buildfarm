@@ -240,7 +240,7 @@ public class AdminServiceImpl implements AdminService {
     GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder().setInstanceName("shard").build();
     GetClientStartTimeResult result = stub.getClientStartTime(request);
     Map<String, Long> AllContainerUptime =new HashMap<String, Long>();
-    for (GetClientStartTime GetClientStartTime : result.getGetClientStartTime()){
+    for (GetClientStartTime GetClientStartTime : result.getClientStartTimeList()){
       AllContainerUptime.put(GetClientStartTime.getInstanceName(),GetClientStartTime.getClientStartTime().getSeconds());
     }
     return AllContainerUptime;
