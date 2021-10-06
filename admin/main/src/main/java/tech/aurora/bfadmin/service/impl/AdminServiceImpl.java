@@ -236,11 +236,14 @@ public class AdminServiceImpl implements AdminService {
     return asgNames;
   }
 
-  private Map<String, Long> getAllContainerUptime(AdminGrpc.AdminBlockingStub stub) {
-    Map<String, Long> AllContainerUptime =new HashMap<String, Long>();
+  private  List<GetClientStartTime> getAllContainerUptime(AdminGrpc.AdminBlockingStub stub) {
     GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder().setInstanceName("shard").build();
     GetClientStartTimeResult result = stub.getClientStartTime(request);
-    return result;
+    Map<String, Long> AllContainerUptime =new HashMap<String, Long>();
+    for (GetClientStartTime GetClientStartTime : result){
+      AllContainerUptime.put(GetClientStartTime.getInstanceName(),GetClientStartTime.getClientStartTime().getSeconds());
+    }
+    return AllContainerUptime;
   }
 
   private String getTagValue(String tagName, List<Tag> tags) {
