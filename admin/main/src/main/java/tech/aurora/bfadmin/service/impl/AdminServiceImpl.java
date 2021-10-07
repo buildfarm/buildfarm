@@ -185,7 +185,7 @@ public class AdminServiceImpl implements AdminService {
       if ("worker".equals(type)) {
         instance.setWorkerType(getTagValue("buildfarm.worker_type", e.getTags()));
       }
-      clientKey= "startTime/" + e.getPrivateIpAddress() + ("worker".equals(type) ? ":8981" : "");
+      String clientKey= "startTime/" + e.getPrivateIpAddress() + ("worker".equals(type) ? ":8981" : "");
       instance.setGroupType(type);
       instance.setContainerStartTime(AllContainerUptime.get(clientKey) !=null ? AllContainerUptime.get(clientKey) : 0L );
       instances.add(instance);
@@ -241,7 +241,7 @@ public class AdminServiceImpl implements AdminService {
     GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder().setInstanceName("shard").build();
     GetClientStartTimeResult result = stub.getClientStartTime(request);
     Map<String, Long> AllContainerUptime = new HashMap<String, Long>();
-    for (GetClientStartTime GetClientStartTime : result.getClientStartTimeList()){
+    for (GetClientStartTime GetClientStartTime : result.GetClientStartTimeList()){
       String clientKey= GetClientStartTime.getInstanceName();
       AllContainerUptime.put(clientKey,GetClientStartTime.getClientStartTime().getSeconds());
     }
