@@ -234,7 +234,7 @@ public class AdminServiceImpl implements AdminService {
     return asgNames;
   }
 
-  private  List<GetClientStartTime> getAllContainerUptime(AdminGrpc.AdminBlockingStub stub) {
+  private  GetClientStartTimeResult getAllContainerUptime(AdminGrpc.AdminBlockingStub stub) {
     GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder().setInstanceName("shard").build();
     GetClientStartTimeResult result = stub.getClientStartTime(request);
     return result;
