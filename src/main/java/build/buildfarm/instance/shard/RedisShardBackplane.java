@@ -14,6 +14,9 @@
 
 package build.buildfarm.instance.shard;
 
+import static java.lang.String.format;
+import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
+
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
@@ -48,7 +51,6 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.GetClientStartTimeResultOrBuilder;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
@@ -74,17 +76,6 @@ import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
-import org.redisson.Redisson;
-import org.redisson.api.RedissonClient;
-import org.redisson.config.Config;
-import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisClusterPipeline;
-import redis.clients.jedis.Response;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
-
-import javax.annotation.Nullable;
-import javax.naming.ConfigurationException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.AbstractMap;
@@ -105,9 +96,16 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static java.lang.String.format;
-import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
+import javax.annotation.Nullable;
+import javax.naming.ConfigurationException;
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.JedisClusterPipeline;
+import redis.clients.jedis.Response;
+import redis.clients.jedis.ScanParams;
+import redis.clients.jedis.ScanResult;
 
 public class RedisShardBackplane implements Backplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
@@ -1456,7 +1454,10 @@ public class RedisShardBackplane implements Backplane {
       allUptimeKeys.addAll(client.call(jedis -> jedis.keys("startTime/*")));
       List<GetClientStartTime> startTimes = new ArrayList<>();
       for (String key : allUptimeKeys) {
-        startTimes.add(client.call(jedis -> GetClientStartTime.newBuilder()
+        startTimes.add(
+            client.call(
+                jedis ->
+                    GetClientStartTime.newBuilder()
                         .setInstanceName(key)
                         .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(key))))
                         .build()));
