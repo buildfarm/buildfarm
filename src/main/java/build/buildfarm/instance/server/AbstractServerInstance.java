@@ -270,7 +270,7 @@ public abstract class AbstractServerInstance implements Instance {
                     return null;
                   },
                   executor);
-      digestsCompleteFuture = transformAsync(digestsCompleteFuture, next, executor);
+      digestsCompleteFuture = transformAsync(digestsCompleteFuture, next, contextExecutor);
     }
     return transformAsync(
         digestsCompleteFuture,
