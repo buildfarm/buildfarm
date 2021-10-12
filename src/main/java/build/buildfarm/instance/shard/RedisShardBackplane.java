@@ -103,8 +103,8 @@ import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisClusterPipeline;
+import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
@@ -1457,6 +1457,7 @@ public class RedisShardBackplane implements Backplane {
       for (Map.Entry<String, JedisPool> entry : clusterNodes.entrySet()) {
         Jedis jedis = entry.getValue().getResource();
         allUptimeKeys.addAll(client.call(jedis -> jedis.keys("startTime/*")));
+      }
       List<GetClientStartTime> startTimes = new ArrayList<>();
       for (String key : allUptimeKeys) {
         startTimes.add(
