@@ -176,7 +176,8 @@ public class AdminServiceImpl implements AdminService {
     List<Instance> instances = new ArrayList<>();
     ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
     AdminGrpc.AdminBlockingStub stub = AdminGrpc.newBlockingStub(channel);
-    GetClientStartTimeResult AllContainerUptime=getAllContainerUptime(stub);
+    Map<String, Long> AllContainerUptime =new HashMap<String, Long>();
+    AllContainerUptime=getAllContainerUptime(stub);
     for (com.amazonaws.services.ec2.model.Instance e : getEc2Instances(clusterId, type)) {
       Instance instance = new Instance();
       instance.setEc2Instance(e);
@@ -184,7 +185,9 @@ public class AdminServiceImpl implements AdminService {
       if ("worker".equals(type)) {
         instance.setWorkerType(getTagValue("buildfarm.worker_type", e.getTags()));
       }
+      String clientKey= "startTime/" + e.getPrivateIpAddress() + ("worker".equals(type) ? ":8981" : "");
       instance.setGroupType(type);
+      instance.setContainerStartTime(AllContainerUptime.get(clientKey) !=null ? AllContainerUptime.get(clientKey) : 0L );
       instances.add(instance);
     }
     if (channel != null) {
@@ -237,7 +240,12 @@ public class AdminServiceImpl implements AdminService {
   private  GetClientStartTimeResult getAllContainerUptime(AdminGrpc.AdminBlockingStub stub) {
     GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder().setInstanceName("shard").build();
     GetClientStartTimeResult result = stub.getClientStartTime(request);
-    return result;
+    Map<String, Long> AllContainerUptime = new HashMap<String, Long>();
+    for (GetClientStartTime GetClientStartTime : result.getClientStartTimeList()){
+      String clientKey= GetClientStartTime.getInstanceName();
+      AllContainerUptime.put(clientKey,GetClientStartTime.getClientStartTime().getSeconds());
+    }
+    return AllContainerUptime;
   }
 
   private String getTagValue(String tagName, List<Tag> tags) {
