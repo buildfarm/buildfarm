@@ -176,8 +176,8 @@ public class AdminServiceImpl implements AdminService {
     List<Instance> instances = new ArrayList<>();
     ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
     AdminGrpc.AdminBlockingStub stub = AdminGrpc.newBlockingStub(channel);
-    Map<String, Long> AllContainerUptime =new HashMap<String, Long>();
-    AllContainerUptime=getAllContainerUptime(stub);
+    Map<String, Long> AllContainersUptime =new HashMap<String, Long>();
+    AllContainersUptime=getAllContainersUptime(stub);
     for (com.amazonaws.services.ec2.model.Instance e : getEc2Instances(clusterId, type)) {
       Instance instance = new Instance();
       instance.setEc2Instance(e);
@@ -187,7 +187,7 @@ public class AdminServiceImpl implements AdminService {
       }
       String clientKey= "startTime/" + e.getPrivateIpAddress() + ("worker".equals(type) ? ":8981" : "");
       instance.setGroupType(type);
-      instance.setContainerStartTime(AllContainerUptime.get(clientKey) !=null ? AllContainerUptime.get(clientKey) : 0L );
+      instance.setContainerStartTime(AllContainersUptime.get(clientKey) !=null ? AllContainersUptime.get(clientKey) : 0L );
       instances.add(instance);
     }
     if (channel != null) {
@@ -237,15 +237,15 @@ public class AdminServiceImpl implements AdminService {
     return asgNames;
   }
 
-  private Map<String, Long>  getAllContainerUptime(AdminGrpc.AdminBlockingStub stub) {
+  private Map<String, Long>  getAllContainersUptime(AdminGrpc.AdminBlockingStub stub) {
     GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder().setInstanceName("shard").build();
     GetClientStartTimeResult result = stub.getClientStartTime(request);
-    Map<String, Long> AllContainerUptime = new HashMap<String, Long>();
+    Map<String, Long> AllContainersUptime = new HashMap<String, Long>();
     for (GetClientStartTime GetClientStartTime : result.getClientStartTimeList()){
       String clientKey= GetClientStartTime.getInstanceName();
-      AllContainerUptime.put(clientKey,GetClientStartTime.getClientStartTime().getSeconds());
+      AllContainersUptime.put(clientKey,GetClientStartTime.getClientStartTime().getSeconds());
     }
-    return AllContainerUptime;
+    return AllContainersUptime;
   }
 
   private String getTagValue(String tagName, List<Tag> tags) {
