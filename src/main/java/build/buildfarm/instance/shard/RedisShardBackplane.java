@@ -1451,7 +1451,10 @@ public class RedisShardBackplane implements Backplane {
   public GetClientStartTimeResult getClientStartTime() throws IOException {
     try {
       List<String> allUptimeKeys = new ArrayList<>();
-      allUptimeKeys.addAll(client.call(jedis -> jedis.keys("startTime*")));
+      Map<String, JedisPool> clusterNodes = jedisCluster.getClusterNodes();
+      for (Map.Entry<String, JedisPool> entry : clusterNodes.entrySet()) {
+        Jedis jedis = entry.getValue().getResource();
+        allUptimeKeys.addAll(client.call(jedis -> jedis.keys("startTime/*")));
       List<GetClientStartTime> startTimes = new ArrayList<>();
       for (String key : allUptimeKeys) {
         startTimes.add(
