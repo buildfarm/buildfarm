@@ -187,7 +187,7 @@ public class AdminServiceImpl implements AdminService {
       }
       String clientKey= "startTime/" + e.getPrivateIpAddress() + ("worker".equals(type) ? ":8981" : "");
       instance.setGroupType(type);
-      instance.setContainerStartTime(AllContainersUptime.get(clientKey) !=null ? AllContainersUptime.get(clientKey) : 0L );
+      instance.setContainerStartTime(allContainersUptime.get(clientKey) !=null ? allContainersUptime.get(clientKey) : 0L );
       instances.add(instance);
     }
     if (channel != null) {
