@@ -242,8 +242,7 @@ public class AdminServiceImpl implements AdminService {
     GetClientStartTimeResult result = stub.getClientStartTime(request);
     Map<String, Long> allContainersUptime = new HashMap<String, Long>();
     for (GetClientStartTime GetClientStartTime : result.getClientStartTimeList()){
-      String clientKey = GetClientStartTime.getInstanceName();
-      allContainersUptime.put(clientKey,GetClientStartTime.getClientStartTime().getSeconds());
+      allContainersUptime.put(GetClientStartTime.getInstanceName(),GetClientStartTime.getClientStartTime().getSeconds());
     }
     return allContainersUptime;
   }
