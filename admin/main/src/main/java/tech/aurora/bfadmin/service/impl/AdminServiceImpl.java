@@ -3,6 +3,7 @@ package tech.aurora.bfadmin.service.impl;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
@@ -31,6 +32,8 @@ import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -173,6 +176,8 @@ public class AdminServiceImpl implements AdminService {
     List<Instance> instances = new ArrayList<>();
     ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
     AdminGrpc.AdminBlockingStub stub = AdminGrpc.newBlockingStub(channel);
+    Map<String, Long> allContainersUptime = new HashMap<String, Long>();
+    allContainersUptime = getAllContainersUptime(stub);
     for (com.amazonaws.services.ec2.model.Instance e : getEc2Instances(clusterId, type)) {
       Instance instance = new Instance();
       instance.setEc2Instance(e);
@@ -180,8 +185,9 @@ public class AdminServiceImpl implements AdminService {
       if ("worker".equals(type)) {
         instance.setWorkerType(getTagValue("buildfarm.worker_type", e.getTags()));
       }
+      String clientKey= "startTime/" + e.getPrivateIpAddress() + ("worker".equals(type) ? ":8981" : "");
       instance.setGroupType(type);
-      instance.setContainerStartTime(getContainerUptime(e.getPrivateIpAddress(), getTagValue("aws:autoscaling:groupName", e.getTags()), stub));
+      instance.setContainerStartTime(allContainersUptime.get(clientKey) != null ? allContainersUptime.get(clientKey) : 0L );
       instances.add(instance);
     }
     if (channel != null) {
@@ -231,14 +237,14 @@ public class AdminServiceImpl implements AdminService {
     return asgNames;
   }
 
-  private Long getContainerUptime(String hostname, String asgName, AdminGrpc.AdminBlockingStub stub) {
-    GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder().setClientKey("startTime/" + hostname + (asgName.contains("server") ? "" : (":" + workerPort))).setInstanceName("shard").build();
+  private Map<String, Long>  getAllContainersUptime(AdminGrpc.AdminBlockingStub stub) {
+    GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder().setInstanceName("shard").build();
     GetClientStartTimeResult result = stub.getClientStartTime(request);
-    if (result.hasClientStartTime()) {
-      return result.getClientStartTime().getSeconds();
-    } else {
-      return 0L;
+    Map<String, Long> allContainersUptime = new HashMap<String, Long>();
+    for (GetClientStartTime GetClientStartTime : result.getClientStartTimeList()){
+      allContainersUptime.put(GetClientStartTime.getInstanceName(),GetClientStartTime.getClientStartTime().getSeconds());
     }
+    return allContainersUptime;
   }
 
   private String getTagValue(String tagName, List<Tag> tags) {
