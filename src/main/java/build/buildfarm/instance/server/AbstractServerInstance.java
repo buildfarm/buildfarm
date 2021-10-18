@@ -61,7 +61,7 @@ import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.DigestMismatchException;
-import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.AllCasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -1855,7 +1855,7 @@ public abstract class AbstractServerInstance implements Instance {
   public abstract GetClientStartTimeResult getClientStartTime();
 
   @Override
-  public abstract CasIndexResults reindexAllCas();
+  public abstract AllCasIndexResults reindexAllCas();
 
   public abstract FindOperationsResults findOperations(String filterPredicate);
 
