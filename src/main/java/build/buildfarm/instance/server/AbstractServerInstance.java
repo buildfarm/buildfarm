@@ -1855,7 +1855,7 @@ public abstract class AbstractServerInstance implements Instance {
   public abstract GetClientStartTimeResult getClientStartTime();
 
   @Override
-  public abstract CasIndexResults reindexCas(String hostName);
+  public abstract CasIndexResults reindexAllCas();
 
   public abstract FindOperationsResults findOperations(String filterPredicate);
 

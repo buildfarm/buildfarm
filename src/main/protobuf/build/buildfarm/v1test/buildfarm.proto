@@ -35,9 +35,9 @@ service Admin {
   rpc ScaleCluster(ScaleClusterRequest) returns (google.rpc.Status) {
     option (google.api.http) = { get: "/v1test/admin:scaleCluster" };
   }
-  
-  rpc ReindexCas(ReindexCasRequest) returns (ReindexCasRequestResults) {
-    option (google.api.http) = { get: "/v1test/admin:reindexCas" };
+
+  rpc ReindexAllCas(ReindexAllCasRequest) returns (ReindexAllCasRequestResults) {
+    option (google.api.http) = { get: "/v1test/admin:reindexAllCas" };
   }
   
   rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest) returns (ShutDownWorkerGracefullyRequestResults) {
@@ -65,14 +65,14 @@ message DisableScaleInProtectionRequest{
 message DisableScaleInProtectionRequestResults{
 }
 
-message ReindexCasRequest {
-  string instance_name = 1;
-  
-  // format: ip:port
-  string host_id = 2;
+message ReindexAllCasRequest {
 }
 
-message ReindexCasRequestResults {
+message ReindexAllCasRequestResults {
+  repeated AllCasRequestResults all_cas_request_results= 1;
+}
+
+message AllCasRequestResults {
   int32 removedHosts = 1;
 
   int32 removedKeys = 2;

@@ -86,7 +86,7 @@ public interface Backplane {
   boolean removeWorker(String workerName, String reason) throws IOException;
 
   @ThreadSafe
-  CasIndexResults reindexCas(String workerName) throws IOException;
+  CasIndexResults reindexAllCas() throws IOException;
 
   @ThreadSafe
   void deregisterWorker(String hostName) throws IOException;

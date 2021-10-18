@@ -19,7 +19,7 @@ import static java.util.logging.Level.INFO;
 import build.buildfarm.admin.Admin;
 import build.buildfarm.admin.aws.AwsAdmin;
 import build.buildfarm.admin.gcp.GcpAdmin;
-import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.AllCasIndexResults;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;
@@ -30,8 +30,8 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetHostsRequest;
 import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
-import build.buildfarm.v1test.ReindexCasRequest;
-import build.buildfarm.v1test.ReindexCasRequestResults;
+import build.buildfarm.v1test.ReindexAllCasRequest;
+import build.buildfarm.v1test.ReindexAllCasRequestResults;
 import build.buildfarm.v1test.ScaleClusterRequest;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequestResults;
@@ -148,15 +148,15 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   }
 
   @Override
-  public void reindexCas(
-      ReindexCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
+  public void reindexAllCas(
+      ReindexAllCasRequest request, StreamObserver<ReindexAllCasRequestResults> responseObserver) {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-      CasIndexResults results = instance.reindexCas(request.getHostId());
+      AllCasIndexResults results = instance.reindexAllCas();
       logger.log(INFO, results.toMessage());
       responseObserver.onNext(
-          ReindexCasRequestResults.newBuilder()
+          ReindexAllCasRequestResults.newBuilder()
               .setRemovedHosts(results.removedHosts)
               .setRemovedKeys(results.removedKeys)
               .setTotalKeys(results.totalKeys)

@@ -1043,7 +1043,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public CasIndexResults reindexCas(String hostName) {
+  public CasIndexResults reindexAllCas() {
     throw new UnsupportedOperationException();
   }
 

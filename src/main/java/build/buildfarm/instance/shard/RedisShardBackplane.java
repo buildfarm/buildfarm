@@ -727,9 +727,9 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public CasIndexResults reindexCas(String hostName) throws IOException {
-    CasIndexSettings settings = new CasIndexSettings();
-    settings.hostName = hostName;
+  public CasIndexResults reindexAllCas(String) throws IOException {
+    AllCasIndexSettings settings = new AllCasIndexSettings();
+    //. settings.hostName = hostName;
     settings.casQuery = config.getCasPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));

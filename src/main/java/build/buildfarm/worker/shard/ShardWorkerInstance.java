@@ -371,9 +371,9 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public CasIndexResults reindexCas(String hostName) {
+  public AllCasIndexResults reindexAllCas() {
     try {
-      return backplane.reindexCas(hostName);
+      return backplane.reindexAllCas();
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
