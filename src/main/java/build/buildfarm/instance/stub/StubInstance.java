@@ -57,7 +57,6 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
-import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -880,9 +879,7 @@ public class StubInstance implements Instance {
   public AllCasIndexResults reindexAllCas() {
     throwIfStopped();
     ReindexAllCasRequestResults proto =
-        adminBlockingStub
-            .get()
-            .reindexAllCas(ReindexAllCasRequest.newBuilder().build());
+        adminBlockingStub.get().reindexAllCas(ReindexAllCasRequest.newBuilder().build());
     AllCasIndexResults results = new AllCasIndexResults();
     results.removedHosts = proto.getRemovedHosts();
     results.removedKeys = proto.getRemovedKeys();

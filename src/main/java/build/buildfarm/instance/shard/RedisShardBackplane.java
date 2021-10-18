@@ -24,8 +24,8 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
-import build.buildfarm.common.CasIndexResults;
-import build.buildfarm.common.CasIndexSettings;
+import build.buildfarm.common.AllCasIndexResults;
+import build.buildfarm.common.AllCasIndexSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.StringVisitor;
@@ -727,9 +727,9 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public CasIndexResults reindexAllCas(String) throws IOException {
+  public AllCasIndexResults reindexAllCas() throws IOException {
     AllCasIndexSettings settings = new AllCasIndexSettings();
-    //. settings.hostName = hostName;
+    // . settings.hostName = hostName;
     settings.casQuery = config.getCasPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
