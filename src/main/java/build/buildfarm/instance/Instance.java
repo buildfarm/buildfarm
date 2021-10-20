@@ -143,7 +143,7 @@ public interface Instance {
 
   GetClientStartTimeResult getClientStartTime();
 
-  CasIndexResults reindexCas(@Nuallable String hostName);
+  CasIndexResults reindexCas(@Nullable String hostName);
 
   void deregisterWorker(String workerName);
 
