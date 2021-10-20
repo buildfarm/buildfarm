@@ -881,7 +881,7 @@ public class StubInstance implements Instance {
   public CasIndexResults reindexCas(@Nullable String hostName) {
     throwIfStopped();
     ReindexCasRequestResults proto =
-            adminBlockingStub.get().reindexAllCas(ReindexAllCasRequest.newBuilder().build());
+        adminBlockingStub.get().reindexAllCas(ReindexAllCasRequest.newBuilder().build());
     if (hostName != null) {
       proto =
           adminBlockingStub
