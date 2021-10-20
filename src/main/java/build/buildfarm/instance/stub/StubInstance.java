@@ -880,14 +880,13 @@ public class StubInstance implements Instance {
   @Override
   public CasIndexResults reindexCas(@Nullable String hostName) {
     throwIfStopped();
+    ReindexCasRequestResults proto =
+            adminBlockingStub.get().reindexAllCas(ReindexAllCasRequest.newBuilder().build());
     if (hostName != null) {
       ReindexCasRequestResults proto =
           adminBlockingStub
               .get()
               .reindexCas(ReindexCasRequest.newBuilder().setHostId(hostName).build());
-    } else {
-      ReindexCasRequestResults proto =
-          adminBlockingStub.get().reindexAllCas(ReindexAllCasRequest.newBuilder().build());
     }
     CasIndexResults results = new CasIndexResults();
     results.removedHosts = proto.getRemovedHosts();
