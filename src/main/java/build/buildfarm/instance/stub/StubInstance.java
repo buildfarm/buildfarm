@@ -83,7 +83,7 @@ import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ReindexAllCasRequest;
 import build.buildfarm.v1test.ReindexCasRequest;
-import build.buildfarm.v1test.ReindexCasRequestResult;
+import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import build.buildfarm.v1test.ShutDownWorkerGrpc.ShutDownWorkerBlockingStub;
@@ -881,12 +881,12 @@ public class StubInstance implements Instance {
   public CasIndexResults reindexCas(@Nullable String hostName) {
     throwIfStopped();
     if (hostName != null) {
-      ReindexCasRequestResult proto =
+      ReindexCasRequestResults proto =
           adminBlockingStub
               .get()
               .reindexCas(ReindexCasRequest.newBuilder().setHostId(hostName).build());
     } else {
-      ReindexCasRequestResult proto =
+      ReindexCasRequestResults proto =
           adminBlockingStub.get().reindexAllCas(ReindexAllCasRequest.newBuilder().build());
     }
     CasIndexResults results = new CasIndexResults();
