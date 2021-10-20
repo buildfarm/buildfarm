@@ -879,7 +879,7 @@ public class StubInstance implements Instance {
   @Override
   public CasIndexResults reindexCas(@Nullable String hostName) {
     throwIfStopped();
-    if (hostName != Null) {
+    if (hostName != null) {
       ReindexCasRequestResult proto =
           adminBlockingStub
               .get()
