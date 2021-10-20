@@ -14,6 +14,8 @@
 
 package build.buildfarm.common;
 
+import java.util.List;
+
 /**
  * @class CasIndexSettings
  * @brief Settings used to determine how to index CAS entries and remove worker entries.
