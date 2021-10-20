@@ -877,7 +877,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public CasRequestResults reindexCas(String hostName) {
+  public CasIndexResults reindexCas(String hostName) {
     throwIfStopped();
     ReindexCasRequestResults proto =
         adminBlockingStub

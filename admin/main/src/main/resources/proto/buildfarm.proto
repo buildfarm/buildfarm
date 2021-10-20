@@ -69,7 +69,7 @@ message DisableScaleInProtectionRequest{
 message DisableScaleInProtectionRequestResults{
 }
 
-message ReindexCasRequest{
+message ReindexCasRequest {
     string instance_name = 1;
 
     // format: ip:port
@@ -79,7 +79,7 @@ message ReindexCasRequest{
 message ReindexAllCasRequest {
 }
 
-message ReindexCasRequestResults{
+message ReindexCasRequestResults {
     int32 removedHosts = 1;
 
     int32 removedKeys = 2;

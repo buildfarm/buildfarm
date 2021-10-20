@@ -757,7 +757,7 @@ public class RedisShardBackplane implements Backplane {
       activeWorkers.add(hostName);
     }
     for (String workName : allWorkers) {
-      if (!activeWorkers.contains(hostName)) {
+      if (!activeWorkers.contains(workName)) {
         nonactiveWorkers.add(workName);
       }
     }

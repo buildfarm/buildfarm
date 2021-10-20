@@ -26,6 +26,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.TokenizableIterator;
@@ -370,9 +371,9 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public CasIndexResults reindexCas() {
+  public CasIndexResults reindexCas(String hostName) {
     try {
-      return backplane.reindexCas();
+      return backplane.reindexCas(hostName);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

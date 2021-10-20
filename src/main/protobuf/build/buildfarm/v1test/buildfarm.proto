@@ -17,23 +17,23 @@ option java_outer_classname = "OperationQueueProto";
 // The Admin API is used to perform administrative functions on Buildfarm infrastructure
 service Admin {
   rpc TerminateHost(TerminateHostRequest) returns (google.rpc.Status) {
-    option (google.api.http) = {get: "/v1test/admin:terminateHost"};
+    option (google.api.http) = { get: "/v1test/admin:terminateHost" };
   }
 
   rpc StopContainer(StopContainerRequest) returns (google.rpc.Status) {
-    option (google.api.http) = {get: "/v1test/admin:stopContainer"};
+    option (google.api.http) = { get: "/v1test/admin:stopContainer" };
   }
 
   rpc GetHosts(GetHostsRequest) returns (GetHostsResult) {
-    option (google.api.http) = {get: "/v1test/admin:getHosts"};
+    option (google.api.http) = { get: "/v1test/admin:getHosts" };
   }
 
   rpc GetClientStartTime(GetClientStartTimeRequest) returns (GetClientStartTimeResult) {
-    option (google.api.http) = {get: "/v1test/admin:getClientStartTime"};
+    option (google.api.http) = { get: "/v1test/admin:getClientStartTime" };
   }
 
   rpc ScaleCluster(ScaleClusterRequest) returns (google.rpc.Status) {
-    option (google.api.http) = {get: "/v1test/admin:scaleCluster"};
+    option (google.api.http) = { get: "/v1test/admin:scaleCluster" };
   }
 
   rpc ReindexCas(ReindexCasRequest) returns (ReindexCasRequestResults) {
@@ -68,7 +68,7 @@ message DisableScaleInProtectionRequest{
 message DisableScaleInProtectionRequestResults{
 }
 
-message ReindexCasRequest{
+message ReindexCasRequest {
   string instance_name = 1;
 
   // format: ip:port

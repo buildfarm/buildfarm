@@ -190,12 +190,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public CasIndexResults reindexCas(String hostName) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public CasIndexResults reindexAllCas() {
+    public CasIndexResults reindexCas(@Nullable String hostName) {
       throw new UnsupportedOperationException();
     }
 
