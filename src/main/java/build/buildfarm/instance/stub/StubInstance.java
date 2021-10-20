@@ -892,10 +892,10 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public CasIndexResults reindexCas(@Nullable String hostName) {
+  public CasIndexResults reindexAllCas(@Nullable String hostName) {
     throwIfStopped();
     ReindexCasRequestResults proto =
-        adminBlockingStub.get().reindexCas(ReindexAllCasRequest.newBuilder().build());
+        adminBlockingStub.get().reindexAllCas(ReindexAllCasRequest.newBuilder().build());
     CasIndexResults results = new CasIndexResults();
     results.removedHosts = proto.getRemovedHosts();
     results.removedKeys = proto.getRemovedKeys();
