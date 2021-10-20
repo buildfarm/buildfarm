@@ -753,7 +753,7 @@ public class RedisShardBackplane implements Backplane {
     List<String> activeWorkers = new ArrayList<>();
     List<String> nonactiveWorkers = new ArrayList<>();
     for (String key : allUptimeKeys) {
-      String hostName = key.split('/')[1];
+      String hostName = key.split("/")[1];
       activeWorkers.add(hostName);
     }
     for (String workName : allWorkers) {
