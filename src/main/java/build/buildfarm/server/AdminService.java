@@ -173,7 +173,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       ReindexAllCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
     Instance instance;
     try {
-      CasIndexResults results = instance.reindexCas(Null);
+      CasIndexResults results = instance.reindexCas();
       logger.log(INFO, results.toMessage());
       responseObserver.onNext(
           ReindexCasRequestResults.newBuilder()

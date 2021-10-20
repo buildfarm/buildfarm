@@ -727,7 +727,7 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public CasIndexResults reindexCas(String hostName) throws IOException {
+  public CasIndexResults reindexCas(@Nullable String hostName) throws IOException {
     List<String> hostNames = new ArrayList<>();
     if (hostName != null) {
       hostNames.add(hostName);
