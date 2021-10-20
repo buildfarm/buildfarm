@@ -883,7 +883,7 @@ public class StubInstance implements Instance {
     ReindexCasRequestResults proto =
             adminBlockingStub.get().reindexAllCas(ReindexAllCasRequest.newBuilder().build());
     if (hostName != null) {
-      ReindexCasRequestResults proto =
+      proto =
           adminBlockingStub
               .get()
               .reindexCas(ReindexCasRequest.newBuilder().setHostId(hostName).build());
