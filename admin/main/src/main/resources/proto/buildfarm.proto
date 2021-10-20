@@ -37,7 +37,7 @@ service Admin {
     }
 
     rpc ReindexCas(ReindexCasRequest) returns (ReindexCasRequestResults) {
-        option (google.api.http) = {get: "/v1test/admin:reindexCas"};
+        option (google.api.http) = { get: "/v1test/admin:reindexCas" };
     }
 
     rpc ReindexAllCas(ReindexAllCasRequest) returns (ReindexCasRequestResults) {
