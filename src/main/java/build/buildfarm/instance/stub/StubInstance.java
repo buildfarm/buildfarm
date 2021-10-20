@@ -81,6 +81,7 @@ import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.ReindexAllCasRequest;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
