@@ -144,6 +144,7 @@ public interface Instance {
 
   GetClientStartTimeResult getClientStartTime();
 
+  @param hostName hostName description. Can be null
   CasIndexResults reindexCas(@Nullable String hostName);
 
   void deregisterWorker(String workerName);
