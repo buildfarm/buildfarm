@@ -77,6 +77,7 @@ message ReindexCasRequest {
 }
 
 message ReindexAllCasRequest {
+    string instance_name = 1;
 }
 
 message ReindexCasRequestResults {
