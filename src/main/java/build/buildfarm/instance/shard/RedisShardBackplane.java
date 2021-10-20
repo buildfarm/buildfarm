@@ -24,8 +24,8 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
-import build.buildfarm.common.AllCasIndexResults;
-import build.buildfarm.common.AllCasIndexSettings;
+import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.StringVisitor;
@@ -727,12 +727,41 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public AllCasIndexResults reindexAllCas() throws IOException {
-    AllCasIndexSettings settings = new AllCasIndexSettings();
-    // . settings.hostName = hostName;
+  public CasIndexResults reindexCas(String hostName) throws IOException {
+    List<String> hostNames = new ArrayList<>();
+    if (hostName != null) {
+      hostNames.add(hostName);
+    } else {
+      hostNames = getNonactiveWorkers();
+    }
+    CasIndexSettings settings = new CasIndexSettings();
+    settings.hostNames = hostNames;
     settings.casQuery = config.getCasPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
+  }
+
+  public List<String> getNonactiveWorkers() throws IOException {
+    // get all workers
+    List<String> allWorkers = new ArrayList<>(getWorkers());
+    List<String> allUptimeKeys = new ArrayList<>();
+    Map<String, JedisPool> clusterNodes = client.call(jedis -> jedis.getClusterNodes());
+    for (Map.Entry<String, JedisPool> entry : clusterNodes.entrySet()) {
+      Jedis singlejedis = entry.getValue().getResource();
+      allUptimeKeys.addAll(client.call(jedis -> singlejedis.keys("startTime/*:8981")));
+    }
+    List<String> activeWorkers = new ArrayList<>();
+    List<String> nonactiveWorkers = new ArrayList<>();
+    for (String key : allUptimeKeys) {
+      String hostName = key.split('/')[1];
+      activeWorkers.add(hostName);
+    }
+    for (String workName : allWorkers) {
+      if (!activeWorkers.contains(hostName)) {
+        nonactiveWorkers.add(workName);
+      }
+    }
+    return nonactiveWorkers;
   }
 
   @SuppressWarnings("ConstantConditions")

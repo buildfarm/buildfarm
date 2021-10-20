@@ -57,7 +57,7 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
-import build.buildfarm.common.AllCasIndexResults;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -72,7 +72,6 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
-import build.buildfarm.v1test.AllCasRequestResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BackplaneStatusRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -82,7 +81,8 @@ import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.ReindexAllCasRequest;
+import build.buildfarm.v1test.ReindexCasRequest;
+import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import build.buildfarm.v1test.ShutDownWorkerGrpc.ShutDownWorkerBlockingStub;
@@ -877,11 +877,13 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public AllCasRequestResults reindexAllCas() {
+  public CasRequestResults reindexCas(String hostName) {
     throwIfStopped();
-    AllCasRequestResults proto =
-        adminBlockingStub.get().reindexAllCas(ReindexAllCasRequest.newBuilder().build());
-    AllCasIndexResults results = new AllCasIndexResults();
+    ReindexCasRequestResults proto =
+        adminBlockingStub
+            .get()
+            .reindexCas(ReindexCasRequest.newBuilder().setHostId(hostName).build());
+    CasIndexResults results = new CasIndexResults();
     results.removedHosts = proto.getRemovedHosts();
     results.removedKeys = proto.getRemovedKeys();
     results.totalKeys = proto.getTotalKeys();

@@ -17,26 +17,29 @@ option java_outer_classname = "OperationQueueProto";
 // The Admin API is used to perform administrative functions on Buildfarm infrastructure
 service Admin {
   rpc TerminateHost(TerminateHostRequest) returns (google.rpc.Status) {
-    option (google.api.http) = { get: "/v1test/admin:terminateHost" };
+    option (google.api.http) = {get: "/v1test/admin:terminateHost"};
   }
 
   rpc StopContainer(StopContainerRequest) returns (google.rpc.Status) {
-    option (google.api.http) = { get: "/v1test/admin:stopContainer" };
+    option (google.api.http) = {get: "/v1test/admin:stopContainer"};
   }
 
   rpc GetHosts(GetHostsRequest) returns (GetHostsResult) {
-    option (google.api.http) = { get: "/v1test/admin:getHosts" };
+    option (google.api.http) = {get: "/v1test/admin:getHosts"};
   }
 
   rpc GetClientStartTime(GetClientStartTimeRequest) returns (GetClientStartTimeResult) {
-    option (google.api.http) = { get: "/v1test/admin:getClientStartTime" };
+    option (google.api.http) = {get: "/v1test/admin:getClientStartTime"};
   }
 
   rpc ScaleCluster(ScaleClusterRequest) returns (google.rpc.Status) {
-    option (google.api.http) = { get: "/v1test/admin:scaleCluster" };
+    option (google.api.http) = {get: "/v1test/admin:scaleCluster"};
   }
 
-  rpc ReindexAllCas(ReindexAllCasRequest) returns (ReindexAllCasRequestResults) {
+  rpc ReindexCas(ReindexCasRequest) returns (ReindexCasRequestResults) {
+    option (google.api.http) = {get: "/v1test/admin:reindexCas"};
+  }
+  rpc ReindexAllCas(ReindexAllCasRequest) returns (ReindexCasRequestResults) {
     option (google.api.http) = { get: "/v1test/admin:reindexAllCas" };
   }
   
@@ -65,14 +68,17 @@ message DisableScaleInProtectionRequest{
 message DisableScaleInProtectionRequestResults{
 }
 
+message ReindexCasRequest{
+  string instance_name = 1;
+
+  // format: ip:port
+  string host_id = 2;
+  }
+
 message ReindexAllCasRequest {
 }
 
-message ReindexAllCasRequestResults {
-  repeated AllCasRequestResults all_cas_request_results= 1;
-}
-
-message AllCasRequestResults {
+message ReindexCasRequestResults {
   int32 removedHosts = 1;
 
   int32 removedKeys = 2;

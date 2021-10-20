@@ -19,7 +19,6 @@ import static java.util.logging.Level.INFO;
 import build.buildfarm.admin.Admin;
 import build.buildfarm.admin.aws.AwsAdmin;
 import build.buildfarm.admin.gcp.GcpAdmin;
-import build.buildfarm.common.AllCasIndexResults;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;
@@ -153,7 +152,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-      AllCasIndexResults results = instance.reindexAllCas();
+      CasIndexResults results = instance.reindexCas();
       logger.log(INFO, results.toMessage());
       responseObserver.onNext(
           ReindexAllCasRequestResults.newBuilder()

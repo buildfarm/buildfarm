@@ -25,7 +25,7 @@ public class CasIndexSettings {
    * @brief The name of the worker.
    * @details This correlates the the worker that needs removed from CAS entries.
    */
-  public String hostName;
+  public List<String> hostNames;
 
   /**
    * @field scanAmount

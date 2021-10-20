@@ -42,7 +42,7 @@ import build.buildfarm.ac.FilesystemActionCache;
 import build.buildfarm.ac.GrpcActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorages;
-import build.buildfarm.common.AllCasIndexResults;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.TokenizableIterator;
@@ -1043,7 +1043,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public AllCasIndexResults reindexAllCas() {
+  public CasIndexResults reindexCas(String hostName) {
     throw new UnsupportedOperationException();
   }
 

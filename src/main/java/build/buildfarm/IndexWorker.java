@@ -14,6 +14,7 @@
 
 package build.buildfarm;
 
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
@@ -36,10 +37,10 @@ class IndexWorker {
     String host = args[0];
     String instanceName = args[1];
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
-    // . String reindexworker = args[3];
+    String reindexworker = args[3];
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
-    CasIndexResults results = instance.reindexAllCas();
+    CasIndexResults results = instance.reindexCas(reindexworker);
     System.out.println(results.toMessage());
     instance.stop();
   }

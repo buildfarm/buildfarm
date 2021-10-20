@@ -19,7 +19,6 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.Watcher;
@@ -86,7 +85,7 @@ public interface Backplane {
   boolean removeWorker(String workerName, String reason) throws IOException;
 
   @ThreadSafe
-  CasIndexResults reindexAllCas() throws IOException;
+  CasIndexResults reindexCas(String workerName) throws IOException;
 
   @ThreadSafe
   void deregisterWorker(String hostName) throws IOException;
