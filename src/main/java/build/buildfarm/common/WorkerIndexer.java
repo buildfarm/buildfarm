@@ -83,8 +83,8 @@ public class WorkerIndexer {
           removeWorkerFromCasKeys(cluster, scanResult.getResult(), hostName, results);
         }
         cursor = scanResult.getCursor();
-      } while (!cursor.equals("0"));
-    }
+      }
+    } while (!cursor.equals("0"));
   }
 
   /**
