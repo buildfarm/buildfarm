@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import tech.aurora.bfadmin.model.ClusterDetails;
 import tech.aurora.bfadmin.model.ClusterInfo;
 import tech.aurora.bfadmin.service.AdminService;
+import build.buildfarm.v1test.ReindexCasRequestResults;
 
 import java.util.List;
 
@@ -52,7 +53,7 @@ public class AdminApi {
   }
 
   @RequestMapping("/reindexallcas")
-  public void reindexAllCas() {
+  public ReindexCasRequestResults reindexAllCas() {
     return adminService.reindexAllCas();
   }
 
