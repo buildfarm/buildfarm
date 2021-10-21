@@ -750,7 +750,6 @@ public class RedisShardBackplane implements Backplane {
       Jedis singlejedis = entry.getValue().getResource();
       allUptimeKeys.addAll(client.call(jedis -> singlejedis.keys("startTime/*:8981")));
     }
-    List<String> allWorkers = new ArrayList<>();
     List<String> nonactiveWorkers = new ArrayList<>();
     for (String key : allUptimeKeys) {
       String hostName = key.split("/")[1];
