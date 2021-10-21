@@ -245,7 +245,7 @@ public class AdminServiceImpl implements AdminService {
     AdminGrpc.AdminStub stub = AdminGrpc.newStub(channel);
     ReindexAllCasRequest request = ReindexAllCasRequest.newBuilder().setInstanceName("shard").build();
     ReindexCasRequestResults result = stub.reindexAllCas(request);
-    logger.info("Reindexed {} hosts and {} keys from total {} keys", result.getRemovedHosts, result.getRemovedKeys, result.getTotalKeys);
+    logger.info("Reindexed {} hosts and {} keys from total {} keys", result.getRemovedHosts(), result.getRemovedKeys(), result.getTotalKeys());
   }
 
   private Map<String, Long>  getAllContainersUptime(AdminGrpc.AdminBlockingStub stub) {
