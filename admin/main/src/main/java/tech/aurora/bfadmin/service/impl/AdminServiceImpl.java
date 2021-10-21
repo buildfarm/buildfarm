@@ -237,6 +237,15 @@ public class AdminServiceImpl implements AdminService {
     return asgNames;
   }
 
+  @Override
+  public void reindexAllCas(){
+    ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
+    AdminGrpc.AdminStub stub = AdminGrpc.newStub(channel);
+    ReindexAllCasRequest request = ReindexAllCasRequest.newBuilder().setInstanceName("shard").build();
+    ReindexCasRequestResults result = stub.reindexAllCas(request);
+    logger.info("Reindexed {} hosts and {} keys from total {} keys", result.getRemovedHosts, result.getRemovedKeys, result.getTotalKeys);
+  }
+
   private Map<String, Long>  getAllContainersUptime(AdminGrpc.AdminBlockingStub stub) {
     GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder().setInstanceName("shard").build();
     GetClientStartTimeResult result = stub.getClientStartTime(request);

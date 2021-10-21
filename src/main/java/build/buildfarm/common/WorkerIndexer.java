@@ -76,13 +76,13 @@ public class WorkerIndexer {
 
     String cursor = "0";
     ScanResult scanResult;
-    for (String hostName : settings.hostNames) {
-      do {
-        scanResult = node.scan(cursor, params);
-        if (scanResult != null) {
+    do {
+      scanResult = node.scan(cursor, params);
+      if (scanResult != null) {
+        for (String hostName : settings.hostNames) {
           removeWorkerFromCasKeys(cluster, scanResult.getResult(), hostName, results);
-          cursor = scanResult.getCursor();
         }
+        cursor = scanResult.getCursor();
       } while (!cursor.equals("0"));
     }
   }

@@ -51,6 +51,11 @@ public class AdminApi {
     return adminService.getClusterDetails();
   }
 
+  @RequestMapping("/reindexallcas")
+  public void reindexAllCas() {
+    return adminService.reindexAllCas();
+  }
+
   @RequestMapping("/restart/{instanceId}")
   public int restartContainer(@PathVariable String instanceId) {
     if (instanceId.contains("ip")) {

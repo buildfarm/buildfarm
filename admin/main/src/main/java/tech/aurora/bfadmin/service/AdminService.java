@@ -17,6 +17,8 @@ public interface AdminService {
 
   ClusterDetails getClusterDetails();
 
+  void reindexAllCas();
+
   String scaleGroup(String asgName, Integer desiredInstances);
 
   int terminateInstance(String instanceId, String grpcEndpoint, int grpcPort);
