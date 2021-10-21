@@ -133,7 +133,7 @@ public class Worker extends LoggingMain {
   private final ShardWorkerInstance instance;
 
   @SuppressWarnings("deprecation")
-  private final HealthStatusManager healthStatusManager;
+  private final HealthStatusManager healthStatusManager = new HealthStatusManager();
 
   private final Server server;
   private final Path root;
@@ -449,7 +449,6 @@ public class Worker extends LoggingMain {
     pipeline.add(executeActionStage, 2);
     pipeline.add(reportResultStage, 1);
 
-    healthStatusManager = new HealthStatusManager();
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())

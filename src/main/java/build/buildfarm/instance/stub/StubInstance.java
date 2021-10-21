@@ -872,7 +872,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+  public GetClientStartTimeResult getClientStartTime() {
     throw new UnsupportedOperationException();
   }
 
