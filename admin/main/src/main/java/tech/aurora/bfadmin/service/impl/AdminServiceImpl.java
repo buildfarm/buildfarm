@@ -6,6 +6,8 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
+import build.buildfarm.v1test.ReindexAllCasRequest;
+import build.buildfarm.v1test.ReindexCasRequestResults;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
 import com.amazonaws.services.autoscaling.model.AutoScalingGroup;
