@@ -130,13 +130,18 @@ message Host {
     string lifecycle = 10;
 }
 
+
 message GetClientStartTimeRequest {
     string instance_name = 1;
-    string client_key = 2;
 }
 
 message GetClientStartTimeResult {
-    google.protobuf.Timestamp client_start_time = 1;
+    repeated GetClientStartTime client_start_time = 1;
+}
+
+message GetClientStartTime {
+    string instance_name = 1;
+    google.protobuf.Timestamp client_start_time = 2;
 }
 
 message ScaleClusterRequest {

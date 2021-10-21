@@ -362,9 +362,9 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+  public GetClientStartTimeResult getClientStartTime() {
     try {
-      return backplane.getClientStartTime(clientKey);
+      return backplane.getClientStartTime();
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

@@ -307,5 +307,5 @@ public interface Backplane {
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
 
   @ThreadSafe
-  GetClientStartTimeResult getClientStartTime(String clientKey) throws IOException;
+  GetClientStartTimeResult getClientStartTime() throws IOException;
 }
