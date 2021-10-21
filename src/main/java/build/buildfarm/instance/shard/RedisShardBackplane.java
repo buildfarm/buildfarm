@@ -743,22 +743,19 @@ public class RedisShardBackplane implements Backplane {
 
   public List<String> getNonactiveWorkers() throws IOException {
     // get all workers
-    List<String> allWorkers = new ArrayList<>(getWorkers());
+    List<String> activeWorkers = new ArrayList<>(getWorkers());
     List<String> allUptimeKeys = new ArrayList<>();
     Map<String, JedisPool> clusterNodes = client.call(jedis -> jedis.getClusterNodes());
     for (Map.Entry<String, JedisPool> entry : clusterNodes.entrySet()) {
       Jedis singlejedis = entry.getValue().getResource();
       allUptimeKeys.addAll(client.call(jedis -> singlejedis.keys("startTime/*:8981")));
     }
-    List<String> activeWorkers = new ArrayList<>();
+    List<String> allWorkers = new ArrayList<>();
     List<String> nonactiveWorkers = new ArrayList<>();
     for (String key : allUptimeKeys) {
       String hostName = key.split("/")[1];
-      activeWorkers.add(hostName);
-    }
-    for (String workName : allWorkers) {
-      if (!activeWorkers.contains(workName)) {
-        nonactiveWorkers.add(workName);
+      if (!activeWorkers.contains(hostName)) {
+        nonactiveWorkers.add(hostName);
       }
     }
     return nonactiveWorkers;

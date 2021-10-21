@@ -76,13 +76,15 @@ public class WorkerIndexer {
 
     String cursor = "0";
     ScanResult scanResult;
-    do {
-      scanResult = node.scan(cursor, params);
-      if (scanResult != null) {
-        removeWorkerFromCasKeys(cluster, scanResult.getResult(), settings.hostNames, results);
-        cursor = scanResult.getCursor();
-      }
-    } while (!cursor.equals("0"));
+    for (String hostName : settings.hostNames) {
+      do {
+        scanResult = node.scan(cursor, params);
+        if (scanResult != null) {
+          removeWorkerFromCasKeys(cluster, scanResult.getResult(), hostName, results);
+          cursor = scanResult.getCursor();
+        }
+      } while (!cursor.equals("0"));
+    }
   }
 
   /**
@@ -94,20 +96,15 @@ public class WorkerIndexer {
    * @param results Accumulating results from performing reindexing.
    */
   private static void removeWorkerFromCasKeys(
-      JedisCluster cluster,
-      List<String> casKeys,
-      List<String> workerNames,
-      CasIndexResults results) {
-    for (String workerName : workerNames) {
-      for (String casKey : casKeys) {
-        results.totalKeys++;
-        if (cluster.srem(casKey, workerName) == 1) {
-          results.removedHosts++;
-        }
-        if (cluster.scard(casKey) == 0) {
-          results.removedKeys++;
-          cluster.del(casKey);
-        }
+      JedisCluster cluster, List<String> casKeys, String workerName, CasIndexResults results) {
+    for (String casKey : casKeys) {
+      results.totalKeys++;
+      if (cluster.srem(casKey, workerName) == 1) {
+        results.removedHosts++;
+      }
+      if (cluster.scard(casKey) == 0) {
+        results.removedKeys++;
+        cluster.del(casKey);
       }
     }
   }
