@@ -1,5 +1,6 @@
 package tech.aurora.bfadmin.service;
 
+import build.buildfarm.v1test.ReindexCasRequestResults;
 import tech.aurora.bfadmin.model.ClusterDetails;
 import tech.aurora.bfadmin.model.ClusterInfo;
 
@@ -17,7 +18,7 @@ public interface AdminService {
 
   ClusterDetails getClusterDetails();
 
-  void reindexAllCas();
+  ReindexCasRequestResults reindexAllCas();
 
   String scaleGroup(String asgName, Integer desiredInstances);
 
