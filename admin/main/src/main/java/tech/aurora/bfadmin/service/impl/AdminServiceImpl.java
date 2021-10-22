@@ -242,7 +242,7 @@ public class AdminServiceImpl implements AdminService {
   @Override
   public ReindexCasRequestResults reindexAllCas(){
     ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
-    AdminGrpc.AdminStub stub = AdminGrpc.newStub(channel);
+    AdminGrpc.AdminBlockingStub stub = AdminGrpc.newBlockingStub(channel);
     ReindexAllCasRequest request = ReindexAllCasRequest.newBuilder().setInstanceName("shard").build();
     ReindexCasRequestResults result = stub.reindexAllCas(request);
     logger.info("Reindexed {} hosts and {} keys from total {} keys", result.getRemovedHosts(), result.getRemovedKeys(), result.getTotalKeys());
