@@ -244,7 +244,7 @@ public class AdminServiceImpl implements AdminService {
     ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
     AdminGrpc.AdminStub stub = AdminGrpc.newStub(channel);
     ReindexAllCasRequest request = ReindexAllCasRequest.newBuilder().setInstanceName("shard").build();
-    ReindexCasRequestResults result = stub.reindexAllCas(request);
+    stub.reindexAllCas(request);
   }
 
   private Map<String, Long>  getAllContainersUptime(AdminGrpc.AdminBlockingStub stub) {
