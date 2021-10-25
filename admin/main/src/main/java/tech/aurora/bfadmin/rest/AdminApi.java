@@ -54,7 +54,7 @@ public class AdminApi {
   }
 
   @RequestMapping("/reindexallcas")
-  public ReindexCasRequestResults reindexAllCas() {
+  public void reindexAllCas() {
     return adminService.reindexAllCas();
   }
 

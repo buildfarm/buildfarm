@@ -18,7 +18,7 @@ public interface AdminService {
 
   ClusterDetails getClusterDetails();
 
-  ReindexCasRequestResults reindexAllCas();
+  void reindexAllCas();
 
   String scaleGroup(String asgName, Integer desiredInstances);
 
