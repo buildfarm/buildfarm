@@ -1651,18 +1651,28 @@ public class ShardInstance extends AbstractServerInstance {
     return requeuedFuture;
   }
 
-  String tooManyRequeuesError(
-      String operationName, int currentAttempt, int maxRequeueAttempts) {
+  String operationBlockedError(String operationName) {
+    // Client facing message.
+    return String.format("Operation %s not requeued. " + BLOCK_LIST_ERROR, operationName);
+  }
+
+  String tooManyRequeuesError(String operationName, int currentAttempt, int maxRequeueAttempts) {
+    // Client facing message.
     // If an operation fails from excessive requeue, show this error to the client.  Multiple
     // requeue failures are likely caused by another issue, however its helpful to show the requeue
     // amount to the user in case the attempt amount are improperly configured.
     return String.format(
-        "Operation %s has been requeued too many times ( %d > %d)",
+        "Operation %s not requeued.  Operation has been requeued too many times ( %d > %d)",
         operationName, currentAttempt, maxRequeueAttempts);
   }
-  
-  String operationMissingError(String operationName) {
-    return String.format("Operation %s no longer exists",operationName);
+
+  String operationMissingMessage(String operationName) {
+    return String.format("Operation %s not requeued.  Operation no longer exists", operationName);
+  }
+
+  String operationCompleteMessage(String operationName) {
+    return String.format(
+        "Operation %s not requeued.  Operation has already completed", operationName);
   }
 
   void putFailedOperation(ExecuteEntry executeEntry, String errorMessage) {
@@ -1674,7 +1684,7 @@ public class ShardInstance extends AbstractServerInstance {
             .setMetadata(
                 Any.pack(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED)));
 
-    // put the operation back into the backplane with a failed preconfition.
+    // put the operation back into the backplane with a failed precondition.
     putOperation(
         failedOperation
             .setResponse(Any.pack(denyActionResponse(executeEntry.getActionDigest(), errorMessage)))
@@ -1691,42 +1701,43 @@ public class ShardInstance extends AbstractServerInstance {
 
       // Skip requeuing and fail the operation if its in a deny list.
       if (inDenyList(executeEntry.getRequestMetadata())) {
-        String errorMessage = BLOCK_LIST_ERROR;
-        logger.log(Level.WARNING, errorMessage);
-        putFailedOperation(executeEntry, errorMessage);
+        String msg = operationBlockedError(operationName);
+        logger.log(Level.WARNING, msg);
+        putFailedOperation(executeEntry, msg);
         return IMMEDIATE_VOID_FUTURE;
       }
 
       // Skip requeuing and fail the operation if its already been requeued too many times.
       if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
-        String errorMessage =
+        String msg =
             tooManyRequeuesError(
                 operationName, queueEntry.getRequeueAttempts(), maxRequeueAttempts);
-        logger.log(Level.WARNING, errorMessage);
-        putFailedOperation(executeEntry, errorMessage);
+        logger.log(Level.WARNING, msg);
+        putFailedOperation(executeEntry, msg);
         return IMMEDIATE_VOID_FUTURE;
       }
-      
+
       // Skip requeuing and fail the operation if we couldn't find it.
       // This would prevent us from being able to requeue it anyways.
       Operation operation = getOperation(operationName);
       if (operation == null) {
-        String errorMessage = operationMissingError(operationName);
-        logger.log(Level.WARNING,errorMessage);
+        String msg = operationMissingMessage(operationName);
+        logger.log(Level.WARNING, msg);
         backplane.deleteOperation(operationName); // signal watchers
         return IMMEDIATE_VOID_FUTURE;
       }
-      
+
       // Skip requeuing the operation if its already done.
       // Perhaps the operation was just completed by a worker.
       if (operation.getDone()) {
-        logger.log(Level.WARNING, "Operation " + operation.getName() + " has already completed");
-          backplane.completeOperation(operationName);
+        String msg = operationCompleteMessage(operationName);
+        logger.log(Level.WARNING, msg);
+        backplane.completeOperation(operationName);
         return IMMEDIATE_VOID_FUTURE;
       }
 
+      // Requeue the action as long as the result is not already cached.
       ActionKey actionKey = DigestUtil.asActionKey(executeEntry.getActionDigest());
-
       ListenableFuture<Boolean> cachedResultFuture;
       if (executeEntry.getSkipCacheLookup()) {
         cachedResultFuture = immediateFuture(false);
