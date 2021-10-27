@@ -30,7 +30,7 @@ A pipeline handles operations as they arrive and are processed on a worker. Each
 
 ## Stages
 
-![Stages](https://github.com/bazelbuild/bazel-buildfarm/wiki/images/WorkerStages.png)
+![Stages]({{site.url}}{{site.baseurl}}/assets/images/WorkerStages.png)
 
 Stages have access to a WorkerContext provided to them by their Worker implementation (OperationQueue or Shard) which is used for all activity common across Worker types. Each stage must claim the subsequent stage before submitting it for processing. This allows measurement of processing time and latency for each operation per stage without any interleaving.
 

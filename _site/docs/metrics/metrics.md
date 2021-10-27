@@ -9,11 +9,11 @@ nav_order: 4
 
 To enable emitting of Prometheus metrics, add the following configuration to your configuration file:
 
-`
+```
 prometheus_config: {
   port: 9090
 }
-`
+```
 
 ## Available Prometheus Metrics
 

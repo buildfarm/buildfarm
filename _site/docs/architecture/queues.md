@@ -12,7 +12,7 @@ This section discusses the purpose and design of the Operation queue.  It also d
 Some time after an Action execute request occurs, the longrunning operation it corresponds to will enter the QUEUED state, and will receive an update to that effect on the operation response stream. An operation in the QUEUED state is present in an Operation Queue, which holds the operations in sequence until a worker is available to execute it.
 
 Schedulers put operations on the queue.  Workers take them off.
-![Operation Queue](images/Operation-Queue1.png)  
+![Operation Queue]({{site.url}}{{site.baseurl}}/assets/images/Operation-Queue1.png)  
 
 ## Working with different platform requirements 
 Some operations' Actions may have specific platform requirements in order to execute.
@@ -29,7 +29,7 @@ The matching algorithm is performed by the operation queue when the caller is re
 The matching algorithm is designed to find the appropriate queue to perform these actions on.
 On the scheduler side, the action's platform properties are used for matching.
 On the worker side, the `dequeue_match_settings` are used.
-![Operation Queue Matching](images/Operation-Queue-Matching1.png)  
+![Operation Queue Matching]({{site.url}}{{site.baseurl}}/assets/images/Operation-Queue-Matching1.png)  
 
 This is how the matching algorithm works:
 Each provision queue is checked in the order that it is configured.
