@@ -55,6 +55,7 @@ public class AdminApi {
 
   @RequestMapping("/reindexallcas")
   public void reindexAllCas() {
+    adminService.reindexAllCas();
   }
 
   @RequestMapping("/restart/{instanceId}")
