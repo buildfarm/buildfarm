@@ -1691,48 +1691,58 @@ public class ShardInstance extends AbstractServerInstance {
             .build());
   }
 
+  private boolean canOperationBeRequeued(
+      QueueEntry queueEntry, ExecuteEntry executeEntry, Operation operation) throws IOException {
+    String operationName = executeEntry.getOperationName();
+
+    // Skip requeuing and fail the operation if its in a deny list.
+    if (inDenyList(executeEntry.getRequestMetadata())) {
+      String msg = operationBlockedError(operationName);
+      logger.log(Level.WARNING, msg);
+      putFailedOperation(executeEntry, msg);
+      return false;
+    }
+
+    // Skip requeuing and fail the operation if its already been requeued too many times.
+    if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
+      String msg =
+          tooManyRequeuesError(operationName, queueEntry.getRequeueAttempts(), maxRequeueAttempts);
+      logger.log(Level.WARNING, msg);
+      putFailedOperation(executeEntry, msg);
+      return false;
+    }
+
+    // Skip requeuing and fail the operation if we couldn't find it.
+    // This would prevent us from being able to requeue it anyways.
+    if (operation == null) {
+      String msg = operationMissingMessage(operationName);
+      logger.log(Level.WARNING, msg);
+      backplane.deleteOperation(operationName); // signal watchers
+      return false;
+    }
+
+    // Skip requeuing the operation if its already done.
+    // Perhaps the operation was just completed by a worker.
+    if (operation.getDone()) {
+      String msg = operationCompleteMessage(operationName);
+      logger.log(Level.WARNING, msg);
+      backplane.completeOperation(operationName);
+      return false;
+    }
+
+    return true;
+  }
+
   @VisibleForTesting
   public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry, Duration timeout) {
     ListenableFuture<Void> future;
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+    Operation operation = getOperation(executeEntry.getOperationName());
 
     try {
-      String operationName = executeEntry.getOperationName();
-
-      // Skip requeuing and fail the operation if its in a deny list.
-      if (inDenyList(executeEntry.getRequestMetadata())) {
-        String msg = operationBlockedError(operationName);
-        logger.log(Level.WARNING, msg);
-        putFailedOperation(executeEntry, msg);
-        return IMMEDIATE_VOID_FUTURE;
-      }
-
-      // Skip requeuing and fail the operation if its already been requeued too many times.
-      if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
-        String msg =
-            tooManyRequeuesError(
-                operationName, queueEntry.getRequeueAttempts(), maxRequeueAttempts);
-        logger.log(Level.WARNING, msg);
-        putFailedOperation(executeEntry, msg);
-        return IMMEDIATE_VOID_FUTURE;
-      }
-
-      // Skip requeuing and fail the operation if we couldn't find it.
-      // This would prevent us from being able to requeue it anyways.
-      Operation operation = getOperation(operationName);
-      if (operation == null) {
-        String msg = operationMissingMessage(operationName);
-        logger.log(Level.WARNING, msg);
-        backplane.deleteOperation(operationName); // signal watchers
-        return IMMEDIATE_VOID_FUTURE;
-      }
-
-      // Skip requeuing the operation if its already done.
-      // Perhaps the operation was just completed by a worker.
-      if (operation.getDone()) {
-        String msg = operationCompleteMessage(operationName);
-        logger.log(Level.WARNING, msg);
-        backplane.completeOperation(operationName);
+      // check preconditions before trying to requeue.
+      boolean canRequeue = canOperationBeRequeued(queueEntry, executeEntry, operation);
+      if (!canRequeue) {
         return IMMEDIATE_VOID_FUTURE;
       }
 
