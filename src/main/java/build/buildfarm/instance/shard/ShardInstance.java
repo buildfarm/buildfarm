@@ -1652,12 +1652,10 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   String operationBlockedError(String operationName) {
-    // Client facing message.
     return String.format("Operation %s not requeued. " + BLOCK_LIST_ERROR, operationName);
   }
 
   String tooManyRequeuesError(String operationName, int currentAttempt, int maxRequeueAttempts) {
-    // Client facing message.
     // If an operation fails from excessive requeue, show this error to the client.  Multiple
     // requeue failures are likely caused by another issue, however its helpful to show the requeue
     // amount to the user in case the attempt amount are improperly configured.
