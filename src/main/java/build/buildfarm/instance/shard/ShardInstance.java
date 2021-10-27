@@ -175,6 +175,8 @@ public class ShardInstance extends AbstractServerInstance {
           .register();
   private static final Counter casMissCounter =
       Counter.build().name("cas_miss").help("Number of CAS misses from worker-worker.").register();
+  private static final Counter requeueFailureCounter =
+      Counter.build().name("requeue_failure").help("Number of operations that failed to requeue.").register();
   // Metrics about the dispatched operations
   private static final Gauge dispatchedOperationsSize =
       Gauge.build()
@@ -1696,6 +1698,7 @@ public class ShardInstance extends AbstractServerInstance {
     // Skip requeuing and fail the operation if its in a deny list.
     if (inDenyList(executeEntry.getRequestMetadata())) {
       String msg = operationBlockedError(operationName);
+      requeueFailureCounter.inc();
       logger.log(Level.WARNING, msg);
       putFailedOperation(executeEntry, msg);
       return false;
@@ -1705,6 +1708,7 @@ public class ShardInstance extends AbstractServerInstance {
     if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
       String msg =
           tooManyRequeuesError(operationName, queueEntry.getRequeueAttempts(), maxRequeueAttempts);
+      requeueFailureCounter.inc();
       logger.log(Level.WARNING, msg);
       putFailedOperation(executeEntry, msg);
       return false;
@@ -1714,6 +1718,7 @@ public class ShardInstance extends AbstractServerInstance {
     // This would prevent us from being able to requeue it anyways.
     if (operation == null) {
       String msg = operationMissingMessage(operationName);
+      requeueFailureCounter.inc();
       logger.log(Level.WARNING, msg);
       backplane.deleteOperation(operationName); // signal watchers
       return false;
@@ -1723,7 +1728,7 @@ public class ShardInstance extends AbstractServerInstance {
     // Perhaps the operation was just completed by a worker.
     if (operation.getDone()) {
       String msg = operationCompleteMessage(operationName);
-      logger.log(Level.WARNING, msg);
+      logger.log(Level.INFO, msg);
       backplane.completeOperation(operationName);
       return false;
     }
