@@ -240,11 +240,12 @@ public class AdminServiceImpl implements AdminService {
   }
 
   @Override
-  public void reindexAllCas(){
+  public ReindexCasRequestResults reindexAllCas(){
     ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
     AdminGrpc.AdminFutureStub stub = AdminGrpc.newFutureStub(channel);
     ReindexAllCasRequest request = ReindexAllCasRequest.newBuilder().setInstanceName("shard").build();
-    stub.reindexAllCas(request);
+    ReindexCasRequestResults result = stub.reindexAllCas(request);
+    return result
   }
 
   private Map<String, Long>  getAllContainersUptime(AdminGrpc.AdminBlockingStub stub) {
