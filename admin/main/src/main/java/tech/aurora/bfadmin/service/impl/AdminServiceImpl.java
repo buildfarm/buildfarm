@@ -245,7 +245,7 @@ public class AdminServiceImpl implements AdminService {
     AdminGrpc.AdminFutureStub stub = AdminGrpc.newFutureStub(channel);
     ReindexAllCasRequest request = ReindexAllCasRequest.newBuilder().setInstanceName("shard").build();
     ReindexCasRequestResults result = stub.reindexAllCas(request);
-    return result
+    return result;
   }
 
   private Map<String, Long>  getAllContainersUptime(AdminGrpc.AdminBlockingStub stub) {
