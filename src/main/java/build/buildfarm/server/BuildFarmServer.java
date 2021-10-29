@@ -54,6 +54,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
+import build.buildfarm.instance.Instance;
 
 @SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
@@ -84,7 +85,12 @@ public class BuildFarmServer extends LoggingMain {
       String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
+    
+    //TODO: remove this
     instances = new BuildFarmInstances(session, config.getInstance(), this::stop);
+    
+    
+    Instance instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
 
     healthStatusManager = new HealthStatusManager();
 
@@ -96,8 +102,8 @@ public class BuildFarmServer extends LoggingMain {
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instances))
-            .addService(new CapabilitiesService(instances))
+            .addService(new ActionCacheService(instance))
+            .addService(new CapabilitiesService(instance))
             .addService(
                 new ContentAddressableStorageService(
                     instances,

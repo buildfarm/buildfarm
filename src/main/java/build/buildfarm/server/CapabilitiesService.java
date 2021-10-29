@@ -27,23 +27,15 @@ public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
   private static final Counter numberOfRemoteInvocations =
       Counter.build().name("remote_invocations").help("Number of remote invocations.").register();
 
-  private final BuildFarmInstances instances;
+  private final Instance instance;
 
-  public CapabilitiesService(BuildFarmInstances instances) {
-    this.instances = instances;
+  public CapabilitiesService(Instance instance) {
+    this.instance = instance;
   }
 
   @Override
   public void getCapabilities(
       GetCapabilitiesRequest request, StreamObserver<ServerCapabilities> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-      numberOfRemoteInvocations.inc();
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-      return;
-    }
 
     responseObserver.onNext(
         instance

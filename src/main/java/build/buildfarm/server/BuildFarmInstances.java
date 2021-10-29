@@ -33,6 +33,35 @@ public class BuildFarmInstances {
 
   private final Instance defaultInstance;
 
+
+  //TODO: get rid of everything except this
+  public static Instance createInstance(String session, InstanceConfig instanceConfig, Runnable onStop)       throws InterruptedException, ConfigurationException {
+    String name = instanceConfig.getName();
+    HashFunction hashFunction = getValidHashFunction(instanceConfig);
+    DigestUtil digestUtil = new DigestUtil(hashFunction);
+    Instance instance;
+    switch (instanceConfig.getTypeCase()) {
+      default:
+      case TYPE_NOT_SET:
+        throw new IllegalArgumentException("Instance type not set in config");
+      case MEMORY_INSTANCE_CONFIG:
+        instance =
+            new MemoryInstance(name, digestUtil, instanceConfig.getMemoryInstanceConfig());
+        break;
+      case SHARD_INSTANCE_CONFIG:
+        instance =
+            new ShardInstance(
+                name,
+                session + "-" + name,
+                digestUtil,
+                instanceConfig.getShardInstanceConfig(),
+                onStop);
+        break;
+    }
+    return instance;
+  }
+
+
   public BuildFarmInstances(String session, InstanceConfig instanceConfig, Runnable onStop)
       throws InterruptedException, ConfigurationException {
     String name = instanceConfig.getName();
@@ -62,7 +91,7 @@ public class BuildFarmInstances {
     defaultInstance = instance;
   }
 
-  private Instance getDefault() {
+  public Instance getDefault() {
     return defaultInstance;
   }
 

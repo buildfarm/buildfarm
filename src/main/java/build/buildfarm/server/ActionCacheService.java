@@ -40,22 +40,15 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   private static final Counter actionResultsMetric =
       Counter.build().name("action_results").help("Action results.").register();
 
-  private final BuildFarmInstances instances;
+  private final Instance instance;
 
-  public ActionCacheService(BuildFarmInstances instances) {
-    this.instances = instances;
+  public ActionCacheService(Instance instance) {
+    this.instance = instance;
   }
 
   @Override
   public void getActionResult(
       GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
 
     ListenableFuture<ActionResult> resultFuture =
         instance.getActionResult(
@@ -109,13 +102,6 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   @Override
   public void updateActionResult(
       UpdateActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
 
     ActionResult actionResult = request.getActionResult();
     try {
