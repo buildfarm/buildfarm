@@ -40,9 +40,9 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   private static final Counter actionResultsMetric =
       Counter.build().name("action_results").help("Action results.").register();
 
-  private final Instances instances;
+  private final BuildFarmInstances instances;
 
-  public ActionCacheService(Instances instances) {
+  public ActionCacheService(BuildFarmInstances instances) {
     this.instances = instances;
   }
 

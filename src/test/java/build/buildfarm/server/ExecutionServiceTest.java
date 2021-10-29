@@ -38,11 +38,11 @@ import org.mockito.ArgumentCaptor;
 
 @RunWith(JUnit4.class)
 public class ExecutionServiceTest {
-  private Instances instances;
+  private BuildFarmInstances instances;
 
   @Before
   public void setUp() throws Exception {
-    instances = mock(Instances.class);
+    instances = mock(BuildFarmInstances.class);
   }
 
   @SuppressWarnings("unchecked")
