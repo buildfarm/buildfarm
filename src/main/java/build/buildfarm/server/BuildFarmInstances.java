@@ -57,8 +57,8 @@ public class BuildFarmInstances {
         break;
     }
   }
-  
-  public BuildFarmInstances(Instance instance){
+
+  public BuildFarmInstances(Instance instance) {
     defaultInstance = instance;
   }
 

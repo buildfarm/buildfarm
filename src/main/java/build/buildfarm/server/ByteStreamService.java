@@ -85,7 +85,8 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
   }
 
-  public ByteStreamService(BuildFarmInstances instances, long deadlineAfter, TimeUnit deadlineAfterUnits) {
+  public ByteStreamService(
+      BuildFarmInstances instances, long deadlineAfter, TimeUnit deadlineAfterUnits) {
     this.instances = instances;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
