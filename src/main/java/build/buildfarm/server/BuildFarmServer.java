@@ -70,7 +70,7 @@ public class BuildFarmServer extends LoggingMain {
           .register();
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-  private final Instances instances;
+  private final BuildFarmInstances instances;
   private final HealthStatusManager healthStatusManager;
   private final Server server;
   private boolean stopping = false;

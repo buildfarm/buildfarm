@@ -25,7 +25,7 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import javax.naming.ConfigurationException;
 
-public class BuildFarmInstances implements Instances {
+public class BuildFarmInstances {
   public static StatusException toStatusException(InstanceNotFoundException e) {
     String errorMessage = String.format("Instance \"%s\" not known to Service", e.instanceName);
     return Status.NOT_FOUND.withDescription(errorMessage).asException();
@@ -57,12 +57,15 @@ public class BuildFarmInstances implements Instances {
         break;
     }
   }
+  
+  public BuildFarmInstances(Instance instance){
+    defaultInstance = instance;
+  }
 
   private Instance getDefault() {
     return defaultInstance;
   }
 
-  @Override
   public Instance get(String name) throws InstanceNotFoundException {
     if (defaultInstance == null) {
       throw new InstanceNotFoundException(name);
@@ -71,32 +74,27 @@ public class BuildFarmInstances implements Instances {
     }
   }
 
-  @Override
   public Instance getFromOperationsCollectionName(String operationsCollectionName)
       throws InstanceNotFoundException {
     String instanceName = UrlPath.fromOperationsCollectionName(operationsCollectionName);
     return get(instanceName);
   }
 
-  @Override
   public Instance getFromOperationName(String operationName) throws InstanceNotFoundException {
     String instanceName = UrlPath.fromOperationName(operationName);
     return get(instanceName);
   }
 
-  @Override
   public Instance getFromOperationStream(String operationStream) throws InstanceNotFoundException {
     String instanceName = UrlPath.fromOperationStream(operationStream);
     return get(instanceName);
   }
 
-  @Override
   public Instance getFromBlob(String blobName) throws InstanceNotFoundException {
     String instanceName = UrlPath.fromBlobName(blobName);
     return get(instanceName);
   }
 
-  @Override
   public Instance getFromUploadBlob(String uploadBlobName) throws InstanceNotFoundException {
     String instanceName = UrlPath.fromUploadBlobName(uploadBlobName);
     return get(instanceName);
@@ -111,12 +109,10 @@ public class BuildFarmInstances implements Instances {
     }
   }
 
-  @Override
   public void start(String publicName) {
     defaultInstance.start(publicName);
   }
 
-  @Override
   public void stop() throws InterruptedException {
     defaultInstance.stop();
   }

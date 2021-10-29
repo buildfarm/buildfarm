@@ -25,9 +25,9 @@ import java.util.logging.Logger;
 class FetchService extends FetchImplBase {
   public static final Logger logger = Logger.getLogger(ActionCacheService.class.getName());
 
-  private final Instances instances;
+  private final BuildFarmInstances instances;
 
-  FetchService(Instances instances) {
+  FetchService(BuildFarmInstances instances) {
     this.instances = instances;
   }
 

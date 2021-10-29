@@ -48,7 +48,7 @@ import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
-import build.buildfarm.server.Instances;
+import build.buildfarm.server.BuildFarmInstances;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
@@ -393,7 +393,7 @@ public class Worker extends LoggingMain {
 
     instance = new ShardWorkerInstance(config.getPublicName(), digestUtil, backplane, storage);
 
-    Instances instances = Instances.singular(instance);
+    BuildFarmInstances instances = new BuildFarmInstances(instance);
 
     // Create the appropriate writer for the context
     CasWriter writer;

@@ -33,9 +33,9 @@ import io.grpc.stub.StreamObserver;
 import java.util.function.Consumer;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
-  private final Instances instances;
+  private final BuildFarmInstances instances;
 
-  public OperationQueueService(Instances instances) {
+  public OperationQueueService(BuildFarmInstances instances) {
     this.instances = instances;
   }
 

@@ -44,14 +44,14 @@ import javax.annotation.Nullable;
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private static final Logger logger = Logger.getLogger(ExecutionService.class.getName());
 
-  private final Instances instances;
+  private final BuildFarmInstances instances;
   private final long keepaliveAfter;
   private final TimeUnit keepaliveUnit;
   private final ScheduledExecutorService keepaliveScheduler;
   private final MetricsPublisher metricsPublisher;
 
   public ExecutionService(
-      Instances instances,
+      BuildFarmInstances instances,
       long keepaliveAfter,
       TimeUnit keepaliveUnit,
       ScheduledExecutorService keepaliveScheduler,

@@ -74,7 +74,7 @@ public class ByteStreamServiceTest {
   private Server fakeServer;
   private String fakeServerName;
 
-  @Mock private Instances instances;
+  @Mock private BuildFarmInstances instances;
 
   @Before
   public void setUp() throws Exception {
