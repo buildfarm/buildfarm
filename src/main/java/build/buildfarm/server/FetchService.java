@@ -34,11 +34,7 @@ class FetchService extends FetchImplBase {
   @Override
   public void fetchBlob(
       FetchBlobRequest request, StreamObserver<FetchBlobResponse> responseObserver) {
-    try {
-      fetchBlob(instance), request, responseObserver);
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-    }
+      fetchBlob(instance, request, responseObserver);
   }
 
   private void fetchBlob(
