@@ -127,7 +127,7 @@ public class BuildFarmServer extends LoggingMain {
                     getMetricsPublisher(config.getMetricsConfig())))
             .addService(new OperationQueueService(instances.getDefault()))
             .addService(new OperationsService(instances.getDefault()))
-            .addService(new AdminService(config.getAdminConfig(), instances))
+            .addService(new AdminService(config.getAdminConfig(), instances.getDefault()))
             .addService(new FetchService(instances))
             .addService(ProtoReflectionService.newInstance())
             .addService(new PublishBuildEventService(config.getBuildEventConfig()))

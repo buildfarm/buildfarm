@@ -51,11 +51,11 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   private static final Logger logger = Logger.getLogger(AdminService.class.getName());
 
   private final Admin adminController;
-  private final BuildFarmInstances instances;
+  private final Instance instance;
 
-  public AdminService(AdminConfig config, BuildFarmInstances instances) {
+  public AdminService(AdminConfig config, Instance instance) {
     this.adminController = getAdminController(config);
-    this.instances = instances;
+    this.instance = instance;
   }
 
   @Override
@@ -107,13 +107,6 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   public void getClientStartTime(
       GetClientStartTimeRequest request,
       StreamObserver<GetClientStartTimeResult> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
 
     try {
       GetClientStartTimeResult result = instance.getClientStartTime();
@@ -150,9 +143,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   @Override
   public void reindexCas(
       ReindexCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
-    Instance instance;
     try {
-      instance = instances.get(request.getInstanceName());
       CasIndexResults results = instance.reindexCas(request.getHostId());
       logger.log(INFO, results.toMessage());
       responseObserver.onNext(
