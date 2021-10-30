@@ -28,22 +28,15 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 
 public class OperationsService extends OperationsGrpc.OperationsImplBase {
-  private final BuildFarmInstances instances;
+  private final Instance instance;
 
-  public OperationsService(BuildFarmInstances instances) {
-    this.instances = instances;
+  public OperationsService(Instance instance) {
+    this.instance = instance;
   }
 
   @Override
   public void listOperations(
       ListOperationsRequest request, StreamObserver<ListOperationsResponse> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.getFromOperationsCollectionName(request.getName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
 
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
@@ -67,13 +60,6 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   @Override
   public void getOperation(
       GetOperationRequest request, StreamObserver<Operation> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.getFromOperationName(request.getName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
 
     responseObserver.onNext(instance.getOperation(request.getName()));
     responseObserver.onCompleted();
@@ -82,13 +68,6 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   @Override
   public void deleteOperation(
       DeleteOperationRequest request, StreamObserver<Empty> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.getFromOperationName(request.getName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
 
     try {
       instance.deleteOperation(request.getName());
@@ -102,13 +81,6 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   @Override
   public void cancelOperation(
       CancelOperationRequest request, StreamObserver<Empty> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.getFromOperationName(request.getName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
 
     try {
       instance.cancelOperation(request.getName());
