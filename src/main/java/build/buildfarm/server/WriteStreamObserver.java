@@ -31,6 +31,7 @@ import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.util.concurrent.FutureCallback;
@@ -48,7 +49,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
-import build.buildfarm.instance.Instance;
 
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Logger logger = Logger.getLogger(WriteStreamObserver.class.getName());
@@ -123,12 +123,9 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         Digest uploadBlobDigest = parseUploadBlobDigest(resourceName);
         expectedCommittedSize = uploadBlobDigest.getSizeBytes();
         return ByteStreamService.getUploadBlobWrite(
-            instance,
-            uploadBlobDigest,
-            parseUploadBlobUUID(resourceName));
+            instance, uploadBlobDigest, parseUploadBlobUUID(resourceName));
       case OperationStream:
-        return ByteStreamService.getOperationStreamWrite(
-            instance, resourceName);
+        return ByteStreamService.getOperationStreamWrite(instance, resourceName);
       case Blob:
       default:
         throw INVALID_ARGUMENT

@@ -23,6 +23,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
 import build.buildfarm.v1test.MetricsConfig;
@@ -35,7 +36,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
-import build.buildfarm.instance.Instance;
 
 @RunWith(JUnit4.class)
 public class ExecutionServiceTest {

@@ -34,7 +34,7 @@ class FetchService extends FetchImplBase {
   @Override
   public void fetchBlob(
       FetchBlobRequest request, StreamObserver<FetchBlobResponse> responseObserver) {
-      fetchBlob(instance, request, responseObserver);
+    fetchBlob(instance, request, responseObserver);
   }
 
   private void fetchBlob(

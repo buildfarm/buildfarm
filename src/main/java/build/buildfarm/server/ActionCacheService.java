@@ -49,7 +49,6 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   @Override
   public void getActionResult(
       GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
-
     ListenableFuture<ActionResult> resultFuture =
         instance.getActionResult(
             DigestUtil.asActionKey(request.getActionDigest()),
@@ -102,7 +101,6 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   @Override
   public void updateActionResult(
       UpdateActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
-
     ActionResult actionResult = request.getActionResult();
     try {
       instance.putActionResult(DigestUtil.asActionKey(request.getActionDigest()), actionResult);

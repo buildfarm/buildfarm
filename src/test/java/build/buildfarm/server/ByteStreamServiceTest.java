@@ -152,7 +152,6 @@ public class ByteStreamServiceTest {
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     when(write.getFuture()).thenReturn(writtenFuture);
 
-    
     when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
         .thenReturn(write);
 
@@ -224,7 +223,6 @@ public class ByteStreamServiceTest {
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     when(write.getFuture()).thenReturn(writtenFuture);
 
-    
     when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
         .thenReturn(write);
 
@@ -323,7 +321,6 @@ public class ByteStreamServiceTest {
     String resourceName = "blobs/" + DigestUtil.toString(digest);
     ReadRequest request = ReadRequest.newBuilder().setResourceName(resourceName).build();
 
-    
     doAnswer(answerVoid((blobDigest, offset, limit, chunkObserver, metadata) -> {}))
         .when(instance)
         .getBlob(

@@ -78,7 +78,7 @@ public class ContentAddressableStorageService
   @Override
   public void findMissingBlobs(
       FindMissingBlobsRequest request, StreamObserver<FindMissingBlobsResponse> responseObserver) {
-      instanceFindMissingBlobs(instance, request, responseObserver);
+    instanceFindMissingBlobs(instance, request, responseObserver);
   }
 
   void instanceFindMissingBlobs(
@@ -179,7 +179,6 @@ public class ContentAddressableStorageService
   public void batchUpdateBlobs(
       BatchUpdateBlobsRequest batchRequest,
       StreamObserver<BatchUpdateBlobsResponse> responseObserver) {
-
     BatchUpdateBlobsResponse.Builder response = BatchUpdateBlobsResponse.newBuilder();
     ListenableFuture<BatchUpdateBlobsResponse> responseFuture =
         transform(
@@ -264,12 +263,11 @@ public class ContentAddressableStorageService
   @Override
   public void batchReadBlobs(
       BatchReadBlobsRequest batchRequest, StreamObserver<BatchReadBlobsResponse> responseObserver) {
-      batchReadBlobs(instance, batchRequest, responseObserver);
+    batchReadBlobs(instance, batchRequest, responseObserver);
   }
 
   @Override
   public void getTree(GetTreeRequest request, StreamObserver<GetTreeResponse> responseObserver) {
-
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
       responseObserver.onError(Status.INVALID_ARGUMENT.asException());

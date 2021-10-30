@@ -16,7 +16,6 @@ package build.buildfarm.server;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.common.UrlPath;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.instance.shard.ShardInstance;
@@ -31,11 +30,10 @@ public class BuildFarmInstances {
     return Status.NOT_FOUND.withDescription(errorMessage).asException();
   }
 
-  private final Instance defaultInstance;
-
-
-  //TODO: get rid of everything except this
-  public static Instance createInstance(String session, InstanceConfig instanceConfig, Runnable onStop)       throws InterruptedException, ConfigurationException {
+  // TODO: get rid of everything except this
+  public static Instance createInstance(
+      String session, InstanceConfig instanceConfig, Runnable onStop)
+      throws InterruptedException, ConfigurationException {
     String name = instanceConfig.getName();
     HashFunction hashFunction = getValidHashFunction(instanceConfig);
     DigestUtil digestUtil = new DigestUtil(hashFunction);
@@ -45,8 +43,7 @@ public class BuildFarmInstances {
       case TYPE_NOT_SET:
         throw new IllegalArgumentException("Instance type not set in config");
       case MEMORY_INSTANCE_CONFIG:
-        instance =
-            new MemoryInstance(name, digestUtil, instanceConfig.getMemoryInstanceConfig());
+        instance = new MemoryInstance(name, digestUtil, instanceConfig.getMemoryInstanceConfig());
         break;
       case SHARD_INSTANCE_CONFIG:
         instance =
@@ -61,74 +58,6 @@ public class BuildFarmInstances {
     return instance;
   }
 
-
-  public BuildFarmInstances(String session, InstanceConfig instanceConfig, Runnable onStop)
-      throws InterruptedException, ConfigurationException {
-    String name = instanceConfig.getName();
-    HashFunction hashFunction = getValidHashFunction(instanceConfig);
-    DigestUtil digestUtil = new DigestUtil(hashFunction);
-    switch (instanceConfig.getTypeCase()) {
-      default:
-      case TYPE_NOT_SET:
-        throw new IllegalArgumentException("Instance type not set in config");
-      case MEMORY_INSTANCE_CONFIG:
-        defaultInstance =
-            new MemoryInstance(name, digestUtil, instanceConfig.getMemoryInstanceConfig());
-        break;
-      case SHARD_INSTANCE_CONFIG:
-        defaultInstance =
-            new ShardInstance(
-                name,
-                session + "-" + name,
-                digestUtil,
-                instanceConfig.getShardInstanceConfig(),
-                onStop);
-        break;
-    }
-  }
-
-  public BuildFarmInstances(Instance instance) {
-    defaultInstance = instance;
-  }
-
-  public Instance getDefault() {
-    return defaultInstance;
-  }
-
-  public Instance get(String name) throws InstanceNotFoundException {
-    if (defaultInstance == null) {
-      throw new InstanceNotFoundException(name);
-    } else {
-      return getDefault();
-    }
-  }
-
-  public Instance getFromOperationsCollectionName(String operationsCollectionName)
-      throws InstanceNotFoundException {
-    String instanceName = UrlPath.fromOperationsCollectionName(operationsCollectionName);
-    return get(instanceName);
-  }
-
-  public Instance getFromOperationName(String operationName) throws InstanceNotFoundException {
-    String instanceName = UrlPath.fromOperationName(operationName);
-    return get(instanceName);
-  }
-
-  public Instance getFromOperationStream(String operationStream) throws InstanceNotFoundException {
-    String instanceName = UrlPath.fromOperationStream(operationStream);
-    return get(instanceName);
-  }
-
-  public Instance getFromBlob(String blobName) throws InstanceNotFoundException {
-    String instanceName = UrlPath.fromBlobName(blobName);
-    return get(instanceName);
-  }
-
-  public Instance getFromUploadBlob(String uploadBlobName) throws InstanceNotFoundException {
-    String instanceName = UrlPath.fromUploadBlobName(uploadBlobName);
-    return get(instanceName);
-  }
-
   private static HashFunction getValidHashFunction(InstanceConfig config)
       throws ConfigurationException {
     try {
@@ -136,13 +65,5 @@ public class BuildFarmInstances {
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }
-  }
-
-  public void start(String publicName) {
-    defaultInstance.start(publicName);
-  }
-
-  public void stop() throws InterruptedException {
-    defaultInstance.stop();
   }
 }

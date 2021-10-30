@@ -37,7 +37,6 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   @Override
   public void listOperations(
       ListOperationsRequest request, StreamObserver<ListOperationsResponse> responseObserver) {
-
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
       responseObserver.onError(Status.OUT_OF_RANGE.asException());
@@ -60,7 +59,6 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   @Override
   public void getOperation(
       GetOperationRequest request, StreamObserver<Operation> responseObserver) {
-
     responseObserver.onNext(instance.getOperation(request.getName()));
     responseObserver.onCompleted();
   }
@@ -68,7 +66,6 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   @Override
   public void deleteOperation(
       DeleteOperationRequest request, StreamObserver<Empty> responseObserver) {
-
     try {
       instance.deleteOperation(request.getName());
       responseObserver.onNext(Empty.newBuilder().build());
@@ -81,7 +78,6 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   @Override
   public void cancelOperation(
       CancelOperationRequest request, StreamObserver<Empty> responseObserver) {
-
     try {
       instance.cancelOperation(request.getName());
       responseObserver.onNext(Empty.getDefaultInstance());

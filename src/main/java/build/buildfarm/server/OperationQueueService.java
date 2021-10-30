@@ -97,7 +97,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
   @Override
   public void take(TakeOperationRequest request, StreamObserver<QueueEntry> responseObserver) {
-
     ServerCallStreamObserver<QueueEntry> callObserver =
         (ServerCallStreamObserver<QueueEntry>) responseObserver;
 
@@ -114,7 +113,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   @Override
   public void status(
       BackplaneStatusRequest request, StreamObserver<BackplaneStatus> responseObserver) {
-
     try {
       responseObserver.onNext(instance.backplaneStatus());
       responseObserver.onCompleted();
@@ -125,7 +123,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
   @Override
   public void put(Operation operation, StreamObserver<com.google.rpc.Status> responseObserver) {
-
     try {
       boolean ok = instance.putAndValidateOperation(operation);
       Code code = ok ? Code.OK : Code.INVALID_ARGUMENT;
@@ -143,7 +140,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   @Override
   public void poll(
       PollOperationRequest request, StreamObserver<com.google.rpc.Status> responseObserver) {
-
     boolean ok = instance.pollOperation(request.getOperationName(), request.getStage());
     Code code = ok ? Code.OK : Code.INVALID_ARGUMENT;
     responseObserver.onNext(com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build());

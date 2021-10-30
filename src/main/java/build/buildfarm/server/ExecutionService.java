@@ -188,7 +188,6 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
   @Override
   public void execute(ExecuteRequest request, StreamObserver<Operation> responseObserver) {
-
     ServerCallStreamObserver<Operation> serverCallStreamObserver =
         (ServerCallStreamObserver<Operation>) responseObserver;
     try {

@@ -46,7 +46,6 @@ import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
-import build.buildfarm.server.BuildFarmInstances;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.v1test.AdminGrpc;
@@ -392,8 +391,6 @@ public class Worker extends LoggingMain {
             remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
 
     instance = new ShardWorkerInstance(config.getPublicName(), digestUtil, backplane, storage);
-
-    BuildFarmInstances instances = new BuildFarmInstances(instance);
 
     // Create the appropriate writer for the context
     CasWriter writer;

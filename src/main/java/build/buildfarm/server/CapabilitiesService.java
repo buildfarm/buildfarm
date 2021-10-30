@@ -36,7 +36,6 @@ public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
   @Override
   public void getCapabilities(
       GetCapabilitiesRequest request, StreamObserver<ServerCapabilities> responseObserver) {
-
     responseObserver.onNext(
         instance
             .getCapabilities()

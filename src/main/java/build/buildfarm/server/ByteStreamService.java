@@ -85,8 +85,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
   }
 
-  public ByteStreamService(
-      Instance instance, long deadlineAfter, TimeUnit deadlineAfterUnits) {
+  public ByteStreamService(Instance instance, long deadlineAfter, TimeUnit deadlineAfterUnits) {
     this.instance = instance;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
@@ -304,20 +303,10 @@ public class ByteStreamService extends ByteStreamImplBase {
       throws InstanceNotFoundException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
-        readBlob(
-            instance,
-            parseBlobDigest(resourceName),
-            offset,
-            limit,
-            responseObserver);
+        readBlob(instance, parseBlobDigest(resourceName), offset, limit, responseObserver);
         break;
       case OperationStream:
-        readOperationStream(
-            instance,
-            resourceName,
-            offset,
-            limit,
-            responseObserver);
+        readOperationStream(instance, resourceName, offset, limit, responseObserver);
         break;
       case UploadBlob:
       default:
@@ -435,12 +424,9 @@ public class ByteStreamService extends ByteStreamImplBase {
         return getBlobWrite(instance, parseBlobDigest(resourceName));
       case UploadBlob:
         return getUploadBlobWrite(
-            instance,
-            parseUploadBlobDigest(resourceName),
-            parseUploadBlobUUID(resourceName));
+            instance, parseUploadBlobDigest(resourceName), parseUploadBlobUUID(resourceName));
       case OperationStream:
-        return getOperationStreamWrite(
-            instance, resourceName);
+        return getOperationStreamWrite(instance, resourceName);
       default:
         throw new IllegalArgumentException();
     }

@@ -22,6 +22,7 @@ import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.MetricsPublisher;
 import build.buildfarm.metrics.aws.AwsMetricsPublisher;
 import build.buildfarm.metrics.gcp.GcpMetricsPublisher;
@@ -54,7 +55,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
-import build.buildfarm.instance.Instance;
 
 @SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
@@ -71,7 +71,6 @@ public class BuildFarmServer extends LoggingMain {
           .register();
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-  private final BuildFarmInstances instances;
   private final Instance instance;
   private final HealthStatusManager healthStatusManager;
   private final Server server;
@@ -86,13 +85,7 @@ public class BuildFarmServer extends LoggingMain {
       String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
-    
-    
-    
-    
-    //TODO: remove this
-    instances = new BuildFarmInstances(session, config.getInstance(), this::stop);
-    
+
     instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
 
     healthStatusManager = new HealthStatusManager();
@@ -105,30 +98,30 @@ public class BuildFarmServer extends LoggingMain {
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instances.getDefault()))
-            .addService(new CapabilitiesService(instances.getDefault()))
+            .addService(new ActionCacheService(instance))
+            .addService(new CapabilitiesService(instance))
             .addService(
                 new ContentAddressableStorageService(
-                    instances.getDefault(),
+                    instance,
                     /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
                     TimeUnit.SECONDS
                     /* requestLogLevel=*/ ))
             .addService(
                 new ByteStreamService(
-                    instances.getDefault(),
+                    instance,
                     /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
                     TimeUnit.SECONDS))
             .addService(
                 new ExecutionService(
-                    instances.getDefault(),
+                    instance,
                     config.getExecuteKeepaliveAfterSeconds(),
                     TimeUnit.SECONDS,
                     keepaliveScheduler,
                     getMetricsPublisher(config.getMetricsConfig())))
-            .addService(new OperationQueueService(instances.getDefault()))
-            .addService(new OperationsService(instances.getDefault()))
-            .addService(new AdminService(config.getAdminConfig(), instances.getDefault()))
-            .addService(new FetchService(instances.getDefault()))
+            .addService(new OperationQueueService(instance))
+            .addService(new OperationsService(instance))
+            .addService(new AdminService(config.getAdminConfig(), instance))
+            .addService(new FetchService(instance))
             .addService(ProtoReflectionService.newInstance())
             .addService(new PublishBuildEventService(config.getBuildEventConfig()))
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
@@ -161,7 +154,6 @@ public class BuildFarmServer extends LoggingMain {
 
   public synchronized void start(String publicName, int prometheusPort) throws IOException {
     checkState(!stopping, "must not call start after stop");
-    instances.start(publicName);
     instance.start(publicName);
     server.start();
     healthStatusManager.setStatus(
@@ -193,7 +185,6 @@ public class BuildFarmServer extends LoggingMain {
       if (server != null) {
         server.shutdown();
       }
-      instances.stop();
       instance.stop();
       server.awaitTermination(10, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
