@@ -86,11 +86,12 @@ public class BuildFarmServer extends LoggingMain {
       throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
     
-    //TODO: remove this
-    instances = new BuildFarmInstances(session, config.getInstance(), this::stop);
     
     
     Instance instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
+    
+    //TODO: remove this
+    instances = new BuildFarmInstances(session, config.getInstance(), this::stop);
 
     healthStatusManager = new HealthStatusManager();
 
@@ -102,8 +103,8 @@ public class BuildFarmServer extends LoggingMain {
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instance))
-            .addService(new CapabilitiesService(instance))
+            .addService(new ActionCacheService(instances.getDefault()))
+            .addService(new CapabilitiesService(instances.getDefault()))
             .addService(
                 new ContentAddressableStorageService(
                     instances.getDefault(),
@@ -112,7 +113,7 @@ public class BuildFarmServer extends LoggingMain {
                     /* requestLogLevel=*/ ))
             .addService(
                 new ByteStreamService(
-                    instances,
+                    instances.getDefault(),
                     /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
                     TimeUnit.SECONDS))
             .addService(

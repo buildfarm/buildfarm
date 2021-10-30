@@ -48,13 +48,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
+import build.buildfarm.instance.Instance;
 
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Logger logger = Logger.getLogger(WriteStreamObserver.class.getName());
   private static final Histogram ioMetric =
       Histogram.build().name("io_bytes_write").help("I/O (bytes)").register();
 
-  private final BuildFarmInstances instances;
+  private final Instance instance;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
   private final Runnable requestNext;
@@ -74,12 +75,12 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private long requestBytes = 0;
 
   WriteStreamObserver(
-      BuildFarmInstances instances,
+      Instance instance,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       Runnable requestNext,
       StreamObserver<WriteResponse> responseObserver) {
-    this.instances = instances;
+    this.instance = instance;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.requestNext = requestNext;
@@ -122,12 +123,12 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         Digest uploadBlobDigest = parseUploadBlobDigest(resourceName);
         expectedCommittedSize = uploadBlobDigest.getSizeBytes();
         return ByteStreamService.getUploadBlobWrite(
-            instances.getFromUploadBlob(resourceName),
+            instance,
             uploadBlobDigest,
             parseUploadBlobUUID(resourceName));
       case OperationStream:
         return ByteStreamService.getOperationStreamWrite(
-            instances.getFromOperationStream(resourceName), resourceName);
+            instance, resourceName);
       case Blob:
       default:
         throw INVALID_ARGUMENT

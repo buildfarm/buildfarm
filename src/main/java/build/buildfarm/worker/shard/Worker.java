@@ -456,7 +456,7 @@ public class Worker extends LoggingMain {
                 new ContentAddressableStorageService(
                     instance, /* deadlineAfter=*/ 1, DAYS
                     /* requestLogLevel=*/ ))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
+            .addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, DAYS))
             .addService(
                 new WorkerProfileService(
                     storage,
