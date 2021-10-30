@@ -431,6 +431,7 @@ public class BuildFarmServerTest {
     UUID uuid = UUID.randomUUID();
     String resourceName =
         ByteStreamUploader.uploadResourceName(INSTANCE_NAME, uuid, hash, content.size());
+    
 
     assertThat(getBlob(digest)).isNull();
 

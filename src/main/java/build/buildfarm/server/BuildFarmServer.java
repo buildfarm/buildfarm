@@ -106,7 +106,7 @@ public class BuildFarmServer extends LoggingMain {
             .addService(new CapabilitiesService(instance))
             .addService(
                 new ContentAddressableStorageService(
-                    instances,
+                    instances.getDefault(),
                     /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
                     TimeUnit.SECONDS
                     /* requestLogLevel=*/ ))
