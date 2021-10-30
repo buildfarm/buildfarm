@@ -35,14 +35,15 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
+import build.buildfarm.instance.Instance;
 
 @RunWith(JUnit4.class)
 public class ExecutionServiceTest {
-  private BuildFarmInstances instances;
+  private Instance instance;
 
   @Before
   public void setUp() throws Exception {
-    instances = mock(BuildFarmInstances.class);
+    instance = mock(Instance.class);
   }
 
   @SuppressWarnings("unchecked")
@@ -51,7 +52,7 @@ public class ExecutionServiceTest {
     ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
     ExecutionService service =
         new ExecutionService(
-            instances,
+            instance,
             /* keepaliveAfter=*/ 1,
             /* keepaliveUnit=*/ SECONDS, // far enough in the future that we'll get scheduled and
             keepaliveScheduler,

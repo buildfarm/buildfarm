@@ -72,6 +72,7 @@ public class BuildFarmServer extends LoggingMain {
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
   private final BuildFarmInstances instances;
+  private final Instance instance;
   private final HealthStatusManager healthStatusManager;
   private final Server server;
   private boolean stopping = false;
@@ -88,10 +89,11 @@ public class BuildFarmServer extends LoggingMain {
     
     
     
-    Instance instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
     
     //TODO: remove this
     instances = new BuildFarmInstances(session, config.getInstance(), this::stop);
+    
+    instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
 
     healthStatusManager = new HealthStatusManager();
 
@@ -118,7 +120,7 @@ public class BuildFarmServer extends LoggingMain {
                     TimeUnit.SECONDS))
             .addService(
                 new ExecutionService(
-                    instances,
+                    instances.getDefault(),
                     config.getExecuteKeepaliveAfterSeconds(),
                     TimeUnit.SECONDS,
                     keepaliveScheduler,
@@ -160,6 +162,7 @@ public class BuildFarmServer extends LoggingMain {
   public synchronized void start(String publicName, int prometheusPort) throws IOException {
     checkState(!stopping, "must not call start after stop");
     instances.start(publicName);
+    instance.start(publicName);
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
@@ -191,6 +194,7 @@ public class BuildFarmServer extends LoggingMain {
         server.shutdown();
       }
       instances.stop();
+      instance.stop();
       server.awaitTermination(10, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       if (server != null) {
