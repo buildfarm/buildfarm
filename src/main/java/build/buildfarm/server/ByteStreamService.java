@@ -300,7 +300,7 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   void maybeInstanceRead(
       String resourceName, long offset, long limit, StreamObserver<ReadResponse> responseObserver)
-      throws InstanceNotFoundException, InvalidResourceNameException {
+      throws InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
         readBlob(instance, parseBlobDigest(resourceName), offset, limit, responseObserver);
@@ -326,8 +326,6 @@ public class ByteStreamService extends ByteStreamImplBase {
 
     try {
       maybeInstanceRead(resourceName, offset, limit, responseObserver);
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
     } catch (InvalidResourceNameException e) {
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     }
@@ -351,9 +349,6 @@ public class ByteStreamService extends ByteStreamImplBase {
           format(
               "queryWriteStatus(%s) => committed_size = %d, complete = %s",
               resourceName, write.getCommittedSize(), write.isComplete()));
-    } catch (InstanceNotFoundException e) {
-      logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
     } catch (IllegalArgumentException | InvalidResourceNameException e) {
       logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
@@ -417,8 +412,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     return instance.getOperationStreamWrite(resourceName);
   }
 
-  Write getWrite(String resourceName)
-      throws EntryLimitException, InstanceNotFoundException, InvalidResourceNameException {
+  Write getWrite(String resourceName) throws EntryLimitException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
         return getBlobWrite(instance, parseBlobDigest(resourceName));

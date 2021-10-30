@@ -117,7 +117,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   private Write getWrite(String resourceName)
-      throws EntryLimitException, InstanceNotFoundException, InvalidResourceNameException {
+      throws EntryLimitException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case UploadBlob:
         Digest uploadBlobDigest = parseUploadBlobDigest(resourceName);
@@ -229,10 +229,6 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         }
       } catch (EntryLimitException e) {
         errorResponse(e);
-      } catch (InstanceNotFoundException e) {
-        if (errorResponse(BuildFarmInstances.toStatusException(e))) {
-          logWriteRequest(request, e);
-        }
       } catch (Exception e) {
         if (errorResponse(Status.fromThrowable(e).asException())) {
           logWriteRequest(request, e);

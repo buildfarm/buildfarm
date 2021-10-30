@@ -20,16 +20,9 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.v1test.InstanceConfig;
-import io.grpc.Status;
-import io.grpc.StatusException;
 import javax.naming.ConfigurationException;
 
 public class BuildFarmInstances {
-  public static StatusException toStatusException(InstanceNotFoundException e) {
-    String errorMessage = String.format("Instance \"%s\" not known to Service", e.instanceName);
-    return Status.NOT_FOUND.withDescription(errorMessage).asException();
-  }
-
   public static Instance createInstance(
       String session, InstanceConfig instanceConfig, Runnable onStop)
       throws InterruptedException, ConfigurationException {
