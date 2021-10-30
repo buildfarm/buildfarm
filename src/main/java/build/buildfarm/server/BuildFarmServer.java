@@ -125,7 +125,7 @@ public class BuildFarmServer extends LoggingMain {
                     TimeUnit.SECONDS,
                     keepaliveScheduler,
                     getMetricsPublisher(config.getMetricsConfig())))
-            .addService(new OperationQueueService(instances))
+            .addService(new OperationQueueService(instances.getDefault()))
             .addService(new OperationsService(instances))
             .addService(new AdminService(config.getAdminConfig(), instances))
             .addService(new FetchService(instances))
