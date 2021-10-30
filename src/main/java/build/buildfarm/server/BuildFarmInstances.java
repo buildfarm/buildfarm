@@ -30,7 +30,6 @@ public class BuildFarmInstances {
     return Status.NOT_FOUND.withDescription(errorMessage).asException();
   }
 
-  // TODO: get rid of everything except this
   public static Instance createInstance(
       String session, InstanceConfig instanceConfig, Runnable onStop)
       throws InterruptedException, ConfigurationException {
