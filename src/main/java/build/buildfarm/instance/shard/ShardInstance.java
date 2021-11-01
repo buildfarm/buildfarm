@@ -1657,7 +1657,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   String operationBlockedError(String operationName) {
-    return String.format("Operation %s not requeued. " + BLOCK_LIST_ERROR, operationName);
+    return String.format(NO_REQUEUE_BLOCKED_ERROR, operationName);
   }
 
   String tooManyRequeuesError(String operationName, int currentAttempt, int maxRequeueAttempts) {
@@ -1665,17 +1665,15 @@ public class ShardInstance extends AbstractServerInstance {
     // requeue failures are likely caused by another issue, however its helpful to show the requeue
     // amount to the user in case the attempt amount are improperly configured.
     return String.format(
-        "Operation %s not requeued.  Operation has been requeued too many times ( %d > %d)",
-        operationName, currentAttempt, maxRequeueAttempts);
+        NO_REQUEUE_TOO_MANY_ERROR, operationName, currentAttempt, maxRequeueAttempts);
   }
 
   String operationMissingMessage(String operationName) {
-    return String.format("Operation %s not requeued.  Operation no longer exists", operationName);
+    return String.format(NO_REQUEUE_MISSING_MESSAGE, operationName);
   }
 
   String operationCompleteMessage(String operationName) {
-    return String.format(
-        "Operation %s not requeued.  Operation has already completed", operationName);
+    return String.format(NO_REQUEUE_COMPLETE_MESSAGE, operationName);
   }
 
   void putFailedOperation(ExecuteEntry executeEntry, String errorMessage) {
