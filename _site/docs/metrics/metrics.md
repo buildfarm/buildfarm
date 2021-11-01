@@ -33,6 +33,14 @@ Counter for the number of successful executions
 
 Gauge of a number of items in prequeue
 
+**cas_miss**
+
+Counter for number of CAS misses from worker-worker
+
+**requeue_failure**
+
+Counterfor number of operations that failed to requeue
+
 **dispatched_operations_size**
 
 Gauge of the number of dispatched operations
