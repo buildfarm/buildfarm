@@ -54,7 +54,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Histogram ioMetric =
       Histogram.build().name("io_bytes_write").help("I/O (bytes)").register();
 
-  private final Instances instances;
+  private final BuildFarmInstances instances;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
   private final Runnable requestNext;
@@ -74,7 +74,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private long requestBytes = 0;
 
   WriteStreamObserver(
-      Instances instances,
+      BuildFarmInstances instances,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       Runnable requestNext,

@@ -27,9 +27,9 @@ public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
   private static final Counter numberOfRemoteInvocations =
       Counter.build().name("remote_invocations").help("Number of remote invocations.").register();
 
-  private final Instances instances;
+  private final BuildFarmInstances instances;
 
-  public CapabilitiesService(Instances instances) {
+  public CapabilitiesService(BuildFarmInstances instances) {
     this.instances = instances;
   }
 

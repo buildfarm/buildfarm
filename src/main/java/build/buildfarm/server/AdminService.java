@@ -51,9 +51,9 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   private static final Logger logger = Logger.getLogger(AdminService.class.getName());
 
   private final Admin adminController;
-  private final Instances instances;
+  private final BuildFarmInstances instances;
 
-  public AdminService(AdminConfig config, Instances instances) {
+  public AdminService(AdminConfig config, BuildFarmInstances instances) {
     this.adminController = getAdminController(config);
     this.instances = instances;
   }

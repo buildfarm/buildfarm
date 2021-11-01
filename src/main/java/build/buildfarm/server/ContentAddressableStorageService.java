@@ -60,12 +60,12 @@ public class ContentAddressableStorageService
   private static final Histogram missingBlobs =
       Histogram.build().name("missing_blobs").help("Find missing blobs.").register();
 
-  private final Instances instances;
+  private final BuildFarmInstances instances;
   private final long writeDeadlineAfter;
   private final TimeUnit writeDeadlineAfterUnits;
 
   public ContentAddressableStorageService(
-      Instances instances, long writeDeadlineAfter, TimeUnit writeDeadlineAfterUnits) {
+      BuildFarmInstances instances, long writeDeadlineAfter, TimeUnit writeDeadlineAfterUnits) {
     this.instances = instances;
     this.writeDeadlineAfter = writeDeadlineAfter;
     this.writeDeadlineAfterUnits = writeDeadlineAfterUnits;

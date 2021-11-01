@@ -64,7 +64,7 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
-  private final Instances instances;
+  private final BuildFarmInstances instances;
 
   static class UnexpectedEndOfStreamException extends IOException {
     private final long remaining;
@@ -85,7 +85,8 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
   }
 
-  public ByteStreamService(Instances instances, long deadlineAfter, TimeUnit deadlineAfterUnits) {
+  public ByteStreamService(
+      BuildFarmInstances instances, long deadlineAfter, TimeUnit deadlineAfterUnits) {
     this.instances = instances;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
