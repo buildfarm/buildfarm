@@ -46,7 +46,6 @@ import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
-import build.buildfarm.server.BuildFarmInstances;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.v1test.AdminGrpc;
@@ -393,8 +392,6 @@ public class Worker extends LoggingMain {
 
     instance = new ShardWorkerInstance(config.getPublicName(), digestUtil, backplane, storage);
 
-    BuildFarmInstances instances = new BuildFarmInstances(instance);
-
     // Create the appropriate writer for the context
     CasWriter writer;
     if (!isCasShard) {
@@ -454,9 +451,9 @@ public class Worker extends LoggingMain {
             .addService(healthStatusManager.getHealthService())
             .addService(
                 new ContentAddressableStorageService(
-                    instances, /* deadlineAfter=*/ 1, DAYS
+                    instance, /* deadlineAfter=*/ 1, DAYS
                     /* requestLogLevel=*/ ))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
+            .addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, DAYS))
             .addService(
                 new WorkerProfileService(
                     storage,
