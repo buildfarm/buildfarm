@@ -31,6 +31,7 @@ import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.util.concurrent.FutureCallback;
@@ -54,7 +55,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Histogram ioMetric =
       Histogram.build().name("io_bytes_write").help("I/O (bytes)").register();
 
-  private final Instances instances;
+  private final Instance instance;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
   private final Runnable requestNext;
@@ -74,12 +75,12 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private long requestBytes = 0;
 
   WriteStreamObserver(
-      Instances instances,
+      Instance instance,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       Runnable requestNext,
       StreamObserver<WriteResponse> responseObserver) {
-    this.instances = instances;
+    this.instance = instance;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.requestNext = requestNext;
@@ -116,18 +117,15 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   private Write getWrite(String resourceName)
-      throws EntryLimitException, InstanceNotFoundException, InvalidResourceNameException {
+      throws EntryLimitException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case UploadBlob:
         Digest uploadBlobDigest = parseUploadBlobDigest(resourceName);
         expectedCommittedSize = uploadBlobDigest.getSizeBytes();
         return ByteStreamService.getUploadBlobWrite(
-            instances.getFromUploadBlob(resourceName),
-            uploadBlobDigest,
-            parseUploadBlobUUID(resourceName));
+            instance, uploadBlobDigest, parseUploadBlobUUID(resourceName));
       case OperationStream:
-        return ByteStreamService.getOperationStreamWrite(
-            instances.getFromOperationStream(resourceName), resourceName);
+        return ByteStreamService.getOperationStreamWrite(instance, resourceName);
       case Blob:
       default:
         throw INVALID_ARGUMENT
@@ -231,10 +229,6 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         }
       } catch (EntryLimitException e) {
         errorResponse(e);
-      } catch (InstanceNotFoundException e) {
-        if (errorResponse(BuildFarmInstances.toStatusException(e))) {
-          logWriteRequest(request, e);
-        }
       } catch (Exception e) {
         if (errorResponse(Status.fromThrowable(e).asException())) {
           logWriteRequest(request, e);

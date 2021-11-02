@@ -60,13 +60,13 @@ public class ContentAddressableStorageService
   private static final Histogram missingBlobs =
       Histogram.build().name("missing_blobs").help("Find missing blobs.").register();
 
-  private final Instances instances;
+  private final Instance instance;
   private final long writeDeadlineAfter;
   private final TimeUnit writeDeadlineAfterUnits;
 
   public ContentAddressableStorageService(
-      Instances instances, long writeDeadlineAfter, TimeUnit writeDeadlineAfterUnits) {
-    this.instances = instances;
+      Instance instance, long writeDeadlineAfter, TimeUnit writeDeadlineAfterUnits) {
+    this.instance = instance;
     this.writeDeadlineAfter = writeDeadlineAfter;
     this.writeDeadlineAfterUnits = writeDeadlineAfterUnits;
   }
@@ -78,11 +78,7 @@ public class ContentAddressableStorageService
   @Override
   public void findMissingBlobs(
       FindMissingBlobsRequest request, StreamObserver<FindMissingBlobsResponse> responseObserver) {
-    try {
-      instanceFindMissingBlobs(instances.get(request.getInstanceName()), request, responseObserver);
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-    }
+    instanceFindMissingBlobs(instance, request, responseObserver);
   }
 
   void instanceFindMissingBlobs(
@@ -183,14 +179,6 @@ public class ContentAddressableStorageService
   public void batchUpdateBlobs(
       BatchUpdateBlobsRequest batchRequest,
       StreamObserver<BatchUpdateBlobsResponse> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(batchRequest.getInstanceName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
-
     BatchUpdateBlobsResponse.Builder response = BatchUpdateBlobsResponse.newBuilder();
     ListenableFuture<BatchUpdateBlobsResponse> responseFuture =
         transform(
@@ -275,23 +263,11 @@ public class ContentAddressableStorageService
   @Override
   public void batchReadBlobs(
       BatchReadBlobsRequest batchRequest, StreamObserver<BatchReadBlobsResponse> responseObserver) {
-    try {
-      batchReadBlobs(instances.get(batchRequest.getInstanceName()), batchRequest, responseObserver);
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-    }
+    batchReadBlobs(instance, batchRequest, responseObserver);
   }
 
   @Override
   public void getTree(GetTreeRequest request, StreamObserver<GetTreeResponse> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
-
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
       responseObserver.onError(Status.INVALID_ARGUMENT.asException());
