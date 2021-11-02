@@ -140,6 +140,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     }
   }
 
+  @Override
   public void reindexCas(
       ReindexCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
     Instance instance;
