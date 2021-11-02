@@ -143,7 +143,6 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   @Override
   public void reindexCas(
       ReindexCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
-    Instance instance;
     try {
       CasIndexResults results = instance.reindexCas(request.getHostId());
       logger.log(INFO, results.toMessage());
@@ -163,7 +162,6 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   @Override
   public void reindexAllCas(
       ReindexAllCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
-    Instance instance;
     try {
       instance = instance.get(request.getInstanceName());
       String arg = null;
