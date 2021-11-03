@@ -105,7 +105,6 @@ class ShardActionCache {
     actionResultCache.put(actionKey, CompletableFuture.completedFuture(actionResult));
   }
 
-  // from backplane
   private static ActionResult parseActionResult(String json) {
     try {
       ActionResult.Builder builder = ActionResult.newBuilder();

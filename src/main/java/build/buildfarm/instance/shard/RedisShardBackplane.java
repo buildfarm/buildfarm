@@ -115,7 +115,7 @@ import redis.clients.jedis.ScanResult;
 public class RedisShardBackplane implements Backplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
 
-  // TODO(luxe): move to config
+  // TODO(luxe): move to config in follow-up PR
   private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
 
   private static final JsonFormat.Parser operationParser =

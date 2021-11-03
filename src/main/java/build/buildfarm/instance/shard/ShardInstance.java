@@ -515,6 +515,7 @@ public class ShardInstance extends AbstractServerInstance {
         backplane.putActionResult(actionKey, actionResult);
       }
     } catch (IOException e) {
+      logger.log(Level.SEVERE, "actionKey not stored in ActionCache", e);
     }
   }
 
