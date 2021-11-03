@@ -42,6 +42,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -331,7 +332,7 @@ public class ShardInstance extends AbstractServerInstance {
         name,
         digestUtil,
         /* contentAddressableStorage=*/ null,
-        /* actionCache=*/ readThroughActionCache,
+        /* actionCache=*/ null,
         /* outstandingOperations=*/ null,
         /* completedOperations=*/ null,
         /* activeBlobWrites=*/ null);
@@ -499,6 +500,21 @@ public class ShardInstance extends AbstractServerInstance {
               }
             },
             "Prometheus Metrics Collector");
+  }
+  
+  @Override
+  public ListenableFuture<ActionResult> getActionResult(
+      ActionKey actionKey, RequestMetadata requestMetadata) {
+    ListenableFuture<ActionResult> result = checkNotNull(readThroughActionCache.get(actionKey));
+    return extendWithEnsureOutputsCheck(result, requestMetadata);
+  }
+
+  @Override
+  public void putActionResult(ActionKey actionKey, ActionResult actionResult)
+      throws InterruptedException {
+    if (actionResult.getExitCode() == 0) {
+      readThroughActionCache.put(actionKey, actionResult);
+    }
   }
 
   private void updateQueueSizes(List<QueueStatus> queues) {
