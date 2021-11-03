@@ -345,7 +345,7 @@ public abstract class AbstractServerInstance implements Instance {
     ListenableFuture<ActionResult> result = checkNotNull(actionCache.get(actionKey));
     return extendWithEnsureOutputsCheck(result, requestMetadata);
   }
-  
+
   public ListenableFuture<ActionResult> extendWithEnsureOutputsCheck(
       ListenableFuture<ActionResult> result, RequestMetadata requestMetadata) {
     if (shouldEnsureOutputsPresent(requestMetadata)) {

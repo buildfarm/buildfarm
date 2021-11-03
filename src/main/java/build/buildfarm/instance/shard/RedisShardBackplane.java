@@ -14,7 +14,9 @@
 
 package build.buildfarm.instance.shard;
 
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.lang.String.format;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
 import build.bazel.remote.execution.v2.ActionResult;
@@ -86,6 +88,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -158,7 +161,7 @@ public class RedisShardBackplane implements Backplane {
   private final Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
   private long workerSetExpiresAt = 0;
 
-  private RedisMap actionCache;
+  public ShardActionCache actionCache; // TODO: make private
   private RedisMap blockedActions;
   private RedisMap blockedInvocations;
   private RedisMap processingOperations;
@@ -575,8 +578,13 @@ public class RedisShardBackplane implements Backplane {
     return Redisson.create(redissonConfig);
   }
 
-  static RedisMap createActionCache(RedisShardBackplaneConfig config) {
-    return new RedisMap(config.getActionCachePrefix());
+  ShardActionCache createActionCache(RedisShardBackplaneConfig config) {
+    return new ShardActionCache(
+        client,
+        config.getActionCachePrefix(),
+        config.getActionCacheExpire(),
+        10000 /*TODO: make bigger*/,
+        listeningDecorator(newFixedThreadPool(24)));
   }
 
   static BalancedRedisQueue createPrequeue(RedisClient client, RedisShardBackplaneConfig config)
@@ -852,17 +860,9 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public ActionResult getActionResult(ActionKey actionKey) throws IOException {
-    String json = client.call(jedis -> actionCache.get(jedis, asDigestStr(actionKey)));
-    if (json == null) {
-      return null;
-    }
-
-    ActionResult actionResult = parseActionResult(json);
-    if (actionResult == null) {
-      client.run(jedis -> removeActionResult(jedis, actionKey));
-    }
-    return actionResult;
+  public ActionResult getActionResult(ActionKey actionKey)
+      throws IOException, InterruptedException, ExecutionException {
+    return actionCache.get(actionKey).get();
   }
 
   // we do this by action hash only, so that we can use RequestMetadata to filter
@@ -876,14 +876,11 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
-    String json = JsonFormat.printer().print(actionResult);
-    client.run(
-        jedis ->
-            actionCache.insert(jedis, asDigestStr(actionKey), json, config.getActionCacheExpire()));
+    actionCache.put(client, actionKey, actionResult);
   }
 
   private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
-    actionCache.remove(jedis, asDigestStr(actionKey));
+    actionCache.actionCache.remove(jedis, asDigestStr(actionKey));
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -899,7 +896,17 @@ public class RedisShardBackplane implements Backplane {
     List<String> keyNames = new ArrayList<>();
     actionKeys.forEach(key -> keyNames.add(asDigestStr(key)));
 
-    client.run(jedis -> actionCache.remove(jedis, keyNames));
+    client.run(jedis -> actionCache.actionCache.remove(jedis, keyNames));
+  }
+
+  @Override
+  public void invalidate(ActionKey actionKey) {
+    actionCache.invalidate(actionKey);
+  }
+
+  @Override
+  public void readThrough(ActionKey actionKey, ActionResult actionResult) {
+    actionCache.readThrough(actionKey, actionResult);
   }
 
   @SuppressWarnings("ConstantConditions")

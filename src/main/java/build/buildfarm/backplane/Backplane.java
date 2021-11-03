@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 public interface Backplane {
   final class ActionCacheScanResult {
@@ -106,7 +107,14 @@ public interface Backplane {
    * <p>Retrieves and returns an action result from the hash map.
    */
   @ThreadSafe
-  ActionResult getActionResult(ActionKey actionKey) throws IOException;
+  ActionResult getActionResult(ActionKey actionKey)
+      throws IOException, InterruptedException, ExecutionException;
+
+  @ThreadSafe
+  void invalidate(ActionKey actionKey);
+
+  @ThreadSafe
+  void readThrough(ActionKey actionKey, ActionResult actionResult);
 
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the digest of the action
