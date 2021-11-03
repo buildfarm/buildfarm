@@ -6,6 +6,8 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
+import build.buildfarm.v1test.ReindexAllCasRequest;
+import build.buildfarm.v1test.ReindexCasRequestResults;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
 import com.amazonaws.services.autoscaling.model.AutoScalingGroup;
@@ -235,6 +237,14 @@ public class AdminServiceImpl implements AdminService {
       }
     }
     return asgNames;
+  }
+
+  @Override
+  public void reindexAllCas(){
+    ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
+    AdminGrpc.AdminFutureStub stub = AdminGrpc.newFutureStub(channel);
+    ReindexAllCasRequest request = ReindexAllCasRequest.newBuilder().setInstanceName("shard").build();
+    stub.reindexAllCas(request);
   }
 
   private Map<String, Long>  getAllContainersUptime(AdminGrpc.AdminBlockingStub stub) {
