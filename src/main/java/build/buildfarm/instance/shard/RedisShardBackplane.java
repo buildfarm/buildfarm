@@ -115,6 +115,9 @@ import redis.clients.jedis.ScanResult;
 public class RedisShardBackplane implements Backplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
 
+  // TODO(luxe): move to config
+  private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
+
   private static final JsonFormat.Parser operationParser =
       JsonFormat.parser()
           .usingTypeRegistry(
@@ -161,7 +164,7 @@ public class RedisShardBackplane implements Backplane {
   private final Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
   private long workerSetExpiresAt = 0;
 
-  public ShardActionCache actionCache; // TODO: make private
+  private ShardActionCache actionCache;
   private RedisMap blockedActions;
   private RedisMap blockedInvocations;
   private RedisMap processingOperations;
@@ -583,7 +586,7 @@ public class RedisShardBackplane implements Backplane {
         client,
         config.getActionCachePrefix(),
         config.getActionCacheExpire(),
-        10000 /*TODO: make bigger*/,
+        DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE,
         listeningDecorator(newFixedThreadPool(24)));
   }
 
@@ -880,7 +883,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
-    actionCache.actionCache.remove(jedis, asDigestStr(actionKey));
+    actionCache.remove(jedis, actionKey);
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -892,11 +895,7 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
-    // convert action keys to strings
-    List<String> keyNames = new ArrayList<>();
-    actionKeys.forEach(key -> keyNames.add(asDigestStr(key)));
-
-    client.run(jedis -> actionCache.actionCache.remove(jedis, keyNames));
+    actionCache.remove(client, actionKeys);
   }
 
   @Override

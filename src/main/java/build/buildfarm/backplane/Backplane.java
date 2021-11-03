@@ -39,7 +39,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 
 public interface Backplane {
   final class ActionCacheScanResult {
@@ -107,8 +106,7 @@ public interface Backplane {
    * <p>Retrieves and returns an action result from the hash map.
    */
   @ThreadSafe
-  ActionResult getActionResult(ActionKey actionKey)
-      throws IOException, InterruptedException, ExecutionException;
+  ActionResult getActionResult(ActionKey actionKey) throws Exception;
 
   @ThreadSafe
   void invalidate(ActionKey actionKey);

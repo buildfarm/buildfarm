@@ -34,11 +34,13 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.Status;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import redis.clients.jedis.JedisCluster;
 
 class ShardActionCache {
-  public final RedisMap actionCache; // TODO make private
+  private final RedisMap actionCache;
   private final AsyncLoadingCache<ActionKey, ActionResult> actionResultCache;
   private final int actionCacheExpire;
 
@@ -81,6 +83,18 @@ class ShardActionCache {
       throw Status.fromThrowable(e).asRuntimeException();
     }
     readThrough(actionKey, actionResult);
+  }
+
+  public void remove(JedisCluster jedis, ActionKey actionKey) {
+    actionCache.remove(jedis, asDigestStr(actionKey));
+  }
+
+  public void remove(RedisClient client, Iterable<ActionKey> actionKeys) throws IOException {
+    // convert action keys to strings
+    List<String> keyNames = new ArrayList<>();
+    actionKeys.forEach(key -> keyNames.add(asDigestStr(key)));
+
+    client.run(jedis -> actionCache.remove(jedis, keyNames));
   }
 
   public void invalidate(ActionKey actionKey) {
