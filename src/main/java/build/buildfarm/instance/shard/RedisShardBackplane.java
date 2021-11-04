@@ -1414,10 +1414,6 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
-  private String asDigestStr(ActionKey actionKey) {
-    return DigestUtil.toString(actionKey.getDigest());
-  }
-
   String operationKey(String operationName) {
     return config.getOperationPrefix() + ":" + operationName;
   }
