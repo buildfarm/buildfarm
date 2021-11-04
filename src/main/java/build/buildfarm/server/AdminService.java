@@ -30,6 +30,7 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetHostsRequest;
 import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
+import build.buildfarm.v1test.ReindexAllCasRequest;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ScaleClusterRequest;
@@ -144,6 +145,26 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       ReindexCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
     try {
       CasIndexResults results = instance.reindexCas(request.getHostId());
+      logger.log(INFO, results.toMessage());
+      responseObserver.onNext(
+          ReindexCasRequestResults.newBuilder()
+              .setRemovedHosts(results.removedHosts)
+              .setRemovedKeys(results.removedKeys)
+              .setTotalKeys(results.totalKeys)
+              .build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, "Could not reindex CAS.", e);
+      responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
+    }
+  }
+
+  @Override
+  public void reindexAllCas(
+      ReindexAllCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
+    try {
+      String arg = null;
+      CasIndexResults results = instance.reindexCas(arg);
       logger.log(INFO, results.toMessage());
       responseObserver.onNext(
           ReindexCasRequestResults.newBuilder()

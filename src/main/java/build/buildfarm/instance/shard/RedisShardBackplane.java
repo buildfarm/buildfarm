@@ -738,12 +738,37 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public CasIndexResults reindexCas(String hostName) throws IOException {
+  public CasIndexResults reindexCas(@Nullable String hostName) throws IOException {
+    List<String> hostNames = new ArrayList<>();
+    if (hostName != null) {
+      hostNames.add(hostName);
+    } else {
+      hostNames = getNonactiveWorkers();
+    }
     CasIndexSettings settings = new CasIndexSettings();
-    settings.hostName = hostName;
+    settings.hostNames = hostNames;
     settings.casQuery = config.getCasPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
+  }
+
+  public List<String> getNonactiveWorkers() throws IOException {
+    // get all workers
+    List<String> activeWorkers = new ArrayList<>(getWorkers());
+    List<String> allUptimeKeys = new ArrayList<>();
+    Map<String, JedisPool> clusterNodes = client.call(jedis -> jedis.getClusterNodes());
+    for (Map.Entry<String, JedisPool> entry : clusterNodes.entrySet()) {
+      Jedis singlejedis = entry.getValue().getResource();
+      allUptimeKeys.addAll(client.call(jedis -> singlejedis.keys("startTime/*:8981")));
+    }
+    List<String> nonactiveWorkers = new ArrayList<>();
+    for (String key : allUptimeKeys) {
+      String hostName = key.split("/")[1];
+      if (!activeWorkers.contains(hostName)) {
+        nonactiveWorkers.add(hostName);
+      }
+    }
+    return nonactiveWorkers;
   }
 
   @SuppressWarnings("ConstantConditions")
