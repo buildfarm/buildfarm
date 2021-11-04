@@ -1038,12 +1038,12 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+  public GetClientStartTimeResult getClientStartTime() {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public CasIndexResults reindexCas(String hostName) {
+  public CasIndexResults reindexCas(@Nullable String hostName) {
     throw new UnsupportedOperationException();
   }
 

@@ -207,6 +207,18 @@ public abstract class AbstractServerInstance implements Instance {
           + "To resolve this error, you can tag the rule with 'no-remote'.  "
           + "You can also adjust the action behavior to attempt a different action hash.";
 
+  public static final String NO_REQUEUE_BLOCKED_ERROR =
+      "Operation %s not requeued. " + BLOCK_LIST_ERROR;
+
+  public static final String NO_REQUEUE_TOO_MANY_ERROR =
+      "Operation %s not requeued.  Operation has been requeued too many times ( %d > %d).";
+
+  public static final String NO_REQUEUE_MISSING_MESSAGE =
+      "Operation %s not requeued.  Operation no longer exists.";
+
+  public static final String NO_REQUEUE_COMPLETE_MESSAGE =
+      "Operation %s not requeued.  Operation has already completed.";
+
   public AbstractServerInstance(
       String name,
       DigestUtil digestUtil,
@@ -270,7 +282,7 @@ public abstract class AbstractServerInstance implements Instance {
                     return null;
                   },
                   executor);
-      digestsCompleteFuture = transformAsync(digestsCompleteFuture, next, executor);
+      digestsCompleteFuture = transformAsync(digestsCompleteFuture, next, contextExecutor);
     }
     return transformAsync(
         digestsCompleteFuture,
@@ -1852,7 +1864,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public abstract GetClientStartTimeResult getClientStartTime(String clientKey);
+  public abstract GetClientStartTimeResult getClientStartTime();
 
   @Override
   public abstract CasIndexResults reindexCas(String hostName);

@@ -48,6 +48,7 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 public interface Instance {
   String getName();
@@ -141,9 +142,9 @@ public interface Instance {
 
   PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully();
 
-  GetClientStartTimeResult getClientStartTime(String clientKey);
+  GetClientStartTimeResult getClientStartTime();
 
-  CasIndexResults reindexCas(String hostName);
+  CasIndexResults reindexCas(@Nullable String hostName);
 
   void deregisterWorker(String workerName);
 

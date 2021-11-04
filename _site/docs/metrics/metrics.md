@@ -9,11 +9,11 @@ nav_order: 4
 
 To enable emitting of Prometheus metrics, add the following configuration to your configuration file:
 
-`
+```
 prometheus_config: {
   port: 9090
 }
-`
+```
 
 ## Available Prometheus Metrics
 
@@ -32,6 +32,14 @@ Counter for the number of successful executions
 **pre_queue_size**
 
 Gauge of a number of items in prequeue
+
+**cas_miss**
+
+Counter for number of CAS misses from worker-worker
+
+**requeue_failure**
+
+Counterfor number of operations that failed to requeue
 
 **dispatched_operations_size**
 
