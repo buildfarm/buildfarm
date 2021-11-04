@@ -30,7 +30,7 @@ DEFAULT_TEST_TARGET="//src/test/...:all"
 DEFAULT_TEST_TAG_FILTERS="-redis"
 
 # How to spawn bazel.  The CI has a bazel available.
-DEFAULT_BAZEL_WRAPPER=${HOME}/src/bazel/bazel-bin/src/bazel
+DEFAULT_BAZEL_WRAPPER=bazel
 
 # Where test logs will occur.
 # Individual code coverage files can be found within this directory.
