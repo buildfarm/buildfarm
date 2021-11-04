@@ -205,7 +205,7 @@ public class ShardInstance extends AbstractServerInstance {
       Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
   private final AsyncCache<Digest, Command> commandCache =
       Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
-  private final AsyncCache<Digest, Action> actionCache =
+  private final AsyncCache<Digest, Action> digestToActionCache =
       Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
   private final Cache<RequestMetadata, Boolean> recentCacheServedExecutions =
       Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).build();
@@ -1288,7 +1288,7 @@ public class ShardInstance extends AbstractServerInstance {
           }
         };
 
-    return toListenableFuture(actionCache.get(actionBlobDigest, getCallback));
+    return toListenableFuture(digestToActionCache.get(actionBlobDigest, getCallback));
   }
 
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
