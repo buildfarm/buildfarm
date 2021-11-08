@@ -1,5 +1,4 @@
 """
-miu
 buildfarm dependencies that can be imported into other WORKSPACE files
 """
 
