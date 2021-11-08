@@ -34,9 +34,9 @@ def archive_dependencies(third_party):
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "sha256": "d25fdde33fe21ab659cdf5c577acc06e71b51195e0cdcf73fac188b818b00212",
-            "strip_prefix": "grpc-java-93a77a78a9a1ee889bef4c1fcfb02be343c671d1",
-            "urls": ["https://github.com/grpc/grpc-java/archive/93a77a78a9a1ee889bef4c1fcfb02be343c671d1.zip"],
+            "sha256": "101b21af120901e9bf342384988f57af3332b59d997f64d5f41a1e24ffb96f19",
+            "strip_prefix": "grpc-java-1.42.0",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.42.0.zip"],
         },
 
         # The APIs that we implement.
