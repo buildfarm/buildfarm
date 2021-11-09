@@ -95,7 +95,6 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
         },
         directExecutor());
     actionResultsMetric.inc();
-    logger.log(Level.FINE, String.format("GetActionResult %d Requests", 1));
   }
 
   @Override
