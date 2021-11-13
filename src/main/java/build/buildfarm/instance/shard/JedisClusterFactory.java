@@ -146,8 +146,8 @@ public class JedisClusterFactory {
     return () ->
         new JedisCluster(
             new HostAndPort(redisUri.getHost(), redisUri.getPort()),
-            /* connectionTimeout=*/ Integer.max(2000, timeout),
-            /* soTimeout=*/ Integer.max(2000, timeout),
+            /* connectionTimeout=*/ Integer.max(10000, timeout),
+            /* soTimeout=*/ Integer.max(10000, timeout),
             Integer.max(5, maxAttempts),
             password,
             poolConfig);
