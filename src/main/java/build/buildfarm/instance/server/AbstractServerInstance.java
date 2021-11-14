@@ -75,6 +75,7 @@ import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueuedOperation;
@@ -1864,7 +1865,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public abstract GetClientStartTimeResult getClientStartTime();
+  public abstract GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request);
 
   @Override
   public abstract CasIndexResults reindexCas(String hostName);

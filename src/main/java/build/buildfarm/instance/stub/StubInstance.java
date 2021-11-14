@@ -74,6 +74,7 @@ import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BackplaneStatusRequest;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -873,7 +874,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime() {
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     throw new UnsupportedOperationException();
   }
 
