@@ -76,6 +76,7 @@ import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
@@ -2459,9 +2460,9 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime() {
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     try {
-      return backplane.getClientStartTime();
+      return backplane.getClientStartTime(request);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
