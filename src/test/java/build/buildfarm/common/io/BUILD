@@ -1,6 +1,6 @@
 java_test(
     name = "tests",
-    srcs = glob(["*Test.java"]),
+    srcs = glob(["*.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",
