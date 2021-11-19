@@ -2877,15 +2877,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Write write =
             delegate.getWrite(
                 fileEntryKey.getDigest(), UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-        try (OutputStream out = write.getOutput(1, MINUTES, () -> {});
-            InputStream in = Files.newInputStream(getPath(e.key))) {
-          ByteStreams.copy(in, out);
-        } catch (IOException ioEx) {
-          write.reset();
-          logger.log(Level.SEVERE, format("error delegating expired entry %s", e.key), ioEx);
-          throw new InterruptedException();
-        }
+        performCopy(write, e);
       }
+    }
+  }
+
+  private void performCopy(Write write, Entry e) throws IOException, InterruptedException {
+    try (OutputStream out = write.getOutput(1, MINUTES, () -> {});
+        InputStream in = Files.newInputStream(getPath(e.key))) {
+      ByteStreams.copy(in, out);
+    } catch (IOException ioEx) {
+      write.reset();
+      logger.log(Level.SEVERE, format("error delegating expired entry %s", e.key), ioEx);
+      throw new InterruptedException();
     }
   }
 }
