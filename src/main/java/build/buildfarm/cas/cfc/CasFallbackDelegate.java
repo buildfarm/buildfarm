@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 
 /**
  * @class CasFallbackDelegate
@@ -39,7 +40,7 @@ public class CasFallbackDelegate {
    * @param skipLoad Whether to load the existing cache (relevant for CasFileCache).
    */
   public static void start(
-      ContentAddressableStorage delegate,
+      @Nullable ContentAddressableStorage delegate,
       Consumer<Digest> onStartPut,
       ExecutorService removeDirectoryService,
       boolean skipLoad)
@@ -60,8 +61,11 @@ public class CasFallbackDelegate {
    * @return Inputstream to blob.
    * @note Suggested return identifier: istream.
    */
-  public static InputStream newTransparentInput(
-      ContentAddressableStorage delegate, NoSuchFileException e, Digest digest, long offset)
+  public static InputStream newInput(
+      @Nullable ContentAddressableStorage delegate,
+      NoSuchFileException e,
+      Digest digest,
+      long offset)
       throws IOException {
     if (delegate == null) {
       throw e;
@@ -77,7 +81,7 @@ public class CasFallbackDelegate {
    * @note Suggested return identifier: foundBlobs.
    */
   public static Iterable<Digest> findMissingBlobs(
-      ContentAddressableStorage delegate, ImmutableList<Digest> missingDigests)
+      @Nullable ContentAddressableStorage delegate, ImmutableList<Digest> missingDigests)
       throws InterruptedException {
     // skip calling the fallback CAS if it does not exist or we already found the digests
     if (delegate == null || missingDigests.isEmpty()) {
@@ -96,7 +100,7 @@ public class CasFallbackDelegate {
    * @note Suggested return identifier: found.
    */
   public static boolean contains(
-      ContentAddressableStorage delegate, Digest digest, Digest.Builder result) {
+      @Nullable ContentAddressableStorage delegate, Digest digest, Digest.Builder result) {
     return delegate != null && delegate.contains(digest, result);
   }
 }

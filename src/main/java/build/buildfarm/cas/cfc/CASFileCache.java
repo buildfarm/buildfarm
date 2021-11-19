@@ -468,7 +468,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     try {
       return newLocalInput(digest, offset);
     } catch (NoSuchFileException e) {
-      return CasFallbackDelegate.newTransparentInput(delegate, e, digest, offset);
+      return CasFallbackDelegate.newInput(delegate, e, digest, offset);
     }
   }
 
@@ -517,7 +517,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     try {
       return newLocalInput(digest, offset);
     } catch (NoSuchFileException e) {
-      return newInputFallback(e, digest, offset);
+      return newInputFallback(digest, offset);
     }
   }
 
@@ -1792,14 +1792,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 + e.referenceCount
                 + " references");
       }
-      boolean interrupted = expireEntryFallback(e);
+      expireEntryFallback(e);
       Entry removedEntry = storage.remove(e.key);
       // reference compare on purpose
       if (removedEntry == e) {
         ListenableFuture<Entry> entryFuture = dischargeEntryFuture(e, service);
-        if (interrupted) {
-          Thread.currentThread().interrupt();
-        }
         return entryFuture;
       }
       if (removedEntry == null) {
@@ -1821,10 +1818,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             "removed entry %s did not match last unreferenced entry, restoring it",
             e.key);
         storage.put(e.key, removedEntry);
-      }
-      // possibly delegated, but no removal, if we're interrupted, abort loop
-      if (interrupted || Thread.currentThread().isInterrupted()) {
-        throw new InterruptedException();
       }
     }
     return null;
@@ -2855,11 +2848,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   // CAS fallback methods
 
-  private InputStream newInputFallback(NoSuchFileException e, Digest digest, long offset)
-      throws IOException {
-    if (delegate == null) {
-      throw e;
-    }
+  private InputStream newInputFallback(Digest digest, long offset) throws IOException {
+    checkNotNull(delegate);
 
     if (digest.getSizeBytes() > maxEntrySizeInBytes) {
       return delegate.newInput(digest, offset);
@@ -2878,8 +2868,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         write);
   }
 
-  private boolean expireEntryFallback(Entry e) throws IOException, InterruptedException {
-    boolean interrupted = false;
+  private void expireEntryFallback(Entry e) throws IOException, InterruptedException {
     if (delegate != null) {
       FileEntryKey fileEntryKey = parseFileEntryKey(e.key, e.size);
       if (fileEntryKey == null) {
@@ -2892,15 +2881,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             InputStream in = Files.newInputStream(getPath(e.key))) {
           ByteStreams.copy(in, out);
         } catch (IOException ioEx) {
-          interrupted =
-              Thread.interrupted()
-                  || ioEx.getCause() instanceof InterruptedException
-                  || ioEx instanceof ClosedByInterruptException;
           write.reset();
           logger.log(Level.SEVERE, format("error delegating expired entry %s", e.key), ioEx);
+          throw new InterruptedException();
         }
       }
     }
-    return interrupted;
   }
 }
