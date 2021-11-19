@@ -17,7 +17,7 @@ Buildfarm uses modular instances, where an instance is associated with one concr
 
 # Typical Deployment
 
-![Buildfarm Architecture Diagram](https://github.com/bazelbuild/bazel-buildfarm/wiki/images/Architecture-Aws.png)
+![Buildfarm Architecture Diagram]({{site.url}}{{site.baseurl}}/assets/images/Architecture-Aws.png)
 
 ## Workers
 

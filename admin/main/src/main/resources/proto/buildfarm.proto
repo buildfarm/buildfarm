@@ -40,6 +40,10 @@ service Admin {
         option (google.api.http) = { get: "/v1test/admin:reindexCas" };
     }
 
+    rpc ReindexAllCas(ReindexAllCasRequest) returns (ReindexCasRequestResults) {
+        option (google.api.http) = { get: "/v1test/admin:reindexAllCas" };
+    }
+
     rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest) returns (ShutDownWorkerGracefullyRequestResults) {
         option (google.api.http) = { get: "/v1test/admin:deregisterWorker" };
     }
@@ -70,6 +74,10 @@ message ReindexCasRequest {
 
     // format: ip:port
     string host_id = 2;
+}
+
+message ReindexAllCasRequest {
+    string instance_name = 1;
 }
 
 message ReindexCasRequestResults {
@@ -133,6 +141,7 @@ message Host {
 
 message GetClientStartTimeRequest {
     string instance_name = 1;
+    repeated string host_name = 2;
 }
 
 message GetClientStartTimeResult {

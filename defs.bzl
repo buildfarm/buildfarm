@@ -68,7 +68,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.auth:google-auth-library-oauth2-http:0.9.1",
                         "com.google.code.findbugs:jsr305:3.0.1",
                         "com.google.code.gson:gson:2.8.6",
-                        "com.google.errorprone:error_prone_annotations:2.2.0",
+                        "com.google.errorprone:error_prone_annotations:2.9.0",
                         "com.google.errorprone:error_prone_core:0.92",
                         "com.google.guava:failureaccess:1.0.1",
                         "com.google.guava:guava:30.1.1-jre",

@@ -21,4 +21,4 @@ Buildfarm is a service software stack which presents an implementation of the [R
 
 Buildfarm is cross-platform has been heavily tested with bazel as a client.
 
-This documentation is a comprehensive description of the architecture, features, functionality, and operation, as well as a guide to a smoothly installing and running the software. Familiarity with the Remote Execution API is expected, and references to it will be provided as needed.
+This documentation is a comprehensive description of the architecture, features, functionality, and operation, as well as a guide to smoothly installing and running the software. Familiarity with the Remote Execution API is expected, and references to it will be provided as needed.
