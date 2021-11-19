@@ -1796,8 +1796,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Entry removedEntry = storage.remove(e.key);
       // reference compare on purpose
       if (removedEntry == e) {
-        ListenableFuture<Entry> entryFuture = dischargeEntryFuture(e, service);
-        return entryFuture;
+        return dischargeEntryFuture(e, service);
       }
       if (removedEntry == null) {
         logger.log(Level.SEVERE, format("entry %s was already removed during expiration", e.key));
