@@ -76,6 +76,7 @@ import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
@@ -168,7 +169,18 @@ public class ShardInstance extends AbstractServerInstance {
       Counter.build().name("execution_success").help("Execution success.").register();
   private static final Gauge preQueueSize =
       Gauge.build().name("pre_queue_size").help("Pre queue size.").register();
-
+  private static final Counter casHitCounter =
+      Counter.build()
+          .name("cas_hit")
+          .help("Number of successful CAS hits from worker-worker.")
+          .register();
+  private static final Counter casMissCounter =
+      Counter.build().name("cas_miss").help("Number of CAS misses from worker-worker.").register();
+  private static final Counter requeueFailureCounter =
+      Counter.build()
+          .name("requeue_failure")
+          .help("Number of operations that failed to requeue.")
+          .register();
   // Metrics about the dispatched operations
   private static final Gauge dispatchedOperationsSize =
       Gauge.build()
@@ -772,6 +784,7 @@ public class ShardInstance extends AbstractServerInstance {
                   removeMalfunctioningWorker(
                       worker, t, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
                 } else if (status.getCode() == Code.NOT_FOUND) {
+                  casMissCounter.inc();
                   logger.log(
                       Level.FINE, worker + " did not contain " + DigestUtil.toString(blobDigest));
                   // ignore this, the worker will update the backplane eventually
@@ -816,6 +829,7 @@ public class ShardInstance extends AbstractServerInstance {
               @Override
               public void onCompleted() {
                 blobObserver.onCompleted();
+                casHitCounter.inc();
               }
             },
             requestMetadata);
@@ -1643,78 +1657,124 @@ public class ShardInstance extends AbstractServerInstance {
     return requeuedFuture;
   }
 
+  String operationBlockedError(String operationName) {
+    return String.format(NO_REQUEUE_BLOCKED_ERROR, operationName);
+  }
+
+  String tooManyRequeuesError(String operationName, int currentAttempt, int maxRequeueAttempts) {
+    // If an operation fails from excessive requeue, show this error to the client.  Multiple
+    // requeue failures are likely caused by another issue, however its helpful to show the requeue
+    // amount to the user in case the attempt amount are improperly configured.
+    return String.format(
+        NO_REQUEUE_TOO_MANY_ERROR, operationName, currentAttempt, maxRequeueAttempts);
+  }
+
+  String operationMissingMessage(String operationName) {
+    return String.format(NO_REQUEUE_MISSING_MESSAGE, operationName);
+  }
+
+  String operationCompleteMessage(String operationName) {
+    return String.format(NO_REQUEUE_COMPLETE_MESSAGE, operationName);
+  }
+
+  void putFailedOperation(ExecuteEntry executeEntry, String errorMessage) {
+    // Create a failed operation which will be reported back to the client.
+    Operation.Builder failedOperation =
+        Operation.newBuilder()
+            .setName(executeEntry.getOperationName())
+            .setDone(true)
+            .setMetadata(
+                Any.pack(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED)));
+
+    // put the operation back into the backplane with a failed precondition.
+    putOperation(
+        failedOperation
+            .setResponse(Any.pack(denyActionResponse(executeEntry.getActionDigest(), errorMessage)))
+            .build());
+  }
+
+  private boolean canOperationBeRequeued(
+      QueueEntry queueEntry, ExecuteEntry executeEntry, Operation operation) throws IOException {
+    String operationName = executeEntry.getOperationName();
+
+    // Skip requeuing and fail the operation if its in a deny list.
+    if (inDenyList(executeEntry.getRequestMetadata())) {
+      String msg = operationBlockedError(operationName);
+      requeueFailureCounter.inc();
+      logger.log(Level.WARNING, msg);
+      putFailedOperation(executeEntry, msg);
+      return false;
+    }
+
+    // Skip requeuing and fail the operation if its already been requeued too many times.
+    if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
+      String msg =
+          tooManyRequeuesError(operationName, queueEntry.getRequeueAttempts(), maxRequeueAttempts);
+      requeueFailureCounter.inc();
+      logger.log(Level.WARNING, msg);
+      putFailedOperation(executeEntry, msg);
+      return false;
+    }
+
+    // Skip requeuing and fail the operation if we couldn't find it.
+    // This would prevent us from being able to requeue it anyways.
+    if (operation == null) {
+      String msg = operationMissingMessage(operationName);
+      requeueFailureCounter.inc();
+      logger.log(Level.WARNING, msg);
+      backplane.deleteOperation(operationName); // signal watchers
+      return false;
+    }
+
+    // Skip requeuing the operation if its already done.
+    // Perhaps the operation was just completed by a worker.
+    if (operation.getDone()) {
+      String msg = operationCompleteMessage(operationName);
+      logger.log(Level.INFO, msg);
+      backplane.completeOperation(operationName);
+      return false;
+    }
+
+    return true;
+  }
+
   @VisibleForTesting
   public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry, Duration timeout) {
+    ListenableFuture<Void> future;
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
-    String operationName = executeEntry.getOperationName();
+    Operation operation = getOperation(executeEntry.getOperationName());
+
     try {
-      Operation.Builder failedOperation =
-          Operation.newBuilder()
-              .setName(operationName)
-              .setDone(true)
-              .setMetadata(
-                  Any.pack(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED)));
-      if (inDenyList(executeEntry.getRequestMetadata())) {
-        putOperation(
-            failedOperation
-                .setResponse(
-                    Any.pack(denyActionResponse(executeEntry.getActionDigest(), BLOCK_LIST_ERROR)))
-                .build());
-        return IMMEDIATE_VOID_FUTURE;
-      } else if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
-        logger.log(
-            Level.WARNING, "Operation " + operationName + " has been requeued too many times.");
-        putOperation(
-            failedOperation
-                .setResponse(
-                    Any.pack(
-                        denyActionResponse(
-                            executeEntry.getActionDigest(),
-                            "This execute request has been requeued too many times")))
-                .build());
+      // check preconditions before trying to requeue.
+      boolean canRequeue = canOperationBeRequeued(queueEntry, executeEntry, operation);
+      if (!canRequeue) {
         return IMMEDIATE_VOID_FUTURE;
       }
-    } catch (IOException e) {
-      return immediateFailedFuture(e);
-    }
-    Operation operation;
-    try {
-      operation = getOperation(operationName);
-      if (operation == null) {
-        logger.log(Level.FINE, "Operation " + operationName + " no longer exists");
-        backplane.deleteOperation(operationName); // signal watchers
-        return IMMEDIATE_VOID_FUTURE;
+
+      // Requeue the action as long as the result is not already cached.
+      ActionKey actionKey = DigestUtil.asActionKey(executeEntry.getActionDigest());
+      ListenableFuture<Boolean> cachedResultFuture;
+      if (executeEntry.getSkipCacheLookup()) {
+        cachedResultFuture = immediateFuture(false);
+      } else {
+        cachedResultFuture =
+            checkCacheFuture(actionKey, operation, executeEntry.getRequestMetadata());
       }
+      future =
+          transformAsync(
+              cachedResultFuture,
+              (cachedResult) -> {
+                if (cachedResult) {
+                  return IMMEDIATE_VOID_FUTURE;
+                }
+                return validateAndRequeueOperation(operation, queueEntry, timeout);
+              },
+              operationTransformService);
+
     } catch (IOException | StatusRuntimeException e) {
       return immediateFailedFuture(e);
     }
-    if (operation.getDone()) {
-      logger.log(Level.FINE, "Operation " + operation.getName() + " has already completed");
-      try {
-        backplane.completeOperation(operationName);
-      } catch (IOException e) {
-        return immediateFailedFuture(e);
-      }
-      return IMMEDIATE_VOID_FUTURE;
-    }
-
-    ActionKey actionKey = DigestUtil.asActionKey(executeEntry.getActionDigest());
-    ListenableFuture<Boolean> cachedResultFuture;
-    if (executeEntry.getSkipCacheLookup()) {
-      cachedResultFuture = immediateFuture(false);
-    } else {
-      cachedResultFuture =
-          checkCacheFuture(actionKey, operation, executeEntry.getRequestMetadata());
-    }
-    return transformAsync(
-        cachedResultFuture,
-        (cachedResult) -> {
-          if (cachedResult) {
-            return IMMEDIATE_VOID_FUTURE;
-          }
-          return validateAndRequeueOperation(operation, queueEntry, timeout);
-        },
-        operationTransformService);
+    return future;
   }
 
   Watcher newActionResultWatcher(ActionKey actionKey, Watcher watcher) {
@@ -2400,9 +2460,9 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     try {
-      return backplane.getClientStartTime(clientKey);
+      return backplane.getClientStartTime(request);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

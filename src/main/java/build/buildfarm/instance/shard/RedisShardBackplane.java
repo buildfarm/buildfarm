@@ -49,6 +49,8 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.GetClientStartTime;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
@@ -100,8 +102,10 @@ import javax.naming.ConfigurationException;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
+import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
@@ -724,12 +728,37 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public CasIndexResults reindexCas(String hostName) throws IOException {
+  public CasIndexResults reindexCas(@Nullable String hostName) throws IOException {
+    List<String> hostNames = new ArrayList<>();
+    if (hostName != null) {
+      hostNames.add(hostName);
+    } else {
+      hostNames = getNonactiveWorkers();
+    }
     CasIndexSettings settings = new CasIndexSettings();
-    settings.hostName = hostName;
+    settings.hostNames = hostNames;
     settings.casQuery = config.getCasPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
+  }
+
+  public List<String> getNonactiveWorkers() throws IOException {
+    // get all workers
+    List<String> activeWorkers = new ArrayList<>(getWorkers());
+    List<String> allUptimeKeys = new ArrayList<>();
+    Map<String, JedisPool> clusterNodes = client.call(jedis -> jedis.getClusterNodes());
+    for (Map.Entry<String, JedisPool> entry : clusterNodes.entrySet()) {
+      Jedis singlejedis = entry.getValue().getResource();
+      allUptimeKeys.addAll(client.call(jedis -> singlejedis.keys("startTime/*:8981")));
+    }
+    List<String> nonactiveWorkers = new ArrayList<>();
+    for (String key : allUptimeKeys) {
+      String hostName = key.split("/")[1];
+      if (!activeWorkers.contains(hostName)) {
+        nonactiveWorkers.add(hostName);
+      }
+    }
+    return nonactiveWorkers;
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -1448,15 +1477,22 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) throws IOException {
-    try {
-      return client.call(
-          jedis ->
-              GetClientStartTimeResult.newBuilder()
-                  .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(clientKey))))
-                  .build());
-    } catch (NumberFormatException nfe) {
-      return GetClientStartTimeResult.newBuilder().build();
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request)
+      throws IOException {
+    List<GetClientStartTime> startTimes = new ArrayList<>();
+    for (String key : request.getHostNameList()) {
+      try {
+        startTimes.add(
+            client.call(
+                jedis ->
+                    GetClientStartTime.newBuilder()
+                        .setInstanceName(key)
+                        .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(key))))
+                        .build()));
+      } catch (NumberFormatException nfe) {
+        logger.warning("Could not obtain start time for " + key);
+      }
     }
+    return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
   }
 }

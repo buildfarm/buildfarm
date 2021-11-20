@@ -48,7 +48,6 @@ import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
-import build.buildfarm.server.Instances;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
@@ -133,7 +132,7 @@ public class Worker extends LoggingMain {
   private final ShardWorkerInstance instance;
 
   @SuppressWarnings("deprecation")
-  private final HealthStatusManager healthStatusManager;
+  private final HealthStatusManager healthStatusManager = new HealthStatusManager();
 
   private final Server server;
   private final Path root;
@@ -393,8 +392,6 @@ public class Worker extends LoggingMain {
 
     instance = new ShardWorkerInstance(config.getPublicName(), digestUtil, backplane, storage);
 
-    Instances instances = Instances.singular(instance);
-
     // Create the appropriate writer for the context
     CasWriter writer;
     if (!isCasShard) {
@@ -449,15 +446,14 @@ public class Worker extends LoggingMain {
     pipeline.add(executeActionStage, 2);
     pipeline.add(reportResultStage, 1);
 
-    healthStatusManager = new HealthStatusManager();
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
             .addService(
                 new ContentAddressableStorageService(
-                    instances, /* deadlineAfter=*/ 1, DAYS
+                    instance, /* deadlineAfter=*/ 1, DAYS
                     /* requestLogLevel=*/ ))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
+            .addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, DAYS))
             .addService(
                 new WorkerProfileService(
                     storage,

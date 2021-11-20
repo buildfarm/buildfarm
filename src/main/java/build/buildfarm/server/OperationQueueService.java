@@ -33,10 +33,10 @@ import io.grpc.stub.StreamObserver;
 import java.util.function.Consumer;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
-  private final Instances instances;
+  private final Instance instance;
 
-  public OperationQueueService(Instances instances) {
-    this.instances = instances;
+  public OperationQueueService(Instance instance) {
+    this.instance = instance;
   }
 
   private static class OperationQueueMatchListener implements MatchListener {
@@ -97,14 +97,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
   @Override
   public void take(TakeOperationRequest request, StreamObserver<QueueEntry> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
-
     ServerCallStreamObserver<QueueEntry> callObserver =
         (ServerCallStreamObserver<QueueEntry>) responseObserver;
 
@@ -121,14 +113,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   @Override
   public void status(
       BackplaneStatusRequest request, StreamObserver<BackplaneStatus> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
-
     try {
       responseObserver.onNext(instance.backplaneStatus());
       responseObserver.onCompleted();
@@ -139,14 +123,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
   @Override
   public void put(Operation operation, StreamObserver<com.google.rpc.Status> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.getFromOperationName(operation.getName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
-
     try {
       boolean ok = instance.putAndValidateOperation(operation);
       Code code = ok ? Code.OK : Code.INVALID_ARGUMENT;
@@ -164,14 +140,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   @Override
   public void poll(
       PollOperationRequest request, StreamObserver<com.google.rpc.Status> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.getFromOperationName(request.getOperationName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
-
     boolean ok = instance.pollOperation(request.getOperationName(), request.getStage());
     Code code = ok ? Code.OK : Code.INVALID_ARGUMENT;
     responseObserver.onNext(com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build());

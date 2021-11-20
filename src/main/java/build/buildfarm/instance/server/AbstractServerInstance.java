@@ -21,6 +21,7 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.common.Trees.enumerateTreeFileDigests;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
@@ -74,6 +75,7 @@ import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueuedOperation;
@@ -206,6 +208,18 @@ public abstract class AbstractServerInstance implements Instance {
           + "To resolve this error, you can tag the rule with 'no-remote'.  "
           + "You can also adjust the action behavior to attempt a different action hash.";
 
+  public static final String NO_REQUEUE_BLOCKED_ERROR =
+      "Operation %s not requeued. " + BLOCK_LIST_ERROR;
+
+  public static final String NO_REQUEUE_TOO_MANY_ERROR =
+      "Operation %s not requeued.  Operation has been requeued too many times ( %d > %d).";
+
+  public static final String NO_REQUEUE_MISSING_MESSAGE =
+      "Operation %s not requeued.  Operation no longer exists.";
+
+  public static final String NO_REQUEUE_COMPLETE_MESSAGE =
+      "Operation %s not requeued.  Operation has already completed.";
+
   public AbstractServerInstance(
       String name,
       DigestUtil digestUtil,
@@ -244,13 +258,14 @@ public abstract class AbstractServerInstance implements Instance {
     if (result == null) {
       return immediateFuture(ImmutableList.of());
     }
-    // TODO Directories
     ImmutableList.Builder<Digest> digests = ImmutableList.builder();
     digests.addAll(Iterables.transform(result.getOutputFilesList(), OutputFile::getDigest));
     // findMissingBlobs will weed out empties
     digests.add(result.getStdoutDigest());
     digests.add(result.getStderrDigest());
     ListenableFuture<Void> digestsCompleteFuture = immediateFuture(null);
+
+    Executor contextExecutor = Context.current().fixedContextExecutor(executor);
     for (OutputDirectory directory : result.getOutputDirectoriesList()) {
       // TODO make tree cache
       // create an async function here to avoid initiating the calls to expect immediately
@@ -268,10 +283,27 @@ public abstract class AbstractServerInstance implements Instance {
                     return null;
                   },
                   executor);
-      digestsCompleteFuture = transformAsync(digestsCompleteFuture, next, executor);
+      digestsCompleteFuture = transformAsync(digestsCompleteFuture, next, contextExecutor);
     }
     return transformAsync(
-        digestsCompleteFuture, v -> findMissingBlobs(digests.build(), requestMetadata), executor);
+        digestsCompleteFuture,
+        v -> findMissingBlobs(digests.build(), requestMetadata),
+        contextExecutor);
+  }
+
+  private ListenableFuture<ActionResult> notFoundNullActionResult(
+      ListenableFuture<ActionResult> actionResultFuture) {
+    return catchingAsync(
+        actionResultFuture,
+        Exception.class,
+        e -> {
+          Status status = Status.fromThrowable(e);
+          if (status.getCode() == io.grpc.Status.Code.NOT_FOUND) {
+            return immediateFuture(null);
+          }
+          return immediateFailedFuture(e);
+        },
+        directExecutor());
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -282,15 +314,16 @@ public abstract class AbstractServerInstance implements Instance {
             resultFuture,
             result -> findMissingActionResultOutputs(result, directExecutor(), requestMetadata),
             directExecutor());
-    return transformAsync(
-        missingOutputsFuture,
-        missingOutputs -> {
-          if (Iterables.isEmpty(missingOutputs)) {
-            return resultFuture;
-          }
-          return immediateFuture(null);
-        },
-        directExecutor());
+    return notFoundNullActionResult(
+        transformAsync(
+            missingOutputsFuture,
+            missingOutputs -> {
+              if (Iterables.isEmpty(missingOutputs)) {
+                return resultFuture;
+              }
+              return immediateFuture(null);
+            },
+            directExecutor()));
   }
 
   private static boolean shouldEnsureOutputsPresent(RequestMetadata requestMetadata) {
@@ -1462,8 +1495,12 @@ public abstract class AbstractServerInstance implements Instance {
           @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
-            logger.log(
-                Level.WARNING, format("expect for %s failed", DigestUtil.toString(digest)), t);
+            Status status = Status.fromThrowable(t);
+            // NOT_FOUNDs are not notable enough to log independently
+            if (status.getCode() != io.grpc.Status.Code.NOT_FOUND) {
+              logger.log(
+                  Level.WARNING, format("expect for %s failed", DigestUtil.toString(digest)), t);
+            }
             future.setException(t);
           }
         },
@@ -1828,7 +1865,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public abstract GetClientStartTimeResult getClientStartTime(String clientKey);
+  public abstract GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request);
 
   @Override
   public abstract CasIndexResults reindexCas(String hostName);

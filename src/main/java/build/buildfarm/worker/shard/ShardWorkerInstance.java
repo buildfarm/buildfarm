@@ -40,6 +40,7 @@ import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -362,9 +363,9 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     try {
-      return backplane.getClientStartTime(clientKey);
+      return backplane.getClientStartTime(request);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
