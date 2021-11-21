@@ -238,11 +238,8 @@ public class RedisShardBackplaneTest {
     // ACT
     // dispatch the operation and test properties of the QueueEntry and internal jedis calls.
     QueueEntry readyForRequeue = null;
-    try {
-      List<Platform.Property> properties = new ArrayList<>();
-      readyForRequeue = backplane.dispatchOperation(properties);
-    } catch (InterruptedException e) {
-    }
+    List<Platform.Property> properties = new ArrayList<>();
+    readyForRequeue = backplane.dispatchOperation(properties);
 
     // ASSERT
     assertThat(readyForRequeue.getRequeueAttempts())
@@ -303,11 +300,8 @@ public class RedisShardBackplaneTest {
     // ACT
     // dispatch the operation and test properties of the QueueEntry and internal jedis calls.
     QueueEntry readyForRequeue = null;
-    try {
-      List<Platform.Property> properties = new ArrayList<>();
-      readyForRequeue = backplane.dispatchOperation(properties);
-    } catch (InterruptedException e) {
-    }
+    List<Platform.Property> properties = new ArrayList<>();
+    readyForRequeue = backplane.dispatchOperation(properties);
 
     // ASSERT
     assertThat(readyForRequeue.getRequeueAttempts())
