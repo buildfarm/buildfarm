@@ -16,5 +16,7 @@ java_test(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_grpc_grpc_testing",
         "@maven//:org_mockito_mockito_core",
+        "@maven//:commons_io_commons_io",
+        "@maven//:org_apache_commons_commons_compress",
     ],
 )

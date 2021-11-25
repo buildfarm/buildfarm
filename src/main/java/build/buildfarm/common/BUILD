@@ -25,6 +25,8 @@ java_library(
         "@maven//:io_grpc_grpc_context",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:org_threeten_threetenbp",
+        "@maven//:commons_io_commons_io",
+        "@maven//:org_apache_commons_commons_compress",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
