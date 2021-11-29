@@ -478,7 +478,6 @@ public class Utils {
     return fileSystem.getUserPrincipalLookupService().lookupPrincipalByName(userName);
   }
 
-
   public static List<Path> getSymbolicLinkReferences(Path dir) {
     List<Path> paths = new ArrayList<>();
 
@@ -500,7 +499,7 @@ public class Utils {
     }
 
     return paths;
-}
+  }
 
   /**
    * @brief Use a tar archive stream to extract all of its files to a destination path.
