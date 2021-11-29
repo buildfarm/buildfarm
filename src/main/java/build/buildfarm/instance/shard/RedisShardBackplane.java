@@ -50,6 +50,7 @@ import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTime;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
@@ -1233,8 +1234,7 @@ public class RedisShardBackplane implements Backplane {
       logger.log(Level.SEVERE, "error parsing queue entry", e);
       return null;
     }
-    QueueEntry queueEntry =
-        queueEntryBuilder.setRequeueAttempts(queueEntryBuilder.getRequeueAttempts() + 1).build();
+    QueueEntry queueEntry = queueEntryBuilder.build();
 
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     Operation operation = keepaliveOperation(operationName);
@@ -1266,7 +1266,9 @@ public class RedisShardBackplane implements Backplane {
                 operationName, operationQueue.getDequeueName()));
       }
       dispatchedOperations.remove(jedis, operationName);
-      return queueEntry;
+
+      // Return an entry so that if it needs re-queued, it will have the correct "requeue attempts".
+      return queueEntryBuilder.setRequeueAttempts(queueEntry.getRequeueAttempts() + 1).build();
     }
     return null;
   }
@@ -1475,16 +1477,11 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public GetClientStartTimeResult getClientStartTime() throws IOException {
-    try {
-      List<String> allUptimeKeys = new ArrayList<>();
-      Map<String, JedisPool> clusterNodes = client.call(jedis -> jedis.getClusterNodes());
-      for (Map.Entry<String, JedisPool> entry : clusterNodes.entrySet()) {
-        Jedis singlejedis = entry.getValue().getResource();
-        allUptimeKeys.addAll(client.call(jedis -> singlejedis.keys("startTime/*")));
-      }
-      List<GetClientStartTime> startTimes = new ArrayList<>();
-      for (String key : allUptimeKeys) {
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request)
+      throws IOException {
+    List<GetClientStartTime> startTimes = new ArrayList<>();
+    for (String key : request.getHostNameList()) {
+      try {
         startTimes.add(
             client.call(
                 jedis ->
@@ -1492,10 +1489,10 @@ public class RedisShardBackplane implements Backplane {
                         .setInstanceName(key)
                         .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(key))))
                         .build()));
+      } catch (NumberFormatException nfe) {
+        logger.warning("Could not obtain start time for " + key);
       }
-      return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
-    } catch (NumberFormatException nfe) {
-      return GetClientStartTimeResult.newBuilder().build();
     }
+    return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
   }
 }

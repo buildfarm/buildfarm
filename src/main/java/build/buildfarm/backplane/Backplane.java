@@ -29,6 +29,7 @@ import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
@@ -307,5 +308,5 @@ public interface Backplane {
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
 
   @ThreadSafe
-  GetClientStartTimeResult getClientStartTime() throws IOException;
+  GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) throws IOException;
 }

@@ -478,21 +478,6 @@ public class Utils {
     return fileSystem.getUserPrincipalLookupService().lookupPrincipalByName(userName);
   }
 
-  public static void unTar(TarArchiveInputStream tis, File destFile) throws IOException {
-    TarArchiveEntry tarEntry;
-    while ((tarEntry = tis.getNextTarEntry()) != null) {
-      if (tarEntry.isDirectory()) {
-        if (!destFile.exists()) {
-          destFile.mkdirs();
-        }
-      } else {
-        FileOutputStream fos = new FileOutputStream(destFile);
-        IOUtils.copy(tis, fos);
-        fos.close();
-      }
-    }
-    tis.close();
-  }
 
   public static List<Path> getSymbolicLinkReferences(Path dir) {
     List<Path> paths = new ArrayList<>();
@@ -515,5 +500,28 @@ public class Utils {
     }
 
     return paths;
+}
+
+  /**
+   * @brief Use a tar archive stream to extract all of its files to a destination path.
+   * @details This utility function is useful for extracting files from a docker container. When an
+   *     execution is performed in the docker container, it will return ta stream object so that
+   *     files can be extracted.
+   */
+  public static void unTar(TarArchiveInputStream tis, File destinationPath) throws IOException {
+    TarArchiveEntry tarEntry;
+    while ((tarEntry = tis.getNextTarEntry()) != null) {
+      // Directories don't need copied over. We ensure the destination path exists.
+      if (tarEntry.isDirectory()) {
+        destinationPath.mkdirs();
+      }
+
+      // Copy tar files to the destination path
+      else {
+        try (FileOutputStream fos = new FileOutputStream(destinationPath)) {
+          IOUtils.copy(tis, fos);
+        }
+      }
+    }
   }
 }
