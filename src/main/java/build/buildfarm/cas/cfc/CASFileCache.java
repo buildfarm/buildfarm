@@ -517,8 +517,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     try {
       return newLocalInput(digest, offset);
     } catch (NoSuchFileException e) {
-      return newInputFallback(digest, offset);
+      if (delegate == null) {
+        throw e;
+      }
     }
+    return newInputFallback(digest, offset);
   }
 
   @Override
