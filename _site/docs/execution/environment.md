@@ -111,7 +111,7 @@ container_pull(
 
 Be sure to substitute the `sha256:<sha256sum>` with your content from above.
 
-Next we will create a BUILD file to create our target image. We will use the shard variant here, but the operationqueue worker (with supporting server execution) will work as well. The content of the BUILD file should be:
+Next we will create a BUILD file to create our target image. We will use the shard variant here, but the memory worker (with supporting server execution) will work as well. The content of the BUILD file should be:
 
 ```
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
