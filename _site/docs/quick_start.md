@@ -77,7 +77,7 @@ run `bazel run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/serv
 
 From another prompt in the buildfarm repository directory:
 
-run `bazel run src/main/java/build/buildfarm:buildfarm-operationqueue-worker $PWD/examples/worker.config.example`
+run `bazel run src/main/java/build/buildfarm:buildfarm-memory-worker $PWD/examples/worker.config.example`
 
 From another prompt, in your client workspace:
 
