@@ -21,6 +21,7 @@ import com.google.devtools.build.v1.PublishBuildToolEventStreamResponse;
 import com.google.devtools.build.v1.PublishLifecycleEventRequest;
 import com.google.devtools.build.v1.StreamId;
 import com.google.protobuf.Empty;
+import com.google.protobuf.TextFormat;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
@@ -71,9 +72,8 @@ public class PublishBuildEventService extends PublishBuildEventImplBase {
   }
 
   private void recordEvent(PublishBuildToolEventStreamRequest in) {
-    if (config.getRecordEvents()) {
-      // TODO(luxe): Do something better with events
-      logger.log(Level.INFO, in.getProjectId());
+    if (config.getRecordEvents() && in.hasOrderedBuildEvent()) {
+      logger.log(Level.INFO, TextFormat.shortDebugString(in.getOrderedBuildEvent()));
     }
   }
 }
