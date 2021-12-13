@@ -302,15 +302,36 @@ public class Worker extends LoggingMain {
   }
 
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
+    addMissingRoot(config);
+    verifyRootConfiguration(config);
+    return Paths.get(config.getRoot());
+  }
+
+  private static void addMissingRoot(ShardWorkerConfig config) {
+    Path root = Paths.get(config.getRoot());
+    if (!Files.isDirectory(root)) {
+      try {
+        Files.createDirectories(root);
+      } catch (IOException e) {
+        logger.log(Level.SEVERE, e.toString());
+      }
+    }
+  }
+
+  private static void verifyRootConfiguration(ShardWorkerConfig config)
+      throws ConfigurationException {
     String rootValue = config.getRoot();
+
+    // Configuration error if no root is specified.
     if (Strings.isNullOrEmpty(rootValue)) {
       throw new ConfigurationException("root value in config missing");
     }
+
+    // Configuration error if root does not exist.
     Path root = Paths.get(rootValue);
     if (!Files.isDirectory(root)) {
       throw new ConfigurationException("root [" + root.toString() + "] is not directory");
     }
-    return root;
   }
 
   private static Path getValidFilesystemCASPath(FilesystemCASConfig config, Path root)
