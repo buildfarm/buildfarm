@@ -304,7 +304,6 @@ public class Worker extends LoggingMain {
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
     addMissingRoot(config);
     verifyRootConfiguration(config);
-
     return Paths.get(config.getRoot());
   }
 
