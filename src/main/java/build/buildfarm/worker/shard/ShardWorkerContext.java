@@ -839,10 +839,7 @@ class ShardWorkerContext implements WorkerContext {
       Command command,
       Path workingDirectory) {
     if (limitExecution) {
-      ResourceLimits limits =
-          ResourceDecider.decideResourceLimitations(
-              command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
-
+      ResourceLimits limits = commandExecutionSettings(command);
       return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
     }
     return new IOResource() {
