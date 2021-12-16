@@ -88,6 +88,11 @@ java_image(
     runtime_deps = [
         "//src/main/java/build/buildfarm/server",
     ],
+    jvm_flags = [
+        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties"
+    ],
+    args = ["/app/build_buildfarm/examples/shard-server.config.example"],
+    data = ["//src/main/java/build/buildfarm:configs", "//examples:example_configs"],
 )
 
 java_image(
