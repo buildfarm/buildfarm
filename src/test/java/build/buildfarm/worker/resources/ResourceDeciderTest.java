@@ -529,6 +529,5 @@ public class ResourceDeciderTest {
 
     // ASSERT
     assertThat(limits.workerName).isEqualTo("foo");
-    ;
   }
 }
