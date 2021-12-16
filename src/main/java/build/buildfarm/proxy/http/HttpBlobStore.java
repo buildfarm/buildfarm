@@ -146,7 +146,6 @@ public final class HttpBlobStore implements SimpleBlobStore {
       int remoteMaxConnections,
       @Nullable final Credentials creds)
       throws ConfigurationException, URISyntaxException, SSLException {
-
     if (KQueue.isAvailable()) {
       return new HttpBlobStore(
           KQueueEventLoopGroup::new,
@@ -519,7 +518,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
     put(key, length, in, true);
   }
 
-  @SuppressWarnings("FutureReturnValueIgnored")
+  @SuppressWarnings({"FutureReturnValueIgnored", "ConstantConditions"})
   private void put(String key, long length, InputStream in, boolean casUpload)
       throws IOException, InterruptedException {
     InputStream wrappedIn =
@@ -563,7 +562,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
     }
   }
 
-  @SuppressWarnings("FutureReturnValueIgnored")
+  @SuppressWarnings({"FutureReturnValueIgnored", "ConstantConditions"})
   private void putAfterCredentialRefresh(UploadCommand cmd) throws InterruptedException {
     Channel ch = null;
     try {
@@ -623,6 +622,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
   }
 
   /** See https://tools.ietf.org/html/rfc6750#section-3.1 */
+  @SuppressWarnings("ConstantConditions")
   private boolean authTokenExpired(HttpResponse response) {
     synchronized (credentialsLock) {
       if (creds == null) {

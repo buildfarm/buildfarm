@@ -48,7 +48,6 @@ import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
 import com.google.protobuf.ByteString;
 import io.grpc.Server;
@@ -66,6 +65,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -270,10 +270,11 @@ public class StubInstanceTest {
             responseObserver.onNext(
                 BatchUpdateBlobsResponse.newBuilder()
                     .addAllResponses(
-                        Iterables.transform(
-                            batchRequest.getRequestsList(),
-                            request ->
-                                Response.newBuilder().setDigest(request.getDigest()).build()))
+                        batchRequest.getRequestsList().stream()
+                            .map(
+                                request ->
+                                    Response.newBuilder().setDigest(request.getDigest()).build())
+                            .collect(Collectors.toList()))
                     .build());
             responseObserver.onCompleted();
           }
@@ -292,7 +293,6 @@ public class StubInstanceTest {
   public void completedWriteBeforeCloseThrowsOnNextInteraction()
       throws IOException, InterruptedException {
     String resourceName = "early-completed-output-stream-test";
-    AtomicReference<ByteString> writtenContent = new AtomicReference<>();
     serviceRegistry.addService(
         new ByteStreamImplBase() {
           boolean completed = false;
@@ -302,7 +302,6 @@ public class StubInstanceTest {
           public StreamObserver<WriteRequest> write(
               StreamObserver<WriteResponse> responseObserver) {
             return new StreamObserver<WriteRequest>() {
-
               @Override
               public void onNext(WriteRequest request) {
                 if (!completed) {
@@ -445,6 +444,7 @@ public class StubInstanceTest {
     instance.stop();
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void readBlobInterchangeDoesNotRequestUntilStarted() {
     ServerCallStreamObserver<ByteString> mockBlobObserver = mock(ServerCallStreamObserver.class);

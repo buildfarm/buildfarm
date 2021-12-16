@@ -17,7 +17,6 @@ package build.buildfarm.instance.queues;
 import build.buildfarm.instance.MatchListener;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.SetMultimap;
 import com.google.longrunning.Operation;
@@ -29,7 +28,6 @@ import java.util.List;
     Each queue is tagged with the required provisions which affects the operations and workers involved with the queue.
 */
 public class WorkerQueues implements Iterable<WorkerQueue> {
-
   /*
     The specific queues whose provision requirements are considered when queuing an operation.
     The queues are evaluated in the order that they are listed.
@@ -38,8 +36,9 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
     That way, all of the provision-requiring queues are considered first,
     before choosing the fallback queue last.
   */
-  public List<WorkerQueue> specificQueues = Lists.newArrayList();
+  public final List<WorkerQueue> specificQueues = Lists.newArrayList();
 
+  @SuppressWarnings("NullableProblems")
   @Override
   public Iterator<WorkerQueue> iterator() {
     return specificQueues.iterator();
@@ -47,7 +46,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
 
   public int queueSize(String queueName) {
     for (WorkerQueue queue : specificQueues) {
-      if (queue.name == queueName) {
+      if (queue.name.equals(queueName)) {
         return queue.operations.size();
       }
     }
@@ -63,9 +62,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
   */
   public WorkerQueue MatchEligibleQueue(SetMultimap<String, String> provisions)
       throws InterruptedException {
-
     for (WorkerQueue queue : specificQueues) {
-
       /*
         Accept the queue if all of its provision requirements are met by the given provisions.
         If no queue is eligible based on the provisions return the last queue for now.
@@ -79,7 +76,6 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
   }
 
   public boolean enqueueOperation(Operation operation, SetMultimap<String, String> provisions) {
-
     // if the user gives null provisions, assume an empty set
     if (provisions == null) {
       provisions = HashMultimap.create();
@@ -94,43 +90,40 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
     return true;
   }
 
-  public boolean AddWorker(SetMultimap<String, String> provisions, MatchListener listener) {
-
+  @SuppressWarnings("CatchMayIgnoreException")
+  public void AddWorker(SetMultimap<String, String> provisions, MatchListener listener) {
     try {
       WorkerQueue queue = MatchEligibleQueue(provisions);
       queue.workers.add(new Worker(provisions, listener));
     } catch (Exception e) {
-      return false;
     }
-    return true;
   }
 
-  public boolean AddWorkers(String queueName, List<Worker> workers) {
+  public void AddWorkers(String queueName, List<Worker> workers) {
     for (WorkerQueue queue : specificQueues) {
-      if (queue.name == queueName) {
+      if (queue.name.equals(queueName)) {
         queue.workers.addAll(workers);
-        return true;
+        return;
       }
     }
-    return false;
   }
 
   /*
     Removes all instances of an existing listener from any of the queues
   */
   public void removeWorker(MatchListener listener) {
-
     for (WorkerQueue queue : specificQueues) {
       removeWorkerFromQueue(queue, listener);
     }
   }
 
+  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   private void enqueueOperation(List<Operation> operations, Operation operation) {
     synchronized (operations) {
       Preconditions.checkState(
-          !Iterables.any(
-              operations,
-              (queuedOperation) -> queuedOperation.getName().equals(operation.getName())));
+          operations.stream()
+              .noneMatch(
+                  (queuedOperation) -> queuedOperation.getName().equals(operation.getName())));
       operations.add(operation);
     }
   }
@@ -150,12 +143,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
 
   private void removeWorkerFromQueue(WorkerQueue queue, MatchListener listener) {
     synchronized (queue.workers) {
-      Iterator<Worker> iter = queue.workers.iterator();
-      while (iter.hasNext()) {
-        if (iter.next().getListener() == listener) {
-          iter.remove();
-        }
-      }
+      queue.workers.removeIf(worker -> worker.getListener() == listener);
     }
   }
 }

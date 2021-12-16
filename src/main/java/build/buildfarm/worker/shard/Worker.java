@@ -23,7 +23,6 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
@@ -49,7 +48,6 @@ import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
-import build.buildfarm.server.Instances;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
@@ -89,6 +87,7 @@ import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.services.HealthStatusManager;
+import io.prometheus.client.Counter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -117,6 +116,12 @@ public class Worker extends LoggingMain {
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
+  private static final Counter healthCheckMetric =
+      Counter.build()
+          .name("health_check")
+          .labelNames("lifecycle")
+          .help("Service health check.")
+          .register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
   private final boolean isCasShard;
@@ -125,7 +130,10 @@ public class Worker extends LoggingMain {
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
-  private final HealthStatusManager healthStatusManager;
+
+  @SuppressWarnings("deprecation")
+  private final HealthStatusManager healthStatusManager = new HealthStatusManager();
+
   private final Server server;
   private final Path root;
   private final DigestUtil digestUtil;
@@ -133,7 +141,6 @@ public class Worker extends LoggingMain {
   private final Pipeline pipeline;
   private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
-  private final PrometheusPublisher prometheusPublisher;
 
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
@@ -142,15 +149,13 @@ public class Worker extends LoggingMain {
 
     public void insertBlob(Digest digest, ByteString content)
         throws IOException, InterruptedException {
-      insertStream(digest, () -> content.newInput());
+      insertStream(digest, content::newInput);
     }
 
-    private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
-      Write write =
-          execFileSystem
-              .getStorage()
-              .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-      return write;
+    private Write getLocalWrite(Digest digest) throws IOException {
+      return execFileSystem
+          .getStorage()
+          .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
     }
 
     private void insertStream(Digest digest, IOSupplier<InputStream> suppliedStream)
@@ -177,7 +182,6 @@ public class Worker extends LoggingMain {
 
     private void insertFileToCasMember(Digest digest, Path file)
         throws IOException, InterruptedException {
-
       try (InputStream in = Files.newInputStream(file)) {
         writeToCasMember(digest, in);
       } catch (ExecutionException e) {
@@ -187,18 +191,14 @@ public class Worker extends LoggingMain {
 
     private void writeToCasMember(Digest digest, InputStream in)
         throws IOException, InterruptedException, ExecutionException {
-
       // create a write for inserting into another CAS member.
       String workerName = getRandomWorker();
-      Instance casMember = workerStub(workerName);
       Write write = getCasMemberWrite(digest, workerName);
 
       streamIntoWriteFuture(in, write, digest).get();
     }
 
-    private Write getCasMemberWrite(Digest digest, String workerName)
-        throws IOException, InterruptedException {
-
+    private Write getCasMemberWrite(Digest digest, String workerName) throws IOException {
       Instance casMember = workerStub(workerName);
 
       return casMember.getBlobWrite(
@@ -212,7 +212,6 @@ public class Worker extends LoggingMain {
 
     private void insertBlobToCasMember(Digest digest, ByteString content)
         throws IOException, InterruptedException {
-
       try (InputStream in = content.newInput()) {
         writeToCasMember(digest, in);
       } catch (ExecutionException e) {
@@ -285,6 +284,7 @@ public class Worker extends LoggingMain {
    * @param clusterEndpoint the current Buildfarm endpoint.
    * @param instanceIp Ip of the the instance that we want to disable scale in protection.
    */
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   private void disableScaleInProtection(String clusterEndpoint, String instanceIp) {
     ManagedChannel channel = null;
     try {
@@ -302,15 +302,36 @@ public class Worker extends LoggingMain {
   }
 
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
+    addMissingRoot(config);
+    verifyRootConfiguration(config);
+    return Paths.get(config.getRoot());
+  }
+
+  private static void addMissingRoot(ShardWorkerConfig config) {
+    Path root = Paths.get(config.getRoot());
+    if (!Files.isDirectory(root)) {
+      try {
+        Files.createDirectories(root);
+      } catch (IOException e) {
+        logger.log(Level.SEVERE, e.toString());
+      }
+    }
+  }
+
+  private static void verifyRootConfiguration(ShardWorkerConfig config)
+      throws ConfigurationException {
     String rootValue = config.getRoot();
+
+    // Configuration error if no root is specified.
     if (Strings.isNullOrEmpty(rootValue)) {
       throw new ConfigurationException("root value in config missing");
     }
+
+    // Configuration error if root does not exist.
     Path root = Paths.get(rootValue);
     if (!Files.isDirectory(root)) {
       throw new ConfigurationException("root [" + root.toString() + "] is not directory");
     }
-    return root;
   }
 
   private static Path getValidFilesystemCASPath(FilesystemCASConfig config, Path root)
@@ -339,11 +360,12 @@ public class Worker extends LoggingMain {
     return instance.stripQueuedOperation(operation);
   }
 
+  @SuppressWarnings({"deprecation", "unchecked"})
   public Worker(String session, ServerBuilder<?> serverBuilder, ShardWorkerConfig config)
       throws ConfigurationException {
     super("BuildFarmShardWorker");
     this.config = config;
-    isCasShard = !config.getOmitFromCas();
+    isCasShard = config.getCapabilities().getCas();
     String identifier = "buildfarm-worker-" + config.getPublicName() + "-" + session;
     root = getValidRoot(config);
     if (config.getPublicName().isEmpty()) {
@@ -389,15 +411,7 @@ public class Worker extends LoggingMain {
         createExecFileSystem(
             remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
 
-    instance =
-        new ShardWorkerInstance(
-            config.getPublicName(),
-            digestUtil,
-            backplane,
-            storage,
-            config.getShardWorkerInstanceConfig());
-
-    Instances instances = Instances.singular(instance);
+    instance = new ShardWorkerInstance(config.getPublicName(), digestUtil, backplane, storage);
 
     // Create the appropriate writer for the context
     CasWriter writer;
@@ -418,9 +432,9 @@ public class Worker extends LoggingMain {
             config.getDequeueMatchSettings().getPlatform(),
             config.getOperationPollPeriod(),
             backplane::pollOperation,
-            config.getInlineContentLimit(),
             config.getInputFetchStageWidth(),
             config.getExecuteStageWidth(),
+            config.getInputFetchDeadline(),
             backplane,
             execFileSystem,
             new EmptyInputStreamFactory(
@@ -428,9 +442,8 @@ public class Worker extends LoggingMain {
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
             config.getExecutionPoliciesList(),
             instance,
-            /* deadlineAfter=*/ 1,
-            /* deadlineAfterUnits=*/ DAYS,
-            config.getDefaultActionTimeout(),
+            /* deadlineAfter=*/
+            /* deadlineAfterUnits=*/ config.getDefaultActionTimeout(),
             config.getMaximumActionTimeout(),
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
@@ -440,13 +453,12 @@ public class Worker extends LoggingMain {
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));
-    PipelineStage errorStage = completeStage; /* new ErrorStage(); */
-    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
+    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, completeStage);
     PipelineStage executeActionStage =
-        new ExecuteActionStage(context, reportResultStage, errorStage);
+        new ExecuteActionStage(context, reportResultStage, completeStage);
     PipelineStage inputFetchStage =
         new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
-    PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
+    PipelineStage matchStage = new MatchStage(context, inputFetchStage, completeStage);
 
     pipeline = new Pipeline();
     // pipeline.add(errorStage, 0);
@@ -455,14 +467,14 @@ public class Worker extends LoggingMain {
     pipeline.add(executeActionStage, 2);
     pipeline.add(reportResultStage, 1);
 
-    healthStatusManager = new HealthStatusManager();
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
             .addService(
                 new ContentAddressableStorageService(
-                    instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
+                    instance, /* deadlineAfter=*/ 1, DAYS
+                    /* requestLogLevel=*/ ))
+            .addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, DAYS))
             .addService(
                 new WorkerProfileService(
                     storage,
@@ -474,13 +486,10 @@ public class Worker extends LoggingMain {
             .addService(new ShutDownWorkerGracefully(this, config))
             .build();
 
-    prometheusPublisher = new PrometheusPublisher();
-
     logger.log(INFO, String.format("%s initialized", identifier));
   }
 
   private static Duration getGrpcTimeout(ShardWorkerConfig config) {
-
     // return the configured
     if (config.getShardWorkerInstanceConfig().hasGrpcTimeout()) {
       Duration configured = config.getShardWorkerInstanceConfig().getGrpcTimeout();
@@ -492,15 +501,12 @@ public class Worker extends LoggingMain {
     // return a default
     Duration defaultDuration = Durations.fromSeconds(60);
     logger.log(
-        INFO,
-        String.format(
-            "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s"));
+        INFO, "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
     return defaultDuration;
   }
 
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
       throws IOException {
-
     SettableFuture<Long> writtenFuture = SettableFuture.create();
     int chunkSizeBytes = (int) Size.kbToBytes(128);
 
@@ -514,7 +520,6 @@ public class Worker extends LoggingMain {
             /* deadlineAfterUnits=*/ DAYS,
             () -> {
               try {
-
                 FeedbackOutputStream outStream = (FeedbackOutputStream) write;
                 while (outStream.isReady()) {
                   if (!CopyBytes(in, outStream, chunkSizeBytes)) {
@@ -568,6 +573,7 @@ public class Worker extends LoggingMain {
     return false;
   }
 
+  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   private String getRandomWorker() throws IOException {
     Set<String> workerSet = backplane.getWorkers();
     synchronized (workerSet) {
@@ -601,23 +607,19 @@ public class Worker extends LoggingMain {
         (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
 
     InputStreamFactory localPopulatingInputStreamFactory =
-        new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest blobDigest, long offset)
-              throws IOException, InterruptedException {
-            // FIXME use write
-            ByteString content =
-                ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
+        (blobDigest, offset) -> {
+          // FIXME use write
+          ByteString content =
+              ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
 
-            if (offset == 0) {
-              // extra computations
-              Blob blob = new Blob(content, digestUtil);
-              // here's hoping that our digest matches...
-              storage.put(blob);
-            }
-
-            return content.newInput();
+          if (offset == 0) {
+            // extra computations
+            Blob blob = new Blob(content, digestUtil);
+            // here's hoping that our digest matches...
+            storage.put(blob);
           }
+
+          return content.newInput();
         };
     return new FuseExecFileSystem(
         root,
@@ -700,7 +702,8 @@ public class Worker extends LoggingMain {
       throws ConfigurationException {
     ImmutableList.Builder<ContentAddressableStorage> storages = ImmutableList.builder();
     // must construct delegates first
-    ContentAddressableStorage storage = null, delegate = null;
+    ContentAddressableStorage storage = null;
+    ContentAddressableStorage delegate = null;
     for (ContentAddressableStorageConfig config : Lists.reverse(configs)) {
       storage =
           createStorage(
@@ -722,11 +725,12 @@ public class Worker extends LoggingMain {
         owner,
         config.getLinkInputDirectories(),
         removeDirectoryService,
-        accessRecorder,
-        /* deadlineAfter=*/ 1,
-        /* deadlineAfterUnits=*/ DAYS);
+        accessRecorder
+        /* deadlineAfter=*/
+        /* deadlineAfterUnits=*/ );
   }
 
+  @SuppressWarnings({"deprecation", "ResultOfMethodCallIgnored"})
   public void stop() throws InterruptedException {
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
@@ -740,6 +744,7 @@ public class Worker extends LoggingMain {
     }
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
+    healthCheckMetric.labels("stop").inc();
     if (execFileSystem != null) {
       logger.log(INFO, "Stopping exec filesystem");
       execFileSystem.stop();
@@ -775,7 +780,6 @@ public class Worker extends LoggingMain {
 
   private void onStoragePut(Digest digest) {
     try {
-
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
       if (isCasShard) {
         backplane.addBlobLocation(digest, config.getPublicName());
@@ -788,7 +792,6 @@ public class Worker extends LoggingMain {
   private void onStorageExpire(Iterable<Digest> digests) {
     if (isCasShard) {
       try {
-
         // if the worker is a CAS member, it can send/modify blobs in the backplane.
         backplane.removeBlobsLocation(digests, config.getPublicName());
       } catch (IOException e) {
@@ -898,6 +901,7 @@ public class Worker extends LoggingMain {
         .start();
   }
 
+  @SuppressWarnings("deprecation")
   public void start() throws InterruptedException {
     try {
       backplane.start(config.getPublicName());
@@ -911,7 +915,7 @@ public class Worker extends LoggingMain {
       server.start();
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-      prometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
+      PrometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
@@ -926,12 +930,13 @@ public class Worker extends LoggingMain {
       return;
     }
     pipeline.start();
+    healthCheckMetric.labels("start").inc();
   }
 
   @Override
   protected void onShutdown() throws InterruptedException {
     logger.log(SEVERE, "*** shutting down gRPC server since JVM is shutting down");
-    prometheusPublisher.stopHttpServer();
+    PrometheusPublisher.stopHttpServer();
     stop();
     logger.log(SEVERE, "*** server shut down");
   }
@@ -964,6 +969,7 @@ public class Worker extends LoggingMain {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   public static void startWorker(String[] args) throws Exception {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //

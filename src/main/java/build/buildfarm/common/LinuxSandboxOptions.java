@@ -24,7 +24,6 @@ import java.util.ArrayList;
  *     https://github.com/bazelbuild/bazel/blob/e8a6db03d2f279910297d2ac2657ca3202241711/src/main/tools/linux-sandbox-options.h.
  */
 public class LinuxSandboxOptions {
-
   /**
    * @field workingDir
    * @brief Working directory.
@@ -72,14 +71,14 @@ public class LinuxSandboxOptions {
    * @brief Files or directories to make writable for the sandboxed process.
    * @details Flag value: -w.
    */
-  public ArrayList<String> writableFiles = new ArrayList<>();
+  public final ArrayList<String> writableFiles = new ArrayList<>();
 
   /**
    * @field tmpfsDirs
    * @brief Directories where to mount an empty tmpfs.
    * @details Flag value: -e.
    */
-  public ArrayList<String> tmpfsDirs = new ArrayList<>();
+  public final ArrayList<String> tmpfsDirs = new ArrayList<>();
 
   /**
    * @field bindMountSources
@@ -128,7 +127,7 @@ public class LinuxSandboxOptions {
    * @brief Set the username inside the sandbox to 'nobody'.
    * @details Flag value: -U.
    */
-  public boolean fakeUsername = false;
+  public final boolean fakeUsername = false;
 
   /**
    * @field debug

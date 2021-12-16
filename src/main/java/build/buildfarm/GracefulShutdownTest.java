@@ -35,6 +35,7 @@ class GracefulShutdownTest {
    *
    * @param args
    */
+  @SuppressWarnings({"JavaDoc", "ResultOfMethodCallIgnored"})
   private static void shutDownGracefully(String[] args) {
     String workerName = args[1];
     String bfEndpoint = args[2];
@@ -57,6 +58,7 @@ class GracefulShutdownTest {
    *
    * @param args
    */
+  @SuppressWarnings({"JavaDoc", "ResultOfMethodCallIgnored"})
   private static void prepareWorkerForShutDown(String[] args) {
     String workerIpWithPort = args[1];
     System.out.println("Inform worker " + workerIpWithPort + " to prepare for shutdown!");
@@ -73,6 +75,7 @@ class GracefulShutdownTest {
    *
    * @param args
    */
+  @SuppressWarnings({"JavaDoc", "ResultOfMethodCallIgnored"})
   private static void disableScaleInProtection(String[] args) {
     String instancePrivateIp = args[1];
     String bfEndpoint = args[2];
@@ -84,16 +87,21 @@ class GracefulShutdownTest {
     System.out.println("Request for " + instancePrivateIp + " sent");
   }
 
-  public static void main(String[] args) throws Exception {
-    if (args[0].equals("ShutDown")) {
-      shutDownGracefully(args);
-    } else if (args[0].equals("PrepareWorker")) {
-      prepareWorkerForShutDown(args);
-    } else if (args[0].equals("DisableProtection")) {
-      disableScaleInProtection(args);
-    } else {
-      System.out.println(
-          "The action your choose is wrong. Please choose one from ShutDown, PrepareWorker, and DisableProtection");
+  public static void main(String[] args) {
+    switch (args[0]) {
+      case "ShutDown":
+        shutDownGracefully(args);
+        break;
+      case "PrepareWorker":
+        prepareWorkerForShutDown(args);
+        break;
+      case "DisableProtection":
+        disableScaleInProtection(args);
+        break;
+      default:
+        System.out.println(
+            "The action your choose is wrong. Please choose one from ShutDown, PrepareWorker, and DisableProtection");
+        break;
     }
   }
 }

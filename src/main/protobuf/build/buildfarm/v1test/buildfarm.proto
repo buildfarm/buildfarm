@@ -35,9 +35,12 @@ service Admin {
   rpc ScaleCluster(ScaleClusterRequest) returns (google.rpc.Status) {
     option (google.api.http) = { get: "/v1test/admin:scaleCluster" };
   }
-  
+
   rpc ReindexCas(ReindexCasRequest) returns (ReindexCasRequestResults) {
     option (google.api.http) = { get: "/v1test/admin:reindexCas" };
+  }
+  rpc ReindexAllCas(ReindexAllCasRequest) returns (ReindexCasRequestResults) {
+    option (google.api.http) = { get: "/v1test/admin:reindexAllCas" };
   }
   
   rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest) returns (ShutDownWorkerGracefullyRequestResults) {
@@ -67,9 +70,13 @@ message DisableScaleInProtectionRequestResults{
 
 message ReindexCasRequest {
   string instance_name = 1;
-  
+
   // format: ip:port
   string host_id = 2;
+  }
+
+message ReindexAllCasRequest {
+  string instance_name = 1;
 }
 
 message ReindexCasRequestResults {
@@ -132,11 +139,16 @@ message Host {
 
 message GetClientStartTimeRequest {
   string instance_name = 1;
-  string client_key = 2;
+  repeated string host_name = 2;
 }
 
 message GetClientStartTimeResult {
-  google.protobuf.Timestamp client_start_time = 1;
+  repeated GetClientStartTime client_start_time = 1;
+}
+
+message GetClientStartTime {
+  string instance_name = 1;
+  google.protobuf.Timestamp client_start_time = 2;
 }
 
 message ScaleClusterRequest {
@@ -198,21 +210,29 @@ message PollOperationRequest {
 }
 
 message BuildFarmServerConfig {
-  repeated InstanceConfig instances = 1;
+  InstanceConfig instance = 1;
 
-  string default_instance_name = 2; // must be present in instances list or empty
+  int32 port = 2;
 
-  int32 port = 3;
+  int32 execute_keepalive_after_seconds = 3;
 
-  int32 execute_keepalive_after_seconds = 4;
+  MetricsConfig metrics_config = 4;
 
-  MetricsConfig metrics_config = 5;
+  AdminConfig admin_config = 5;
 
-  AdminConfig admin_config = 6;
-
-  PrometheusConfig prometheus_config = 7;
+  PrometheusConfig prometheus_config = 6;
   
-  BuildEventConfig build_event_config = 8;
+  BuildEventConfig build_event_config = 7;
+  
+  // Absolute path to the PEM file containing both the required certificates and any
+  // associated private key.
+  optional string ssl_certificate_path = 8;
+
+  // CAS write deadline
+  google.protobuf.Duration cas_write_timeout = 9;
+
+  // Bytestream upload blob deadline
+  google.protobuf.Duration bytestream_timeout = 10;
 }
 
 message MetricsConfig {
@@ -546,7 +566,7 @@ message ShardInstanceConfig {
     RedisShardBackplaneConfig redis_shard_backplane_config = 4;
   }
 
-  int64 max_blob_size = 5;
+  int64 max_entry_size_bytes = 5;
   
   int32 max_cpu = 9;
 
@@ -557,6 +577,11 @@ message ShardInstanceConfig {
   
   // default timeouts on grpc requests made by instances
   google.protobuf.Duration grpc_timeout = 8;
+  
+  // Whether the instance should consult a denylist when looking up actions & invocations.
+  bool use_deny_list = 10;
+
+  int32 max_requeue_attempts = 11;
 }
 
 message ShardWorkerInstanceConfig {
@@ -592,6 +617,18 @@ message DequeueMatchSettings {
   
   // worker platform used to match operations
   build.bazel.remote.execution.v2.Platform platform = 3;
+}
+
+message WorkerCapabilities {
+  
+  // This determines whether the shard instance will participate in the backplane
+  // and cache it's operation outputs in its own cache file CAS.
+  // When omitted from CAS, the worker will send its execution outputs.
+  bool cas = 1;
+  
+  // This determines whether the shard instance will participate in the execution pool.
+  // Workers that don't execute may be used for storage only.
+  bool execution = 2;
 }
 
 message ShardWorkerConfig {
@@ -660,16 +697,16 @@ message ShardWorkerConfig {
   // user principal name for executions
   string exec_owner = 32;
   
-  // This determines whether the shard instance will participate in the backplane
-  // and cache it's operation outputs in its own cache file CAS.
-  // When omitted from CAS, the worker will send its output to another worker's CAS.
-  bool omit_from_cas = 33;
+  WorkerCapabilities capabilities = 38;
   
   bool error_operation_remaining_resources = 34;
 
   AdminConfig admin_config = 35;
 
   PrometheusConfig prometheus_config = 37;
+
+  // a limit on time (in seconds) for input fetch stage to fetch inputs
+  int32 input_fetch_deadline = 39;
   
 }
 
@@ -784,12 +821,66 @@ message OperationQueueStatus {
   int64 size = 2;
 }
 
+message LabeledCount {
+  string name = 1;
+  
+  int64 size = 2;
+}
+
+message DispatchedOperationsStatus {
+  
+  // the total number of currently dispatched operations
+  int64 size = 1;
+  
+  // how many of the current dispatched operations are 'build' related
+  int64 build_action_amount = 2;
+  
+  // how many of the current dispatched operations are 'test' related
+  int64 test_action_amount = 3;
+  
+  // how many of the current dispatched operations cannot be fetched and determine the type
+  int64 unknown_action_amount = 4;
+  
+  // count dispatched operations by the queue they originated in
+  // for example, "how many cpu vs gpu operations are running?"
+  repeated LabeledCount from_queues = 5;
+  
+  // count dispatched operations by the tool they originated from
+  // for example, "Is anyone using a build tool or bazel version not supported by the main repo?"
+  repeated LabeledCount tools = 6;
+  
+  // count the kinds of action mnemonics occurring.
+  // for example, CppCompile or GoLink.
+  repeated LabeledCount action_mnemonics = 7;
+
+  // count the program names being run for the command
+  // for example, clang, bash.
+  repeated LabeledCount command_tools = 8;
+  
+  // count the unique targets being resolved
+  repeated LabeledCount target_ids = 9;
+  
+  // count the unique configurations being used
+  repeated LabeledCount config_ids = 10;
+  
+  // platform properties used by the dispatched operations
+  repeated LabeledCount platform_properties = 11;
+  
+  // how many unique clients are currently being served.
+  // This is based on the uniqueness of tool_id for currently dispatched operations.
+  int64 unique_clients_amount = 12;
+  
+  // how many of the dispatched operations have been requeued.
+  // many requeued operations could be a sign of a problem.
+  int64 requeued_operations_amount = 13;
+}
+
 message BackplaneStatus {
   QueueStatus prequeue = 1;
 
   OperationQueueStatus operation_queue = 2;
-
-  int64 dispatched_size = 3;
+  
+  DispatchedOperationsStatus dispatched_operations = 9;
 
   repeated string active_workers = 4;
   
@@ -800,6 +891,10 @@ message BackplaneStatus {
   int64 blocked_actions_size = 7;
   
   int64 blocked_invocations_size = 8;
+  
+  int64 fetch_time_ms = 10;
+
+  int64 dispatched_size = 11;
 }
 
 message QueuedOperationMetadata {
@@ -1006,6 +1101,9 @@ message WorkerConfig {
 
   // user principal name for executions
   string exec_owner = 29;
+
+  // a limit on time (in seconds) for input fetch stage to fetch inputs
+  int32 input_fetch_deadline = 30;
 }
 
 message TreeIteratorToken {

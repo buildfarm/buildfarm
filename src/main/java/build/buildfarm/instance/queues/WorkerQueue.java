@@ -31,16 +31,15 @@ import java.util.List;
  * queued.
  */
 public class WorkerQueue {
-
   /* a name for the queue */
   public String name;
 
   /* The required provisions to allow workers and operations to be added to the queue. */
-  public SetMultimap<String, String> requiredProvisions = LinkedHashMultimap.create();
+  public final SetMultimap<String, String> requiredProvisions = LinkedHashMultimap.create();
 
   /* The queue itself */
-  public List<Operation> operations = Lists.newArrayList();
+  public final List<Operation> operations = Lists.newArrayList();
 
   /* The worker's whose own configured provisions allow them to be eligible to access this queue. */
-  public List<Worker> workers = Lists.newArrayList();
+  public final List<Worker> workers = Lists.newArrayList();
 }

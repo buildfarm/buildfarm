@@ -10,6 +10,7 @@ load(
 )
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 
 IO_NETTY_MODULES = [
     "buffer",
@@ -68,7 +69,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.auth:google-auth-library-oauth2-http:0.9.1",
                         "com.google.code.findbugs:jsr305:3.0.1",
                         "com.google.code.gson:gson:2.8.6",
-                        "com.google.errorprone:error_prone_annotations:2.2.0",
+                        "com.google.errorprone:error_prone_annotations:2.9.0",
                         "com.google.errorprone:error_prone_core:0.92",
                         "com.google.guava:failureaccess:1.0.1",
                         "com.google.guava:guava:30.1.1-jre",
@@ -79,15 +80,17 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.truth:truth:0.44",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
-                    ] + ["io.netty:netty-%s:4.1.38.Final" % module for module in IO_NETTY_MODULES] +
-                    ["io.grpc:grpc-%s:1.37.0" % module for module in IO_GRPC_MODULES] +
+                    ] + ["io.netty:netty-%s:4.1.65.Final" % module for module in IO_NETTY_MODULES] +
+                    ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
                     [
                         "io.prometheus:simpleclient:0.10.0",
                         "io.prometheus:simpleclient_hotspot:0.10.0",
                         "io.prometheus:simpleclient_httpserver:0.10.0",
                         "junit:junit:4.12",
                         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
+                        "org.apache.commons:commons-compress:1.21",
                         "org.apache.commons:commons-pool2:2.9.0",
+                        "commons-io:commons-io:2.11.0",
                         "org.apache.tomcat:annotations-api:6.0.53",
                         "org.checkerframework:checker-qual:2.5.2",
                         "org.mockito:mockito-core:2.25.0",
@@ -95,7 +98,8 @@ def buildfarm_init(name = "buildfarm"):
                         "org.openjdk.jmh:jmh-generator-annprocess:1.23",
                         "org.redisson:redisson:3.13.1",
                         "org.threeten:threetenbp:1.3.3",
-                        "org.xerial:sqlite-jdbc:3.31.1",
+                        "org.xerial:sqlite-jdbc:3.34.0",
+                        "org.jetbrains:annotations:16.0.2",
                     ],
         generate_compat_repositories = True,
         repositories = [
@@ -118,6 +122,11 @@ def buildfarm_init(name = "buildfarm"):
     native.bind(
         name = "jar/redis/clients/jedis",
         actual = "@jedis//jar",
+    )
+
+    llvm_toolchain(
+        name = "llvm_toolchain",
+        llvm_version = "10.0.0",
     )
 
 def ensure_accurate_metadata():

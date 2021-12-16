@@ -14,9 +14,10 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.collect.Sets;
 import io.prometheus.client.Gauge;
-import io.prometheus.client.Summary;
+import io.prometheus.client.Histogram;
 import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -30,17 +31,17 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   private static final Logger logger = Logger.getLogger(ExecuteActionStage.class.getName());
   private static final Gauge executionSlotUsage =
       Gauge.build().name("execution_slot_usage").help("Execution slot Usage.").register();
-  private static final Summary executionTime =
-      Summary.build().name("execution_time_ms").help("Execution time in ms.").register();
-  private static final Summary executionStallTime =
-      Summary.build()
+  private static final Histogram executionTime =
+      Histogram.build().name("execution_time_ms").help("Execution time in ms.").register();
+  private static final Histogram executionStallTime =
+      Histogram.build()
           .name("execution_stall_time_ms")
           .help("Execution stall time in ms.")
           .register();
 
   private final Set<Thread> executors = Sets.newHashSet();
   private final AtomicInteger executorClaims = new AtomicInteger(0);
-  private BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
+  private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
   private volatile int size = 0;
 
   public ExecuteActionStage(

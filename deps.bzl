@@ -34,9 +34,9 @@ def archive_dependencies(third_party):
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "sha256": "416f94c976b5f2d0625e9c64391aa10520fa05e6f618803e4b7fc85098b02078",
-            "strip_prefix": "grpc-java-1.37.0",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.37.0.zip"],
+            "sha256": "101b21af120901e9bf342384988f57af3332b59d997f64d5f41a1e24ffb96f19",
+            "strip_prefix": "grpc-java-1.42.0",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.42.0.zip"],
         },
 
         # The APIs that we implement.
@@ -54,9 +54,23 @@ def archive_dependencies(third_party):
             "build_file": "%s:BUILD.remote_apis" % third_party,
             "patch_args": ["-p1"],
             "patches": ["%s/remote-apis:remote-apis.patch" % third_party],
-            "sha256": "03433a21ed97517f0fbda03c759854850336775a22dc737bab918949ceeddac9",
-            "strip_prefix": "remote-apis-f54876595da9f2c2d66c98c318d00b60fd64900b",
-            "url": "https://github.com/bazelbuild/remote-apis/archive/f54876595da9f2c2d66c98c318d00b60fd64900b.zip",
+            "sha256": "1d69f5f2f694fe93ee78a630f196047892ae51878297a89601c98964486655c6",
+            "strip_prefix": "remote-apis-6345202a036a297b22b0a0e7531ef702d05f2130",
+            "url": "https://github.com/bazelbuild/remote-apis/archive/6345202a036a297b22b0a0e7531ef702d05f2130.zip",
+        },
+        {
+            "name": "rules_cc",
+            "sha256": "34b2ebd4f4289ebbc27c7a0d854dcd510160109bb0194c0ba331c9656ffcb556",
+            "strip_prefix": "rules_cc-daf6ace7cfeacd6a83e9ff2ed659f416537b6c74",
+            "url": "https://github.com/bazelbuild/rules_cc/archive/daf6ace7cfeacd6a83e9ff2ed659f416537b6c74.tar.gz",
+        },
+
+        # Used to format proto files
+        {
+            "name": "com_grail_bazel_toolchain",
+            "sha256": "54b54eedc71b93b278c44b6c056a737dc68545c6da75f63d0810676e1181f559",
+            "strip_prefix": "bazel-toolchain-76ce37e977a304acf8948eadabb82c516320e286",
+            "url": "https://github.com/grailbio/bazel-toolchain/archive/76ce37e977a304acf8948eadabb82c516320e286.tar.gz",
         },
 
         # Ideally we would use the 0.14.4 release of rules_docker,
@@ -81,6 +95,15 @@ def archive_dependencies(third_party):
             "urls": ["https://github.com/bazelbuild/bazel/archive/3.7.2.tar.gz"],
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
+        },
+
+        # Optional execution wrappers
+        {
+            "name": "skip_sleep",
+            "build_file": "%s:BUILD.skip_sleep" % third_party,
+            "sha256": "03980702e8e9b757df68aa26493ca4e8573770f15dd8a6684de728b9cb8549f1",
+            "strip_prefix": "TARDIS-f54fa4743e67763bb1ad77039b3d15be64e2e564",
+            "url": "https://github.com/Unilang/TARDIS/archive/f54fa4743e67763bb1ad77039b3d15be64e2e564.zip",
         },
     ]
 

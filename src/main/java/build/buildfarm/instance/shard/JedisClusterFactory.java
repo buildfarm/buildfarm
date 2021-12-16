@@ -36,7 +36,6 @@ import redis.clients.jedis.ScanResult;
  * @details A factory for creating a jedis cluster instance.
  */
 public class JedisClusterFactory {
-
   /**
    * @brief Create a jedis cluster instance.
    * @details Use proto configuration to connect to a redis cluster server and provide a jedis
@@ -102,7 +101,8 @@ public class JedisClusterFactory {
    * @param node An established jedis client to operate on a redis node.
    * @note Overloaded.
    */
-  private static void deleteExistingKeys(Jedis node) throws Exception {
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static void deleteExistingKeys(Jedis node) {
     String nextCursor = "0";
     Set<String> matchingKeys = new HashSet<>();
     ScanParams params = new ScanParams();
@@ -125,7 +125,7 @@ public class JedisClusterFactory {
     // we cannot pass all of the keys to del because of the following error:
     // "CROSSSLOT Keys in request don't hash to the same slot"
     // so iterate over and delete them individually.
-    for (String key : matchingKeys.toArray(new String[matchingKeys.size()])) {
+    for (String key : matchingKeys.toArray(new String[0])) {
       node.del(key);
     }
   }

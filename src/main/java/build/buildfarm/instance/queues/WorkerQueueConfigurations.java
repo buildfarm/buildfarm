@@ -22,7 +22,6 @@ import java.util.List;
  * examples.
  */
 public class WorkerQueueConfigurations {
-
   public static WorkerQueues gpuAndFallback() {
     WorkerQueues queues = new WorkerQueues();
     queues.AddQueues(WorkerQueueConfigurations.gpuAndFallbackQueues());
@@ -37,8 +36,7 @@ public class WorkerQueueConfigurations {
 
   /* This is a queue paradigm for a GPU and non-GPU queue */
   private static List<WorkerQueue> gpuAndFallbackQueues() {
-
-    List<WorkerQueue> queues = new ArrayList<WorkerQueue>();
+    List<WorkerQueue> queues = new ArrayList<>();
 
     // add a gpu queue
     queues.add(gpuQueue());
@@ -53,15 +51,13 @@ public class WorkerQueueConfigurations {
 
   /* This is a queue paradigm of only one gpu queue */
   private static List<WorkerQueue> gpuQueues() {
-
-    List<WorkerQueue> queues = new ArrayList<WorkerQueue>();
+    List<WorkerQueue> queues = new ArrayList<>();
     queues.add(gpuQueue());
     return queues;
   }
 
   /* This is an example of a gpu configured queue */
   private static WorkerQueue gpuQueue() {
-
     // add a gpu queue
     WorkerQueue gpuQueue = new WorkerQueue();
     gpuQueue.name = "GPU";

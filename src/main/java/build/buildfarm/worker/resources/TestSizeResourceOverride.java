@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.resources;
 
 /**
  * @class TestSizeResourceOverride
@@ -22,18 +22,17 @@ package build.buildfarm.worker;
  *     the test size buckets which will assign good defaults.
  */
 public class TestSizeResourceOverride {
-
   /**
    * @field coreMin
    * @brief What to override the minimum core amount to.
    * @details Override will take precedence over other settings.
    */
-  public int coreMin = 1;
+  public final int coreMin = 1;
 
   /**
    * @field coreMax
    * @brief What to override the maximum core amount to.
    * @details Override will take precedence over other settings.
    */
-  public int coreMax = 1;
+  public final int coreMax = 1;
 }

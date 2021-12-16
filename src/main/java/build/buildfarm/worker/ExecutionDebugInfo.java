@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.worker.resources.ResourceLimits;
+import com.google.devtools.build.lib.shell.Protos.ResourceUsage;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,7 +25,6 @@ import java.util.Map;
  * @details This information can be returned to the client as the stderr of the failed action.
  */
 public class ExecutionDebugInfo {
-
   /**
    * @field description
    * @brief A description of the data for how it was populated.
@@ -43,7 +44,7 @@ public class ExecutionDebugInfo {
    * @brief The environment variables for the command.
    * @details The environment variables are decided by both users and buildfarm.
    */
-  public Map<String, String> environment = new HashMap<String, String>();
+  public Map<String, String> environment = new HashMap<>();
 
   /**
    * @field workingDirectory
@@ -58,4 +59,34 @@ public class ExecutionDebugInfo {
    * @details These limitations are decided by exec_properties and buildfarm configurations.
    */
   public ResourceLimits limits = new ResourceLimits();
+
+  /**
+   * @field executionStatistics
+   * @brief The resource usage statistics from running the action.
+   * @details These statistics are calculated through POSIX getrusage()- a feature available to
+   *     bazel's linux sandbox.
+   */
+  public ResourceUsage executionStatistics = ResourceUsage.newBuilder().build();
+
+  /**
+   * @field stdout
+   * @brief The action result's stdout
+   * @details Converted from proto bytes.
+   */
+  public String stdout = "";
+
+  /**
+   * @field stdout
+   * @brief The action result's stdout
+   * @details Converted from proto bytes.
+   */
+  public String stderr = "";
+
+  /**
+   * @field exitCode
+   * @brief The exit code of the execution.
+   * @details The debugger will fail the execution but this is to indicate what the actual exit code
+   *     of the action was.
+   */
+  public int exitCode = 0;
 }

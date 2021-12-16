@@ -36,8 +36,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /** Utility methods for the instance package. * */
-public class Utils {
-
+public final class Utils {
   private Utils() {}
 
   public static ByteString getBlob(
@@ -53,7 +52,7 @@ public class Utils {
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
-      throws IOException, InterruptedException {
+      throws IOException {
     try (InputStream in =
         instance.newBlobInput(
             blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata)) {
@@ -96,6 +95,7 @@ public class Utils {
               future.set(digest);
             }
 
+            @SuppressWarnings("NullableProblems")
             @Override
             public void onFailure(Throwable t) {
               future.setException(t);

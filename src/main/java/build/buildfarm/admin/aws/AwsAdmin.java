@@ -89,10 +89,10 @@ public class AwsAdmin implements Admin {
         ec2.describeInstances(
             new DescribeInstancesRequest()
                 .withFilters(new Filter().withName("tag-value").withValues(filter)));
-    Long hostNum = 1L;
+    long hostNum = 1L;
     for (Reservation r : instancesResult.getReservations()) {
       for (Instance e : r.getInstances()) {
-        Long uptime = getHostUptimeInMinutes(e.getLaunchTime());
+        long uptime = getHostUptimeInMinutes(e.getLaunchTime());
         if (e.getPrivateIpAddress() != null
             && uptime > ageInMinutes
             && status.equalsIgnoreCase(e.getState().getName())) {
@@ -159,7 +159,6 @@ public class AwsAdmin implements Admin {
    */
   @Override
   public void disableHostScaleInProtection(String privateDnsName) {
-
     // 1 get AutoScalingGroup and InstanceId
     Instance workerInstance = getInstanceId(privateDnsName);
     if (workerInstance == null) {
@@ -168,7 +167,7 @@ public class AwsAdmin implements Admin {
       throw new RuntimeException(errorMessage);
     }
     String instanceId = workerInstance.getInstanceId();
-    String autoScalingGroup = getTagValue("aws:autoscaling:groupName", workerInstance.getTags());
+    String autoScalingGroup = getTagValue(workerInstance.getTags());
     if (autoScalingGroup == null || autoScalingGroup.length() == 0) {
       String errorMessage =
           "Cannot find AutoScalingGroup name of worker with private DNS name " + privateDnsName;
@@ -190,9 +189,9 @@ public class AwsAdmin implements Admin {
             instanceId, autoScalingGroup, result.toString()));
   }
 
-  private String getTagValue(String targetTagName, List<Tag> tags) {
+  private String getTagValue(List<Tag> tags) {
     for (Tag tag : tags) {
-      if (targetTagName.equalsIgnoreCase(tag.getKey())) {
+      if ("aws:autoscaling:groupName".equalsIgnoreCase(tag.getKey())) {
         return tag.getValue();
       }
     }

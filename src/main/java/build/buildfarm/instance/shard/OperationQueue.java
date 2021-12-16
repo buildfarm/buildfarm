@@ -33,7 +33,6 @@ import redis.clients.jedis.JedisCluster;
  *     information.
  */
 public class OperationQueue {
-
   /**
    * @field maxQueueSize
    * @brief The maximum amount of elements that should be added to the queue.
@@ -47,7 +46,7 @@ public class OperationQueue {
    * @brief Different queues based on platform execution requirements.
    * @details The appropriate queues are chosen based on given properties.
    */
-  private List<ProvisionedRedisQueue> queues;
+  private final List<ProvisionedRedisQueue> queues;
 
   /**
    * @brief Constructor.
@@ -131,6 +130,7 @@ public class OperationQueue {
    * @note Overloaded.
    * @note Suggested return identifier: name.
    */
+  @SuppressWarnings("SameReturnValue")
   public String getDequeueName() {
     return "operation_dequeue";
   }
@@ -147,6 +147,18 @@ public class OperationQueue {
   public String getDequeueName(List<Platform.Property> provisions) {
     BalancedRedisQueue queue = chooseEligibleQueue(provisions);
     return queue.getDequeueName();
+  }
+
+  /**
+   * @brief Get internal queue name.
+   * @details Get the name of the internal queue based on the platform properties.
+   * @param provisions Provisions used to select an eligible queue.
+   * @return The name of the queue.
+   * @note Suggested return identifier: name.
+   */
+  public String getName(List<Platform.Property> provisions) {
+    BalancedRedisQueue queue = chooseEligibleQueue(provisions);
+    return queue.getName();
   }
 
   /**
@@ -193,9 +205,10 @@ public class OperationQueue {
     }
 
     // build proto
-    OperationQueueStatus status =
-        OperationQueueStatus.newBuilder().setSize(size(jedis)).addAllProvisions(provisions).build();
-    return status;
+    return OperationQueueStatus.newBuilder()
+        .setSize(size(jedis))
+        .addAllProvisions(provisions)
+        .build();
   }
 
   /**
@@ -259,9 +272,10 @@ public class OperationQueue {
     // At this point, we were unable to match an action to an eligible queue.
     // We will build an error explaining why the matching failed. This will help user's properly
     // configure their queue or adjust the execution_properties of their actions.
-    String eligibilityResults = "Below are the eligibility results for each provisioned queue:\n";
+    StringBuilder eligibilityResults =
+        new StringBuilder("Below are the eligibility results for each provisioned queue:\n");
     for (ProvisionedRedisQueue provisionedQueue : queues) {
-      eligibilityResults += provisionedQueue.explainEligibility(toMultimap(provisions));
+      eligibilityResults.append(provisionedQueue.explainEligibility(toMultimap(provisions)));
     }
 
     throw new RuntimeException(

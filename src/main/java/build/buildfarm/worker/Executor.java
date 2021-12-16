@@ -24,7 +24,6 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.Write;
@@ -33,8 +32,10 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
+import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
+import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -43,6 +44,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import io.grpc.Deadline;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -94,7 +96,7 @@ class Executor {
     ExecuteOperationMetadata executingMetadata =
         metadata.toBuilder().setStage(ExecutionStage.Value.EXECUTING).build();
 
-    Iterable<ExecutionPolicy> policies = new ArrayList<ExecutionPolicy>();
+    Iterable<ExecutionPolicy> policies = new ArrayList<>();
     if (limits.useExecutionPolicies) {
       policies =
           ExecutionPolicies.forPlatform(
@@ -118,7 +120,7 @@ class Executor {
 
     boolean operationUpdateSuccess = false;
     try {
-      operationUpdateSuccess = workerContext.putOperation(operation, operationContext.action);
+      operationUpdateSuccess = workerContext.putOperation(operation);
     } catch (IOException e) {
       logger.log(
           Level.SEVERE, format("error putting operation %s as EXECUTING", operation.getName()), e);
@@ -199,7 +201,8 @@ class Executor {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
     Code statusCode;
     try (IOResource resource =
-        workerContext.limitExecution(operationName, arguments, operationContext.command)) {
+        workerContext.limitExecution(
+            operationName, arguments, operationContext.command, workingDirectory)) {
       for (ExecutionPolicy policy : policies) {
         if (policy.getPolicyCase() == WRAPPER) {
           arguments.addAll(transformWrapper(policy.getWrapper()));
@@ -212,7 +215,7 @@ class Executor {
         if (argumentItr.hasNext()) {
           String exe = argumentItr.next(); // Get first element, this is the executable
           arguments.add(workingDirectory.resolve(exe).toAbsolutePath().normalize().toString());
-          argumentItr.forEachRemaining(arg -> arguments.add(arg));
+          argumentItr.forEachRemaining(arguments::add);
         }
       } else {
         arguments.addAll(command.getArgumentsList());
@@ -227,8 +230,8 @@ class Executor {
               limits,
               timeout,
               isDefaultTimeout,
-              "", // executingMetadata.getStdoutStreamName(),
-              "", // executingMetadata.getStderrStreamName(),
+              // executingMetadata.getStdoutStreamName(),
+              // executingMetadata.getStderrStreamName(),
               resultBuilder);
 
       // From Bazel Test Encyclopedia:
@@ -237,19 +240,18 @@ class Executor {
       // based on the exit code observed from the main process. The test runner may kill any stray
       // processes. Tests should not leak processes in this fashion.
       // Based on configuration, we will decide whether remaining resources should be an error.
-      if (workerContext.shouldErrorOperationOnRemainingResources() && resource.isReferenced()) {
+      if (workerContext.shouldErrorOperationOnRemainingResources()
+          && resource.isReferenced()
+          && statusCode == Code.OK) {
         // there should no longer be any references to the resource. Any references will be
         // killed upon close, but we must error the operation due to improper execution
-        ExecuteResponse executeResponse = operationContext.executeResponse.build();
-        if (statusCode == Code.OK) {
-          // per the gRPC spec: 'The operation was attempted past the valid range.' Seems
-          // appropriate
-          statusCode = Code.OUT_OF_RANGE;
-          operationContext
-              .executeResponse
-              .getStatusBuilder()
-              .setMessage("command resources were referenced after execution completed");
-        }
+        // per the gRPC spec: 'The operation was attempted past the valid range.' Seems
+        // appropriate
+        statusCode = Code.OUT_OF_RANGE;
+        operationContext
+            .executeResponse
+            .getStatusBuilder()
+            .setMessage("command resources were referenced after execution completed");
       }
     } catch (IOException e) {
       logger.log(Level.SEVERE, format("error executing operation %s", operationName), e);
@@ -360,9 +362,7 @@ class Executor {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
     Map<String, Property> properties =
-        uniqueIndex(
-            operationContext.command.getPlatform().getPropertiesList(),
-            (property) -> property.getName());
+        uniqueIndex(operationContext.command.getPlatform().getPropertiesList(), Property::getName);
 
     arguments.add(wrapper.getPath());
     for (String argument : wrapper.getArgumentsList()) {
@@ -387,6 +387,7 @@ class Executor {
     return arguments.build();
   }
 
+  @SuppressWarnings("ConstantConditions")
   private Code executeCommand(
       String operationName,
       Path execDir,
@@ -395,8 +396,6 @@ class Executor {
       ResourceLimits limits,
       Duration timeout,
       boolean isDefaultTimeout,
-      String stdoutStreamName,
-      String stderrStreamName,
       ActionResult.Builder resultBuilder)
       throws IOException, InterruptedException {
     ProcessBuilder processBuilder =
@@ -412,19 +411,16 @@ class Executor {
       environment.put(environmentVariable.getKey(), environmentVariable.getValue());
     }
 
-    final Write stdoutWrite, stderrWrite;
+    final Write stdoutWrite;
+    final Write stderrWrite;
 
-    if (stdoutStreamName != null
-        && !stdoutStreamName.isEmpty()
-        && workerContext.getStreamStdout()) {
-      stdoutWrite = workerContext.getOperationStreamWrite(stdoutStreamName);
+    if ("" != null && !"".isEmpty() && workerContext.getStreamStdout()) {
+      stdoutWrite = workerContext.getOperationStreamWrite("");
     } else {
       stdoutWrite = new NullWrite();
     }
-    if (stderrStreamName != null
-        && !stderrStreamName.isEmpty()
-        && workerContext.getStreamStderr()) {
-      stderrWrite = workerContext.getOperationStreamWrite(stderrStreamName);
+    if ("" != null && !"".isEmpty() && workerContext.getStreamStderr()) {
+      stderrWrite = workerContext.getOperationStreamWrite("");
     } else {
       stderrWrite = new NullWrite();
     }
@@ -511,11 +507,6 @@ class Executor {
     stdoutReaderThread.join();
     stderrReaderThread.join();
 
-    // allow debugging after an execution
-    if (limits.debugAfterExecution) {
-      return ExecutionDebugger.performAfterExecutionDebug(processBuilder, limits, resultBuilder);
-    }
-
     try {
       resultBuilder
           .setExitCode(exitCode)
@@ -530,6 +521,24 @@ class Executor {
           format("error getting process outputs for %s after timeout", operationName),
           e);
     }
+
+    // allow debugging after an execution
+    if (limits.debugAfterExecution) {
+      // Obtain execution statistics recorded while the action executed.
+      // Currently we can only source this data when using the sandbox.
+      ExecutionStatistics executionStatistics = ExecutionStatistics.newBuilder().build();
+      if (limits.useLinuxSandbox) {
+        executionStatistics =
+            ExecutionStatistics.newBuilder()
+                .mergeFrom(
+                    new FileInputStream(execDir.resolve("action_execution_statistics").toString()))
+                .build();
+      }
+
+      return ExecutionDebugger.performAfterExecutionDebug(
+          processBuilder, exitCode, limits, executionStatistics, resultBuilder);
+    }
+
     return statusCode;
   }
 }

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # From: https://github.com/philwo/bazelisk/blob/042926be3cebfeeabf036b3f170def243f2d3217/bazelisk.py 
+#
+# werkt: Modified to support M1 arm64
 """
 Copyright 2018 Google Inc. All rights reserved.
 
@@ -136,9 +138,9 @@ def resolve_latest_version(version_history, offset):
 
 def determine_bazel_filename(version):
     machine = normalized_machine_arch_name()
-    if machine != "x86_64":
+    if machine not in ["x86_64", "arm64"]:
         raise Exception(
-            'Unsupported machine architecture "{}". Bazel currently only supports x86_64.'.format(
+            'Unsupported machine architecture "{}". Bazel currently only supports x86_64, arm64.'.format(
                 machine
             )
         )
@@ -158,6 +160,8 @@ def normalized_machine_arch_name():
     machine = platform.machine().lower()
     if machine == "amd64":
         machine = "x86_64"
+    if machine == "aarch64":
+        machine = "arm64"
     return machine
 
 

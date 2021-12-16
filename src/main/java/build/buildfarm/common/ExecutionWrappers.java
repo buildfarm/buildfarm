@@ -22,7 +22,6 @@ package build.buildfarm.common;
  *     policies in the worker configuration file.
  */
 public class ExecutionWrappers {
-
   /**
    * @field CGROUPS
    * @brief The program to use when running actions under cgroups.
@@ -42,7 +41,7 @@ public class ExecutionWrappers {
    * @brief The program to use when running actions under bazel's sandbox.
    * @details This program is expected to be packaged with the worker image.
    */
-  public static final String LINUX_SANDBOX = "/app/buildfarm/linux-sandbox";
+  public static final String LINUX_SANDBOX = "/app/build_buildfarm/linux-sandbox";
 
   /**
    * @field AS_NOBODY
@@ -50,12 +49,34 @@ public class ExecutionWrappers {
    * @details This program is expected to be packaged with the worker image. The linux-sandbox is
    *     also capable of doing what this standalone programs does and may be chosen instead.
    */
-  public static final String AS_NOBODY = "/app/buildfarm/as-nobody";
+  public static final String AS_NOBODY = "/app/build_buildfarm/as-nobody";
 
   /**
    * @field PROCESS_WRAPPER
    * @brief The program to use when running actions under bazel's process-wrapper
    * @details This program is expected to be packaged with the worker image.
    */
-  public static final String PROCESS_WRAPPER = "/app/buildfarm/process-wrapper";
+  public static final String PROCESS_WRAPPER = "/app/build_buildfarm/process-wrapper";
+
+  /**
+   * @field SKIP_SLEEP
+   * @brief The program to use when running actions under bazel's skip sleep wrapper.
+   * @details This program is expected to be packaged with the worker image.
+   */
+  public static final String SKIP_SLEEP = "/app/build_buildfarm/skip_sleep";
+
+  /**
+   * @field SKIP_SLEEP_PRELOAD
+   * @brief The shared object that the skip sleep wrapper uses to spoof syscalls.
+   * @details The shared object needs passed to the program which will LD_PRELOAD it.
+   */
+  public static final String SKIP_SLEEP_PRELOAD = "/app/build_buildfarm/skip_sleep_preload.so";
+
+  /**
+   * @field DELAY
+   * @brief The program to used to timeshift actions when running under skip_sleep.
+   * @details This program is expected to be packaged with the worker image. Warning: This wrapper
+   *     is only intended to be used with skip_sleep.
+   */
+  public static final String DELAY = "/app/build_buildfarm/delay.sh";
 }

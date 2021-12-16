@@ -29,7 +29,6 @@ import io.grpc.netty.NettyChannelBuilder;
 // ./tool <URL> shard SHA256 <user>
 // The operations that match the query will be printed.
 class FindOperations {
-
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
         NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
@@ -37,7 +36,6 @@ class FindOperations {
   }
 
   public static void main(String[] args) throws Exception {
-
     // get arguments for establishing an instance
     String host = args[0];
     String instanceName = args[1];
@@ -55,7 +53,7 @@ class FindOperations {
 
     // get operations and print them
     ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
-    String token = instance.listOperations(100, "/operations", filterPredicate, operations);
+    instance.listOperations(100, "/operations", filterPredicate, operations);
     for (Operation operation : operations.build()) {
       System.out.println(operation.getName());
     }

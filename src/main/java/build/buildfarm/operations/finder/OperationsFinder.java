@@ -34,7 +34,6 @@ import redis.clients.jedis.ScanResult;
  *     caller has or wants to filter on.
  */
 public class OperationsFinder {
-
   /**
    * @brief Finds operations based on search settings.
    * @details Operations can be found based on different search queries depending on the context a
@@ -48,14 +47,16 @@ public class OperationsFinder {
   public static FindOperationsResults findOperations(
       JedisCluster cluster, Instance instance, FindOperationsSettings settings) {
     FindOperationsResults results = new FindOperationsResults();
-    results.operations = new HashMap<String, EnrichedOperation>();
+    results.operations = new HashMap<>();
 
     adjustFilter(settings);
 
     // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
     // This prevents us from using the cluster's SCAN to traverse all of the CAS.
     // That's why we choose to scan each of the jedisNode's individually.
-    cluster.getClusterNodes().values().stream()
+    cluster
+        .getClusterNodes()
+        .values()
         .forEach(
             pool -> {
               try (Jedis node = pool.getResource()) {
@@ -89,6 +90,7 @@ public class OperationsFinder {
    * @param settings Settings on what operations to find and keep.
    * @param results Accumulating results from performing a search.
    */
+  @SuppressWarnings({"unchecked", "rawtypes"})
   private static void findOperationNode(
       JedisCluster cluster,
       Jedis node,

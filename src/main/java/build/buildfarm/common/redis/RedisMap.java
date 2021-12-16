@@ -27,7 +27,6 @@ import redis.clients.jedis.JedisClusterPipeline;
  *     redis maps with the same name, would in fact be the same underlying redis map.
  */
 public class RedisMap {
-
   /**
    * @field name
    * @brief The unique name of the map.
@@ -52,9 +51,25 @@ public class RedisMap {
    * @param key The name of the key.
    * @param value The value for the key.
    * @param timeout_s Timeout to expire the entry. (units: seconds (s))
+   * @note Overloaded.
    */
   public void insert(JedisCluster jedis, String key, String value, int timeout_s) {
     jedis.setex(createKeyName(key), timeout_s, value);
+  }
+
+  /**
+   * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
+   * @details If the key already exists, then the value is replaced.
+   * @param jedis Jedis cluster client.
+   * @param key The name of the key.
+   * @param value The value for the key.
+   * @param timeout_s Timeout to expire the entry. (units: seconds (s))
+   * @note Overloaded.
+   */
+  public void insert(JedisCluster jedis, String key, String value, long timeout_s) {
+    // Jedis only provides int precision.  this is fine as the units are seconds.
+    // We supply an interface for longs as a convenience to callers.
+    jedis.setex(createKeyName(key), (int) timeout_s, value);
   }
 
   /**

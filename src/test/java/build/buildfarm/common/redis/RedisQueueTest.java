@@ -38,7 +38,6 @@ import redis.clients.jedis.JedisCluster;
  */
 @RunWith(JUnit4.class)
 public class RedisQueueTest {
-
   private JedisCluster redis;
 
   @Before
@@ -56,9 +55,8 @@ public class RedisQueueTest {
   // Failure explanation: the queue is throwing an exception upon construction
   @Test
   public void redisQueueConstructsWithoutError() throws Exception {
-
     // ACT
-    RedisQueue queue = new RedisQueue("test");
+    new RedisQueue("test");
   }
 
   // Function under test: push
@@ -66,7 +64,6 @@ public class RedisQueueTest {
   // Failure explanation: the queue is throwing an exception upon push
   @Test
   public void pushPushWithoutError() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
 
@@ -79,7 +76,6 @@ public class RedisQueueTest {
   // Failure explanation: the queue is throwing an exception upon pushing different values
   @Test
   public void pushPushDifferentWithoutError() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
 
@@ -93,7 +89,6 @@ public class RedisQueueTest {
   // Failure explanation: the queue is throwing an exception upon pushing the same values
   @Test
   public void pushPushSameWithoutError() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
 
@@ -107,13 +102,12 @@ public class RedisQueueTest {
   // Failure explanation: the queue is throwing an exception upon pushing many values
   @Test
   public void pushPushMany() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
 
     // ACT
     for (int i = 0; i < 1000; ++i) {
-      queue.push(redis, "foo" + String.valueOf(i));
+      queue.push(redis, "foo" + i);
     }
   }
 
@@ -122,7 +116,6 @@ public class RedisQueueTest {
   // Failure explanation: the queue size is not accurately reflecting the pushes
   @Test
   public void pushPushIncreasesSize() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
 
@@ -155,7 +148,6 @@ public class RedisQueueTest {
   // Failure explanation: name does not match what it should
   @Test
   public void getNameNameIsStored() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("queue_name");
 
@@ -171,7 +163,6 @@ public class RedisQueueTest {
   // Failure explanation: name does not match what it should
   @Test
   public void getDequeueNameNameIsStored() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("queue_name");
 
@@ -187,7 +178,6 @@ public class RedisQueueTest {
   // Failure explanation: size is incorrectly reporting the expected queue size
   @Test
   public void sizeAdjustPushDequeue() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
 
@@ -224,7 +214,6 @@ public class RedisQueueTest {
   // Failure explanation: we are unable to visit each element in the queue
   @Test
   public void visitCheckVisitOfEachElement() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
     queue.push(redis, "element 1");
@@ -237,7 +226,7 @@ public class RedisQueueTest {
     queue.push(redis, "element 8");
 
     // ACT
-    List<String> visited = new ArrayList<String>();
+    List<String> visited = new ArrayList<>();
     StringVisitor visitor =
         new StringVisitor() {
           public void visit(String entry) {
@@ -263,15 +252,14 @@ public class RedisQueueTest {
   // Failure explanation: we are unable to visit all the elements when there are many of them
   @Test
   public void visitVisitManyOverPageSize() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
     for (int i = 0; i < 2500; ++i) {
-      queue.push(redis, "foo" + String.valueOf(i));
+      queue.push(redis, "foo" + i);
     }
 
     // ACT
-    List<String> visited = new ArrayList<String>();
+    List<String> visited = new ArrayList<>();
     StringVisitor visitor =
         new StringVisitor() {
           public void visit(String entry) {
@@ -283,7 +271,7 @@ public class RedisQueueTest {
     // ASSERT
     assertThat(visited.size()).isEqualTo(2500);
     for (int i = 0; i < 2500; ++i) {
-      assertThat(visited.contains("foo" + String.valueOf(i))).isTrue();
+      assertThat(visited.contains("foo" + i)).isTrue();
     }
   }
 }

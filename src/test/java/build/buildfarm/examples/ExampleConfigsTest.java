@@ -33,7 +33,6 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 @SuppressWarnings({"ProtoBuilderReturnValueIgnored", "ReturnValueIgnored"})
 public class ExampleConfigsTest {
-
   @Before
   public void skipWindows() {
     org.junit.Assume.assumeFalse(System.getProperty("os.name").contains("Win"));
@@ -41,7 +40,6 @@ public class ExampleConfigsTest {
 
   @Test
   public void workerConfig() throws IOException {
-
     // parse text into protobuf
     Path configPath =
         Paths.get(
@@ -55,7 +53,6 @@ public class ExampleConfigsTest {
 
   @Test
   public void serverConfig() throws IOException {
-
     // parse text into protobuf
     Path configPath =
         Paths.get(
@@ -69,7 +66,6 @@ public class ExampleConfigsTest {
 
   @Test
   public void shardWorkerConfig() throws IOException {
-
     // parse text into protobuf
     Path configPath =
         Paths.get(
@@ -86,7 +82,6 @@ public class ExampleConfigsTest {
 
   @Test
   public void shardServerConfig() throws IOException {
-
     // parse text into protobuf
     Path configPath =
         Paths.get(

@@ -49,12 +49,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
-import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class StubWriteOutputStreamTest {
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
 
+  @SuppressWarnings("unchecked")
   private final StreamObserver<WriteRequest> writeObserver = mock(StreamObserver.class);
 
   private final ByteStreamImplBase serviceImpl =
@@ -87,18 +87,18 @@ public class StubWriteOutputStreamTest {
         grpcCleanup.register(InProcessChannelBuilder.forName(serverName).directExecutor().build());
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void resetExceptionsAreInterpreted() {
     String unimplementedResourceName = "unimplemented-resource";
     QueryWriteStatusRequest unimplementedRequest =
         QueryWriteStatusRequest.newBuilder().setResourceName(unimplementedResourceName).build();
     doAnswer(
-            (Answer)
-                invocation -> {
-                  StreamObserver<QueryWriteStatusResponse> observer = invocation.getArgument(1);
-                  observer.onError(Status.UNIMPLEMENTED.asException());
-                  return null;
-                })
+            invocation -> {
+              StreamObserver<QueryWriteStatusResponse> observer = invocation.getArgument(1);
+              observer.onError(Status.UNIMPLEMENTED.asException());
+              return null;
+            })
         .when(serviceImpl)
         .queryWriteStatus(eq(unimplementedRequest), any(StreamObserver.class));
 
@@ -106,12 +106,11 @@ public class StubWriteOutputStreamTest {
     QueryWriteStatusRequest notFoundRequest =
         QueryWriteStatusRequest.newBuilder().setResourceName(notFoundResourceName).build();
     doAnswer(
-            (Answer)
-                invocation -> {
-                  StreamObserver<QueryWriteStatusResponse> observer = invocation.getArgument(1);
-                  observer.onError(Status.NOT_FOUND.asException());
-                  return null;
-                })
+            invocation -> {
+              StreamObserver<QueryWriteStatusResponse> observer = invocation.getArgument(1);
+              observer.onError(Status.NOT_FOUND.asException());
+              return null;
+            })
         .when(serviceImpl)
         .queryWriteStatus(eq(notFoundRequest), any(StreamObserver.class));
 
@@ -139,6 +138,7 @@ public class StubWriteOutputStreamTest {
     verify(serviceImpl, times(1)).queryWriteStatus(eq(notFoundRequest), any(StreamObserver.class));
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void resetIsRespectedOnSubsequentWrite() throws IOException {
     String resourceName = "reset-resource";
@@ -175,7 +175,6 @@ public class StubWriteOutputStreamTest {
             Functions.identity(),
             /* expectedSize=*/ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
             /* autoflush=*/ true);
-    ByteString content = ByteString.copyFromUtf8("Hello, World");
 
     boolean callbackTimedOut = false;
     try (OutputStream out =

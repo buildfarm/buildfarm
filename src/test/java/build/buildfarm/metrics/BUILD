@@ -5,10 +5,8 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",
-        "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/metrics",
         "//src/main/java/build/buildfarm/metrics/aws",
-        "//src/main/java/build/buildfarm/metrics/gcp",
         "//src/main/java/build/buildfarm/metrics/log",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",

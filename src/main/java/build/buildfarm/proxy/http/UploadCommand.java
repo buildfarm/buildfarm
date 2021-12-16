@@ -20,7 +20,6 @@ import java.net.URI;
 
 /** Object sent through the channel pipeline to start an upload. */
 final class UploadCommand {
-
   private final URI uri;
   private final boolean casUpload;
   private final String hash;

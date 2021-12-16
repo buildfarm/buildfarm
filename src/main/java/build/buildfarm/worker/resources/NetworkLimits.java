@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.resources;
+
+import java.util.ArrayList;
 
 /**
  * @class NetworkLimits
@@ -23,11 +25,17 @@ package build.buildfarm.worker;
  *     doing the same.
  */
 public class NetworkLimits {
-
   /**
    * @field blockNetwork
    * @brief Whether or not to block network access.
    * @details Depending on the server implementation, we may skip applying network restrictions.
    */
   public boolean blockNetwork = false;
+
+  /**
+   * @field description
+   * @brief Description explaining why settings were chosen.
+   * @details This can be used to debug execution behavior.
+   */
+  public final ArrayList<String> description = new ArrayList<>();
 }

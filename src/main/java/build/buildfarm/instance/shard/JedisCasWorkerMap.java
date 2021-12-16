@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
-import org.redisson.api.RSetMultimapCache;
 import redis.clients.jedis.JedisClusterPipeline;
 
 /**
@@ -32,7 +31,6 @@ import redis.clients.jedis.JedisClusterPipeline;
  *     set(worker1,worker2)}.
  */
 public class JedisCasWorkerMap implements CasWorkerMap {
-
   /**
    * @field name
    * @brief The unique name of the map.
@@ -48,13 +46,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @note units: seconds
    */
   private final int keyExpiration_s;
-
-  /**
-   * @field cacheMap
-   * @brief A memory cached redis container to serve as the cas lookup.
-   * @details This is only used if the object is configured to use a memory cache.
-   */
-  private RSetMultimapCache<String, String> cacheMap;
 
   /**
    * @brief Constructor.
@@ -213,7 +204,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
     client.run(
         jedis -> {
           for (Digest blobDigest : blobDigests) {
-
             String key = redisCasKey(blobDigest);
             Set<String> workers = jedis.smembers(key);
 

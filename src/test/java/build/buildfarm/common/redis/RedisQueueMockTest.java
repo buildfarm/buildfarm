@@ -43,7 +43,6 @@ import redis.clients.jedis.JedisCluster;
  */
 @RunWith(JUnit4.class)
 public class RedisQueueMockTest {
-
   @Mock private JedisCluster redis;
 
   @Before
@@ -56,9 +55,8 @@ public class RedisQueueMockTest {
   // Failure explanation: the queue is throwing an exception upon construction
   @Test
   public void redisQueueConstructsWithoutError() throws Exception {
-
     // ACT
-    RedisQueue queue = new RedisQueue("test");
+    new RedisQueue("test");
   }
 
   // Function under test: push
@@ -66,7 +64,6 @@ public class RedisQueueMockTest {
   // Failure explanation: the queue is throwing an exception upon push
   @Test
   public void pushPushWithoutError() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
 
@@ -82,7 +79,6 @@ public class RedisQueueMockTest {
   // Failure explanation: the queue is throwing an exception upon pushing different values
   @Test
   public void pushPushDifferentWithoutError() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
 
@@ -100,7 +96,6 @@ public class RedisQueueMockTest {
   // Failure explanation: the queue is throwing an exception upon pushing the same values
   @Test
   public void pushPushSameWithoutError() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
 
@@ -117,18 +112,17 @@ public class RedisQueueMockTest {
   // Failure explanation: the queue is throwing an exception upon pushing many values
   @Test
   public void pushPushMany() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
 
     // ACT
     for (int i = 0; i < 1000; ++i) {
-      queue.push(redis, "foo" + String.valueOf(i));
+      queue.push(redis, "foo" + i);
     }
 
     // ASSERT
     for (int i = 0; i < 1000; ++i) {
-      verify(redis, times(1)).lpush("test", "foo" + String.valueOf(i));
+      verify(redis, times(1)).lpush("test", "foo" + i);
     }
   }
 
@@ -137,7 +131,6 @@ public class RedisQueueMockTest {
   // Failure explanation: the queue size is not accurately reflecting the pushes
   @Test
   public void pushCallsLPush() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
 
@@ -163,7 +156,6 @@ public class RedisQueueMockTest {
   // remove it
   @Test
   public void removeFromDequeueRemoveADequeueValue() throws Exception {
-
     // ARRANGE
     when(redis.lrem("test_dequeue", -1, "foo")).thenReturn(1L);
     RedisQueue queue = new RedisQueue("test");
@@ -181,7 +173,6 @@ public class RedisQueueMockTest {
   // Failure explanation: something prevented the element from being dequeued
   @Test
   public void dequeueElementCanBeDequeuedWithTimeout() throws Exception {
-
     // ARRANGE
     when(redis.brpoplpush("test", "test_dequeue", 1)).thenReturn("foo");
     RedisQueue queue = new RedisQueue("test");
@@ -199,7 +190,6 @@ public class RedisQueueMockTest {
   // Failure explanation: element was dequeued
   @Test
   public void dequeueElementIsNotDequeuedIfTimeRunsOut() throws Exception {
-
     // ARRANGE
     when(redis.brpoplpush("test", "test_dequeue", 1)).thenReturn(null);
     RedisQueue queue = new RedisQueue("test");
@@ -217,7 +207,6 @@ public class RedisQueueMockTest {
   // Failure explanation: the dequeue was not interrupted as expected
   @Test
   public void dequeueInterrupt() throws Exception {
-
     // ARRANGE
     when(redis.brpoplpush("test", "test_dequeue", 1)).thenReturn(null);
     RedisQueue queue = new RedisQueue("test");
@@ -228,7 +217,7 @@ public class RedisQueueMockTest {
         new Thread(
             () -> {
               try {
-                String val = queue.dequeue(redis, 100000);
+                queue.dequeue(redis, 100000);
               } catch (Exception e) {
               }
             });
@@ -241,7 +230,6 @@ public class RedisQueueMockTest {
   // Failure explanation: something prevented the element from being dequeued
   @Test
   public void nonBlockingDequeueElementCanBeDequeued() throws Exception {
-
     // ARRANGE
     when(redis.rpoplpush("test", "test_dequeue")).thenReturn("foo");
     RedisQueue queue = new RedisQueue("test");
@@ -259,7 +247,6 @@ public class RedisQueueMockTest {
   // Failure explanation: name does not match what it should
   @Test
   public void getNameNameIsStored() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("queue_name");
 
@@ -275,7 +262,6 @@ public class RedisQueueMockTest {
   // Failure explanation: name does not match what it should
   @Test
   public void getDequeueNameNameIsStored() throws Exception {
-
     // ARRANGE
     RedisQueue queue = new RedisQueue("queue_name");
 
@@ -291,7 +277,6 @@ public class RedisQueueMockTest {
   // Failure explanation: we are unable to visit each element in the queue
   @Test
   public void visitCheckVisitOfEachElement() throws Exception {
-
     // MOCK
     when(redis.lrange(any(String.class), any(Long.class), any(Long.class)))
         .thenReturn(
@@ -317,7 +302,7 @@ public class RedisQueueMockTest {
     queue.push(redis, "element 8");
 
     // ACT
-    List<String> visited = new ArrayList<String>();
+    List<String> visited = new ArrayList<>();
     StringVisitor visitor =
         new StringVisitor() {
           public void visit(String entry) {
@@ -343,7 +328,6 @@ public class RedisQueueMockTest {
   // Failure explanation: we are unable to visit each element in the queue
   @Test
   public void visitDequeueCheckVisitOfEachElement() throws Exception {
-
     // MOCK
     when(redis.lrange(any(String.class), any(Long.class), any(Long.class)))
         .thenReturn(
@@ -361,7 +345,7 @@ public class RedisQueueMockTest {
     RedisQueue queue = new RedisQueue("test");
 
     // ACT
-    List<String> visited = new ArrayList<String>();
+    List<String> visited = new ArrayList<>();
     StringVisitor visitor =
         new StringVisitor() {
           public void visit(String entry) {

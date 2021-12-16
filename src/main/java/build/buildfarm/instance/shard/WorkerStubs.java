@@ -26,7 +26,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.protobuf.Duration;
 import io.grpc.ManagedChannel;
@@ -34,21 +33,19 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.util.concurrent.TimeUnit;
 
-public class WorkerStubs {
+public final class WorkerStubs {
   private WorkerStubs() {}
 
+  @SuppressWarnings("rawtypes")
   public static LoadingCache create(DigestUtil digestUtil, Duration timeout) {
     return CacheBuilder.newBuilder()
         .expireAfterAccess(10, TimeUnit.MINUTES)
         .removalListener(
-            new RemovalListener<String, Instance>() {
-              @Override
-              public void onRemoval(RemovalNotification<String, Instance> notification) {
-                stopInstance(notification.getValue());
-              }
-            })
+            (RemovalListener<String, Instance>)
+                notification -> stopInstance(notification.getValue()))
         .build(
             new CacheLoader<String, Instance>() {
+              @SuppressWarnings("NullableProblems")
               @Override
               public Instance load(String worker) {
                 return newStubInstance(worker, digestUtil, timeout);

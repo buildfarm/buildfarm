@@ -65,6 +65,7 @@ import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.FilesystemACConfig;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
@@ -82,7 +83,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Iterables;
@@ -139,22 +139,20 @@ public class MemoryInstance extends AbstractServerInstance {
       CacheBuilder.newBuilder()
           .expireAfterWrite(1, TimeUnit.HOURS)
           .removalListener(
-              new RemovalListener<String, ByteStringStreamSource>() {
-                @Override
-                public void onRemoval(
-                    RemovalNotification<String, ByteStringStreamSource> notification) {
-                  try {
-                    notification.getValue().getOutput().close();
-                  } catch (IOException e) {
-                    logger.log(
-                        Level.SEVERE,
-                        format("error closing stream source %s", notification.getKey()),
-                        e);
-                  }
-                }
-              })
+              (RemovalListener<String, ByteStringStreamSource>)
+                  notification -> {
+                    try {
+                      notification.getValue().getOutput().close();
+                    } catch (IOException e) {
+                      logger.log(
+                          Level.SEVERE,
+                          format("error closing stream source %s", notification.getKey()),
+                          e);
+                    }
+                  })
           .build(
               new CacheLoader<String, ByteStringStreamSource>() {
+                @SuppressWarnings("NullableProblems")
                 @Override
                 public ByteStringStreamSource load(String name) {
                   return newStreamSource(name);
@@ -241,7 +239,7 @@ public class MemoryInstance extends AbstractServerInstance {
             config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
         outstandingOperations,
         MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil),
-        /*activeBlobWrites=*/ new ConcurrentHashMap<Digest, ByteString>());
+        /*activeBlobWrites=*/ new ConcurrentHashMap<>());
     this.config = config;
     this.watchers = watchers;
     this.outstandingOperations = outstandingOperations;
@@ -282,7 +280,7 @@ public class MemoryInstance extends AbstractServerInstance {
   private static ActionCache createDelegateCASActionCache(
       ContentAddressableStorage cas, DigestUtil digestUtil) {
     return new ActionCache() {
-      DelegateCASMap<ActionKey, ActionResult> map =
+      final DelegateCASMap<ActionKey, ActionResult> map =
           new DelegateCASMap<>(cas, ActionResult.parser(), digestUtil);
 
       @Override
@@ -304,7 +302,7 @@ public class MemoryInstance extends AbstractServerInstance {
   private static OperationsMap createCompletedOperationMap(
       ContentAddressableStorage cas, DigestUtil digestUtil) {
     return new OperationsMap() {
-      DelegateCASMap<String, Operation> map =
+      final DelegateCASMap<String, Operation> map =
           new DelegateCASMap<>(cas, Operation.parser(), digestUtil);
 
       @Override
@@ -344,6 +342,7 @@ public class MemoryInstance extends AbstractServerInstance {
     try {
       return streams.get(name);
     } catch (ExecutionException e) {
+      //noinspection deprecation
       Throwables.propagateIfInstanceOf(e.getCause(), RuntimeException.class);
       throw new UncheckedExecutionException(e.getCause());
     }
@@ -390,14 +389,10 @@ public class MemoryInstance extends AbstractServerInstance {
     };
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public InputStream newOperationStreamInput(
-      String name,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata)
-      throws IOException {
+      String name, long offset, RequestMetadata requestMetadata) throws IOException {
     InputStream in = getStreamSource(name).openStream();
     in.skip(offset);
     return in;
@@ -405,7 +400,6 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void enqueueOperation(Operation operation) {
-
     try {
       queuedOperations.enqueueOperation(operation, getOperationProvisions(operation));
     } catch (InterruptedException e) {
@@ -759,7 +753,6 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private SetMultimap<String, String> getOperationProvisions(Operation operation)
       throws InterruptedException {
-
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     Preconditions.checkState(metadata != null, "metadata not found");
 
@@ -784,6 +777,7 @@ public class MemoryInstance extends AbstractServerInstance {
     return createProvisions(command.getPlatform());
   }
 
+  @SuppressWarnings("ConstantConditions")
   private void matchSynchronized(Platform platform, MatchListener listener)
       throws InterruptedException {
     ImmutableList.Builder<Operation> rejectedOperations = ImmutableList.builder();
@@ -955,7 +949,6 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   public String listOperations(
       int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
-
     TokenizableIterator<Operation> iter = createOperationsIterator(pageToken);
     while (iter.hasNext() && pageSize != 0) {
       Operation operation = iter.next();
@@ -1036,8 +1029,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected Object operationLock(String name) {
-    /** simple instance-wide locking on the completed operations */
+  protected Object operationLock() {
     return completedOperations;
   }
 
@@ -1047,12 +1039,12 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public CasIndexResults reindexCas(String hostName) {
+  public CasIndexResults reindexCas(@Nullable String hostName) {
     throw new UnsupportedOperationException();
   }
 

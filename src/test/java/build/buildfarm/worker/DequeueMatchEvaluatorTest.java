@@ -42,32 +42,11 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class DequeueMatchEvaluatorTest {
-
-  // Function under test: shouldKeepOperation
-  // Reason for testing: null queue entries should be kept
-  // Failure explanation: this decision has changed
-  @Test
-  public void shouldKeepOperationKeepNullQueueEntry() throws Exception {
-
-    // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-    SetMultimap<String, String> workerProvisions = HashMultimap.create();
-    QueueEntry entry = null;
-
-    // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
-
-    // ASSERT
-    assertThat(shouldKeep).isTrue();
-  }
-
   // Function under test: shouldKeepOperation
   // Reason for testing: empty plaform queue entries should be kept
   // Failure explanation: properties are being evaluated differently now
   @Test
   public void shouldKeepOperationKeepEmptyQueueEntry() throws Exception {
-
     // ARRANGE
     DequeueMatchSettings settings = new DequeueMatchSettings();
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
@@ -88,7 +67,6 @@ public class DequeueMatchEvaluatorTest {
   // differently
   @Test
   public void shouldKeepOperationValidMinCoresQueueEntry() throws Exception {
-
     // ARRANGE
     DequeueMatchSettings settings = new DequeueMatchSettings();
 
@@ -119,7 +97,6 @@ public class DequeueMatchEvaluatorTest {
   // differently
   @Test
   public void shouldKeepOperationInvalidMinCoresQueueEntry() throws Exception {
-
     // ARRANGE
     DequeueMatchSettings settings = new DequeueMatchSettings();
 
@@ -148,7 +125,6 @@ public class DequeueMatchEvaluatorTest {
   // Failure explanation: either the property names changed or max-cores is evaluated differently
   @Test
   public void shouldKeepOperationMaxCoresDoNotInfluenceAcceptance() throws Exception {
-
     // ARRANGE
     DequeueMatchSettings settings = new DequeueMatchSettings();
 
@@ -180,7 +156,6 @@ public class DequeueMatchEvaluatorTest {
   // Failure explanation: ensuring exact property matches is not behaving correctly by default
   @Test
   public void shouldKeepOperationUnmatchedPropertiesRejectionAcceptance() throws Exception {
-
     // ARRANGE
     DequeueMatchSettings settings = new DequeueMatchSettings();
 

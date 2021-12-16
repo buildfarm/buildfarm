@@ -42,15 +42,12 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class ProvisionedRedisQueueTest {
-
   // Function under test: ProvisionedRedisQueue
   // Reason for testing: the object can be constructed
   // Failure explanation: the object cannot be constructed
   @Test
   public void provisionedRedisQueueCanConstruct() throws Exception {
-
-    ProvisionedRedisQueue queue =
-        new ProvisionedRedisQueue("name", ImmutableList.of(), HashMultimap.create());
+    new ProvisionedRedisQueue("name", ImmutableList.of(), HashMultimap.create());
   }
 
   // Function under test: ProvisionedRedisQueue
@@ -58,9 +55,7 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the object cannot be constructed
   @Test
   public void provisionedRedisQueueCanConstructOverload() throws Exception {
-
-    ProvisionedRedisQueue queue =
-        new ProvisionedRedisQueue("name", ImmutableList.of(), HashMultimap.create(), true);
+    new ProvisionedRedisQueue("name", ImmutableList.of(), HashMultimap.create(), true);
   }
 
   // Function under test: explainEligibility
@@ -69,7 +64,6 @@ public class ProvisionedRedisQueueTest {
   // explanation is wrong
   @Test
   public void explainEligibilityNoProvisionsAccepted() throws Exception {
-
     // ARRANGE
     ProvisionedRedisQueue queue =
         new ProvisionedRedisQueue("foo", ImmutableList.of(), HashMultimap.create());
@@ -93,7 +87,6 @@ public class ProvisionedRedisQueueTest {
   // explanation is wrong
   @Test
   public void explainEligibilityNoProvisionsAcceptedAllowUserUnmatched() throws Exception {
-
     // ARRANGE
     ProvisionedRedisQueue queue =
         new ProvisionedRedisQueue("foo", ImmutableList.of(), HashMultimap.create(), true);
@@ -116,7 +109,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the queue is unable to accept the properties or the explanation is wrong
   @Test
   public void explainEligibilitySingleProvisionMatched() throws Exception {
-
     // ARRANGE
     SetMultimap<String, String> queueProperties = HashMultimap.create();
     queueProperties.put("key", "value");
@@ -141,7 +133,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the queue is unable to accept the properties or the explanation is wrong
   @Test
   public void explainEligibilitySingleProvisionMatchedAllowUserUnmatched() throws Exception {
-
     // ARRANGE
     SetMultimap<String, String> queueProperties = HashMultimap.create();
     queueProperties.put("key", "value");
@@ -166,7 +157,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the queue is still accepting properties or the explanation is wrong
   @Test
   public void explainEligibilitySingleProvisionNotMatched() throws Exception {
-
     // ARRANGE
     SetMultimap<String, String> queueProperties = HashMultimap.create();
     queueProperties.put("key", "value");
@@ -191,7 +181,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the queue is not accepting properties or the explanation is wrong
   @Test
   public void explainEligibilitySingleProvisionAllowedToNotMatch() throws Exception {
-
     // ARRANGE
     SetMultimap<String, String> queueProperties = HashMultimap.create();
     queueProperties.put("key", "value");
@@ -217,7 +206,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the queue is still accepting properties or the explanation is wrong
   @Test
   public void explainEligibilitySingleProvisionStillRequired() throws Exception {
-
     // ARRANGE
     SetMultimap<String, String> queueProperties = HashMultimap.create();
     queueProperties.put("key", "value");
@@ -243,7 +231,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the queue is still accepting properties or the explanation is wrong
   @Test
   public void explainEligibilitySingleProvisionStillRequiredAllowUserUnmatched() throws Exception {
-
     // ARRANGE
     SetMultimap<String, String> queueProperties = HashMultimap.create();
     queueProperties.put("key", "value");
@@ -268,7 +255,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the queue is unable to accept the properties or the explanation is wrong
   @Test
   public void explainEligibilityAcceptedDueToWildcard() throws Exception {
-
     // ARRANGE
     SetMultimap<String, String> queueProperties = HashMultimap.create();
     queueProperties.put("*", "value");
@@ -291,7 +277,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the queue is unable to accept the properties or the explanation is wrong
   @Test
   public void explainEligibilityAcceptedDueToWildcardAllowUserUnmatched() throws Exception {
-
     // ARRANGE
     SetMultimap<String, String> queueProperties = HashMultimap.create();
     queueProperties.put("*", "value");
@@ -315,7 +300,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the queue is accepting properties or the explanation is wrong
   @Test
   public void explainEligibilityAllowUnmatchedBadUseCaseExample() throws Exception {
-
     // ARRANGE
     SetMultimap<String, String> queueProperties = HashMultimap.create();
     queueProperties.put("min-cores", "*");
@@ -345,7 +329,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the queue is not accepting properties or the explanation is wrong
   @Test
   public void explainEligibilityAllowUnmatchedUseCaseExample() throws Exception {
-
     // ARRANGE
     SetMultimap<String, String> queueProperties = HashMultimap.create();
     queueProperties.put("min-cores", "*");
@@ -375,7 +358,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the selection key is not properly being recognized
   @Test
   public void explainEligibilitySpecificallySelectQueue() throws Exception {
-
     // ARRANGE
     ProvisionedRedisQueue queue =
         new ProvisionedRedisQueue("foo", ImmutableList.of(), HashMultimap.create());
@@ -398,7 +380,6 @@ public class ProvisionedRedisQueueTest {
   // Failure explanation: the queue is incorrectly still being selected or the explanation is wrong
   @Test
   public void explainEligibilityFailToSpecificallySelectQueue() throws Exception {
-
     // ARRANGE
     ProvisionedRedisQueue queue =
         new ProvisionedRedisQueue("foo", ImmutableList.of(), HashMultimap.create());

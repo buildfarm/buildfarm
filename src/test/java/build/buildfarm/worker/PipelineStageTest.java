@@ -75,7 +75,7 @@ public class PipelineStageTest {
     AtomicInteger count = new AtomicInteger();
     PipelineStage stage =
         new StubPipelineStage("waiter", new StubWorkerContext(), output, error) {
-          Object lock = new Object();
+          final Object lock = new Object();
 
           @Override
           public OperationContext tick(OperationContext operationContext)

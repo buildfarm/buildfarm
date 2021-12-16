@@ -28,7 +28,6 @@ import redis.clients.jedis.JedisCluster;
  *     queue.
  */
 public class RedisQueue {
-
   /**
    * @field name
    * @brief The unique name of the queue.
@@ -88,9 +87,8 @@ public class RedisQueue {
    * @note Suggested return identifier: val.
    */
   public String dequeue(JedisCluster jedis, int timeout_s) throws InterruptedException {
-    String val = null;
     for (int i = 0; i < timeout_s; ++i) {
-      val = jedis.brpoplpush(name, getDequeueName(), 1);
+      String val = jedis.brpoplpush(name, getDequeueName(), 1);
       if (val != null) {
         return val;
       }

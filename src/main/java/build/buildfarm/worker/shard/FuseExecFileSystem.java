@@ -49,12 +49,17 @@ class FuseExecFileSystem implements ExecFileSystem {
   }
 
   @Override
+  public Path root() {
+    return root;
+  }
+
+  @Override
   public ContentAddressableStorage getStorage() {
     return storage;
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException {
+  public InputStream newInput(Digest digest, long offset) throws IOException {
     return storage.newInput(digest, offset);
   }
 

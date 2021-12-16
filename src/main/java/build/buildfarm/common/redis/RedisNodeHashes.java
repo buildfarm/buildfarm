@@ -31,7 +31,6 @@ import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
  *     used to obtain the hashtags needed to hit every node in the cluster.
  */
 public class RedisNodeHashes {
-
   /**
    * @brief Get a list of evenly distributing hashtags for the provided redis cluster.
    * @details Each hashtag will map to a slot on a different node.
@@ -39,12 +38,12 @@ public class RedisNodeHashes {
    * @return Hashtags that will each has to a slot on a different node.
    * @note Suggested return identifier: hashtags.
    */
+  @SuppressWarnings({"unchecked", "rawtypes"})
   public static List<String> getEvenlyDistributedHashes(JedisCluster jedis) {
     try {
       List<List<Long>> slotRanges = getSlotRanges(jedis);
       ImmutableList.Builder hashTags = ImmutableList.builder();
       for (List<Long> slotRange : slotRanges) {
-
         // we can use any slot that is in range for the node.
         // in this case, we will use the first slot.
         hashTags.add(RedisSlotToHash.correlate(slotRange.get(0)));
@@ -63,13 +62,13 @@ public class RedisNodeHashes {
    * @return Hashtags that will each has to a slot on a different node.
    * @note Suggested return identifier: hashtags.
    */
+  @SuppressWarnings({"unchecked", "rawtypes"})
   public static List<String> getEvenlyDistributedHashesWithPrefix(
       JedisCluster jedis, String prefix) {
     try {
       List<List<Long>> slotRanges = getSlotRanges(jedis);
       ImmutableList.Builder hashTags = ImmutableList.builder();
       for (List<Long> slotRange : slotRanges) {
-
         // we can use any slot that is in range for the node.
         // in this case, we will use the first slot.
         hashTags.add(
@@ -88,6 +87,7 @@ public class RedisNodeHashes {
    * @return Slot ranges for all of the nodes in the cluster.
    * @note Suggested return identifier: slotRanges.
    */
+  @SuppressWarnings("unchecked")
   private static List<List<Long>> getSlotRanges(JedisCluster jedis) {
     // get slot information for each node
     List<Object> slots = getClusterSlots(jedis);
@@ -125,14 +125,11 @@ public class RedisNodeHashes {
     JedisException nodeException = null;
     for (Map.Entry<String, JedisPool> node : jedis.getClusterNodes().entrySet()) {
       JedisPool pool = node.getValue();
-      Jedis resource = pool.getResource();
-      try {
+      try (Jedis resource = pool.getResource()) {
         return resource.clusterSlots();
       } catch (JedisException e) {
         nodeException = e;
         // log error with node
-      } finally {
-        resource.close();
       }
     }
     if (nodeException != null) {

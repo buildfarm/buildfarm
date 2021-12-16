@@ -35,15 +35,13 @@ import redis.clients.jedis.JedisCluster;
  */
 @RunWith(JUnit4.class)
 public class RedisMapMockTest {
-
   // Function under test: redisMap
   // Reason for testing: the map can be constructed with a valid cluster instance and name
   // Failure explanation: the map is throwing an exception upon construction
   @Test
   public void redisMapConstructsWithoutError() throws Exception {
-
     // ARRANGE
-    RedisMap map = new RedisMap("test");
+    new RedisMap("test");
   }
 
   // Function under test: insert
@@ -51,7 +49,6 @@ public class RedisMapMockTest {
   // Failure explanation: jedis was not called as expected
   @Test
   public void insertInsert() throws Exception {
-
     // ARRANGE
     JedisCluster redis = mock(JedisCluster.class);
     RedisMap map = new RedisMap("test");
@@ -68,7 +65,6 @@ public class RedisMapMockTest {
   // Failure explanation: jedis was not called as expected
   @Test
   public void removeRemove() throws Exception {
-
     // ARRANGE
     JedisCluster redis = mock(JedisCluster.class);
     RedisMap map = new RedisMap("test");
@@ -86,7 +82,6 @@ public class RedisMapMockTest {
   // Failure explanation: jedis was not called as expected
   @Test
   public void getGet() throws Exception {
-
     // ARRANGE
     JedisCluster redis = mock(JedisCluster.class);
     when(redis.get("test:key")).thenReturn("value");

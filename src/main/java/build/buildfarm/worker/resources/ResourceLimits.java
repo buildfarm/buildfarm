@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.resources;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -28,7 +29,6 @@ import java.util.Map;
  *     to decide the eligibility of which workers can execute which actions.
  */
 public class ResourceLimits {
-
   /**
    * @field useLinuxSandbox
    * @brief Whether to use bazel's linux sandbox as an execution wrapper.
@@ -54,25 +54,47 @@ public class ResourceLimits {
   public boolean fakeUsername = false;
 
   /**
+   * @field tmpFs
+   * @brief Whether the action should use tmpfs for the tmp directory.
+   * @details The linux-sandbox supports thie functionality through tmpfsDirs option.
+   */
+  public boolean tmpFs = false;
+
+  /**
+   * @field containerSettings
+   * @brief Some actions may need to run in a container. These settings are used to determine which
+   *     container to use and how to use it.
+   * @details This also provides compatibility with https://github.com/bazelbuild/bazel-toolchains
+   */
+  public ContainerSettings containerSettings = new ContainerSettings();
+
+  /**
    * @field cpu
    * @brief Resource limitations on CPUs.
    * @details Decides specific CPU limitations and whether to apply them for a given action.
    */
-  public CpuLimits cpu = new CpuLimits();
+  public final CpuLimits cpu = new CpuLimits();
 
   /**
    * @field mem
    * @brief Resource limitations on memory usage.
    * @details Decides specific memory limitations and whether to apply them for a given action.
    */
-  public MemLimits mem = new MemLimits();
+  public final MemLimits mem = new MemLimits();
 
   /**
    * @field network
    * @brief Resource limitations on network usage.
    * @details Decides specific network limitations and whether to apply them for a given action.
    */
-  public NetworkLimits network = new NetworkLimits();
+  public final NetworkLimits network = new NetworkLimits();
+
+  /**
+   * @field time
+   * @brief Resource limitations on time usage.
+   * @details Decides specific time limitations and whether to apply them for a given action.
+   */
+  public final TimeLimits time = new TimeLimits();
 
   /**
    * @field extraEnvironmentVariables
@@ -80,7 +102,7 @@ public class ResourceLimits {
    * @details These variables are added to the end of the existing environment variables in the
    *     Command.
    */
-  public Map<String, String> extraEnvironmentVariables = new HashMap<String, String>();
+  public Map<String, String> extraEnvironmentVariables = new HashMap<>();
 
   /**
    * @field debugBeforeExecution
@@ -105,4 +127,26 @@ public class ResourceLimits {
    *     about getting debug information for regular build actions.
    */
   public boolean debugTestsOnly = true;
+
+  /**
+   * @field debugTarget
+   * @brief A specific target to debug. Used for substring matching on actions.
+   * @details When used, only matches will preserve debug flags.
+   */
+  public String debugTarget = "";
+
+  /**
+   * @field unusedProperties
+   * @brief Exec_properties that were not used when deciding resource limits.
+   * @details Foreign platform properties may be be added to the command that are ignored when
+   *     parsing exec_properties. They are listed here for visibility.
+   */
+  public final Map<String, String> unusedProperties = new HashMap<>();
+
+  /**
+   * @field description
+   * @brief Description explaining why settings were chosen.
+   * @details This can be used to debug execution behavior.
+   */
+  public final ArrayList<String> description = new ArrayList<>();
 }
