@@ -1,4 +1,3 @@
-
 java_binary(
     name = "bf-mount",
     srcs = ["Mount.java"],
