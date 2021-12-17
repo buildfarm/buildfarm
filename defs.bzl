@@ -52,7 +52,7 @@ COM_AWS_MODULES = [
 ORG_SPRING_MODULES = [
     "spring-beans",
     "spring-core",
-    "spring-context"
+    "spring-context",
 ]
 
 ORG_SPRING_BOOT_MODULES = [
