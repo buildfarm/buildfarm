@@ -1,9 +1,3 @@
-load("@io_bazel_rules_docker//container:container.bzl", "container_image")
-load("//:defs.bzl", "ensure_accurate_metadata")
-
-package(
-    default_visibility = ["//src:__subpackages__"],
-)
 
 java_binary(
     name = "bf-mount",
