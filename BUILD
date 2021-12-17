@@ -101,12 +101,18 @@ java_image(
 java_image(
     name = "buildfarm-shard-worker",
     base = "@ubuntu-bionic//image",
+    args = ["/app/build_buildfarm/examples/shard-worker.config.example"],
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
     ],
+    data = [
+        "//examples:example_configs",
+        "//src/main/java/build/buildfarm:configs",
+    ],
+    jvm_flags = [
+        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+    ],
     entrypoint = [
-        "/app/buildfarm/tini",
-        "--",
     ],
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
