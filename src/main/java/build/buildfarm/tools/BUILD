@@ -5,7 +5,6 @@ package(
     default_visibility = ["//src:__subpackages__"],
 )
 
-
 java_binary(
     name = "bf-mount",
     srcs = ["Mount.java"],

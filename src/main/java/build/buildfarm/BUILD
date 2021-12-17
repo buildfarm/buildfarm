@@ -105,4 +105,3 @@ container_image(
     tags = ["container"],
     visibility = ["//visibility:public"],
 )
-
