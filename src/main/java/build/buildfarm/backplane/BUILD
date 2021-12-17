@@ -10,5 +10,6 @@ java_library(
         "@googleapis//:google_longrunning_operations_java_proto",
         "@maven//:com_google_guava_guava",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "@maven//:net_jcip_jcip_annotations"
     ],
 )

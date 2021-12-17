@@ -27,5 +27,6 @@ java_library(
         "@maven//:io_prometheus_simpleclient",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "@maven//:net_jcip_jcip_annotations"
     ],
 )
