@@ -26,7 +26,6 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
-import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.StringVisitor;
@@ -41,7 +40,6 @@ import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.Utils;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
@@ -49,22 +47,20 @@ import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
-import build.buildfarm.v1test.DispatchedOperationsStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.GetClientStartTime;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.LabeledCount;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
@@ -74,7 +70,6 @@ import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
@@ -88,7 +83,6 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -107,10 +101,11 @@ import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
-import org.redisson.config.ClusterServersConfig;
 import org.redisson.config.Config;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
+import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
@@ -141,7 +136,7 @@ public class RedisShardBackplane implements Backplane {
                   .add(PreconditionFailure.getDescriptor())
                   .build());
 
-  private class ActionAmounts {
+  private static class ActionAmounts {
     Integer build = 0;
     Integer test = 0;
     Integer unknown = 0;
@@ -159,11 +154,9 @@ public class RedisShardBackplane implements Backplane {
   private RedisShardSubscriber subscriber = null;
   private RedisShardSubscription operationSubscription = null;
   private ExecutorService subscriberService = null;
-  private boolean poolStarted = false;
   private @Nullable RedisClient client = null;
-  private @Nullable RedissonClient redissonClient = null;
 
-  private Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
+  private final Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
   private long workerSetExpiresAt = 0;
 
   private RedisMap actionCache;
@@ -197,11 +190,10 @@ public class RedisShardBackplane implements Backplane {
     this.jedisClusterFactory = jedisClusterFactory;
   }
 
+  @SuppressWarnings("NullableProblems")
   @Override
-  public InterruptingRunnable setOnUnsubscribe(InterruptingRunnable onUnsubscribe) {
-    InterruptingRunnable oldOnUnsubscribe = this.onUnsubscribe;
+  public void setOnUnsubscribe(InterruptingRunnable onUnsubscribe) {
     this.onUnsubscribe = onUnsubscribe;
-    return oldOnUnsubscribe;
   }
 
   abstract static class QueueEntryListVisitor extends StringVisitor {
@@ -251,7 +243,7 @@ public class RedisShardBackplane implements Backplane {
           protected void visit(ExecuteEntry executeEntry, String executeEntryJson) {
             String operationName = executeEntry.getOperationName();
             String value = processingOperations.get(jedis, operationName);
-            int defaultTimeout_ms = config.getProcessingTimeoutMillis();
+            long defaultTimeout_ms = config.getProcessingTimeoutMillis();
 
             // get the operation's expiration
             Instant expiresAt = convertToMilliInstant(value, operationName);
@@ -260,7 +252,7 @@ public class RedisShardBackplane implements Backplane {
             if (expiresAt == null) {
               expiresAt = now.plusMillis(defaultTimeout_ms);
               String keyValue = String.format("%d", expiresAt.toEpochMilli());
-              int timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
+              long timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
               processingOperations.insert(jedis, operationName, keyValue, timeout_s);
             }
 
@@ -284,7 +276,7 @@ public class RedisShardBackplane implements Backplane {
           protected void visit(QueueEntry queueEntry, String queueEntryJson) {
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             String value = dispatchedOperations.get(jedis, operationName);
-            int defaultTimeout_ms = config.getDispatchingTimeoutMillis();
+            long defaultTimeout_ms = config.getDispatchingTimeoutMillis();
 
             // get the operation's expiration
             Instant expiresAt = convertToMilliInstant(value, operationName);
@@ -293,7 +285,7 @@ public class RedisShardBackplane implements Backplane {
             if (expiresAt == null) {
               expiresAt = now.plusMillis(defaultTimeout_ms);
               String keyValue = String.format("%d", expiresAt.toEpochMilli());
-              int timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
+              long timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
               dispatchedOperations.insert(jedis, operationName, keyValue, timeout_s);
             }
 
@@ -384,7 +376,7 @@ public class RedisShardBackplane implements Backplane {
     for (String channel : expiringChannels) {
       Operation operation = parseOperationJson(getOperation(jedis, parseOperationChannel(channel)));
       if (operation == null || !operation.getDone()) {
-        publishExpiration(jedis, channel, now, /* force=*/ false);
+        publishExpiration(jedis, channel, now/* force=*/ );
       } else {
         subscriber.onOperation(channel, onPublish.apply(operation), expiresAt);
       }
@@ -434,15 +426,16 @@ public class RedisShardBackplane implements Backplane {
         .build();
   }
 
-  void publishExpiration(JedisCluster jedis, String channel, Instant effectiveAt, boolean force) {
+  void publishExpiration(JedisCluster jedis, String channel, Instant effectiveAt) {
     publish(
         jedis,
         channel,
         effectiveAt,
         OperationChange.newBuilder()
-            .setExpire(OperationChange.Expire.newBuilder().setForce(force).build()));
+            .setExpire(OperationChange.Expire.newBuilder().setForce(false).build()));
   }
 
+  @SuppressWarnings({"unchecked", "rawtypes"})
   public void updateWatchedIfDone(JedisCluster jedis) {
     List<String> operationChannels = subscriber.watchedOperationChannels();
     if (operationChannels.isEmpty()) {
@@ -453,7 +446,9 @@ public class RedisShardBackplane implements Backplane {
     List<Map.Entry<String, Response<String>>> operations = new ArrayList(operationChannels.size());
     JedisClusterPipeline p = jedis.pipelined();
     for (String operationName :
-        Iterables.transform(operationChannels, RedisShardBackplane::parseOperationChannel)) {
+        operationChannels.stream()
+            .map(RedisShardBackplane::parseOperationChannel)
+            .collect(Collectors.toList())) {
       operations.add(
           new AbstractMap.SimpleEntry<>(operationName, p.get(operationKey(operationName))));
     }
@@ -508,6 +503,7 @@ public class RedisShardBackplane implements Backplane {
     subscriptionThread.start();
   }
 
+  @SuppressWarnings("ConstantConditions")
   private void startFailsafeOperationThread() {
     failsafeOperationThread =
         new Thread(
@@ -545,8 +541,8 @@ public class RedisShardBackplane implements Backplane {
     client = new RedisClient(jedisClusterFactory.get());
 
     // Create containers that make up the backplane
-    casWorkerMap = createCasWorkerMap(redissonClient, config);
-    actionCache = createActionCache(client, config);
+    casWorkerMap = createCasWorkerMap(config);
+    actionCache = createActionCache(config);
     prequeue = createPrequeue(client, config);
     operationQueue = createOperationQueue(client, config);
     blockedActions = new RedisMap(config.getActionBlacklistPrefix());
@@ -566,31 +562,21 @@ public class RedisShardBackplane implements Backplane {
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
   }
 
-  static CasWorkerMap createCasWorkerMap(RedissonClient client, RedisShardBackplaneConfig config)
-      throws IOException {
+  CasWorkerMap createCasWorkerMap(RedisShardBackplaneConfig config) throws IOException {
     if (config.getCacheCas()) {
-      client = createRedissonClient(config);
-      return new RedissonCasWorkerMap(client, config.getCasPrefix(), config.getCasExpire());
+      RedissonClient redissonClient = createRedissonClient();
+      return new RedissonCasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire());
     } else {
       return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
     }
   }
 
-  static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) throws IOException {
+  static RedissonClient createRedissonClient() {
     Config redissonConfig = new Config();
-
-    ClusterServersConfig finalConfig =
-        redissonConfig
-            .useClusterServers()
-            .addNodeAddress(config.getRedisUri())
-            .setCheckSlotsCoverage(false);
-
-    RedissonClient client = Redisson.create(redissonConfig);
-    return client;
+    return Redisson.create(redissonConfig);
   }
 
-  static RedisMap createActionCache(RedisClient client, RedisShardBackplaneConfig config)
-      throws IOException {
+  static RedisMap createActionCache(RedisShardBackplaneConfig config) {
     return new RedisMap(config.getActionCachePrefix());
   }
 
@@ -603,6 +589,7 @@ public class RedisShardBackplane implements Backplane {
         config.getMaxPreQueueDepth());
   }
 
+  @SuppressWarnings({"unchecked", "rawtypes"})
   static OperationQueue createOperationQueue(RedisClient client, RedisShardBackplaneConfig config)
       throws IOException {
     // Construct an operation queue based on configuration.
@@ -643,14 +630,13 @@ public class RedisShardBackplane implements Backplane {
   }
 
   static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
-    List<String> clusterHashes =
-        client.call(
-            jedis ->
-                RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(
-                    jedis, RedisHashtags.existingHash(queueName)));
-    return clusterHashes;
+    return client.call(
+        jedis ->
+            RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(
+                jedis, RedisHashtags.existingHash(queueName)));
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public synchronized void stop() throws InterruptedException {
     if (failsafeOperationThread != null) {
@@ -677,14 +663,14 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean isStopped() {
     return client.isClosed();
   }
 
   @Override
-  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher)
-      throws IOException {
+  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
     TimedWatcher timedWatcher =
         new TimedWatcher(nextExpiresAt(Instant.now())) {
           @Override
@@ -695,8 +681,9 @@ public class RedisShardBackplane implements Backplane {
     return subscriber.watch(operationChannel(operationName), timedWatcher);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
-  public boolean addWorker(ShardWorker shardWorker) throws IOException {
+  public void addWorker(ShardWorker shardWorker) throws IOException {
     String json = JsonFormat.printer().print(shardWorker);
     String workerChangeJson =
         JsonFormat.printer()
@@ -706,7 +693,7 @@ public class RedisShardBackplane implements Backplane {
                     .setName(shardWorker.getEndpoint())
                     .setAdd(WorkerChange.Add.getDefaultInstance())
                     .build());
-    return client.call(
+    client.call(
         jedis -> {
           // could rework with an hget to publish prior, but this seems adequate, and
           // we are the only guaranteed source
@@ -726,6 +713,7 @@ public class RedisShardBackplane implements Backplane {
     return false;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean removeWorker(String name, String reason) throws IOException {
     WorkerChange workerChange =
@@ -738,15 +726,42 @@ public class RedisShardBackplane implements Backplane {
         && client.call(jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
-  public CasIndexResults reindexCas(String hostName) throws IOException {
+  public CasIndexResults reindexCas(@Nullable String hostName) throws IOException {
+    List<String> hostNames = new ArrayList<>();
+    if (hostName != null) {
+      hostNames.add(hostName);
+    } else {
+      hostNames = getNonactiveWorkers();
+    }
     CasIndexSettings settings = new CasIndexSettings();
-    settings.hostName = hostName;
+    settings.hostNames = hostNames;
     settings.casQuery = config.getCasPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
 
+  public List<String> getNonactiveWorkers() throws IOException {
+    // get all workers
+    List<String> activeWorkers = new ArrayList<>(getWorkers());
+    List<String> allUptimeKeys = new ArrayList<>();
+    Map<String, JedisPool> clusterNodes = client.call(jedis -> jedis.getClusterNodes());
+    for (Map.Entry<String, JedisPool> entry : clusterNodes.entrySet()) {
+      Jedis singlejedis = entry.getValue().getResource();
+      allUptimeKeys.addAll(client.call(jedis -> singlejedis.keys("startTime/*:8981")));
+    }
+    List<String> nonactiveWorkers = new ArrayList<>();
+    for (String key : allUptimeKeys) {
+      String hostName = key.split("/")[1];
+      if (!activeWorkers.contains(hostName)) {
+        nonactiveWorkers.add(hostName);
+      }
+    }
+    return nonactiveWorkers;
+  }
+
+  @SuppressWarnings("ConstantConditions")
   @Override
   public FindOperationsResults findOperations(Instance instance, String filterPredicate)
       throws IOException {
@@ -762,6 +777,7 @@ public class RedisShardBackplane implements Backplane {
     removeWorker(workerName, "Requested shutdown");
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public synchronized Set<String> getWorkers() throws IOException {
     long now = System.currentTimeMillis();
@@ -785,8 +801,7 @@ public class RedisShardBackplane implements Backplane {
   // sophisticated in the future. But for now, we'll give back n random workers.
   public List<String> suggestedWorkersToScaleDown(int numWorkers) throws IOException {
     // get all workers
-    List<String> allWorkers = new ArrayList<String>();
-    allWorkers.addAll(getWorkers());
+    List<String> allWorkers = new ArrayList<>(getWorkers());
 
     // ensure selection amount is in range [0 - size]
     numWorkers = Math.max(0, Math.min(numWorkers, allWorkers.size()));
@@ -861,6 +876,7 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public ActionResult getActionResult(ActionKey actionKey) throws IOException {
     String json = client.call(jedis -> actionCache.get(jedis, asDigestStr(actionKey)));
@@ -876,12 +892,14 @@ public class RedisShardBackplane implements Backplane {
   }
 
   // we do this by action hash only, so that we can use RequestMetadata to filter
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void blacklistAction(String actionId) throws IOException {
     client.run(
         jedis -> blockedActions.insert(jedis, actionId, "", config.getActionBlacklistExpire()));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
     String json = JsonFormat.printer().print(actionResult);
@@ -894,26 +912,23 @@ public class RedisShardBackplane implements Backplane {
     actionCache.remove(jedis, asDigestStr(actionKey));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void removeActionResult(ActionKey actionKey) throws IOException {
     client.run(jedis -> removeActionResult(jedis, actionKey));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
     // convert action keys to strings
-    List<String> keyNames = new ArrayList<String>();
-    actionKeys.forEach(
-        key -> {
-          keyNames.add(asDigestStr(key));
-        });
+    List<String> keyNames = new ArrayList<>();
+    actionKeys.forEach(key -> keyNames.add(asDigestStr(key)));
 
-    client.run(
-        jedis -> {
-          actionCache.remove(jedis, keyNames);
-        });
+    client.run(jedis -> actionCache.remove(jedis, keyNames));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public ActionCacheScanResult scanActionCache(String scanToken, int count) throws IOException {
     final String jedisScanToken = scanToken == null ? SCAN_POINTER_START : scanToken;
@@ -931,8 +946,8 @@ public class RedisShardBackplane implements Backplane {
 
               List<Response<String>> actionResults = new ArrayList<>(keyResults.size());
               JedisClusterPipeline p = jedis.pipelined();
-              for (int i = 0; i < keyResults.size(); i++) {
-                actionResults.add(p.get(keyResults.get(i)));
+              for (String key : keyResults) {
+                actionResults.add(p.get(key));
               }
               p.sync();
               for (int i = 0; i < keyResults.size(); i++) {
@@ -950,11 +965,12 @@ public class RedisShardBackplane implements Backplane {
             });
     return new ActionCacheScanResult(
         token,
-        Iterables.transform(
-            results.build(),
-            (entry) ->
-                new AbstractMap.SimpleEntry<>(
-                    entry.getKey(), parseActionResult(entry.getValue()))));
+        results.build().stream()
+            .map(
+                (entry) ->
+                    new AbstractMap.SimpleEntry<>(
+                        entry.getKey(), parseActionResult(entry.getValue())))
+            .collect(Collectors.toList()));
   }
 
   @Override
@@ -1029,20 +1045,19 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private String getOperation(JedisCluster jedis, String operationName) {
-    String json = jedis.get(operationKey(operationName));
-    return json;
+    return jedis.get(operationKey(operationName));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public Operation getOperation(String operationName) throws IOException {
     String json = client.call(jedis -> getOperation(jedis, operationName));
     return parseOperationJson(json);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean putOperation(Operation operation, ExecutionStage.Value stage) throws IOException {
-    // FIXME queue and prequeue should no longer be passed to here
-    boolean prequeue = stage == ExecutionStage.Value.UNKNOWN && !operation.getDone();
     boolean queue = stage == ExecutionStage.Value.QUEUED;
     boolean complete = !queue && operation.getDone();
     boolean publish = !queue && stage != ExecutionStage.Value.UNKNOWN;
@@ -1092,6 +1107,7 @@ public class RedisShardBackplane implements Backplane {
     operationQueue.push(jedis, provisions, queueEntryJson);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void queue(QueueEntry queueEntry, Operation operation) throws IOException {
     String operationName = operation.getName();
@@ -1110,6 +1126,7 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
+  @SuppressWarnings("ConstantConditions")
   public Map<String, Operation> getOperationsMap() throws IOException {
     ImmutableMap.Builder<String, String> builder = new ImmutableMap.Builder<>();
     client.run(
@@ -1123,17 +1140,11 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public Iterable<String> getOperations() throws IOException {
+  public Iterable<String> getOperations() {
     throw new UnsupportedOperationException();
-    /*
-    return client.call(jedis -> {
-      Iterable<String> dispatchedOperations = jedis.hkeys(config.getDispatchedOperationsHashName());
-      Iterable<String> queuedOperations = jedis.lrange(config.getQueuedOperationsListName(), 0, -1);
-      return Iterables.concat(queuedOperations, dispatchedOperations, getCompletedOperations(jedis));
-    });
-    */
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public ImmutableList<DispatchedOperation> getDispatchedOperations() throws IOException {
     ImmutableList.Builder<DispatchedOperation> builder = new ImmutableList.Builder<>();
@@ -1203,13 +1214,14 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public ExecuteEntry deprequeueOperation() throws IOException, InterruptedException {
     return client.blockingCall(this::deprequeueOperation);
   }
 
-  private QueueEntry dispatchOperation(JedisCluster jedis, List<Platform.Property> provisions)
-      throws InterruptedException {
+  private @Nullable QueueEntry dispatchOperation(
+      JedisCluster jedis, List<Platform.Property> provisions) throws InterruptedException {
     String queueEntryJson = operationQueue.dequeue(jedis, provisions);
     if (queueEntryJson == null) {
       return null;
@@ -1222,8 +1234,7 @@ public class RedisShardBackplane implements Backplane {
       logger.log(Level.SEVERE, "error parsing queue entry", e);
       return null;
     }
-    QueueEntry queueEntry =
-        queueEntryBuilder.setRequeueAttempts(queueEntryBuilder.getRequeueAttempts() + 1).build();
+    QueueEntry queueEntry = queueEntryBuilder.build();
 
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     Operation operation = keepaliveOperation(operationName);
@@ -1255,32 +1266,33 @@ public class RedisShardBackplane implements Backplane {
                 operationName, operationQueue.getDequeueName()));
       }
       dispatchedOperations.remove(jedis, operationName);
-      return queueEntry;
+
+      // Return an entry so that if it needs re-queued, it will have the correct "requeue attempts".
+      return queueEntryBuilder.setRequeueAttempts(queueEntry.getRequeueAttempts() + 1).build();
     }
     return null;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public QueueEntry dispatchOperation(List<Platform.Property> provisions)
       throws IOException, InterruptedException {
-    return client.blockingCall(
-        jedis -> {
-          return dispatchOperation(jedis, provisions);
-        });
+    return client.blockingCall(jedis -> dispatchOperation(jedis, provisions));
   }
 
-  String printPollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
+  String printPollOperation(QueueEntry queueEntry, long requeueAt)
       throws InvalidProtocolBufferException {
     DispatchedOperation o =
         DispatchedOperation.newBuilder().setQueueEntry(queueEntry).setRequeueAt(requeueAt).build();
     return JsonFormat.printer().print(o);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void rejectOperation(QueueEntry queueEntry) throws IOException {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    String dispatchedEntryJson = printPollOperation(queueEntry, ExecutionStage.Value.QUEUED, 0);
+    String dispatchedEntryJson = printPollOperation(queueEntry, 0);
     client.run(
         jedis -> {
           if (isBlacklisted(jedis, queueEntry.getExecuteEntry().getRequestMetadata())) {
@@ -1299,13 +1311,14 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
       throws IOException {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     String json;
     try {
-      json = printPollOperation(queueEntry, stage, requeueAt);
+      json = printPollOperation(queueEntry, requeueAt);
     } catch (InvalidProtocolBufferException e) {
       logger.log(Level.SEVERE, "error printing dispatched operation " + operationName, e);
       return false;
@@ -1326,6 +1339,7 @@ public class RedisShardBackplane implements Backplane {
     return false;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException {
     String operationName = operation.getName();
@@ -1344,16 +1358,15 @@ public class RedisShardBackplane implements Backplane {
     return Operation.newBuilder().setName(operationName).build();
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void queueing(String operationName) throws IOException {
     Operation operation = keepaliveOperation(operationName);
     // publish so that watchers reset their timeout
-    client.run(
-        jedis -> {
-          publishReset(jedis, operation);
-        });
+    client.run(jedis -> publishReset(jedis, operation));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException {
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
@@ -1370,11 +1383,13 @@ public class RedisShardBackplane implements Backplane {
     jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void completeOperation(String operationName) throws IOException {
     client.run(jedis -> completeOperation(jedis, operationName));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public void deleteOperation(String operationName) throws IOException {
     Operation o =
@@ -1416,6 +1431,7 @@ public class RedisShardBackplane implements Backplane {
     return operationQueue.isEligible(provisions);
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException {
     if (requestMetadata.getToolInvocationId().isEmpty()
@@ -1435,267 +1451,48 @@ public class RedisShardBackplane implements Backplane {
     return isActionBlocked || isInvocationBlocked;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean canQueue() throws IOException {
     return client.call(jedis -> operationQueue.canQueue(jedis));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean canPrequeue() throws IOException {
     return client.call(jedis -> prequeue.canQueue(jedis));
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
-  public BackplaneStatus backplaneStatus(Instance instance) throws IOException {
-    Set<String> workers = getWorkers();
-    return client.call(
-        jedis ->
-            BackplaneStatus.newBuilder()
-                .setPrequeue(prequeue.status(jedis))
-                .setOperationQueue(operationQueue.status(jedis))
-                .setBlockedActionsSize(blockedActions.size(jedis))
-                .setBlockedInvocationsSize(blockedInvocations.size(jedis))
-                .setDispatchedOperations(getDispatchedOperationsStatus(jedis, instance))
-                .addAllActiveWorkers(workers)
-                .build());
+  public BackplaneStatus backplaneStatus() throws IOException {
+    BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
+    builder.addAllActiveWorkers(client.call(jedis -> jedis.hkeys(config.getWorkersHashName())));
+    builder.setDispatchedSize(
+        client.call(jedis -> jedis.hlen(config.getDispatchedOperationsHashName())));
+    builder.setOperationQueue(operationQueue.status(client.call(jedis -> jedis)));
+    builder.setPrequeue(prequeue.status(client.call(jedis -> jedis)));
+    return builder.build();
   }
 
-  /**
-   * @brief Analyze the currently dispatched operations to derive statistics about the operations
-   *     workers are currently executing.
-   * @details This status message is intended to be used as metrics.
-   * @param cluster An established redis cluster.
-   * @param instance An instance is used to get additional information about the operation.
-   * @return Metrics about the currently dispatched operations.
-   */
-  private DispatchedOperationsStatus getDispatchedOperationsStatus(
-      JedisCluster jedis, Instance instance) {
-    // Metrics related to dispatched operations
-    ActionAmounts actionAmounts = new ActionAmounts();
-    Integer requeuedOperationsAmount = 0;
-    Set<String> uniqueToolInvocationIds = Sets.newHashSet();
-    Map<String, Integer> fromQueueAmounts = new HashMap();
-    Map<String, Integer> toolAmounts = new HashMap();
-    Map<String, Integer> commandTools = new HashMap();
-    Map<String, Integer> actionMnemonics = new HashMap();
-    Map<String, Integer> targetIds = new HashMap();
-    Map<String, Integer> configIds = new HashMap();
-    Map<String, Integer> platformProperties = new HashMap();
-
-    // Iterate over each dispatched operation, and accumulate metrics about buildfarm's ongoing
-    // executions.
-    try {
-      for (DispatchedOperation operation : getDispatchedOperations()) {
-        QueuedOperation queuedOperation =
-            resolveQueuedOperationDigest(
-                instance, operation.getQueueEntry().getQueuedOperationDigest());
-
-        // 1. Information about the client / caller.
-
-        // Record unique tool invocation ids (ex. d6d7bfbc-c61e-4cdd-abaf-d3ea779335bf)
-        // This will let us know how many unique clients are getting work processed.
-        // This correlates to the number of individuals using buildfarm.
-        // We will probably be able to get a similar number from the incoming build event streams.
-        // However, users will have the ability to disable BES on the client side.
-        // They cannot disable the fact that their actions are tagged with their invocation id.
-        // Therefore, this may be a more reliable metric for "active users".
-        uniqueToolInvocationIds.add(
-            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getToolInvocationId());
-
-        // Record the tool that the operation came from (ex. bazel-4.0.0, pants-v2).
-        // This will let us know if anyone is using an unexpected build tool or bazel version with
-        // buildfarm.  In the past, we've speculated that mixing bazel version with buildfarm might
-        // result in stability issues.
-        // Now we'll be able to match any issues with when unexpected build tools were used.
-        String toolName =
-            operation
-                    .getQueueEntry()
-                    .getExecuteEntry()
-                    .getRequestMetadata()
-                    .getToolDetails()
-                    .getToolName()
-                + "-"
-                + operation
-                    .getQueueEntry()
-                    .getExecuteEntry()
-                    .getRequestMetadata()
-                    .getToolDetails()
-                    .getToolVersion();
-        incrementValue(toolAmounts, toolName);
-
-        // Record the target Id that initiated the operation.
-        // Note: This metadata is not populated by bazel until 4.1.0
-        String targetId =
-            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getTargetId();
-        incrementValue(targetIds, targetId);
-
-        // Record the build configuration of the action.
-        // Note: This metadata is not populated by bazel until 4.1.0
-        String configId =
-            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getConfigurationId();
-        incrementValue(configIds, configId);
-
-        // 2. Information about where the worker fetched the operation.
-
-        // Record the queue where the operation came from (ex. cpu, gpu).
-        // Queues often drain quickly.  This will let us identify the on-going work by the queues
-        // where originated from.
-        // We can correlate queue spikes with the the saturation they cause to dispatched
-        // operations.
-        String queueName =
-            operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
-        incrementValue(fromQueueAmounts, queueName);
-
-        // Record whether the operation has been requeued before
-        if (operation.getQueueEntry().getRequeueAttempts() > 0) {
-          requeuedOperationsAmount++;
-        }
-
-        // 3. Information about the operation.
-
-        // Record the action type (ex. build, test).
-        // Generally speaking, there are "build" actions and "test" actions.
-        // This is useful for knowing if buildfarm has been saturated with test work due
-        // clients using --runs_per_test.  It is also relevant to distinguish actions this way
-        // because long-running actions are often tests.
-        incrementActionType(queuedOperation, actionAmounts);
-
-        // Record the action mnemonic of the operation (ex. CppCompile, GoLink).
-        // This will let us know what kind of work is occurring.
-        // Although we know the mnemonic characteristics by statically analyzing the repo,
-        // we don't know what kind of actions dominate buildfarm's compute under typical load.
-        // This let us know what toolchains and rules are used most heavily and perhaps how to
-        // optimize for them.
-        // Note: This metadata is not populated by bazel until 4.1.0
-        String actionMnemonic =
-            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getActionMnemonic();
-        incrementValue(actionMnemonics, actionMnemonic);
-
-        // Record the programs being run (ex. clang, bash).
-        // Not all actions have mnemonics, and some mnemonics are used for multiple program
-        // invocations.
-        // This help us identify what toolchains are running and how it correlates to existing
-        // operation information.
-        List<String> arguments = queuedOperation.getCommand().getArgumentsList();
-        if (!arguments.isEmpty()) {
-          incrementValue(commandTools, arguments.get(0));
-        }
-
-        // Record platform properties being used on dispatched operations.
-        // How we run actions can be influenced by users through platform properties.
-        // Detecting issues through an influx of specific platform properties can help diagnose.
-        // For example, we may see many dispatched operations using a high amount of cores.
-        for (Platform.Property property :
-            queuedOperation.getCommand().getPlatform().getPropertiesList()) {
-          incrementValue(platformProperties, property.getName() + "=" + property.getValue());
-        }
-      }
-
-    } catch (Exception e) {
-      logger.log(Level.SEVERE, "Unable to analyze dispatched operation: ", e);
-    }
-
-    DispatchedOperationsStatus status =
-        DispatchedOperationsStatus.newBuilder()
-            .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
-            .setBuildActionAmount(actionAmounts.build)
-            .setTestActionAmount(actionAmounts.test)
-            .setUnknownActionAmount(actionAmounts.unknown)
-            .setRequeuedOperationsAmount(requeuedOperationsAmount)
-            .addAllFromQueues(toLabeledCounts(fromQueueAmounts))
-            .addAllTools(toLabeledCounts(toolAmounts))
-            .addAllActionMnemonics(toLabeledCounts(actionMnemonics))
-            .addAllCommandTools(toLabeledCounts(commandTools))
-            .addAllTargetIds(toLabeledCounts(targetIds))
-            .addAllConfigIds(toLabeledCounts(configIds))
-            .addAllPlatformProperties(toLabeledCounts(platformProperties))
-            .setUniqueClientsAmount(uniqueToolInvocationIds.size())
-            .build();
-
-    return status;
-  }
-
-  /**
-   * @brief Convert a map of string counts into a similar proto metric type.
-   * @details Certain metrics represent a list of strings with a count.
-   * @param map The map to convert.
-   * @return The metric type for counted strings.
-   */
-  private List<LabeledCount> toLabeledCounts(Map<String, Integer> map) {
-    List<LabeledCount> counts = new ArrayList<>();
-    for (Map.Entry<String, Integer> entry : map.entrySet()) {
-      counts.add(
-          LabeledCount.newBuilder().setName(entry.getKey()).setSize(entry.getValue()).build());
-    }
-    return counts;
-  }
-
-  /**
-   * @brief Increment a stat about the kind of operation.
-   * @details It is either a build/test action, or unknown in the event of missing data.
-   * @param queuedOperation The operation to analyze.
-   * @param actionAmounts The counts for the types of operation (build, test, unknown)
-   */
-  private void incrementActionType(QueuedOperation queuedOperation, ActionAmounts actionAmounts) {
-    if (queuedOperation != null) {
-      if (CommandUtils.isTest(queuedOperation.getCommand())) {
-        actionAmounts.test++;
-      } else {
-        actionAmounts.build++;
-      }
-    } else {
-      actionAmounts.unknown++;
-    }
-  }
-
-  /**
-   * @brief Increment the value of any key.
-   * @details Add the key with value 1 if it does not previously exist.
-   * @param map The map to find and increment the key in.
-   * @param key The key to increment the value of.
-   */
-  private static <K> void incrementValue(Map<K, Integer> map, K key) {
-    Integer count = map.get(key);
-    if (count == null) {
-      map.put(key, 1);
-    } else {
-      map.put(key, count + 1);
-    }
-  }
-
-  /**
-   * @brief Get the queued operation based on the digest.
-   * @details Instance used to fetch the blob.
-   * @param instance An instance is used to get additional information about the queue entry.
-   * @param digest The queued operation digest.
-   * @return The queued operation from the provided digest.
-   * @note Suggested return identifier: queuedOperation.
-   */
-  private static QueuedOperation resolveQueuedOperationDigest(Instance instance, Digest digest) {
-    try {
-      ByteString blob = Utils.getBlob(instance, digest, RequestMetadata.getDefaultInstance());
-      QueuedOperation operation;
+  @SuppressWarnings("ConstantConditions")
+  @Override
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request)
+      throws IOException {
+    List<GetClientStartTime> startTimes = new ArrayList<>();
+    for (String key : request.getHostNameList()) {
       try {
-        operation = QueuedOperation.parseFrom(blob);
-        return operation;
-      } catch (InvalidProtocolBufferException e) {
-        return null;
+        startTimes.add(
+            client.call(
+                jedis ->
+                    GetClientStartTime.newBuilder()
+                        .setInstanceName(key)
+                        .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(key))))
+                        .build()));
+      } catch (NumberFormatException nfe) {
+        logger.warning("Could not obtain start time for " + key);
       }
-    } catch (Exception e) {
-      return null;
     }
-  }
-
-  @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) throws IOException {
-    try {
-      return client.call(
-          jedis ->
-              GetClientStartTimeResult.newBuilder()
-                  .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(clientKey))))
-                  .build());
-    } catch (NumberFormatException nfe) {
-      return GetClientStartTimeResult.newBuilder().build();
-    }
+    return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
   }
 }

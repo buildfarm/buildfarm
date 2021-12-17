@@ -33,12 +33,12 @@ public class RedisClient implements Closeable {
   private static final String MISCONF_RESPONSE = "MISCONF";
 
   @FunctionalInterface
-  public static interface JedisContext<T> {
+  public interface JedisContext<T> {
     T run(JedisCluster jedis) throws JedisException;
   }
 
   @FunctionalInterface
-  public static interface JedisInterruptibleContext<T> {
+  public interface JedisInterruptibleContext<T> {
     T run(JedisCluster jedis) throws InterruptedException, JedisException;
   }
 
@@ -82,13 +82,11 @@ public class RedisClient implements Closeable {
 
   public void run(Consumer<JedisCluster> withJedis) throws IOException {
     call(
-        new JedisContext<Void>() {
-          @Override
-          public Void run(JedisCluster jedis) throws JedisException {
-            withJedis.accept(jedis);
-            return null;
-          }
-        });
+        (JedisContext<Void>)
+            jedis -> {
+              withJedis.accept(jedis);
+              return null;
+            });
   }
 
   public <T> T blockingCall(JedisInterruptibleContext<T> withJedis)
@@ -111,6 +109,7 @@ public class RedisClient implements Closeable {
     return result;
   }
 
+  @SuppressWarnings("ConstantConditions")
   public <T> T call(JedisContext<T> withJedis) throws IOException {
     throwIfClosed();
     try {

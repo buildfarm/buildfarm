@@ -1,5 +1,3 @@
-[![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=master)](https://buildkite.com/bazel/buildfarm-postsubmit)
-
 # Bazel Buildfarm
 
 This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
@@ -9,7 +7,11 @@ found in the [bazel documentation](https://docs.bazel.build/versions/master/remo
 
 File issues here for bugs or feature requests, and ask questions via build team [slack](https://join.slack.com/t/buildteamworld/shared_invite/zt-4zy8f5j5-KwiJuBoAAUorB_mdQHwF7Q) in the #buildfarm channel.
 
-[Buildfarm Wiki](https://github.com/bazelbuild/bazel-buildfarm/wiki)
+|Buildfarm CI|Nightly CI|Nightly Functionality Test|
+|--|--|--|
+| ![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main) |![Build status](https://badge.buildkite.com/d0c1471a98dd7d7123e6c21b57add0e8c2c0552042ea18f02c.svg)|![Build status](https://badge.buildkite.com/e0ac44ec0a8c3473d3d9490600366f1a73e8fa171d4913e9e3.svg)|
+
+[Buildfarm Docs](https://bazelbuild.github.io/bazel-buildfarm/)
 
 ## Usage
 
@@ -35,7 +37,7 @@ bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile> [<-p|--p
 Run via
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+bazel run //src/main/java/build/buildfarm:buildfarm-memory-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
 ```
 
 - **`configfile`** has to be in Protocol Buffer text format, corresponding to a [WorkerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L459) definition.
@@ -72,7 +74,7 @@ bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.
 and
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/worker.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-memory-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/worker.config.example
 ```
 
 To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:

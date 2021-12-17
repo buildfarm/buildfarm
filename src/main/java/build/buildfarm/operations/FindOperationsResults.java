@@ -29,7 +29,7 @@ public class FindOperationsResults {
    * @details The key is the operation keu, and the value is all the collected information about the
    *     operation.
    */
-  public Map<String, EnrichedOperation> operations = new HashMap<String, EnrichedOperation>();
+  public Map<String, EnrichedOperation> operations = new HashMap<>();
 
   /**
    * @brief Get a string message for the results.
@@ -38,10 +38,7 @@ public class FindOperationsResults {
    * @note Suggested return identifier: message.
    */
   public String toMessage() {
-    StringBuilder message = new StringBuilder();
-    message
-        .append(String.format("results: %d\n", operations.size()))
-        .append(String.join("\n", operations.keySet()));
-    return message.toString();
+    return String.format("results: %d\n", operations.size())
+        + String.join("\n", operations.keySet());
   }
 }

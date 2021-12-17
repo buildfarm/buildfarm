@@ -54,6 +54,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.WorkerListMessage;
@@ -72,13 +73,12 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
 import java.util.Stack;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
@@ -87,7 +87,7 @@ public class AbstractServerInstanceTest {
 
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
-  class DummyServerInstance extends AbstractServerInstance {
+  static class DummyServerInstance extends AbstractServerInstance {
     DummyServerInstance(
         ContentAddressableStorage contentAddressableStorage, ActionCache actionCache) {
       super(
@@ -141,7 +141,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    protected Object operationLock(String operationName) {
+    protected Object operationLock() {
       throw new UnsupportedOperationException();
     }
 
@@ -161,7 +161,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public GetClientStartTimeResult getClientStartTime(String clientKey) {
+    public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
       throw new UnsupportedOperationException();
     }
 
@@ -182,11 +182,7 @@ public class AbstractServerInstanceTest {
 
     @Override
     public InputStream newOperationStreamInput(
-        String name,
-        long offset,
-        long deadlineAfter,
-        TimeUnit deadlineAfterUnits,
-        RequestMetadata requestMetadata) {
+        String name, long offset, RequestMetadata requestMetadata) {
       throw new UnsupportedOperationException();
     }
 
@@ -196,7 +192,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public CasIndexResults reindexCas(String hostName) {
+    public CasIndexResults reindexCas(@Nullable String hostName) {
       throw new UnsupportedOperationException();
     }
 
@@ -221,17 +217,15 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
+    public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
       throw new UnsupportedOperationException();
     }
   }
 
   @Test
   public void duplicateFileInputIsInvalid() {
-    AbstractServerInstance instance = new DummyServerInstance();
-
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    instance.validateActionInputDirectory(
+    AbstractServerInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllFiles(
@@ -256,10 +250,8 @@ public class AbstractServerInstanceTest {
 
   @Test
   public void unsortedFileInputIsInvalid() {
-    AbstractServerInstance instance = new DummyServerInstance();
-
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    instance.validateActionInputDirectory(
+    AbstractServerInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllFiles(
@@ -284,12 +276,10 @@ public class AbstractServerInstanceTest {
 
   @Test
   public void duplicateDirectoryInputIsInvalid() {
-    AbstractServerInstance instance = new DummyServerInstance();
-
     Directory emptyDirectory = Directory.getDefaultInstance();
     Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    instance.validateActionInputDirectory(
+    AbstractServerInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllDirectories(
@@ -321,12 +311,10 @@ public class AbstractServerInstanceTest {
 
   @Test
   public void unsortedDirectoryInputIsInvalid() {
-    AbstractServerInstance instance = new DummyServerInstance();
-
     Directory emptyDirectory = Directory.getDefaultInstance();
     Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    instance.validateActionInputDirectory(
+    AbstractServerInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllDirectories(
@@ -359,10 +347,10 @@ public class AbstractServerInstanceTest {
   public void nestedOutputDirectoriesAreInvalid() {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     AbstractServerInstance.validateOutputs(
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of("foo", "foo/bar"),
+        ImmutableSet.of(),
+        ImmutableSet.of(),
+        ImmutableSet.of(),
+        ImmutableSet.of("foo", "foo/bar"),
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -376,10 +364,10 @@ public class AbstractServerInstanceTest {
   public void outputDirectoriesContainingOutputFilesAreInvalid() {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     AbstractServerInstance.validateOutputs(
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of("foo/bar"),
-        ImmutableSet.<String>of("foo"),
+        ImmutableSet.of(),
+        ImmutableSet.of(),
+        ImmutableSet.of("foo/bar"),
+        ImmutableSet.of("foo"),
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -393,10 +381,10 @@ public class AbstractServerInstanceTest {
   public void outputFilesAsOutputDirectoryAncestorsAreInvalid() {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     AbstractServerInstance.validateOutputs(
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of(),
-        ImmutableSet.<String>of("foo"),
-        ImmutableSet.<String>of("foo/bar"),
+        ImmutableSet.of(),
+        ImmutableSet.of(),
+        ImmutableSet.of("foo"),
+        ImmutableSet.of("foo/bar"),
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -467,31 +455,31 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getDescription()).isEqualTo("working directory is not an input directory");
   }
 
+  @SuppressWarnings("unchecked")
   private static void doBlob(
       ContentAddressableStorage contentAddressableStorage,
       Digest digest,
       ByteString content,
       RequestMetadata requestMetadata) {
     doAnswer(
-            new Answer<Void>() {
-              @Override
-              public Void answer(InvocationOnMock invocation) {
-                StreamObserver<ByteString> blobObserver =
-                    (StreamObserver) invocation.getArguments()[3];
-                blobObserver.onNext(content);
-                blobObserver.onCompleted();
-                return null;
-              }
-            })
+            (Answer<Void>)
+                invocation -> {
+                  StreamObserver<ByteString> blobObserver =
+                      (StreamObserver) invocation.getArguments()[3];
+                  blobObserver.onNext(content);
+                  blobObserver.onCompleted();
+                  return null;
+                })
         .when(contentAddressableStorage)
         .get(
             eq(digest),
-            /* offset=*/ eq(0l),
+            /* offset=*/ eq(0L),
             eq(digest.getSizeBytes()),
             any(ServerCallStreamObserver.class),
             eq(requestMetadata));
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void outputDirectoriesFilesAreEnsuredPresent() throws Exception {
     // our test subjects - these should appear in the findMissingBlobs request
@@ -554,7 +542,7 @@ public class AbstractServerInstanceTest {
     verify(contentAddressableStorage, times(1))
         .get(
             eq(treeDigest),
-            /* offset=*/ eq(0l),
+            /* offset=*/ eq(0L),
             eq(treeDigest.getSizeBytes()),
             any(ServerCallStreamObserver.class),
             eq(requestMetadata));

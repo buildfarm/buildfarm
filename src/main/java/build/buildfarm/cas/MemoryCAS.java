@@ -108,6 +108,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     return missing;
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public synchronized InputStream newInput(Digest digest, long offset) throws IOException {
     // implicit int bounds compare against size bytes
@@ -244,6 +245,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   @Override
   public void put(Blob blob) {
     put(blob, null);
+    onPut.accept(blob.getDigest());
   }
 
   @Override
@@ -254,6 +256,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
     if (add(blob, onExpiration)) {
       writes.getFuture(blob.getDigest()).set(blob.getData());
+      onPut.accept(blob.getDigest());
     }
   }
 
@@ -324,7 +327,8 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   private static class Entry {
-    Entry before, after;
+    Entry before;
+    Entry after;
     final String key;
     final Blob value;
     private List<Runnable> onExpirations;

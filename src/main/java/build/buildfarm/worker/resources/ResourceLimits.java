@@ -30,6 +30,13 @@ import java.util.Map;
  */
 public class ResourceLimits {
   /**
+   * @field workerName
+   * @brief The name of the worker used for executing an action.
+   * @details This can be helpful for correlating actions to the underlying worker agent.
+   */
+  public String workerName = "";
+
+  /**
    * @field useLinuxSandbox
    * @brief Whether to use bazel's linux sandbox as an execution wrapper.
    * @details Other resource limits will be translated into the appropriate CLI arguments for the
@@ -61,32 +68,40 @@ public class ResourceLimits {
   public boolean tmpFs = false;
 
   /**
+   * @field containerSettings
+   * @brief Some actions may need to run in a container. These settings are used to determine which
+   *     container to use and how to use it.
+   * @details This also provides compatibility with https://github.com/bazelbuild/bazel-toolchains
+   */
+  public ContainerSettings containerSettings = new ContainerSettings();
+
+  /**
    * @field cpu
    * @brief Resource limitations on CPUs.
    * @details Decides specific CPU limitations and whether to apply them for a given action.
    */
-  public CpuLimits cpu = new CpuLimits();
+  public final CpuLimits cpu = new CpuLimits();
 
   /**
    * @field mem
    * @brief Resource limitations on memory usage.
    * @details Decides specific memory limitations and whether to apply them for a given action.
    */
-  public MemLimits mem = new MemLimits();
+  public final MemLimits mem = new MemLimits();
 
   /**
    * @field network
    * @brief Resource limitations on network usage.
    * @details Decides specific network limitations and whether to apply them for a given action.
    */
-  public NetworkLimits network = new NetworkLimits();
+  public final NetworkLimits network = new NetworkLimits();
 
   /**
    * @field time
    * @brief Resource limitations on time usage.
    * @details Decides specific time limitations and whether to apply them for a given action.
    */
-  public TimeLimits time = new TimeLimits();
+  public final TimeLimits time = new TimeLimits();
 
   /**
    * @field extraEnvironmentVariables
@@ -94,7 +109,7 @@ public class ResourceLimits {
    * @details These variables are added to the end of the existing environment variables in the
    *     Command.
    */
-  public Map<String, String> extraEnvironmentVariables = new HashMap<String, String>();
+  public Map<String, String> extraEnvironmentVariables = new HashMap<>();
 
   /**
    * @field debugBeforeExecution
@@ -133,12 +148,12 @@ public class ResourceLimits {
    * @details Foreign platform properties may be be added to the command that are ignored when
    *     parsing exec_properties. They are listed here for visibility.
    */
-  public Map<String, String> unusedProperties = new HashMap<String, String>();
+  public final Map<String, String> unusedProperties = new HashMap<>();
 
   /**
    * @field description
    * @brief Description explaining why settings were chosen.
    * @details This can be used to debug execution behavior.
    */
-  public ArrayList<String> description = new ArrayList<>();
+  public final ArrayList<String> description = new ArrayList<>();
 }

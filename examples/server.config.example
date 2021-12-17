@@ -1,6 +1,6 @@
 # an instance specification
-instances {
-  name: "default_memory_instance"
+instance {
+  name: "memory"
 
   # the digest function for this instance, required
   # to match out of band between the client and server
@@ -64,68 +64,17 @@ instances {
   }
 }
 
-# another instance, provided to indicate multiplexing configs
-instances {
-  name: "another_memory_instance"
-
-  # digest functions may be different between instances
-  digest_function: SHA1
-
-  memory_instance_config: {
-    list_operations_default_page_size: 1024
-    list_operations_max_page_size: 16384
-
-    tree_default_page_size: 1024
-    tree_max_page_size: 16384
-
-    operation_poll_timeout: {
-      seconds: 30
-      nanos: 0
-    }
-
-    operation_completed_delay: {
-      seconds: 10
-      nanos: 0
-    }
-
-    cas_config: {
-      grpc: {
-        # instance name for CAS resources, default is empty
-        instance_name: "internal"
-
-        # target suitable for netty channel
-        target: "cas-host.cloud.org:5000"
-      }
-    }
-
-    action_cache_config: {
-      grpc: {
-        # instance name for AC requests, default is empty
-        instance_name: "lru-ac"
-
-        # target suitable for netty channel
-        target: "ac-host.cloud.org:5001"
-      }
-    }
-
-    default_action_timeout: {
-      seconds: 600
-      nanos: 0
-    }
-
-    maximum_action_timeout: {
-      seconds: 3600
-      nanos: 0
-    }
-  }
-}
-
 # the listening port of the buildfarm grpc server
 port: 8980
 
-# the instance to which all requests with an empty/missing
-# instance name are routed
-#
-# this can be empty as well, to indicate that there is no
-# default instance
-default_instance_name: "default_memory_instance"
+# cas write timeout
+cas_write_timeout: {
+  seconds: 3600
+  nanos: 0
+}
+
+# bytestream timeout
+bytestream_timeout: {
+  seconds: 3600
+  nanos: 0
+}

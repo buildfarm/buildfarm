@@ -83,6 +83,7 @@ public class Retrier {
      * Creates a Backoff supplier for a Backoff which does not support any retries. Both the
      * Supplier and the Backoff are stateless and thread-safe.
      */
+    @SuppressWarnings("Guava")
     Supplier<Backoff> NO_RETRIES =
         () ->
             new Backoff() {
@@ -108,6 +109,7 @@ public class Retrier {
      *     jitter, and 1 providing a duration that is 0-200% of the non-jittered duration.
      * @param maxAttempts Maximal times to attempt a retry 0 means no retries.
      */
+    @SuppressWarnings("Guava")
     static Supplier<Backoff> exponential(
         Duration initial, Duration max, double multiplier, double jitter, int maxAttempts) {
       Preconditions.checkArgument(multiplier > 1, "multipler must be > 1");
@@ -143,6 +145,7 @@ public class Retrier {
     }
   }
 
+  @SuppressWarnings("Guava")
   public static final Predicate<Status> DEFAULT_IS_RETRIABLE =
       st -> {
         switch (st.getCode()) {
@@ -160,6 +163,7 @@ public class Retrier {
         }
       };
 
+  @SuppressWarnings("Guava")
   public static final Predicate<Status> REDIS_IS_RETRIABLE =
       st -> {
         switch (st.getCode()) {
@@ -172,18 +176,28 @@ public class Retrier {
         }
       };
 
+  @SuppressWarnings("Guava")
   public static final Predicate<Status> RETRY_ALL = Predicates.alwaysTrue();
+
+  @SuppressWarnings("Guava")
   public static final Predicate<Status> RETRY_NONE = Predicates.alwaysFalse();
+
   public static final Retrier NO_RETRIES = new Retrier(Backoff.NO_RETRIES, RETRY_NONE);
 
+  @SuppressWarnings("Guava")
   private final Supplier<Backoff> backoffSupplier;
+
+  @SuppressWarnings("Guava")
   private final Predicate<Status> isRetriable;
+
   private final ListeningScheduledExecutorService retryScheduler;
 
+  @SuppressWarnings("Guava")
   public Retrier(Supplier<Backoff> backoffSupplier, Predicate<Status> isRetriable) {
     this(backoffSupplier, isRetriable, /* retryScheduler=*/ null);
   }
 
+  @SuppressWarnings("Guava")
   public Retrier(
       Supplier<Backoff> backoffSupplier,
       Predicate<Status> isRetriable,
@@ -287,8 +301,10 @@ public class Retrier {
   }
 
   public static class ProgressiveBackoff implements Backoff {
+    @SuppressWarnings("Guava")
     private final Supplier<Backoff> backoffSupplier;
-    private Backoff currentBackoff = null;
+
+    private Backoff currentBackoff;
     private int retries = 0;
 
     /**
@@ -298,6 +314,7 @@ public class Retrier {
      *
      * @param backoffSupplier Delegate Backoff generator
      */
+    @SuppressWarnings("Guava")
     public ProgressiveBackoff(Supplier<Backoff> backoffSupplier) {
       this.backoffSupplier = backoffSupplier;
       currentBackoff = backoffSupplier.get();

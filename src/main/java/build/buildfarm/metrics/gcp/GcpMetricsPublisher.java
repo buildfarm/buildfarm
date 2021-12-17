@@ -16,11 +16,8 @@ package build.buildfarm.metrics.gcp;
 
 import build.buildfarm.metrics.AbstractMetricsPublisher;
 import build.buildfarm.v1test.MetricsConfig;
-import java.util.logging.Logger;
 
 public class GcpMetricsPublisher extends AbstractMetricsPublisher {
-  private static final Logger logger = Logger.getLogger(GcpMetricsPublisher.class.getName());
-
   public GcpMetricsPublisher(MetricsConfig metricsConfig) {
     super(metricsConfig.getClusterId());
   }

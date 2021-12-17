@@ -31,7 +31,6 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import io.grpc.Status;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 class ShardActionCache implements ReadThroughActionCache {
   private final Backplane backplane;
@@ -41,10 +40,8 @@ class ShardActionCache implements ReadThroughActionCache {
     this.backplane = backplane;
 
     AsyncCacheLoader<ActionKey, ActionResult> loader =
-        new AsyncCacheLoader<ActionKey, ActionResult>() {
-          @Override
-          public CompletableFuture<ActionResult> asyncLoad(ActionKey actionKey, Executor executor) {
-            return toCompletableFuture(
+        (actionKey, executor) ->
+            toCompletableFuture(
                 catching(
                     service.submit(() -> backplane.getActionResult(actionKey)),
                     IOException.class,
@@ -52,8 +49,6 @@ class ShardActionCache implements ReadThroughActionCache {
                       throw Status.fromThrowable(e).asRuntimeException();
                     },
                     executor));
-          }
-        };
 
     actionResultCache = Caffeine.newBuilder().maximumSize(maxLocalCacheSize).buildAsync(loader);
   }

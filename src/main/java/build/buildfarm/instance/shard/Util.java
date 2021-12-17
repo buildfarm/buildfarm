@@ -83,13 +83,7 @@ public class Util {
     synchronized (workerSet) {
       foundFuture =
           correctMissingBlobSynchronized(
-              backplane,
-              workerSet,
-              originalLocationSet,
-              workerInstanceFactory,
-              digest,
-              foundWorkers,
-              requestMetadata);
+              workerSet, workerInstanceFactory, digest, foundWorkers, requestMetadata);
     }
     return transform(
         foundFuture,
@@ -114,9 +108,7 @@ public class Util {
   }
 
   static ListenableFuture<Void> correctMissingBlobSynchronized(
-      Backplane backplane,
       Set<String> workerSet,
-      Set<String> originalLocationSet,
       Function<String, Instance> workerInstanceFactory,
       Digest digest,
       Set<String> foundWorkers,
@@ -142,6 +134,7 @@ public class Util {
             complete();
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             fail(Status.fromThrowable(t).asRuntimeException());
@@ -164,6 +157,7 @@ public class Util {
               foundCallback.onSuccess(found ? worker : null);
             }
 
+            @SuppressWarnings("NullableProblems")
             @Override
             public void onFailure(Throwable t) {
               foundCallback.onFailure(t);
@@ -197,6 +191,7 @@ public class Util {
             foundCallback.onSuccess(found);
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);

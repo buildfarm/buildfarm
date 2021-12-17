@@ -76,6 +76,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     this(/* publicName=*/ null, backplane, rand, workerStubs, onUnavailable);
   }
 
+  @SuppressWarnings("NullableProblems")
   public RemoteInputStreamFactory(
       String publicName,
       Backplane backplane,
@@ -98,6 +99,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     }
   }
 
+  @SuppressWarnings({"ResultOfMethodCallIgnored", "StatementWithEmptyBody"})
   private InputStream fetchBlobFromRemoteWorker(
       Digest blobDigest,
       Deque<String> workers,
@@ -144,6 +146,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     return newInput(blobDigest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
   }
 
+  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   public InputStream newInput(
       Digest blobDigest,
       long offset,
@@ -248,6 +251,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);

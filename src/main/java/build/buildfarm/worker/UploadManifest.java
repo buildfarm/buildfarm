@@ -20,7 +20,6 @@ import static build.buildfarm.worker.Utils.statIfFound;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.io.Dirent;
@@ -38,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** UploadManifest adds output metadata to a {@link ActionResult}. */
 /** FIXME move into worker implementation and implement 'fast add' with this for sharding */
 public class UploadManifest {
   private final DigestUtil digestUtil;
@@ -53,7 +51,7 @@ public class UploadManifest {
 
   /**
    * Create an UploadManifest from an ActionResult builder and an exec root. The ActionResult
-   * builder is populated through a call to {@link #addFile(Digest, Path)}.
+   * builder is populated through a call to .
    */
   public UploadManifest(
       DigestUtil digestUtil,
@@ -76,8 +74,7 @@ public class UploadManifest {
   }
 
   /** Add a collection of files to the UploadManifest. */
-  public void addFiles(Iterable<Path> files, CASInsertionPolicy policy)
-      throws IllegalStateException, IOException, InterruptedException {
+  public void addFiles(Iterable<Path> files) throws IllegalStateException, IOException {
     for (Path file : files) {
       FileStatus stat = statIfFound(file, /* followSymlinks= */ false, fileStore);
       if (stat == null) {
@@ -87,11 +84,10 @@ public class UploadManifest {
       if (stat.isDirectory()) {
         mismatchedOutput(file);
       } else if (stat.isFile()) {
-        addFile(file, policy);
+        addFile(file);
       } else if (allowSymlinks && stat.isSymbolicLink()) {
-        /** FIXME symlink to directory? */
         // is the stat correct?
-        addFile(file, policy);
+        addFile(file);
       } else {
         illegalOutput(file);
       }
@@ -104,8 +100,7 @@ public class UploadManifest {
    * including the descendants, can be reconstructed and 2) uploading all the non-directory
    * descendant files.
    */
-  public void addDirectories(Iterable<Path> dirs)
-      throws IllegalStateException, IOException, InterruptedException {
+  public void addDirectories(Iterable<Path> dirs) throws IllegalStateException, IOException {
     for (Path dir : dirs) {
       FileStatus stat = statIfFound(dir, /* followSymlinks= */ false, fileStore);
       if (stat == null) {
@@ -122,8 +117,6 @@ public class UploadManifest {
     }
   }
 
-  private void addFiles(Iterable<Path> files, boolean isDirectory, CASInsertionPolicy policy)
-      throws IllegalStateException, IOException, InterruptedException {}
   /** Map of digests to file paths to upload. */
   public Map<Digest, Path> getDigestToFile() {
     return digestToFile;
@@ -134,6 +127,7 @@ public class UploadManifest {
    * transmitted through {@link #getDigestToFile()}. When it is a directory, it is transmitted as a
    * {@link Tree} protobuf message through {@link #getDigestToChunkers()}.
    */
+  @SuppressWarnings("JavaDoc")
   public Map<Digest, Chunker> getDigestToChunkers() {
     return digestToChunkers;
   }
@@ -159,14 +153,13 @@ public class UploadManifest {
     }
   }
 
-  private void addFile(Path file, CASInsertionPolicy policy) throws IOException {
+  private void addFile(Path file) throws IOException {
     Digest digest = digestUtil.compute(file);
-    OutputFile.Builder builder =
-        result
-            .addOutputFilesBuilder()
-            .setPath(execRoot.relativize(file).toString())
-            .setIsExecutable(Files.isExecutable(file))
-            .setDigest(digest);
+    result
+        .addOutputFilesBuilder()
+        .setPath(execRoot.relativize(file).toString())
+        .setIsExecutable(Files.isExecutable(file))
+        .setDigest(digest);
     digestToFile.put(digest, file);
   }
 
@@ -219,7 +212,7 @@ public class UploadManifest {
     return b.build();
   }
 
-  private void mismatchedOutput(Path what) throws IllegalStateException, IOException {
+  private void mismatchedOutput(Path what) throws IllegalStateException {
     String kind =
         Files.isSymbolicLink(what)
             ? "symbolic link"
@@ -231,7 +224,7 @@ public class UploadManifest {
             execRoot.relativize(what), kind, expected));
   }
 
-  private void illegalOutput(Path what) throws IllegalStateException, IOException {
+  private void illegalOutput(Path what) throws IllegalStateException {
     String kind = Files.isSymbolicLink(what) ? "symbolic link" : "special file";
     throw new IllegalStateException(
         String.format(

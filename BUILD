@@ -14,9 +14,9 @@ buildifier(
 # Buildfarm may also choose different execution wrappers dynamically based on exec_properties.
 # Be aware that the process-wrapper and linux-sandbox come from bazel itself.
 # Therefore, users may want to ensure that the same bazel version is sourced here as is used locally.
-filegroup(
+java_library(
     name = "execution_wrappers",
-    data = [
+    runtime_deps = [
         ":as-nobody",
         ":delay",
         ":linux-sandbox.binary",
@@ -79,9 +79,17 @@ sh_binary(
 # Docker images for buildfarm components
 java_image(
     name = "buildfarm-server",
+    args = ["/app/build_buildfarm/examples/shard-server.config.example"],
     base = "@amazon_corretto_java_image_base//image",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
+    ],
+    data = [
+        "//examples:example_configs",
+        "//src/main/java/build/buildfarm:configs",
+    ],
+    jvm_flags = [
+        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
     ],
     main_class = "build.buildfarm.server.BuildFarmServer",
     tags = ["container"],
@@ -103,10 +111,7 @@ java_image(
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
     runtime_deps = [
-        ":as-nobody",
-        ":linux-sandbox.binary",
-        ":process-wrapper.binary",
-        ":tini.binary",
+        ":execution_wrappers",
         "//src/main/java/build/buildfarm/worker/shard",
     ],
 )
