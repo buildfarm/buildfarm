@@ -1490,7 +1490,7 @@ public class ShardInstance extends AbstractServerInstance {
                     format(
                         "property '%s' value was out of range: %d", property.getName(), intValue));
           }
-          if (property.getName().equals("min-cores")) {
+          if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
             minCores = intValue;
           } else {
             maxCores = intValue;
