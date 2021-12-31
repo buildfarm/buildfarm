@@ -17,7 +17,7 @@ main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
   if (setregid(pw->pw_gid, pw->pw_gid) < 0) {
-    perror("setgroups");
+    perror("setregid");
     return EXIT_FAILURE;
   }
   if (setreuid(pw->pw_uid, pw->pw_uid) < 0) {
