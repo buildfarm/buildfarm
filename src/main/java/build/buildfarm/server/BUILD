@@ -30,7 +30,6 @@ java_library(
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
-        "@maven//:io_github_lognet_grpc_spring_boot_starter",
         "@maven//:io_grpc_grpc_api",
         "@maven//:io_grpc_grpc_context",
         "@maven//:io_grpc_grpc_core",
