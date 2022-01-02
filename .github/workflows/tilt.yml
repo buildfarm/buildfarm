@@ -19,6 +19,8 @@ jobs:
         #uses: helm/kind-action@94729529f85113b88f4f819c17ce61382e6d8478 # renovate: tag=v1.2.0
       #- name: Use tilt Kind
       #  run: curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.11.1/kind-linux-amd64 && chmod +x ./kind && mv ./kind /bin && wget https://raw.githubusercontent.com/tilt-dev/kind-local/78c8b3a82ff8ac1ae4e12f5956986c4b1e07affb/kind-with-registry.sh && chmod 777 kind-with-registry.sh && ./kind-with-registry.sh
+      - name: test
+        run: ctlptl create cluster kind --registry=ctlptl-registry
       - name: Install tilt cli
         uses: yokawasa/action-setup-kube-tools@c81bf94cddd6c3172e6f61aa7f5ad66a2b5db98d # renovate: tag=v0.8.0
         with:
@@ -27,4 +29,4 @@ jobs:
           tilt: 'v0.23.4'
       - name: Verify tilt ci
         run: |
-          ctlptl create cluster kind --registry=ctlptl-registry && timeout 1200 tilt ci
+           timeout 1200 tilt ci
