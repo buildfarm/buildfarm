@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shard-worker
+  labels:
+    app: shard-worker
+spec:
+  selector:
+    matchLabels:
+      app: shard-worker
+  template:
+    metadata:
+      labels:
+        app: shard-worker
+    spec:
+      hostNetwork: true
+      containers:
+      - name: shard-worker
+        image: buildfarm-shard-worker-image
+        ports:
+        - containerPort: 8981
