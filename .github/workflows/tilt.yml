@@ -1,0 +1,30 @@
+name: tilt
+on:
+  push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: tiltdev/tilt:latest
+    steps:
+      - name: Checkout git repo
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # renovate: tag=v2
+      - name: Install Deps
+        run: apt-get update && apt-get -y install curl wget git python gcc default-jdk g++ snapd
+      #- name: microk8s
+        #run: snap install microk8s --classic && microk8s.enable dns && microk8s.enable registry && microk8s.kubectl config view --flatten > ~/.kube/microk8s-config && KUBECONFIG=~/.kube/microk8s-config:~/.kube/config kubectl config view --flatten > ~/.kube/temp-config && mv ~/.kube/temp-config ~/.kube/config && kubectl config use-context microk8s
+        #uses: actions/setup-python@v2
+        #with:
+        #  python-version: '2.7'
+      #- name: Create k8s Kind Cluster
+        #uses: helm/kind-action@94729529f85113b88f4f819c17ce61382e6d8478 # renovate: tag=v1.2.0
+      #- name: Use tilt Kind
+      #  run: curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.11.1/kind-linux-amd64 && chmod +x ./kind && mv ./kind /bin && wget https://raw.githubusercontent.com/tilt-dev/kind-local/78c8b3a82ff8ac1ae4e12f5956986c4b1e07affb/kind-with-registry.sh && chmod 777 kind-with-registry.sh && ./kind-with-registry.sh
+      - name: Install tilt cli
+        uses: yokawasa/action-setup-kube-tools@c81bf94cddd6c3172e6f61aa7f5ad66a2b5db98d # renovate: tag=v0.8.0
+        with:
+          setup-tools: |
+            tilt
+          tilt: 'v0.23.4'
+      - name: Verify tilt ci
+        run: |
+          ctlptl create cluster kind --registry=ctlptl-registry && timeout 1200 tilt ci
