@@ -5,3 +5,9 @@ k8s_object(
     kind = "service",
     template = ":redis-cluster.yaml",
 )
+
+k8s_object(
+    name = "shard-worker",
+    kind = "service",
+    template = ":shard-worker.yaml",
+)

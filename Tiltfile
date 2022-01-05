@@ -50,9 +50,10 @@ k8s_yaml(local('./bazelw run //kubernetes/deployments:server'))
 k8s_yaml(local('./bazelw run //kubernetes/deployments:shard-worker'))
 k8s_yaml(local('./bazelw run //kubernetes/deployments:redis-cluster'))
 k8s_yaml(local('./bazelw run //kubernetes/services:redis-cluster'))
+k8s_yaml(local('./bazelw run //kubernetes/services:shard-worker'))
 
 # Expose endpoints outside the kubernetes cluster.
 k8s_resource('kubernetes-dashboard', port_forwards=8443)
 k8s_resource('shard-worker', port_forwards=8981)
 k8s_resource('server', port_forwards=8980)
-#k8s_resource('redis-cluster', port_forwards=6379)
+k8s_resource('redis-cluster', port_forwards=6379)

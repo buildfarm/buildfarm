@@ -3,7 +3,7 @@ port: 8981
 
 # the host:port of this grpc server, required to be accessible
 # by all shard cluster servers
-public_name: "localhost:8981"
+public_name: "shard-worker-service:8981"
 
 
 capabilities {
