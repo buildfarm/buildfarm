@@ -75,6 +75,7 @@ import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueuedOperation;
@@ -206,6 +207,18 @@ public abstract class AbstractServerInstance implements Instance {
       "This request is in block list and is forbidden.  "
           + "To resolve this error, you can tag the rule with 'no-remote'.  "
           + "You can also adjust the action behavior to attempt a different action hash.";
+
+  public static final String NO_REQUEUE_BLOCKED_ERROR =
+      "Operation %s not requeued. " + BLOCK_LIST_ERROR;
+
+  public static final String NO_REQUEUE_TOO_MANY_ERROR =
+      "Operation %s not requeued.  Operation has been requeued too many times ( %d > %d).";
+
+  public static final String NO_REQUEUE_MISSING_MESSAGE =
+      "Operation %s not requeued.  Operation no longer exists.";
+
+  public static final String NO_REQUEUE_COMPLETE_MESSAGE =
+      "Operation %s not requeued.  Operation has already completed.";
 
   public AbstractServerInstance(
       String name,
@@ -1852,7 +1865,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public abstract GetClientStartTimeResult getClientStartTime();
+  public abstract GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request);
 
   @Override
   public abstract CasIndexResults reindexCas(String hostName);

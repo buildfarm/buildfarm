@@ -1,15 +1,15 @@
 # Bazel Buildfarm
 
+|Buildfarm CI|Nightly CI|Nightly Functionality Test|
+|--|--|--|
+| ![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main) |![Build status](https://badge.buildkite.com/d0c1471a98dd7d7123e6c21b57add0e8c2c0552042ea18f02c.svg)|![Build status](https://badge.buildkite.com/e0ac44ec0a8c3473d3d9490600366f1a73e8fa171d4913e9e3.svg)|
+
 This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
 
 Background information on the status of caching and remote execution in bazel can be
 found in the [bazel documentation](https://docs.bazel.build/versions/master/remote-caching.html).
 
 File issues here for bugs or feature requests, and ask questions via build team [slack](https://join.slack.com/t/buildteamworld/shared_invite/zt-4zy8f5j5-KwiJuBoAAUorB_mdQHwF7Q) in the #buildfarm channel.
-
-|Buildfarm CI|Nightly CI|Nightly Functionality Test|
-|--|--|--|
-| ![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main) |![Build status](https://badge.buildkite.com/d0c1471a98dd7d7123e6c21b57add0e8c2c0552042ea18f02c.svg)|![Build status](https://badge.buildkite.com/e0ac44ec0a8c3473d3d9490600366f1a73e8fa171d4913e9e3.svg)|
 
 [Buildfarm Docs](https://bazelbuild.github.io/bazel-buildfarm/)
 
@@ -82,71 +82,6 @@ To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. 
 ```
 bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/examples/server.config.example
 ```
-
-## Developer Information
-
-### Setting up Redis for local testing
-
-This is done using [`examples/development-redis-cluster.sh`](examples/development-redis-cluster.sh).
-
-Tested with Redis `6.0.10`, other versions probably work fine as well.
-
-First of all you need Redis installed:
-* macOS: `brew install redis`
-* Debian / Ubuntu: `sudo apt-get update && sudo apt-get install redis-server redis-tools`
-
-Then you need eight terminal panes for this. Six for [a minimal Redis
-cluster](https://redis.io/topics/cluster-tutorial#creating-and-using-a-redis-cluster),
-one for the Buildfarm server and one for a Buildfarm worker.
-
-* `./examples/development-redis-cluster.sh 0`
-* `./examples/development-redis-cluster.sh 1`
-* `./examples/development-redis-cluster.sh 2`
-* `./examples/development-redis-cluster.sh 3`
-* `./examples/development-redis-cluster.sh 4`
-* `./examples/development-redis-cluster.sh 5`
-* ```sh
-  redis-cli --cluster create 127.0.0.1:6379 127.0.0.1:6380 127.0.0.1:6381 127.0.0.1:6382 127.0.0.1:6383 127.0.0.1:6384 --cluster-replicas 1
-  ```
-
-Your Redis cluster is now up, and you can now start your Buildfarm server talking to it:
-```sh
-bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/shard-server.config.example
-```
-
-And your Buildfarm worker:
-```sh
-mkdir /tmp/worker
-bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/shard-worker.config.example
-```
-
-### Setting up intelliJ
-
-1. Check [which IntelliJ versions are supported by the Bazel
-   plugin](https://plugins.jetbrains.com/plugin/8609-bazel/versions)
-1. Make sure you have a supported IntelliJ version, otherwise [download one
-   here](https://www.jetbrains.com/idea/download/other.html)
-1. Follow [the Bazel plugin
-   instructions](https://ij.bazel.build/docs/import-project.html) and import
-   [`ij.bazelproject`](ij.bazelproject)
-1. Once IntelliJ is done loading your project, open
-   [`BuildFarmServer.java`](src/main/java/build/buildfarm/server/BuildFarmServer.java)
-   and find the `main()` method at the bottom
-1. Press the green play button symbol in the gutter next to `main()` to create a
-   Bazel build configuration for starting a server. Launching this configuration
-   should get you a help text from Buildfarm Server indicating missing a config
-   file.
-
-   This indicates a successful launch!
-1. To add a config file, edit your new run configuration and enter the absolute
-   path to [`examples/server.config.example`](examples/server.config.example) in
-   the "Executable flags" text box.
-
-Now, you should have something like this, and you can now run / debug Buildfarm
-Server from inside of IntelliJ, just like any other program:
-
-![IntelliJ Buildfarm Server run
-configuration](examples/intellij-server-run-config.png)
 
 
 ### Third-party Dependencies

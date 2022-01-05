@@ -132,6 +132,8 @@
 		<java.version>1.8</java.version>
 		<docker.image.prefix>bazelbuild/buildfarm-admin</docker.image.prefix>
 		<awsSdkVersion>1.11.970</awsSdkVersion>
+		<log4j2.version>2.16.0</log4j2.version>
+		<thymeleaf.version>3.0.14.RELEASE</thymeleaf.version>
 	</properties>
 
 	<build>
@@ -221,6 +223,21 @@
 					<source>8</source>
 					<target>8</target>
 				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.owasp</groupId>
+				<artifactId>dependency-check-maven</artifactId>
+				<version>6.5.0</version>
+				<configuration>
+					<failBuildOnCVSS>8</failBuildOnCVSS>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>

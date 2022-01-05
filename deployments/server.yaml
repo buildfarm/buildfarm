@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server
+  labels:
+    app: server
+spec:
+  selector:
+    matchLabels:
+      app: server
+  template:
+    metadata:
+      labels:
+        app: server
+    spec:
+      hostNetwork: true
+      containers:
+      - name: server
+        image: buildfarm-server-image
+        ports:
+        - containerPort: 8980

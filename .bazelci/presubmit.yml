@@ -60,6 +60,7 @@ tasks:
     - "..."
   rpm_builds:
     name: "Rpm Builds"
+    bazel: "4.2.2"
     platform: centos7
     shell_commands:
     - ./bazelw build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm

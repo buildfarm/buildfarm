@@ -5,130 +5,96 @@ parent: Execution
 nav_order: 5
 ---
 
-This page contains all of the [execution properties](https://docs.bazel.build/versions/master/be/common-definitions.html#common.exec_properties) supported by Buildfarm.  
-Users can also customize buildfarm to understand additional properties that are not listed here (This is often done when configuring the [Operation Queue](https://github.com/bazelbuild/bazel-buildfarm/wiki/Operation-Queue)).
+Execution Policies can be defined to modify or control Action execution on workers. A given policy can be assigned a name, with a policy with a default name (the empty string) affecting all executions on a worker, as well as a single type of modifier.
 
+Policies are applied in order of definition for a single matching name, with the default policies applied first, followed by the order specified effective by the action.
 
-## Core Selection:  
+## Wrapper execution policy modifier type
 
-### `min-cores`
-**description:** the minimum number of cores needed by an action.  Should be set to >= 1  
-Workers and queues can be configured to behave differently based on this property.
+This policy type specifies that a worker should prepend a single path, and a number of arguments, to the execution of a subprocess to generate an action result. These arguments have a limited substitution mechanism that discovers any appearance of `<property-name>` and substitutes it with a string representation of a value currently available in the platform properties for the action. _If a specified `property-name` platform property is not present for the action, the wrapper is discarded entirely._ Note that this substitution does not apply to the `path` of the wrapper, which may point to any file with appropriate permissions - executable, and readable if necessary as a shell script, on linux, for example.
 
-### `max-cores`
-**description:** the maximum number of cores needed by an action. Buildfarm will enforce a max.  
-Workers and queues can be configured to behave differently based on this property.
+### Example:
 
-### `cores`
-**description:** the minimum & maximum number of cores needed by an action.  This sets both `min-cores` and `max-cores` accordingly.
+This example will use the buildfarm-provided executable `as-nobody`, which will upon execution demote itself to a `nobody` effective process owner uid, and perform an `execvp(2)` with the remaining provided program arguments, which will subsequently execute as a user that no longer matches the worker process.
 
-**use case:** very often you want unit tests (or all actions in general) to be constrained to a core limit via cgroups.  
-This is relevant for performance and stability of the worker as multiple tests share the same hardware as the worker.
+```
+# default wrapper policy application
+execution_policies: {
+  wrapper: {
+    path: "/app/buildfarm/as-nobody"
+  }
+}
+```
 
-## Memory Selection:  
+## Action Specification
 
-### `min-mem`
-**description:** the minimum amount of bytes the action may use.
+An execution may be requested for an Action definition which includes the platform property `execution-policy`, which will select from the available execution policies present on a worker. A worker will not execute any action for which it does not have definitions matching its requested policies, similar to other platform requirements.
 
-### `max-mem`
-**description:** the maximum amount of bytes the action may use.
+## Built-in Execution Policies
+Buildfarm images are packaged with custom execution wrappers to be used as policies.  Some of these wrappers are chosen dynamically based on the action.  For example, the bazel-sandbox is included with buildfarm and can be chosen with `exec_property{"linux-sandbox": "True"}`.  Below is a description of the execution wrappers provided:
 
-**use case:** very often you want unit tests (or all actions in general) to be constrained to a memory limit via cgroups.  
-This is relevant for performance and stability of the worker as multiple tests share the same hardware as the worker.
-Tests that exceed their memory requirements will be killed.
+### process-wrapper
+The process wrapper also used by bazel to allow Java to reliably kill processes.  It is recommended this is used on all actions.
 
-## Execution Settings:  
+### linux-sandbox
+The sandbox bazel uses when running actions client-side.  This provides many isolations for actions such as tmpfs and block-network.  It may also have performance issues.  We include it with buildfarm to ensure additional consistency between local/remote actions.
 
-### `linux-sandbox`
-**description:** Use bazel's linux sandbox as an execution wrapper.
+### tini
+tini is a [a tiny but valid init for containers](https://github.com/krallin/tini).  Depending on how buildfarm is containerized you may want to use. 
 
-### `block-network`
-**description:** Creates a new network namespace.  Assumes the usage of the linux sandbox.
+### as-nobody
+This is used to set the action's user to "nobody".  Otherwise buildfarm will run the action as root which may be undesirable. 
 
-### `tmpfs`
-**description:** Mounts an empty tmpfs under `/tmp` for the action.  Assumes the usage of the linux sandbox.
+### skip_sleep (skip_sleep.preload + delay)
+These wrappers are used for detecting actions that rely on time.  Below is a demonstration of how they can be used.
+This addresses two problems in regards to an action's dependence on time.  The 1st problem is when an action takes longer than it should because it's sleeping unnecessarily.  The 2nd problem is when an action relies on time which causes it to eventually be broken on master despite the code not changing.  Both problems are expressed below as unit tests.  We demonstrate a time-spoofing mechanism (the re-writing of syscalls) which allows us to detect these problems generically over any action.  The objective is to analyze builds for performance inefficiency and discover future instabilities before they occur.
 
-## Queue / Pool Selection:  
-
-### `choose-queue`
-**description:** place the action directly on the chosen queue (queue name must be known based on buildfarm configuration).  
-
-**use case:** Other remote execution solutions have slightly different paradigms on deciding where actions go. They leverage execution properties for selecting a "pool" of machines to send the action. We sort of have a pool of workers waiting on particular queues. For parity with this concept, we support this execution property which will take precedence in deciding queue eligibility.
-
-## Extending Execution:  
-
-### `env-var` / `env-vars`
-**description:** ensure the action is executed with additional environment variables.  These variables are applied last in the order given. 
- 
-`env-var` expects a single key/value like `--remote_default_exec_properties=env-var:FOO=VALUE`  
-`env-vars` expects a key/json like `--remote_default_exec_properties=env-vars='{"FOO": "VALUE","FOO2": "VALUE2"}'`
-
-**use case:**
-Users may need to set additional environment variables through `exec_properties`.  
-Changing code or using `--action_env` may be less feasible than specifying them through these exec_properties.  
-Additionally, the values of their environment variables may need to be influenced by buildfarm decisions.  
-
-**example:** pytorch tests can still see the underlying hardware through `/proc/cpuinfo`.  
-Despite being given 1 core, they see all of the cpus and decide to spawn that many threads. This essentially starves them and gives poor test performance (we may spoof cpuinfo in the future).  Another solution is to use env vars `OMP_NUM_THREADS` and `MKL_NUM_THREADS`.  This could be done in code, but we can't trust that developers will do it consistently or keep it in sync with `min-cores` / `max-cores`.  Allowing these environment variables to be passed the same way as the core settings would be ideal.  
-
-**Standard Example:**  
-This test will succeed when env var TESTVAR is foobar, and fail otherwise.
+### Issue 1 (slow test)
 ```
 #!/bin/bash
-[ "$TESTVAR" = "foobar" ]
+set -euo pipefail
+
+echo -n "testing... "
+sleep 10;
+echo "done"
 ```
+The test takes 10 seconds to run on average.
 ```
-./bazel test  \
---remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
-//env_test:main
-FAIL
+bazel test --runs_per_test=10 --config=remote //cloud/buildfarm:sleep_test
+//cloud/buildfarm:sleep_test                                             PASSED in 10.2s
+  Stats over 10 runs: max = 10.2s, min = 10.1s, avg = 10.2s, dev = 0.0s
 ```
 
+We can check for performance improvements by using the `skip-sleep` option.  
 ```
-./bazel test --remote_default_exec_properties='env-vars={"TESTVAR": "foobar"}' \
- --remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
-//env_test:main
-PASS
+bazel test --runs_per_test=10 --config=remote --remote_default_exec_properties='skip-sleep=true' //cloud/buildfarm:sleep_test
+//cloud/buildfarm:sleep_test                                             PASSED in 1.0s
+  Stats over 10 runs: max = 1.0s, min = 0.9s, avg = 1.0s, dev = 0.0s
 ```
-**Template Example:**
-If you give a range of cores, buildfarm has the authority to decide how many your operation actually claims.  You can let buildfarm resolve this value for you (via [mustache](https://mustache.github.io/)).  
+
+Now the test is 10x faster.  If skipping sleep makes an action perform significantly faster without affecting its success rate, that would warrant further investigation into the action's implementation.
+
+### Issue 2 (future failing test)
 ```
 #!/bin/bash
-[ "$MKL_NUM_THREADS" = "1" ]
+set -euo pipefail
+
+CURRENT_YEAR=$(date +"%Y")
+if [[ "$CURRENT_YEAR" -eq "2021" ]]; then
+        echo "The year matches."
+        date
+        exit 0;
+fi;
+echo "Times change."
+date
+exit -1;
 ```
+The test passes today, but will it pass tomorrow?  Will it pass a year from now?  We can find out by using the `time-shift` option.
 ```
-./bazel test  \
---remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
-//env_test:main
-FAIL
+bazel test --test_output=streamed --remote_default_exec_properties='time-shift=31556952' --config=remote //cloud/buildfarm:future_fail
+INFO: Found 1 test target...
+Times change.
+Mon Sep 25 18:31:09 UTC 2023
+//cloud/buildfarm:future_fail                                            FAILED in 18.0s
 ```
-```
-./bazel test  \
---remote_default_exec_properties='env-vars="MKL_NUM_THREADS": "{{limits.cpu.claimed}}"' \
---remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
-//env_test:main
-PASS
-```
-
-**Available Templates:**  
-`{{limits.cpu.min}}`: what buildfarm has decided is a valid min core count for the action.  
-`{{limits.cpu.max}}`: what buildfarm has decided is a valid max core count for the action.  
-`{{limits.cpu.claimed}}`: buildfarm's decision on how many cores your action should claim.  
-
-## Debugging Execution:  
-
-### `debug-before-execution`
-**description:** Fails the execution with important debug information on how the execution will be performed.  
-**use case:** Sometimes you want to know the exact execution context and cli that the action is going to be run with.  This can help any situation where local action behavior seems different than remote action behavior.
-
-### `debug-after-execution`
-**description:** Runs the execution, but fails it afterward with important debug information on how the execution was performed.
-
-
-## Additional Information
-Custom properties can also be added to buildfarm's configuration in order to facilitate queue matching (see [Platform Queues](https://github.com/bazelbuild/bazel-buildfarm/wiki/Shard-Platform-Operation-Queue)).
-
-Please note that not all execution properties may be relevant to you or the best option depending on your build client.  
-For example, some execution properties were created to facilitate behavior before bazel had a better solution in place.  
-
-Buildfarm's configuration for accepting execution properties can be strict or flexible.  Buildfarm has been used alongside other remote execution tools and allowing increased flexibility on these properties is necessary so the solutions can coexist for the same targets. 
+Time is shifted to the year 2023 and the test now fails.  We can fix the problem before others see it.

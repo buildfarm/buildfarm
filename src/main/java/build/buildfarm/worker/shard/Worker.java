@@ -48,7 +48,6 @@ import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
-import build.buildfarm.server.Instances;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
@@ -303,15 +302,36 @@ public class Worker extends LoggingMain {
   }
 
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
+    addMissingRoot(config);
+    verifyRootConfiguration(config);
+    return Paths.get(config.getRoot());
+  }
+
+  private static void addMissingRoot(ShardWorkerConfig config) {
+    Path root = Paths.get(config.getRoot());
+    if (!Files.isDirectory(root)) {
+      try {
+        Files.createDirectories(root);
+      } catch (IOException e) {
+        logger.log(Level.SEVERE, e.toString());
+      }
+    }
+  }
+
+  private static void verifyRootConfiguration(ShardWorkerConfig config)
+      throws ConfigurationException {
     String rootValue = config.getRoot();
+
+    // Configuration error if no root is specified.
     if (Strings.isNullOrEmpty(rootValue)) {
       throw new ConfigurationException("root value in config missing");
     }
+
+    // Configuration error if root does not exist.
     Path root = Paths.get(rootValue);
     if (!Files.isDirectory(root)) {
       throw new ConfigurationException("root [" + root.toString() + "] is not directory");
     }
-    return root;
   }
 
   private static Path getValidFilesystemCASPath(FilesystemCASConfig config, Path root)
@@ -393,8 +413,6 @@ public class Worker extends LoggingMain {
 
     instance = new ShardWorkerInstance(config.getPublicName(), digestUtil, backplane, storage);
 
-    Instances instances = Instances.singular(instance);
-
     // Create the appropriate writer for the context
     CasWriter writer;
     if (!isCasShard) {
@@ -454,9 +472,9 @@ public class Worker extends LoggingMain {
             .addService(healthStatusManager.getHealthService())
             .addService(
                 new ContentAddressableStorageService(
-                    instances, /* deadlineAfter=*/ 1, DAYS
+                    instance, /* deadlineAfter=*/ 1, DAYS
                     /* requestLogLevel=*/ ))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
+            .addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, DAYS))
             .addService(
                 new WorkerProfileService(
                     storage,
