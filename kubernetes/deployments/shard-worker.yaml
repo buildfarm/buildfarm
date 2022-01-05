@@ -13,7 +13,7 @@ spec:
       labels:
         app: shard-worker
     spec:
-      hostNetwork: true
+      #hostNetwork: true
       containers:
       - name: shard-worker
         image: buildfarm-shard-worker-image

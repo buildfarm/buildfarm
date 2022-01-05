@@ -13,7 +13,7 @@ spec:
       labels:
         app: server
     spec:
-      hostNetwork: true
+      #hostNetwork: true
       containers:
       - name: server
         image: buildfarm-server-image
