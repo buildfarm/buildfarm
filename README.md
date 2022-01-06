@@ -127,8 +127,4 @@ Optionally, if you want to use the buildfarm docker container image targets, you
 load("@build_buildfarm//:images.bzl", "buildfarm_images")
 
 buildfarm_images()
-
-load("@build_buildfarm//:pip.bzl", "buildfarm_pip")
-
-buildfarm_pip()
 ```
