@@ -143,6 +143,7 @@ public abstract class AbstractServerInstance implements Instance {
   protected final OperationsMap completedOperations;
   protected final Map<Digest, ByteString> activeBlobWrites;
   protected final DigestUtil digestUtil;
+  protected final boolean ensureOutputsPresent;
 
   public static final String ACTION_INPUT_ROOT_DIRECTORY_PATH = "";
 
@@ -227,7 +228,8 @@ public abstract class AbstractServerInstance implements Instance {
       ActionCache actionCache,
       OperationsMap outstandingOperations,
       OperationsMap completedOperations,
-      Map<Digest, ByteString> activeBlobWrites) {
+      Map<Digest, ByteString> activeBlobWrites,
+      boolean ensureOutputsPresent) {
     this.name = name;
     this.digestUtil = digestUtil;
     this.contentAddressableStorage = contentAddressableStorage;
@@ -235,6 +237,7 @@ public abstract class AbstractServerInstance implements Instance {
     this.outstandingOperations = outstandingOperations;
     this.completedOperations = completedOperations;
     this.activeBlobWrites = activeBlobWrites;
+    this.ensureOutputsPresent = ensureOutputsPresent;
   }
 
   @Override
@@ -326,7 +329,15 @@ public abstract class AbstractServerInstance implements Instance {
             directExecutor()));
   }
 
-  private static boolean shouldEnsureOutputsPresent(RequestMetadata requestMetadata) {
+  private static boolean shouldEnsureOutputsPresent(
+      boolean ensureOutputsPresent, RequestMetadata requestMetadata) {
+
+    // We will ensure outputs are present if the system is globally configured to check.
+    // Otherwise we will determine if dynamically from optional URI parameters.
+    if (ensureOutputsPresent) {
+      return true;
+    }
+
     try {
       URI uri = new URI(requestMetadata.getCorrelatedInvocationsId());
       QueryStringDecoder decoder = new QueryStringDecoder(uri);
@@ -344,7 +355,7 @@ public abstract class AbstractServerInstance implements Instance {
   public ListenableFuture<ActionResult> getActionResult(
       ActionKey actionKey, RequestMetadata requestMetadata) {
     ListenableFuture<ActionResult> result = checkNotNull(actionCache.get(actionKey));
-    if (shouldEnsureOutputsPresent(requestMetadata)) {
+    if (shouldEnsureOutputsPresent(ensureOutputsPresent, requestMetadata)) {
       result = checkNotNull(ensureOutputsPresent(result, requestMetadata));
     }
     return result;
