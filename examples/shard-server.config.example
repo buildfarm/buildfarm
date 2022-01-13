@@ -41,6 +41,10 @@ instance {
     # The operation queuer is exclusive and should run on
     # multiple instances concurrently.
     run_operation_queuer: true
+    
+    # When checking the action cache, decide whether all outputs are also present in the CAS.
+    # If any output is missing, a cache miss is returned to the client.
+    ensure_outputs_present: false
 
     # The maximum size of a single blob accepted via a
     # ByteStream#write or ContentAddressableStorage#batchUpdateBlobs
