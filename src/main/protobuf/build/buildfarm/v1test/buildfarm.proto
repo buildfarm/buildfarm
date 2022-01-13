@@ -547,6 +547,8 @@ message ShardInstanceConfig {
   oneof backplane {
     RedisShardBackplaneConfig redis_shard_backplane_config = 4;
   }
+  
+  bool ensure_outputs_present = 12;
 
   int64 max_entry_size_bytes = 5;
   

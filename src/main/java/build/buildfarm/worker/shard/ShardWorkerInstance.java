@@ -71,7 +71,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       DigestUtil digestUtil,
       Backplane backplane,
       ContentAddressableStorage contentAddressableStorage) {
-    super(name, digestUtil, contentAddressableStorage, null, null, null, null);
+    super(name, digestUtil, contentAddressableStorage, null, null, null, null, false);
     this.backplane = backplane;
   }
 
