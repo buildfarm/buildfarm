@@ -290,7 +290,8 @@ public class ShardInstance extends AbstractServerInstance {
         config.getUseDenyList(),
         onStop,
         WorkerStubs.create(digestUtil, config.getGrpcTimeout()),
-        actionCacheFetchService);
+        actionCacheFetchService,
+        config.getEnsureOutputsPresent());
   }
 
   public ShardInstance(
@@ -308,7 +309,8 @@ public class ShardInstance extends AbstractServerInstance {
       boolean useDenyList,
       Runnable onStop,
       LoadingCache<String, Instance> workerStubs,
-      ListeningExecutorService actionCacheFetchService) {
+      ListeningExecutorService actionCacheFetchService,
+      boolean ensureOutputsPresent) {
     super(
         name,
         digestUtil,
@@ -316,7 +318,8 @@ public class ShardInstance extends AbstractServerInstance {
         /* actionCache=*/ readThroughActionCache,
         /* outstandingOperations=*/ null,
         /* completedOperations=*/ null,
-        /* activeBlobWrites=*/ null);
+        /* activeBlobWrites=*/ null,
+        ensureOutputsPresent);
     this.backplane = backplane;
     this.readThroughActionCache = readThroughActionCache;
     this.workerStubs = workerStubs;

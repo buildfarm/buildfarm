@@ -3,19 +3,23 @@ kind: Deployment
 metadata:
   name: server
   labels:
-    app: server
+    name: server
 spec:
+  replicas: 1
   selector:
     matchLabels:
-      app: server
+      name: server
   template:
     metadata:
       labels:
-        app: server
+        name: server
     spec:
-      hostNetwork: true
       containers:
       - name: server
         image: buildfarm-server-image
         ports:
         - containerPort: 8980
+        env:
+        - name: REDIS_URI
+          value: "redis://redis-cluster-service:6379"
+

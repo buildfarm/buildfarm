@@ -43,6 +43,18 @@ public class ConfigAdjuster {
    */
   public static void adjust(ShardWorkerConfig.Builder builder, ShardWorkerOptions options) {
 
+    // Handle env overrides.  A typical pattern for docker builds.
+    String redisURI = System.getenv("REDIS_URI");
+    if (redisURI != null) {
+      logger.log(Level.INFO, String.format("Overwriting redis URI: %s", redisURI));
+      builder.getRedisShardBackplaneConfigBuilder().setRedisUri(redisURI);
+    }
+    String instanceName = System.getenv("INSTANCE_NAME");
+    if (instanceName != null) {
+      logger.log(Level.INFO, String.format("Overwriting public name: %s", instanceName));
+      builder.setPublicName(instanceName);
+    }
+
     if (!Strings.isNullOrEmpty(options.root)) {
       logger.log(Level.INFO, "setting root from CLI: " + options.root);
       builder.setRoot(options.root);
@@ -91,6 +103,17 @@ public class ConfigAdjuster {
    * @note Overloaded.
    */
   public static void adjust(BuildFarmServerConfig.Builder builder, ServerOptions options) {
+
+    // Handle env overrides.  A typical pattern for docker builds.
+    String redisURI = System.getenv("REDIS_URI");
+    if (redisURI != null) {
+      logger.log(Level.INFO, String.format("Overwriting redis URI: %s", redisURI));
+      builder
+          .getInstanceBuilder()
+          .getShardInstanceConfigBuilder()
+          .getRedisShardBackplaneConfigBuilder()
+          .setRedisUri(redisURI);
+    }
 
     if (options.port > 0) {
       logger.log(Level.INFO, "setting port from CLI: " + options.port);

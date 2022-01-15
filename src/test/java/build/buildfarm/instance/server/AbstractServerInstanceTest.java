@@ -97,7 +97,8 @@ public class AbstractServerInstanceTest {
           actionCache,
           /* outstandingOperations=*/ null,
           /* completedOperations=*/ null,
-          /* activeBlobWrites=*/ null);
+          /* activeBlobWrites=*/ null,
+          false);
     }
 
     DummyServerInstance() {
