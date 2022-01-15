@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shard-worker
+  labels:
+    name: shard-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: shard-worker
+  template:
+    metadata:
+      labels:
+        name: shard-worker
+    spec:
+      containers:
+      - name: shard-worker
+        image: buildfarm-shard-worker-image
+        ports:
+        - containerPort: 8981
+        env:
+        - name: REDIS_URI
+          value: "redis://redis-cluster-service:6379"
+        - name: INSTANCE_NAME
+          value: "shard-worker-service:8981"

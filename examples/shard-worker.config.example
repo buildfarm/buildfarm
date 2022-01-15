@@ -53,6 +53,7 @@ dequeue_match_settings: {
     #   value: "value_string"
     # }
   }
+  accept_everything: True
 
 }
 

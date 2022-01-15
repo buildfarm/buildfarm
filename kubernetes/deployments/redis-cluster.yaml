@@ -3,20 +3,20 @@ kind: Deployment
 metadata:
   name: redis-cluster
   labels:
-    name: redis-primary
+    name: redis-cluster
 spec:
   replicas: 1 
   selector:
     matchLabels:
-      name: redis-primary
+      name: redis-cluster
   template:
     metadata:
       labels:
-        name: redis-primary
+        name: redis-cluster
     spec:
-      subdomain: primary
+      #subdomain: primary
       containers:
-      - name: redis
+      - name: redis-cluster
         image: redis:5.0.4
         ports:
         - containerPort: 6379

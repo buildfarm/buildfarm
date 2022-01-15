@@ -138,6 +138,18 @@ public class BuildFarmServer extends LoggingMain {
     if (options.port > 0) {
       builder.setPort(options.port);
     }
+
+    // Handle env overrides.  A typical pattern for docker builds.
+    String redisURI = System.getenv("REDIS_URI");
+    if (redisURI != null) {
+      logger.log(Level.INFO, String.format("Overwriting redis URI: %s", redisURI));
+      builder
+          .getInstanceBuilder()
+          .getShardInstanceConfigBuilder()
+          .getRedisShardBackplaneConfigBuilder()
+          .setRedisUri(redisURI);
+    }
+
     return builder.build();
   }
 

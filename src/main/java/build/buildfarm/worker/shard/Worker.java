@@ -951,6 +951,19 @@ public class Worker extends LoggingMain {
     if (!Strings.isNullOrEmpty(options.publicName)) {
       builder.setPublicName(options.publicName);
     }
+
+    // Handle env overrides.  A typical pattern for docker builds.
+    String redisURI = System.getenv("REDIS_URI");
+    if (redisURI != null) {
+      logger.log(Level.INFO, String.format("Overwriting redis URI: %s", redisURI));
+      builder.getRedisShardBackplaneConfigBuilder().setRedisUri(redisURI);
+    }
+    String instanceName = System.getenv("INSTANCE_NAME");
+    if (instanceName != null) {
+      logger.log(Level.INFO, String.format("Overwriting public name: %s", instanceName));
+      builder.setPublicName(instanceName);
+    }
+
     return builder.build();
   }
 
