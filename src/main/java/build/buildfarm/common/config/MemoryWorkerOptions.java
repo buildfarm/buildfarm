@@ -12,19 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server;
+package build.buildfarm.common.config;
 
 import com.google.devtools.common.options.Option;
 import com.google.devtools.common.options.OptionsBase;
 
-/** Command-line options definition for example server. */
-public class BuildFarmServerOptions extends OptionsBase {
+/** Command-line options definition for Worker. */
+public class MemoryWorkerOptions extends OptionsBase {
   @Option(name = "help", abbrev = 'h', help = "Prints usage info.", defaultValue = "true")
   public boolean help;
 
-  @Option(name = "port", abbrev = 'p', help = "Port to use.", defaultValue = "-1")
-  public int port;
+  @Option(
+      name = "root",
+      help = "Root base directory for all work being performed.",
+      defaultValue = "")
+  public String root;
 
-  @Option(name = "public_name", abbrev = 'n', help = "Name of this server.", defaultValue = "")
-  public String publicName;
+  @Option(
+      name = "cas_cache_directory",
+      help = "(Absolute or relative to root) path to cached files from CAS.",
+      defaultValue = "")
+  public String casCacheDirectory;
 }

@@ -8,6 +8,7 @@ java_library(
         "//src/main/java/build/buildfarm/admin/gcp",
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/memory",
