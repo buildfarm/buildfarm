@@ -32,6 +32,8 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
+import build.buildfarm.common.config.ConfigAdjuster;
+import build.buildfarm.common.config.MemoryWorkerOptions;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
@@ -279,17 +281,11 @@ public class Worker extends LoggingMain {
     }
   }
 
-  private static WorkerConfig toWorkerConfig(Readable input, WorkerOptions options)
+  private static WorkerConfig toWorkerConfig(Readable input, MemoryWorkerOptions options)
       throws IOException {
     WorkerConfig.Builder builder = WorkerConfig.newBuilder();
     TextFormat.merge(input, builder);
-    if (!Strings.isNullOrEmpty(options.root)) {
-      builder.setRoot(options.root);
-    }
-
-    if (!Strings.isNullOrEmpty(options.casCacheDirectory)) {
-      builder.setCasCacheDirectory(options.casCacheDirectory);
-    }
+    ConfigAdjuster.adjust(builder, options);
     return builder.build();
   }
 
@@ -302,7 +298,7 @@ public class Worker extends LoggingMain {
   /** returns success or failure */
   @SuppressWarnings("ConstantConditions")
   static boolean workerMain(String[] args) {
-    OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
+    OptionsParser parser = OptionsParser.newOptionsParser(MemoryWorkerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
@@ -315,7 +311,7 @@ public class Worker extends LoggingMain {
           new Worker(
               toWorkerConfig(
                   new InputStreamReader(configInputStream),
-                  parser.getOptions(WorkerOptions.class)));
+                  parser.getOptions(MemoryWorkerOptions.class)));
       configInputStream.close();
       worker.start();
       return true;

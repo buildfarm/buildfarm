@@ -6,7 +6,7 @@ nav_order: 4
 ---
 
 This page contains all of the [execution properties](https://docs.bazel.build/versions/master/be/common-definitions.html#common.exec_properties) supported by Buildfarm.  
-Users can customize buildfarm to understand additional properties that are not listed here.
+Users can also customize buildfarm to understand additional properties that are not listed here (This is often done when configuring the [Operation Queue](https://github.com/bazelbuild/bazel-buildfarm/wiki/Operation-Queue)).
 
 
 ## Core Selection:  
@@ -19,8 +19,34 @@ Workers and queues can be configured to behave differently based on this propert
 **description:** the maximum number of cores needed by an action. Buildfarm will enforce a max.  
 Workers and queues can be configured to behave differently based on this property.
 
+### `cores`
+**description:** the minimum & maximum number of cores needed by an action.  This sets both `min-cores` and `max-cores` accordingly.
+
 **use case:** very often you want unit tests (or all actions in general) to be constrained to a core limit via cgroups.  
 This is relevant for performance and stability of the worker as multiple tests share the same hardware as the worker.
+
+## Memory Selection:  
+
+### `min-mem`
+**description:** the minimum amount of bytes the action may use.
+
+### `max-mem`
+**description:** the maximum amount of bytes the action may use.
+
+**use case:** very often you want unit tests (or all actions in general) to be constrained to a memory limit via cgroups.  
+This is relevant for performance and stability of the worker as multiple tests share the same hardware as the worker.
+Tests that exceed their memory requirements will be killed.
+
+## Execution Settings:  
+
+### `linux-sandbox`
+**description:** Use bazel's linux sandbox as an execution wrapper.
+
+### `block-network`
+**description:** Creates a new network namespace.  Assumes the usage of the linux sandbox.
+
+### `tmpfs`
+**description:** Mounts an empty tmpfs under `/tmp` for the action.  Assumes the usage of the linux sandbox.
 
 ## Queue / Pool Selection:  
 

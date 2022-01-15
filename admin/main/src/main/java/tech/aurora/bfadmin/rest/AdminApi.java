@@ -1,5 +1,6 @@
 package tech.aurora.bfadmin.rest;
 
+import build.buildfarm.v1test.ReindexCasRequestResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import tech.aurora.bfadmin.model.ClusterDetails;
 import tech.aurora.bfadmin.model.ClusterInfo;
 import tech.aurora.bfadmin.service.AdminService;
+
 
 import java.util.List;
 
@@ -49,6 +51,11 @@ public class AdminApi {
   @RequestMapping("/cluster/details")
   public ClusterDetails getClusterDetails() {
     return adminService.getClusterDetails();
+  }
+
+  @RequestMapping("/reindexallcas")
+  public void reindexAllCas() {
+    adminService.reindexAllCas();
   }
 
   @RequestMapping("/restart/{instanceId}")
