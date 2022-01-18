@@ -6,7 +6,7 @@ nav_order: 7
 
 ## Developer Information
 
-The recommended solution for deploying a complete dev enviornment is to use [tilt](https://tilt.dev/).
+The recommended solution for deploying a complete dev environment is to use [tilt](https://tilt.dev/).
 Go to the root of the repo and run `tilt up`.
 
 Below is information for running services directly.
