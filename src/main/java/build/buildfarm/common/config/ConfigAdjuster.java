@@ -73,6 +73,8 @@ public class ConfigAdjuster {
           Level.INFO,
           "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
     }
+
+    builder.setExecuteStageWidth(adjustExecuteStageWidth(builder.getExecuteStageWidth()));
   }
 
   /**
@@ -93,6 +95,8 @@ public class ConfigAdjuster {
       logger.log(Level.INFO, "casCacheDirectory from CLI: " + options.casCacheDirectory);
       builder.setCasCacheDirectory(options.casCacheDirectory);
     }
+
+    builder.setExecuteStageWidth(adjustExecuteStageWidth(builder.getExecuteStageWidth()));
   }
 
   /**
@@ -135,5 +139,26 @@ public class ConfigAdjuster {
           Level.INFO,
           "Bytestream timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
     }
+  }
+
+  private static int adjustExecuteStageWidth(int currentWidth) {
+
+    int availableCores = Runtime.getRuntime().availableProcessors();
+    if (currentWidth <= 0) {
+      logger.log(
+          Level.INFO,
+          "Execute stage width is not valid.  Setting to available cores: " + availableCores);
+      return availableCores;
+    }
+    if (currentWidth != availableCores) {
+      logger.log(
+          Level.WARNING,
+          "The configured 'execute stage width' does not optimally saturate available cores: "
+              + currentWidth
+              + " > "
+              + availableCores);
+    }
+
+    return currentWidth;
   }
 }
