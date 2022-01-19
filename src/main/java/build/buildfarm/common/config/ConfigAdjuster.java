@@ -73,6 +73,8 @@ public class ConfigAdjuster {
           Level.INFO,
           "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
     }
+
+    adjustExecuteStageWidth(builder);
   }
 
   /**
@@ -93,6 +95,8 @@ public class ConfigAdjuster {
       logger.log(Level.INFO, "casCacheDirectory from CLI: " + options.casCacheDirectory);
       builder.setCasCacheDirectory(options.casCacheDirectory);
     }
+
+    adjustExecuteStageWidth(builder);
   }
 
   /**
@@ -134,6 +138,44 @@ public class ConfigAdjuster {
       logger.log(
           Level.INFO,
           "Bytestream timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
+    }
+  }
+
+  private static void adjustExecuteStageWidth(WorkerConfig.Builder builder) {
+
+    int availableCores = Runtime.getRuntime().availableProcessors();
+    if (builder.getExecuteStageWidth() <= 0) {
+      builder.setExecuteStageWidth(availableCores);
+      logger.log(
+          Level.INFO,
+          "Execute stage width is not valid.  Setting to available cores: " + availableCores);
+    }
+    if (builder.getExecuteStageWidth() != availableCores) {
+      logger.log(
+          Level.WARNING,
+          "The configured 'execute stage width' does not optimally saturate available cores: "
+              + builder.getExecuteStageWidth()
+              + " > "
+              + availableCores);
+    }
+  }
+
+  private static void adjustExecuteStageWidth(ShardWorkerConfig.Builder builder) {
+
+    int availableCores = Runtime.getRuntime().availableProcessors();
+    if (builder.getExecuteStageWidth() <= 0) {
+      builder.setExecuteStageWidth(availableCores);
+      logger.log(
+          Level.INFO,
+          "Execute stage width is not valid.  Setting to available cores: " + availableCores);
+    }
+    if (builder.getExecuteStageWidth() != availableCores) {
+      logger.log(
+          Level.WARNING,
+          "The configured 'execute stage width' does not optimally saturate available cores: "
+              + builder.getExecuteStageWidth()
+              + " > "
+              + availableCores);
     }
   }
 }

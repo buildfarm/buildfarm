@@ -17,6 +17,11 @@ spec:
       containers:
       - name: shard-worker
         image: buildfarm-shard-worker-image
+        resources:
+          limits:
+            cpu: "2"
+          requests:
+            cpu: "2"
         ports:
         - containerPort: 8981
         env:
