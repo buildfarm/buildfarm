@@ -1,11 +1,11 @@
 ---
 layout: default
-title: Enviornment
+title: Environment
 parent: Execution
 nav_order: 1
 ---
 
-# Enviornment
+# Environment
 
 Since workers are expected to execute programs in a way that makes using remote transparent to build users, there is a great deal of nuance to their definition. Operating System, Distribution, runtimes, compilers, their versions, and standard libraries make this a tricky proposition. While hermeticizing a build by declaring the full set of tools a compilation requires is the 'right' solution for a build, it may be too big of a hill to climb for everyone, particularly those trying to ease into remote execution.
 
