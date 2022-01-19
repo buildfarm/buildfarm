@@ -443,8 +443,7 @@ public class Worker extends LoggingMain {
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
             config.getExecutionPoliciesList(),
             instance,
-            /* deadlineAfter=*/
-            /* deadlineAfterUnits=*/ config.getDefaultActionTimeout(),
+            config.getDefaultActionTimeout(),
             config.getMaximumActionTimeout(),
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),

@@ -404,7 +404,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ByteString getBlob(Digest blobDigest) throws InterruptedException {
-    return getBlob(blobDigest, /* offset=*//* count=*/ blobDigest.getSizeBytes());
+    return getBlob(blobDigest, /* count=*/ blobDigest.getSizeBytes());
   }
 
   ByteString getBlob(Digest blobDigest, long count) throws IndexOutOfBoundsException {
@@ -431,8 +431,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected ListenableFuture<ByteString> getBlobFuture(
       Digest blobDigest, RequestMetadata requestMetadata) {
-    return getBlobFuture(
-        blobDigest, /* offset=*//* count=*/ blobDigest.getSizeBytes(), requestMetadata);
+    return getBlobFuture(blobDigest, /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
@@ -440,7 +439,7 @@ public abstract class AbstractServerInstance implements Instance {
     SettableFuture<ByteString> future = SettableFuture.create();
     getBlob(
         blobDigest,
-        0,
+        /* offset=*/ 0,
         count,
         new ServerCallStreamObserver<ByteString>() {
           ByteString content = ByteString.EMPTY;
