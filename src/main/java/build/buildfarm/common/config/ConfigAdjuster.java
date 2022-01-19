@@ -74,7 +74,7 @@ public class ConfigAdjuster {
           "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
     }
 
-    adjustExecuteStageWidth(builder);
+    builder.setExecuteStageWidth(adjustExecuteStageWidth(builder.getExecuteStageWidth()));
   }
 
   /**
@@ -96,7 +96,7 @@ public class ConfigAdjuster {
       builder.setCasCacheDirectory(options.casCacheDirectory);
     }
 
-    adjustExecuteStageWidth(builder);
+    builder.setExecuteStageWidth(adjustExecuteStageWidth(builder.getExecuteStageWidth()));
   }
 
   /**
@@ -141,41 +141,24 @@ public class ConfigAdjuster {
     }
   }
 
-  private static void adjustExecuteStageWidth(WorkerConfig.Builder builder) {
+  private static int adjustExecuteStageWidth(int currentWidth) {
 
     int availableCores = Runtime.getRuntime().availableProcessors();
-    if (builder.getExecuteStageWidth() <= 0) {
-      builder.setExecuteStageWidth(availableCores);
+    if (currentWidth <= 0) {
       logger.log(
           Level.INFO,
           "Execute stage width is not valid.  Setting to available cores: " + availableCores);
+      return availableCores;
     }
-    if (builder.getExecuteStageWidth() != availableCores) {
+    if (currentWidth != availableCores) {
       logger.log(
           Level.WARNING,
           "The configured 'execute stage width' does not optimally saturate available cores: "
-              + builder.getExecuteStageWidth()
+              + currentWidth
               + " > "
               + availableCores);
     }
-  }
 
-  private static void adjustExecuteStageWidth(ShardWorkerConfig.Builder builder) {
-
-    int availableCores = Runtime.getRuntime().availableProcessors();
-    if (builder.getExecuteStageWidth() <= 0) {
-      builder.setExecuteStageWidth(availableCores);
-      logger.log(
-          Level.INFO,
-          "Execute stage width is not valid.  Setting to available cores: " + availableCores);
-    }
-    if (builder.getExecuteStageWidth() != availableCores) {
-      logger.log(
-          Level.WARNING,
-          "The configured 'execute stage width' does not optimally saturate available cores: "
-              + builder.getExecuteStageWidth()
-              + " > "
-              + availableCores);
-    }
+    return currentWidth;
   }
 }
