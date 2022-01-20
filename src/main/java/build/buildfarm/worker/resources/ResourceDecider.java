@@ -127,11 +127,16 @@ public final class ResourceDecider {
     // the future, than picking the sandbox automatically can be removed. For now however, its
     // better to choose the sandbox in order to honor the user's request instead of silently
     // ignoring the request due to a disabled sandbox.
-    if (limits.network.blockNetwork) {
+    boolean deriveSandboxUsingBlockNetwork = false;
+    boolean deriveSandboxUsingTmpFs = false;
+
+    if (limits.network.blockNetwork && deriveSandboxUsingBlockNetwork) {
       limits.useLinuxSandbox = true;
+      limits.description.add("sandbox is chosen because of block network usage");
     }
-    if (limits.tmpFs) {
+    if (limits.tmpFs && deriveSandboxUsingTmpFs) {
       limits.useLinuxSandbox = true;
+      limits.description.add("sandbox is chosen because of tmpfs usage");
     }
 
     // Avoid using the existing execution policies when using the linux sandbox.
