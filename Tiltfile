@@ -11,6 +11,7 @@
 
 # Dependency for live-reload
 load('./bazel.Tiltfile', 'bazel_sourcefile_deps')
+load('ext://helm_remote', 'helm_remote')
 
 # Overrides Tilt telemetry.
 # By default, Tilt does not send telemetry.
@@ -52,8 +53,12 @@ k8s_yaml(local('./bazelw run //kubernetes/deployments:redis-cluster'))
 k8s_yaml(local('./bazelw run //kubernetes/services:redis-cluster'))
 k8s_yaml(local('./bazelw run //kubernetes/services:shard-worker'))
 
+helm_remote('grafana', repo_url='https://grafana.github.io/helm-charts')
+
 # Expose endpoints outside the kubernetes cluster.
 k8s_resource('kubernetes-dashboard', port_forwards=8443)
 k8s_resource('shard-worker', port_forwards=8981)
 k8s_resource('server', port_forwards=8980)
 k8s_resource('redis-cluster', port_forwards=6379)
+k8s_resource(workload='grafana', port_forwards=3000)
+
