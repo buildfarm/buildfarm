@@ -74,6 +74,7 @@ import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BackplaneStatusRequest;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -81,6 +82,7 @@ import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.ReindexAllCasRequest;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
@@ -125,6 +127,7 @@ import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.AbstractStub;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
@@ -750,7 +753,15 @@ public class StubInstance implements Instance {
   @Override
   public boolean putOperation(Operation operation) {
     throwIfStopped();
-    return deadlined(operationQueueBlockingStub).put(operation).getCode() == Code.OK.getNumber();
+    com.google.rpc.Status status = deadlined(operationQueueBlockingStub).put(operation);
+    int code = status.getCode();
+    if (code != Code.OK.getNumber() && code != Code.INVALID_ARGUMENT.getNumber()) {
+      logger.log(
+          Level.SEVERE,
+          format("putOperation(%s) response was unexpected", operation.getName()),
+          StatusProto.toStatusException(status));
+    }
+    return code == Code.OK.getNumber();
   }
 
   @Override
@@ -761,14 +772,21 @@ public class StubInstance implements Instance {
   @Override
   public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
     throwIfStopped();
-    return deadlined(operationQueueBlockingStub)
+    com.google.rpc.Status status =
+        deadlined(operationQueueBlockingStub)
             .poll(
                 PollOperationRequest.newBuilder()
                     .setOperationName(operationName)
                     .setStage(stage)
-                    .build())
-            .getCode()
-        == Code.OK.getNumber();
+                    .build());
+    int code = status.getCode();
+    if (code != Code.OK.getNumber() && code != Code.INVALID_ARGUMENT.getNumber()) {
+      logger.log(
+          Level.SEVERE,
+          format("pollOperation(%s) response was unexpected", operationName),
+          StatusProto.toStatusException(status));
+    }
+    return code == Code.OK.getNumber();
   }
 
   @Override
@@ -856,17 +874,21 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public CasIndexResults reindexCas(String hostName) {
+  public CasIndexResults reindexCas(@Nullable String hostName) {
     throwIfStopped();
     ReindexCasRequestResults proto =
-        adminBlockingStub
-            .get()
-            .reindexCas(ReindexCasRequest.newBuilder().setHostId(hostName).build());
+        adminBlockingStub.get().reindexAllCas(ReindexAllCasRequest.newBuilder().build());
+    if (hostName != null) {
+      proto =
+          adminBlockingStub
+              .get()
+              .reindexCas(ReindexCasRequest.newBuilder().setHostId(hostName).build());
+    }
     CasIndexResults results = new CasIndexResults();
     results.removedHosts = proto.getRemovedHosts();
     results.removedKeys = proto.getRemovedKeys();

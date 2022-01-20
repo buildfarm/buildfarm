@@ -44,19 +44,19 @@ import javax.annotation.Nullable;
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private static final Logger logger = Logger.getLogger(ExecutionService.class.getName());
 
-  private final Instances instances;
+  private final Instance instance;
   private final long keepaliveAfter;
   private final TimeUnit keepaliveUnit;
   private final ScheduledExecutorService keepaliveScheduler;
   private final MetricsPublisher metricsPublisher;
 
   public ExecutionService(
-      Instances instances,
+      Instance instance,
       long keepaliveAfter,
       TimeUnit keepaliveUnit,
       ScheduledExecutorService keepaliveScheduler,
       MetricsPublisher metricsPublisher) {
-    this.instances = instances;
+    this.instance = instance;
     this.keepaliveAfter = keepaliveAfter;
     this.keepaliveUnit = keepaliveUnit;
     this.keepaliveScheduler = keepaliveScheduler;
@@ -176,13 +176,6 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   public void waitExecution(
       WaitExecutionRequest request, StreamObserver<Operation> responseObserver) {
     String operationName = request.getName();
-    Instance instance;
-    try {
-      instance = instances.getFromOperationName(operationName);
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
 
     ServerCallStreamObserver<Operation> serverCallStreamObserver =
         (ServerCallStreamObserver<Operation>) responseObserver;
@@ -195,14 +188,6 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
   @Override
   public void execute(ExecuteRequest request, StreamObserver<Operation> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
-
     ServerCallStreamObserver<Operation> serverCallStreamObserver =
         (ServerCallStreamObserver<Operation>) responseObserver;
     try {

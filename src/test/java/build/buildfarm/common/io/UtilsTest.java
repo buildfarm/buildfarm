@@ -17,16 +17,20 @@ package build.buildfarm.common.io;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.protobuf.ByteString;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.Mockito;
 
 @RunWith(JUnit4.class)
 public class UtilsTest {
@@ -38,6 +42,7 @@ public class UtilsTest {
   public void setUp() throws IOException {
     root = Files.createTempDirectory("native-cas-test");
     fileStore = Files.getFileStore(root);
+    org.junit.Assume.assumeFalse(System.getProperty("os.name").contains("Win"));
   }
 
   @After
@@ -74,5 +79,56 @@ public class UtilsTest {
     Object firstKey = files.get(0).getFileKey();
     Object secondKey = files.get(1).getFileKey();
     assertThat(firstKey).isNotEqualTo(secondKey);
+  }
+
+  @Test
+  public void unTarTisEmpty() throws IOException {
+    // ARRANGE
+    TarArchiveInputStream tis = Mockito.mock(TarArchiveInputStream.class);
+    File dst = Mockito.mock(File.class);
+
+    // ACT
+    Utils.unTar(tis, dst);
+
+    // ASSERT
+    Mockito.verify(dst, Mockito.times(0)).mkdirs();
+  }
+
+  @Test
+  public void unTarEntryCreate1() throws IOException {
+    // ARRANGE
+    TarArchiveInputStream tis = Mockito.mock(TarArchiveInputStream.class);
+    TarArchiveEntry entry = Mockito.mock(TarArchiveEntry.class);
+    File dst = Mockito.mock(File.class);
+
+    Mockito.when(tis.getNextTarEntry()).thenReturn(entry).thenReturn(null);
+    Mockito.when(entry.isDirectory()).thenReturn(true);
+
+    // ACT
+    Utils.unTar(tis, dst);
+
+    // ASSERT
+    Mockito.verify(dst, Mockito.times(1)).mkdirs();
+  }
+
+  @Test
+  public void unTarEntryCreate3() throws IOException {
+    // ARRANGE
+    TarArchiveInputStream tis = Mockito.mock(TarArchiveInputStream.class);
+    TarArchiveEntry entry = Mockito.mock(TarArchiveEntry.class);
+    File dst = Mockito.mock(File.class);
+
+    Mockito.when(tis.getNextTarEntry())
+        .thenReturn(entry)
+        .thenReturn(entry)
+        .thenReturn(entry)
+        .thenReturn(null);
+    Mockito.when(entry.isDirectory()).thenReturn(true);
+
+    // ACT
+    Utils.unTar(tis, dst);
+
+    // ASSERT
+    Mockito.verify(dst, Mockito.times(3)).mkdirs();
   }
 }

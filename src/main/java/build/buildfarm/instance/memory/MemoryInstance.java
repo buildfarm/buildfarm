@@ -65,6 +65,7 @@ import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.FilesystemACConfig;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
@@ -238,7 +239,8 @@ public class MemoryInstance extends AbstractServerInstance {
             config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
         outstandingOperations,
         MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil),
-        /*activeBlobWrites=*/ new ConcurrentHashMap<>());
+        /*activeBlobWrites=*/ new ConcurrentHashMap<>(),
+        false);
     this.config = config;
     this.watchers = watchers;
     this.outstandingOperations = outstandingOperations;
@@ -1038,12 +1040,12 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public CasIndexResults reindexCas(String hostName) {
+  public CasIndexResults reindexCas(@Nullable String hostName) {
     throw new UnsupportedOperationException();
   }
 

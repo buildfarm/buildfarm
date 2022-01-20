@@ -145,11 +145,13 @@ public class ShardInstanceTest {
             /* runOperationQueuer=*/ false,
             /* maxBlobSize=*/ 0,
             /* maxCpu=*/ 1,
+            /* maxRequeueAttempts=*/ 1,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
             /* useDenyList=*/ true,
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
-            /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()));
+            /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()),
+            false);
     instance.start("startTime/test:0000");
   }
 
