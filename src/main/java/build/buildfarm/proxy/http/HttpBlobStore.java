@@ -219,8 +219,10 @@ public final class HttpBlobStore implements SimpleBlobStore {
         new ChannelPoolHandler() {
           @Override
           public void channelReleased(Channel ch) {}
+
           @Override
           public void channelAcquired(Channel ch) {}
+
           @Override
           public void channelCreated(Channel ch) {
             ChannelPipeline p = ch.pipeline();

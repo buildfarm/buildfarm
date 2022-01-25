@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 /** Utility functions to handle Metadata for remote Grpc calls. */
 public class TracingMetadataUtils {
   private TracingMetadataUtils() {}
+
   private static final Context.Key<RequestMetadata> CONTEXT_KEY =
       Context.key("remote-grpc-metadata");
 

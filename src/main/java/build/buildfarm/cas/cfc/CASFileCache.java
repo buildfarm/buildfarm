@@ -918,6 +918,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
             @Override
             public void cancel() {}
+
             @Override
             public Path getPath() {
               return null;

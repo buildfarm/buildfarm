@@ -48,6 +48,7 @@ public class Directories {
       PosixFilePermissions.fromString("r-xr-xr-x");
 
   private Directories() {}
+
   private static void makeWritable(Path dir, boolean writable) throws IOException {
     FileStore fileStore = Files.getFileStore(dir);
     if (fileStore.supportsFileAttributeView("posix")) {

@@ -24,6 +24,7 @@ import java.nio.file.Path;
 
 public final class Utils {
   private Utils() {}
+
   public static FileStatus statIfFound(Path path, boolean followSymlinks, FileStore fileStore) {
     try {
       return stat(path, followSymlinks, fileStore);

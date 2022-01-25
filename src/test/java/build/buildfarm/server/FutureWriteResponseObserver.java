@@ -29,6 +29,7 @@ class FutureWriteResponseObserver implements StreamObserver<WriteResponse> {
 
   @Override
   public void onCompleted() {}
+
   @Override
   public void onError(Throwable t) {
     future.setException(t);

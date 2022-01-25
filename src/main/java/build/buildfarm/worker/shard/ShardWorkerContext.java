@@ -845,6 +845,7 @@ class ShardWorkerContext implements WorkerContext {
     return new IOResource() {
       @Override
       public void close() {}
+
       @Override
       public boolean isReferenced() {
         return false;

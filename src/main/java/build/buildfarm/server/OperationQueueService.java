@@ -55,8 +55,10 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
     @Override
     public void onWaitStart() {}
+
     @Override
     public void onWaitEnd() {}
+
     @SuppressWarnings("unchecked")
     @Override
     public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {

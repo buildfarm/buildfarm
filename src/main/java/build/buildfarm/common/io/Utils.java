@@ -71,6 +71,7 @@ public class Utils {
   }
 
   private Utils() {}
+
   enum IOErrorFormatter {
     AccessDeniedException("access denied"),
     FileSystemException(""),
@@ -106,6 +107,7 @@ public class Utils {
   private static final LinkOption[] NO_LINK_OPTION = new LinkOption[0];
   // This isn't generally safe; we rely on the file system APIs not modifying the array.
   private static final LinkOption[] NOFOLLOW_LINKS_OPTION = {LinkOption.NOFOLLOW_LINKS};
+
   private static LinkOption[] linkOpts(boolean followSymlinks) {
     return followSymlinks ? NO_LINK_OPTION : NOFOLLOW_LINKS_OPTION;
   }

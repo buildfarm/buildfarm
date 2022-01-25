@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 /** Utility methods for the instance package. * */
 public final class Utils {
   private Utils() {}
+
   public static ByteString getBlob(
       Instance instance, Digest blobDigest, RequestMetadata requestMetadata)
       throws IOException, InterruptedException {

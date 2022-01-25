@@ -57,8 +57,10 @@ public class OperationQueueClientTest {
         new MatchListener() {
           @Override
           public void onWaitStart() {}
+
           @Override
           public void onWaitEnd() {}
+
           @Override
           public boolean onEntry(@Nullable QueueEntry queueEntry) {
             return true;

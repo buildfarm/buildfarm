@@ -347,6 +347,7 @@ public class StubInstance implements Instance {
 
   @Override
   public void start(String publicName) {}
+
   @Override
   public void stop() throws InterruptedException {
     isStopped = true;

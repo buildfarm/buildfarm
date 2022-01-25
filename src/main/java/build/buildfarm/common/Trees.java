@@ -25,6 +25,7 @@ import build.bazel.remote.execution.v2.Tree;
 // Convenience methods for interacting with Trees
 public final class Trees {
   private Trees() {}
+
   public static Iterable<Digest> directoryFileDigests(Directory directory) {
     return transform(directory.getFilesList(), FileNode::getDigest);
   }
