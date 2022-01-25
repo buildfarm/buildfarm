@@ -91,7 +91,6 @@ public interface Write {
 
     @Override
     public void reset() {}
-
     @Override
     public ListenableFuture<Long> getFuture() {
       return immediateFuture(committedSize);

@@ -50,7 +50,6 @@ public class Util {
       st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.apply(st);
 
   private Util() {}
-
   abstract static class AggregateCallback<T> implements FutureCallback<T> {
     private final AtomicInteger outstanding;
 

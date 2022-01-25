@@ -28,7 +28,6 @@ import io.grpc.protobuf.StatusProto;
 
 public final class Actions {
   private Actions() {}
-
   public static String invalidActionMessage(Digest actionDigest) {
     return format("Action %s is invalid", DigestUtil.toString(actionDigest));
   }

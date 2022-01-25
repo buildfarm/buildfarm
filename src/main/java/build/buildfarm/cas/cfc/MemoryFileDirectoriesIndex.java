@@ -39,7 +39,6 @@ class MemoryFileDirectoriesIndex extends FileDirectoriesIndex {
 
   @Override
   public void close() {}
-
   @GuardedBy("this")
   private Set<Digest> removeEntryDirectories(String entry) {
     Set<String> directories = data.remove(entry);

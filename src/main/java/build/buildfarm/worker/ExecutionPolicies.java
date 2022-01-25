@@ -26,7 +26,6 @@ public class ExecutionPolicies {
   private static final String DEFAULT_EXECUTION_POLICY_NAME = "";
 
   private ExecutionPolicies() {}
-
   @FunctionalInterface
   interface ExecutionPoliciesIndex {
     Iterable<ExecutionPolicy> get(String name);

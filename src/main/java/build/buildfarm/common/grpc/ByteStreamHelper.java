@@ -42,7 +42,6 @@ import javax.annotation.Nullable;
 
 public final class ByteStreamHelper {
   private ByteStreamHelper() {}
-
   @SuppressWarnings("Guava")
   public static InputStream newInput(
       String resourceName,

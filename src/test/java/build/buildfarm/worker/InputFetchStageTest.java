@@ -94,7 +94,6 @@ public class InputFetchStageTest {
               ExecutionStage.Value stage,
               Runnable onFailure,
               Deadline deadline) {}
-
           @Override
           public int getInputFetchStageWidth() {
             return 1;

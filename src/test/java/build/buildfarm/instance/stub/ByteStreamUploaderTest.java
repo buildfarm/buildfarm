@@ -68,10 +68,8 @@ public class ByteStreamUploaderTest {
             return new StreamObserver<WriteRequest>() {
               @Override
               public void onNext(WriteRequest request) {}
-
               @Override
               public void onError(Throwable t) {}
-
               @Override
               public void onCompleted() {}
             };

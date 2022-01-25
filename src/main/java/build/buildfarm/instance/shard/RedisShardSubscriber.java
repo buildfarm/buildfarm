@@ -313,7 +313,6 @@ class RedisShardSubscriber extends JedisPubSub {
 
   @Override
   public void onSubscribe(String channel, int subscribedChannels) {}
-
   @Override
   public void onUnsubscribe(String channel, int subscribedChannels) {
     List<TimedWatchFuture> operationWatchers;

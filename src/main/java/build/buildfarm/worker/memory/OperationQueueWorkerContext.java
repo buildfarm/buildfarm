@@ -394,10 +394,8 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public void createExecutionLimits() {}
-
   @Override
   public void destroyExecutionLimits() {}
-
   @Override
   public IOResource limitExecution(
       String operationName,
@@ -407,7 +405,6 @@ class OperationQueueWorkerContext implements WorkerContext {
     return new IOResource() {
       @Override
       public void close() {}
-
       @Override
       public boolean isReferenced() {
         return false;

@@ -35,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 
 public final class WorkerStubs {
   private WorkerStubs() {}
-
   @SuppressWarnings("rawtypes")
   public static LoadingCache create(DigestUtil digestUtil, Duration timeout) {
     return CacheBuilder.newBuilder()

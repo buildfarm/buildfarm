@@ -242,10 +242,8 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void start(String publicName) {}
-
   @Override
   public void stop() throws InterruptedException {}
-
   @Override
   public String getName() {
     return name;
@@ -331,7 +329,6 @@ public abstract class AbstractServerInstance implements Instance {
 
   private static boolean shouldEnsureOutputsPresent(
       boolean ensureOutputsPresent, RequestMetadata requestMetadata) {
-
     // The 'ensure outputs present' setting means that the AC will only return results to the client
     // when all of the action output blobs are present in the CAS.  If any one blob is missing, the
     // system will return a cache miss.  Although this is a more expensive check to perform, some
@@ -451,13 +448,10 @@ public abstract class AbstractServerInstance implements Instance {
 
           @Override
           public void setCompression(String compression) {}
-
           @Override
           public void setOnCancelHandler(Runnable onCancelHandler) {}
-
           @Override
           public void disableAutoInboundFlowControl() {}
-
           @Override
           public boolean isReady() {
             return true;
@@ -465,10 +459,8 @@ public abstract class AbstractServerInstance implements Instance {
 
           @Override
           public void request(int count) {}
-
           @Override
           public void setMessageCompression(boolean enable) {}
-
           @Override
           public void setOnReadyHandler(Runnable onReadyHandler) {
             onReadyHandler.run();
