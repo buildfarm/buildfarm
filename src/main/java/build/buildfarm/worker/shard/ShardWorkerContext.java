@@ -511,24 +511,28 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     if (Files.isDirectory(outputPath)) {
-      logger.log(Level.FINE, "ReportResultStage: " + outputFile + " is a directory");
+      String message = String.format("ReportResultStage: %s is a directory", outputPath);
+      logger.log(Level.FINE, message);
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(outputFile)
-          .setDescription("An output file was a directory");
+          .setDescription(message);
       return;
     }
 
     long size = Files.size(outputPath);
     long maxEntrySize = execFileSystem.getStorage().maxEntrySize();
     if (maxEntrySize != UNLIMITED_ENTRY_SIZE_MAX && size > maxEntrySize) {
+      String message =
+          String.format(
+              "The output %s could not be uploaded because it exceeded the maximum size of an entry (%d > %d)",
+              outputPath, size, maxEntrySize);
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject(outputFile + ": " + size)
-          .setDescription(
-              "An output could not be uploaded because it exceeded the maximum size of an entry");
+          .setDescription(message);
       return;
     }
 
