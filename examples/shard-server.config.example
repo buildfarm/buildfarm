@@ -1,5 +1,5 @@
 # an instance specification
-instances {
+instance {
   name: "shard"
 
   # the digest function for this instance, required
@@ -41,6 +41,10 @@ instances {
     # The operation queuer is exclusive and should run on
     # multiple instances concurrently.
     run_operation_queuer: true
+    
+    # When checking the action cache, decide whether all outputs are also present in the CAS.
+    # If any output is missing, a cache miss is returned to the client.
+    ensure_outputs_present: false
 
     # The maximum size of a single blob accepted via a
     # ByteStream#write or ContentAddressableStorage#batchUpdateBlobs
@@ -48,7 +52,18 @@ instances {
     # a transient UNAVAILABLE response, which, in bazel's case, induces
     # a fallback to non-remote recovery, rather than a catastrophic
     # failure.
-    max_blob_size: 4294967296
+    max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
+
+    # The maximum number of cpu cores that any min/max-cores platform property
+    # may request. If this is 0 (default), the property is not limited.
+    # max_cpu: 16
+
+    # Maximum number of requeue attempts for an operation
+    max_requeue_attempts: 5
+    
+    # Whether the instance should consult a denylist when looking up actions & invocations.
+    # For cache-only systems users may want to disable this check.
+    use_deny_list: True
 
     # A backplane specification hosted with redis cluster
     redis_shard_backplane_config: {
@@ -136,7 +151,7 @@ instances {
 
       # The delay in milliseconds used to populate processing operation
       # entries
-      processing_timeout_millis: 10000
+      processing_timeout_millis: 20000
 
       # The redis key used to store a list of QueueEntrys
       # awaiting execution by workers. These are queued
@@ -228,6 +243,7 @@ instances {
               value: "*"
             }
           }
+          allow_unmatched: True
         }
       }
     }
@@ -237,9 +253,14 @@ instances {
 # the listening port of the buildfarm grpc server
 port: 8980
 
-# the instance to which all requests with an empty/missing
-# instance name are routed
-#
-# this can be empty as well, to indicate that there is no
-# default instance
-default_instance_name: "shard"
+# cas write timeout
+cas_write_timeout: {
+  seconds: 3600
+  nanos: 0
+}
+
+# bytestream timeout
+bytestream_timeout: {
+  seconds: 3600
+  nanos: 0
+}

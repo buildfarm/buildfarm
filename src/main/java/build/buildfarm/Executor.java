@@ -18,7 +18,6 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.buildfarm.common.io.Utils.stat;
 import static build.buildfarm.instance.stub.ByteStreamUploader.uploadResourceName;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.Iterables.all;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -114,14 +113,13 @@ class Executor {
     }
 
     void print(int code, String responseType, long micros) {
-      System.out.println(
-          String.format(
-              "Action: %s -> %s: %s %s in %gms",
-              DigestUtil.toString(actionDigest),
-              operationName,
-              responseType,
-              Code.forNumber(code),
-              micros / 1000.0f));
+      System.out.printf(
+          "Action: %s -> %s: %s %s in %gms%n",
+          DigestUtil.toString(actionDigest),
+          operationName,
+          responseType,
+          Code.forNumber(code),
+          micros / 1000.0f);
     }
 
     void printStillWaiting() {
@@ -254,7 +252,6 @@ class Executor {
                 .setDigest(missingDigest)
                 .setData(ByteString.copyFrom(Files.readAllBytes(path)))
                 .build();
-        boolean foundBucket = false;
         int maxBucketSize = 0;
         long minBucketSize = Size.mbToBytes(2) + 1;
         int maxBucketIndex = 0;
@@ -262,11 +259,9 @@ class Executor {
         int size = (int) missingDigest.getSizeBytes() + 48;
         for (int i = 0; i < 128; i++) {
           int newBucketSize = bucketSizes[i] + size;
-          if (newBucketSize < Size.mbToBytes(2)) {
-            if (bucketSizes[i] < minBucketSize) {
-              minBucketSize = bucketSizes[i];
-              minBucketIndex = i;
-            }
+          if (newBucketSize < Size.mbToBytes(2) && bucketSizes[i] < minBucketSize) {
+            minBucketSize = bucketSizes[i];
+            minBucketIndex = i;
           }
           if (bucketSizes[i] > maxBucketSize) {
             maxBucketSize = bucketSizes[i];
@@ -280,9 +275,8 @@ class Executor {
           BatchUpdateBlobsResponse batchResponse = casStub.batchUpdateBlobs(batchRequest);
           long usecs = stopwatch.elapsed(MICROSECONDS);
           checkState(
-              all(
-                  batchResponse.getResponsesList(),
-                  response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
+              batchResponse.getResponsesList().stream()
+                  .allMatch(response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
           System.out.println(
               "Updated "
                   + batchRequest.getRequestsCount()
@@ -337,7 +331,7 @@ class Executor {
             writtenBytes += len;
             first = false;
           }
-          WriteResponse response = writtenFuture.get();
+          writtenFuture.get();
           System.out.println(
               "Wrote long "
                   + DigestUtil.toString(missingDigest)
@@ -354,9 +348,8 @@ class Executor {
         BatchUpdateBlobsResponse batchResponse = casStub.batchUpdateBlobs(batchRequest);
         long usecs = stopwatch.elapsed(MICROSECONDS);
         checkState(
-            all(
-                batchResponse.getResponsesList(),
-                response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
+            batchResponse.getResponsesList().stream()
+                .allMatch(response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
         System.out.println(
             "Updated " + batchRequest.getRequestsCount() + " blobs in " + (usecs / 1000.0) + "ms");
       }

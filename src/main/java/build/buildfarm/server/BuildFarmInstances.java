@@ -16,93 +16,38 @@ package build.buildfarm.server;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.common.UrlPath;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.v1test.InstanceConfig;
-import io.grpc.Status;
-import io.grpc.StatusException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import javax.naming.ConfigurationException;
 
-public class BuildFarmInstances implements Instances {
-  public static StatusException toStatusException(InstanceNotFoundException e) {
-    String errorMessage = String.format("Instance \"%s\" not known to Service", e.instanceName);
-    return Status.NOT_FOUND.withDescription(errorMessage).asException();
-  }
-
-  private final Map<String, Instance> instances;
-  private final Instance defaultInstance;
-
-  public BuildFarmInstances(
-      String session,
-      List<InstanceConfig> instanceConfigs,
-      String defaultInstanceName,
-      Runnable onStop)
+public class BuildFarmInstances {
+  public static Instance createInstance(
+      String session, InstanceConfig instanceConfig, Runnable onStop)
       throws InterruptedException, ConfigurationException {
-    instances = new HashMap<String, Instance>();
-    createInstances(session, instanceConfigs, onStop);
-    if (!defaultInstanceName.isEmpty()) {
-      if (!instances.containsKey(defaultInstanceName)) {
-        throw new ConfigurationException(
-            defaultInstanceName + " not specified in instance configs.");
-      }
-      defaultInstance = instances.get(defaultInstanceName);
-    } else {
-      defaultInstance = null;
-    }
-  }
-
-  private Instance getDefault() {
-    return defaultInstance;
-  }
-
-  @Override
-  public Instance get(String name) throws InstanceNotFoundException {
+    String name = instanceConfig.getName();
+    HashFunction hashFunction = getValidHashFunction(instanceConfig);
+    DigestUtil digestUtil = new DigestUtil(hashFunction);
     Instance instance;
-    if (name == null || name.isEmpty()) {
-      instance = getDefault();
-    } else {
-      instance = instances.get(name);
-    }
-    if (instance == null) {
-      throw new InstanceNotFoundException(name);
+    switch (instanceConfig.getTypeCase()) {
+      default:
+      case TYPE_NOT_SET:
+        throw new IllegalArgumentException("Instance type not set in config");
+      case MEMORY_INSTANCE_CONFIG:
+        instance = new MemoryInstance(name, digestUtil, instanceConfig.getMemoryInstanceConfig());
+        break;
+      case SHARD_INSTANCE_CONFIG:
+        instance =
+            new ShardInstance(
+                name,
+                session + "-" + name,
+                digestUtil,
+                instanceConfig.getShardInstanceConfig(),
+                onStop);
+        break;
     }
     return instance;
-  }
-
-  @Override
-  public Instance getFromOperationsCollectionName(String operationsCollectionName)
-      throws InstanceNotFoundException {
-    String instanceName = UrlPath.fromOperationsCollectionName(operationsCollectionName);
-    return get(instanceName);
-  }
-
-  @Override
-  public Instance getFromOperationName(String operationName) throws InstanceNotFoundException {
-    String instanceName = UrlPath.fromOperationName(operationName);
-    return get(instanceName);
-  }
-
-  @Override
-  public Instance getFromOperationStream(String operationStream) throws InstanceNotFoundException {
-    String instanceName = UrlPath.fromOperationStream(operationStream);
-    return get(instanceName);
-  }
-
-  @Override
-  public Instance getFromBlob(String blobName) throws InstanceNotFoundException {
-    String instanceName = UrlPath.fromBlobName(blobName);
-    return get(instanceName);
-  }
-
-  @Override
-  public Instance getFromUploadBlob(String uploadBlobName) throws InstanceNotFoundException {
-    String instanceName = UrlPath.fromUploadBlobName(uploadBlobName);
-    return get(instanceName);
   }
 
   private static HashFunction getValidHashFunction(InstanceConfig config)
@@ -111,49 +56,6 @@ public class BuildFarmInstances implements Instances {
       return HashFunction.get(config.getDigestFunction());
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
-    }
-  }
-
-  private void createInstances(
-      String session, List<InstanceConfig> instanceConfigs, Runnable onStop)
-      throws InterruptedException, ConfigurationException {
-    for (InstanceConfig instanceConfig : instanceConfigs) {
-      String name = instanceConfig.getName();
-      HashFunction hashFunction = getValidHashFunction(instanceConfig);
-      DigestUtil digestUtil = new DigestUtil(hashFunction);
-      switch (instanceConfig.getTypeCase()) {
-        default:
-        case TYPE_NOT_SET:
-          throw new IllegalArgumentException("Instance type not set in config");
-        case MEMORY_INSTANCE_CONFIG:
-          instances.put(
-              name, new MemoryInstance(name, digestUtil, instanceConfig.getMemoryInstanceConfig()));
-          break;
-        case SHARD_INSTANCE_CONFIG:
-          instances.put(
-              name,
-              new ShardInstance(
-                  name,
-                  session + "-" + name,
-                  digestUtil,
-                  instanceConfig.getShardInstanceConfig(),
-                  onStop));
-          break;
-      }
-    }
-  }
-
-  @Override
-  public void start(String publicName) {
-    for (Instance instance : instances.values()) {
-      instance.start(publicName);
-    }
-  }
-
-  @Override
-  public void stop() throws InterruptedException {
-    for (Instance instance : instances.values()) {
-      instance.stop();
     }
   }
 }

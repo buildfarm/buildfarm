@@ -43,7 +43,8 @@ import javax.annotation.Nullable;
 public final class ByteStreamHelper {
   private ByteStreamHelper() {}
 
-  public static final InputStream newInput(
+  @SuppressWarnings("Guava")
+  public static InputStream newInput(
       String resourceName,
       long offset,
       Supplier<ByteStreamStub> bsStubSupplier,

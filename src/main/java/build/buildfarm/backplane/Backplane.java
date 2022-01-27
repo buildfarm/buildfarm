@@ -29,6 +29,7 @@ import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
@@ -59,7 +60,7 @@ public interface Backplane {
    * <p>onSubscribe is called via the subscription thread, and is not called when operations are not
    * listened to
    */
-  InterruptingRunnable setOnUnsubscribe(InterruptingRunnable onUnsubscribe);
+  void setOnUnsubscribe(InterruptingRunnable onUnsubscribe);
 
   /** Start the backplane's operation */
   @ThreadSafe
@@ -73,13 +74,9 @@ public interface Backplane {
   @ThreadSafe
   boolean isStopped();
 
-  /**
-   * Adds a worker to the set of active workers.
-   *
-   * <p>Returns true if the worker was newly added, and false if it was already a member of the set.
-   */
+  /** Adds a worker to the set of active workers. */
   @ThreadSafe
-  boolean addWorker(ShardWorker shardWorker) throws IOException;
+  void addWorker(ShardWorker shardWorker) throws IOException;
 
   /**
    * Removes a worker's name from the set of active workers.
@@ -96,7 +93,7 @@ public interface Backplane {
   void deregisterWorker(String hostName) throws IOException;
 
   @ThreadSafe
-  public FindOperationsResults findOperations(Instance instance, String filterPredicate)
+  FindOperationsResults findOperations(Instance instance, String filterPredicate)
       throws IOException;
 
   /** Returns a set of the names of all active workers. */
@@ -268,7 +265,7 @@ public interface Backplane {
 
   /** Register a watcher for an operation */
   @ThreadSafe
-  ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) throws IOException;
+  ListenableFuture<Void> watchOperation(String operationName, Watcher watcher);
 
   /** Get all dispatched operations */
   @ThreadSafe
@@ -276,7 +273,7 @@ public interface Backplane {
 
   /** Get all operations */
   @ThreadSafe
-  Iterable<String> getOperations() throws IOException;
+  Iterable<String> getOperations();
 
   /** Requeue a dispatched operation */
   @ThreadSafe
@@ -305,11 +302,11 @@ public interface Backplane {
   boolean canPrequeue() throws IOException;
 
   @ThreadSafe
-  BackplaneStatus backplaneStatus(Instance instance) throws IOException;
+  BackplaneStatus backplaneStatus() throws IOException;
 
   @ThreadSafe
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
 
   @ThreadSafe
-  GetClientStartTimeResult getClientStartTime(String clientKey) throws IOException;
+  GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) throws IOException;
 }

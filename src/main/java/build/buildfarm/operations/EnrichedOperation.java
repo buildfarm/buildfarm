@@ -65,6 +65,7 @@ public class EnrichedOperation {
    * @return The structure as a json string.
    * @note Suggested return identifier: json.
    */
+  @SuppressWarnings("unchecked")
   public String asJsonString() {
     try {
       JsonFormat.Printer operationPrinter =

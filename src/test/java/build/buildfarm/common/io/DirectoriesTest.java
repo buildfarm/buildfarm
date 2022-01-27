@@ -30,7 +30,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 class DirectoriesTest {
-  protected Path root;
+  protected final Path root;
 
   protected DirectoriesTest(Path root) {
     this.root = root;
@@ -93,8 +93,7 @@ class DirectoriesTest {
       if (Thread.interrupted()) {
         throw new RuntimeException(new InterruptedException());
       }
-      Path path = Files.createTempDirectory("native-utils-test");
-      return path;
+      return Files.createTempDirectory("native-utils-test");
     }
 
     @Test

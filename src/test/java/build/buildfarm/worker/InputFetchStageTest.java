@@ -26,10 +26,8 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import io.grpc.Deadline;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import org.junit.Test;
@@ -74,9 +72,6 @@ public class InputFetchStageTest {
 
   @Test
   public void invalidQueuedOperationFails() throws InterruptedException {
-    Map<String, QueuedOperation> queuedOperations = Maps.newHashMap();
-    List<QueueEntry> queue = Lists.newArrayList();
-
     Poller poller = mock(Poller.class);
 
     QueueEntry badEntry =
@@ -103,6 +98,11 @@ public class InputFetchStageTest {
           @Override
           public int getInputFetchStageWidth() {
             return 1;
+          }
+
+          @Override
+          public int getInputFetchDeadline() {
+            return 60;
           }
 
           @Override

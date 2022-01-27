@@ -184,7 +184,7 @@ public class ReportResultStage extends PipelineStage {
     operationContext.poller.pause();
 
     try {
-      if (!workerContext.putOperation(completedOperation, operationContext.action)) {
+      if (!workerContext.putOperation(completedOperation)) {
         return null;
       }
     } catch (IOException e) {

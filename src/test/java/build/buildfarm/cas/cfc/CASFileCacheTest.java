@@ -72,7 +72,6 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -94,8 +93,8 @@ class CASFileCacheTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   private CASFileCache fileCache;
-  private Path root;
-  private boolean storeFileDirsIndexInMemory;
+  private final Path root;
+  private final boolean storeFileDirsIndexInMemory;
   private Map<Digest, ByteString> blobs;
   private ExecutorService putService;
 
@@ -141,12 +140,12 @@ class CASFileCacheTest {
             onExpire,
             delegate) {
           @Override
-          protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
+          protected InputStream newExternalInput(Digest digest) throws IOException {
             ByteString content = blobs.get(digest);
             if (content == null) {
-              return fileCache.newTransparentInput(digest, offset);
+              return fileCache.newTransparentInput(digest, 0);
             }
-            return content.substring((int) offset).newInput();
+            return content.substring((int) (long) 0).newInput();
           }
         };
     // do this so that we can remove the cache root dir
@@ -365,7 +364,6 @@ class CASFileCacheTest {
     Path invalidDigest = root.resolve("00").resolve("digest");
     ByteString validBlob = ByteString.copyFromUtf8("valid");
     Digest validDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("valid"));
-    String validHash = validDigest.getHash();
     Path invalidExec = fileCache.getPath(CASFileCache.getFileName(validDigest, false) + "_regular");
 
     Files.write(tooFewComponents, ImmutableList.of("Too Few Components"), StandardCharsets.UTF_8);
@@ -415,16 +413,13 @@ class CASFileCacheTest {
     ExecutorService service = newSingleThreadExecutor();
     Future<Void> putFuture =
         service.submit(
-            new Callable<Void>() {
-              @Override
-              public Void call() throws IOException, InterruptedException {
-                started.set(true);
-                ByteString content = ByteString.copyFromUtf8("CAS Would Exceed Max Size");
-                Digest digest = DIGEST_UTIL.compute(content);
-                blobs.put(digest, content);
-                fileCache.put(digest, /* isExecutable=*/ false);
-                return null;
-              }
+            () -> {
+              started.set(true);
+              ByteString content = ByteString.copyFromUtf8("CAS Would Exceed Max Size");
+              Digest digest = DIGEST_UTIL.compute(content);
+              blobs.put(digest, content);
+              fileCache.put(digest, /* isExecutable=*/ false);
+              return null;
             });
     while (!started.get()) {
       MICROSECONDS.sleep(1);
@@ -748,6 +743,7 @@ class CASFileCacheTest {
     assertThat(Files.exists(fileCache.getPath(expiringKey))).isFalse();
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void interruptDeferredDuringExpirations() throws IOException, InterruptedException {
     Blob expiringBlob;
@@ -848,13 +844,13 @@ class CASFileCacheTest {
   public void readThroughSwitchesToLocalOnComplete() throws IOException, InterruptedException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Blob blob = new Blob(content, DIGEST_UTIL);
-    when(delegate.newInput(eq(blob.getDigest()), eq(0l))).thenReturn(content.newInput());
+    when(delegate.newInput(eq(blob.getDigest()), eq(0L))).thenReturn(content.newInput());
     InputStream in = fileCache.newInput(blob.getDigest(), 0);
     byte[] buf = new byte[content.size()];
     // advance to the middle of the content
     assertThat(in.read(buf, 0, 6)).isEqualTo(6);
     assertThat(ByteString.copyFrom(buf, 0, 6)).isEqualTo(content.substring(0, 6));
-    verify(delegate, times(1)).newInput(blob.getDigest(), 0l);
+    verify(delegate, times(1)).newInput(blob.getDigest(), 0L);
     // trigger the read through to complete immediately by supplying the blob
     fileCache.put(blob);
     // read the remaining content
@@ -908,17 +904,17 @@ class CASFileCacheTest {
         };
     when(delegate.getWrite(eq(blob.getDigest()), any(UUID.class), any(RequestMetadata.class)))
         .thenReturn(write);
-    when(delegate.newInput(eq(blob.getDigest()), eq(0l))).thenReturn(content.newInput());
+    when(delegate.newInput(eq(blob.getDigest()), eq(0L))).thenReturn(content.newInput());
     // the switch will reset to this point
     InputStream switchedIn = content.newInput();
     switchedIn.skip(6);
-    when(delegate.newInput(eq(blob.getDigest()), eq(6l))).thenReturn(switchedIn);
+    when(delegate.newInput(eq(blob.getDigest()), eq(6L))).thenReturn(switchedIn);
     InputStream in = fileCache.newReadThroughInput(blob.getDigest(), 0, write);
     byte[] buf = new byte[content.size()];
     // advance to the middle of the content
     assertThat(in.read(buf, 0, 6)).isEqualTo(6);
     assertThat(ByteString.copyFrom(buf, 0, 6)).isEqualTo(content.substring(0, 6));
-    verify(delegate, times(1)).newInput(blob.getDigest(), 0l);
+    verify(delegate, times(1)).newInput(blob.getDigest(), 0L);
     // read the remaining content
     int remaining = content.size() - 6;
     assertThat(in.read(buf, 6, remaining)).isEqualTo(remaining);
@@ -934,6 +930,43 @@ class CASFileCacheTest {
     assertThat(fileCache.findMissingBlobs(ImmutableList.of(emptyDigest))).isEmpty();
   }
 
+  @Test
+  public void newInputThrowsNoSuchFileExceptionWithoutDelegate() throws Exception {
+    ContentAddressableStorage undelegatedCAS =
+        new CASFileCache(
+            root,
+            /* maxSizeInBytes=*/ 1024,
+            /* maxEntrySizeInBytes=*/ 1024,
+            /* hexBucketLevels=*/ 1,
+            storeFileDirsIndexInMemory,
+            DIGEST_UTIL,
+            expireService,
+            /* accessRecorder=*/ directExecutor(),
+            storage,
+            /* directoriesIndexDbName=*/ ":memory:",
+            /* onPut=*/ digest -> {},
+            /* onExpire=*/ digests -> {},
+            /* delegate=*/ null) {
+          @Override
+          protected InputStream newExternalInput(Digest digest) throws IOException {
+            ByteString content = blobs.get(digest);
+            if (content == null) {
+              return fileCache.newTransparentInput(digest, 0);
+            }
+            return content.substring((int) (long) 0).newInput();
+          }
+        };
+    ByteString blob = ByteString.copyFromUtf8("Missing Entry");
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
+    NoSuchFileException expected = null;
+    try (InputStream in = undelegatedCAS.newInput(blobDigest, /* offset=*/ 0)) {
+      fail("should not get here");
+    } catch (NoSuchFileException e) {
+      expected = e;
+    }
+    assertThat(expected).isNotNull();
+  }
+
   @RunWith(JUnit4.class)
   public static class NativeFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public NativeFileDirsIndexInMemoryCASFileCacheTest() throws IOException {
@@ -944,8 +977,7 @@ class CASFileCacheTest {
       if (Thread.interrupted()) {
         throw new RuntimeException(new InterruptedException());
       }
-      Path path = Files.createTempDirectory("native-cas-test");
-      return path;
+      return Files.createTempDirectory("native-cas-test");
     }
   }
 
@@ -959,8 +991,7 @@ class CASFileCacheTest {
       if (Thread.interrupted()) {
         throw new RuntimeException(new InterruptedException());
       }
-      Path path = Files.createTempDirectory("native-cas-test");
-      return path;
+      return Files.createTempDirectory("native-cas-test");
     }
   }
 

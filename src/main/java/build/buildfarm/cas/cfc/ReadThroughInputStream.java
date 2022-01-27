@@ -25,7 +25,7 @@ import java.nio.channels.ClosedChannelException;
 import javax.annotation.concurrent.GuardedBy;
 
 class ReadThroughInputStream extends InputStream {
-  static interface InputStreamGenerator {
+  interface InputStreamGenerator {
     InputStream open(long offset) throws IOException;
   }
 

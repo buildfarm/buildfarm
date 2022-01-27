@@ -14,12 +14,15 @@ buildifier(
 # Buildfarm may also choose different execution wrappers dynamically based on exec_properties.
 # Be aware that the process-wrapper and linux-sandbox come from bazel itself.
 # Therefore, users may want to ensure that the same bazel version is sourced here as is used locally.
-filegroup(
+java_library(
     name = "execution_wrappers",
-    data = [
+    runtime_deps = [
         ":as-nobody",
+        ":delay",
         ":linux-sandbox.binary",
         ":process-wrapper.binary",
+        ":skip_sleep.binary",
+        ":skip_sleep.preload",
         ":tini.binary",
     ],
 )
@@ -53,12 +56,40 @@ cc_binary(
     }),
 )
 
+genrule(
+    name = "skip_sleep.binary",
+    srcs = ["@skip_sleep"],
+    outs = ["skip_sleep"],
+    cmd = "cp $< $@;",
+)
+
+genrule(
+    name = "skip_sleep.preload",
+    srcs = ["@skip_sleep//:skip_sleep_preload"],
+    outs = ["skip_sleep_preload.so"],
+    cmd = "cp $< $@;",
+)
+
+# The delay wrapper is only intended to be used with the "skip_sleep" wrapper.
+sh_binary(
+    name = "delay",
+    srcs = ["delay.sh"],
+)
+
 # Docker images for buildfarm components
 java_image(
     name = "buildfarm-server",
+    args = ["/app/build_buildfarm/examples/shard-server.config.example"],
     base = "@amazon_corretto_java_image_base//image",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
+    ],
+    data = [
+        "//examples:example_configs",
+        "//src/main/java/build/buildfarm:configs",
+    ],
+    jvm_flags = [
+        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
     ],
     main_class = "build.buildfarm.server.BuildFarmServer",
     tags = ["container"],
@@ -69,21 +100,22 @@ java_image(
 
 java_image(
     name = "buildfarm-shard-worker",
+    args = ["/app/build_buildfarm/examples/shard-worker.config.example"],
     base = "@ubuntu-bionic//image",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
     ],
-    entrypoint = [
-        "/app/buildfarm/tini",
-        "--",
+    data = [
+        "//examples:example_configs",
+        "//src/main/java/build/buildfarm:configs",
+    ],
+    jvm_flags = [
+        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
     ],
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
     runtime_deps = [
-        ":as-nobody",
-        ":linux-sandbox.binary",
-        ":process-wrapper.binary",
-        ":tini.binary",
+        ":execution_wrappers",
         "//src/main/java/build/buildfarm/worker/shard",
     ],
 )

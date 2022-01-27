@@ -58,11 +58,17 @@ tasks:
     - "..."
     test_targets:
     - "..."
+  rpm_builds:
+    name: "Rpm Builds"
+    bazel: "4.2.2"
+    platform: centos7
+    shell_commands:
+    - ./bazelw build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
 
   # We want to run the unit tests again inside of a docker container.
   # This is because test cases may behave different while in docker due to user permissions.
   # This is more of a sanity check between a defined docker file and running tests directly on the host.
-  ubuntu1604:
+  docker_unit_tests:
     name: "Docker Unit Tests"
     platform: ubuntu1804
     shell_commands:
@@ -70,15 +76,44 @@ tasks:
     
   # Test that buildfarm can build software using the default configurations.
   # It starts the distributed storage backend and buildfarm services.
-  # It performs a realistic build on generated cc targets.
-  integration_test:
+  # It performs a realistic build on generated cc targets and gating projects.
+  integration_test_many:
     name: "Integration Test (Memory)"
     platform: ubuntu1804
     shell_commands:
+    - export TEST_SHARD=false
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - ./.bazelci/integration_test.sh
-  integration_test_shard:
+  integration_test_many_shard:
     name: "Integration Test (Shard)"
     platform: ubuntu1804
     shell_commands:
     - export TEST_SHARD=true
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - ./.bazelci/integration_test.sh
+    
+  # Memory integration test is too slow.
+  # We can re-enable it if memory instance becomes faster or we build less targets.
+  # It is preserved here for offline testing.
+  
+  # integration_test_abseil:
+  #   name: "Abseil Test (Memory)"
+  #   platform: ubuntu1804
+  #   shell_commands:
+  #   - export TEST_SHARD=false
+  #   - export RUN_TEST=./.bazelci/run_abseil_test.sh
+  #   - ./.bazelci/integration_test.sh
+  
+  integration_test_abseil_shard:
+    name: "Abseil Test (Shard)"
+    platform: ubuntu1804
+    shell_commands:
+    - export TEST_SHARD=true
+    - export RUN_TEST=./.bazelci/run_abseil_test.sh
+    - ./.bazelci/integration_test.sh
+
+  buildfarm_admin_test:
+    name: "BF Admin Test"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/test_bfadmin.sh

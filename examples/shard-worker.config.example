@@ -5,9 +5,16 @@ port: 8981
 # by all shard cluster servers
 public_name: "localhost:8981"
 
-# This determines whether the worker is a shard of the cas.
-# When not a shard, it will upload into the Sharded CAS
-omit_from_cas: false
+
+capabilities {
+  # This determines whether the worker is a shard of the cas.
+  # When not a shard, it will upload execution outputs.
+  cas: true
+  
+  # This determines whether the shard instance will participate in the execution pool.
+  # Workers that don't execute may be used for storage only.
+  execution: true
+}
 
 # the digest function for this worker, required
 # to match out of band between the client and server
@@ -46,6 +53,7 @@ dequeue_match_settings: {
     #   value: "value_string"
     # }
   }
+  accept_everything: True
 
 }
 
@@ -99,11 +107,15 @@ cas: {
 #  }
 #}
 
-# the number of concurrently available slots in the execute phase
+# The number of concurrently available slots in the execute phase.
+# If a value of 0 is provided the system will derive a stage width equal to the available CPU cores.
 execute_stage_width: 1
 
 # the number of concurrently available slots in the input fetch phase
 input_fetch_stage_width: 1
+
+# a limit on time (in seconds) for input fetch stage to fetch inputs
+input_fetch_deadline: 60
 
 # Use an input directory creation strategy which creates a single
 # directory tree at the highest level of the input tree containing

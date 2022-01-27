@@ -67,17 +67,14 @@ public class UtilTest {
     Backplane backplane = mock(Backplane.class);
 
     Function<String, Instance> workerInstanceFactory =
-        new Function<String, Instance>() {
-          @Override
-          public Instance apply(String worker) {
-            if (worker.equals(worker1Name)) {
-              return missingInstance;
-            }
-            if (worker.equals(worker2Name) || worker.equals(worker3Name)) {
-              return foundInstance;
-            }
-            return null;
+        worker -> {
+          if (worker.equals(worker1Name)) {
+            return missingInstance;
           }
+          if (worker.equals(worker2Name) || worker.equals(worker3Name)) {
+            return foundInstance;
+          }
+          return null;
         };
     ListenableFuture<Set<String>> correctFuture =
         correctMissingBlob(
@@ -113,14 +110,11 @@ public class UtilTest {
         .thenReturn(immediateFailedFuture(Status.INVALID_ARGUMENT.asRuntimeException()));
 
     Function<String, Instance> workerInstanceFactory =
-        new Function<String, Instance>() {
-          @Override
-          public Instance apply(String worker) {
-            if (worker.equals(workerName)) {
-              return instance;
-            }
-            return null;
+        worker -> {
+          if (worker.equals(workerName)) {
+            return instance;
           }
+          return null;
         };
     ListenableFuture<Set<String>> correctFuture =
         correctMissingBlob(
@@ -163,17 +157,14 @@ public class UtilTest {
         .thenReturn(immediateFailedFuture(Status.UNAVAILABLE.asRuntimeException()));
 
     Function<String, Instance> workerInstanceFactory =
-        new Function<String, Instance>() {
-          @Override
-          public Instance apply(String worker) {
-            if (worker.equals(workerName)) {
-              return instance;
-            }
-            if (worker.equals(unavailableWorkerName)) {
-              return unavailableInstance;
-            }
-            return null;
+        worker -> {
+          if (worker.equals(workerName)) {
+            return instance;
           }
+          if (worker.equals(unavailableWorkerName)) {
+            return unavailableInstance;
+          }
+          return null;
         };
     ListenableFuture<Set<String>> correctFuture =
         correctMissingBlob(
@@ -206,14 +197,11 @@ public class UtilTest {
         .thenReturn(immediateFuture(ImmutableList.of()));
 
     Function<String, Instance> workerInstanceFactory =
-        new Function<String, Instance>() {
-          @Override
-          public Instance apply(String worker) {
-            if (worker.equals(workerName)) {
-              return instance;
-            }
-            return null;
+        worker -> {
+          if (worker.equals(workerName)) {
+            return instance;
           }
+          return null;
         };
     ListenableFuture<Set<String>> correctFuture =
         correctMissingBlob(
@@ -249,14 +237,11 @@ public class UtilTest {
         .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
 
     Function<String, Instance> workerInstanceFactory =
-        new Function<String, Instance>() {
-          @Override
-          public Instance apply(String worker) {
-            if (worker.equals(workerName)) {
-              return instance;
-            }
-            return null;
+        worker -> {
+          if (worker.equals(workerName)) {
+            return instance;
           }
+          return null;
         };
     ListenableFuture<Set<String>> correctFuture =
         correctMissingBlob(

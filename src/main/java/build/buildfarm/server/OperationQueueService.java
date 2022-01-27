@@ -24,40 +24,31 @@ import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
 import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.rpc.Code;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
-  private final Instances instances;
+  private final Instance instance;
 
-  public OperationQueueService(Instances instances) {
-    this.instances = instances;
-  }
-
-  private static <V> V getUnchecked(ListenableFuture<V> future) throws InterruptedException {
-    try {
-      return future.get();
-    } catch (ExecutionException e) {
-      return null;
-    }
+  public OperationQueueService(Instance instance) {
+    this.instance = instance;
   }
 
   private static class OperationQueueMatchListener implements MatchListener {
-    private final Instance instance;
+    @SuppressWarnings("rawtypes")
     private final InterruptingPredicate onMatch;
-    private final Consumer<Runnable> setOnCancelHandler;
-    private QueueEntry queueEntry = null;
 
+    private final Consumer<Runnable> setOnCancelHandler;
+    private final QueueEntry queueEntry = null;
+
+    @SuppressWarnings("rawtypes")
     OperationQueueMatchListener(
-        Instance instance, InterruptingPredicate onMatch, Consumer<Runnable> setOnCancelHandler) {
-      this.instance = instance;
+        InterruptingPredicate onMatch, Consumer<Runnable> setOnCancelHandler) {
       this.onMatch = onMatch;
       this.setOnCancelHandler = setOnCancelHandler;
     }
@@ -68,6 +59,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     @Override
     public void onWaitEnd() {}
 
+    @SuppressWarnings("unchecked")
     @Override
     public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
       return onMatch.testInterruptibly(queueEntry);
@@ -105,14 +97,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
   @Override
   public void take(TakeOperationRequest request, StreamObserver<QueueEntry> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
-
     ServerCallStreamObserver<QueueEntry> callObserver =
         (ServerCallStreamObserver<QueueEntry>) responseObserver;
 
@@ -120,9 +104,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       instance.match(
           request.getPlatform(),
           new OperationQueueMatchListener(
-              instance,
-              createOnMatch(instance, responseObserver),
-              callObserver::setOnCancelHandler));
+              createOnMatch(instance, responseObserver), callObserver::setOnCancelHandler));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
@@ -131,14 +113,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   @Override
   public void status(
       BackplaneStatusRequest request, StreamObserver<BackplaneStatus> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
-
     try {
       responseObserver.onNext(instance.backplaneStatus());
       responseObserver.onCompleted();
@@ -149,17 +123,9 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
   @Override
   public void put(Operation operation, StreamObserver<com.google.rpc.Status> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.getFromOperationName(operation.getName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
-
     try {
       boolean ok = instance.putAndValidateOperation(operation);
-      Code code = ok ? Code.OK : Code.UNAVAILABLE;
+      Code code = ok ? Code.OK : Code.INVALID_ARGUMENT;
       responseObserver.onNext(com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build());
       responseObserver.onCompleted();
     } catch (IllegalStateException e) {
@@ -174,16 +140,8 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   @Override
   public void poll(
       PollOperationRequest request, StreamObserver<com.google.rpc.Status> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.getFromOperationName(request.getOperationName());
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
-    }
-
     boolean ok = instance.pollOperation(request.getOperationName(), request.getStage());
-    Code code = ok ? Code.OK : Code.UNAVAILABLE;
+    Code code = ok ? Code.OK : Code.INVALID_ARGUMENT;
     responseObserver.onNext(com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build());
     responseObserver.onCompleted();
   }

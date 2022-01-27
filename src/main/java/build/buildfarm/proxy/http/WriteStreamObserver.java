@@ -24,7 +24,6 @@ import io.grpc.stub.StreamObserver;
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private final WriteObserverSource writeObserverSource;
   private final StreamObserver<WriteResponse> responseObserver;
-  private Throwable error = null;
   private WriteObserver write = null;
 
   WriteStreamObserver(
@@ -65,7 +64,6 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
   @Override
   public void onError(Throwable t) {
-    error = t;
     responseObserver.onError(t);
   }
 

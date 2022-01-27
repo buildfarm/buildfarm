@@ -43,24 +43,6 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class DequeueMatchEvaluatorTest {
   // Function under test: shouldKeepOperation
-  // Reason for testing: null queue entries should be kept
-  // Failure explanation: this decision has changed
-  @Test
-  public void shouldKeepOperationKeepNullQueueEntry() throws Exception {
-    // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-    SetMultimap<String, String> workerProvisions = HashMultimap.create();
-    QueueEntry entry = null;
-
-    // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
-
-    // ASSERT
-    assertThat(shouldKeep).isTrue();
-  }
-
-  // Function under test: shouldKeepOperation
   // Reason for testing: empty plaform queue entries should be kept
   // Failure explanation: properties are being evaluated differently now
   @Test

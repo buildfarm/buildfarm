@@ -68,7 +68,7 @@ public class BalancedRedisQueue {
    * @details Although these are multiple queues, the balanced redis queue treats them as one in its
    *     interface.
    */
-  private List<RedisQueue> queues = new ArrayList<RedisQueue>();
+  private final List<RedisQueue> queues = new ArrayList<>();
 
   /**
    * @field currentPushQueue
@@ -171,7 +171,6 @@ public class BalancedRedisQueue {
     boolean blocking = false;
     // try each of the internal queues with exponential backoff
     int currentTimeout_s = START_TIMEOUT_SECONDS;
-    int maxTimeout_s = MAX_TIMEOUT_SECONDS;
     while (true) {
       final String val;
       RedisQueue queue = queues.get(roundRobinPopIndex());
@@ -188,7 +187,7 @@ public class BalancedRedisQueue {
       if (currentPopQueue == startQueue) {
         // advance timeout if blocking on queue and not at max each queue cycle
         if (blocking) {
-          currentTimeout_s = Math.min(currentTimeout_s * 2, maxTimeout_s);
+          currentTimeout_s = Math.min(currentTimeout_s * 2, MAX_TIMEOUT_SECONDS);
         } else {
           blocking = true;
         }
@@ -279,9 +278,7 @@ public class BalancedRedisQueue {
     }
 
     // build proto
-    QueueStatus status =
-        QueueStatus.newBuilder().setName(name).setSize(size).addAllInternalSizes(sizes).build();
-    return status;
+    return QueueStatus.newBuilder().setName(name).setSize(size).addAllInternalSizes(sizes).build();
   }
 
   /**
@@ -339,7 +336,6 @@ public class BalancedRedisQueue {
   /**
    * @brief Create multiple queues for each of the hashes given.
    * @details Create the multiple queues that will act as a single balanced queue.
-   * @param client An established redis client.
    * @param name The global name of the queue.
    * @param hashtags Hashtags to distribute queue data.
    */
@@ -404,20 +400,6 @@ public class BalancedRedisQueue {
   }
 
   /**
-   * @brief Get the previous queue in the round robin.
-   * @details If we are currently on the first queue it becomes the last queue.
-   * @param index Current queue index.
-   * @return And adjusted val based on the current queue index.
-   * @note Suggested return identifier: adjustedCurrentQueue.
-   */
-  private int previousQueueInRoundRobin(int index) {
-    if (index == 0) {
-      return queues.size() - 1;
-    }
-    return index - 1;
-  }
-
-  /**
    * @brief List of queues in a particular order for full iteration over all of the queues.
    * @details An ordered list of queues for operations that assume to traverse over all of the
    *     queues. Some operations like clear() / size() require calling methods on all of the
@@ -445,8 +427,7 @@ public class BalancedRedisQueue {
     // to improve cpu utilization, we can try randomizing
     // the order we traverse the internal queues for operations
     // that may return early
-    List<RedisQueue> randomQueues = new ArrayList<RedisQueue>();
-    randomQueues.addAll(queues);
+    List<RedisQueue> randomQueues = new ArrayList<>(queues);
     Collections.shuffle(randomQueues);
     return randomQueues;
   }
