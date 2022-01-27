@@ -27,12 +27,12 @@ public class TestSizeResourceOverride {
    * @brief What to override the minimum core amount to.
    * @details Override will take precedence over other settings.
    */
-  public int coreMin = 1;
+  public final int coreMin = 1;
 
   /**
    * @field coreMax
    * @brief What to override the maximum core amount to.
    * @details Override will take precedence over other settings.
    */
-  public int coreMax = 1;
+  public final int coreMax = 1;
 }

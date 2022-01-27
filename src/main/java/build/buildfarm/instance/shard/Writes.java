@@ -42,7 +42,7 @@ import java.util.function.Supplier;
 class Writes {
   private final LoadingCache<BlobWriteKey, Instance> blobWriteInstances;
 
-  private class InvalidatingWrite implements Write {
+  private static class InvalidatingWrite implements Write {
     private final Write delegate;
     private final Runnable onInvalidation;
 
@@ -116,15 +116,16 @@ class Writes {
   }
 
   Writes(Supplier<Instance> instanceSupplier) {
-    this(instanceSupplier, /* writeExpiresAfter=*/ 1, /* writeExpiresUnit=*/ TimeUnit.HOURS);
+    this(instanceSupplier, /* writeExpiresAfter=*/ 1);
   }
 
-  Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter, TimeUnit writeExpiresUnit) {
+  Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter) {
     blobWriteInstances =
         CacheBuilder.newBuilder()
-            .expireAfterWrite(writeExpiresAfter, writeExpiresUnit)
+            .expireAfterWrite(writeExpiresAfter, TimeUnit.HOURS)
             .build(
                 new CacheLoader<BlobWriteKey, Instance>() {
+                  @SuppressWarnings("NullableProblems")
                   @Override
                   public Instance load(BlobWriteKey key) {
                     return instanceSupplier.get();

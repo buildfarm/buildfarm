@@ -19,8 +19,6 @@
     <exclude name="CheckResultSet"/>
     <exclude name="ConstantsInInterface"/>
     <exclude name="DefaultLabelNotLastInSwitchStmt"/>
-    <exclude name="DoubleBraceInitialization"/>
-    <exclude name="ForLoopCanBeForeach"/>
     <exclude name="ForLoopVariableCount"/>
     <exclude name="GuardLogStatement"/>
     <exclude name="JUnit4SuitesShouldUseSuiteAnnotation"/>
@@ -34,8 +32,6 @@
     <exclude name="LiteralsFirstInComparisons"/>
     <exclude name="LooseCoupling"/>
     <exclude name="MethodReturnsInternalArray"/>
-    <exclude name="MissingOverride"/>
-    <exclude name="OneDeclarationPerLine"/>
     <exclude name="PositionLiteralsFirstInCaseInsensitiveComparisons"/>
     <exclude name="PositionLiteralsFirstInComparisons"/>
     <exclude name="PreserveStackTrace"/>
@@ -44,8 +40,6 @@
     <exclude name="ReplaceVectorWithList"/>
     <exclude name="SwitchStmtsShouldHaveDefault"/>
     <exclude name="SystemPrintln"/>
-    <exclude name="UnusedAssignment"/>
-    <exclude name="UnusedFormalParameter"/>
     <exclude name="UseAssertEqualsInsteadOfAssertTrue"/>
     <exclude name="UseAssertNullInsteadOfAssertTrue"/>
     <exclude name="UseAssertSameInsteadOfAssertTrue"/>
@@ -65,7 +59,6 @@
     <exclude name="AvoidPrefixingMethodParameters"/>
     <exclude name="AvoidProtectedFieldInFinalClass"/>
     <exclude name="AvoidProtectedMethodInFinalClassNotExtending"/>
-    <exclude name="AvoidUsingNativeCode"/>
     <exclude name="BooleanGetMethodName"/>
     <exclude name="CallSuperInConstructor"/>
     <exclude name="ClassNamingConventions"/>
@@ -77,11 +70,8 @@
     <exclude name="ExtendsObject"/>
     <exclude name="FieldDeclarationsShouldBeAtStartOfClass"/>
     <exclude name="FieldNamingConventions"/>
-    <exclude name="ForLoopShouldBeWhileLoop"/>
-    <exclude name="ForLoopsMustUseBraces"/>
     <exclude name="FormalParameterNamingConventions"/>
     <exclude name="GenericsNaming"/>
-    <exclude name="IdenticalCatchBranches"/>
     <exclude name="LinguisticNaming"/>
     <exclude name="LocalHomeNamingConvention"/>
     <exclude name="LocalInterfaceSessionNamingConvention"/>
@@ -92,7 +82,6 @@
     <exclude name="MethodNamingConventions"/>
     <exclude name="MIsLeadingVariableName"/>
     <exclude name="OnlyOneReturn"/>
-    <exclude name="PackageCase"/>
     <exclude name="PrematureDeclaration"/>
     <exclude name="RemoteInterfaceNamingConvention"/>
     <exclude name="RemoteSessionInterfaceNamingConvention"/>
@@ -102,7 +91,6 @@
     <exclude name="SuspiciousConstantFieldName"/>
     <exclude name="TooManyStaticImports"/>
     <exclude name="UnnecessaryAnnotationValueElement"/>
-    <exclude name="UnnecessaryCast"/>
     <exclude name="UnnecessaryConstructor"/>
     <exclude name="UnnecessaryFullyQualifiedName"/>
     <exclude name="UselessParentheses"/>
@@ -117,7 +105,6 @@
     <exclude name="AvoidThrowingNullPointerException"/>
     <exclude name="AvoidThrowingRawExceptionTypes"/>
     <exclude name="AvoidUncheckedExceptionsInSignatures"/>
-    <exclude name="ClassWithOnlyPrivateConstructorsShouldBeFinal"/>
     <exclude name="CouplingBetweenObjects"/>
     <exclude name="CyclomaticComplexity"/>
     <exclude name="DataClass"/>
@@ -157,10 +144,8 @@
 </rule>
 
 <rule ref="category/java/documentation.xml">
-    <exclude name="CommentContent"/>
     <exclude name="CommentRequired"/>
     <exclude name="CommentSize"/>
-    <exclude name="UncommentedEmptyConstructor"/>
     <exclude name="UncommentedEmptyMethodBody"/>
 </rule>
 
@@ -171,7 +156,6 @@
     <exclude name="AvoidAssertAsIdentifier"/>
     <exclude name="AvoidBranchingStatementAsLastInLoop"/>
     <exclude name="AvoidCallingFinalize"/>
-    <exclude name="AvoidCatchingNPE"/>
     <exclude name="AvoidCatchingThrowable"/>
     <exclude name="AvoidDecimalLiteralsInBigDecimalConstructor"/>
     <exclude name="AvoidDuplicateLiterals"/>
@@ -185,9 +169,6 @@
     <exclude name="AvoidUsingOctalValues"/>
     <exclude name="BadComparison"/>
     <exclude name="BeanMembersShouldSerialize"/>
-    <exclude name="BrokenNullCheck"/>
-    <exclude name="CallSuperFirst"/>
-    <exclude name="CallSuperLast"/>
     <exclude name="CheckSkipResult"/>
     <exclude name="ClassCastExceptionWithToArray"/>
     <exclude name="CloneMethodMustBePublic"/>
@@ -199,31 +180,17 @@
     <exclude name="ConstructorCallsOverridableMethod"/>
     <exclude name="DataflowAnomalyAnalysis"/>
     <exclude name="DetachedTestCase"/>
-    <exclude name="DoNotCallGarbageCollectionExplicitly"/>
-    <exclude name="DoNotExtendJavaLangThrowable"/>
-    <exclude name="DoNotHardCodeSDCard"/>
     <exclude name="DoNotTerminateVM"/>
     <exclude name="DoNotThrowExceptionInFinally"/>
-    <exclude name="DontImportSun"/>
-    <exclude name="DontUseFloatTypeForLoopIndices"/>
     <exclude name="EmptyCatchBlock"/>
-    <exclude name="EmptyFinalizer"/>
-    <exclude name="EmptyFinallyBlock"/>
     <exclude name="EmptyIfStmt"/>
     <exclude name="EmptyInitializer"/>
-    <exclude name="EmptyStatementBlock"/>
-    <exclude name="EmptyStatementNotInLoop"/>
-    <exclude name="EmptySwitchStatements"/>
-    <exclude name="EmptySynchronizedBlock"/>
-    <exclude name="EmptyTryBlock"/>
     <exclude name="EmptyWhileStmt"/>
-    <exclude name="EqualsNull"/>
     <exclude name="FinalizeDoesNotCallSuperFinalize"/>
     <exclude name="FinalizeOnlyCallsSuperFinalize"/>
     <exclude name="FinalizeOverloaded"/>
     <exclude name="FinalizeShouldBeProtected"/>
     <exclude name="IdempotentOperations"/>
-    <exclude name="ImportFromSamePackage"/>
     <exclude name="InstantiationToGetClass"/>
     <exclude name="InvalidLogMessageFormat"/>
     <exclude name="JumbledIncrementer"/>
@@ -231,7 +198,6 @@
     <exclude name="JUnitStaticSuite"/>
     <exclude name="LoggerIsNotStaticFinal"/>
     <exclude name="MethodWithSameNameAsEnclosingClass"/>
-    <exclude name="MisplacedNullCheck"/>
     <exclude name="MissingBreakInSwitch"/>
     <exclude name="MissingSerialVersionUID"/>
     <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
@@ -253,14 +219,11 @@
     <exclude name="SuspiciousHashcodeMethodName"/>
     <exclude name="SuspiciousOctalEscape"/>
     <exclude name="TestClassWithoutTestCases"/>
-    <exclude name="UnconditionalIfStatement"/>
     <exclude name="UnnecessaryBooleanAssertion"/>
     <exclude name="UnnecessaryCaseChange"/>
     <exclude name="UnnecessaryConversionTemporary"/>
-    <exclude name="UnusedNullCheckInEquals"/>
     <exclude name="UseCorrectExceptionLogging"/>
     <exclude name="UseEqualsToCompareStrings"/>
-    <exclude name="UselessOperationOnImmutable"/>
     <exclude name="UseLocaleWithCaseConversions"/>
     <exclude name="UseProperClassLoader"/>
 </rule>

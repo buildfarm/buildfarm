@@ -21,7 +21,10 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.LoggingMain;
+import build.buildfarm.common.config.ConfigAdjuster;
+import build.buildfarm.common.config.ServerOptions;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.MetricsPublisher;
 import build.buildfarm.metrics.aws.AwsMetricsPublisher;
 import build.buildfarm.metrics.gcp.GcpMetricsPublisher;
@@ -39,6 +42,7 @@ import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import io.prometheus.client.Counter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -54,6 +58,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
+@SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
   // collected, which would cause us to loose their configuration.
@@ -68,11 +73,10 @@ public class BuildFarmServer extends LoggingMain {
           .register();
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-  private final Instances instances;
+  private final Instance instance;
   private final HealthStatusManager healthStatusManager;
   private final Server server;
   private boolean stopping = false;
-  private final PrometheusPublisher prometheusPublisher;
 
   public BuildFarmServer(String session, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
@@ -83,55 +87,57 @@ public class BuildFarmServer extends LoggingMain {
       String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
-    String defaultInstanceName = config.getDefaultInstanceName();
-    instances =
-        new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
+
+    instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
 
     healthStatusManager = new HealthStatusManager();
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-
+    if (!config.getSslCertificatePath().equals("")) {
+      File ssl_certificate_path = new File(config.getSslCertificatePath());
+      serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
+    }
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instances))
-            .addService(new CapabilitiesService(instances))
+            .addService(new ActionCacheService(instance))
+            .addService(new CapabilitiesService(instance))
             .addService(
                 new ContentAddressableStorageService(
-                    instances,
-                    /* deadlineAfter=*/ 1,
-                    TimeUnit.DAYS,
-                    /* requestLogLevel=*/ Level.INFO))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
+                    instance,
+                    /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
+                    TimeUnit.SECONDS
+                    /* requestLogLevel=*/ ))
+            .addService(
+                new ByteStreamService(
+                    instance,
+                    /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
+                    TimeUnit.SECONDS))
             .addService(
                 new ExecutionService(
-                    instances,
+                    instance,
                     config.getExecuteKeepaliveAfterSeconds(),
                     TimeUnit.SECONDS,
                     keepaliveScheduler,
                     getMetricsPublisher(config.getMetricsConfig())))
-            .addService(new OperationQueueService(instances))
-            .addService(new OperationsService(instances))
-            .addService(new AdminService(config.getAdminConfig(), instances))
-            .addService(new FetchService(instances))
+            .addService(new OperationQueueService(instance))
+            .addService(new OperationsService(instance))
+            .addService(new AdminService(config.getAdminConfig(), instance))
+            .addService(new FetchService(instance))
             .addService(ProtoReflectionService.newInstance())
             .addService(new PublishBuildEventService(config.getBuildEventConfig()))
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
             .intercept(headersInterceptor)
             .build();
 
-    prometheusPublisher = new PrometheusPublisher();
-
     logger.log(Level.INFO, String.format("%s initialized", session));
   }
 
   private static BuildFarmServerConfig toBuildFarmServerConfig(
-      Readable input, BuildFarmServerOptions options) throws IOException {
+      Readable input, ServerOptions options) throws IOException {
     BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
     TextFormat.merge(input, builder);
-    if (options.port > 0) {
-      builder.setPort(options.port);
-    }
+    ConfigAdjuster.adjust(builder, options);
     return builder.build();
   }
 
@@ -148,11 +154,11 @@ public class BuildFarmServer extends LoggingMain {
 
   public synchronized void start(String publicName, int prometheusPort) throws IOException {
     checkState(!stopping, "must not call start after stop");
-    instances.start(publicName);
+    instance.start(publicName);
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    prometheusPublisher.startHttpServer(prometheusPort);
+    PrometheusPublisher.startHttpServer(prometheusPort);
     healthCheckMetric.labels("start").inc();
   }
 
@@ -163,6 +169,7 @@ public class BuildFarmServer extends LoggingMain {
     System.err.println("*** server shut down");
   }
 
+  @SuppressWarnings("ConstantConditions")
   public void stop() {
     synchronized (this) {
       if (stopping) {
@@ -172,13 +179,13 @@ public class BuildFarmServer extends LoggingMain {
     }
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
-    prometheusPublisher.stopHttpServer();
+    PrometheusPublisher.stopHttpServer();
     healthCheckMetric.labels("stop").inc();
     try {
       if (server != null) {
         server.shutdown();
       }
-      instances.stop();
+      instance.stop();
       server.awaitTermination(10, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       if (server != null) {
@@ -204,6 +211,7 @@ public class BuildFarmServer extends LoggingMain {
   }
 
   /** returns success or failure */
+  @SuppressWarnings("ConstantConditions")
   static boolean serverMain(String[] args) {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //
@@ -212,7 +220,7 @@ public class BuildFarmServer extends LoggingMain {
     // unknown stream 11369
     nettyLogger.setLevel(SEVERE);
 
-    OptionsParser parser = OptionsParser.newOptionsParser(BuildFarmServerOptions.class);
+    OptionsParser parser = OptionsParser.newOptionsParser(ServerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
@@ -221,7 +229,7 @@ public class BuildFarmServer extends LoggingMain {
     }
 
     Path configPath = Paths.get(residue.get(0));
-    BuildFarmServerOptions options = parser.getOptions(BuildFarmServerOptions.class);
+    ServerOptions options = parser.getOptions(ServerOptions.class);
 
     String session = "buildfarm-server";
     if (!options.publicName.isEmpty()) {

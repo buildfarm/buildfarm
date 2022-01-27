@@ -56,6 +56,7 @@ public class ExecutionPropertiesParser {
     parser.put(ExecutionProperties.ENV_VARS, ExecutionPropertiesParser::storeEnvVars);
     parser.put(ExecutionProperties.SKIP_SLEEP, ExecutionPropertiesParser::storeSkipSleep);
     parser.put(ExecutionProperties.TIME_SHIFT, ExecutionPropertiesParser::storeTimeShift);
+    parser.put(ExecutionProperties.CONTAINER_IMAGE, ExecutionPropertiesParser::storeContainerImage);
     parser.put(
         ExecutionProperties.DEBUG_BEFORE_EXECUTION,
         ExecutionPropertiesParser::storeBeforeExecutionDebug);
@@ -72,10 +73,7 @@ public class ExecutionPropertiesParser {
     command
         .getPlatform()
         .getPropertiesList()
-        .forEach(
-            (property) -> {
-              evaluateProperty(parser, limits, property);
-            });
+        .forEach((property) -> evaluateProperty(parser, limits, property));
     return limits;
   }
 
@@ -215,6 +213,7 @@ public class ExecutionPropertiesParser {
    * @param limits Current limits to apply changes to.
    * @param property The property to store.
    */
+  @SuppressWarnings("unchecked")
   private static void storeEnvVars(ResourceLimits limits, Property property) {
     try {
       JSONParser parser = new JSONParser();
@@ -233,7 +232,7 @@ public class ExecutionPropertiesParser {
    * @param property The property to store.
    */
   private static void storeEnvVar(ResourceLimits limits, Property property) {
-    String keyValue[] = property.getName().split(":", 2);
+    String[] keyValue = property.getName().split(":", 2);
     String key = keyValue[1];
     String value = property.getValue();
     limits.extraEnvironmentVariables.put(key, value);
@@ -260,6 +259,18 @@ public class ExecutionPropertiesParser {
   private static void storeTimeShift(ResourceLimits limits, Property property) {
     limits.time.timeShift = Integer.parseInt(property.getValue());
     describeChange(limits.time.description, "time shift", property.getValue(), property);
+  }
+
+  /**
+   * @brief Store the property for an action's container name.
+   * @details Parses and stores a String.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeContainerImage(ResourceLimits limits, Property property) {
+    limits.containerSettings.containerImage = property.getValue();
+    describeChange(
+        limits.containerSettings.description, "container image", property.getValue(), property);
   }
 
   /**

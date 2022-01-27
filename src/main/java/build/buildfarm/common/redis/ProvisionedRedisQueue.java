@@ -92,7 +92,7 @@ public class ProvisionedRedisQueue {
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
     this.queue = new BalancedRedisQueue(name, hashtags);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
-    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
+    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard);
     allowUserUnmatched = false;
   }
 
@@ -113,7 +113,7 @@ public class ProvisionedRedisQueue {
       boolean allowUserUnmatched) {
     this.queue = new BalancedRedisQueue(name, hashtags);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
-    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
+    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard);
     this.allowUserUnmatched = allowUserUnmatched;
   }
 
@@ -178,19 +178,18 @@ public class ProvisionedRedisQueue {
    * @details This will organize the incoming provisions into separate sets.
    * @param filterProvisions The filtered provisions of the queue.
    * @param isFullyWildcard If the queue will deem any set of properties eligible.
-   * @param wildcardValue Symbol for identifying wildcard in both key/value of provisions.
    * @return Provisions filtered by wildcard.
    * @note Suggested return identifier: filteredProvisions.
    */
   private static FilteredProvisions filterProvisionsByWildcard(
-      SetMultimap<String, String> filterProvisions, boolean isFullyWildcard, String wildcardValue) {
+      SetMultimap<String, String> filterProvisions, boolean isFullyWildcard) {
     FilteredProvisions provisions = new FilteredProvisions();
     provisions.wildcard =
         isFullyWildcard
             ? ImmutableSet.of()
             : filterProvisions.asMap().entrySet().stream()
-                .filter(e -> e.getValue().contains(wildcardValue))
-                .map(e -> e.getKey())
+                .filter(e -> e.getValue().contains(ProvisionedRedisQueue.WILDCARD_VALUE))
+                .map(Map.Entry::getKey)
                 .collect(ImmutableSet.toImmutableSet());
     provisions.required =
         isFullyWildcard

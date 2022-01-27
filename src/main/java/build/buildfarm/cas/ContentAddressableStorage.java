@@ -105,7 +105,7 @@ public interface ContentAddressableStorage extends InputStreamFactory {
 
   /** Insert a blob into the CAS. */
   @ThreadSafe
-  void put(Blob blob) throws EntryLimitException, InterruptedException;
+  void put(Blob blob) throws InterruptedException;
 
   /**
    * Insert a value into the CAS with expiration callback.

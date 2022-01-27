@@ -19,7 +19,8 @@ package build.buildfarm.common;
  * @brief Execution properties understood and used by buildfarm.
  * @details These are the execution property key names that have special meaning when applied to
  *     actions. Users can still configure their own unique execution properties along side these for
- *     workers and the operation queue.
+ *     workers and the operation queue. Some of these properties originated specifically for
+ *     buildfarm usage. Other properties exist for compadibility with bazelbuild/bazel-toolchains.
  */
 public class ExecutionProperties {
   /**
@@ -194,4 +195,104 @@ public class ExecutionProperties {
    *     test dynamically.
    */
   public static final String PROCESS_WRAPPER = "process-wrapper";
+
+  /**
+   * @field CONTAINER_IMAGE
+   * @brief The exec_property to inform the executor to run the action under the specified
+   *     container.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String CONTAINER_IMAGE = "container-image";
+
+  /**
+   * @field DOCKER_ADD_CAPABILITIES
+   * @brief The exec_property to add docker capabilities.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String DOCKER_ADD_CAPABILITIES = "dockerAddCapabilities";
+
+  /**
+   * @field DOCKER_DROP_CAPABILITIES
+   * @brief The exec_property to remove docker capabilities.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String DOCKER_DROP_CAPABILITIES = "dockerDropCapabilities";
+
+  /**
+   * @field DOCKER_NETWORK
+   * @brief The exec_property to configure docker's network.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String DOCKER_NETWORK = "dockerNetwork";
+
+  /**
+   * @field DOCKER_PRIVILEGED
+   * @brief The exec_property to run docker as privileged.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String DOCKER_PRIVILEGED = "dockerPrivileged";
+
+  /**
+   * @field DOCKER_RUN_AS_ROOT
+   * @brief The exec_property to run docker as root.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String DOCKER_RUN_AS_ROOT = "dockerRunAsRoot";
+
+  /**
+   * @field DOCKER_RUNTIME
+   * @brief The exec_property to set docker's runtime.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String DOCKER_RUNTIME = "dockerRuntime";
+
+  /**
+   * @field DOCKER_SHM_SIZE
+   * @brief The exec_property to set docker's shm size.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String DOCKER_SHM_SIZE = "dockerShmSize";
+
+  /**
+   * @field DOCKER_SIBLING_CONTAINERS
+   * @brief The exec_property to enable docker sibling containers.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String DOCKER_SIBLING_CONTAINERS = "dockerSiblingContainers";
+
+  /**
+   * @field DOCKER_ULIMITS
+   * @brief The exec_property to set docker ulimits.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String DOCKER_ULIMITS = "dockerUlimits";
+
+  /**
+   * @field DOCKER_USE_URANDOM
+   * @brief The exec_property to enable docker's use of urandom.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String DOCKER_USE_URANDOM = "dockerUseURandom";
+
+  /**
+   * @field GCE_MACHINE_TYPE
+   * @brief The exec_property to choose a particular GCE machine type.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String GCE_MACHINE_TYPE = "gceMachineType";
+
+  /**
+   * @field OS_FAMILY
+   * @brief The exec_property to choose which OS family the action should run under.
+   * @details Originated from bazelbuild/bazel-toolchains.
+   */
+  public static final String OS_FAMILY = "OSFamily";
+
+  /**
+   * @field POOL
+   * @brief The exec_property to choose which pool of workers should take the action.
+   * @details Originated from bazelbuild/bazel-toolchains (similar to choose-queue for buildfarm's
+   *     operation queue).
+   */
+  public static final String POOL = "Pool";
 }

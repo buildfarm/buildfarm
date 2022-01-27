@@ -101,6 +101,11 @@ public class InputFetchStageTest {
           }
 
           @Override
+          public int getInputFetchDeadline() {
+            return 60;
+          }
+
+          @Override
           public QueuedOperation getQueuedOperation(QueueEntry queueEntry) {
             assertThat(queueEntry).isEqualTo(badEntry);
             // inspire empty argument list in Command resulting in null

@@ -79,8 +79,8 @@ public class InputFetcher implements Runnable {
         "InputFetcher",
         operationContext.queueEntry,
         QUEUED,
-        () -> fetcherThread.interrupt(),
-        Deadline.after(60, SECONDS));
+        fetcherThread::interrupt,
+        Deadline.after(workerContext.getInputFetchDeadline(), SECONDS));
     try {
       return fetchPolled(stopwatch);
     } finally {
@@ -88,8 +88,8 @@ public class InputFetcher implements Runnable {
     }
   }
 
-  private static String BAZEL_HOST_BIN_PREFIX = "bazel-out/host/bin/";
-  private static String BAZEL_RUNFILES_SUFFIX = ".runfiles/__main__/";
+  private static final String BAZEL_HOST_BIN_PREFIX = "bazel-out/host/bin/";
+  private static final String BAZEL_RUNFILES_SUFFIX = ".runfiles/__main__/";
 
   static String getExecutablePath(
       String programPath, Directory root, Map<Digest, Directory> directoriesIndex) {
@@ -106,7 +106,7 @@ public class InputFetcher implements Runnable {
     if (runfilesProgramDigest == null) {
       return programPath;
     }
-    if (!programDigest.equals(runfilesProgramPath)) {
+    if (!programDigest.equals(runfilesProgramDigest)) {
       return programPath;
     }
     return runfilesProgramPath;
@@ -161,14 +161,16 @@ public class InputFetcher implements Runnable {
     try {
       queuedOperation = workerContext.getQueuedOperation(operationContext.queueEntry);
       if (queuedOperation == null || !isQueuedOperationValid(queuedOperation)) {
-        logger.log(Level.SEVERE, format("invalid queued operation: %s", operationName));
+        if (queuedOperation != null) {
+          logger.log(Level.SEVERE, format("invalid queued operation: %s", operationName));
+        }
         owner.error().put(operationContext);
         return 0;
       }
 
       if (queuedOperation.hasTree()) {
         directoriesIndex =
-            DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories());
+            DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap());
       } else {
         // TODO remove legacy interpretation and field after transition
         directoriesIndex =

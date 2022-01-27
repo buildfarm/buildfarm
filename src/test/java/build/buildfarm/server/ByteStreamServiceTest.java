@@ -41,7 +41,6 @@ import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.SettableFuture;
@@ -57,6 +56,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -65,7 +65,6 @@ import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
@@ -75,7 +74,7 @@ public class ByteStreamServiceTest {
   private Server fakeServer;
   private String fakeServerName;
 
-  @Mock private Instances instances;
+  @Mock private Instance instance;
 
   @Before
   public void setUp() throws Exception {
@@ -84,7 +83,7 @@ public class ByteStreamServiceTest {
     // Use a mutable service registry for later registering the service impl for each test case.
     fakeServer =
         InProcessServerBuilder.forName(fakeServerName)
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, SECONDS))
+            .addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, SECONDS))
             .directExecutor()
             .build()
             .start();
@@ -141,13 +140,11 @@ public class ByteStreamServiceTest {
 
     Write write = mock(Write.class);
     doAnswer(
-            new Answer<Void>() {
-              @Override
-              public Void answer(InvocationOnMock invocation) {
-                output.reset();
-                return null;
-              }
-            })
+            (Answer<Void>)
+                invocation -> {
+                  output.reset();
+                  return null;
+                })
         .when(write)
         .reset();
     when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
@@ -155,7 +152,6 @@ public class ByteStreamServiceTest {
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     when(write.getFuture()).thenReturn(writtenFuture);
 
-    Instance instance = mock(Instance.class);
     when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
         .thenReturn(write);
 
@@ -163,7 +159,6 @@ public class ByteStreamServiceTest {
     String resourceName =
         ByteStreamUploader.uploadResourceName(
             /* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
-    when(instances.getFromUploadBlob(eq(resourceName))).thenReturn(instance);
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamStub service = ByteStreamGrpc.newStub(channel);
@@ -228,7 +223,6 @@ public class ByteStreamServiceTest {
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     when(write.getFuture()).thenReturn(writtenFuture);
 
-    Instance instance = mock(Instance.class);
     when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
         .thenReturn(write);
 
@@ -236,7 +230,6 @@ public class ByteStreamServiceTest {
     String resourceName =
         ByteStreamUploader.uploadResourceName(
             /* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
-    when(instances.getFromUploadBlob(eq(resourceName))).thenReturn(instance);
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamStub service = ByteStreamGrpc.newStub(channel);
@@ -271,7 +264,7 @@ public class ByteStreamServiceTest {
     verify(write, times(2)).getFuture();
   }
 
-  class CountingReadObserver implements StreamObserver<ReadResponse> {
+  static class CountingReadObserver implements StreamObserver<ReadResponse> {
     private final List<Integer> sizes = Lists.newArrayList();
     private final ByteString.Output sink = ByteString.newOutput();
     private boolean completed = false;
@@ -310,6 +303,7 @@ public class ByteStreamServiceTest {
     }
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void readSlicesLargeChunksFromInstance() throws Exception {
     // pick a large chunk size
@@ -327,8 +321,6 @@ public class ByteStreamServiceTest {
     String resourceName = "blobs/" + DigestUtil.toString(digest);
     ReadRequest request = ReadRequest.newBuilder().setResourceName(resourceName).build();
 
-    Instance instance = mock(Instance.class);
-    when(instances.getFromBlob(eq(resourceName))).thenReturn(instance);
     doAnswer(answerVoid((blobDigest, offset, limit, chunkObserver, metadata) -> {}))
         .when(instance)
         .getBlob(
@@ -360,6 +352,10 @@ public class ByteStreamServiceTest {
     assertThat(readObserver.getData()).isEqualTo(content);
     List<Integer> sizes = readObserver.getSizesList();
     assertThat(sizes.size()).isEqualTo(11); // 10 + 1 incomplete chunk
-    assertThat(Iterables.filter(sizes, (responseSize) -> responseSize > CHUNK_SIZE)).isEmpty();
+    assertThat(
+            sizes.stream()
+                .filter((responseSize) -> responseSize > CHUNK_SIZE)
+                .collect(Collectors.toList()))
+        .isEmpty();
   }
 }

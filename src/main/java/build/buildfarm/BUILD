@@ -79,7 +79,7 @@ container_image(
 )
 
 java_binary(
-    name = "buildfarm-operationqueue-worker",
+    name = "buildfarm-memory-worker",
     jvm_flags = ensure_accurate_metadata(),
     main_class = "build.buildfarm.worker.memory.Worker",
     visibility = ["//visibility:public"],
@@ -89,10 +89,10 @@ java_binary(
 )
 
 container_image(
-    name = "buildfarm-operationqueue-worker.container",
+    name = "buildfarm-memory-worker.container",
     base = "@java_image_base//image",
     cmd = [
-        "buildfarm-operationqueue-worker_deploy.jar",
+        "buildfarm-memory-worker_deploy.jar",
         "/config/worker.config",
     ],
     # leverage the implicit target of the buildfarm-server to get a fat jar.
@@ -100,7 +100,7 @@ container_image(
     # so we'd want some wrappy script. This seemed more straightforward.
     # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
     files = [
-        ":buildfarm-operationqueue-worker_deploy.jar",
+        ":buildfarm-memory-worker_deploy.jar",
     ],
     tags = ["container"],
     visibility = ["//visibility:public"],
@@ -243,6 +243,7 @@ java_binary(
     deps = [
         ":worker-profiler-printer",
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/common/redis",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/shard",
