@@ -12,4 +12,4 @@ Buildfarm's backplane uses a [Jedis Cluster](https://github.com/xetorthio/jedis)
 
 ## Balanced Queues
 To balance CPU utilization across multiple nodes in a redis cluster, we distribute operations through redis hashtags.  We have a conceptual queue that uses multiple redis lists in its implementation.  
-![Balanced Queues](https://github.com/bazelbuild/bazel-buildfarm/wiki/images/BalancedQueues.png)
+![Balanced Queues]({{site.url}}{{site.baseurl}}/assets/images/BalancedQueues.png)

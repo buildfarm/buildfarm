@@ -53,6 +53,7 @@ dequeue_match_settings: {
     #   value: "value_string"
     # }
   }
+  accept_everything: True
 
 }
 
@@ -106,7 +107,8 @@ cas: {
 #  }
 #}
 
-# the number of concurrently available slots in the execute phase
+# The number of concurrently available slots in the execute phase.
+# If a value of 0 is provided the system will derive a stage width equal to the available CPU cores.
 execute_stage_width: 1
 
 # the number of concurrently available slots in the input fetch phase

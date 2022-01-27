@@ -3,8 +3,11 @@ package tech.aurora.bfadmin.service.impl;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
+import build.buildfarm.v1test.ReindexAllCasRequest;
+import build.buildfarm.v1test.ReindexCasRequestResults;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
 import com.amazonaws.services.autoscaling.model.AutoScalingGroup;
@@ -31,6 +34,8 @@ import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -171,8 +176,6 @@ public class AdminServiceImpl implements AdminService {
 
   private List<Instance> getInstances(String clusterId, String type) {
     List<Instance> instances = new ArrayList<>();
-    ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
-    AdminGrpc.AdminBlockingStub stub = AdminGrpc.newBlockingStub(channel);
     for (com.amazonaws.services.ec2.model.Instance e : getEc2Instances(clusterId, type)) {
       Instance instance = new Instance();
       instance.setEc2Instance(e);
@@ -180,14 +183,42 @@ public class AdminServiceImpl implements AdminService {
       if ("worker".equals(type)) {
         instance.setWorkerType(getTagValue("buildfarm.worker_type", e.getTags()));
       }
+      String clientKey= "startTime/" + e.getPrivateIpAddress() + ("worker".equals(type) ? ":8981" : "");
       instance.setGroupType(type);
-      instance.setContainerStartTime(getContainerUptime(e.getPrivateIpAddress(), getTagValue("aws:autoscaling:groupName", e.getTags()), stub));
       instances.add(instance);
+    }
+    return updateContainersUptimes(instances, type);
+  }
+
+  private List<Instance> updateContainersUptimes(List<Instance> instances, String type) {
+    List<String> hostNames = new ArrayList<>();
+    for (Instance instance : instances) {
+      hostNames.add("startTime/" + instance.getEc2Instance().getPrivateIpAddress() + ("worker".equals(type) ? ":8981" : ""));
+    }
+    Map<String, Long> allContainersUptime = getAllContainersUptime(hostNames);
+    for (Instance instance : instances) {
+      String clientKey = "startTime/" + instance.getEc2Instance().getPrivateIpAddress() + ("worker".equals(type) ? ":8981" : "");
+      instance.setContainerStartTime(allContainersUptime.get(clientKey) != null ? allContainersUptime.get(clientKey) : 0L );
+    }
+    return instances;
+  }
+
+  private Map<String, Long>  getAllContainersUptime(List<String> hostNames) {
+    ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
+    AdminGrpc.AdminBlockingStub stub = AdminGrpc.newBlockingStub(channel);
+    GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder()
+            .setInstanceName("shard")
+            .addAllHostName(hostNames)
+            .build();
+    GetClientStartTimeResult result = stub.getClientStartTime(request);
+    Map<String, Long> allContainersUptime = new HashMap<String, Long>();
+    for (GetClientStartTime GetClientStartTime : result.getClientStartTimeList()){
+      allContainersUptime.put(GetClientStartTime.getInstanceName(),GetClientStartTime.getClientStartTime().getSeconds());
     }
     if (channel != null) {
       channel.shutdown();
     }
-    return instances;
+    return allContainersUptime;
   }
 
   private AutoScalingGroup getAutoScalingGroup(String asgName) {
@@ -231,14 +262,12 @@ public class AdminServiceImpl implements AdminService {
     return asgNames;
   }
 
-  private Long getContainerUptime(String hostname, String asgName, AdminGrpc.AdminBlockingStub stub) {
-    GetClientStartTimeRequest request = GetClientStartTimeRequest.newBuilder().setClientKey("startTime/" + hostname + (asgName.contains("server") ? "" : (":" + workerPort))).setInstanceName("shard").build();
-    GetClientStartTimeResult result = stub.getClientStartTime(request);
-    if (result.hasClientStartTime()) {
-      return result.getClientStartTime().getSeconds();
-    } else {
-      return 0L;
-    }
+  @Override
+  public void reindexAllCas(){
+    ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
+    AdminGrpc.AdminFutureStub stub = AdminGrpc.newFutureStub(channel);
+    ReindexAllCasRequest request = ReindexAllCasRequest.newBuilder().setInstanceName("shard").build();
+    stub.reindexAllCas(request);
   }
 
   private String getTagValue(String tagName, List<Tag> tags) {
