@@ -39,6 +39,8 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.ConfigAdjuster;
+import build.buildfarm.common.config.ShardWorkerOptions;
 import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
@@ -75,9 +77,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Duration;
 import com.google.protobuf.TextFormat;
-import com.google.protobuf.util.Durations;
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -302,15 +302,36 @@ public class Worker extends LoggingMain {
   }
 
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
+    addMissingRoot(config);
+    verifyRootConfiguration(config);
+    return Paths.get(config.getRoot());
+  }
+
+  private static void addMissingRoot(ShardWorkerConfig config) {
+    Path root = Paths.get(config.getRoot());
+    if (!Files.isDirectory(root)) {
+      try {
+        Files.createDirectories(root);
+      } catch (IOException e) {
+        logger.log(Level.SEVERE, e.toString());
+      }
+    }
+  }
+
+  private static void verifyRootConfiguration(ShardWorkerConfig config)
+      throws ConfigurationException {
     String rootValue = config.getRoot();
+
+    // Configuration error if no root is specified.
     if (Strings.isNullOrEmpty(rootValue)) {
       throw new ConfigurationException("root value in config missing");
     }
+
+    // Configuration error if root does not exist.
     Path root = Paths.get(rootValue);
     if (!Files.isDirectory(root)) {
       throw new ConfigurationException("root [" + root.toString() + "] is not directory");
     }
-    return root;
   }
 
   private static Path getValidFilesystemCASPath(FilesystemCASConfig config, Path root)
@@ -368,7 +389,8 @@ public class Worker extends LoggingMain {
         break;
     }
 
-    workerStubs = WorkerStubs.create(digestUtil, getGrpcTimeout(config));
+    workerStubs =
+        WorkerStubs.create(digestUtil, config.getShardWorkerInstanceConfig().getGrpcTimeout());
 
     ExecutorService removeDirectoryService =
         newFixedThreadPool(
@@ -421,8 +443,7 @@ public class Worker extends LoggingMain {
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
             config.getExecutionPoliciesList(),
             instance,
-            /* deadlineAfter=*/
-            /* deadlineAfterUnits=*/ config.getDefaultActionTimeout(),
+            config.getDefaultActionTimeout(),
             config.getMaximumActionTimeout(),
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
@@ -466,22 +487,6 @@ public class Worker extends LoggingMain {
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
-  }
-
-  private static Duration getGrpcTimeout(ShardWorkerConfig config) {
-    // return the configured
-    if (config.getShardWorkerInstanceConfig().hasGrpcTimeout()) {
-      Duration configured = config.getShardWorkerInstanceConfig().getGrpcTimeout();
-      if (configured.getSeconds() > 0 || configured.getNanos() > 0) {
-        return configured;
-      }
-    }
-
-    // return a default
-    Duration defaultDuration = Durations.fromSeconds(60);
-    logger.log(
-        INFO, "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
-    return defaultDuration;
   }
 
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
@@ -920,16 +925,11 @@ public class Worker extends LoggingMain {
     logger.log(SEVERE, "*** server shut down");
   }
 
-  private static ShardWorkerConfig toShardWorkerConfig(Readable input, WorkerOptions options)
+  private static ShardWorkerConfig toShardWorkerConfig(Readable input, ShardWorkerOptions options)
       throws IOException {
     ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
     TextFormat.merge(input, builder);
-    if (!Strings.isNullOrEmpty(options.root)) {
-      builder.setRoot(options.root);
-    }
-    if (!Strings.isNullOrEmpty(options.publicName)) {
-      builder.setPublicName(options.publicName);
-    }
+    ConfigAdjuster.adjust(builder, options);
     return builder.build();
   }
 
@@ -957,7 +957,7 @@ public class Worker extends LoggingMain {
     // unknown stream 11369
     nettyLogger.setLevel(SEVERE);
 
-    OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
+    OptionsParser parser = OptionsParser.newOptionsParser(ShardWorkerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
@@ -970,7 +970,8 @@ public class Worker extends LoggingMain {
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       ShardWorkerConfig config =
           toShardWorkerConfig(
-              new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
+              new InputStreamReader(configInputStream),
+              parser.getOptions(ShardWorkerOptions.class));
       worker = new Worker(session, config);
     }
     worker.start();

@@ -376,7 +376,7 @@ public class RedisShardBackplane implements Backplane {
     for (String channel : expiringChannels) {
       Operation operation = parseOperationJson(getOperation(jedis, parseOperationChannel(channel)));
       if (operation == null || !operation.getDone()) {
-        publishExpiration(jedis, channel, now/* force=*/ );
+        publishExpiration(jedis, channel, now);
       } else {
         subscriber.onOperation(channel, onPublish.apply(operation), expiresAt);
       }

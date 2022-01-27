@@ -17,6 +17,14 @@ def archive_dependencies(third_party):
             "url": "https://github.com/bazelbuild/rules_jvm_external/archive/%s.zip" % RULES_JVM_EXTERNAL_TAG,
         },
 
+        # Kubernetes rules.  Useful for local development with tilt.
+        {
+            "name": "io_bazel_rules_k8s",
+            "strip_prefix": "rules_k8s-0.5",
+            "url": "https://github.com/bazelbuild/rules_k8s/archive/v0.5.tar.gz",
+            "sha256": "773aa45f2421a66c8aa651b8cecb8ea51db91799a405bd7b913d77052ac7261a",
+        },
+
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
         {
             "name": "com_google_protobuf",
@@ -72,19 +80,11 @@ def archive_dependencies(third_party):
             "strip_prefix": "bazel-toolchain-76ce37e977a304acf8948eadabb82c516320e286",
             "url": "https://github.com/grailbio/bazel-toolchain/archive/76ce37e977a304acf8948eadabb82c516320e286.tar.gz",
         },
-
-        # Ideally we would use the 0.14.4 release of rules_docker,
-        # but that version introduced new pypi and pkg dependncies on tar-related targets making the upgrade difficult.
-        # Those dependencies were then removed afterward.  We pick a stable commit after 0.14.4 instead of cherry-picking in the different changes.
-        # https://github.com/bazelbuild/rules_docker/issues/1622
-        # When a new version after 0.14.4 is released, we can go back to a pinned version.
         {
             "name": "io_bazel_rules_docker",
-            "patch_args": ["-p1"],
-            "patches": ["%s/io_bazel_rules_docker:entrypoint.patch" % third_party],
-            "sha256": "d5609b7858246fa11e76237aa9b3e681615bdc8acf2ed29058426cf7c4cea099",
-            "strip_prefix": "rules_docker-f4822f3921f0c343dd9e5ae65c760d0fb70be1b3",
-            "urls": ["https://github.com/bazelbuild/rules_docker/archive/f4822f3921f0c343dd9e5ae65c760d0fb70be1b3.tar.gz"],
+            "sha256": "59536e6ae64359b716ba9c46c39183403b01eabfbd57578e84398b4829ca499a",
+            "strip_prefix": "rules_docker-0.22.0",
+            "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.22.0/rules_docker-v0.22.0.tar.gz"],
         },
 
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.

@@ -150,7 +150,8 @@ public class ShardInstanceTest {
             /* useDenyList=*/ true,
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
-            /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()));
+            /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()),
+            false);
     instance.start("startTime/test:0000");
   }
 
