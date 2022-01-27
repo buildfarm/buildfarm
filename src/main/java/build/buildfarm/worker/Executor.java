@@ -245,7 +245,6 @@ class Executor {
               command.getEnvironmentVariablesList(),
               limits,
               timeout,
-              isDefaultTimeout,
               // executingMetadata.getStdoutStreamName(),
               // executingMetadata.getStderrStreamName(),
               resultBuilder);
@@ -411,7 +410,6 @@ class Executor {
       List<EnvironmentVariable> environmentVariables,
       ResourceLimits limits,
       Duration timeout,
-      boolean isDefaultTimeout,
       ActionResult.Builder resultBuilder)
       throws IOException, InterruptedException {
     ProcessBuilder processBuilder =
