@@ -88,6 +88,7 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.services.HealthStatusManager;
 import io.prometheus.client.Counter;
+import io.prometheus.client.Gauge;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -125,6 +126,16 @@ public class Worker extends LoggingMain {
           .register();
   private static final Counter workerPausedMetric =
       Counter.build().name("worker_paused").help("Worker paused.").register();
+  private static final Gauge executionSlotsTotal =
+      Gauge.build()
+          .name("execution_slots_total")
+          .help("Total execution slots configured on worker.")
+          .register();
+  private static final Gauge inputFetchSlotsTotal =
+      Gauge.build()
+          .name("input_fetch_slots_total")
+          .help("Total input fetch slots configured on worker.")
+          .register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
   private final boolean isCasShard;
@@ -732,6 +743,8 @@ public class Worker extends LoggingMain {
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     healthCheckMetric.labels("stop").inc();
+    executionSlotsTotal.set(0);
+    inputFetchSlotsTotal.set(0);
     if (execFileSystem != null) {
       logger.log(INFO, "Stopping exec filesystem");
       execFileSystem.stop();
@@ -935,6 +948,8 @@ public class Worker extends LoggingMain {
     }
     pipeline.start();
     healthCheckMetric.labels("start").inc();
+    executionSlotsTotal.set(config.getExecuteStageWidth());
+    inputFetchSlotsTotal.set(config.getInputFetchStageWidth());
   }
 
   @Override
