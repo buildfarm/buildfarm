@@ -141,19 +141,32 @@ public class ConfigAdjuster {
   }
 
   private static int adjustExecuteStageWidth(int currentWidth, int widthOffset) {
+    // Is this the best way to derive system processors?
+    // It seems to work fine on host machines & inside containers.
     int availableCores = Runtime.getRuntime().availableProcessors();
+
+    // Some cores of a machine are reserved for usage other than buildfarm's execution.
+    // Adjust via a user provided offset when deriving the execute stage width to avoid over
+    // saturation.
     availableCores -= widthOffset;
+
+    // The user has chosen to have their execution width derived for them
     if (currentWidth <= 0) {
       logger.log(
           Level.INFO,
-          "Execute stage width is not valid.  Setting to available cores: " + availableCores);
+          String.format(
+              "Execute stage width is not valid.  Setting to available cores: %d (offset: %d)",
+              availableCores, widthOffset));
       return availableCores;
     }
+
+    // The user is providing their own execution width.
+    // Show a warning to help them decide if their selection is optimal
     if (currentWidth != availableCores) {
       logger.log(
           Level.WARNING,
           String.format(
-              "The configured 'execute stage width' does not optimally saturate available cores: %d < %d (offset: %d)",
+              "The configured 'execute stage width' does not optimally saturate available cores: %d < %d (offset: %d).  You can derive your execution stage width automatically by excluding it from the config.",
               currentWidth, availableCores, widthOffset));
     }
 
