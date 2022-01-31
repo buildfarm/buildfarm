@@ -88,6 +88,7 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.services.HealthStatusManager;
 import io.prometheus.client.Counter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -122,6 +123,8 @@ public class Worker extends LoggingMain {
           .labelNames("lifecycle")
           .help("Service health check.")
           .register();
+  private static final Counter workerPausedMetric =
+      Counter.build().name("worker_paused").help("Worker paused.").register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
   private final boolean isCasShard;
@@ -853,9 +856,26 @@ public class Worker extends LoggingMain {
                 return now + registrationIntervalMillis;
               }
 
+              boolean isWorkerPausedFromNewWork() {
+                try {
+                  File pausedFile = new File(config.getRoot() + "/.paused");
+                  if (pausedFile.exists()) {
+                    logger.log(Level.INFO, "The current worker is paused from taking on new work!");
+                    pipeline.stopMatchingOperations();
+                    workerPausedMetric.inc();
+                    return true;
+                  }
+                } catch (Exception e) {
+                  logger.log(Level.WARNING, "Could not open .paused file.", e);
+                }
+                return false;
+              }
+
               void registerIfExpired() {
                 long now = System.currentTimeMillis();
-                if (now >= workerRegistrationExpiresAt && !inGracefulShutdown) {
+                if (now >= workerRegistrationExpiresAt
+                    && !inGracefulShutdown
+                    && !isWorkerPausedFromNewWork()) {
                   // worker must be registered to match
                   addWorker(nextRegistration(now));
                   // update every 10 seconds
