@@ -643,6 +643,11 @@ message ShardWorkerConfig {
 
   // execute width
   int32 execute_stage_width = 16;
+  
+  // An offset width used when deriving the execute stage width.
+  // Some cores of a machine are reserved for usage other than buildfarm's execution.
+  // Provide that offset here when deriving the execute stage width to avoid over saturation.
+  int32 execute_stage_width_offset = 40;
 
   // symlink cas input-only directories
   bool link_input_directories = 17;
@@ -1062,6 +1067,11 @@ message WorkerConfig {
 
   // execute width
   int32 execute_stage_width = 18;
+  
+  // An offset width used when deriving the execute stage width.
+  // Some cores of a machine are reserved for usage other than buildfarm's execution.
+  // Provide that offset here when deriving the execute stage width to avoid over saturation.
+  int32 execute_stage_width_offset = 31;
 
   // symlink cas input-only directories
   bool link_input_directories = 19;

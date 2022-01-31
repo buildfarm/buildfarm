@@ -31,7 +31,6 @@ import java.util.logging.Logger;
  *     will adjust accordingly after a configuration is loaded.
  */
 public class ConfigAdjuster {
-
   private static final Logger logger = Logger.getLogger(ConfigAdjuster.class.getName());
 
   /**
@@ -42,7 +41,6 @@ public class ConfigAdjuster {
    * @note Overloaded.
    */
   public static void adjust(ShardWorkerConfig.Builder builder, ShardWorkerOptions options) {
-
     // Handle env overrides.  A typical pattern for docker builds.
     String redisURI = System.getenv("REDIS_URI");
     if (redisURI != null) {
@@ -65,7 +63,6 @@ public class ConfigAdjuster {
     }
 
     if (!builder.getShardWorkerInstanceConfig().hasGrpcTimeout()) {
-
       Duration defaultDuration = Durations.fromSeconds(60);
       builder.setShardWorkerInstanceConfig(
           builder.getShardWorkerInstanceConfigBuilder().setGrpcTimeout(defaultDuration).build());
@@ -74,7 +71,9 @@ public class ConfigAdjuster {
           "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
     }
 
-    builder.setExecuteStageWidth(adjustExecuteStageWidth(builder.getExecuteStageWidth()));
+    builder.setExecuteStageWidth(
+        adjustExecuteStageWidth(
+            builder.getExecuteStageWidth(), builder.getExecuteStageWidthOffset()));
   }
 
   /**
@@ -85,7 +84,6 @@ public class ConfigAdjuster {
    * @note Overloaded.
    */
   public static void adjust(WorkerConfig.Builder builder, MemoryWorkerOptions options) {
-
     if (!Strings.isNullOrEmpty(options.root)) {
       logger.log(Level.INFO, "setting root from CLI: " + options.root);
       builder.setRoot(options.root);
@@ -96,7 +94,9 @@ public class ConfigAdjuster {
       builder.setCasCacheDirectory(options.casCacheDirectory);
     }
 
-    builder.setExecuteStageWidth(adjustExecuteStageWidth(builder.getExecuteStageWidth()));
+    builder.setExecuteStageWidth(
+        adjustExecuteStageWidth(
+            builder.getExecuteStageWidth(), builder.getExecuteStageWidthOffset()));
   }
 
   /**
@@ -107,7 +107,6 @@ public class ConfigAdjuster {
    * @note Overloaded.
    */
   public static void adjust(BuildFarmServerConfig.Builder builder, ServerOptions options) {
-
     // Handle env overrides.  A typical pattern for docker builds.
     String redisURI = System.getenv("REDIS_URI");
     if (redisURI != null) {
@@ -141,9 +140,9 @@ public class ConfigAdjuster {
     }
   }
 
-  private static int adjustExecuteStageWidth(int currentWidth) {
-
+  private static int adjustExecuteStageWidth(int currentWidth, int widthOffset) {
     int availableCores = Runtime.getRuntime().availableProcessors();
+    availableCores -= widthOffset;
     if (currentWidth <= 0) {
       logger.log(
           Level.INFO,
@@ -153,10 +152,9 @@ public class ConfigAdjuster {
     if (currentWidth != availableCores) {
       logger.log(
           Level.WARNING,
-          "The configured 'execute stage width' does not optimally saturate available cores: "
-              + currentWidth
-              + " > "
-              + availableCores);
+          String.format(
+              "The configured 'execute stage width' does not optimally saturate available cores: %d < %d (offset: %d)",
+              currentWidth, availableCores, widthOffset));
     }
 
     return currentWidth;
