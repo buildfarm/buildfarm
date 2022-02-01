@@ -31,6 +31,7 @@ import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.Tree;
@@ -142,7 +143,7 @@ public interface Instance {
 
   PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully();
 
-  GetClientStartTimeResult getClientStartTime();
+  GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request);
 
   CasIndexResults reindexCas(@Nullable String hostName);
 

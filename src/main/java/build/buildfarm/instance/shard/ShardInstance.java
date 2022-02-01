@@ -39,7 +39,6 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.INFO;
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
 
@@ -76,6 +75,7 @@ import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
@@ -231,24 +231,6 @@ public class ShardInstance extends AbstractServerInstance {
   // TODO: move to config
   private static final Duration queueTimeout = Durations.fromSeconds(60);
 
-  private static Duration getGrpcTimeout(ShardInstanceConfig config) {
-    // return the configured
-    if (config.hasGrpcTimeout()) {
-      Duration configured = config.getGrpcTimeout();
-      if (configured.getSeconds() > 0 || configured.getNanos() > 0) {
-        return configured;
-      }
-    }
-
-    // return a default
-    Duration defaultDuration = Durations.fromSeconds(60);
-    logger.log(
-        INFO,
-        String.format(
-            "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s"));
-    return defaultDuration;
-  }
-
   private static Backplane createBackplane(ShardInstanceConfig config, String identifier)
       throws ConfigurationException {
     ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
@@ -302,8 +284,9 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaximumActionTimeout(),
         config.getUseDenyList(),
         onStop,
-        WorkerStubs.create(digestUtil, getGrpcTimeout(config)),
-        actionCacheFetchService);
+        WorkerStubs.create(digestUtil, config.getGrpcTimeout()),
+        actionCacheFetchService,
+        config.getEnsureOutputsPresent());
   }
 
   public ShardInstance(
@@ -320,7 +303,8 @@ public class ShardInstance extends AbstractServerInstance {
       boolean useDenyList,
       Runnable onStop,
       LoadingCache<String, Instance> workerStubs,
-      ListeningExecutorService actionCacheFetchService) {
+      ListeningExecutorService actionCacheFetchService,
+      boolean ensureOutputsPresent) {
     super(
         name,
         digestUtil,
@@ -328,7 +312,8 @@ public class ShardInstance extends AbstractServerInstance {
         /* actionCache=*/ null,
         /* outstandingOperations=*/ null,
         /* completedOperations=*/ null,
-        /* activeBlobWrites=*/ null);
+        /* activeBlobWrites=*/ null,
+        ensureOutputsPresent);
     this.backplane = backplane;
     this.workerStubs = workerStubs;
     this.onStop = onStop;
@@ -1498,7 +1483,7 @@ public class ShardInstance extends AbstractServerInstance {
           || property.getName().equals(ExecutionProperties.MAX_CORES)) {
         try {
           int intValue = Integer.parseInt(property.getValue());
-          if (intValue <= 0 || intValue > maxCpu) {
+          if (intValue <= 0 || (maxCpu != 0 && intValue > maxCpu)) {
             preconditionFailure
                 .addViolationsBuilder()
                 .setType(VIOLATION_TYPE_INVALID)
@@ -1507,7 +1492,7 @@ public class ShardInstance extends AbstractServerInstance {
                     format(
                         "property '%s' value was out of range: %d", property.getName(), intValue));
           }
-          if (property.getName().equals("min-cores")) {
+          if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
             minCores = intValue;
           } else {
             maxCores = intValue;
@@ -2477,9 +2462,9 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime() {
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     try {
-      return backplane.getClientStartTime();
+      return backplane.getClientStartTime(request);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

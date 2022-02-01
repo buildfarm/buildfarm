@@ -15,6 +15,7 @@
 package build.buildfarm;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.config.ShardWorkerOptions;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.JedisClusterFactory;
@@ -25,7 +26,6 @@ import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.WorkerProfileMessage;
-import build.buildfarm.worker.shard.WorkerOptions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Sets;
 import com.google.devtools.common.options.OptionsParser;
@@ -109,7 +109,7 @@ class WorkerProfile {
   }
 
   private static RedisShardBackplaneConfig toRedisShardBackplaneConfig(
-      Readable input, WorkerOptions options) throws IOException {
+      Readable input, ShardWorkerOptions options) throws IOException {
     ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
     TextFormat.merge(input, builder);
     if (!Strings.isNullOrEmpty(options.root)) {
@@ -123,7 +123,7 @@ class WorkerProfile {
 
   @SuppressWarnings("ConstantConditions")
   private static Set<String> getWorkers(String[] args) throws ConfigurationException, IOException {
-    OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
+    OptionsParser parser = OptionsParser.newOptionsParser(ShardWorkerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
@@ -134,7 +134,8 @@ class WorkerProfile {
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       config =
           toRedisShardBackplaneConfig(
-              new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
+              new InputStreamReader(configInputStream),
+              parser.getOptions(ShardWorkerOptions.class));
     } catch (Exception e) {
       e.printStackTrace();
     }
