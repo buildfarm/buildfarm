@@ -26,6 +26,8 @@ import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 import io.grpc.protobuf.ProtoUtils;
 import io.grpc.stub.MetadataUtils;
+import java.util.HashMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 /** Utility functions to handle Metadata for remote Grpc calls. */
@@ -34,6 +36,8 @@ public class TracingMetadataUtils {
 
   private static final Context.Key<RequestMetadata> CONTEXT_KEY =
       Context.key("remote-grpc-metadata");
+
+  private static Map<String, String> capturedHeaders = new HashMap<>();
 
   @VisibleForTesting
   public static final Metadata.Key<RequestMetadata> METADATA_KEY =
@@ -45,6 +49,7 @@ public class TracingMetadataUtils {
     if (metadata == null) {
       metadata = RequestMetadata.getDefaultInstance();
     }
+
     return metadata;
   }
 
@@ -71,8 +76,22 @@ public class TracingMetadataUtils {
       if (meta == null) {
         meta = RequestMetadata.getDefaultInstance();
       }
+
+      capturedHeaders = extractHeaders(headers);
+
       Context ctx = Context.current().withValue(CONTEXT_KEY, meta);
       return Contexts.interceptCall(ctx, call, headers, next);
+    }
+
+    private static Map<String, String> extractHeaders(Metadata headers) {
+      Map<String, String> capturedHeaders = new HashMap<>();
+      for (String key : headers.keys()) {
+        if (!key.endsWith(Metadata.BINARY_HEADER_SUFFIX)) {
+          String val = headers.get(Metadata.Key.of(key, Metadata.ASCII_STRING_MARSHALLER));
+          capturedHeaders.put(key, val);
+        }
+      }
+      return capturedHeaders;
     }
   }
 }
