@@ -331,7 +331,6 @@ public abstract class AbstractServerInstance implements Instance {
 
   private static boolean shouldEnsureOutputsPresent(
       boolean ensureOutputsPresent, RequestMetadata requestMetadata) {
-
     // The 'ensure outputs present' setting means that the AC will only return results to the client
     // when all of the action output blobs are present in the CAS.  If any one blob is missing, the
     // system will return a cache miss.  Although this is a more expensive check to perform, some
