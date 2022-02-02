@@ -88,6 +88,8 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.services.HealthStatusManager;
 import io.prometheus.client.Counter;
+import io.prometheus.client.Gauge;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -121,6 +123,18 @@ public class Worker extends LoggingMain {
           .name("health_check")
           .labelNames("lifecycle")
           .help("Service health check.")
+          .register();
+  private static final Counter workerPausedMetric =
+      Counter.build().name("worker_paused").help("Worker paused.").register();
+  private static final Gauge executionSlotsTotal =
+      Gauge.build()
+          .name("execution_slots_total")
+          .help("Total execution slots configured on worker.")
+          .register();
+  private static final Gauge inputFetchSlotsTotal =
+      Gauge.build()
+          .name("input_fetch_slots_total")
+          .help("Total input fetch slots configured on worker.")
           .register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
@@ -729,6 +743,8 @@ public class Worker extends LoggingMain {
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     healthCheckMetric.labels("stop").inc();
+    executionSlotsTotal.set(0);
+    inputFetchSlotsTotal.set(0);
     if (execFileSystem != null) {
       logger.log(INFO, "Stopping exec filesystem");
       execFileSystem.stop();
@@ -853,9 +869,26 @@ public class Worker extends LoggingMain {
                 return now + registrationIntervalMillis;
               }
 
+              boolean isWorkerPausedFromNewWork() {
+                try {
+                  File pausedFile = new File(config.getRoot() + "/.paused");
+                  if (pausedFile.exists()) {
+                    logger.log(Level.INFO, "The current worker is paused from taking on new work!");
+                    pipeline.stopMatchingOperations();
+                    workerPausedMetric.inc();
+                    return true;
+                  }
+                } catch (Exception e) {
+                  logger.log(Level.WARNING, "Could not open .paused file.", e);
+                }
+                return false;
+              }
+
               void registerIfExpired() {
                 long now = System.currentTimeMillis();
-                if (now >= workerRegistrationExpiresAt && !inGracefulShutdown) {
+                if (now >= workerRegistrationExpiresAt
+                    && !inGracefulShutdown
+                    && !isWorkerPausedFromNewWork()) {
                   // worker must be registered to match
                   addWorker(nextRegistration(now));
                   // update every 10 seconds
@@ -915,6 +948,8 @@ public class Worker extends LoggingMain {
     }
     pipeline.start();
     healthCheckMetric.labels("start").inc();
+    executionSlotsTotal.set(config.getExecuteStageWidth());
+    inputFetchSlotsTotal.set(config.getInputFetchStageWidth());
   }
 
   @Override
