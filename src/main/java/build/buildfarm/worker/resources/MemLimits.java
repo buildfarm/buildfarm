@@ -64,5 +64,5 @@ public class MemLimits {
    * @brief Description explaining why settings were chosen.
    * @details This can be used to debug execution behavior.
    */
-  public ArrayList<String> description = new ArrayList<>();
+  public final ArrayList<String> description = new ArrayList<>();
 }

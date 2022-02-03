@@ -70,7 +70,6 @@ import com.google.longrunning.OperationsGrpc;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
@@ -97,13 +96,12 @@ public class BuildFarmServerTest {
 
   private BuildFarmServer server;
   private ManagedChannel inProcessChannel;
-  private MemoryInstanceConfig memoryInstanceConfig;
 
   @Before
   public void setUp() throws Exception {
     String uniqueServerName = "in-process server for " + getClass();
 
-    memoryInstanceConfig =
+    MemoryInstanceConfig memoryInstanceConfig =
         MemoryInstanceConfig.newBuilder()
             .setListOperationsDefaultPageSize(1024)
             .setListOperationsMaxPageSize(16384)
@@ -124,7 +122,7 @@ public class BuildFarmServerTest {
 
     BuildFarmServerConfig.Builder configBuilder = BuildFarmServerConfig.newBuilder().setPort(0);
     configBuilder
-        .addInstancesBuilder()
+        .getInstanceBuilder()
         .setName(INSTANCE_NAME)
         .setDigestFunction(DigestFunction.Value.SHA256)
         .setMemoryInstanceConfig(memoryInstanceConfig);
@@ -237,7 +235,7 @@ public class BuildFarmServerTest {
 
     ListOperationsResponse listResponse = operationsStub.listOperations(listRequest);
 
-    assertThat(Iterables.transform(listResponse.getOperationsList(), o -> o.getName()))
+    assertThat(Iterables.transform(listResponse.getOperationsList(), Operation::getName))
         .containsExactly(operation.getName());
 
     CancelOperationRequest cancelRequest =
@@ -252,8 +250,7 @@ public class BuildFarmServerTest {
   }
 
   @Test
-  public void cancelledOperationHasCancelledState()
-      throws IOException, InterruptedException, InvalidProtocolBufferException {
+  public void cancelledOperationHasCancelledState() throws IOException, InterruptedException {
     Operation operation = executeAction(createSimpleAction());
 
     OperationsGrpc.OperationsBlockingStub operationsStub =
@@ -279,8 +276,7 @@ public class BuildFarmServerTest {
   }
 
   @Test
-  public void cancellingExecutingOperationFailsPoll()
-      throws IOException, InterruptedException, InvalidProtocolBufferException {
+  public void cancellingExecutingOperationFailsPoll() throws IOException, InterruptedException {
     Operation operation = executeAction(createSimpleAction());
 
     // take our operation from the queue
@@ -334,7 +330,7 @@ public class BuildFarmServerTest {
                         .setOperationName(executingOperation.getName())
                         .build())
                 .getCode())
-        .isEqualTo(Code.UNAVAILABLE.getNumber());
+        .isNotEqualTo(Code.OK.getNumber());
   }
 
   private Operation getOperation(String name) {
@@ -347,8 +343,7 @@ public class BuildFarmServerTest {
   }
 
   @Test
-  public void actionWithExcessiveTimeoutFailsValidation()
-      throws IOException, InterruptedException, InvalidProtocolBufferException {
+  public void actionWithExcessiveTimeoutFailsValidation() throws IOException, InterruptedException {
     Digest actionDigestWithExcessiveTimeout =
         createAction(Action.newBuilder().setTimeout(Duration.newBuilder().setSeconds(9000)));
 

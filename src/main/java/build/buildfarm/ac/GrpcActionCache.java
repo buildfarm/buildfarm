@@ -38,6 +38,7 @@ public class GrpcActionCache implements ActionCache {
     this.channel = channel;
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public ListenableFuture<ActionResult> get(ActionKey actionKey) {
     return catchingAsync(
@@ -58,6 +59,7 @@ public class GrpcActionCache implements ActionCache {
         directExecutor());
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void put(ActionKey actionKey, ActionResult actionResult) {
     ActionCacheGrpc.newBlockingStub(channel)

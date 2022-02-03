@@ -85,12 +85,10 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -110,6 +108,7 @@ class ShardWorkerContext implements WorkerContext {
   private final SetMultimap<String, String> matchProvisions;
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
+  private final int inputFetchDeadline;
   private final int inputFetchStageWidth;
   private final int executeStageWidth;
   private final Backplane backplane;
@@ -145,16 +144,14 @@ class ShardWorkerContext implements WorkerContext {
       Platform platform,
       Duration operationPollPeriod,
       OperationPoller operationPoller,
-      int inlineContentLimit,
       int inputFetchStageWidth,
       int executeStageWidth,
+      int inputFetchDeadline,
       Backplane backplane,
       ExecFileSystem execFileSystem,
       InputStreamFactory inputStreamFactory,
       Iterable<ExecutionPolicy> policies,
       Instance instance,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
       Duration defaultActionTimeout,
       Duration maximumActionTimeout,
       boolean limitExecution,
@@ -170,6 +167,7 @@ class ShardWorkerContext implements WorkerContext {
     this.operationPoller = operationPoller;
     this.inputFetchStageWidth = inputFetchStageWidth;
     this.executeStageWidth = executeStageWidth;
+    this.inputFetchDeadline = inputFetchDeadline;
     this.backplane = backplane;
     this.execFileSystem = execFileSystem;
     this.inputStreamFactory = inputStreamFactory;
@@ -276,6 +274,12 @@ class ShardWorkerContext implements WorkerContext {
     Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
     ByteString queuedOperationBlob = getBlob(queuedOperationDigest);
     if (queuedOperationBlob == null) {
+      logger.log(
+          Level.WARNING,
+          format(
+              "missing queued operation: %s(%s)",
+              queueEntry.getExecuteEntry().getOperationName(),
+              DigestUtil.toString(queuedOperationDigest)));
       return null;
     }
     try {
@@ -291,6 +295,7 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
@@ -312,7 +317,8 @@ class ShardWorkerContext implements WorkerContext {
     }
     listener.onWaitEnd();
 
-    if (DequeueMatchEvaluator.shouldKeepOperation(matchSettings, matchProvisions, queueEntry)) {
+    if (queueEntry == null
+        || DequeueMatchEvaluator.shouldKeepOperation(matchSettings, matchProvisions, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -330,7 +336,7 @@ class ShardWorkerContext implements WorkerContext {
 
           @Override
           public boolean getMatched() {
-            return matched;
+            return !matched;
           }
 
           @Override
@@ -373,7 +379,7 @@ class ShardWorkerContext implements WorkerContext {
             listener.setOnCancelHandler(onCancelHandler);
           }
         };
-    while (!dedupMatchListener.getMatched()) {
+    while (dedupMatchListener.getMatched()) {
       try {
         matchInterruptible(dedupMatchListener);
       } catch (IOException e) {
@@ -423,6 +429,11 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public int getExecuteStageWidth() {
     return executeStageWidth;
+  }
+
+  @Override
+  public int getInputFetchDeadline() {
+    return inputFetchDeadline;
   }
 
   @Override
@@ -564,8 +575,8 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     Directory toDirectory() {
-      Collections.sort(files, Comparator.comparing(node -> node.getName()));
-      Collections.sort(directories, Comparator.comparing(node -> node.getName()));
+      files.sort(Comparator.comparing(FileNode::getName));
+      directories.sort(Comparator.comparing(DirectoryNode::getName));
       return Directory.newBuilder().addAllFiles(files).addAllDirectories(directories).build();
     }
   }
@@ -598,7 +609,7 @@ class ShardWorkerContext implements WorkerContext {
         outputDirPath,
         new SimpleFileVisitor<Path>() {
           OutputDirectoryContext currentDirectory = null;
-          Stack<OutputDirectoryContext> path = new Stack<>();
+          final Stack<OutputDirectoryContext> path = new Stack<>();
 
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
@@ -641,8 +652,7 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-              throws IOException {
+          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
             path.push(currentDirectory);
             if (dir.equals(outputDirPath)) {
               currentDirectory = outputRoot;
@@ -653,7 +663,7 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+          public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
             OutputDirectoryContext parentDirectory = path.pop();
             Directory directory = currentDirectory.toDirectory();
             if (parentDirectory == null) {
@@ -704,8 +714,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action)
-      throws IOException, InterruptedException {
+  public boolean putOperation(Operation operation) throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
       completedOperations.inc();
@@ -820,7 +829,7 @@ class ShardWorkerContext implements WorkerContext {
 
   public ResourceLimits commandExecutionSettings(Command command) {
     return ResourceDecider.decideResourceLimitations(
-        command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
+        command, name, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
   }
 
   @Override
@@ -830,10 +839,7 @@ class ShardWorkerContext implements WorkerContext {
       Command command,
       Path workingDirectory) {
     if (limitExecution) {
-      ResourceLimits limits =
-          ResourceDecider.decideResourceLimitations(
-              command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
-
+      ResourceLimits limits = commandExecutionSettings(command);
       return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
     }
     return new IOResource() {

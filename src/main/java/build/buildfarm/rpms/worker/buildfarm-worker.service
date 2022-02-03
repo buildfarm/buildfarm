@@ -1,0 +1,17 @@
+[Unit]
+Description=buildfarm worker
+
+[Service]
+Type=simple
+User=root
+Group=root
+Restart=always
+WorkingDirectory=/usr/local/buildfarm-worker
+ExecStart=/bin/sh -c 'exec /usr/bin/java -Djava.util.logging.config.file=/usr/local/buildfarm-worker/logging.properties \
+          -jar /usr/local/buildfarm-worker/buildfarm-shard-worker_deploy.jar \
+          /etc/buildfarm-worker/config/worker.config >>/var/log/buildfarm-worker/worker.log 2>&1'
+Restart=on-abort
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

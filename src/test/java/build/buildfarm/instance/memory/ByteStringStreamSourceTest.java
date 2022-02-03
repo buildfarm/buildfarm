@@ -33,6 +33,7 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ByteStringStreamSourceTest {
+  @SuppressWarnings("unchecked")
   @Test
   public void closeCallsCommittedFuture() throws IOException {
     FutureCallback<Void> mockCallback = mock(FutureCallback.class);

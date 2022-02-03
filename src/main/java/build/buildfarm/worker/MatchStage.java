@@ -42,13 +42,12 @@ public class MatchStage extends PipelineStage {
 
   class MatchOperationListener implements MatchListener {
     private OperationContext operationContext;
-    private Stopwatch stopwatch;
+    private final Stopwatch stopwatch;
     private long waitStart;
     private long waitDuration;
-    private Poller poller = null;
-    private QueueEntry queueEntry = null;
+    private final Poller poller = null;
+    private final QueueEntry queueEntry = null;
     private boolean matched = false;
-    private Runnable onCancelHandler = null; // never called, only blocking stub used
 
     public MatchOperationListener(OperationContext operationContext, Stopwatch stopwatch) {
       this.operationContext = operationContext;
@@ -72,6 +71,7 @@ public class MatchStage extends PipelineStage {
       waitStart = elapsedUSecs;
     }
 
+    @SuppressWarnings("ConstantConditions")
     @Override
     public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
       if (queueEntry == null) {
@@ -96,9 +96,10 @@ public class MatchStage extends PipelineStage {
 
     @Override
     public void setOnCancelHandler(Runnable onCancelHandler) {
-      this.onCancelHandler = onCancelHandler;
+      // never called, only blocking stub used
     }
 
+    @SuppressWarnings("SameReturnValue")
     private boolean onOperationPolled() throws InterruptedException {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
       logStart(operationName);
@@ -182,7 +183,7 @@ public class MatchStage extends PipelineStage {
   }
 
   @Override
-  public OperationContext take() throws InterruptedException {
+  public OperationContext take() {
     throw new UnsupportedOperationException();
   }
 

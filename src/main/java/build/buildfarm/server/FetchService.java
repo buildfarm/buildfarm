@@ -25,20 +25,16 @@ import java.util.logging.Logger;
 class FetchService extends FetchImplBase {
   public static final Logger logger = Logger.getLogger(ActionCacheService.class.getName());
 
-  private final Instances instances;
+  private final Instance instance;
 
-  FetchService(Instances instances) {
-    this.instances = instances;
+  FetchService(Instance instance) {
+    this.instance = instance;
   }
 
   @Override
   public void fetchBlob(
       FetchBlobRequest request, StreamObserver<FetchBlobResponse> responseObserver) {
-    try {
-      fetchBlob(instances.get(request.getInstanceName()), request, responseObserver);
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-    }
+    fetchBlob(instance, request, responseObserver);
   }
 
   private void fetchBlob(
@@ -81,6 +77,7 @@ class FetchService extends FetchImplBase {
               responseObserver.onCompleted();
             }
 
+            @SuppressWarnings("NullableProblems")
             @Override
             public void onFailure(Throwable t) {
               // handle NoSuchFileException

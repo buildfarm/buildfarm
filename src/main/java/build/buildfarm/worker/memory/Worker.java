@@ -26,13 +26,14 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
+import build.buildfarm.common.config.ConfigAdjuster;
+import build.buildfarm.common.config.MemoryWorkerOptions;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
@@ -133,9 +134,8 @@ public class Worker extends LoggingMain {
         retryScheduler);
   }
 
-  private static ByteStreamUploader createStubUploader(
-      String instanceName, Channel channel, Retrier retrier) {
-    return new ByteStreamUploader(instanceName, channel, null, 300, retrier);
+  private static ByteStreamUploader createStubUploader(String instanceName, Channel channel) {
+    return new ByteStreamUploader(instanceName, channel, null, 300, Worker.retrier);
   }
 
   private static Instance newStubInstance(
@@ -182,16 +182,12 @@ public class Worker extends LoggingMain {
             casChannel,
             digestUtil,
             casEndpoint.getDeadlineAfterSeconds());
-    uploader = createStubUploader(casInstance.getName(), casChannel, retrier);
+    uploader = createStubUploader(casInstance.getName(), casChannel);
     operationQueueInstance = newStubInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory =
-        new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest digest, long offset) throws IOException {
-            return casInstance.newBlobInput(
+        (digest, offset) ->
+            casInstance.newBlobInput(
                 digest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
-          }
-        };
     fileCache =
         new InjectedCASFileCache(
             inputStreamFactory,
@@ -237,13 +233,12 @@ public class Worker extends LoggingMain {
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> oq.deactivate(operation.getName()));
-    PipelineStage errorStage = completeStage; /* new ErrorStage(); */
-    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
+    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, completeStage);
     PipelineStage executeActionStage =
-        new ExecuteActionStage(context, reportResultStage, errorStage);
+        new ExecuteActionStage(context, reportResultStage, completeStage);
     PipelineStage inputFetchStage =
         new InputFetchStage(context, executeActionStage, new PutOperationStage(oq::requeue));
-    PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
+    PipelineStage matchStage = new MatchStage(context, inputFetchStage, completeStage);
 
     pipeline = new Pipeline();
     // pipeline.add(errorStage, 0);
@@ -264,6 +259,7 @@ public class Worker extends LoggingMain {
     stop();
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   private void stop() throws InterruptedException {
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
@@ -285,17 +281,11 @@ public class Worker extends LoggingMain {
     }
   }
 
-  private static WorkerConfig toWorkerConfig(Readable input, WorkerOptions options)
+  private static WorkerConfig toWorkerConfig(Readable input, MemoryWorkerOptions options)
       throws IOException {
     WorkerConfig.Builder builder = WorkerConfig.newBuilder();
     TextFormat.merge(input, builder);
-    if (!Strings.isNullOrEmpty(options.root)) {
-      builder.setRoot(options.root);
-    }
-
-    if (!Strings.isNullOrEmpty(options.casCacheDirectory)) {
-      builder.setCasCacheDirectory(options.casCacheDirectory);
-    }
+    ConfigAdjuster.adjust(builder, options);
     return builder.build();
   }
 
@@ -306,8 +296,9 @@ public class Worker extends LoggingMain {
   }
 
   /** returns success or failure */
+  @SuppressWarnings("ConstantConditions")
   static boolean workerMain(String[] args) {
-    OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
+    OptionsParser parser = OptionsParser.newOptionsParser(MemoryWorkerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
@@ -320,7 +311,7 @@ public class Worker extends LoggingMain {
           new Worker(
               toWorkerConfig(
                   new InputStreamReader(configInputStream),
-                  parser.getOptions(WorkerOptions.class)));
+                  parser.getOptions(MemoryWorkerOptions.class)));
       configInputStream.close();
       worker.start();
       return true;

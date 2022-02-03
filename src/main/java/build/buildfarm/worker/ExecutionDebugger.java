@@ -42,6 +42,7 @@ public class ExecutionDebugger {
    * @return Return code for the debugged execution.
    * @note Suggested return identifier: code.
    */
+  @SuppressWarnings("SameReturnValue")
   public static Code performBeforeExecutionDebug(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
     String message = getBeforeExecutionDebugInfo(processBuilder, limits, resultBuilder);
@@ -63,6 +64,7 @@ public class ExecutionDebugger {
    * @return Return code for the debugged execution.
    * @note Suggested return identifier: code.
    */
+  @SuppressWarnings("SameReturnValue")
   public static Code performAfterExecutionDebug(
       ProcessBuilder processBuilder,
       int exitCode,

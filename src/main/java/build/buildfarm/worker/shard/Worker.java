@@ -23,7 +23,6 @@ import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
@@ -40,6 +39,8 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.ConfigAdjuster;
+import build.buildfarm.common.config.ShardWorkerOptions;
 import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
@@ -49,7 +50,6 @@ import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
-import build.buildfarm.server.Instances;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
@@ -77,9 +77,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Duration;
 import com.google.protobuf.TextFormat;
-import com.google.protobuf.util.Durations;
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -90,6 +88,8 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.services.HealthStatusManager;
 import io.prometheus.client.Counter;
+import io.prometheus.client.Gauge;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -124,6 +124,18 @@ public class Worker extends LoggingMain {
           .labelNames("lifecycle")
           .help("Service health check.")
           .register();
+  private static final Counter workerPausedMetric =
+      Counter.build().name("worker_paused").help("Worker paused.").register();
+  private static final Gauge executionSlotsTotal =
+      Gauge.build()
+          .name("execution_slots_total")
+          .help("Total execution slots configured on worker.")
+          .register();
+  private static final Gauge inputFetchSlotsTotal =
+      Gauge.build()
+          .name("input_fetch_slots_total")
+          .help("Total input fetch slots configured on worker.")
+          .register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
   private final boolean hasCasCapability;
@@ -133,7 +145,10 @@ public class Worker extends LoggingMain {
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
-  private final HealthStatusManager healthStatusManager;
+
+  @SuppressWarnings("deprecation")
+  private final HealthStatusManager healthStatusManager = new HealthStatusManager();
+
   private final Server server;
   private final Path root;
   private final DigestUtil digestUtil;
@@ -141,7 +156,6 @@ public class Worker extends LoggingMain {
   private final Pipeline pipeline;
   private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
-  private final PrometheusPublisher prometheusPublisher;
 
   public class CasReplicationStage extends PipelineStage.NullStage {};
 
@@ -152,10 +166,10 @@ public class Worker extends LoggingMain {
 
     public void insertBlob(Digest digest, ByteString content)
         throws IOException, InterruptedException {
-      insertStream(digest, () -> content.newInput());
+      insertStream(digest, content::newInput);
     }
 
-    private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
+    private Write getLocalWrite(Digest digest) throws IOException {
       return execFileSystem
           .getStorage()
           .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
@@ -201,8 +215,7 @@ public class Worker extends LoggingMain {
       streamIntoWriteFuture(in, write, digest).get();
     }
 
-    private Write getCasMemberWrite(Digest digest, String workerName)
-        throws IOException, InterruptedException {
+    private Write getCasMemberWrite(Digest digest, String workerName) throws IOException {
       Instance casMember = workerStub(workerName);
 
       return casMember.getBlobWrite(
@@ -288,6 +301,7 @@ public class Worker extends LoggingMain {
    * @param clusterEndpoint the current Buildfarm endpoint.
    * @param instanceIp Ip of the the instance that we want to disable scale in protection.
    */
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   private void disableScaleInProtection(String clusterEndpoint, String instanceIp) {
     ManagedChannel channel = null;
     try {
@@ -305,15 +319,36 @@ public class Worker extends LoggingMain {
   }
 
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
+    addMissingRoot(config);
+    verifyRootConfiguration(config);
+    return Paths.get(config.getRoot());
+  }
+
+  private static void addMissingRoot(ShardWorkerConfig config) {
+    Path root = Paths.get(config.getRoot());
+    if (!Files.isDirectory(root)) {
+      try {
+        Files.createDirectories(root);
+      } catch (IOException e) {
+        logger.log(Level.SEVERE, e.toString());
+      }
+    }
+  }
+
+  private static void verifyRootConfiguration(ShardWorkerConfig config)
+      throws ConfigurationException {
     String rootValue = config.getRoot();
+
+    // Configuration error if no root is specified.
     if (Strings.isNullOrEmpty(rootValue)) {
       throw new ConfigurationException("root value in config missing");
     }
+
+    // Configuration error if root does not exist.
     Path root = Paths.get(rootValue);
     if (!Files.isDirectory(root)) {
       throw new ConfigurationException("root [" + root.toString() + "] is not directory");
     }
-    return root;
   }
 
   private static Path getValidFilesystemCASPath(FilesystemCASConfig config, Path root)
@@ -342,6 +377,7 @@ public class Worker extends LoggingMain {
     return instance.stripQueuedOperation(operation);
   }
 
+  @SuppressWarnings({"deprecation", "unchecked"})
   public Worker(String session, ServerBuilder<?> serverBuilder, ShardWorkerConfig config)
       throws ConfigurationException {
     super("BuildFarmShardWorker");
@@ -371,7 +407,8 @@ public class Worker extends LoggingMain {
         break;
     }
 
-    workerStubs = WorkerStubs.create(digestUtil, getGrpcTimeout(config));
+    workerStubs =
+        WorkerStubs.create(digestUtil, config.getShardWorkerInstanceConfig().getGrpcTimeout());
 
     ExecutorService removeDirectoryService =
         newFixedThreadPool(
@@ -393,15 +430,7 @@ public class Worker extends LoggingMain {
         createExecFileSystem(
             remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
 
-    instance =
-        new ShardWorkerInstance(
-            config.getPublicName(),
-            digestUtil,
-            backplane,
-            storage,
-            config.getShardWorkerInstanceConfig());
-
-    Instances instances = Instances.singular(instance);
+    instance = new ShardWorkerInstance(config.getPublicName(), digestUtil, backplane, storage);
 
     // Create the appropriate writer for the context
     CasWriter writer;
@@ -422,9 +451,9 @@ public class Worker extends LoggingMain {
             config.getDequeueMatchSettings().getPlatform(),
             config.getOperationPollPeriod(),
             backplane::pollOperation,
-            config.getInlineContentLimit(),
             config.getInputFetchStageWidth(),
             config.getExecuteStageWidth(),
+            config.getInputFetchDeadline(),
             backplane,
             execFileSystem,
             new EmptyInputStreamFactory(
@@ -432,8 +461,6 @@ public class Worker extends LoggingMain {
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
             config.getExecutionPoliciesList(),
             instance,
-            /* deadlineAfter=*/ 1,
-            /* deadlineAfterUnits=*/ DAYS,
             config.getDefaultActionTimeout(),
             config.getMaximumActionTimeout(),
             config.getLimitExecution(),
@@ -445,8 +472,6 @@ public class Worker extends LoggingMain {
     healthStatusManager = new HealthStatusManager();
     pipeline = new Pipeline();
     server = createServer(serverBuilder, storage, instances, pipeline, context);
-
-    prometheusPublisher = new PrometheusPublisher();
 
     logger.log(INFO, String.format("%s initialized", identifier));
   }
@@ -582,6 +607,7 @@ public class Worker extends LoggingMain {
     return false;
   }
 
+  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   private String getRandomWorker() throws IOException {
     Set<String> workerSet = backplane.getWorkers();
     synchronized (workerSet) {
@@ -615,23 +641,19 @@ public class Worker extends LoggingMain {
         (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
 
     InputStreamFactory localPopulatingInputStreamFactory =
-        new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest blobDigest, long offset)
-              throws IOException, InterruptedException {
-            // FIXME use write
-            ByteString content =
-                ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
+        (blobDigest, offset) -> {
+          // FIXME use write
+          ByteString content =
+              ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
 
-            if (offset == 0) {
-              // extra computations
-              Blob blob = new Blob(content, digestUtil);
-              // here's hoping that our digest matches...
-              storage.put(blob);
-            }
-
-            return content.newInput();
+          if (offset == 0) {
+            // extra computations
+            Blob blob = new Blob(content, digestUtil);
+            // here's hoping that our digest matches...
+            storage.put(blob);
           }
+
+          return content.newInput();
         };
     return new FuseExecFileSystem(
         root,
@@ -737,11 +759,12 @@ public class Worker extends LoggingMain {
         owner,
         config.getLinkInputDirectories(),
         removeDirectoryService,
-        accessRecorder,
-        /* deadlineAfter=*/ 1,
-        /* deadlineAfterUnits=*/ DAYS);
+        accessRecorder
+        /* deadlineAfter=*/
+        /* deadlineAfterUnits=*/ );
   }
 
+  @SuppressWarnings({"deprecation", "ResultOfMethodCallIgnored"})
   public void stop() throws InterruptedException {
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
@@ -756,6 +779,8 @@ public class Worker extends LoggingMain {
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     healthCheckMetric.labels("stop").inc();
+    executionSlotsTotal.set(0);
+    inputFetchSlotsTotal.set(0);
     if (execFileSystem != null) {
       logger.log(INFO, "Stopping exec filesystem");
       execFileSystem.stop();
@@ -880,9 +905,26 @@ public class Worker extends LoggingMain {
                 return now + registrationIntervalMillis;
               }
 
+              boolean isWorkerPausedFromNewWork() {
+                try {
+                  File pausedFile = new File(config.getRoot() + "/.paused");
+                  if (pausedFile.exists()) {
+                    logger.log(Level.INFO, "The current worker is paused from taking on new work!");
+                    pipeline.stopMatchingOperations();
+                    workerPausedMetric.inc();
+                    return true;
+                  }
+                } catch (Exception e) {
+                  logger.log(Level.WARNING, "Could not open .paused file.", e);
+                }
+                return false;
+              }
+
               void registerIfExpired() {
                 long now = System.currentTimeMillis();
-                if (now >= workerRegistrationExpiresAt && !inGracefulShutdown) {
+                if (now >= workerRegistrationExpiresAt
+                    && !inGracefulShutdown
+                    && !isWorkerPausedFromNewWork()) {
                   // worker must be registered to match
                   addWorker(nextRegistration(now));
                   // update every 10 seconds
@@ -912,6 +954,7 @@ public class Worker extends LoggingMain {
         .start();
   }
 
+  @SuppressWarnings("deprecation")
   public void start() throws InterruptedException {
     try {
       backplane.start(config.getPublicName());
@@ -925,7 +968,7 @@ public class Worker extends LoggingMain {
       server.start();
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-      prometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
+      PrometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
@@ -941,26 +984,23 @@ public class Worker extends LoggingMain {
     }
     pipeline.start();
     healthCheckMetric.labels("start").inc();
+    executionSlotsTotal.set(config.getExecuteStageWidth());
+    inputFetchSlotsTotal.set(config.getInputFetchStageWidth());
   }
 
   @Override
   protected void onShutdown() throws InterruptedException {
     logger.log(SEVERE, "*** shutting down gRPC server since JVM is shutting down");
-    prometheusPublisher.stopHttpServer();
+    PrometheusPublisher.stopHttpServer();
     stop();
     logger.log(SEVERE, "*** server shut down");
   }
 
-  private static ShardWorkerConfig toShardWorkerConfig(Readable input, WorkerOptions options)
+  private static ShardWorkerConfig toShardWorkerConfig(Readable input, ShardWorkerOptions options)
       throws IOException {
     ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
     TextFormat.merge(input, builder);
-    if (!Strings.isNullOrEmpty(options.root)) {
-      builder.setRoot(options.root);
-    }
-    if (!Strings.isNullOrEmpty(options.publicName)) {
-      builder.setPublicName(options.publicName);
-    }
+    ConfigAdjuster.adjust(builder, options);
     return builder.build();
   }
 
@@ -979,6 +1019,7 @@ public class Worker extends LoggingMain {
     }
   }
 
+  @SuppressWarnings("ConstantConditions")
   public static void startWorker(String[] args) throws Exception {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //
@@ -987,7 +1028,7 @@ public class Worker extends LoggingMain {
     // unknown stream 11369
     nettyLogger.setLevel(SEVERE);
 
-    OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
+    OptionsParser parser = OptionsParser.newOptionsParser(ShardWorkerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
@@ -1000,7 +1041,8 @@ public class Worker extends LoggingMain {
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       ShardWorkerConfig config =
           toShardWorkerConfig(
-              new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
+              new InputStreamReader(configInputStream),
+              parser.getOptions(ShardWorkerOptions.class));
       worker = new Worker(session, config);
     }
     worker.start();
