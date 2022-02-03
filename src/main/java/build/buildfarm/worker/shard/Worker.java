@@ -469,9 +469,8 @@ public class Worker extends LoggingMain {
             config.getErrorOperationRemainingResources(),
             writer);
 
-    healthStatusManager = new HealthStatusManager();
     pipeline = new Pipeline();
-    server = createServer(serverBuilder, storage, instances, pipeline, context);
+    server = createServer(serverBuilder, storage, instance, pipeline, context);
 
     logger.log(INFO, String.format("%s initialized", identifier));
   }
@@ -479,14 +478,13 @@ public class Worker extends LoggingMain {
   private Server createServer(
       ServerBuilder<?> serverBuilder,
       ContentAddressableStorage storage,
-      Instances instances,
+      Instance instance,
       Pipeline pipeline,
       ShardWorkerContext context) {
     serverBuilder.addService(healthStatusManager.getHealthService());
     serverBuilder.addService(
-        new ContentAddressableStorageService(
-            instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER));
-    serverBuilder.addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS));
+        new ContentAddressableStorageService(instance, /* deadlineAfter=*/ 1, DAYS));
+    serverBuilder.addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, DAYS));
     serverBuilder.addService(new ShutDownWorkerGracefully(this, config));
 
     // We will build a worker's server based on it's capabilities.
@@ -519,24 +517,6 @@ public class Worker extends LoggingMain {
     }
 
     return serverBuilder.build();
-  }
-
-  private static Duration getGrpcTimeout(ShardWorkerConfig config) {
-    // return the configured
-    if (config.getShardWorkerInstanceConfig().hasGrpcTimeout()) {
-      Duration configured = config.getShardWorkerInstanceConfig().getGrpcTimeout();
-      if (configured.getSeconds() > 0 || configured.getNanos() > 0) {
-        return configured;
-      }
-    }
-
-    // return a default
-    Duration defaultDuration = Durations.fromSeconds(60);
-    logger.log(
-        INFO,
-        String.format(
-            "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s"));
-    return defaultDuration;
   }
 
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
