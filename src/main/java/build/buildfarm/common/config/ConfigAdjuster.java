@@ -229,7 +229,7 @@ public class ConfigAdjuster {
   private static void checkExecutionWrapperAvailability() {
     ExecutionWrapperProperties wrapperProperties = createExecutionWrapperProperties();
 
-    // Find any missing tools, and warn the user that missing tools means missing features.
+    // Find missing tools, and warn the user that missing tools mean missing features.
     wrapperProperties.mapping.forEach(
         (tools, features) ->
             tools.forEach(
