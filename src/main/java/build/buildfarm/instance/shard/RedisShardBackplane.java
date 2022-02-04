@@ -739,6 +739,7 @@ public class RedisShardBackplane implements Backplane {
     settings.hostNames = hostNames;
     settings.casQuery = config.getCasPrefix() + ":*";
     settings.scanAmount = 10000;
+    logger.info("Running CAS Indexer with settings: " + settings.toString());
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
 
