@@ -99,14 +99,11 @@ public class BuildFarmServer extends LoggingMain {
   private Server createServer(
       ServerBuilder<?> serverBuilder, Instance instance, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
-
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     if (!config.getSslCertificatePath().equals("")) {
       File ssl_certificate_path = new File(config.getSslCertificatePath());
       serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }
-
-    boolean measureGrpcLatency = false;
 
     serverBuilder.addService(healthStatusManager.getHealthService());
     serverBuilder.addService(new ActionCacheService(instance));
@@ -137,12 +134,9 @@ public class BuildFarmServer extends LoggingMain {
     serverBuilder.intercept(TransmitStatusRuntimeExceptionInterceptor.instance());
     serverBuilder.intercept(headersInterceptor);
 
-    if (measureGrpcLatency) {
+    if (config.getMeasureGrpcLatency()) {
       MonitoringServerInterceptor monitoringInterceptor =
           MonitoringServerInterceptor.create(Configuration.cheapMetricsOnly());
-      // ServerInterceptors.intercept(healthStatusManager.getHealthService(),
-      // monitoringInterceptor);
-
       serverBuilder.intercept(monitoringInterceptor);
     }
     return serverBuilder.build();

@@ -233,6 +233,10 @@ message BuildFarmServerConfig {
 
   // Bytestream upload blob deadline
   google.protobuf.Duration bytestream_timeout = 10;
+
+  // Publish GRPC metrics to promethesus for each server endpoint.
+  // This is used for SLAs at API boundaries. You may want something similar at the proxy level to see frontend/backend performance.
+  bool measure_grpc_latency = 11;
 }
 
 message MetricsConfig {
