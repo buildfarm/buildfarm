@@ -133,24 +133,37 @@ public class BuildFarmServer extends LoggingMain {
 
     serverBuilder.intercept(TransmitStatusRuntimeExceptionInterceptor.instance());
     serverBuilder.intercept(headersInterceptor);
+    handleGrpcMetricIntercepts(serverBuilder, config);
 
+    return serverBuilder.build();
+  }
+
+  private static void handleGrpcMetricIntercepts(
+      ServerBuilder<?> serverBuilder, BuildFarmServerConfig config) {
+    // Decide how to capture GRPC Prometheus metrics.
+    // By default, we don't capture any.
     if (config.getGrpcMetrics().getEnabled()) {
-      // Decide how to capture GRPC Prometheus metrics.
+      // Assume cheap metrics.
+      // Cheap metrics include send/receive totals tagged with return codes.  No latencies.
       Configuration grpcConfig = Configuration.cheapMetricsOnly();
+
+      // Enable latency buckets.
       if (config.getGrpcMetrics().getProvideLatencyHistograms()) {
         grpcConfig = grpcConfig.allMetrics();
       }
+
+      // Enable latency buckets with status codes.
       if (config.getGrpcMetrics().getTagLatenciesByCode()) {
-        // TODO(thickey): feature is unreleased.
+        // The feature is not yet included in latest release.
+        // Once the feature is available, we can enable this code:
         // grpcConfig = grpcConfig.withCodeLabelInLatencyHistogram();
       }
 
-      // Apply config to create an interceptor.
+      // Apply config to create an interceptor and apply it to the GRPC server.
       MonitoringServerInterceptor monitoringInterceptor =
           MonitoringServerInterceptor.create(grpcConfig);
       serverBuilder.intercept(monitoringInterceptor);
     }
-    return serverBuilder.build();
   }
 
   private static BuildFarmServerConfig toBuildFarmServerConfig(
