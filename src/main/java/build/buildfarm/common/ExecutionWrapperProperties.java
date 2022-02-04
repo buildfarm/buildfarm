@@ -33,5 +33,5 @@ public class ExecutionWrapperProperties {
    * @brief A mapping from execution wrappers to features they enable.
    * @details If an execution wrapper is missing the corresponding features would not be possible.
    */
-  public final Map<String, ArrayList<String>> mapping = new HashMap<>();
+  public final Map<ArrayList<String>, ArrayList<String>> mapping = new HashMap<>();
 }

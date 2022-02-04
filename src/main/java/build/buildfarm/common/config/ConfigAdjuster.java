@@ -181,43 +181,35 @@ public class ConfigAdjuster {
   private static void checkExecutionWrapperAvailability() {
     ExecutionWrapperProperties wrapperProperties = new ExecutionWrapperProperties();
     wrapperProperties.mapping.put(
-        ExecutionWrappers.CGROUPS,
+        new ArrayList<String>(Arrays.asList(ExecutionWrappers.CGROUPS)),
         new ArrayList<String>(
             Arrays.asList(
                 "limit_execution",
                 ExecutionProperties.CORES,
                 ExecutionProperties.MIN_CORES,
-                ExecutionProperties.MAX_CORES,ExecutionProperties.MIN_MEM,ExecutionProperties.MAX_MEM)));
-    
+                ExecutionProperties.MAX_CORES,
+                ExecutionProperties.MIN_MEM,
+                ExecutionProperties.MAX_MEM)));
+
     wrapperProperties.mapping.put(
-        ExecutionWrappers.LINUX_SANDBOX,
+        new ArrayList<String>(Arrays.asList(ExecutionWrappers.LINUX_SANDBOX)),
+        new ArrayList<String>(Arrays.asList(ExecutionProperties.LINUX_SANDBOX)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(ExecutionWrappers.AS_NOBODY)),
+        new ArrayList<String>(Arrays.asList(ExecutionProperties.AS_NOBODY)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(ExecutionWrappers.PROCESS_WRAPPER)),
+        new ArrayList<String>(Arrays.asList(ExecutionProperties.PROCESS_WRAPPER)));
+
+    wrapperProperties.mapping.put(
         new ArrayList<String>(
             Arrays.asList(
-                ExecutionProperties.LINUX_SANDBOX)));
-    
-    wrapperProperties.mapping.put(
-        ExecutionWrappers.AS_NOBODY,
+                ExecutionWrappers.SKIP_SLEEP,
+                ExecutionWrappers.SKIP_SLEEP_PRELOAD,
+                ExecutionWrappers.DELAY)),
         new ArrayList<String>(
-            Arrays.asList(
-                ExecutionProperties.AS_NOBODY)));
-                
-    wrapperProperties.mapping.put(
-        ExecutionWrappers.PROCESS_WRAPPER,
-        new ArrayList<String>(
-            Arrays.asList(
-                ExecutionProperties.PROCESS_WRAPPER)));
-    
-    wrapperProperties.mapping.put(
-        ExecutionWrappers.SKIP_SLEEP,
-        new ArrayList<String>(
-            Arrays.asList(
-                ExecutionProperties.SKIP_SLEEP, ExecutionProperties.TIME_SHIFT)));
-    
-    wrapperProperties.mapping.put(
-        ExecutionWrappers.SKIP_SLEEP_PRELOAD,
-        new ArrayList<String>(
-            Arrays.asList(
-                ExecutionProperties.SKIP_SLEEP, ExecutionProperties.TIME_SHIFT)));
-                
+            Arrays.asList(ExecutionProperties.SKIP_SLEEP, ExecutionProperties.TIME_SHIFT)));
   }
 }
