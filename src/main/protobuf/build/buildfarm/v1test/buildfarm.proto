@@ -209,6 +209,28 @@ message PollOperationRequest {
   build.bazel.remote.execution.v2.ExecutionStage.Value stage = 3;
 }
 
+// Publish GRPC metrics to promethesus for each server endpoint. This is used
+// for SLAs at API boundaries. You may want something similar at the proxy level
+// to see frontend/backend performance.
+message GrpcPrometheusMetrics {
+  // Whether to enable this metric gathering at all. If disabled, there should
+  // be no related metrics registered in prometheus.
+  bool enabled = 1;
+
+  // These metrics are more expensive  to calculate. If disabled, you only
+  // receive "cheap" metrics. Cheap metrics include send/receive totals tagged
+  // with return codes.  No latencies.
+  bool provide_latency_histograms = 2;
+
+  // A status code label will be added to latency histogram. If latency
+  // histogram itself is disabled, this takes no effect. Warning: this will
+  // increase the number of histograms by a factor of actually happened codes
+  // (up to io.grpc.Status.Code values count), which could lead to additional
+  // local memory usage and load on prometheus (storage and memory usage,
+  // query-time complexity)
+  bool tag_latencies_by_code = 3;
+}
+
 message BuildFarmServerConfig {
   InstanceConfig instance = 1;
 
@@ -235,8 +257,8 @@ message BuildFarmServerConfig {
   google.protobuf.Duration bytestream_timeout = 10;
 
   // Publish GRPC metrics to promethesus for each server endpoint.
-  // This is used for SLAs at API boundaries. You may want something similar at the proxy level to see frontend/backend performance.
-  bool measure_grpc_latency = 11;
+  // We use this for SLAs at the API boundary. You may want something similar at the proxy level to compare frontend/backend performance.
+  GrpcPrometheusMetrics grpc_metrics = 11;
 }
 
 message MetricsConfig {

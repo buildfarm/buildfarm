@@ -258,8 +258,28 @@ prometheus_config: {
   port: 9090
 }
 
-# whether to publish prometheus metrics about GRPC endpoints
-measure_grpc_latency: True
+# Publish GRPC metrics to promethesus for each server endpoint. This is used
+# for SLAs at API boundaries. You may want something similar at the proxy level
+# to see frontend/backend performance.
+grpc_metrics: {
+
+  # Whether to enable this metric gathering at all. If disabled, there should
+  # be no related metrics registered in prometheus.
+  enabled: True
+  
+  # These metrics are more expensive  to calculate. If disabled, you only
+  # receive "cheap" metrics. Cheap metrics include send/receive totals tagged
+  # with return codes.  No latencies.
+  provide_latency_histograms: True
+  
+  # A status code label will be added to latency histogram. If latency
+  # histogram itself is disabled, this takes no effect. Warning: this will
+  # increase the number of histograms by a factor of actually happened codes
+  # (up to io.grpc.Status.Code values count), which could lead to additional
+  # local memory usage and load on prometheus (storage and memory usage,
+  # query-time complexity)
+  tag_latencies_by_code: True
+}
 
 # cas write timeout
 cas_write_timeout: {

@@ -134,9 +134,20 @@ public class BuildFarmServer extends LoggingMain {
     serverBuilder.intercept(TransmitStatusRuntimeExceptionInterceptor.instance());
     serverBuilder.intercept(headersInterceptor);
 
-    if (config.getMeasureGrpcLatency()) {
+    if (config.getGrpcMetrics().getEnabled()) {
+      // Decide how to capture GRPC Prometheus metrics.
+      Configuration grpcConfig = Configuration.cheapMetricsOnly();
+      if (config.getGrpcMetrics().getProvideLatencyHistograms()) {
+        grpcConfig = grpcConfig.allMetrics();
+      }
+      if (config.getGrpcMetrics().getTagLatenciesByCode()) {
+        // TODO(thickey): feature is unreleased.
+        // grpcConfig = grpcConfig.withCodeLabelInLatencyHistogram();
+      }
+
+      // Apply config to create an interceptor.
       MonitoringServerInterceptor monitoringInterceptor =
-          MonitoringServerInterceptor.create(Configuration.cheapMetricsOnly());
+          MonitoringServerInterceptor.create(grpcConfig);
       serverBuilder.intercept(monitoringInterceptor);
     }
     return serverBuilder.build();
