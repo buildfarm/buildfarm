@@ -253,6 +253,14 @@ instance {
 # the listening port of the buildfarm grpc server
 port: 8980
 
+# the publishing port of the buildfarm prometheus metrics
+prometheus_config: {
+  port: 9090
+}
+
+# whether to publish prometheus metrics about GRPC endpoints
+measure_grpc_latency: True
+
 # cas write timeout
 cas_write_timeout: {
   seconds: 3600
