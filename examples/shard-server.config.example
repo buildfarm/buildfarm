@@ -265,12 +265,12 @@ grpc_metrics: {
 
   # Whether to enable this metric gathering at all. If disabled, there should
   # be no related metrics registered in prometheus.
-  enabled: True
+  enabled: False
   
-  # These metrics are more expensive  to calculate. If disabled, you only
+  # These metrics are more expensive to calculate. If disabled, you only
   # receive "cheap" metrics. Cheap metrics include send/receive totals tagged
   # with return codes.  No latencies.
-  provide_latency_histograms: True
+  provide_latency_histograms: False
   
   # A status code label will be added to latency histogram. If latency
   # histogram itself is disabled, this takes no effect. Warning: this will
@@ -278,7 +278,7 @@ grpc_metrics: {
   # (up to io.grpc.Status.Code values count), which could lead to additional
   # local memory usage and load on prometheus (storage and memory usage,
   # query-time complexity)
-  tag_latencies_by_code: True
+  tag_latencies_by_code: False
 }
 
 # cas write timeout
