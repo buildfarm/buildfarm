@@ -39,6 +39,7 @@ java_library(
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
+        "@maven//:me_dinowernli_java_grpc_prometheus",
         "@maven//:org_springframework_boot_spring_boot",
         "@maven//:org_springframework_boot_spring_boot_autoconfigure",
         "@maven//:org_springframework_spring_beans",
@@ -49,6 +50,5 @@ java_library(
         "@remote_apis//:build_bazel_remote_asset_v1_remote_asset_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_semver_java_proto",
-        "@maven//:me_dinowernli_java_grpc_prometheus",
     ],
 )
