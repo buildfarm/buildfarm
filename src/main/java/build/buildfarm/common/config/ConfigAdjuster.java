@@ -14,12 +14,17 @@
 
 package build.buildfarm.common.config;
 
+import build.buildfarm.common.ExecutionProperties;
+import build.buildfarm.common.ExecutionWrapperProperties;
+import build.buildfarm.common.ExecutionWrappers;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.v1test.WorkerConfig;
 import com.google.common.base.Strings;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -171,5 +176,48 @@ public class ConfigAdjuster {
     }
 
     return currentWidth;
+  }
+
+  private static void checkExecutionWrapperAvailability() {
+    ExecutionWrapperProperties wrapperProperties = new ExecutionWrapperProperties();
+    wrapperProperties.mapping.put(
+        ExecutionWrappers.CGROUPS,
+        new ArrayList<String>(
+            Arrays.asList(
+                "limit_execution",
+                ExecutionProperties.CORES,
+                ExecutionProperties.MIN_CORES,
+                ExecutionProperties.MAX_CORES,ExecutionProperties.MIN_MEM,ExecutionProperties.MAX_MEM)));
+    
+    wrapperProperties.mapping.put(
+        ExecutionWrappers.LINUX_SANDBOX,
+        new ArrayList<String>(
+            Arrays.asList(
+                ExecutionProperties.LINUX_SANDBOX)));
+    
+    wrapperProperties.mapping.put(
+        ExecutionWrappers.AS_NOBODY,
+        new ArrayList<String>(
+            Arrays.asList(
+                ExecutionProperties.AS_NOBODY)));
+                
+    wrapperProperties.mapping.put(
+        ExecutionWrappers.PROCESS_WRAPPER,
+        new ArrayList<String>(
+            Arrays.asList(
+                ExecutionProperties.PROCESS_WRAPPER)));
+    
+    wrapperProperties.mapping.put(
+        ExecutionWrappers.SKIP_SLEEP,
+        new ArrayList<String>(
+            Arrays.asList(
+                ExecutionProperties.SKIP_SLEEP, ExecutionProperties.TIME_SHIFT)));
+    
+    wrapperProperties.mapping.put(
+        ExecutionWrappers.SKIP_SLEEP_PRELOAD,
+        new ArrayList<String>(
+            Arrays.asList(
+                ExecutionProperties.SKIP_SLEEP, ExecutionProperties.TIME_SHIFT)));
+                
   }
 }
