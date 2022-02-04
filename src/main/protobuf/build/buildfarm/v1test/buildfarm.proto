@@ -139,6 +139,7 @@ message Host {
 
 message GetClientStartTimeRequest {
   string instance_name = 1;
+  repeated string host_name = 2;
 }
 
 message GetClientStartTimeResult {
@@ -546,6 +547,8 @@ message ShardInstanceConfig {
   oneof backplane {
     RedisShardBackplaneConfig redis_shard_backplane_config = 4;
   }
+  
+  bool ensure_outputs_present = 12;
 
   int64 max_entry_size_bytes = 5;
   
@@ -639,7 +642,14 @@ message ShardWorkerConfig {
   int32 input_fetch_stage_width = 26;
 
   // execute width
-  int32 execute_stage_width = 16;
+  oneof execute_stage_width_setting {
+    int32 execute_stage_width = 16;
+    
+    // An offset width used when deriving the execute stage width.
+    // Some cores of a machine are reserved for usage other than buildfarm's execution.
+    // Provide that offset here when deriving the execute stage width to avoid over saturation.
+    int32 execute_stage_width_offset = 40;
+  }
 
   // symlink cas input-only directories
   bool link_input_directories = 17;
@@ -1058,7 +1068,14 @@ message WorkerConfig {
   int32 input_fetch_stage_width = 23;
 
   // execute width
-  int32 execute_stage_width = 18;
+  oneof execute_stage_width_setting {
+    int32 execute_stage_width = 18;
+    
+    // An offset width used when deriving the execute stage width.
+    // Some cores of a machine are reserved for usage other than buildfarm's execution.
+    // Provide that offset here when deriving the execute stage width to avoid over saturation.
+    int32 execute_stage_width_offset = 31;
+  }
 
   // symlink cas input-only directories
   bool link_input_directories = 19;

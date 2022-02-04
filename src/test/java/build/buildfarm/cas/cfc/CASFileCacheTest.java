@@ -930,6 +930,43 @@ class CASFileCacheTest {
     assertThat(fileCache.findMissingBlobs(ImmutableList.of(emptyDigest))).isEmpty();
   }
 
+  @Test
+  public void newInputThrowsNoSuchFileExceptionWithoutDelegate() throws Exception {
+    ContentAddressableStorage undelegatedCAS =
+        new CASFileCache(
+            root,
+            /* maxSizeInBytes=*/ 1024,
+            /* maxEntrySizeInBytes=*/ 1024,
+            /* hexBucketLevels=*/ 1,
+            storeFileDirsIndexInMemory,
+            DIGEST_UTIL,
+            expireService,
+            /* accessRecorder=*/ directExecutor(),
+            storage,
+            /* directoriesIndexDbName=*/ ":memory:",
+            /* onPut=*/ digest -> {},
+            /* onExpire=*/ digests -> {},
+            /* delegate=*/ null) {
+          @Override
+          protected InputStream newExternalInput(Digest digest) throws IOException {
+            ByteString content = blobs.get(digest);
+            if (content == null) {
+              return fileCache.newTransparentInput(digest, 0);
+            }
+            return content.substring((int) (long) 0).newInput();
+          }
+        };
+    ByteString blob = ByteString.copyFromUtf8("Missing Entry");
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
+    NoSuchFileException expected = null;
+    try (InputStream in = undelegatedCAS.newInput(blobDigest, /* offset=*/ 0)) {
+      fail("should not get here");
+    } catch (NoSuchFileException e) {
+      expected = e;
+    }
+    assertThat(expected).isNotNull();
+  }
+
   @RunWith(JUnit4.class)
   public static class NativeFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public NativeFileDirsIndexInMemoryCASFileCacheTest() throws IOException {

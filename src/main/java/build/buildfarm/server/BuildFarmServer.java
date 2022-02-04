@@ -21,6 +21,8 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.LoggingMain;
+import build.buildfarm.common.config.ConfigAdjuster;
+import build.buildfarm.common.config.ServerOptions;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.MetricsPublisher;
@@ -132,12 +134,10 @@ public class BuildFarmServer extends LoggingMain {
   }
 
   private static BuildFarmServerConfig toBuildFarmServerConfig(
-      Readable input, BuildFarmServerOptions options) throws IOException {
+      Readable input, ServerOptions options) throws IOException {
     BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
     TextFormat.merge(input, builder);
-    if (options.port > 0) {
-      builder.setPort(options.port);
-    }
+    ConfigAdjuster.adjust(builder, options);
     return builder.build();
   }
 
@@ -220,7 +220,7 @@ public class BuildFarmServer extends LoggingMain {
     // unknown stream 11369
     nettyLogger.setLevel(SEVERE);
 
-    OptionsParser parser = OptionsParser.newOptionsParser(BuildFarmServerOptions.class);
+    OptionsParser parser = OptionsParser.newOptionsParser(ServerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
@@ -229,7 +229,7 @@ public class BuildFarmServer extends LoggingMain {
     }
 
     Path configPath = Paths.get(residue.get(0));
-    BuildFarmServerOptions options = parser.getOptions(BuildFarmServerOptions.class);
+    ServerOptions options = parser.getOptions(ServerOptions.class);
 
     String session = "buildfarm-server";
     if (!options.publicName.isEmpty()) {

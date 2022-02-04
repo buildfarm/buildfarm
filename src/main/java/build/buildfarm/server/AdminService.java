@@ -109,7 +109,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       GetClientStartTimeRequest request,
       StreamObserver<GetClientStartTimeResult> responseObserver) {
     try {
-      GetClientStartTimeResult result = instance.getClientStartTime();
+      GetClientStartTimeResult result = instance.getClientStartTime(request);
       responseObserver.onNext(result);
       responseObserver.onCompleted();
     } catch (Exception e) {
@@ -145,7 +145,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       ReindexCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
     try {
       CasIndexResults results = instance.reindexCas(request.getHostId());
-      logger.log(INFO, results.toMessage());
+      logger.log(INFO, "Indexer results: " + results.toMessage());
       responseObserver.onNext(
           ReindexCasRequestResults.newBuilder()
               .setRemovedHosts(results.removedHosts)
@@ -165,7 +165,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     try {
       String arg = null;
       CasIndexResults results = instance.reindexCas(arg);
-      logger.log(INFO, results.toMessage());
+      logger.log(INFO, "Indexer results: " + results.toMessage());
       responseObserver.onNext(
           ReindexCasRequestResults.newBuilder()
               .setRemovedHosts(results.removedHosts)

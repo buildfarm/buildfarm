@@ -1,11 +1,11 @@
 ---
 layout: default
-title: Enviornment
+title: Environment
 parent: Execution
 nav_order: 1
 ---
 
-# Enviornment
+# Environment
 
 Since workers are expected to execute programs in a way that makes using remote transparent to build users, there is a great deal of nuance to their definition. Operating System, Distribution, runtimes, compilers, their versions, and standard libraries make this a tricky proposition. While hermeticizing a build by declaring the full set of tools a compilation requires is the 'right' solution for a build, it may be too big of a hill to climb for everyone, particularly those trying to ease into remote execution.
 
@@ -111,7 +111,7 @@ container_pull(
 
 Be sure to substitute the `sha256:<sha256sum>` with your content from above.
 
-Next we will create a BUILD file to create our target image. We will use the shard variant here, but the operationqueue worker (with supporting server execution) will work as well. The content of the BUILD file should be:
+Next we will create a BUILD file to create our target image. We will use the shard variant here, but the memory worker (with supporting server execution) will work as well. The content of the BUILD file should be:
 
 ```
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")

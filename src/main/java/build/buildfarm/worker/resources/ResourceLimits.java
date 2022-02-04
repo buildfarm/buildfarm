@@ -30,6 +30,13 @@ import java.util.Map;
  */
 public class ResourceLimits {
   /**
+   * @field workerName
+   * @brief The name of the worker used for executing an action.
+   * @details This can be helpful for correlating actions to the underlying worker agent.
+   */
+  public String workerName = "";
+
+  /**
    * @field useLinuxSandbox
    * @brief Whether to use bazel's linux sandbox as an execution wrapper.
    * @details Other resource limits will be translated into the appropriate CLI arguments for the
