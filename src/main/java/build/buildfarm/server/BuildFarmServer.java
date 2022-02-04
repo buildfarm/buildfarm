@@ -154,6 +154,7 @@ public class BuildFarmServer extends LoggingMain {
 
       // Enable latency buckets with status codes.
       if (config.getGrpcMetrics().getTagLatenciesByCode()) {
+        // TODO(luxe):
         // The feature is not yet included in latest release.
         // Once the feature is available, we can enable this code:
         // grpcConfig = grpcConfig.withCodeLabelInLatencyHistogram();
