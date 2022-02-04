@@ -33,6 +33,8 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.resources.ResourceLimits;
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.core.DockerClientBuilder;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
@@ -41,6 +43,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import io.grpc.Deadline;
@@ -428,6 +431,23 @@ class Executor {
     // allow debugging before an execution
     if (limits.debugBeforeExecution) {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
+    }
+
+    // run the action under docker
+    if (!limits.containerSettings.containerImage.isEmpty()) {
+      DockerClient dockerClient = DockerClientBuilder.getInstance().build();
+
+      // create settings
+      DockerExecutorSettings settings = new DockerExecutorSettings();
+      settings.fetchTimeout = Durations.fromMinutes(1);
+      settings.operationContext = operationContext;
+      settings.execDir = execDir;
+      settings.limits = limits;
+      settings.envVars = environment;
+      settings.timeout = timeout;
+      settings.arguments = arguments;
+
+      return DockerExecutor.runActionWithDocker(dockerClient, settings, resultBuilder);
     }
 
     long startNanoTime = System.nanoTime();

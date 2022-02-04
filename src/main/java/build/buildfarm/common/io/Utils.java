@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystem;
+import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
@@ -475,6 +476,29 @@ public class Utils {
       return null;
     }
     return fileSystem.getUserPrincipalLookupService().lookupPrincipalByName(userName);
+  }
+
+  public static List<Path> getSymbolicLinkReferences(Path dir) {
+    List<Path> paths = new ArrayList<>();
+
+    try {
+      Files.walk(dir, FileVisitOption.FOLLOW_LINKS)
+          .forEach(
+              path -> {
+                if (Files.isSymbolicLink(path)) {
+                  try {
+                    Path reference = Files.readSymbolicLink(path);
+                    paths.add(reference);
+                  } catch (IOException e) {
+                    logger.log(Level.WARNING, "Could not derive symbolic link: ", e);
+                  }
+                }
+              });
+    } catch (Exception e) {
+      logger.log(Level.WARNING, "Could not traverse dir: ", e);
+    }
+
+    return paths;
   }
 
   /**
