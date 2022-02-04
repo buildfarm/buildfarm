@@ -57,6 +57,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
+import me.dinowernli.grpc.prometheus.Configuration;
+import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 
 @SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
@@ -88,49 +90,62 @@ public class BuildFarmServer extends LoggingMain {
       throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
 
-    instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
-
     healthStatusManager = new HealthStatusManager();
+    instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
+    server = createServer(serverBuilder, instance, config);
+    logger.log(Level.INFO, String.format("%s initialized", session));
+  }
+
+  private Server createServer(
+      ServerBuilder<?> serverBuilder, Instance instance, BuildFarmServerConfig config)
+      throws InterruptedException, ConfigurationException {
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     if (!config.getSslCertificatePath().equals("")) {
       File ssl_certificate_path = new File(config.getSslCertificatePath());
       serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }
-    server =
-        serverBuilder
-            .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instance))
-            .addService(new CapabilitiesService(instance))
-            .addService(
-                new ContentAddressableStorageService(
-                    instance,
-                    /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
-                    TimeUnit.SECONDS
-                    /* requestLogLevel=*/ ))
-            .addService(
-                new ByteStreamService(
-                    instance,
-                    /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
-                    TimeUnit.SECONDS))
-            .addService(
-                new ExecutionService(
-                    instance,
-                    config.getExecuteKeepaliveAfterSeconds(),
-                    TimeUnit.SECONDS,
-                    keepaliveScheduler,
-                    getMetricsPublisher(config.getMetricsConfig())))
-            .addService(new OperationQueueService(instance))
-            .addService(new OperationsService(instance))
-            .addService(new AdminService(config.getAdminConfig(), instance))
-            .addService(new FetchService(instance))
-            .addService(ProtoReflectionService.newInstance())
-            .addService(new PublishBuildEventService(config.getBuildEventConfig()))
-            .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
-            .intercept(headersInterceptor)
-            .build();
 
-    logger.log(Level.INFO, String.format("%s initialized", session));
+    boolean measureGrpcLatency = false;
+
+    serverBuilder.addService(healthStatusManager.getHealthService());
+    serverBuilder.addService(new ActionCacheService(instance));
+    serverBuilder.addService(new CapabilitiesService(instance));
+    serverBuilder.addService(
+        new ContentAddressableStorageService(
+            instance, /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(), TimeUnit.SECONDS
+            /* requestLogLevel=*/ ));
+    serverBuilder.addService(
+        new ByteStreamService(
+            instance,
+            /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
+            TimeUnit.SECONDS));
+    serverBuilder.addService(
+        new ExecutionService(
+            instance,
+            config.getExecuteKeepaliveAfterSeconds(),
+            TimeUnit.SECONDS,
+            keepaliveScheduler,
+            getMetricsPublisher(config.getMetricsConfig())));
+    serverBuilder.addService(new OperationQueueService(instance));
+    serverBuilder.addService(new OperationsService(instance));
+    serverBuilder.addService(new AdminService(config.getAdminConfig(), instance));
+    serverBuilder.addService(new FetchService(instance));
+    serverBuilder.addService(ProtoReflectionService.newInstance());
+    serverBuilder.addService(new PublishBuildEventService(config.getBuildEventConfig()));
+
+    serverBuilder.intercept(TransmitStatusRuntimeExceptionInterceptor.instance());
+    serverBuilder.intercept(headersInterceptor);
+
+    if (measureGrpcLatency) {
+      MonitoringServerInterceptor monitoringInterceptor =
+          MonitoringServerInterceptor.create(Configuration.cheapMetricsOnly());
+      // ServerInterceptors.intercept(healthStatusManager.getHealthService(),
+      // monitoringInterceptor);
+
+      serverBuilder.intercept(monitoringInterceptor);
+    }
+    return serverBuilder.build();
   }
 
   private static BuildFarmServerConfig toBuildFarmServerConfig(
