@@ -108,8 +108,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     // concern.  To counteract this, we allow enforcing a policy where clients cannot upload to the
     // action cache.
     if (policy.equals(ActionCacheAccessPolicy.READ_ONLY)) {
-      responseObserver.onError(
-          Status.PERMISSION_DENIED.asException());
+      responseObserver.onError(Status.PERMISSION_DENIED.asException());
       return;
     }
 
