@@ -106,7 +106,8 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     // A user with write access to the cache can write anything, including malicious code and
     // binaries, which can then be returned to other users on cache lookups.  This is a security
     // concern.  To counteract this, we allow enforcing a policy where clients cannot upload to the
-    // action cache.
+    // action cache.  In this paradigm, it is only the remote execution engine itself that populates
+    // the action cache.
     if (policy.equals(ActionCacheAccessPolicy.READ_ONLY)) {
       responseObserver.onError(Status.PERMISSION_DENIED.asException());
       return;
