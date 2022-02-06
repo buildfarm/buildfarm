@@ -14,7 +14,6 @@
 
 package build.buildfarm;
 
-
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
