@@ -45,8 +45,8 @@ public class MatchStage extends PipelineStage {
     private final Stopwatch stopwatch;
     private long waitStart;
     private long waitDuration;
-    private final Poller poller = null;
-    private final QueueEntry queueEntry = null;
+    private static final Poller poller = null;
+    private static final QueueEntry queueEntry = null;
     private boolean matched = false;
 
     public MatchOperationListener(OperationContext operationContext, Stopwatch stopwatch) {
