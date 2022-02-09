@@ -22,6 +22,7 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
@@ -499,6 +500,13 @@ public class Utils {
     }
 
     return paths;
+  }
+
+  public static void safeSkip(InputStream data, long desiredSkip) throws IOException {
+    long actualSkip = data.skip(desiredSkip);
+    if (actualSkip != desiredSkip) {
+      throw new IOException("could not skip specified amount");
+    }
   }
 
   /**

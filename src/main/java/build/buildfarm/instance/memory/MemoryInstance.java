@@ -52,6 +52,7 @@ import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.common.io.Utils;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.queues.Worker;
 import build.buildfarm.instance.queues.WorkerQueue;
@@ -395,7 +396,7 @@ public class MemoryInstance extends AbstractServerInstance {
   public InputStream newOperationStreamInput(
       String name, long offset, RequestMetadata requestMetadata) throws IOException {
     InputStream in = getStreamSource(name).openStream();
-    in.skip(offset);
+    Utils.safeSkip(in, offset);
     return in;
   }
 

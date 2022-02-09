@@ -49,6 +49,7 @@ import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.EvenMoreFiles;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.common.io.Utils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -907,7 +908,7 @@ class CASFileCacheTest {
     when(delegate.newInput(eq(blob.getDigest()), eq(0L))).thenReturn(content.newInput());
     // the switch will reset to this point
     InputStream switchedIn = content.newInput();
-    switchedIn.skip(6);
+    Utils.safeSkip(switchedIn, 6);
     when(delegate.newInput(eq(blob.getDigest()), eq(6L))).thenReturn(switchedIn);
     InputStream in = fileCache.newReadThroughInput(blob.getDigest(), 0, write);
     byte[] buf = new byte[content.size()];

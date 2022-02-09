@@ -17,6 +17,7 @@ package build.buildfarm.instance.stub;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
+import build.buildfarm.common.io.Utils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.io.ByteStreams;
@@ -142,10 +143,10 @@ public final class Chunker {
       reset();
       if (toOffset != 0) {
         maybeInitialize();
-        data.skip(toOffset);
+        Utils.safeSkip(data, toOffset);
       }
     } else if (offset != toOffset) {
-      data.skip(toOffset - offset);
+      Utils.safeSkip(data, toOffset - offset);
     }
     offset = toOffset;
   }

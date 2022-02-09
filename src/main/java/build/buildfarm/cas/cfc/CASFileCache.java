@@ -60,6 +60,7 @@ import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.io.FileStatus;
 import build.buildfarm.common.io.NamedFileKey;
+import build.buildfarm.common.io.Utils;
 import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -483,7 +484,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         InputStream input;
         try {
           input = Files.newInputStream(getPath(key));
-          input.skip(offset);
+          Utils.safeSkip(input, offset);
         } catch (NoSuchFileException eNoEnt) {
           boolean removed = false;
           synchronized (this) {

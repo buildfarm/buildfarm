@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.io.Utils;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -125,7 +126,7 @@ public class MemoryCAS implements ContentAddressableStorage {
       throw new NoSuchFileException(DigestUtil.toString(digest));
     }
     InputStream in = blob.getData().newInput();
-    in.skip(offset);
+    Utils.safeSkip(in, offset);
     return in;
   }
 

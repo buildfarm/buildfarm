@@ -167,9 +167,7 @@
     <exclude name="AvoidLosingExceptionInformation"/>
     <exclude name="AvoidMultipleUnaryOperators"/>
     <exclude name="AvoidUsingOctalValues"/>
-    <exclude name="BadComparison"/>
     <exclude name="BeanMembersShouldSerialize"/>
-    <exclude name="CheckSkipResult"/>
     <exclude name="ClassCastExceptionWithToArray"/>
     <exclude name="CloneMethodMustBePublic"/>
     <exclude name="CloneMethodMustImplementCloneable"/>

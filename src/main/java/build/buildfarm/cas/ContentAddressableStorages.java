@@ -26,6 +26,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.io.Utils;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.FilesystemCASConfig;
@@ -164,7 +165,7 @@ public final class ContentAddressableStorages {
           throw new NoSuchFileException(digest.getHash());
         }
         InputStream in = data.newInput();
-        in.skip(offset);
+        Utils.safeSkip(in, offset);
         return in;
       }
 
