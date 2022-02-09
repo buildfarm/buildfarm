@@ -45,7 +45,6 @@
     <exclude name="UseAssertSameInsteadOfAssertTrue"/>
     <exclude name="UseAssertTrueInsteadOfAssertEquals"/>
     <exclude name="UseCollectionIsEmpty"/>
-    <exclude name="UseTryWithResources"/>
     <exclude name="UseVarargs"/>
 </rule>
 
@@ -235,10 +234,6 @@
     <exclude name="AvoidUsingVolatile"/>
     <exclude name="DoNotUseThreads"/>
     <exclude name="DontCallThreadRun"/>
-    <exclude name="DoubleCheckedLocking"/>
-    <exclude name="NonThreadSafeSingleton"/>
-    <exclude name="UnsynchronizedStaticDateFormatter"/>
-    <exclude name="UnsynchronizedStaticFormatter"/>
     <exclude name="UseConcurrentHashMap"/>
     <exclude name="UseNotifyAllInsteadOfNotify"/>
 </rule>
@@ -252,8 +247,6 @@
 </rule>
 
 <rule ref="category/java/security.xml">
-    <exclude name="HardCodedCryptoKey"/>
-    <exclude name="InsecureCryptoIv"/>
 </rule>
 
 </ruleset>
