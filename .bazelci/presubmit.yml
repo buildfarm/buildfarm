@@ -1,5 +1,5 @@
 ---
-buildifier: 5.0.0
+buildifier: 4.2.5
 tasks:
   
   # Linting jobs
