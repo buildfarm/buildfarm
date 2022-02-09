@@ -61,7 +61,7 @@ ORG_SPRING_BOOT_MODULES = [
     "spring-boot",
 ]
 
-def buildfarm_init(name = "buildfarm"):
+def buildfarm_init():
     """
     Initialize the WORKSPACE for buildfarm-related targets
 
