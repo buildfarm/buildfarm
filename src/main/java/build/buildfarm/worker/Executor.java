@@ -67,8 +67,6 @@ class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
   private static final Logger logger = Logger.getLogger(Executor.class.getName());
 
-  private static final Object execLock = new Object();
-
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
   private final ExecuteActionStage owner;
@@ -168,7 +166,6 @@ class Executor {
   }
 
   private static Duration decideTimeout(TimeoutSettings settings, Action action) {
-
     // First we need to acquire the appropriate timeout duration for the action.
     // We begin with a default configured timeout.
     Duration timeout = settings.defaultTimeout;
@@ -467,9 +464,7 @@ class Executor {
     long startNanoTime = System.nanoTime();
     Process process;
     try {
-      synchronized (execLock) {
-        process = processBuilder.start();
-      }
+      process = processBuilder.start();
       process.getOutputStream().close();
     } catch (IOException e) {
       logger.log(Level.SEVERE, format("error starting process for %s", operationName), e);
