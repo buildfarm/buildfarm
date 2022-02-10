@@ -30,9 +30,9 @@ import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.common.ProcessUtils;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
-import build.buildfarm.common.ProcessUtils;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.ExecutionPolicy;
@@ -167,7 +167,6 @@ class Executor {
   }
 
   private static Duration decideTimeout(TimeoutSettings settings, Action action) {
-
     // First we need to acquire the appropriate timeout duration for the action.
     // We begin with a default configured timeout.
     Duration timeout = settings.defaultTimeout;

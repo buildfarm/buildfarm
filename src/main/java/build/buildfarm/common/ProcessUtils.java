@@ -22,7 +22,6 @@ import java.io.IOException;
  * @details Contains thread-safe utility on starting java processes.
  */
 public class ProcessUtils {
-
   // We represent an ideal global lock for
   // process invocations, which is required due to the following race condition:
 
@@ -41,9 +40,9 @@ public class ProcessUtils {
   // there are CPU cores on my workstation - the more threads the more likely it happens.
   //
   // As a workaround, we put a synchronized block around the fork.
-  // Bazel also does this (https://github.com/bazelbuild/bazel/blob/1deb3f7aa22ec322786360085f9eb723e624d7c7/src/main/java/com/google/devtools/build/lib/shell/JavaSubprocessFactory.java#L146)
-  public synchronized static Process threadSafeStart(ProcessBuilder builder) throws IOException {
+  // Bazel also does this:
+  // https://github.com/bazelbuild/bazel/blob/1deb3f7aa22ec322786360085f9eb723e624d7c7/src/main/java/com/google/devtools/build/lib/shell/JavaSubprocessFactory.java#L146
+  public static synchronized Process threadSafeStart(ProcessBuilder builder) throws IOException {
     return builder.start();
   }
-
 }
