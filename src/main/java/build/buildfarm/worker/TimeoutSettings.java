@@ -23,7 +23,6 @@ import com.google.protobuf.Duration;
  *     this timeout is appropriate and adjust the timeout as needed based on configuration.
  */
 public class TimeoutSettings {
-
   /**
    * @field defaultTimeout
    * @brief A default timeout to use if the action did not provide their own.
