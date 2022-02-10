@@ -168,7 +168,6 @@ class Executor {
   }
 
   private static Duration decideTimeout(TimeoutSettings settings, Action action) {
-
     // First we need to acquire the appropriate timeout duration for the action.
     // We begin with a default configured timeout.
     Duration timeout = settings.defaultTimeout;
