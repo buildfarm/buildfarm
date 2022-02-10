@@ -103,14 +103,12 @@
     <exclude name="CouplingBetweenObjects"/>
     <exclude name="CyclomaticComplexity"/>
     <exclude name="DataClass"/>
-    <exclude name="DoNotExtendJavaLangError"/>
     <exclude name="ExceptionAsFlowControl"/>
     <exclude name="ExcessiveClassLength"/>
     <exclude name="ExcessiveImports"/>
     <exclude name="ExcessiveMethodLength"/>
     <exclude name="ExcessiveParameterList"/>
     <exclude name="ExcessivePublicCount"/>
-    <exclude name="FinalFieldCouldBeStatic"/>
     <exclude name="GodClass"/>
     <exclude name="ImmutableField"/>
     <exclude name="LawOfDemeter"/>
