@@ -10,7 +10,6 @@
 
 			<title th:text="${pageTitle}">Buildfarm Admin</title>
 
-			<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
 			<link rel="stylesheet" type="text/css" th:href="@{/assets/vendor/fontawesome-free/css/all.css}">
 			<link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
 			<link rel="stylesheet" type="text/css" th:href="@{/assets/css/bfadmin.css}">
@@ -19,10 +18,7 @@
 
 			<link rel="icon" th:href="@{/assets/img/favicon.ico}">
 
-			<script th:inline="javascript">
-				var startDate = /*[[${startDate}]]*/ "";
-				var endDate = /*[[${endDate}]]*/ "";
-			</script>
+			<script th:inline="javascript">let securityKey = /*[[${securityKey}]]*/ "";</script>
 		</head>
 
 		<div th:fragment="bfadmin-sidebar">
@@ -210,11 +206,9 @@
 			<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery-easing/1.4.1/jquery.easing.compatibility.min.js"></script>
 			<script type="text/javascript" src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js"></script>
 			<script type="text/javascript" src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
-			<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
 			<script th:src="@{/assets/vendor/datatables/dataTables.bootstrap4.js}"></script>
 			<script th:src="@{/assets/js/bfadmin.js}"></script>
 			<script th:src="@{/assets/js/datatables.js}"></script>
-			<script th:src="@{/assets/js/datepicker.js}"></script>
 			<script th:src="@{/assets/js/bfadmin-events.js}"></script>
 		</div>
 	</body>

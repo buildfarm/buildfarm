@@ -35,9 +35,12 @@ service Admin {
   rpc ScaleCluster(ScaleClusterRequest) returns (google.rpc.Status) {
     option (google.api.http) = { get: "/v1test/admin:scaleCluster" };
   }
-  
+
   rpc ReindexCas(ReindexCasRequest) returns (ReindexCasRequestResults) {
     option (google.api.http) = { get: "/v1test/admin:reindexCas" };
+  }
+  rpc ReindexAllCas(ReindexAllCasRequest) returns (ReindexCasRequestResults) {
+    option (google.api.http) = { get: "/v1test/admin:reindexAllCas" };
   }
   
   rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest) returns (ShutDownWorkerGracefullyRequestResults) {
@@ -67,9 +70,13 @@ message DisableScaleInProtectionRequestResults{
 
 message ReindexCasRequest {
   string instance_name = 1;
-  
+
   // format: ip:port
   string host_id = 2;
+  }
+
+message ReindexAllCasRequest {
+  string instance_name = 1;
 }
 
 message ReindexCasRequestResults {
@@ -132,11 +139,16 @@ message Host {
 
 message GetClientStartTimeRequest {
   string instance_name = 1;
-  string client_key = 2;
+  repeated string host_name = 2;
 }
 
 message GetClientStartTimeResult {
-  google.protobuf.Timestamp client_start_time = 1;
+  repeated GetClientStartTime client_start_time = 1;
+}
+
+message GetClientStartTime {
+  string instance_name = 1;
+  google.protobuf.Timestamp client_start_time = 2;
 }
 
 message ScaleClusterRequest {
@@ -215,6 +227,12 @@ message BuildFarmServerConfig {
   // Absolute path to the PEM file containing both the required certificates and any
   // associated private key.
   optional string ssl_certificate_path = 8;
+
+  // CAS write deadline
+  google.protobuf.Duration cas_write_timeout = 9;
+
+  // Bytestream upload blob deadline
+  google.protobuf.Duration bytestream_timeout = 10;
 }
 
 message MetricsConfig {
@@ -529,8 +547,10 @@ message ShardInstanceConfig {
   oneof backplane {
     RedisShardBackplaneConfig redis_shard_backplane_config = 4;
   }
+  
+  bool ensure_outputs_present = 12;
 
-  int64 max_blob_size = 5;
+  int64 max_entry_size_bytes = 5;
   
   int32 max_cpu = 9;
 
@@ -544,6 +564,8 @@ message ShardInstanceConfig {
   
   // Whether the instance should consult a denylist when looking up actions & invocations.
   bool use_deny_list = 10;
+
+  int32 max_requeue_attempts = 11;
 }
 
 message ShardWorkerInstanceConfig {
@@ -620,7 +642,14 @@ message ShardWorkerConfig {
   int32 input_fetch_stage_width = 26;
 
   // execute width
-  int32 execute_stage_width = 16;
+  oneof execute_stage_width_setting {
+    int32 execute_stage_width = 16;
+    
+    // An offset width used when deriving the execute stage width.
+    // Some cores of a machine are reserved for usage other than buildfarm's execution.
+    // Provide that offset here when deriving the execute stage width to avoid over saturation.
+    int32 execute_stage_width_offset = 40;
+  }
 
   // symlink cas input-only directories
   bool link_input_directories = 17;
@@ -666,6 +695,9 @@ message ShardWorkerConfig {
   AdminConfig admin_config = 35;
 
   PrometheusConfig prometheus_config = 37;
+
+  // a limit on time (in seconds) for input fetch stage to fetch inputs
+  int32 input_fetch_deadline = 39;
   
 }
 
@@ -1036,7 +1068,14 @@ message WorkerConfig {
   int32 input_fetch_stage_width = 23;
 
   // execute width
-  int32 execute_stage_width = 18;
+  oneof execute_stage_width_setting {
+    int32 execute_stage_width = 18;
+    
+    // An offset width used when deriving the execute stage width.
+    // Some cores of a machine are reserved for usage other than buildfarm's execution.
+    // Provide that offset here when deriving the execute stage width to avoid over saturation.
+    int32 execute_stage_width_offset = 31;
+  }
 
   // symlink cas input-only directories
   bool link_input_directories = 19;
@@ -1060,6 +1099,9 @@ message WorkerConfig {
 
   // user principal name for executions
   string exec_owner = 29;
+
+  // a limit on time (in seconds) for input fetch stage to fetch inputs
+  int32 input_fetch_deadline = 30;
 }
 
 message TreeIteratorToken {

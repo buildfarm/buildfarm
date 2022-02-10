@@ -1,5 +1,5 @@
 ---
-buildifier: latest
+buildifier: 4.2.5
 tasks:
   
   # Linting jobs
@@ -46,6 +46,8 @@ tasks:
     - "..."
   macos:
     name: "Unit Tests"
+    build_flags:
+    - "--build_tag_filters=-container"
     build_targets:
     - "..."
     test_targets:
@@ -58,11 +60,17 @@ tasks:
     - "..."
     test_targets:
     - "..."
+  rpm_builds:
+    name: "Rpm Builds"
+    bazel: "4.2.2"
+    platform: centos7
+    shell_commands:
+    - ./bazelw build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
 
   # We want to run the unit tests again inside of a docker container.
   # This is because test cases may behave different while in docker due to user permissions.
   # This is more of a sanity check between a defined docker file and running tests directly on the host.
-  ubuntu1604:
+  docker_unit_tests:
     name: "Docker Unit Tests"
     platform: ubuntu1804
     shell_commands:
@@ -105,3 +113,9 @@ tasks:
     - export TEST_SHARD=true
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
     - ./.bazelci/integration_test.sh
+
+  buildfarm_admin_test:
+    name: "BF Admin Test"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/test_bfadmin.sh
