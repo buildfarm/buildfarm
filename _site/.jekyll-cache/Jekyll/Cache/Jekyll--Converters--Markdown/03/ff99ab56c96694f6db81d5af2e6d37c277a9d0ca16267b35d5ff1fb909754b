@@ -1,0 +1,15 @@
+I"%<h1 class="fs-9" id="bazel-buildfarm">Bazel Buildfarm</h1>
+
+<p class="fs-6 fw-300">Remote Execution</p>
+
+<p><a href="https://bazelbuild.github.io/bazel-buildfarm/docs/quick_start/" class="btn btn-primary fs-5 mb-4 mb-md-0 mr-2">Get started now</a> <a href="https://github.com/bazelbuild/bazel-buildfarm" class="btn fs-5 mb-4 mb-md-0">View it on GitHub</a></p>
+
+<hr />
+
+<h2 id="what-is-buildfarm">What is buildfarm?</h2>
+<p>Buildfarm is a service software stack which presents an implementation of the <a href="https://github.com/bazelbuild/remote-apis">Remote Execution API</a>. This means it can be used by any client of that API to retain content <code class="language-plaintext highlighter-rouge">ContentAddressableStorage</code>, cache ActionResults by a key <code class="language-plaintext highlighter-rouge">ActionCache</code>, and execute actions asynchronously <code class="language-plaintext highlighter-rouge">Execution</code>.</p>
+
+<p>Buildfarm is cross-platform has been heavily tested with bazel as a client.</p>
+
+<p>This documentation is a comprehensive description of the architecture, features, functionality, and operation, as well as a guide to smoothly installing and running the software. Familiarity with the Remote Execution API is expected, and references to it will be provided as needed.</p>
+:ET

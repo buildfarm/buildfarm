@@ -1,0 +1,37 @@
+I"/
+<p>Using the Prometheus metrics you may want to setup alerts on your buildfarm cluster.  Below are some example alerts:</p>
+
+<p><strong>High Cpu Queue</strong>
+<code class="language-plaintext highlighter-rouge">avg(queue_size{job="your_instance", queue_name="cpu_queue"})</code><br />
+Critical = Triggered when the value is greater than 1000 for 60m<br />
+Warning = Triggered when the value is greater than 1000 for 30m</p>
+
+<p><strong>High Cluster Utilization</strong><br />
+<code class="language-plaintext highlighter-rouge">avg(execution_slot_usage{job="your_instance", service="buildfarm-worker"})</code><br />
+Critical = Triggered when the value is greater than 85 for 60m<br />
+Warning = Triggered when the value is greater than 85 for 30m</p>
+
+<p><strong>Multiple Bazel Versions Detected</strong><br />
+<code class="language-plaintext highlighter-rouge">count by (tool_name) (count(dispatched_operations_tools_amount{job="your_instance", service="buildfarm-server"}) without(host_ip, instance))</code><br />
+Warning = Triggered when the value is greater than 1 for 1m</p>
+
+<p><strong>No available workers</strong><br />
+<code class="language-plaintext highlighter-rouge">avg(worker_pool_size{job="your_instance", service="buildfarm-server"})</code><br />
+Critical = Triggered when the value is equal to 0 for 5m<br />
+Warning = Triggered when the value is equal to 0 for 2m</p>
+
+<p><strong>Stuck CPU Workers</strong></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>(avg(delta(execution_slot_usage{job="your_instance", service="buildfarm-worker"}[5m])) by (host_ip) == 0) and (avg(execution_slot_usage{job="your_instance", service="buildfarm-worker"}) by (host_ip) &gt; 0) and (avg(execution_slot_usage{job="your_instance", service="buildfarm-worker"}) by (host_ip) &lt; 89)
+</code></pre></div></div>
+<p>Critical = Triggered when the value is greater than or equal to 0 for 30m</p>
+
+<p><strong>Key Expirations - Builds May Be Slow</strong></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>avg(increase(expired_key_total{job="your_instance", service="buildfarm-worker"}[5m])) by (host_ip)
+</code></pre></div></div>
+<p>Warning = Triggered when the value is greater than 10000 for 1h</p>
+
+<p><strong>High Prequeue</strong><br />
+<code class="language-plaintext highlighter-rouge">pre_queue_size{job="your_instance", service="buildfarm-server"}</code><br />
+Critical = Triggered when the value is greater than 0 for 15m<br />
+Warning = Triggered when the value is greater than 0 for 5m</p>
+:ET

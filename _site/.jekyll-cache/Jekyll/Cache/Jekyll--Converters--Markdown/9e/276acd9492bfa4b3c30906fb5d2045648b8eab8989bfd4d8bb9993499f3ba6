@@ -1,0 +1,92 @@
+I"9<h1 id="quick-start">Quick Start</h1>
+
+<p>Here we describe how to use bazel remote caching or remote execution with buildfarm. We’ll start by creating a single workspace that can be used for both.</p>
+
+<p>Let’s start with a bazel workspace with a single file to compile into an executable:</p>
+
+<p>Create a new directory for our workspace and add the following files:</p>
+
+<p><code class="language-plaintext highlighter-rouge">main.cc</code>:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>#include &lt;iostream&gt;
+
+int main( int argc, char *argv[] )
+{
+  std::cout &lt;&lt; "Hello, World!" &lt;&lt; std::endl;
+}
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">BUILD</code>:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>cc_binary(
+    name = "main",
+    srcs = ["main.cc"],
+)
+</code></pre></div></div>
+
+<p>And an empty WORKSPACE file.</p>
+
+<p>As a test, verify that <code class="language-plaintext highlighter-rouge">bazel run :main</code> builds your main program and runs it, and prints <code class="language-plaintext highlighter-rouge">Hello, World!</code>. This will ensure that you have properly installed bazel and a C++ compiler, and have a working target before moving on to remote execution.</p>
+
+<p>Download and extract the buildfarm repository. Each command sequence below will have the intended working directory indicated, between the client (workspace running bazel), and buildfarm.</p>
+
+<p>This tutorial assumes that you have a bazel binary in your path and you are in the root of your buildfarm clone/release, and has been tested to work with bash on linux.</p>
+
+<h2 id="remote-caching">Remote Caching</h2>
+
+<p>A Buildfarm server with an instance can be used strictly as an ActionCache and ContentAddressableStorage to improve build performance. This is an example of running a bazel client that will retrieve results if available, and store them if the cache is missed and the execution needs to run locally.</p>
+
+<p>Download the buildfarm repository and change into its directory, then:</p>
+
+<p>run <code class="language-plaintext highlighter-rouge">bazel run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/server.config.example</code></p>
+
+<p>This will wait while the server runs, indicating that it is ready for requests.</p>
+
+<p>From another prompt (i.e. a separate terminal) in your newly created workspace directory from above:</p>
+
+<p>run <code class="language-plaintext highlighter-rouge">bazel clean</code>
+run <code class="language-plaintext highlighter-rouge">bazel run --remote_cache=grpc://localhost:8980 :main</code></p>
+
+<p>Why do we clean here? Since we’re verifying re-execution and caching, this ensures that we will execute any actions in the <code class="language-plaintext highlighter-rouge">run</code> step and interact with the remote cache. We should be attempting to retrieve cached results, and then when we miss - since we just started this memory resident server - bazel will upload the results of the execution for later use. There will be no change in the output of this bazel run if everything worked, since bazel does not provide output each time it uploads results.</p>
+
+<p>To prove that we have placed something in the action cache, we need to do the following:</p>
+
+<p>run <code class="language-plaintext highlighter-rouge">bazel clean</code>
+run <code class="language-plaintext highlighter-rouge">bazel run --remote_cache=localhost:8980 :main</code></p>
+
+<p>This should now print statistics on the <code class="language-plaintext highlighter-rouge">processes</code> line that indicate that you’ve retrieved results from the cache for your actions:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>INFO: 2 processes: 2 remote cache hit.
+</code></pre></div></div>
+
+<h2 id="remote-execution-and-caching">Remote Execution (and caching)</h2>
+
+<p>Now we will use buildfarm for remote execution with a minimal configuration - a single memory instance, with a host-colocated worker that can execute a single process at a time - via a bazel invocation on our workspace.</p>
+
+<p>First, we should restart the buildfarm server to ensure that we get remote execution (this can also be forced from the client by using <code class="language-plaintext highlighter-rouge">--noremote_accept_cached</code>). From the buildfarm server prompt and directory:</p>
+
+<p>interrupt a running <code class="language-plaintext highlighter-rouge">buildfarm-server</code>
+run <code class="language-plaintext highlighter-rouge">bazel run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/server.config.example</code></p>
+
+<p>From another prompt in the buildfarm repository directory:</p>
+
+<p>run <code class="language-plaintext highlighter-rouge">bazel run src/main/java/build/buildfarm:buildfarm-operationqueue-worker $PWD/examples/worker.config.example</code></p>
+
+<p>From another prompt, in your client workspace:</p>
+
+<p>run <code class="language-plaintext highlighter-rouge">bazel run --remote_executor=grpc://localhost:8980 :main</code></p>
+
+<p>Your build should now print out the following on its <code class="language-plaintext highlighter-rouge">processes</code> summary line:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>INFO: 2 processes: 2 remote.
+</code></pre></div></div>
+
+<p>That <code class="language-plaintext highlighter-rouge">2 remote</code> indicates that your compile and link ran remotely. Congratulations, you just build something through remote execution!</p>
+
+<h2 id="buildfarm-manager">Buildfarm Manager</h2>
+
+<p>You can now easily launch a new Buildfarm cluster locally or in AWS using an open sourced <a href="https://github.com/80degreeswest/bfmgr">Buildfarm Manager</a>.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>wget https://github.com/80degreeswest/bfmgr/releases/download/1.0.7/bfmgr-1.0.7.jar
+java -jar bfmgr-1.0.7.jar
+Navigate to http://localhost
+</code></pre></div></div>
+:ET

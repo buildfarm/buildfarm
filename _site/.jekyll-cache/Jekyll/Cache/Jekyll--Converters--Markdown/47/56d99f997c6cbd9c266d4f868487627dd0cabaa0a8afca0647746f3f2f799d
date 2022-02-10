@@ -1,0 +1,175 @@
+I"�<h2 id="prometheus-configuration">Prometheus Configuration</h2>
+
+<p>To enable emitting of Prometheus metrics, add the following configuration to your configuration file:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>prometheus_config: {
+  port: 9090
+}
+</code></pre></div></div>
+
+<h2 id="available-prometheus-metrics">Available Prometheus Metrics</h2>
+
+<p><strong>remote_invocations</strong></p>
+
+<p>Counter for the number of invocations of the capabilities service</p>
+
+<p><strong>expired_key</strong></p>
+
+<p>Counter for key expirations</p>
+
+<p><strong>execution_success</strong></p>
+
+<p>Counter for the number of successful executions</p>
+
+<p><strong>pre_queue_size</strong></p>
+
+<p>Gauge of a number of items in prequeue</p>
+
+<p><strong>dispatched_operations_size</strong></p>
+
+<p>Gauge of the number of dispatched operations</p>
+
+<p><strong>dispatched_operations_build_amount</strong></p>
+
+<p>Gauge for the number of dispatched operations that are build actions</p>
+
+<p><strong>dispatched_operations_test_amount</strong></p>
+
+<p>Gauge for the number of dispatched operations that are test actions</p>
+
+<p><strong>dispatched_operations_unknown_amount</strong></p>
+
+<p>Gauge for the number of dispatched operations that could not be identified as build / test</p>
+
+<p><strong>dispatched_operations_from_queue_amount</strong></p>
+
+<p>Gauge for the number of dispatched operations that came from each queue (using “queue_name” as label)</p>
+
+<p><strong>dispatched_operations_tools_amount</strong></p>
+
+<p>Gauge for the number of dispatched operations by tool name (using “tool_name” as label)</p>
+
+<p><strong>dispatched_operations_mnemonics_amount</strong></p>
+
+<p>Gauge for the number of dispatched operations by mnemonic (using “mnemonic” as label)</p>
+
+<p><strong>dispatched_operations_command_tools</strong></p>
+
+<p>Gauge for the number of dispatched operations by cli tool (using “tool” as label)</p>
+
+<p><strong>dispatched_operations_targets_amount</strong></p>
+
+<p>Gauge for the number of dispatched operations by target (using “target” as label)</p>
+
+<p><strong>dispatched_operations_config_amount</strong></p>
+
+<p>Gauge for the number of dispatched operations by config (using “config” as label)</p>
+
+<p><strong>dispatched_operations_platform_properties</strong></p>
+
+<p>Gauge for the number of dispatched operations by platform properties (using “config” as label)</p>
+
+<p><strong>dispatched_operations_clients_being_served</strong></p>
+
+<p>The number of build clients currently being served</p>
+
+<p><strong>dispatched_operations_requeued_operations_amount</strong></p>
+
+<p>The number of dispatched operations that have been requeued</p>
+
+<p><strong>worker_pool_size</strong></p>
+
+<p>Gauge of the number of workers available</p>
+
+<p><strong>queue_size</strong></p>
+
+<p>Gauge of the size of the queue (using a queue_name label for each individual queue)</p>
+
+<p><strong>blocked_actions_size</strong></p>
+
+<p>Gauge of the number of blocked actions</p>
+
+<p><strong>blocked_invocations_size</strong></p>
+
+<p>Gauge of the number of blocked invocations</p>
+
+<p><strong>actions</strong></p>
+
+<p>Counter for the number of actions processed</p>
+
+<p><strong>operations_stage_load</strong></p>
+
+<p>Gauge for the number of operations in each stage (using a stage_name for each individual stage)</p>
+
+<p><strong>operation_status</strong></p>
+
+<p>Gauge for the completed operations status (using a status_code label for each individual GRPC code)</p>
+
+<p><strong>operation_worker</strong></p>
+
+<p>Gauge for the number of operations executed on each worker (using a worker_name label for each individual worker)</p>
+
+<p><strong>action_results</strong></p>
+
+<p>Counter for the number of action results</p>
+
+<p><strong>missing_blobs</strong></p>
+
+<p>Histogram for the number of missing blobs</p>
+
+<p><strong>execution_slot_usage</strong></p>
+
+<p>Gauge for the number of execution slots used on each worker</p>
+
+<p><strong>execution_time_ms</strong></p>
+
+<p>Histogram for the execution time on a worker (in milliseconds)</p>
+
+<p><strong>execution_stall_time_ms</strong></p>
+
+<p>Histogram for the execution stall time on a worker (in milliseconds)</p>
+
+<p><strong>input_fetch_slot_usage</strong></p>
+
+<p>Gauge for the number of input fetch slots used on each worker</p>
+
+<p><strong>input_fetch_time_ms</strong></p>
+
+<p>Histogram for the input fetch time on a worker (in milliseconds)</p>
+
+<p><strong>input_fetch_stall_time_ms</strong></p>
+
+<p>Histogram for the input fetch stall time on a worker (in milliseconds)</p>
+
+<p><strong>queued_time_ms</strong></p>
+
+<p>Summary for the operation queued time (in milliseconds)</p>
+
+<p><strong>output_upload_time_ms</strong></p>
+
+<p>Summary for the output upload time (in milliseconds)</p>
+
+<p><strong>completed_operations</strong></p>
+
+<p>Counter for the number of completed operations</p>
+
+<p><strong>operation_poller</strong></p>
+
+<p>Counter for the number of operations being polled</p>
+
+<p><strong>io_bytes</strong></p>
+
+<p>Histogram for the bytes read/written to get system I/O</p>
+
+<p><strong>health_check</strong></p>
+
+<p>Counter showing service restarts</p>
+
+<p><strong>cas_size</strong></p>
+
+<p>Total size of the worker’s CAS in bytes</p>
+
+<p><strong>cas_entry_count</strong></p>
+
+<p>The total number of entries in the worker’s CAS</p>
+:ET

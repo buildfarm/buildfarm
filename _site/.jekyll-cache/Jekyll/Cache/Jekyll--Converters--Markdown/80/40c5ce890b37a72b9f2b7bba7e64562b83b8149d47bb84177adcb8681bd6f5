@@ -1,0 +1,11 @@
+I"<h1 id="edit-the-site">Edit the site</h1>
+
+<p>The site is rendered with jeykll.  To see changes locally run:</p>
+<ul>
+  <li>cd _site</li>
+  <li>bundle install</li>
+  <li>jekyll serve</li>
+</ul>
+
+<p>You should see a local URL like: http://127.0.0.1:4000/bazel-buildfarm/</p>
+:ET

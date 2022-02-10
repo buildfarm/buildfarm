@@ -1,0 +1,18 @@
+I"-<h1 id="general-features">General Features</h1>
+
+<p>Buildfarm has endeavored to support a wide variety of features implied or mandated by the Remote Execution API, including those currently not in use or worked around by bazel or other clients.</p>
+
+<p>Most notably, buildfarm has universal support for:</p>
+
+<ul>
+  <li>configurable instances with specific instance types</li>
+  <li>progressive and flow controlled CAS reads and writes</li>
+  <li>pluggable external CAS endpoints</li>
+  <li>RequestMetadata behavior attribution</li>
+</ul>
+
+<p>Bazel Client Feature Usage:</p>
+
+<h2 id="fetch-api---planned"><a href="https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_remote_downloader">Fetch API</a> - <a href="https://github.com/bazelbuild/bazel-buildfarm/pull/605">Planned</a></h2>
+<h2 id="builds-without-the-bytes---read-this"><a href="https://github.com/bazelbuild/bazel/issues/6862">Builds Without The Bytes</a> - <a href="https://bazelbuild.github.io/bazel-buildfarm/docs/execution/builds-without-the-bytes/">Read This</a></h2>
+:ET

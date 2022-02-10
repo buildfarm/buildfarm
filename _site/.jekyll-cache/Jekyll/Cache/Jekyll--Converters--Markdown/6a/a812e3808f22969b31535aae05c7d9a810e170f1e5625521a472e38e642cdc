@@ -1,0 +1,120 @@
+I"�&<p>This page contains all of the <a href="https://docs.bazel.build/versions/master/be/common-definitions.html#common.exec_properties">execution properties</a> supported by Buildfarm.<br />
+Users can also customize buildfarm to understand additional properties that are not listed here (This is often done when configuring the <a href="https://github.com/bazelbuild/bazel-buildfarm/wiki/Operation-Queue">Operation Queue</a>).</p>
+
+<h2 id="core-selection">Core Selection:</h2>
+
+<h3 id="min-cores"><code class="language-plaintext highlighter-rouge">min-cores</code></h3>
+<p><strong>description:</strong> the minimum number of cores needed by an action.  Should be set to &gt;= 1<br />
+Workers and queues can be configured to behave differently based on this property.</p>
+
+<h3 id="max-cores"><code class="language-plaintext highlighter-rouge">max-cores</code></h3>
+<p><strong>description:</strong> the maximum number of cores needed by an action. Buildfarm will enforce a max.<br />
+Workers and queues can be configured to behave differently based on this property.</p>
+
+<h3 id="cores"><code class="language-plaintext highlighter-rouge">cores</code></h3>
+<p><strong>description:</strong> the minimum &amp; maximum number of cores needed by an action.  This sets both <code class="language-plaintext highlighter-rouge">min-cores</code> and <code class="language-plaintext highlighter-rouge">max-cores</code> accordingly.</p>
+
+<p><strong>use case:</strong> very often you want unit tests (or all actions in general) to be constrained to a core limit via cgroups.<br />
+This is relevant for performance and stability of the worker as multiple tests share the same hardware as the worker.</p>
+
+<h2 id="memory-selection">Memory Selection:</h2>
+
+<h3 id="min-mem"><code class="language-plaintext highlighter-rouge">min-mem</code></h3>
+<p><strong>description:</strong> the minimum amount of bytes the action may use.</p>
+
+<h3 id="max-mem"><code class="language-plaintext highlighter-rouge">max-mem</code></h3>
+<p><strong>description:</strong> the maximum amount of bytes the action may use.</p>
+
+<p><strong>use case:</strong> very often you want unit tests (or all actions in general) to be constrained to a memory limit via cgroups.<br />
+This is relevant for performance and stability of the worker as multiple tests share the same hardware as the worker.
+Tests that exceed their memory requirements will be killed.</p>
+
+<h2 id="execution-settings">Execution Settings:</h2>
+
+<h3 id="linux-sandbox"><code class="language-plaintext highlighter-rouge">linux-sandbox</code></h3>
+<p><strong>description:</strong> Use bazel’s linux sandbox as an execution wrapper.</p>
+
+<h3 id="block-network"><code class="language-plaintext highlighter-rouge">block-network</code></h3>
+<p><strong>description:</strong> Creates a new network namespace.  Assumes the usage of the linux sandbox.</p>
+
+<h3 id="tmpfs"><code class="language-plaintext highlighter-rouge">tmpfs</code></h3>
+<p><strong>description:</strong> Mounts an empty tmpfs under <code class="language-plaintext highlighter-rouge">/tmp</code> for the action.  Assumes the usage of the linux sandbox.</p>
+
+<h2 id="queue--pool-selection">Queue / Pool Selection:</h2>
+
+<h3 id="choose-queue"><code class="language-plaintext highlighter-rouge">choose-queue</code></h3>
+<p><strong>description:</strong> place the action directly on the chosen queue (queue name must be known based on buildfarm configuration).</p>
+
+<p><strong>use case:</strong> Other remote execution solutions have slightly different paradigms on deciding where actions go. They leverage execution properties for selecting a “pool” of machines to send the action. We sort of have a pool of workers waiting on particular queues. For parity with this concept, we support this execution property which will take precedence in deciding queue eligibility.</p>
+
+<h2 id="extending-execution">Extending Execution:</h2>
+
+<h3 id="env-var--env-vars"><code class="language-plaintext highlighter-rouge">env-var</code> / <code class="language-plaintext highlighter-rouge">env-vars</code></h3>
+<p><strong>description:</strong> ensure the action is executed with additional environment variables.  These variables are applied last in the order given.</p>
+
+<p><code class="language-plaintext highlighter-rouge">env-var</code> expects a single key/value like <code class="language-plaintext highlighter-rouge">--remote_default_exec_properties=env-var:FOO=VALUE</code><br />
+<code class="language-plaintext highlighter-rouge">env-vars</code> expects a key/json like <code class="language-plaintext highlighter-rouge">--remote_default_exec_properties=env-vars='{"FOO": "VALUE","FOO2": "VALUE2"}'</code></p>
+
+<p><strong>use case:</strong>
+Users may need to set additional environment variables through <code class="language-plaintext highlighter-rouge">exec_properties</code>.<br />
+Changing code or using <code class="language-plaintext highlighter-rouge">--action_env</code> may be less feasible than specifying them through these exec_properties.<br />
+Additionally, the values of their environment variables may need to be influenced by buildfarm decisions.</p>
+
+<p><strong>example:</strong> pytorch tests can still see the underlying hardware through <code class="language-plaintext highlighter-rouge">/proc/cpuinfo</code>.<br />
+Despite being given 1 core, they see all of the cpus and decide to spawn that many threads. This essentially starves them and gives poor test performance (we may spoof cpuinfo in the future).  Another solution is to use env vars <code class="language-plaintext highlighter-rouge">OMP_NUM_THREADS</code> and <code class="language-plaintext highlighter-rouge">MKL_NUM_THREADS</code>.  This could be done in code, but we can’t trust that developers will do it consistently or keep it in sync with <code class="language-plaintext highlighter-rouge">min-cores</code> / <code class="language-plaintext highlighter-rouge">max-cores</code>.  Allowing these environment variables to be passed the same way as the core settings would be ideal.</p>
+
+<p><strong>Standard Example:</strong><br />
+This test will succeed when env var TESTVAR is foobar, and fail otherwise.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>#!/bin/bash
+[ "$TESTVAR" = "foobar" ]
+</code></pre></div></div>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>./bazel test  \
+--remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
+//env_test:main
+FAIL
+</code></pre></div></div>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>./bazel test --remote_default_exec_properties='env-vars={"TESTVAR": "foobar"}' \
+ --remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
+//env_test:main
+PASS
+</code></pre></div></div>
+<p><strong>Template Example:</strong>
+If you give a range of cores, buildfarm has the authority to decide how many your operation actually claims.  You can let buildfarm resolve this value for you (via <a href="https://mustache.github.io/">mustache</a>).</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>#!/bin/bash
+[ "$MKL_NUM_THREADS" = "1" ]
+</code></pre></div></div>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>./bazel test  \
+--remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
+//env_test:main
+FAIL
+</code></pre></div></div>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>./bazel test  \
+--remote_default_exec_properties='env-vars="MKL_NUM_THREADS": ""' \
+--remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
+//env_test:main
+PASS
+</code></pre></div></div>
+
+<p><strong>Available Templates:</strong><br />
+<code class="language-plaintext highlighter-rouge">: what buildfarm has decided is a valid min core count for the action.  
+</code>: what buildfarm has decided is a valid max core count for the action.<br />
+``: buildfarm’s decision on how many cores your action should claim.</p>
+
+<h2 id="debugging-execution">Debugging Execution:</h2>
+
+<h3 id="debug-before-execution"><code class="language-plaintext highlighter-rouge">debug-before-execution</code></h3>
+<p><strong>description:</strong> Fails the execution with important debug information on how the execution will be performed.<br />
+<strong>use case:</strong> Sometimes you want to know the exact execution context and cli that the action is going to be run with.  This can help any situation where local action behavior seems different than remote action behavior.</p>
+
+<h3 id="debug-after-execution"><code class="language-plaintext highlighter-rouge">debug-after-execution</code></h3>
+<p><strong>description:</strong> Runs the execution, but fails it afterward with important debug information on how the execution was performed.</p>
+
+<h2 id="additional-information">Additional Information</h2>
+<p>Custom properties can also be added to buildfarm’s configuration in order to facilitate queue matching (see <a href="https://github.com/bazelbuild/bazel-buildfarm/wiki/Shard-Platform-Operation-Queue">Platform Queues</a>).</p>
+
+<p>Please note that not all execution properties may be relevant to you or the best option depending on your build client.<br />
+For example, some execution properties were created to facilitate behavior before bazel had a better solution in place.</p>
+
+<p>Buildfarm’s configuration for accepting execution properties can be strict or flexible.  Buildfarm has been used alongside other remote execution tools and allowing increased flexibility on these properties is necessary so the solutions can coexist for the same targets.</p>
+:ET

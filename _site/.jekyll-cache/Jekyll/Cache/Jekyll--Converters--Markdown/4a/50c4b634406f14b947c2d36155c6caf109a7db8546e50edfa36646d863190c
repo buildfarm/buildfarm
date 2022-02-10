@@ -1,0 +1,9 @@
+I"U<h1 id="redis">Redis</h1>
+
+<p>Redis is used as the in-memory database between sharded actors.<br />
+Buildfarm’s backplane uses a <a href="https://github.com/xetorthio/jedis">Jedis Cluster</a> for various abstractions.</p>
+
+<h2 id="balanced-queues">Balanced Queues</h2>
+<p>To balance CPU utilization across multiple nodes in a redis cluster, we distribute operations through redis hashtags.  We have a conceptual queue that uses multiple redis lists in its implementation.<br />
+<img src="https://github.com/bazelbuild/bazel-buildfarm/wiki/images/BalancedQueues.png" alt="Balanced Queues" /></p>
+:ET

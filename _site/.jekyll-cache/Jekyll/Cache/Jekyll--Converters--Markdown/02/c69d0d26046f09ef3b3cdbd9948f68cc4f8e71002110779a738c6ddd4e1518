@@ -1,0 +1,18 @@
+I"¾	<h1 id="instance-types">Instance Types</h1>
+
+<p>These are the supported instance types selectable for concrete definition of an instance declared for servers in config. The types here are implementations of the <a href="https://github.com/bazelbuild/bazel-buildfarm/blob/main/src/main/java/build/buildfarm/instance/Instance.java">Instance</a> interface.</p>
+
+<h2 id="memory">Memory</h2>
+
+<p>This is a reference implementation of the Remote Execution API which provides an in-memory CAS, AC, and OperationQueue. It has no persistent retention of its state internally, but can be configured to use an external gRPC endpoint for CAS operations, allowing it to act as a proxy. Instances of this type cannot share Operation information across multiple servers/hosts. It presents a matching interface for workers via an OperationQueue service definition, which provides blocking queue <code class="language-plaintext highlighter-rouge">take</code> functionality, as well as a <code class="language-plaintext highlighter-rouge">put</code> for results, and it maintains watchdogs for all outstanding operations, with expiration resulting in reentrance to the queue, assuming that all input preconditions are still met at that time.</p>
+
+<h2 id="shard">Shard</h2>
+
+<p>The shard instance type is a frontend for a set of common backplane operations, allowing for wide distribution of retention and execution. The backplane serves as a registry of shard workers, the storage for the AC, the various queues and event monitors used in Operation processing, and the CAS index.</p>
+
+<p>The only current backplane implementation uses redis, but the backplane interface is strongly decoupled from its usage, and any single or composite communication layer may be used to satisfy its requirements.</p>
+
+<p>Sharded instances select arbitrary members of the Workers set for CAS writes, and reference the backplane CAS index for CAS reads, selecting any of a set of shards that advertise content to retrieve it. These shards can be any gRPC CAS compatible service endpoint.</p>
+
+<p>Executions on shard are transformed into a worker queue through a processor built into the instance. A server which runs the instance (configurably) participates in this pool, reducing load on a directly connected service to the client. This allows an entire cluster of servers to participate evenly in populating the worker queue with heavyweight operation definitions, even if a client is only communicating with a single host.</p>
+:ET

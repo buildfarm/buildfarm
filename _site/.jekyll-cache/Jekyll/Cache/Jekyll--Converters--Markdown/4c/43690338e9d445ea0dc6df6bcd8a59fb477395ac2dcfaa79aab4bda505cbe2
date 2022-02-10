@@ -1,0 +1,6 @@
+I"@<p><code class="language-plaintext highlighter-rouge">exec_owner</code> is a global worker configuration option for Shard workers which indicates a username on the worker that all output directories for executions will own. The InputFetchStage uses this value to specify the filesystem owner user id for Action-&gt;Command OutputFiles and OutputDirectories (soon to be OutputPaths in REAPI 2.1) paths created during exec root preparation.</p>
+
+<p>Specification of this option requires that the filesystem ownership change is available to the worker process principal. For example, a worker which executes as <code class="language-plaintext highlighter-rouge">root</code> under Unix would be capable of changing directory ownership.</p>
+
+<p>This option only affects file ownership, not effective user id of the action process. This option can be coupled with a default ExecutionPolicy wrapper that performs an execution persona change (i.e. <code class="language-plaintext highlighter-rouge">setuid(2)</code> under Unix), to execute a command with privileges that limit it in writing.</p>
+:ET

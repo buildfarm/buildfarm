@@ -1,0 +1,83 @@
+I"A-<p>The Content Addressable Storage File Cache (CFC) is the functional beating heart of all Buildfarm Workers. It should fundamentally be thought of as a rotating set of Content stored in files, indexed by Digests that make up the inputs for Actions to be executed. It also serves several other functions here detailed. This documentation presents it both in terms of functional behavior, as if it were a service or process, as well as with Java semantics, owing to its implementation.</p>
+
+<p>A CFC has the additional responsibility in shard workers of presenting a CAS (Java) Interface, which supports the typical Read, Write, FindMissingBlobs, and batch versions of the R/W requests.</p>
+
+<p>Each CFC needs a filesystem path to use as its root, and a set of configuration parameters. Under this path, it will store the CAS entries, named by their digests, optionally in a partitioned directory hierarchy by subdividing the first N bytes of the hash.</p>
+
+<p>The CAS entries are treated by the CFC in terms of their index (filesystem directory) mapping to an inode (file content and limited metadata). This is an important distinction for the CFC, as it is used to present a substantially deduplicated ephemeral tree of inputs by its corresponding Exec Filesystem when executing actions. This will be described in further detail under the RC-LRU.</p>
+
+<h2 id="file-metadata">File Metadata</h2>
+
+<p>Due to limitations of posix filesystem presentations, input FileNodes with ‘executable’ specifications require a unique inode from their non-executable counterparts. The CFC considers a CAS entry keyed with its path and executability uniquely, and their files are named as such: <code class="language-plaintext highlighter-rouge">&lt;hash&gt;</code> for the non-executable content, <code class="language-plaintext highlighter-rouge">&lt;hash&gt;_exec</code> for executable content. Each is charged with its own size to the storage pool, can be used for executable-idempotent requests on equal footing, and can be expired independently. Using any digest-based interface method without the option for an executable specification will result in executable key impartiality.</p>
+
+<h2 id="operations">Operations</h2>
+
+<h3 id="readdigest-offset-limit-the-cfc-will-locate-the-indexed-file-for-a-digest-with-executable-impartiality-attempt-to-open-it-seek-to-the-offset-requested-and-present-a-limited-stream-of-the-contents-bytes-a-missing-digest-will-result-in-predefined-behavior-per-the-cas-interface-as-well-as-an-invalidation-of-its-process-index-entry-if-it-exists-an-access-for-the-entry-is-inserted-into-the-access-queue-a-read-is-currently-impermeable-to-expiration-and-can-result-in-overcharge-of-filesystem-content-in-such-a-case">Read(digest, offset, limit): The CFC will locate the indexed file for a digest with executable impartiality, attempt to open it, seek to the offset requested, and present a limited stream of the content’s bytes. A missing digest will result in predefined behavior per the CAS Interface, as well as an invalidation of its process index entry, if it exists. An access for the entry is inserted into the Access Queue. A read is (currently) impermeable to expiration, and can result in overcharge of filesystem content in such a case.</h3>
+
+<h3 id="writeid-the-cfc-provides-a-write-interface-object-that-can-be-used-to-insert-content-into-the-cas-service-and-operation-lifetime-implementations-use-this-to-inject-content-as-requested-and-leverage-its-restartable-and-asynchronous-completion-capacities-writes-may-be-rejected-out-of-hand-due-to-configurable-cas-entry-size-limitations-under-the-hood-there-are-several-constraints-present-per-write">Write(id): The CFC provides a Write-interface object that can be used to insert content into the CAS. Service and Operation lifetime implementations use this to inject content as requested, and leverage its restartable and asynchronous completion capacities. Writes may be rejected out of hand due to configurable CAS entry size limitations. Under the hood, there are several constraints present per-write:</h3>
+<ul>
+  <li>A Write is uniquely identified by its digest and a uuid.</li>
+  <li>A Write will charge the storage pool size with its full content size upon opening a stream via getOutput().</li>
+  <li>A Write’s OutputStream is a mutually exclusive transaction, with a premature close() restoring the stream’s capacity for representation.</li>
+  <li>A close() upon completion of a Write’s OutputStream will initiate a validation for it.</li>
+  <li>Upon successful validation (size and content are compared to the expected digest), a commit is effected, making it available as a CAS entry with a recorded access placing it at the head of the RC-LRU.</li>
+  <li>Within a CFC, concurrent Writes to a single digest will compete for completion, with the first one to commit cancelling all other Writes’ OutputStreams to the same digest.</li>
+  <li>Upon a commit, a shared future for all Writes to a single digest is completed, allowing premature indication of committed content receipt.</li>
+</ul>
+
+<h3 id="findmissingblobsdigests-the-process-index-is-queried-for-each-requested-digest-with-executable-impartiality-to-filter-for-only-those-entries-that-do-not-exist-in-the-index-no-file-interactions-take-place-during-this-request-and-no-invalidation-of-content-occurs-upon-this-request-accesses-for-all-existing-entries-enter-the-access-queue">FindMissingBlobs(digests): The process index is queried for each requested digest with executable impartiality, to filter for only those entries that do not exist in the index. No file interactions take place during this request, and no invalidation of content occurs upon this request. Accesses for all existing entries enter the Access Queue.</h3>
+
+<h3 id="batch-readwrite-these-requests-are-sequenced-for-each-entry-resulting-in-only-latency-reduction-corresponding-to-each-individual-operation">Batch Read/Write: These requests are sequenced for each entry, resulting in only latency reduction, corresponding to each individual operation.</h3>
+
+<h2 id="structures">Structures</h2>
+
+<h3 id="entry-index">Entry Index</h3>
+
+<p>This is a Map of CFC Entry Keys ({digest, executability}) to accounting entry metadata. Reference counts, directories containing the entry, and file metadata ttl are metadata fields for the entry, as well as support fields for the RC-LRU.</p>
+
+<h3 id="rc-lru">RC-LRU</h3>
+
+<p>The Reference Counted Least Recently Used list is a composite structure with the Process Index. Entries are either <em>in</em> or <em>out</em> of the RC-LRU, with only those entries <em>in</em> the RC-LRU considered for expiration. All entries with reference counts &gt; 0 are <em>out</em> of the RC-LRU. Manipulation of the RC-LRU is synchronized for the entire CFC, with the actors being the transactive <code class="language-plaintext highlighter-rouge">put[Directory]()</code> and <code class="language-plaintext highlighter-rouge">decrementReferences()</code> methods, as well as the Access Recorder.</p>
+
+<h3 id="directory-index">Directory Index</h3>
+
+<p>Directories can be maintained by the CFC to provide several important heuristic optimizations, both in terms of storage and IO complexity. For a given directory entry, a key of its digest is used to refer to all of its flattened content digests. This is complemented by a filesystem directory named for the digest with a <code class="language-plaintext highlighter-rouge">&lt;hash&gt;_dir</code> name, where it will contain a) real directories underneath it named for each level of DirectoryNode in its REAPI specification, and b) files with names and executability from a FileNode for each Directory’s files, the inodes for which are all CAS entry files (or empty files, in that special size case). The CFC also maintains a reverse index for each CAS entry to all of the directories it exists under. Upon expiration of an entry, each directory it is contained in is also expired, with both Directory Index and filesystem directories being deleted. This is the only growth bound check on any directory, being the only path to expiration.</p>
+
+<h3 id="access-queue">Access Queue</h3>
+
+<p>A simple queue of records of digest set accesses, meant to indicate the entries more desired than not represented.</p>
+
+<h2 id="agents">Agents</h2>
+
+<h3 id="startup-scanner">Startup Scanner</h3>
+
+<p>Upon start(), a CFC scans the contents of its root to populate its indices. It first locates and injects all entry inodes, filtering for valid entry names and filesystem permissions, populating the Entry Index. Invalid names are deleted. It then scans directories, reproducing a Directory tree definition for each toplevel dir for validation, and populates the Directory Index. Invalid directories are deleted. A callback for the set of valid entry digests discovered is invoked. This procedure is (currently) blocking for valid entries, and operates asynchronously during invalid content removal.</p>
+
+<h3 id="access-recorder">Access Recorder</h3>
+
+<p>The Access Queue is depleted by the Access Recorder, active after <code class="language-plaintext highlighter-rouge">start()</code> completion, to perform a simple reordering for accessed entries into the front of the RC-LRU. An entry that is <em>out</em> of the RC-LRU remains out after being processed by the recorder, and an entry that is <em>in</em> is moved to the head. A single thread runs the Access Recorder, and it is terminated when <code class="language-plaintext highlighter-rouge">stop()</code> is called on the CFC.</p>
+
+<h2 id="behaviors">Behaviors</h2>
+
+<h3 id="referencedereference">Reference/Dereference</h3>
+
+<p>Entries can have their reference counts incremented, with 0-&gt;1 moving them <em>out</em> of the RC-LRU, or decremented, with 1-&gt;0 moving them <em>in</em> to the RC-LRU, being placed at the head. Directory {,de}references operate in batch over their contained entries, with directory digests functioning as extreme space-saving shorthands for digest sets.</p>
+
+<h3 id="asynchronous-filesystem-monitor">Asynchronous Filesystem Monitor</h3>
+
+<p>Entry and Directory metadata content Time To Live checks provide convergent consistency in the event of asynchronous filesystem manipulation - in the event of an unexpected availability or permission change to the filesystem, the CFC eventually discovers and presents corrected state.</p>
+
+<h3 id="expiration">Expiration</h3>
+
+<p>As a result of any intended insertion into the CFC, the total content size of the CAS is ‘charged’ by adding the size of the new content. A test is performed against this size. If the size exceeds a configurable maximum content size, expiration occurs and blocks the insertion until complete. To expire content, the CFC removes the tail of the RC-LRU, attempts a delegate write if configured, expires its associated directories, removes its metadata, deletes its file content, and will executable-impartially invoke a callback with the expired digest. This process is repeated until the size is once again below the maximum content size.</p>
+
+<h3 id="delegation">Delegation</h3>
+
+<p>The CFC supports a waterfall delegation to a CAS Interface Object. This Object (currently) sees the following interactions:</p>
+
+<ul>
+  <li>Writes upon expirations of a referencing CFC, with full output streaming.</li>
+  <li>Reads upon content missing from a referencing CFC, with read through insertion of the referencing CFC as an entry</li>
+  <li>FindMissingBlobs for filtered entries that remain missing from a referencing CFC.</li>
+</ul>
+:ET

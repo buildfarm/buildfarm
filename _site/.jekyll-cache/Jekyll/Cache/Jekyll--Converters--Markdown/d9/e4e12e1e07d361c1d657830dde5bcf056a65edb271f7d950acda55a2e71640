@@ -1,0 +1,70 @@
+I"L<h1 id="debugging-executions">Debugging Executions</h1>
+
+<p>This tutorial is intended to guide you in debugging executions that are run on buildfarm.</p>
+
+<h3 id="problem">Problem</h3>
+<p>Build actions (and more specifically unit tests) often behave differently across environments.  This makes it difficult to understand and debug remote action behavior.  The execution environment of buildfarm may seem like an inaccessible black-box to the client.  The problem is further complicated by the fact that buildfarm’s executor may not be using the same tools locally as the build system (such as bazel’s sandbox or process-wrapper).  In buildfarm, these tools are chosen based on the configuration of execution wrappers, and custom execution wrappers exist as well.  Buildfarm may also virtualize hardware and apply restrictions on resources such as cpu, memory, and network.  Additionally, buildfarm actions do not always run on the same machine. Actions in buildfarm are directed to particular eligible workers based on their platform properties.  Despite the platform properties of the worker chosen, the action may run inside a docker container which also affects the execution environment.</p>
+
+<h3 id="capturing-debug-information-before-execution">Capturing debug information (before execution)</h3>
+<p>There are execution properties available to help you capture debug information dynamically when performing executions.<br />
+To capture initial information about an execution, you can use the following:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>bazel test --remote_default_exec_properties='debug-before-execution=true'  \
+--remote_executor=grpc://127.0.0.1:8980 \
+--noremote_accept_cached  \
+--nocache_test_results 
+//&lt;TARGET&gt;
+</code></pre></div></div>
+
+<p>Assuming the action is properly queued and reaches the executor, the executor will deliberately fail the action and send you debug information via json through the action’s stderr.<br />
+You can view this debug information by reading the failure log:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>cat source/bazel-out/k8-fastbuild/testlogs/&lt;TARGET&gt;/test.log   
+</code></pre></div></div>
+
+<p>You can streamline viewing this information via <code class="language-plaintext highlighter-rouge">--test_output=streamed</code></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>bazel test \
+--test_output=streamed \
+--remote_default_exec_properties='debug-before-execution=true' \
+--noremote_accept_cached \
+--nocache_test_results \
+//&lt;TARGET&gt;
+</code></pre></div></div>
+
+<h3 id="capturing-debug-information-after-execution">Capturing debug information (after execution)</h3>
+
+<p>A similar property exists that will tell the executor to run the action, and after the action finishes, return debug information.</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>bazel test \
+--test_output=streamed \
+--remote_default_exec_properties='debug-after-execution=true' \
+--noremote_accept_cached \
+--nocache_test_results \
+//&lt;TARGET&gt;
+</code></pre></div></div>
+
+<p>If your action is hanging, you might not be able to get this debug information and should stick with ‘debug-before-execution=true’.<br />
+If your action is finishing, this would be a ideal to use, as it should provide all the same information that ‘debug-before-execution=true’ does, with additional info about the execution.</p>
+
+<h3 id="configuration">Configuration</h3>
+<p>If you see an error like this:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>properties are not valid for queue eligibility: [name: "debug-before-execution" value: "true"]
+</code></pre></div></div>
+<p>you will need to configure the queue’s <code class="language-plaintext highlighter-rouge">allow_unmatched</code> to true so that the server can still put the action on the queue.
+Additionally you may want to configure the the worker’s <code class="language-plaintext highlighter-rouge">DequeueMatchSettings</code> to also have <code class="language-plaintext highlighter-rouge">allow_unmatched</code> to true.  That will ensure the action does not fail reaching one of the worker due to the additional exec_property.</p>
+
+<h3 id="debugging-tests">Debugging Tests</h3>
+<p>By default, <code class="language-plaintext highlighter-rouge">debug-before-execution</code> and <code class="language-plaintext highlighter-rouge">debug-after-execution</code> only apply to test actions.  The reason being, is that if you wanted to debug a test, but passed a global property like <code class="language-plaintext highlighter-rouge">--remote_default_exec_properties='debug-before-execution=true'</code>, it would invalidate all the actions, and the test would need rebuilt, but the rebuild of the test would fail, because you would actually be debugging the first build action, and you would never see the debug results of the test action.  Debugging tests is more typical, but you can also debug build actions by using <code class="language-plaintext highlighter-rouge">--remote_default_exec_properties='debug-tests-only=false'</code>.</p>
+
+<p>It is more convenient to debug things by passing the global exec properties, but you could also tag targets specifically in the BUILD files with these debug options.</p>
+
+<h3 id="finding-operations">Finding Operations</h3>
+<p>All buildfarm operations can be found using the following query:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>./bazelw run //src/main/java/build/buildfarm:bf-find-operations localhost:8980 shard SHA256 
+</code></pre></div></div>
+
+<p>When you run a build invocation with bazel, bazel will you give you an invocation id.  You can use that to query your specific operations:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>./bazelw run //src/main/java/build/buildfarm:bf-find-operations localhost:8980 shard SHA256 "[?(@.operation.metadata.requestMetadata.toolInvocationId == '1877f43a-9b33-4eca-9d6b-aef71b47bf47')]"
+</code></pre></div></div>
+
+<p>You can find the operation of a specific test name like this:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>./bazelw run //src/main/java/build/buildfarm:bf-find-operations localhost:8980 shard SHA256 "$.command.environmentVariables[?(@.value == '//code/tools/example_tests/bash_hello_world2:main')]"
+</code></pre></div></div>
+:ET

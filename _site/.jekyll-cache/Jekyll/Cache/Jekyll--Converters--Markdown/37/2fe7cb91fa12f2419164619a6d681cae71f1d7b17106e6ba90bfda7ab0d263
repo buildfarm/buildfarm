@@ -1,0 +1,39 @@
+I"_<h3 id="how-to-make-your-aws-cluster-visible-to-buildfarm-admin">How to make your AWS cluster visible to Buildfarm Admin</h3>
+
+<p>Buildfarm Admin currently only works with Buildfarm clusters deployed in AWS. All hosts must be properly tagged with values specified in application.properties.</p>
+
+<ul>
+  <li>Tag schedulers (servers) with buildfarm.instance_type={deployment.tag.instance.type.server}</li>
+  <li>Tag CPU workers with buildfarm.worker_type={deployment.tag.instance.type.cpuworker}</li>
+  <li>Tag GPU workers with buildfarm.worker_type={deployment.tag.instance.type.gpuworker}</li>
+  <li>Tag all hosts with aws:autoscaling:groupName={<ACTUAL AUTOSCALING="" GROUP="" NAME="">}</ACTUAL></li>
+  <li>Tag all hosts with buildfarm.cluster_id={cluster.id}</li>
+</ul>
+
+<h3 id="rest-api-endpoints">REST API Endpoints</h3>
+
+<ul>
+  <li>/restart/worker/{instanceId}</li>
+  <li>/restart/server/{instanceId}</li>
+  <li>/terminate/{instanceId}</li>
+  <li>/scale/{autoScaleGroup}/{numInstances}</li>
+</ul>
+
+<h3 id="build-and-run-buildfarm-admin-locally">Build and Run Buildfarm Admin locally</h3>
+
+<p>Create application.properties file and override any default settings from admin/main/src/main/resources/application.properties. Pass your config file location to the optional spring.config.location flag.</p>
+
+<p>`
+cd admin/main
+./mvnw clean package
+java -jar target/bfadmin.jar -Dspring.config.location=file:<PATH_TO_PROPERTIES_FILE>
+`</PATH_TO_PROPERTIES_FILE></p>
+
+<h3 id="run-latest-docker-container">Run Latest Docker Container</h3>
+
+<p>Replace $HOME with the location of your application.properties file. Make sure the AWS environment variables are set on the host machine for the account where Buildfarm cluster is deployed.</p>
+
+<p>`
+docker run -p 8080:8080 -v $HOME:/var/lib -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN bazelbuild/buildfarm-admin:latest
+`</p>
+:ET

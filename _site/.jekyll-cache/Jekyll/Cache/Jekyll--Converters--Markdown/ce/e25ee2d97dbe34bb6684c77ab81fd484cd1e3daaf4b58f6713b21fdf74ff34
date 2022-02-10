@@ -1,0 +1,26 @@
+I"�<p>bf-cat is a tool provided with buildfarm for investigating the various structures and status of your Buildfarm Cluster.</p>
+
+<p>Its basic usage is:</p>
+
+<p><code class="language-plaintext highlighter-rouge">bf-cat &lt;host[:port]&gt; &lt;instance-name&gt; &lt;hash-function&gt; &lt;command&gt; [params...]</code></p>
+
+<p><strong>instance-name</strong> is the name of the specific instance to inquire about, typically configured on schedulers. A literal empty string parameter (i.e. bash: <code class="language-plaintext highlighter-rouge">""</code>) will use the default instance for a server.</p>
+
+<p><strong>hash-function</strong> is one of MD5, SHA1, SHA256, etc selected to match the supported digest functions of an instance, and used to compute digests for content retrieved.</p>
+
+<p><strong>command</strong> is typically one of the following, with digest parameters as <hash>/<size>, as typically represented in log entries:</size></hash></p>
+
+<ul>
+  <li><strong><code class="language-plaintext highlighter-rouge">Action &lt;digest&gt;</code></strong>: Retrieves Action definitions from the CAS and renders them with field identifiers.</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">Capabilities</code></strong>: Retrieve the capabilities response for an instance.</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">Command &lt;digest&gt;</code></strong>: Retrieves Command definitions from the CAS and renders them with field identifiers.</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">Directory &lt;digest&gt;</code></strong>: Retrieves Directory definitions from the CAS and redners them with field identifiers.</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">File &lt;digest&gt;</code></strong>: Downloads a Blob from the CAS and prints it to stdout. This can be safely redirected to a file, with no additional output interceding</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">Missing &lt;digest&gt;</code></strong>: Make a findMissingBlobs request, outputting only the digests in the parameter list that are missing from the CAS</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">Operation &lt;name&gt;</code></strong>: Retrieves current operation statuses and renders them with field identifiers as able. This uses the Operations API and will include rich information about operations in flight, compared to the ‘execute’ function</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">BackplaneStatus</code></strong>: Retrieve the status of a shard cluster’s operation queues, with discrete information about each provisioned layer of the ready-to-run queue.</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">TreeLayout &lt;digest&gt;</code></strong>: Retrieves Trees of inputs from a root node. A Tree is printed with indent-levels according to depth in the directory hierarchy with FileNode and DirectoryNode fields with digests for each entry, as well as a weight by byte and % of the sizes of each directory subtree.</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">WorkerProfile</code></strong>: Retrieve profile information about a worker’s operation, including the size of the CAS and the relative performance of the execution pipeline</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">Watch &lt;name&gt;</code></strong>: Watch an operation to retrieve status updates about its progress through the operation pipeline</li>
+</ul>
+:ET
