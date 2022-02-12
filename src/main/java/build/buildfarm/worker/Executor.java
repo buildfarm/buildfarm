@@ -122,7 +122,7 @@ class Executor {
                         .setExecutingOn(workerContext.getName())
                         .setExecuteOperationMetadata(executingMetadata)
                         .setRequestMetadata(
-                            operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
+                            operationContext.queueEntry.getPreQueueEntry().getRequestMetadata())
                         .build()))
             .build();
 

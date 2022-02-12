@@ -29,7 +29,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.MatchListener;
-import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.Tree;
 import com.google.common.base.Throwables;
@@ -77,7 +77,7 @@ public class ShardWorkerInstanceTest {
   public void dispatchOperationIgnoresNull() throws IOException, InterruptedException {
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("op"))
+            .setPreQueueEntry(PreQueueEntry.newBuilder().setOperationName("op"))
             .build();
     when(backplane.dispatchOperation(any(List.class))).thenReturn(null).thenReturn(queueEntry);
     MatchListener listener = mock(MatchListener.class);

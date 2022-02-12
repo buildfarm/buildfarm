@@ -22,7 +22,7 @@ import static org.mockito.Mockito.verify;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Poller;
-import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.collect.Lists;
@@ -76,7 +76,7 @@ public class InputFetchStageTest {
 
     QueueEntry badEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("bad"))
+            .setPreQueueEntry(PreQueueEntry.newBuilder().setOperationName("bad"))
             .build();
 
     WorkerContext workerContext =

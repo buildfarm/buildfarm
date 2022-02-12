@@ -20,7 +20,7 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.buildfarm.common.Poller;
 import build.buildfarm.instance.MatchListener;
-import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
@@ -101,7 +101,7 @@ public class MatchStage extends PipelineStage {
 
     @SuppressWarnings("SameReturnValue")
     private boolean onOperationPolled() throws InterruptedException {
-      String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
+      String operationName = operationContext.queueEntry.getPreQueueEntry().getOperationName();
       logStart(operationName);
 
       long matchingAtUSecs = stopwatch.elapsed(MICROSECONDS);
@@ -154,7 +154,7 @@ public class MatchStage extends PipelineStage {
   private OperationContext match(OperationContext operationContext) {
     Timestamp workerStartTimestamp = Timestamps.fromMillis(System.currentTimeMillis());
 
-    ExecuteEntry executeEntry = operationContext.queueEntry.getExecuteEntry();
+    PreQueueEntry executeEntry = operationContext.queueEntry.getPreQueueEntry();
     // this may be superfluous - we can probably just set the name and action digest
     Operation operation =
         Operation.newBuilder()

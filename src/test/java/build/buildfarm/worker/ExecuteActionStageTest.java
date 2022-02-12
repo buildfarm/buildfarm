@@ -19,7 +19,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.QueueEntry;
 import java.nio.file.Paths;
 import org.junit.Test;
@@ -36,7 +36,7 @@ public class ExecuteActionStageTest {
 
     QueueEntry errorEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("error"))
+            .setPreQueueEntry(PreQueueEntry.newBuilder().setOperationName("error"))
             .build();
     OperationContext errorContext =
         OperationContext.newBuilder()

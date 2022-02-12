@@ -287,7 +287,7 @@ public class BuildFarmServerTest {
         OperationQueueGrpc.newBlockingStub(inProcessChannel);
 
     QueueEntry givenEntry = operationQueueStub.take(takeRequest);
-    String givenOperationName = givenEntry.getExecuteEntry().getOperationName();
+    String givenOperationName = givenEntry.getPreQueueEntry().getOperationName();
 
     assertThat(givenOperationName).isEqualTo(operation.getName());
 

@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.v1test.DispatchedOperation;
-import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -85,8 +85,8 @@ public class DispatchedMonitorTest {
   public void shouldRequeueOperationWithEarlyRequeueAt() throws Exception {
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(
-                ExecuteEntry.newBuilder()
+            .setPreQueueEntry(
+                PreQueueEntry.newBuilder()
                     .setOperationName("operation-with-early-requeue-at")
                     .build())
             .build();
@@ -108,8 +108,8 @@ public class DispatchedMonitorTest {
       throws Exception {
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(
-                ExecuteEntry.newBuilder()
+            .setPreQueueEntry(
+                PreQueueEntry.newBuilder()
                     .setOperationName("operation-with-early-requeue-at")
                     .build())
             .build();
@@ -139,8 +139,8 @@ public class DispatchedMonitorTest {
   public void shouldIgnoreExecutionException() throws Exception {
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(
-                ExecuteEntry.newBuilder()
+            .setPreQueueEntry(
+                PreQueueEntry.newBuilder()
                     .setOperationName("operation-with-early-requeue-at")
                     .build())
             .build();

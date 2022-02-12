@@ -74,10 +74,10 @@ import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
-import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueueStatus;
@@ -355,7 +355,7 @@ public class ShardInstance extends AbstractServerInstance {
                   ensureCanQueue(stopwatch); // wait for transition to canQueue state
                   long canQueueUSecs = stopwatch.elapsed(MICROSECONDS);
                   stopwatch.stop();
-                  ExecuteEntry executeEntry = backplane.deprequeueOperation();
+                  PreQueueEntry executeEntry = backplane.deprequeueOperation();
                   stopwatch.start();
                   if (executeEntry == null) {
                     logger.log(Level.SEVERE, "OperationQueuer: Got null from deprequeue...");
@@ -1357,7 +1357,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   ExecuteOperationMetadata executeOperationMetadata(
-      ExecuteEntry executeEntry, ExecutionStage.Value stage) {
+      PreQueueEntry executeEntry, ExecutionStage.Value stage) {
     return ExecuteOperationMetadata.newBuilder()
         .setActionDigest(executeEntry.getActionDigest())
         .setStdoutStreamName(executeEntry.getStdoutStreamName())
@@ -1368,7 +1368,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private ListenableFuture<QueuedOperationResult> uploadQueuedOperation(
       QueuedOperation queuedOperation,
-      ExecuteEntry executeEntry,
+      PreQueueEntry executeEntry,
       ExecutorService service,
       Duration timeout)
       throws EntryLimitException {
@@ -1382,7 +1382,7 @@ public class ShardInstance extends AbstractServerInstance {
             .build();
     QueueEntry entry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(executeEntry)
+            .setPreQueueEntry(executeEntry)
             .setQueuedOperationDigest(queuedOperationDigest)
             .setPlatform(queuedOperation.getCommand().getPlatform())
             .build();
@@ -1535,7 +1535,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private ListenableFuture<Void> validateAndRequeueOperation(
       Operation operation, QueueEntry queueEntry, Duration timeout) {
-    ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+    PreQueueEntry executeEntry = queueEntry.getPreQueueEntry();
     String operationName = executeEntry.getOperationName();
     checkState(operationName.equals(operation.getName()));
     RequestMetadata requestMetadata = executeEntry.getRequestMetadata();
@@ -1661,7 +1661,7 @@ public class ShardInstance extends AbstractServerInstance {
     return String.format(NO_REQUEUE_COMPLETE_MESSAGE, operationName);
   }
 
-  void putFailedOperation(ExecuteEntry executeEntry, String errorMessage) {
+  void putFailedOperation(PreQueueEntry executeEntry, String errorMessage) {
     // Create a failed operation which will be reported back to the client.
     Operation.Builder failedOperation =
         Operation.newBuilder()
@@ -1678,7 +1678,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private boolean canOperationBeRequeued(
-      QueueEntry queueEntry, ExecuteEntry executeEntry, Operation operation) throws IOException {
+      QueueEntry queueEntry, PreQueueEntry executeEntry, Operation operation) throws IOException {
     String operationName = executeEntry.getOperationName();
 
     // Skip requeuing and fail the operation if its in a deny list.
@@ -1725,7 +1725,7 @@ public class ShardInstance extends AbstractServerInstance {
   @VisibleForTesting
   public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry, Duration timeout) {
     ListenableFuture<Void> future;
-    ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+    PreQueueEntry executeEntry = queueEntry.getPreQueueEntry();
     Operation operation = getOperation(executeEntry.getOperationName());
 
     try {
@@ -1829,8 +1829,8 @@ public class ShardInstance extends AbstractServerInstance {
 
       String stdoutStreamName = operationName + "/streams/stdout";
       String stderrStreamName = operationName + "/streams/stderr";
-      ExecuteEntry executeEntry =
-          ExecuteEntry.newBuilder()
+      PreQueueEntry executeEntry =
+          PreQueueEntry.newBuilder()
               .setOperationName(operationName)
               .setActionDigest(actionDigest)
               .setExecutionPolicy(executionPolicy)
@@ -2017,7 +2017,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout) {
+  public ListenableFuture<Void> queue(PreQueueEntry executeEntry, Poller poller, Duration timeout) {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(executeEntry.getActionDigest())
@@ -2059,7 +2059,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<Void> transformAndQueue(
-      ExecuteEntry executeEntry,
+      PreQueueEntry executeEntry,
       Poller poller,
       Operation operation,
       Stopwatch stopwatch,
@@ -2208,7 +2208,7 @@ public class ShardInstance extends AbstractServerInstance {
                 operation.toBuilder().setMetadata(Any.pack(queuedOperationMetadata)).build();
             QueueEntry queueEntry =
                 QueueEntry.newBuilder()
-                    .setExecuteEntry(executeEntry)
+                    .setPreQueueEntry(executeEntry)
                     .setQueuedOperationDigest(queuedOperationMetadata.getQueuedOperationDigest())
                     .setPlatform(
                         profiledQueuedMetadata.getQueuedOperation().getCommand().getPlatform())

@@ -32,7 +32,7 @@ instance {
     # request entries cooperatively from an arrival queue
     # on the backplane.
     # If true, this instance will validate and transform
-    # an arrival queue ExecuteRequest as an ExecuteEntry into
+    # an arrival queue ExecuteRequest as an PreQueueEntry into
     # a QueueEntry with a heavyweight ready-to-run QueuedOperation
     # available in the CAS via a fixed size.
     # At least one agent within the cluster must exist to
@@ -127,7 +127,7 @@ instance {
       # modification
       operation_expire: 604800 # 1 week
 
-      # The redis key used to store a list of ExecuteEntrys
+      # The redis key used to store a list of PreQueueEntrys
       # awaiting transformation into QueueEntrys. These are queued
       # by an instance which receives an ExecuteRequest, and
       # dequeued by an operation_queuer agent.

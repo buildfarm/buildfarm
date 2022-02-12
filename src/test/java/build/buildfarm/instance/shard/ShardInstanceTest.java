@@ -63,7 +63,7 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
-import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.github.benmanes.caffeine.cache.AsyncCache;
@@ -265,9 +265,9 @@ public class ShardInstanceTest {
         RequestMetadata.getDefaultInstance(),
         /* watcher=*/ mockWatcher);
     verify(mockWatcher, times(1)).observe(any(Operation.class));
-    ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
+    ArgumentCaptor<PreQueueEntry> executeEntryCaptor = ArgumentCaptor.forClass(PreQueueEntry.class);
     verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));
-    ExecuteEntry executeEntry = executeEntryCaptor.getValue();
+    PreQueueEntry executeEntry = executeEntryCaptor.getValue();
     assertThat(executeEntry.getActionDigest()).isEqualTo(actionDigest);
   }
 
@@ -276,8 +276,8 @@ public class ShardInstanceTest {
     Action action = createAction(false);
     Digest actionDigest = DIGEST_UTIL.compute(action);
 
-    ExecuteEntry executeEntry =
-        ExecuteEntry.newBuilder()
+    PreQueueEntry executeEntry =
+        PreQueueEntry.newBuilder()
             .setOperationName("missing-action-operation")
             .setActionDigest(actionDigest)
             .setSkipCacheLookup(true)
@@ -331,8 +331,8 @@ public class ShardInstanceTest {
     Action action = createAction(true, true, inputRootDigest, SIMPLE_COMMAND);
     Digest actionDigest = DIGEST_UTIL.compute(action);
 
-    ExecuteEntry executeEntry =
-        ExecuteEntry.newBuilder()
+    PreQueueEntry executeEntry =
+        PreQueueEntry.newBuilder()
             .setOperationName("missing-directory-operation")
             .setActionDigest(actionDigest)
             .setSkipCacheLookup(true)
@@ -384,8 +384,8 @@ public class ShardInstanceTest {
     Action action = createAction(true, false);
     Digest actionDigest = DIGEST_UTIL.compute(action);
 
-    ExecuteEntry executeEntry =
-        ExecuteEntry.newBuilder()
+    PreQueueEntry executeEntry =
+        PreQueueEntry.newBuilder()
             .setOperationName("missing-command-operation")
             .setActionDigest(actionDigest)
             .setSkipCacheLookup(true)
@@ -457,8 +457,8 @@ public class ShardInstanceTest {
     Action action = createAction(true, true, inputRootDigest, SIMPLE_COMMAND);
     Digest actionDigest = DIGEST_UTIL.compute(action);
 
-    ExecuteEntry executeEntry =
-        ExecuteEntry.newBuilder()
+    PreQueueEntry executeEntry =
+        PreQueueEntry.newBuilder()
             .setOperationName("missing-directory-operation")
             .setActionDigest(actionDigest)
             .setSkipCacheLookup(true)
@@ -526,8 +526,8 @@ public class ShardInstanceTest {
         .when(mockBackplane)
         .queue(any(QueueEntry.class), any(Operation.class));
 
-    ExecuteEntry executeEntry =
-        ExecuteEntry.newBuilder()
+    PreQueueEntry executeEntry =
+        PreQueueEntry.newBuilder()
             .setOperationName("queue-operation-put-failure-cancels-operation")
             .setActionDigest(actionDigest)
             .setSkipCacheLookup(true)
@@ -569,8 +569,8 @@ public class ShardInstanceTest {
   @Test
   public void queueOperationCompletesOperationWithCachedActionResult() throws Exception {
     ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder().setHash("test").build());
-    ExecuteEntry executeEntry =
-        ExecuteEntry.newBuilder()
+    PreQueueEntry executeEntry =
+        PreQueueEntry.newBuilder()
             .setOperationName("operation-with-cached-action-result")
             .setActionDigest(actionKey.getDigest())
             .build();
@@ -593,8 +593,8 @@ public class ShardInstanceTest {
   public void queueWithFailedCacheCheckContinues() throws Exception {
     Action action = createAction();
     ActionKey actionKey = DIGEST_UTIL.computeActionKey(action);
-    ExecuteEntry executeEntry =
-        ExecuteEntry.newBuilder()
+    PreQueueEntry executeEntry =
+        PreQueueEntry.newBuilder()
             .setOperationName("operation-with-erroring-action-result")
             .setActionDigest(actionKey.getDigest())
             .build();
@@ -656,15 +656,15 @@ public class ShardInstanceTest {
             .build();
 
     String operationName = "cache-served-operation";
-    ExecuteEntry cacheServedExecuteEntry =
-        ExecuteEntry.newBuilder()
+    PreQueueEntry cacheServedPreQueueEntry =
+        PreQueueEntry.newBuilder()
             .setOperationName(operationName)
             .setActionDigest(actionDigest)
             .setRequestMetadata(requestMetadata)
             .build();
     Poller poller = mock(Poller.class);
     instance
-        .queue(cacheServedExecuteEntry, poller, DEFAULT_TIMEOUT)
+        .queue(cacheServedPreQueueEntry, poller, DEFAULT_TIMEOUT)
         .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
 
     verify(poller, times(1)).pause();
@@ -694,9 +694,9 @@ public class ShardInstanceTest {
         requestMetadata,
         /* watcher=*/ mockWatcher);
     verify(mockWatcher, times(1)).observe(any(Operation.class));
-    ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
+    ArgumentCaptor<PreQueueEntry> executeEntryCaptor = ArgumentCaptor.forClass(PreQueueEntry.class);
     verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));
-    ExecuteEntry executeEntry = executeEntryCaptor.getValue();
+    PreQueueEntry executeEntry = executeEntryCaptor.getValue();
     assertThat(executeEntry.getSkipCacheLookup()).isTrue();
   }
 
@@ -721,8 +721,8 @@ public class ShardInstanceTest {
     Digest actionDigest = DIGEST_UTIL.compute(action);
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(
-                ExecuteEntry.newBuilder()
+            .setPreQueueEntry(
+                PreQueueEntry.newBuilder()
                     .setOperationName(operationName)
                     .setSkipCacheLookup(true)
                     .setActionDigest(actionDigest))
@@ -790,8 +790,8 @@ public class ShardInstanceTest {
     Digest actionDigest = DIGEST_UTIL.compute(action);
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(
-                ExecuteEntry.newBuilder()
+            .setPreQueueEntry(
+                PreQueueEntry.newBuilder()
                     .setOperationName(operationName)
                     .setSkipCacheLookup(true)
                     .setActionDigest(actionDigest))

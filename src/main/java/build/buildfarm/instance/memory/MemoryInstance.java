@@ -63,7 +63,6 @@ import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.BackplaneStatus;
-import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.FilesystemACConfig;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -71,6 +70,7 @@ import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationQueueStatus;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.Tree;
@@ -731,8 +731,8 @@ public class MemoryInstance extends AbstractServerInstance {
           QueueEntry queueEntry =
               QueueEntry.newBuilder()
                   // FIXME find a way to get this properly populated...
-                  .setExecuteEntry(
-                      ExecuteEntry.newBuilder()
+                  .setPreQueueEntry(
+                      PreQueueEntry.newBuilder()
                           .setOperationName(operationName)
                           .setActionDigest(metadata.getActionDigest())
                           .setStdoutStreamName(metadata.getStdoutStreamName())
@@ -835,8 +835,8 @@ public class MemoryInstance extends AbstractServerInstance {
           QueueEntry queueEntry =
               QueueEntry.newBuilder()
                   // FIXME find a way to get this properly populated...
-                  .setExecuteEntry(
-                      ExecuteEntry.newBuilder()
+                  .setPreQueueEntry(
+                      PreQueueEntry.newBuilder()
                           .setOperationName(operationName)
                           .setActionDigest(metadata.getActionDigest())
                           .setStdoutStreamName(metadata.getStdoutStreamName())

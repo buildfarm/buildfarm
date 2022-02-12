@@ -224,7 +224,7 @@ class ShardWorkerContext implements WorkerContext {
       ExecutionStage.Value stage,
       Runnable onFailure,
       Deadline deadline) {
-    String operationName = queueEntry.getExecuteEntry().getOperationName();
+    String operationName = queueEntry.getPreQueueEntry().getOperationName();
     poller.resume(
         () -> {
           boolean success = false;
@@ -278,7 +278,7 @@ class ShardWorkerContext implements WorkerContext {
           Level.WARNING,
           format(
               "missing queued operation: %s(%s)",
-              queueEntry.getExecuteEntry().getOperationName(),
+              queueEntry.getPreQueueEntry().getOperationName(),
               DigestUtil.toString(queuedOperationDigest)));
       return null;
     }
@@ -289,7 +289,7 @@ class ShardWorkerContext implements WorkerContext {
           Level.WARNING,
           format(
               "invalid queued operation: %s(%s)",
-              queueEntry.getExecuteEntry().getOperationName(),
+              queueEntry.getPreQueueEntry().getOperationName(),
               DigestUtil.toString(queuedOperationDigest)));
       return null;
     }
@@ -355,7 +355,7 @@ class ShardWorkerContext implements WorkerContext {
               matched = true;
               return listener.onEntry(null);
             }
-            String operationName = queueEntry.getExecuteEntry().getOperationName();
+            String operationName = queueEntry.getPreQueueEntry().getOperationName();
             if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
               logger.log(Level.WARNING, "matched duplicate operation " + operationName);
               return false;

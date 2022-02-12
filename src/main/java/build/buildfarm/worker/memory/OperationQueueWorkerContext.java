@@ -146,7 +146,7 @@ class OperationQueueWorkerContext implements WorkerContext {
       ExecutionStage.Value stage,
       Runnable onFailure,
       Deadline deadline) {
-    String operationName = queueEntry.getExecuteEntry().getOperationName();
+    String operationName = queueEntry.getPreQueueEntry().getOperationName();
     poller.resume(
         () -> {
           boolean success = oq.poll(operationName, stage);
@@ -263,7 +263,7 @@ class OperationQueueWorkerContext implements WorkerContext {
     Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
     ByteString queuedOperationBlob =
         getBlob(
-            casInstance, queuedOperationDigest, queueEntry.getExecuteEntry().getRequestMetadata());
+            casInstance, queuedOperationDigest, queueEntry.getPreQueueEntry().getRequestMetadata());
     if (queuedOperationBlob == null) {
       return null;
     }
@@ -274,7 +274,7 @@ class OperationQueueWorkerContext implements WorkerContext {
           WARNING,
           format(
               "invalid queued operation: %s(%s)",
-              queueEntry.getExecuteEntry().getOperationName(),
+              queueEntry.getPreQueueEntry().getOperationName(),
               DigestUtil.toString(queuedOperationDigest)));
       return null;
     }

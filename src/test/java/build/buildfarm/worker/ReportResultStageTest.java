@@ -34,8 +34,8 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Poller;
-import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
@@ -97,8 +97,8 @@ public class ReportResultStageTest {
             .build();
     QueueEntry reportedEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(
-                ExecuteEntry.newBuilder().setOperationName(reportedOperation.getName()))
+            .setPreQueueEntry(
+                PreQueueEntry.newBuilder().setOperationName(reportedOperation.getName()))
             .build();
     OperationContext reportedContext =
         OperationContext.newBuilder()
@@ -135,8 +135,8 @@ public class ReportResultStageTest {
     Digest actionDigest = DIGEST_UTIL.compute(action);
     QueueEntry erroringEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(
-                ExecuteEntry.newBuilder()
+            .setPreQueueEntry(
+                PreQueueEntry.newBuilder()
                     .setOperationName(erroringOperation.getName())
                     .setActionDigest(actionDigest))
             .build();

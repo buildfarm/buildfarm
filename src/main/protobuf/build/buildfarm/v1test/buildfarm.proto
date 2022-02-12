@@ -464,7 +464,7 @@ message RedisShardBackplaneConfig {
   // the expiration time in seconds for operation keys
   int32 operation_expire = 6;
 
-  // the arrival queue. Contains ExecuteEntry messages
+  // the arrival queue. Contains PreQueueEntry messages
   string pre_queued_operations_list_name = 18;
 
   // the atomic target list for reliable arrival queue removal
@@ -768,7 +768,7 @@ message ProfiledQueuedOperationMetadata {
   google.protobuf.Duration uploaded_in = 5;
 }
 
-message ExecuteEntry {
+message PreQueueEntry {
   string operation_name = 1;
 
   build.bazel.remote.execution.v2.Digest action_digest = 2;
@@ -789,7 +789,7 @@ message ExecuteEntry {
 }
 
 message QueueEntry {
-  ExecuteEntry execute_entry = 1;
+  PreQueueEntry pre_queue_entry = 1;
 
   build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
 

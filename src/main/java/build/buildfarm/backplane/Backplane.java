@@ -27,9 +27,9 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.DispatchedOperation;
-import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
 import com.google.common.collect.ImmutableList;
@@ -195,7 +195,7 @@ public interface Backplane {
    */
   boolean putOperation(Operation operation, ExecutionStage.Value stage) throws IOException;
 
-  ExecuteEntry deprequeueOperation() throws IOException, InterruptedException;
+  PreQueueEntry deprequeueOperation() throws IOException, InterruptedException;
 
   /**
    * The state of operations is tracked in a series of lists representing the order in which the
@@ -245,7 +245,7 @@ public interface Backplane {
   /** Requeue a dispatched operation */
   void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException;
 
-  void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException;
+  void prequeue(PreQueueEntry executeEntry, Operation operation) throws IOException;
 
   void queue(QueueEntry queueEntry, Operation operation) throws IOException;
 

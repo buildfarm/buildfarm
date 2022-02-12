@@ -536,7 +536,7 @@ public class MemoryInstanceTest {
     verify(listener, times(1)).onEntry(queueEntryCaptor.capture());
     QueueEntry queueEntry = queueEntryCaptor.getValue();
     assertThat(queueEntry).isNotNull();
-    String operationName = queueEntry.getExecuteEntry().getOperationName();
+    String operationName = queueEntry.getPreQueueEntry().getOperationName();
     assertThat(requeuers).isNotEmpty();
     Operation queuedOperation = outstandingOperations.get(operationName);
     assertThat(AbstractServerInstance.isQueued(queuedOperation)).isTrue();

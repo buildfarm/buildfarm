@@ -47,12 +47,12 @@ import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
-import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -210,16 +210,16 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
-  abstract static class ExecuteEntryListVisitor extends StringVisitor {
-    protected abstract void visit(ExecuteEntry executeEntry, String executeEntryJson);
+  abstract static class PreQueueEntryListVisitor extends StringVisitor {
+    protected abstract void visit(PreQueueEntry executeEntry, String executeEntryJson);
 
     public void visit(String entry) {
-      ExecuteEntry.Builder executeEntry = ExecuteEntry.newBuilder();
+      PreQueueEntry.Builder executeEntry = PreQueueEntry.newBuilder();
       try {
         JsonFormat.parser().merge(entry, executeEntry);
         visit(executeEntry.build(), entry);
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.FINE, "invalid ExecuteEntry json: " + entry, e);
+        logger.log(Level.FINE, "invalid PreQueueEntry json: " + entry, e);
       }
     }
   }
@@ -238,9 +238,9 @@ public class RedisShardBackplane implements Backplane {
   private void scanProcessing(JedisCluster jedis, Consumer<String> onOperationName, Instant now) {
     prequeue.visitDequeue(
         jedis,
-        new ExecuteEntryListVisitor() {
+        new PreQueueEntryListVisitor() {
           @Override
-          protected void visit(ExecuteEntry executeEntry, String executeEntryJson) {
+          protected void visit(PreQueueEntry executeEntry, String executeEntryJson) {
             String operationName = executeEntry.getOperationName();
             String value = processingOperations.get(jedis, operationName);
             long defaultTimeout_ms = config.getProcessingTimeoutMillis();
@@ -274,7 +274,7 @@ public class RedisShardBackplane implements Backplane {
         new QueueEntryListVisitor() {
           @Override
           protected void visit(QueueEntry queueEntry, String queueEntryJson) {
-            String operationName = queueEntry.getExecuteEntry().getOperationName();
+            String operationName = queueEntry.getPreQueueEntry().getOperationName();
             String value = dispatchedOperations.get(jedis, operationName);
             long defaultTimeout_ms = config.getDispatchingTimeoutMillis();
 
@@ -304,9 +304,9 @@ public class RedisShardBackplane implements Backplane {
   private void scanPrequeue(JedisCluster jedis, Consumer<String> onOperationName) {
     prequeue.visit(
         jedis,
-        new ExecuteEntryListVisitor() {
+        new PreQueueEntryListVisitor() {
           @Override
-          protected void visit(ExecuteEntry executeEntry, String executeEntryJson) {
+          protected void visit(PreQueueEntry executeEntry, String executeEntryJson) {
             onOperationName.accept(executeEntry.getOperationName());
           }
         });
@@ -318,7 +318,7 @@ public class RedisShardBackplane implements Backplane {
         new QueueEntryListVisitor() {
           @Override
           protected void visit(QueueEntry queueEntry, String queueEntryJson) {
-            onOperationName.accept(queueEntry.getExecuteEntry().getOperationName());
+            onOperationName.accept(queueEntry.getPreQueueEntry().getOperationName());
           }
         });
   }
@@ -1184,16 +1184,16 @@ public class RedisShardBackplane implements Backplane {
     return builder.build();
   }
 
-  private ExecuteEntry deprequeueOperation(JedisCluster jedis) throws InterruptedException {
+  private PreQueueEntry deprequeueOperation(JedisCluster jedis) throws InterruptedException {
     String executeEntryJson = prequeue.dequeue(jedis);
     if (executeEntryJson == null) {
       return null;
     }
 
-    ExecuteEntry.Builder executeEntryBuilder = ExecuteEntry.newBuilder();
+    PreQueueEntry.Builder executeEntryBuilder = PreQueueEntry.newBuilder();
     try {
       JsonFormat.parser().merge(executeEntryJson, executeEntryBuilder);
-      ExecuteEntry executeEntry = executeEntryBuilder.build();
+      PreQueueEntry executeEntry = executeEntryBuilder.build();
       String operationName = executeEntry.getOperationName();
 
       Operation operation = keepaliveOperation(operationName);
@@ -1217,7 +1217,7 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public ExecuteEntry deprequeueOperation() throws IOException, InterruptedException {
+  public PreQueueEntry deprequeueOperation() throws IOException, InterruptedException {
     return client.blockingCall(this::deprequeueOperation);
   }
 
@@ -1237,7 +1237,7 @@ public class RedisShardBackplane implements Backplane {
     }
     QueueEntry queueEntry = queueEntryBuilder.build();
 
-    String operationName = queueEntry.getExecuteEntry().getOperationName();
+    String operationName = queueEntry.getPreQueueEntry().getOperationName();
     Operation operation = keepaliveOperation(operationName);
     publishReset(jedis, operation);
 
@@ -1291,12 +1291,12 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void rejectOperation(QueueEntry queueEntry) throws IOException {
-    String operationName = queueEntry.getExecuteEntry().getOperationName();
+    String operationName = queueEntry.getPreQueueEntry().getOperationName();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
     String dispatchedEntryJson = printPollOperation(queueEntry, 0);
     client.run(
         jedis -> {
-          if (isBlacklisted(jedis, queueEntry.getExecuteEntry().getRequestMetadata())) {
+          if (isBlacklisted(jedis, queueEntry.getPreQueueEntry().getRequestMetadata())) {
             pollOperation(
                 jedis, operationName, dispatchedEntryJson); // complete our lease to error operation
           } else {
@@ -1316,7 +1316,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
       throws IOException {
-    String operationName = queueEntry.getExecuteEntry().getOperationName();
+    String operationName = queueEntry.getPreQueueEntry().getOperationName();
     String json;
     try {
       json = printPollOperation(queueEntry, requeueAt);
@@ -1342,7 +1342,7 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException {
+  public void prequeue(PreQueueEntry executeEntry, Operation operation) throws IOException {
     String operationName = operation.getName();
     String operationJson = operationPrinter.print(operation);
     String executeEntryJson = JsonFormat.printer().print(executeEntry);
@@ -1371,7 +1371,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException {
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    String operationName = queueEntry.getExecuteEntry().getOperationName();
+    String operationName = queueEntry.getPreQueueEntry().getOperationName();
     Operation publishOperation = keepaliveOperation(operationName);
     client.run(
         jedis -> {

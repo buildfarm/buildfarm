@@ -90,7 +90,8 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
           responseObserver.onError(e);
         }
       }
-      instance.putOperation(instance.getOperation(queueEntry.getExecuteEntry().getOperationName()));
+      instance.putOperation(
+          instance.getOperation(queueEntry.getPreQueueEntry().getOperationName()));
       return false;
     };
   }

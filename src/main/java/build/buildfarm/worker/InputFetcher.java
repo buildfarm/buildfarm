@@ -145,7 +145,7 @@ public class InputFetcher implements Runnable {
   }
 
   private long fetchPolled(Stopwatch stopwatch) throws InterruptedException {
-    String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
+    String operationName = operationContext.queueEntry.getPreQueueEntry().getOperationName();
     logger.log(Level.FINE, format("fetching inputs: %s", operationName));
 
     ExecutedActionMetadata.Builder executedAction =
@@ -254,7 +254,7 @@ public class InputFetcher implements Runnable {
         throw e;
       }
     } else {
-      String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
+      String operationName = operationContext.queueEntry.getPreQueueEntry().getOperationName();
       logger.log(
           Level.FINE, "InputFetcher: Operation " + operationName + " Failed to claim output");
 
@@ -265,7 +265,7 @@ public class InputFetcher implements Runnable {
   @Override
   public void run() {
     long stallUSecs = 0;
-    String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
+    String operationName = operationContext.queueEntry.getPreQueueEntry().getOperationName();
     Stopwatch stopwatch = Stopwatch.createStarted();
     try {
       stallUSecs = runInterruptibly(stopwatch);

@@ -101,7 +101,7 @@ public class InputFetchStage extends SuperscalarPipelineStage {
     synchronized (this) {
       fetchers.add(fetcher);
       logStart(
-          operationContext.queueEntry.getExecuteEntry().getOperationName(),
+          operationContext.queueEntry.getPreQueueEntry().getOperationName(),
           getUsage(fetchers.size()));
       fetcher.start();
     }

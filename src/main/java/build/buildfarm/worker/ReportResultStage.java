@@ -95,7 +95,7 @@ public class ReportResultStage extends PipelineStage {
     boolean blacklist = false;
     try {
       workerContext.uploadOutputs(
-          operationContext.queueEntry.getExecuteEntry().getActionDigest(),
+          operationContext.queueEntry.getPreQueueEntry().getActionDigest(),
           resultBuilder,
           operationContext.execDir,
           operationContext.command.getOutputFilesList(),
@@ -170,7 +170,7 @@ public class ReportResultStage extends PipelineStage {
     CompletedOperationMetadata completedMetadata =
         CompletedOperationMetadata.newBuilder()
             .setExecuteOperationMetadata(metadata.toBuilder().setStage(COMPLETED).build())
-            .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
+            .setRequestMetadata(operationContext.queueEntry.getPreQueueEntry().getRequestMetadata())
             .build();
 
     Operation completedOperation =

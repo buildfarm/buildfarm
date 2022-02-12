@@ -26,8 +26,8 @@ import static org.mockito.Mockito.when;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
-import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationChange;
+import build.buildfarm.v1test.PreQueueEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.WorkerChange;
@@ -117,7 +117,7 @@ public class RedisShardBackplaneTest {
     backplane.start("startTime/test:0000");
 
     final String opName = "op";
-    ExecuteEntry executeEntry = ExecuteEntry.newBuilder().setOperationName(opName).build();
+    PreQueueEntry executeEntry = PreQueueEntry.newBuilder().setOperationName(opName).build();
     Operation op = Operation.newBuilder().setName(opName).build();
     backplane.prequeue(executeEntry, op);
 
@@ -172,7 +172,7 @@ public class RedisShardBackplaneTest {
 
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("op").build())
+            .setPreQueueEntry(PreQueueEntry.newBuilder().setOperationName("op").build())
             .build();
     backplane.requeueDispatchedOperation(queueEntry);
 
@@ -211,7 +211,7 @@ public class RedisShardBackplaneTest {
     // The jedis cluser is also mocked to assume success on other operations.
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("op").build())
+            .setPreQueueEntry(PreQueueEntry.newBuilder().setOperationName("op").build())
             .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
@@ -272,7 +272,7 @@ public class RedisShardBackplaneTest {
     // The jedis cluser is also mocked to assume success on other operations.
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("op").build())
+            .setPreQueueEntry(PreQueueEntry.newBuilder().setOperationName("op").build())
             .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);

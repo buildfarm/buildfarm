@@ -38,7 +38,7 @@ Superscalar stages have a configurable number of slots for their activity. Claim
 
 ### Match
 
-The Match stage is responsible for dequeuing an operation from the Ready-To-Run queue. This operation is dequeued as a QueueEntry which contains the ExecuteEntry and a Digest for the transformed QueuedOperation. The ExecuteEntry contains a Platform definition which must match the worker's provided platform manifest in order to proceed. A rejected QueueEntry for this reason will be reinserted into the Ready-To-Run queue.
+The Match stage is responsible for dequeuing an operation from the Ready-To-Run queue. This operation is dequeued as a QueueEntry which contains the PreQueueEntry and a Digest for the transformed QueuedOperation. The PreQueueEntry contains a Platform definition which must match the worker's provided platform manifest in order to proceed. A rejected QueueEntry for this reason will be reinserted into the Ready-To-Run queue.
 
 The Match stage is unique in that it claims a slot in the Input Fetch stage prior to its iteration. This removes a polling requirement for the active operation present in other stages while waiting to feed the interstage, reducing the stage's complexity.
 

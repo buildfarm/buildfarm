@@ -51,7 +51,7 @@ class DispatchedMonitor implements Runnable {
 
   private ListenableFuture<Void> requeueDispatchedOperation(DispatchedOperation o, long now) {
     QueueEntry queueEntry = o.getQueueEntry();
-    String operationName = queueEntry.getExecuteEntry().getOperationName();
+    String operationName = queueEntry.getPreQueueEntry().getOperationName();
 
     logOverdueOperation(o, now);
     ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry, Durations.fromSeconds(60));
@@ -69,7 +69,7 @@ class DispatchedMonitor implements Runnable {
 
   private void logOverdueOperation(DispatchedOperation o, long now) {
     // log that the dispatched operation is overdue in order to indicate that it should be requeued.
-    String operationName = o.getQueueEntry().getExecuteEntry().getOperationName();
+    String operationName = o.getQueueEntry().getPreQueueEntry().getOperationName();
     long overdue_amount = now - o.getRequeueAt();
     String message =
         String.format(
