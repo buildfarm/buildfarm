@@ -56,6 +56,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.buildfarm.instance.shard.OperationQueuer;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
@@ -224,7 +225,6 @@ public class ShardInstance extends AbstractServerInstance {
   private final ScheduledExecutorService contextDeadlineScheduler =
       newSingleThreadScheduledExecutor();
   private final ExecutorService operationDeletionService = newSingleThreadExecutor();
-  private final BlockingQueue transformTokensQueue = new LinkedBlockingQueue(256);
   private final boolean useDenyList;
   private Thread operationQueuer;
   private boolean stopping = false;
@@ -346,120 +346,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     if (runOperationQueuer) {
-      operationQueuer =
-          new Thread(
-              new Runnable() {
-                final Stopwatch stopwatch = Stopwatch.createUnstarted();
-
-                ListenableFuture<Void> iterate() throws IOException, InterruptedException {
-                  ensureCanQueue(stopwatch); // wait for transition to canQueue state
-                  long canQueueUSecs = stopwatch.elapsed(MICROSECONDS);
-                  stopwatch.stop();
-                  ExecuteEntry executeEntry = backplane.deprequeueOperation();
-                  stopwatch.start();
-                  if (executeEntry == null) {
-                    logger.log(Level.SEVERE, "OperationQueuer: Got null from deprequeue...");
-                    return immediateFuture(null);
-                  }
-                  // half the watcher expiry, need to expose this from backplane
-                  Poller poller = new Poller(Durations.fromSeconds(5));
-                  String operationName = executeEntry.getOperationName();
-                  poller.resume(
-                      () -> {
-                        try {
-                          backplane.queueing(executeEntry.getOperationName());
-                        } catch (IOException e) {
-                          if (!stopping && !stopped) {
-                            logger.log(
-                                Level.SEVERE,
-                                format("error polling %s for queuing", operationName),
-                                e);
-                          }
-                          // mostly ignore, we will be stopped at some point later
-                        }
-                        return !stopping && !stopped;
-                      },
-                      () -> {},
-                      Deadline.after(5, MINUTES));
-                  try {
-                    logger.log(Level.FINE, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller, queueTimeout);
-                    addCallback(
-                        queueFuture,
-                        new FutureCallback<Void>() {
-                          @Override
-                          public void onSuccess(Void result) {
-                            logger.log(Level.FINE, "successfully queued " + operationName);
-                            // nothing
-                          }
-
-                          @Override
-                          public void onFailure(Throwable t) {
-                            logger.log(Level.SEVERE, "error queueing " + operationName, t);
-                          }
-                        },
-                        operationTransformService);
-                    long operationTransformDispatchUSecs =
-                        stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
-                    logger.log(
-                        Level.FINE,
-                        format(
-                            "OperationQueuer: Dispatched To Transform %s: %dus in canQueue, %dus in transform dispatch",
-                            operationName, canQueueUSecs, operationTransformDispatchUSecs));
-                    return queueFuture;
-                  } catch (Throwable t) {
-                    poller.pause();
-                    logger.log(Level.SEVERE, "error queueing " + operationName, t);
-                    return immediateFuture(null);
-                  }
-                }
-
-                @Override
-                public void run() {
-                  logger.log(Level.FINE, "OperationQueuer: Running");
-                  try {
-                    for (; ; ) {
-                      transformTokensQueue.put(new Object());
-                      stopwatch.start();
-                      try {
-                        iterate()
-                            .addListener(
-                                () -> {
-                                  try {
-                                    transformTokensQueue.take();
-                                  } catch (InterruptedException e) {
-                                    logger.log(
-                                        Level.SEVERE,
-                                        "interrupted while returning transform token",
-                                        e);
-                                  }
-                                },
-                                operationTransformService);
-                      } catch (IOException e) {
-                        transformTokensQueue.take();
-                        // problems interacting with backplane
-                      } finally {
-                        stopwatch.reset();
-                      }
-                    }
-                  } catch (InterruptedException e) {
-                    // treat with exit
-                    operationQueuer = null;
-                    return;
-                  } catch (Exception t) {
-                    logger.log(
-                        Level.SEVERE, "OperationQueuer: fatal exception during iteration", t);
-                  } finally {
-                    logger.log(Level.FINE, "OperationQueuer: Exiting");
-                  }
-                  operationQueuer = null;
-                  try {
-                    stop();
-                  } catch (InterruptedException e) {
-                    logger.log(Level.SEVERE, "interrupted while stopping instance " + getName(), e);
-                  }
-                }
-              });
+      operationQueuer = OperationQueuer.createThread(backplane,queueTimeout,operationTransformService,getName());
     } else {
       operationQueuer = null;
     }
@@ -491,14 +378,6 @@ public class ShardInstance extends AbstractServerInstance {
       for (QueueStatus queueStatus : queues) {
         queueSize.labels(queueStatus.getName()).set(queueStatus.getSize());
       }
-    }
-  }
-
-  private void ensureCanQueue(Stopwatch stopwatch) throws IOException, InterruptedException {
-    while (!backplane.canQueue()) {
-      stopwatch.stop();
-      TimeUnit.MILLISECONDS.sleep(100);
-      stopwatch.start();
     }
   }
 
@@ -574,6 +453,11 @@ public class ShardInstance extends AbstractServerInstance {
     logger.log(Level.FINE, format("Instance %s has been stopped", getName()));
     stopping = false;
     stopped = true;
+  }
+  
+    @VisibleForTesting
+  public static ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout) {
+    return OperationQueuer.queue(backplane, executeEntry, poller, timeout, operationTransformService, contextDeadlineScheduler, getName());
   }
 
   @Override
@@ -1955,319 +1839,6 @@ public class ShardInstance extends AbstractServerInstance {
             .setMetadata(Any.pack(completeMetadata))
             .build();
     backplane.putOperation(completedOperation, completeMetadata.getStage());
-  }
-
-  private ListenableFuture<Boolean> checkCacheFuture(
-      ActionKey actionKey, Operation operation, RequestMetadata requestMetadata) {
-    ExecuteOperationMetadata metadata =
-        ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(actionKey.getDigest())
-            .setStage(ExecutionStage.Value.CACHE_CHECK)
-            .build();
-    try {
-      backplane.putOperation(
-          operation.toBuilder().setMetadata(Any.pack(metadata)).build(), metadata.getStage());
-    } catch (IOException e) {
-      return immediateFailedFuture(e);
-    }
-
-    Context.CancellableContext withDeadline =
-        Context.current().withDeadlineAfter(60, SECONDS, contextDeadlineScheduler);
-    try {
-      return checkCacheFutureCancellable(actionKey, operation, requestMetadata, withDeadline);
-    } catch (RuntimeException e) {
-      withDeadline.cancel(null);
-      throw e;
-    }
-  }
-
-  private ListenableFuture<Boolean> checkCacheFutureCancellable(
-      ActionKey actionKey,
-      Operation operation,
-      RequestMetadata requestMetadata,
-      Context.CancellableContext ctx) {
-    ListenableFuture<Boolean> checkCacheFuture =
-        transformAsync(
-            getActionResult(actionKey, requestMetadata),
-            actionResult -> {
-              try {
-                return immediateFuture(
-                    ctx.call(
-                        () -> {
-                          if (actionResult != null) {
-                            deliverCachedActionResult(
-                                actionResult, actionKey, operation, requestMetadata);
-                          }
-                          return actionResult != null;
-                        }));
-              } catch (Exception e) {
-                return immediateFailedFuture(e);
-              }
-            },
-            operationTransformService);
-    checkCacheFuture.addListener(() -> ctx.cancel(null), operationTransformService);
-    return catching(
-        checkCacheFuture,
-        Exception.class,
-        (e) -> {
-          logger.log(Level.SEVERE, "error checking cache for " + operation.getName(), e);
-          return false;
-        },
-        operationTransformService);
-  }
-
-  @VisibleForTesting
-  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout) {
-    ExecuteOperationMetadata metadata =
-        ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(executeEntry.getActionDigest())
-            .setStdoutStreamName(executeEntry.getStdoutStreamName())
-            .setStderrStreamName(executeEntry.getStderrStreamName())
-            .build();
-    Operation operation =
-        Operation.newBuilder()
-            .setName(executeEntry.getOperationName())
-            .setMetadata(Any.pack(metadata))
-            .build();
-    Digest actionDigest = executeEntry.getActionDigest();
-    ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
-
-    Stopwatch stopwatch = Stopwatch.createStarted();
-    ListenableFuture<Boolean> cachedResultFuture;
-    if (executeEntry.getSkipCacheLookup()) {
-      cachedResultFuture = immediateFuture(false);
-    } else {
-      cachedResultFuture =
-          checkCacheFuture(actionKey, operation, executeEntry.getRequestMetadata());
-    }
-    return transformAsync(
-        cachedResultFuture,
-        (cachedResult) -> {
-          if (cachedResult) {
-            poller.pause();
-            long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
-            logger.log(
-                Level.FINE,
-                format(
-                    "ShardInstance(%s): checkCache(%s): %sus elapsed",
-                    getName(), operation.getName(), checkCacheUSecs));
-            return IMMEDIATE_VOID_FUTURE;
-          }
-          return transformAndQueue(executeEntry, poller, operation, stopwatch, timeout);
-        },
-        operationTransformService);
-  }
-
-  private ListenableFuture<Void> transformAndQueue(
-      ExecuteEntry executeEntry,
-      Poller poller,
-      Operation operation,
-      Stopwatch stopwatch,
-      Duration timeout) {
-    long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
-    ExecuteOperationMetadata metadata;
-    try {
-      metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-    } catch (InvalidProtocolBufferException e) {
-      return immediateFailedFuture(e);
-    }
-    Digest actionDigest = metadata.getActionDigest();
-    SettableFuture<Void> queueFuture = SettableFuture.create();
-    logger.log(
-        Level.FINE,
-        format(
-            "ShardInstance(%s): queue(%s): fetching action %s",
-            getName(), operation.getName(), actionDigest.getHash()));
-    RequestMetadata requestMetadata = executeEntry.getRequestMetadata();
-    ListenableFuture<Action> actionFuture =
-        catchingAsync(
-            transformAsync(
-                expectAction(actionDigest, requestMetadata),
-                (action) -> {
-                  if (action == null) {
-                    throw Status.NOT_FOUND.asException();
-                  } else if (action.getDoNotCache()) {
-                    // invalidate our action cache result as well as watcher owner
-                    readThroughActionCache.invalidate(DigestUtil.asActionKey(actionDigest));
-                    backplane.putOperation(
-                        operation.toBuilder().setMetadata(Any.pack(action)).build(),
-                        metadata.getStage());
-                  }
-                  return immediateFuture(action);
-                },
-                operationTransformService),
-            StatusException.class,
-            (e) -> {
-              Status st = Status.fromThrowable(e);
-              if (st.getCode() == Code.NOT_FOUND) {
-                PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-                preconditionFailure
-                    .addViolationsBuilder()
-                    .setType(VIOLATION_TYPE_MISSING)
-                    .setSubject("blobs/" + DigestUtil.toString(actionDigest))
-                    .setDescription(MISSING_ACTION);
-                checkPreconditionFailure(actionDigest, preconditionFailure.build());
-              }
-              throw st.asRuntimeException();
-            },
-            operationTransformService);
-    QueuedOperation.Builder queuedOperationBuilder = QueuedOperation.newBuilder();
-    ListenableFuture<ProfiledQueuedOperationMetadata.Builder> queuedFuture =
-        transformAsync(
-            actionFuture,
-            (action) -> {
-              logger.log(
-                  Level.FINE,
-                  format(
-                      "ShardInstance(%s): queue(%s): fetched action %s transforming queuedOperation",
-                      getName(), operation.getName(), actionDigest.getHash()));
-              Stopwatch transformStopwatch = Stopwatch.createStarted();
-              return transform(
-                  transformQueuedOperation(
-                      operation.getName(),
-                      action,
-                      action.getCommandDigest(),
-                      action.getInputRootDigest(),
-                      queuedOperationBuilder,
-                      operationTransformService,
-                      requestMetadata),
-                  (queuedOperation) ->
-                      ProfiledQueuedOperationMetadata.newBuilder()
-                          .setQueuedOperation(queuedOperation)
-                          .setQueuedOperationMetadata(
-                              buildQueuedOperationMetadata(
-                                  metadata, requestMetadata, queuedOperation))
-                          .setTransformedIn(
-                              Durations.fromMicros(transformStopwatch.elapsed(MICROSECONDS))),
-                  operationTransformService);
-            },
-            operationTransformService);
-    ListenableFuture<ProfiledQueuedOperationMetadata.Builder> validatedFuture =
-        transformAsync(
-            queuedFuture,
-            (profiledQueuedMetadata) -> {
-              logger.log(
-                  Level.FINE,
-                  format(
-                      "ShardInstance(%s): queue(%s): queuedOperation %s transformed, validating",
-                      getName(),
-                      operation.getName(),
-                      DigestUtil.toString(
-                          profiledQueuedMetadata
-                              .getQueuedOperationMetadata()
-                              .getQueuedOperationDigest())));
-              long startValidateUSecs = stopwatch.elapsed(MICROSECONDS);
-              /* sync, throws StatusException */
-              validateQueuedOperation(actionDigest, profiledQueuedMetadata.getQueuedOperation());
-              return immediateFuture(
-                  profiledQueuedMetadata.setValidatedIn(
-                      Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startValidateUSecs)));
-            },
-            operationTransformService);
-    ListenableFuture<ProfiledQueuedOperationMetadata> queuedOperationCommittedFuture =
-        transformAsync(
-            validatedFuture,
-            (profiledQueuedMetadata) -> {
-              logger.log(
-                  Level.FINE,
-                  format(
-                      "ShardInstance(%s): queue(%s): queuedOperation %s validated, uploading",
-                      getName(),
-                      operation.getName(),
-                      DigestUtil.toString(
-                          profiledQueuedMetadata
-                              .getQueuedOperationMetadata()
-                              .getQueuedOperationDigest())));
-              ByteString queuedOperationBlob =
-                  profiledQueuedMetadata.getQueuedOperation().toByteString();
-              Digest queuedOperationDigest =
-                  profiledQueuedMetadata.getQueuedOperationMetadata().getQueuedOperationDigest();
-              long startUploadUSecs = stopwatch.elapsed(MICROSECONDS);
-              return transform(
-                  writeBlobFuture(
-                      queuedOperationDigest, queuedOperationBlob, requestMetadata, timeout),
-                  (committedSize) ->
-                      profiledQueuedMetadata
-                          .setUploadedIn(
-                              Durations.fromMicros(
-                                  stopwatch.elapsed(MICROSECONDS) - startUploadUSecs))
-                          .build(),
-                  operationTransformService);
-            },
-            operationTransformService);
-
-    // onQueue call?
-    addCallback(
-        queuedOperationCommittedFuture,
-        new FutureCallback<ProfiledQueuedOperationMetadata>() {
-          @Override
-          public void onSuccess(ProfiledQueuedOperationMetadata profiledQueuedMetadata) {
-            QueuedOperationMetadata queuedOperationMetadata =
-                profiledQueuedMetadata.getQueuedOperationMetadata();
-            Operation queueOperation =
-                operation.toBuilder().setMetadata(Any.pack(queuedOperationMetadata)).build();
-            QueueEntry queueEntry =
-                QueueEntry.newBuilder()
-                    .setExecuteEntry(executeEntry)
-                    .setQueuedOperationDigest(queuedOperationMetadata.getQueuedOperationDigest())
-                    .setPlatform(
-                        profiledQueuedMetadata.getQueuedOperation().getCommand().getPlatform())
-                    .build();
-            try {
-              ensureCanQueue(stopwatch);
-              long startQueueUSecs = stopwatch.elapsed(MICROSECONDS);
-              poller.pause();
-              backplane.queue(queueEntry, queueOperation);
-              long elapsedUSecs = stopwatch.elapsed(MICROSECONDS);
-              long queueUSecs = elapsedUSecs - startQueueUSecs;
-              logger.log(
-                  Level.FINE,
-                  format(
-                      "ShardInstance(%s): queue(%s): %dus checkCache, %dus transform, %dus validate, %dus upload, %dus queue, %dus elapsed",
-                      getName(),
-                      queueOperation.getName(),
-                      checkCacheUSecs,
-                      Durations.toMicros(profiledQueuedMetadata.getTransformedIn()),
-                      Durations.toMicros(profiledQueuedMetadata.getValidatedIn()),
-                      Durations.toMicros(profiledQueuedMetadata.getUploadedIn()),
-                      queueUSecs,
-                      elapsedUSecs));
-              queueFuture.set(null);
-            } catch (IOException e) {
-              onFailure(e.getCause() == null ? e : e.getCause());
-            } catch (InterruptedException e) {
-              // ignore
-            }
-          }
-
-          @Override
-          public void onFailure(Throwable t) {
-            poller.pause();
-            com.google.rpc.Status status = StatusProto.fromThrowable(t);
-            if (status == null) {
-              logger.log(
-                  Level.SEVERE, "no rpc status from exception for " + operation.getName(), t);
-              status = asExecutionStatus(t);
-            } else if (com.google.rpc.Code.forNumber(status.getCode())
-                == com.google.rpc.Code.DEADLINE_EXCEEDED) {
-              logger.log(
-                  Level.WARNING,
-                  "an rpc status was thrown with DEADLINE_EXCEEDED for "
-                      + operation.getName()
-                      + ", discarding it",
-                  t);
-              status =
-                  com.google.rpc.Status.newBuilder()
-                      .setCode(com.google.rpc.Code.UNAVAILABLE.getNumber())
-                      .setMessage("SUPPRESSED DEADLINE_EXCEEDED: " + t.getMessage())
-                      .build();
-            }
-            logFailedStatus(actionDigest, status);
-            errorOperationFuture(operation, requestMetadata, status, queueFuture);
-          }
-        },
-        operationTransformService);
-    return queueFuture;
   }
 
   @Override
