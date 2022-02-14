@@ -54,6 +54,7 @@ import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.FilesystemCASConfig;
+import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.worker.DequeueMatchSettings;
@@ -142,6 +143,7 @@ public class Worker extends LoggingMain {
   private final boolean hasExecutionCapability;
 
   private boolean inGracefulShutdown = false;
+  private boolean isPaused = false;
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
@@ -868,6 +870,28 @@ public class Worker extends LoggingMain {
     throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
+  private void runIndexerForWorker() {
+    String clusterEndpoint = config.getAdminConfig().getClusterEndpoint();
+    if (clusterEndpoint.isEmpty()) {
+      logger.warning("Cluster endpoint is not set. Indexer will not run.");
+      return;
+    }
+    ManagedChannel channel = null;
+    try {
+      NettyChannelBuilder builder =
+          NettyChannelBuilder.forTarget(clusterEndpoint).negotiationType(NegotiationType.PLAINTEXT);
+      channel = builder.build();
+      AdminGrpc.AdminFutureStub adminFuture = AdminGrpc.newFutureStub(channel);
+      adminFuture.reindexCas(
+          ReindexCasRequest.newBuilder().setHostId(config.getPublicName()).build());
+      logger.info("Running Indexer for paused worker: " + config.getPublicName());
+    } finally {
+      if (channel != null) {
+        channel.shutdown();
+      }
+    }
+  }
+
   private void startFailsafeRegistration() {
     String endpoint = config.getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
@@ -888,16 +912,17 @@ public class Worker extends LoggingMain {
               boolean isWorkerPausedFromNewWork() {
                 try {
                   File pausedFile = new File(config.getRoot() + "/.paused");
-                  if (pausedFile.exists()) {
+                  if (pausedFile.exists() && !isPaused) {
+                    isPaused = true;
                     logger.log(Level.INFO, "The current worker is paused from taking on new work!");
                     pipeline.stopMatchingOperations();
                     workerPausedMetric.inc();
-                    return true;
+                    runIndexerForWorker();
                   }
                 } catch (Exception e) {
                   logger.log(Level.WARNING, "Could not open .paused file.", e);
                 }
-                return false;
+                return isPaused;
               }
 
               void registerIfExpired() {
