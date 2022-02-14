@@ -184,7 +184,7 @@ class WorkerProfile {
           e.printStackTrace();
         }
       }
-      if (workers == null || workers.size() == 0) {
+      if (workers == null || workers.isEmpty()) {
         System.out.println(
             "cannot find any workers, check the redis url and make sure there are workers in the cluster");
       } else {

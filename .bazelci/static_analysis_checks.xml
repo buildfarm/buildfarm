@@ -36,15 +36,12 @@
     <exclude name="PositionLiteralsFirstInComparisons"/>
     <exclude name="PreserveStackTrace"/>
     <exclude name="ReplaceEnumerationWithIterator"/>
-    <exclude name="ReplaceHashtableWithMap"/>
-    <exclude name="ReplaceVectorWithList"/>
     <exclude name="SwitchStmtsShouldHaveDefault"/>
     <exclude name="SystemPrintln"/>
     <exclude name="UseAssertEqualsInsteadOfAssertTrue"/>
     <exclude name="UseAssertNullInsteadOfAssertTrue"/>
     <exclude name="UseAssertSameInsteadOfAssertTrue"/>
     <exclude name="UseAssertTrueInsteadOfAssertEquals"/>
-    <exclude name="UseCollectionIsEmpty"/>
     <exclude name="UseTryWithResources"/>
     <exclude name="UseVarargs"/>
 </rule>
@@ -54,7 +51,6 @@
     <exclude name="UseUnderscoresInNumericLiterals"/> <!-- these underscores are deemed annoying -->
     <exclude name="AbstractNaming"/>
     <exclude name="AtLeastOneConstructor"/>
-    <exclude name="AvoidDollarSigns"/>
     <exclude name="AvoidFinalLocalVariable"/>
     <exclude name="AvoidPrefixingMethodParameters"/>
     <exclude name="AvoidProtectedFieldInFinalClass"/>
@@ -67,7 +63,6 @@
     <exclude name="ControlStatementBraces"/>
     <exclude name="DefaultPackage"/>
     <exclude name="EmptyMethodInAbstractClassShouldBeAbstract"/>
-    <exclude name="ExtendsObject"/>
     <exclude name="FieldDeclarationsShouldBeAtStartOfClass"/>
     <exclude name="FieldNamingConventions"/>
     <exclude name="FormalParameterNamingConventions"/>
@@ -108,14 +103,12 @@
     <exclude name="CouplingBetweenObjects"/>
     <exclude name="CyclomaticComplexity"/>
     <exclude name="DataClass"/>
-    <exclude name="DoNotExtendJavaLangError"/>
     <exclude name="ExceptionAsFlowControl"/>
     <exclude name="ExcessiveClassLength"/>
     <exclude name="ExcessiveImports"/>
     <exclude name="ExcessiveMethodLength"/>
     <exclude name="ExcessiveParameterList"/>
     <exclude name="ExcessivePublicCount"/>
-    <exclude name="FinalFieldCouldBeStatic"/>
     <exclude name="GodClass"/>
     <exclude name="ImmutableField"/>
     <exclude name="LawOfDemeter"/>
@@ -138,7 +131,6 @@
     <exclude name="SwitchDensity"/>
     <exclude name="TooManyFields"/>
     <exclude name="TooManyMethods"/>
-    <exclude name="UselessOverridingMethod"/>
     <exclude name="UseObjectForClearerAPI"/>
     <exclude name="UseUtilityClass"/>
 </rule>
@@ -153,7 +145,6 @@
     <exclude name="AssignmentInOperand"/>
     <exclude name="AssignmentToNonFinalStatic"/>
     <exclude name="AvoidAccessibilityAlteration"/>
-    <exclude name="AvoidAssertAsIdentifier"/>
     <exclude name="AvoidBranchingStatementAsLastInLoop"/>
     <exclude name="AvoidCallingFinalize"/>
     <exclude name="AvoidCatchingThrowable"/>
@@ -167,7 +158,6 @@
     <exclude name="AvoidLosingExceptionInformation"/>
     <exclude name="AvoidMultipleUnaryOperators"/>
     <exclude name="AvoidUsingOctalValues"/>
-    <exclude name="BadComparison"/>
     <exclude name="BeanMembersShouldSerialize"/>
     <exclude name="CheckSkipResult"/>
     <exclude name="ClassCastExceptionWithToArray"/>
@@ -190,12 +180,6 @@
     <exclude name="FinalizeOnlyCallsSuperFinalize"/>
     <exclude name="FinalizeOverloaded"/>
     <exclude name="FinalizeShouldBeProtected"/>
-    <exclude name="IdempotentOperations"/>
-    <exclude name="InstantiationToGetClass"/>
-    <exclude name="InvalidLogMessageFormat"/>
-    <exclude name="JumbledIncrementer"/>
-    <exclude name="JUnitSpelling"/>
-    <exclude name="JUnitStaticSuite"/>
     <exclude name="LoggerIsNotStaticFinal"/>
     <exclude name="MethodWithSameNameAsEnclosingClass"/>
     <exclude name="MissingBreakInSwitch"/>
@@ -207,9 +191,7 @@
     <exclude name="NullAssignment"/>
     <exclude name="OverrideBothEqualsAndHashcode"/>
     <exclude name="ProperCloneImplementation"/>
-    <exclude name="ProperLogger"/>
     <exclude name="ReturnEmptyArrayRatherThanNull"/>
-    <exclude name="ReturnFromFinallyBlock"/>
     <exclude name="SimpleDateFormatNeedsLocale"/>
     <exclude name="SingleMethodSingleton"/>
     <exclude name="SingletonClassReturningNewInstance"/>
@@ -218,7 +200,6 @@
     <exclude name="SuspiciousEqualsMethodName"/>
     <exclude name="SuspiciousHashcodeMethodName"/>
     <exclude name="SuspiciousOctalEscape"/>
-    <exclude name="TestClassWithoutTestCases"/>
     <exclude name="UnnecessaryBooleanAssertion"/>
     <exclude name="UnnecessaryCaseChange"/>
     <exclude name="UnnecessaryConversionTemporary"/>
