@@ -135,6 +135,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import java.util.function.BiFunction;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -145,6 +146,11 @@ import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.catchingAsync;
+import static build.buildfarm.common.Actions.asExecutionStatus;
+import static build.buildfarm.common.Actions.checkPreconditionFailure;
+import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 
 
 public class OperationQueuer {
@@ -153,7 +159,9 @@ public class OperationQueuer {
     
     private static final BlockingQueue transformTokensQueue = new LinkedBlockingQueue(256);
     
-    public static Thread createThread(Backplane backplane, Duration queueTimeout, ListeningExecutorService operationTransformService, ScheduledExecutorService contextDeadlineScheduler, String name){
+    public static Thread createThread(Backplane backplane, Duration queueTimeout, ListeningExecutorService operationTransformService, ScheduledExecutorService contextDeadlineScheduler, String name, 
+                                      BiFunction<ActionKey, RequestMetadata,ListenableFuture<ActionResult>> getActionResult, Cache<RequestMetadata, Boolean> recentCacheServedExecutions,
+                                      Cache<RequestMetadata, Boolean> recentCacheServedExecutions){
         return           new Thread(
               new Runnable() {
                 final Stopwatch stopwatch = Stopwatch.createUnstarted();
@@ -188,7 +196,7 @@ public class OperationQueuer {
                       Deadline.after(5, MINUTES));
                   try {
                     logger.log(Level.FINE, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(backplane,executeEntry, poller, queueTimeout, name, operationTransformService, contextDeadlineScheduler);
+                    ListenableFuture<Void> queueFuture = queue(backplane,executeEntry, poller, queueTimeout, name, operationTransformService, contextDeadlineScheduler, getActionResult, recentCacheServedExecutions);
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {
@@ -274,7 +282,8 @@ public class OperationQueuer {
   
   
   @VisibleForTesting
-  public static ListenableFuture<Void> queue(Backplane backplane, ExecuteEntry executeEntry, Poller poller, Duration timeout, String name, ListeningExecutorService operationTransformService, ScheduledExecutorService contextDeadlineScheduler) {
+  public static ListenableFuture<Void> queue(Backplane backplane, ExecuteEntry executeEntry, Poller poller, Duration timeout, String name, ListeningExecutorService operationTransformService, ScheduledExecutorService contextDeadlineScheduler, BiFunction<ActionKey,
+                                             RequestMetadata,ListenableFuture<ActionResult>> getActionResult, Cache<RequestMetadata, Boolean> recentCacheServedExecutions) {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(executeEntry.getActionDigest())
@@ -295,7 +304,7 @@ public class OperationQueuer {
       cachedResultFuture = immediateFuture(false);
     } else {
       cachedResultFuture =
-          checkCacheFuture(backplane,actionKey, operation, executeEntry.getRequestMetadata(), operationTransformService, contextDeadlineScheduler);
+          checkCacheFuture(backplane,actionKey, operation, executeEntry.getRequestMetadata(), operationTransformService, contextDeadlineScheduler, getActionResult,recentCacheServedExecutions);
     }
     return transformAsync(
         cachedResultFuture,
@@ -310,14 +319,15 @@ public class OperationQueuer {
                     name, operation.getName(), checkCacheUSecs));
             return Futures.immediateFuture(null);
           }
-          return transformAndQueue(backplane,executeEntry, poller, operation, stopwatch, timeout, operationTransformService);
+          return transformAndQueue(backplane,name, executeEntry, poller, operation, stopwatch, timeout, operationTransformService);
         },
         operationTransformService);
   }
   
   
   private static ListenableFuture<Boolean> checkCacheFuture(Backplane backplane, 
-      ActionKey actionKey, Operation operation, RequestMetadata requestMetadata, ListeningExecutorService operationTransformService, ScheduledExecutorService contextDeadlineScheduler) {
+      ActionKey actionKey, Operation operation, RequestMetadata requestMetadata, ListeningExecutorService operationTransformService, ScheduledExecutorService contextDeadlineScheduler,
+       BiFunction<ActionKey, RequestMetadata,ListenableFuture<ActionResult>> getActionResult, Cache<RequestMetadata, Boolean> recentCacheServedExecutions) {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(actionKey.getDigest())
@@ -333,7 +343,7 @@ public class OperationQueuer {
     Context.CancellableContext withDeadline =
         Context.current().withDeadlineAfter(60, SECONDS, contextDeadlineScheduler);
     try {
-      return checkCacheFutureCancellable(backplane,actionKey, operation, requestMetadata, withDeadline,operationTransformService);
+      return checkCacheFutureCancellable(backplane,actionKey, operation, requestMetadata, withDeadline,operationTransformService,getActionResult,recentCacheServedExecutions);
     } catch (RuntimeException e) {
       withDeadline.cancel(null);
       throw e;
@@ -345,10 +355,12 @@ public class OperationQueuer {
       Operation operation,
       RequestMetadata requestMetadata,
       Context.CancellableContext ctx,
-      ListeningExecutorService operationTransformService) {
+      ListeningExecutorService operationTransformService,
+      BiFunction<ActionKey, RequestMetadata,ListenableFuture<ActionResult>> getActionResult,
+      Cache<RequestMetadata, Boolean> recentCacheServedExecutions) {
     ListenableFuture<Boolean> checkCacheFuture =
         transformAsync(
-            getActionResult(actionKey, requestMetadata),
+            getActionResult.apply(actionKey, requestMetadata),
             actionResult -> {
               try {
                 return immediateFuture(
@@ -356,7 +368,7 @@ public class OperationQueuer {
                         () -> {
                           if (actionResult != null) {
                             deliverCachedActionResult(
-                                actionResult, actionKey, operation, requestMetadata);
+                                actionResult, actionKey, operation, requestMetadata, recentCacheServedExecutions);
                           }
                           return actionResult != null;
                         }));
@@ -377,6 +389,7 @@ public class OperationQueuer {
   }
   
   private static ListenableFuture<Void> transformAndQueue(Backplane backplane, 
+                                                          String name,
       ExecuteEntry executeEntry,
       Poller poller,
       Operation operation,
@@ -396,7 +409,7 @@ public class OperationQueuer {
         Level.FINE,
         format(
             "ShardInstance(%s): queue(%s): fetching action %s",
-            getName(), operation.getName(), actionDigest.getHash()));
+            name, operation.getName(), actionDigest.getHash()));
     RequestMetadata requestMetadata = executeEntry.getRequestMetadata();
     ListenableFuture<Action> actionFuture =
         catchingAsync(
@@ -439,7 +452,7 @@ public class OperationQueuer {
                   Level.FINE,
                   format(
                       "ShardInstance(%s): queue(%s): fetched action %s transforming queuedOperation",
-                      getName(), operation.getName(), actionDigest.getHash()));
+                      name, operation.getName(), actionDigest.getHash()));
               Stopwatch transformStopwatch = Stopwatch.createStarted();
               return transform(
                   transformQueuedOperation(
@@ -469,7 +482,7 @@ public class OperationQueuer {
                   Level.FINE,
                   format(
                       "ShardInstance(%s): queue(%s): queuedOperation %s transformed, validating",
-                      getName(),
+                      name,
                       operation.getName(),
                       DigestUtil.toString(
                           profiledQueuedMetadata
@@ -491,7 +504,7 @@ public class OperationQueuer {
                   Level.FINE,
                   format(
                       "ShardInstance(%s): queue(%s): queuedOperation %s validated, uploading",
-                      getName(),
+                      name,
                       operation.getName(),
                       DigestUtil.toString(
                           profiledQueuedMetadata
@@ -543,7 +556,7 @@ public class OperationQueuer {
                   Level.FINE,
                   format(
                       "ShardInstance(%s): queue(%s): %dus checkCache, %dus transform, %dus validate, %dus upload, %dus queue, %dus elapsed",
-                      getName(),
+                      name,
                       queueOperation.getName(),
                       checkCacheUSecs,
                       Durations.toMicros(profiledQueuedMetadata.getTransformedIn()),
@@ -587,6 +600,56 @@ public class OperationQueuer {
         },
         operationTransformService);
     return queueFuture;
+  }
+  
+  
+  private static void deliverCachedActionResult(
+      ActionResult actionResult,
+      ActionKey actionKey,
+      Operation operation,
+      RequestMetadata requestMetadata,
+      Cache<RequestMetadata, Boolean> recentCacheServedExecutions)
+      throws Exception {
+    recentCacheServedExecutions.put(requestMetadata, true);
+
+    ExecuteOperationMetadata completeMetadata =
+        ExecuteOperationMetadata.newBuilder()
+            .setActionDigest(actionKey.getDigest())
+            .setStage(ExecutionStage.Value.COMPLETED)
+            .build();
+
+    Operation completedOperation =
+        operation
+            .toBuilder()
+            .setDone(true)
+            .setResponse(
+                Any.pack(
+                    ExecuteResponse.newBuilder()
+                        .setResult(actionResult)
+                        .setStatus(
+                            com.google.rpc.Status.newBuilder().setCode(Code.OK.value()).build())
+                        .setCachedResult(true)
+                        .build()))
+            .setMetadata(Any.pack(completeMetadata))
+            .build();
+    backplane.putOperation(completedOperation, completeMetadata.getStage());
+  }
+  
+  
+    private static ListenableFuture<Action> expectAction(Digest actionBlobDigest, RequestMetadata requestMetadata) {
+    BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
+          @Override
+          public CompletableFuture<Action> apply(Digest digest, Executor executor) {
+            Supplier<ListenableFuture<Action>> fetcher =
+                () ->
+                    notFoundNull(
+                        expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
+            return toCompletableFuture(fetcher.get());
+          }
+        };
+
+    return toListenableFuture(digestToActionCache.get(actionBlobDigest, getCallback));
   }
     
     

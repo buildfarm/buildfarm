@@ -346,7 +346,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     if (runOperationQueuer) {
-      operationQueuer = OperationQueuer.createThread(backplane,queueTimeout,operationTransformService,getName());
+      operationQueuer = OperationQueuer.createThread(backplane,queueTimeout,operationTransformService,getName(),this::getActionResult,recentCacheServedExecutions);
     } else {
       operationQueuer = null;
     }
@@ -456,8 +456,8 @@ public class ShardInstance extends AbstractServerInstance {
   }
   
     @VisibleForTesting
-  public static ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout) {
-    return OperationQueuer.queue(backplane, executeEntry, poller, timeout, operationTransformService, contextDeadlineScheduler, getName());
+  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout) {
+    return OperationQueuer.queue(backplane, executeEntry, poller, timeout, operationTransformService, contextDeadlineScheduler, getName(),this::getActionResult, recentCacheServedExecutions);
   }
 
   @Override
@@ -1126,21 +1126,6 @@ public class ShardInstance extends AbstractServerInstance {
     return toListenableFuture(commandCache.get(commandBlobDigest, getCallback));
   }
 
-  ListenableFuture<Action> expectAction(Digest actionBlobDigest, RequestMetadata requestMetadata) {
-    BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
-        new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
-          @Override
-          public CompletableFuture<Action> apply(Digest digest, Executor executor) {
-            Supplier<ListenableFuture<Action>> fetcher =
-                () ->
-                    notFoundNull(
-                        expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
-            return toCompletableFuture(fetcher.get());
-          }
-        };
-
-    return toListenableFuture(digestToActionCache.get(actionBlobDigest, getCallback));
-  }
 
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
     try {
@@ -1810,36 +1795,6 @@ public class ShardInstance extends AbstractServerInstance {
         });
   }
 
-  private void deliverCachedActionResult(
-      ActionResult actionResult,
-      ActionKey actionKey,
-      Operation operation,
-      RequestMetadata requestMetadata)
-      throws Exception {
-    recentCacheServedExecutions.put(requestMetadata, true);
-
-    ExecuteOperationMetadata completeMetadata =
-        ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(actionKey.getDigest())
-            .setStage(ExecutionStage.Value.COMPLETED)
-            .build();
-
-    Operation completedOperation =
-        operation
-            .toBuilder()
-            .setDone(true)
-            .setResponse(
-                Any.pack(
-                    ExecuteResponse.newBuilder()
-                        .setResult(actionResult)
-                        .setStatus(
-                            com.google.rpc.Status.newBuilder().setCode(Code.OK.value()).build())
-                        .setCachedResult(true)
-                        .build()))
-            .setMetadata(Any.pack(completeMetadata))
-            .build();
-    backplane.putOperation(completedOperation, completeMetadata.getStage());
-  }
 
   @Override
   public void match(Platform platform, MatchListener listener) {
