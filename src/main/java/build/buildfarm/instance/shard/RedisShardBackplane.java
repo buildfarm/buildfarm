@@ -36,6 +36,7 @@ import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;
+import build.buildfarm.common.redis.RedisHashMap;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
@@ -167,6 +168,7 @@ public class RedisShardBackplane implements Backplane {
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
   private CasWorkerMap casWorkerMap;
+  private RedisHashMap workers;
 
   public RedisShardBackplane(
       RedisShardBackplaneConfig config,
@@ -549,6 +551,7 @@ public class RedisShardBackplane implements Backplane {
     blockedInvocations = new RedisMap(config.getInvocationBlacklistPrefix());
     processingOperations = new RedisMap(config.getProcessingPrefix());
     dispatchedOperations = new RedisMap(config.getDispatchingPrefix());
+    workers = new RedisHashMap(config.getWorkersHashName());
 
     if (config.getSubscribeToBackplane()) {
       startSubscriptionThread();
@@ -697,7 +700,7 @@ public class RedisShardBackplane implements Backplane {
         jedis -> {
           // could rework with an hget to publish prior, but this seems adequate, and
           // we are the only guaranteed source
-          if (jedis.hset(config.getWorkersHashName(), shardWorker.getEndpoint(), json) == 1) {
+          if (workers.insert(jedis, shardWorker.getEndpoint(), json)) {
             jedis.publish(config.getWorkerChannel(), workerChangeJson);
             return true;
           }
@@ -706,7 +709,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private boolean removeWorkerAndPublish(JedisCluster jedis, String name, String changeJson) {
-    if (jedis.hdel(config.getWorkersHashName(), name) == 1) {
+    if (workers.remove(jedis, name)) {
       jedis.publish(config.getWorkerChannel(), changeJson);
       return true;
     }
@@ -841,9 +844,9 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private Set<String> fetchAndExpireWorkers(JedisCluster jedis, long now) {
-    Set<String> workers = Sets.newConcurrentHashSet();
+    Set<String> returnWorkers = Sets.newConcurrentHashSet();
     ImmutableList.Builder<ShardWorker> invalidWorkers = ImmutableList.builder();
-    for (Map.Entry<String, String> entry : jedis.hgetAll(config.getWorkersHashName()).entrySet()) {
+    for (Map.Entry<String, String> entry : workers.asMap(jedis).entrySet()) {
       String json = entry.getValue();
       String name = entry.getKey();
       try {
@@ -856,7 +859,7 @@ public class RedisShardBackplane implements Backplane {
           if (worker.getExpireAt() <= now) {
             invalidWorkers.add(worker);
           } else {
-            workers.add(worker.getEndpoint());
+            returnWorkers.add(worker.getEndpoint());
           }
         }
       } catch (InvalidProtocolBufferException e) {
@@ -864,7 +867,7 @@ public class RedisShardBackplane implements Backplane {
       }
     }
     removeInvalidWorkers(jedis, now, invalidWorkers.build());
-    return workers;
+    return returnWorkers;
   }
 
   private static ActionResult parseActionResult(String json) {
@@ -1468,7 +1471,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public BackplaneStatus backplaneStatus() throws IOException {
     BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
-    builder.addAllActiveWorkers(client.call(jedis -> jedis.hkeys(config.getWorkersHashName())));
+    builder.addAllActiveWorkers(client.call(jedis -> workers.keys(jedis)));
     builder.setDispatchedSize(
         client.call(jedis -> jedis.hlen(config.getDispatchedOperationsHashName())));
     builder.setOperationQueue(operationQueue.status(client.call(jedis -> jedis)));
