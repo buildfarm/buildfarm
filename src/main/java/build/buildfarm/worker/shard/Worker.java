@@ -740,6 +740,7 @@ public class Worker extends LoggingMain {
         fileCache,
         owner,
         config.getLinkInputDirectories(),
+        config.getRealInputDirectoriesList(),
         removeDirectoryService,
         accessRecorder
         /* deadlineAfter=*/

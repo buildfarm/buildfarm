@@ -125,6 +125,20 @@ input_fetch_deadline: 60
 # multiple actions' executions.
 link_input_directories: true
 
+# A list of paths that will not be subject to the effects of the above
+# link_input_directories setting.
+# Relative to the input root, any directory in the input tree which matches
+# this path completely will have a real directory created for its inputs
+# for every action that executes on the worker. The example 'external' is
+# provided based on the characteristics of bazel's population of a top-level
+# external compendium which will exhibit poor directory caching performance.
+# This may also be used to provide writable directories as input roots for
+# actions which expect to be able to write to an input location and will fail
+# if they cannot.
+real_input_directories: "external"
+
+# real_input_directories: "path/to/uncached/directory"
+
 # an imposed action-key-invariant timeout used in the unspecified timeout case
 default_action_timeout: {
   seconds: 600
