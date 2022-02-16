@@ -42,11 +42,11 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
       Counter.build().name("action_results").help("Action results.").register();
 
   private final Instance instance;
-  private final ActionCacheAccessPolicy policy;
+  private final boolean isWritable;
 
   public ActionCacheService(Instance instance, ActionCacheAccessPolicy policy) {
     this.instance = instance;
-    this.policy = policy;
+    this.isWritable = !policy.equals(ActionCacheAccessPolicy.READ_ONLY);
   }
 
   @Override
@@ -108,7 +108,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     // concern.  To counteract this, we allow enforcing a policy where clients cannot upload to the
     // action cache.  In this paradigm, it is only the remote execution engine itself that populates
     // the action cache.
-    if (policy.equals(ActionCacheAccessPolicy.READ_ONLY)) {
+    if (!isWritable) {
       responseObserver.onError(Status.PERMISSION_DENIED.asException());
       return;
     }
