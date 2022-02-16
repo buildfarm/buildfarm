@@ -11,3 +11,9 @@ k8s_object(
     kind = "service",
     template = ":shard-worker.yaml",
 )
+
+k8s_object(
+    name = "minio",
+    kind = "service",
+    template = ":minio.yaml",
+)

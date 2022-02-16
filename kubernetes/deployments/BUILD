@@ -23,3 +23,9 @@ k8s_object(
     kind = "deployment",
     template = ":redis-cluster.yaml",
 )
+
+#k8s_object(
+#    name = "minio",
+#    kind = "deployment",
+#    template = ":minio.yaml",
+#)
