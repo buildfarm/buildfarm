@@ -119,6 +119,10 @@ buildfarm_dependencies()
 load("@build_buildfarm//:defs.bzl", "buildfarm_init")
 
 buildfarm_init()
+
+load("@maven//:compat.bzl", "compat_repositories")
+
+compat_repositories()
 ```
 
 Optionally, if you want to use the buildfarm docker container image targets, you can add this:

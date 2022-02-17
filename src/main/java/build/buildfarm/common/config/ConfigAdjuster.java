@@ -14,12 +14,19 @@
 
 package build.buildfarm.common.config;
 
+import build.buildfarm.common.ExecutionProperties;
+import build.buildfarm.common.ExecutionWrapperProperties;
+import build.buildfarm.common.ExecutionWrappers;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.v1test.WorkerConfig;
 import com.google.common.base.Strings;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -71,7 +78,11 @@ public class ConfigAdjuster {
           "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
     }
 
-    builder.setExecuteStageWidth(adjustExecuteStageWidth(builder.getExecuteStageWidth()));
+    builder.setExecuteStageWidth(
+        adjustExecuteStageWidth(
+            builder.getExecuteStageWidth(), builder.getExecuteStageWidthOffset()));
+
+    checkExecutionWrapperAvailability();
   }
 
   /**
@@ -92,7 +103,11 @@ public class ConfigAdjuster {
       builder.setCasCacheDirectory(options.casCacheDirectory);
     }
 
-    builder.setExecuteStageWidth(adjustExecuteStageWidth(builder.getExecuteStageWidth()));
+    builder.setExecuteStageWidth(
+        adjustExecuteStageWidth(
+            builder.getExecuteStageWidth(), builder.getExecuteStageWidthOffset()));
+
+    checkExecutionWrapperAvailability();
   }
 
   /**
@@ -136,23 +151,96 @@ public class ConfigAdjuster {
     }
   }
 
-  private static int adjustExecuteStageWidth(int currentWidth) {
+  private static int adjustExecuteStageWidth(int currentWidth, int widthOffset) {
+    // Is this the best way to derive system processors?
+    // It seems to work fine on host machines & inside containers.
     int availableCores = Runtime.getRuntime().availableProcessors();
+
+    // Some cores of a machine are reserved for usage other than buildfarm's execution.
+    // Adjust via a user provided offset when deriving the execute stage width to avoid over
+    // saturation.
+    availableCores -= widthOffset;
+
+    // The user has chosen to have their execution width derived for them
     if (currentWidth <= 0) {
       logger.log(
           Level.INFO,
-          "Execute stage width is not valid.  Setting to available cores: " + availableCores);
+          String.format(
+              "Execute stage width is not valid.  Setting to available cores: %d (offset: %d)",
+              availableCores, widthOffset));
       return availableCores;
     }
+
+    // The user is providing their own execution width.
+    // Show a warning to help them decide if their selection is optimal
     if (currentWidth != availableCores) {
       logger.log(
           Level.WARNING,
-          "The configured 'execute stage width' does not optimally saturate available cores: "
-              + currentWidth
-              + " > "
-              + availableCores);
+          String.format(
+              "The configured 'execute stage width' does not optimally saturate available cores: %d < %d (offset: %d).  You can derive your execution stage width automatically by excluding it from the config.",
+              currentWidth, availableCores, widthOffset));
     }
 
     return currentWidth;
+  }
+
+  private static ExecutionWrapperProperties createExecutionWrapperProperties() {
+    // Create a mapping from the execution wrappers to the features they enable.
+    ExecutionWrapperProperties wrapperProperties = new ExecutionWrapperProperties();
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(ExecutionWrappers.CGROUPS)),
+        new ArrayList<String>(
+            Arrays.asList(
+                "limit_execution",
+                ExecutionProperties.CORES,
+                ExecutionProperties.MIN_CORES,
+                ExecutionProperties.MAX_CORES,
+                ExecutionProperties.MIN_MEM,
+                ExecutionProperties.MAX_MEM)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(ExecutionWrappers.LINUX_SANDBOX)),
+        new ArrayList<String>(
+            Arrays.asList(
+                ExecutionProperties.LINUX_SANDBOX,
+                ExecutionProperties.BLOCK_NETWORK,
+                ExecutionProperties.TMPFS)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(ExecutionWrappers.AS_NOBODY)),
+        new ArrayList<String>(Arrays.asList(ExecutionProperties.AS_NOBODY)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(ExecutionWrappers.PROCESS_WRAPPER)),
+        new ArrayList<String>(Arrays.asList(ExecutionProperties.PROCESS_WRAPPER)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(
+            Arrays.asList(
+                ExecutionWrappers.SKIP_SLEEP,
+                ExecutionWrappers.SKIP_SLEEP_PRELOAD,
+                ExecutionWrappers.DELAY)),
+        new ArrayList<String>(
+            Arrays.asList(ExecutionProperties.SKIP_SLEEP, ExecutionProperties.TIME_SHIFT)));
+
+    return wrapperProperties;
+  }
+
+  private static void checkExecutionWrapperAvailability() {
+    ExecutionWrapperProperties wrapperProperties = createExecutionWrapperProperties();
+
+    // Find missing tools, and warn the user that missing tools mean missing features.
+    wrapperProperties.mapping.forEach(
+        (tools, features) ->
+            tools.forEach(
+                (tool) -> {
+                  if (Files.notExists(Paths.get(tool))) {
+                    String message =
+                        String.format(
+                            "the execution wrapper %s is missing and therefore the following features will not be available: %s",
+                            tool, String.join(", ", features));
+                    logger.log(Level.WARNING, message);
+                  }
+                }));
   }
 }
