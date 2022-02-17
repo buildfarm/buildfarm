@@ -1,7 +1,7 @@
 java_binary(
     name = "bf-mount",
     srcs = ["Mount.java"],
-    main_class = "build.buildfarm.Mount",
+    main_class = "build.buildfarm.tools.Mount",
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -27,7 +27,7 @@ java_binary(
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
     ],
-    main_class = "build.buildfarm.CacheLoad",
+    main_class = "build.buildfarm.tools.CacheLoad",
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/cas",
@@ -52,7 +52,7 @@ java_plugin(
 java_binary(
     name = "bf-executor",
     srcs = ["Executor.java"],
-    main_class = "build.buildfarm.Executor",
+    main_class = "build.buildfarm.tools.Executor",
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -77,7 +77,7 @@ java_binary(
 java_binary(
     name = "bf-extractor",
     srcs = ["Extract.java"],
-    main_class = "build.buildfarm.Extract",
+    main_class = "build.buildfarm.tools.Extract",
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -102,7 +102,7 @@ java_binary(
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
     ],
-    main_class = "build.buildfarm.Cat",
+    main_class = "build.buildfarm.tools.Cat",
     visibility = ["//visibility:public"],
     deps = [
         ":worker-profiler-printer",
@@ -130,7 +130,7 @@ java_binary(
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
     ],
-    main_class = "build.buildfarm.WorkerProfile",
+    main_class = "build.buildfarm.tools.WorkerProfile",
     visibility = ["//visibility:public"],
     deps = [
         ":worker-profiler-printer",
@@ -157,9 +157,37 @@ java_binary(
 )
 
 java_binary(
+    name = "bf-ac",
+    srcs = ["Ac.java"],
+    classpath_resources = [
+        "//src/main/java/build/buildfarm:configs",
+    ],
+    main_class = "build.buildfarm.tools.Ac",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":worker-profiler-printer",
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/instance",
+        "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_context",
+        "@maven//:io_grpc_grpc_core",
+        "@maven//:io_grpc_grpc_netty",
+        "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:io_grpc_grpc_stub",
+    ],
+)
+
+java_binary(
     name = "GracefulShutdownTest",
     srcs = ["GracefulShutdownTest.java"],
-    main_class = "build.buildfarm.GracefulShutdownTest",
+    main_class = "build.buildfarm.tools.GracefulShutdownTest",
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
@@ -172,7 +200,7 @@ java_binary(
 java_binary(
     name = "bf-hist",
     srcs = ["Hist.java"],
-    main_class = "build.buildfarm.Hist",
+    main_class = "build.buildfarm.tools.Hist",
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -195,7 +223,7 @@ java_binary(
 java_binary(
     name = "bf-index-worker",
     srcs = ["IndexWorker.java"],
-    main_class = "build.buildfarm.IndexWorker",
+    main_class = "build.buildfarm.tools.IndexWorker",
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -218,7 +246,7 @@ java_binary(
 java_binary(
     name = "bf-find-operations",
     srcs = ["FindOperations.java"],
-    main_class = "build.buildfarm.FindOperations",
+    main_class = "build.buildfarm.tools.FindOperations",
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -240,7 +268,7 @@ java_binary(
 
 java_binary(
     name = "buildfarm-http-proxy",
-    main_class = "build.buildfarm.proxy.http.HttpProxy",
+    main_class = "build.buildfarm.tools.proxy.http.HttpProxy",
     visibility = ["//visibility:public"],
     runtime_deps = ["//src/main/java/build/buildfarm/proxy/http"],
 )
@@ -248,7 +276,7 @@ java_binary(
 java_binary(
     name = "bf-cancel",
     srcs = ["Cancel.java"],
-    main_class = "build.buildfarm.Cancel",
+    main_class = "build.buildfarm.tools.Cancel",
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
