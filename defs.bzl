@@ -73,6 +73,7 @@ def buildfarm_init(name = "buildfarm"):
                     [
                         "com.fasterxml.jackson.core:jackson-databind:2.9.8",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
+                        "com.github.docker-java:docker-java:3.2.11",
                         "com.github.jnr:jffi:1.2.16",
                         "com.github.jnr:jffi:jar:native:1.2.16",
                         "com.github.jnr:jnr-constants:0.9.9",
@@ -96,6 +97,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
                         "io.github.lognet:grpc-spring-boot-starter:4.5.4",
+                        "net.jcip:jcip-annotations:1.0",
                     ] + ["io.netty:netty-%s:4.1.65.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
                     [

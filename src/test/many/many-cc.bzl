@@ -5,7 +5,7 @@ Provide a simple C++ build graph as large as desired.
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 load("@bazel_skylib//rules:write_file.bzl", _write_file = "write_file")
 
-def write_file(name, out, lines, **kwargs):
+def write_file(name, out, lines):
     """
     Call the skylib write_file routine, ensuring that all lines end with a newline.
     """
