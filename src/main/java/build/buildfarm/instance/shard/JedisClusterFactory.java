@@ -118,7 +118,7 @@ public class JedisClusterFactory {
 
     } while (!nextCursor.equals("0"));
 
-    if (matchingKeys.size() == 0) {
+    if (matchingKeys.isEmpty()) {
       return;
     }
 

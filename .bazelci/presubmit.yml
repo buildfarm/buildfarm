@@ -1,5 +1,5 @@
 ---
-buildifier: latest
+buildifier: 4.2.5
 tasks:
   
   # Linting jobs
@@ -46,6 +46,8 @@ tasks:
     - "..."
   macos:
     name: "Unit Tests"
+    build_flags:
+    - "--build_tag_filters=-container"
     build_targets:
     - "..."
     test_targets:

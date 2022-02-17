@@ -44,7 +44,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     private final InterruptingPredicate onMatch;
 
     private final Consumer<Runnable> setOnCancelHandler;
-    private final QueueEntry queueEntry = null;
+    private static final QueueEntry queueEntry = null;
 
     @SuppressWarnings("rawtypes")
     OperationQueueMatchListener(
