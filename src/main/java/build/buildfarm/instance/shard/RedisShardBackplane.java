@@ -376,7 +376,7 @@ public class RedisShardBackplane implements Backplane {
     for (String channel : expiringChannels) {
       Operation operation = parseOperationJson(getOperation(jedis, parseOperationChannel(channel)));
       if (operation == null || !operation.getDone()) {
-        publishExpiration(jedis, channel, now/* force=*/ );
+        publishExpiration(jedis, channel, now);
       } else {
         subscriber.onOperation(channel, onPublish.apply(operation), expiresAt);
       }
@@ -739,6 +739,7 @@ public class RedisShardBackplane implements Backplane {
     settings.hostNames = hostNames;
     settings.casQuery = config.getCasPrefix() + ":*";
     settings.scanAmount = 10000;
+    logger.info("Running CAS Indexer with settings: " + settings.toString());
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
 

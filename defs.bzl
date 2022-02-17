@@ -11,6 +11,7 @@ load(
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
+load("@io_bazel_rules_k8s//k8s:k8s.bzl", "k8s_repositories")
 
 IO_NETTY_MODULES = [
     "buffer",
@@ -72,6 +73,7 @@ def buildfarm_init(name = "buildfarm"):
                     [
                         "com.fasterxml.jackson.core:jackson-databind:2.9.8",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
+                        "com.github.docker-java:docker-java:3.2.11",
                         "com.github.jnr:jffi:1.2.16",
                         "com.github.jnr:jffi:jar:native:1.2.16",
                         "com.github.jnr:jnr-constants:0.9.9",
@@ -95,6 +97,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
                         "io.github.lognet:grpc-spring-boot-starter:4.5.4",
+                        "net.jcip:jcip-annotations:1.0",
                     ] + ["io.netty:netty-%s:4.1.65.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
                     [
@@ -136,6 +139,8 @@ def buildfarm_init(name = "buildfarm"):
     protobuf_deps()
 
     grpc_java_repositories()
+
+    k8s_repositories()
 
     native.bind(
         name = "jar/redis/clients/jedis",

@@ -239,7 +239,8 @@ public class MemoryInstance extends AbstractServerInstance {
             config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
         outstandingOperations,
         MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil),
-        /*activeBlobWrites=*/ new ConcurrentHashMap<>());
+        /*activeBlobWrites=*/ new ConcurrentHashMap<>(),
+        false);
     this.config = config;
     this.watchers = watchers;
     this.outstandingOperations = outstandingOperations;

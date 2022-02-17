@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.shard;
+package build.buildfarm.common.config;
 
 import com.google.devtools.common.options.Option;
 import com.google.devtools.common.options.OptionsBase;
 
 /** Command-line options definition for Worker. */
-public class WorkerOptions extends OptionsBase {
+public class ShardWorkerOptions extends OptionsBase {
   @Option(name = "help", abbrev = 'h', help = "Prints usage info.", defaultValue = "true")
   public boolean help;
 

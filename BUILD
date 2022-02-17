@@ -1,5 +1,8 @@
 load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
 load("@io_bazel_rules_docker//java:image.bzl", "java_image")
+load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "download_pkgs")
+load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
+load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -16,7 +19,7 @@ buildifier(
 # Therefore, users may want to ensure that the same bazel version is sourced here as is used locally.
 java_library(
     name = "execution_wrappers",
-    runtime_deps = [
+    data = [
         ":as-nobody",
         ":delay",
         ":linux-sandbox.binary",
@@ -98,15 +101,45 @@ java_image(
     ],
 )
 
+# A worker image may need additional packages installed that are not in the base image.
+# We use download/install rules to extend an upstream image.
+# Download cgroup-tools so that the worker is able to restrict actions via control groups.
+download_pkgs(
+    name = "worker_pkgs",
+    image_tar = "@ubuntu-bionic//image",
+    packages = ["cgroup-tools"],
+    tags = ["container"],
+)
+
+install_pkgs(
+    name = "worker_pkgs_image",
+    image_tar = "@ubuntu-bionic//image",
+    installables_tar = ":worker_pkgs.tar",
+    installation_cleanup_commands = "rm -rf /var/lib/apt/lists/*",
+    output_image_name = "worker_pkgs_image",
+    tags = ["container"],
+)
+
+# This becomes the new base image when creating worker images.
+container_image(
+    name = "worker_pkgs_image_wrapper",
+    base = ":worker_pkgs_image.tar",
+    tags = ["container"],
+)
+
 java_image(
     name = "buildfarm-shard-worker",
-    base = "@ubuntu-bionic//image",
+    args = ["/app/build_buildfarm/examples/shard-worker.config.example"],
+    base = ":worker_pkgs_image_wrapper",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
     ],
-    entrypoint = [
-        "/app/buildfarm/tini",
-        "--",
+    data = [
+        "//examples:example_configs",
+        "//src/main/java/build/buildfarm:configs",
+    ],
+    jvm_flags = [
+        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
     ],
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
