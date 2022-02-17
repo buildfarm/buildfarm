@@ -511,7 +511,9 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     if (Files.isDirectory(outputPath)) {
-      String message = String.format("ReportResultStage: %s is a directory", outputPath);
+      String message =
+          String.format(
+              "ReportResultStage: %s is a directory but it should have been a file", outputPath);
       logger.log(Level.FINE, message);
       preconditionFailure
           .addViolationsBuilder()
