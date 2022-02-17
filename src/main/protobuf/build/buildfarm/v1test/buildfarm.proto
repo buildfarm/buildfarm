@@ -211,6 +211,8 @@ message PollOperationRequest {
 
 message BuildFarmServerConfig {
   InstanceConfig instance = 1;
+  
+  ActionCacheAccessPolicy ac_policy = 12;
 
   int32 port = 2;
 
@@ -968,6 +970,12 @@ enum CASInsertionPolicy {
   ALWAYS_INSERT = 1;
 
   INSERT_ABOVE_LIMIT = 2;
+};
+
+enum ActionCacheAccessPolicy {
+  READ_AND_WRITE = 0;
+
+  READ_ONLY = 1;
 };
 
 message InstanceEndpoint {

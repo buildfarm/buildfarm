@@ -250,6 +250,8 @@ instance {
   }
 }
 
+ac_policy: READ_AND_WRITE
+
 # the listening port of the buildfarm grpc server
 port: 8980
 
