@@ -57,6 +57,7 @@ import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
+import build.buildfarm.worker.CasReplicationStage;
 import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
@@ -158,8 +159,6 @@ public class Worker extends LoggingMain {
   private final Pipeline pipeline;
   private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
-
-  public class CasReplicationStage extends PipelineStage.NullStage {};
 
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
@@ -826,6 +825,7 @@ public class Worker extends LoggingMain {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+    logger.log(INFO, "Pipeline finished.  Shutting down.");
     stop();
   }
 
