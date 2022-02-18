@@ -513,11 +513,17 @@ public class Worker extends LoggingMain {
           new WorkerProfileService(
               storage, inputFetchStage, executeActionStage, context, completeStage, backplane));
     } else {
-      PipelineStage casReplicationStage = new CasReplicationStage();
-      pipeline.add(casReplicationStage, 1);
+      pipeline = createStorageOnlyPipeline();
     }
 
     return serverBuilder.build();
+  }
+
+  private Pipeline createStorageOnlyPipeline() {
+    pipeline = new Pipeline();
+    PipelineStage casReplicationStage = new CasReplicationStage();
+    pipeline.add(casReplicationStage, 1);
+    return pipleine;
   }
 
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
@@ -825,7 +831,7 @@ public class Worker extends LoggingMain {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    logger.log(INFO, "Pipeline finished.  Shutting down.");
+    logger.log(INFO, "Shutting down because pipeline finished.");
     stop();
   }
 
