@@ -513,17 +513,15 @@ public class Worker extends LoggingMain {
           new WorkerProfileService(
               storage, inputFetchStage, executeActionStage, context, completeStage, backplane));
     } else {
-      pipeline = createStorageOnlyPipeline();
+      createStorageOnlyPipeline(pipeline);
     }
 
     return serverBuilder.build();
   }
 
-  private Pipeline createStorageOnlyPipeline() {
-    pipeline = new Pipeline();
+  private void createStorageOnlyPipeline(Pipeline pipeline) {
     PipelineStage casReplicationStage = new CasReplicationStage();
     pipeline.add(casReplicationStage, 1);
-    return pipleine;
   }
 
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
