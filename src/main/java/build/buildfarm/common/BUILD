@@ -28,5 +28,6 @@ java_library(
         "@maven//:org_apache_commons_commons_compress",
         "@maven//:org_threeten_threetenbp",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "@maven//:com_github_luben_zstd_jni",
     ],
 )
