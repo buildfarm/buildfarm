@@ -22,4 +22,8 @@ k8s_object(
     name = "redis-cluster",
     kind = "deployment",
     template = ":redis-cluster.yaml",
+<<<<<<< HEAD
 )
+=======
+)
+>>>>>>> main

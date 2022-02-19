@@ -11,6 +11,7 @@ k8s_object(
     kind = "service",
     template = ":shard-worker.yaml",
 )
+<<<<<<< HEAD
 
 k8s_object(
     name = "open-telemetry",
@@ -23,3 +24,5 @@ k8s_object(
     kind = "service",
     template = ":jaeger.yaml",
 )
+=======
+>>>>>>> main
