@@ -54,6 +54,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.WorkerListMessage;
@@ -73,6 +74,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
 import java.util.Stack;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -95,7 +97,8 @@ public class AbstractServerInstanceTest {
           actionCache,
           /* outstandingOperations=*/ null,
           /* completedOperations=*/ null,
-          /* activeBlobWrites=*/ null);
+          /* activeBlobWrites=*/ null,
+          false);
     }
 
     DummyServerInstance() {
@@ -159,7 +162,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public GetClientStartTimeResult getClientStartTime(String clientKey) {
+    public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
       throw new UnsupportedOperationException();
     }
 
@@ -190,7 +193,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public CasIndexResults reindexCas(String hostName) {
+    public CasIndexResults reindexCas(@Nullable String hostName) {
       throw new UnsupportedOperationException();
     }
 

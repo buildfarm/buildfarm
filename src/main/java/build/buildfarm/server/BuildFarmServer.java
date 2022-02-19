@@ -21,7 +21,10 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.LoggingMain;
+import build.buildfarm.common.config.ConfigAdjuster;
+import build.buildfarm.common.config.ServerOptions;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.MetricsPublisher;
 import build.buildfarm.metrics.aws.AwsMetricsPublisher;
 import build.buildfarm.metrics.gcp.GcpMetricsPublisher;
@@ -70,7 +73,7 @@ public class BuildFarmServer extends LoggingMain {
           .register();
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-  private final Instances instances;
+  private final Instance instance;
   private final HealthStatusManager healthStatusManager;
   private final Server server;
   private boolean stopping = false;
@@ -84,7 +87,8 @@ public class BuildFarmServer extends LoggingMain {
       String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
-    instances = new BuildFarmInstances(session, config.getInstance(), this::stop);
+
+    instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
 
     healthStatusManager = new HealthStatusManager();
 
@@ -96,24 +100,30 @@ public class BuildFarmServer extends LoggingMain {
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instances))
-            .addService(new CapabilitiesService(instances))
+            .addService(new ActionCacheService(instance, config.getAcPolicy()))
+            .addService(new CapabilitiesService(instance))
             .addService(
                 new ContentAddressableStorageService(
-                    instances, /* deadlineAfter=*/ 1, TimeUnit.DAYS
+                    instance,
+                    /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
+                    TimeUnit.SECONDS
                     /* requestLogLevel=*/ ))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
+            .addService(
+                new ByteStreamService(
+                    instance,
+                    /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
+                    TimeUnit.SECONDS))
             .addService(
                 new ExecutionService(
-                    instances,
+                    instance,
                     config.getExecuteKeepaliveAfterSeconds(),
                     TimeUnit.SECONDS,
                     keepaliveScheduler,
                     getMetricsPublisher(config.getMetricsConfig())))
-            .addService(new OperationQueueService(instances))
-            .addService(new OperationsService(instances))
-            .addService(new AdminService(config.getAdminConfig(), instances))
-            .addService(new FetchService(instances))
+            .addService(new OperationQueueService(instance))
+            .addService(new OperationsService(instance))
+            .addService(new AdminService(config.getAdminConfig(), instance))
+            .addService(new FetchService(instance))
             .addService(ProtoReflectionService.newInstance())
             .addService(new PublishBuildEventService(config.getBuildEventConfig()))
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
@@ -124,12 +134,10 @@ public class BuildFarmServer extends LoggingMain {
   }
 
   private static BuildFarmServerConfig toBuildFarmServerConfig(
-      Readable input, BuildFarmServerOptions options) throws IOException {
+      Readable input, ServerOptions options) throws IOException {
     BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
     TextFormat.merge(input, builder);
-    if (options.port > 0) {
-      builder.setPort(options.port);
-    }
+    ConfigAdjuster.adjust(builder, options);
     return builder.build();
   }
 
@@ -146,7 +154,7 @@ public class BuildFarmServer extends LoggingMain {
 
   public synchronized void start(String publicName, int prometheusPort) throws IOException {
     checkState(!stopping, "must not call start after stop");
-    instances.start(publicName);
+    instance.start(publicName);
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
@@ -177,7 +185,7 @@ public class BuildFarmServer extends LoggingMain {
       if (server != null) {
         server.shutdown();
       }
-      instances.stop();
+      instance.stop();
       server.awaitTermination(10, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       if (server != null) {
@@ -212,7 +220,7 @@ public class BuildFarmServer extends LoggingMain {
     // unknown stream 11369
     nettyLogger.setLevel(SEVERE);
 
-    OptionsParser parser = OptionsParser.newOptionsParser(BuildFarmServerOptions.class);
+    OptionsParser parser = OptionsParser.newOptionsParser(ServerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
@@ -221,7 +229,7 @@ public class BuildFarmServer extends LoggingMain {
     }
 
     Path configPath = Paths.get(residue.get(0));
-    BuildFarmServerOptions options = parser.getOptions(BuildFarmServerOptions.class);
+    ServerOptions options = parser.getOptions(ServerOptions.class);
 
     String session = "buildfarm-server";
     if (!options.publicName.isEmpty()) {

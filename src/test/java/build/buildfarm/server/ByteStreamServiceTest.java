@@ -74,7 +74,7 @@ public class ByteStreamServiceTest {
   private Server fakeServer;
   private String fakeServerName;
 
-  @Mock private Instances instances;
+  @Mock private Instance instance;
 
   @Before
   public void setUp() throws Exception {
@@ -83,7 +83,7 @@ public class ByteStreamServiceTest {
     // Use a mutable service registry for later registering the service impl for each test case.
     fakeServer =
         InProcessServerBuilder.forName(fakeServerName)
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, SECONDS))
+            .addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, SECONDS))
             .directExecutor()
             .build()
             .start();
@@ -152,7 +152,6 @@ public class ByteStreamServiceTest {
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     when(write.getFuture()).thenReturn(writtenFuture);
 
-    Instance instance = mock(Instance.class);
     when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
         .thenReturn(write);
 
@@ -160,7 +159,6 @@ public class ByteStreamServiceTest {
     String resourceName =
         ByteStreamUploader.uploadResourceName(
             /* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
-    when(instances.getFromUploadBlob(eq(resourceName))).thenReturn(instance);
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamStub service = ByteStreamGrpc.newStub(channel);
@@ -225,7 +223,6 @@ public class ByteStreamServiceTest {
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     when(write.getFuture()).thenReturn(writtenFuture);
 
-    Instance instance = mock(Instance.class);
     when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
         .thenReturn(write);
 
@@ -233,7 +230,6 @@ public class ByteStreamServiceTest {
     String resourceName =
         ByteStreamUploader.uploadResourceName(
             /* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
-    when(instances.getFromUploadBlob(eq(resourceName))).thenReturn(instance);
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamStub service = ByteStreamGrpc.newStub(channel);
@@ -325,8 +321,6 @@ public class ByteStreamServiceTest {
     String resourceName = "blobs/" + DigestUtil.toString(digest);
     ReadRequest request = ReadRequest.newBuilder().setResourceName(resourceName).build();
 
-    Instance instance = mock(Instance.class);
-    when(instances.getFromBlob(eq(resourceName))).thenReturn(instance);
     doAnswer(answerVoid((blobDigest, offset, limit, chunkObserver, metadata) -> {}))
         .when(instance)
         .getBlob(

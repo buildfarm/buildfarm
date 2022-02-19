@@ -1,1 +1,6 @@
+common --enable_platform_specific_config
+
 build:fuse --define=fuse=true
+
+# Workaround for https://github.com/bazelbuild/bazel/issues/3236
+build:linux --sandbox_tmpfs_path=/tmp

@@ -5,7 +5,7 @@
 # We ensure that the system can build a set of bazel targets.
 
 # Run redis container
-docker run -d --name buildfarm-redis -p 6379:6379 redis:5.0.9
+docker run -d --name buildfarm-redis --network host redis:5.0.9 --bind localhost
 
 # Build a container for buildfarm services
 docker build -t buildfarm .

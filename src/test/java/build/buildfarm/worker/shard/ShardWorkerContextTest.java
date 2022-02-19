@@ -88,6 +88,7 @@ public class ShardWorkerContextTest {
         /* inlineContentLimit=*/
         /* inputFetchStageWidth=*/ 0,
         /* executeStageWidth=*/ 0,
+        /* inputFetchDeadline=*/ 60,
         backplane,
         execFileSystem,
         inputStreamFactory,

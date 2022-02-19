@@ -13,11 +13,11 @@
 			<!-- Begin Page Content -->
 			<div class="container-fluid">
 				<!-- Page Heading -->
-				<h1 class="h3 mb-2 text-gray-800">Dashboard - <span id="clusterId" th:text="${clusterId}"></span></h1>
+				<h1 class="h3 mb-2 text-gray-800">Dashboard - <span id="clusterId" th:text="${clusterDetails.clusterId}"></span></h1>
 				<p class="mb-4"></p>
 				<div class="card shadow mb-4">
 					<div class="card-header py-3">
-						<h6 class="m-0 font-weight-bold text-primary">CPU Workers</h6>
+						<h6 class="m-0 font-weight-bold text-primary">Workers</h6>
 					</div>
 					<div class="card-body">
 						<div class="table-responsive">
@@ -31,83 +31,34 @@
 									<th>Container Up</th>
 									<th>Instance Type</th>
 									<th>Lifecycle</th>
+									<th>Worker Type</th>
 									<th></th>
 									<th></th>
 								</tr>
 								</thead>
 								<tbody>
-								<tr th:each="instance : ${workers}">
+								<tr th:each="instance : ${clusterDetails.workers}">
 									<td>
-										<a th:href="@{'https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=' + ${instance.instanceId}}"
+										<a th:href="@{'https://console.aws.amazon.com/ec2/v2/home?region=' + ${awsRegion} + '#Instances:search=' + ${instance.ec2Instance.instanceId}}"
 										   th:target="_blank">
-											<span th:text="${instance.instanceId}"></span>
+											<span th:text="${instance.ec2Instance.instanceId}"></span>
 										</a>
 									</td>
-									<td><span th:text="${instance.privateIp}"></span></td>
+									<td><span th:text="${instance.ec2Instance.privateIpAddress}"></span></td>
 									<td><span th:text="${instance.formattedLaunchTime}"></span></td>
 									<td><span th:text="${instance.uptimeStr}"></span></td>
 									<td><span th:text="${instance.containerUptimeStr}"></span></td>
-									<td><span th:text="${instance.instanceType}"></span></td>
+									<td><span th:text="${instance.ec2Instance.instanceType}"></span></td>
 									<td><span th:text="${instance.lifecycle}"></span></td>
+									<td><span th:text="${instance.workerType}"></span></td>
 									<td>
 											<span><a
-													th:href="@{'/admin/restart/worker/' + ${instance.instanceId}}"
+													th:href="@{'/admin/restart/' + ${instance.ec2Instance.instanceId}}"
 													class="btn btn-danger btn-sm actionable-btn">Reboot</a></span>
 									</td>
 									<td>
 											<span><a
-													th:href="@{'/admin/terminate/' + ${instance.instanceId}}"
-													class="btn btn-danger btn-sm actionable-btn">Terminate</a></span>
-									</td>
-								</tr>
-								</tbody>
-							</table>
-						</div>
-					</div>
-				</div>
-				<p class="mb-4"></p>
-				<div class="card shadow mb-4">
-					<div class="card-header py-3">
-						<h6 class="m-0 font-weight-bold text-primary">GPU Workers</h6>
-					</div>
-					<div class="card-body">
-						<div class="table-responsive">
-							<table class="table table-bordered" id="dataTableGpuWorkers" width="100%" cellspacing="0">
-								<thead>
-								<tr>
-									<th>Instance ID</th>
-									<th>IP Address</th>
-									<th>Launched On</th>
-									<th>Instance Up</th>
-									<th>Container Up</th>
-									<th>Instance Type</th>
-									<th>Lifecycle</th>
-									<th></th>
-									<th></th>
-								</tr>
-								</thead>
-								<tbody>
-								<tr th:each="instance : ${gpuWorkers}">
-									<td>
-										<a th:href="@{'https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=' + ${instance.instanceId}}"
-										   th:target="_blank">
-											<span th:text="${instance.instanceId}"></span>
-										</a>
-									</td>
-									<td><span th:text="${instance.privateIp}"></span></td>
-									<td><span th:text="${instance.formattedLaunchTime}"></span></td>
-									<td><span th:text="${instance.uptimeStr}"></span></td>
-									<td><span th:text="${instance.containerUptimeStr}"></span></td>
-									<td><span th:text="${instance.instanceType}"></span></td>
-									<td><span th:text="${instance.lifecycle}"></span></td>
-									<td>
-											<span><a
-													th:href="@{'/admin/restart/worker/' + ${instance.instanceId}}"
-													class="btn btn-danger btn-sm actionable-btn">Reboot</a></span>
-									</td>
-									<td>
-											<span><a
-													th:href="@{'/admin/terminate/' + ${instance.instanceId}}"
+													th:href="@{'/admin/terminate/' + ${instance.ec2Instance.instanceId}}"
 													class="btn btn-danger btn-sm actionable-btn">Terminate</a></span>
 									</td>
 								</tr>
@@ -138,27 +89,27 @@
 								</tr>
 								</thead>
 								<tbody>
-								<tr th:each="instance : ${servers}">
+								<tr th:each="instance : ${clusterDetails.servers}">
 									<td>
-										<a th:href="@{'https://console.aws.amazon.com/ec2/v2/home?region=us-east-1#Instances:search=' + ${instance.instanceId}}"
+										<a th:href="@{'https://console.aws.amazon.com/ec2/v2/home?region=' + ${awsRegion} + '#Instances:search=' + ${instance.ec2Instance.instanceId}}"
 										   th:target="_blank">
-											<span th:text="${instance.instanceId}"></span>
+											<span th:text="${instance.ec2Instance.instanceId}"></span>
 										</a>
 									</td>
-									<td><span th:text="${instance.privateIp}"></span></td>
+									<td><span th:text="${instance.ec2Instance.privateIpAddress}"></span></td>
 									<td><span th:text="${instance.formattedLaunchTime}"></span></td>
 									<td><span th:text="${instance.uptimeStr}"></span></td>
 									<td><span th:text="${instance.containerUptimeStr}"></span></td>
-									<td><span th:text="${instance.instanceType}"></span></td>
+									<td><span th:text="${instance.ec2Instance.instanceType}"></span></td>
 									<td><span th:text="${instance.lifecycle}"></span></td>
 									<td>
 											<span><a
-													th:href="@{'/admin/restart/server/' + ${instance.instanceId}}"
+													th:href="@{'/admin/restart/' + ${instance.ec2Instance.instanceId}}"
 													class="btn btn-danger btn-sm actionable-btn">Reboot</a></span>
 									</td>
 									<td>
 											<span><a
-													th:href="@{'/admin/terminate/' + ${instance.instanceId}}"
+													th:href="@{'/admin/terminate/' + ${instance.ec2Instance.instanceId}}"
 													class="btn btn-danger btn-sm actionable-btn">Terminate</a></span>
 									</td>
 								</tr>
@@ -169,54 +120,31 @@
 				</div>
 
 				<div class="row">
-					<div class="col-lg-4">
+					<div class="col-lg-4" th:each="workerAsg : ${clusterInfo.workers}">
 						<div class="card shadow mb-4">
 							<!-- Card Header -->
 							<div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-								<h6 class="m-0 font-weight-bold text-primary">CPU Workers Autoscaling Group</h6>
+								<h6 class="m-0 font-weight-bold text-primary">Workers Autoscaling Group (<span th:text="${workerAsg.workerType}"></span>)</h6>
 							</div>
 							<!-- Card Body -->
 							<div class="card-body actionable-container">
-								<p class="card-text">Set desired number of CPU workers.</p>
+								<p class="card-text">Set desired number of workers.</p>
 								<div class="form-group">
-									<label for="numWorkers">Number of CPU Workers</label>
+									<label for="numWorkers">Number of Workers</label>
 									<select
 											class="form-control actionable-value" id="numWorkers">
 										<option>Select</option>
-										<option th:each="i : ${#numbers.sequence( 0, 150, 1)}"><p th:text="${ i }" th:remove="tag"></p></option>
+										<option th:each="i : ${#numbers.sequence( 0, 100, 1)}"><p th:text="${ i }" th:remove="tag"></p></option>
 									</select>
 								</div>
 								<a
-										th:href="@{'/admin/scale/' + ${workersAutoScalingGroup} + '/'}"
-										class="btn btn-primary actionable-btn-with-value">Scale CPU Workers
+										th:href="@{'/admin/scale/' + ${workerAsg.asg.autoScalingGroupName} + '/'}"
+										class="btn btn-primary actionable-btn-with-value">Scale Workers
 									Group</a>
 							</div>
 						</div>
 					</div>
-					<div class="col-lg-4">
-						<div class="card shadow mb-4">
-							<!-- Card Header -->
-							<div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-								<h6 class="m-0 font-weight-bold text-primary">GPU Workers Autoscaling Group</h6>
-							</div>
-							<!-- Card Body -->
-							<div class="card-body actionable-container">
-								<p class="card-text">Set desired number of GPU workers.</p>
-								<div class="form-group">
-									<label for="numWorkers">Number of GPU Workers</label>
-									<select
-											class="form-control actionable-value" id="numGpuWorkers">
-										<option>Select</option>
-										<option th:each="i : ${#numbers.sequence( 0, 30, 1)}"><p th:text="${ i }" th:remove="tag"></p></option>
-									</select>
-								</div>
-								<a
-										th:href="@{'/admin/scale/' + ${gpuWorkersAutoScalingGroup} + '/'}"
-										class="btn btn-primary actionable-btn-with-value">Scale GPU Workers
-									Group</a>
-							</div>
-						</div>
-					</div>
+
 					<div class="col-lg-4">
 						<div class="card shadow mb-4">
 							<!-- Card Header -->
@@ -231,11 +159,11 @@
 									<select
 											class="form-control actionable-value" id="numServers">
 										<option>Select</option>
-										<option th:each="i : ${#numbers.sequence( 0, 20, 1)}"><p th:text="${ i }" th:remove="tag"></p></option>
+										<option th:each="i : ${#numbers.sequence( 0, 100, 1)}"><p th:text="${ i }" th:remove="tag"></p></option>
 									</select>
 								</div>
 								<a
-										th:href="@{'/admin/scale/' + ${serversAutoScalingGroup} + '/'}"
+										th:href="@{'/admin/scale/' + ${clusterInfo.servers.asg.autoScalingGroupName} + '/'}"
 										class="btn btn-primary actionable-btn-with-value">Scale Servers
 									Group</a>
 							</div>

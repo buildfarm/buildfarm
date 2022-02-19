@@ -79,7 +79,9 @@ public class WorkerIndexer {
     do {
       scanResult = node.scan(cursor, params);
       if (scanResult != null) {
-        removeWorkerFromCasKeys(cluster, scanResult.getResult(), settings.hostName, results);
+        for (String hostName : settings.hostNames) {
+          removeWorkerFromCasKeys(cluster, scanResult.getResult(), hostName, results);
+        }
         cursor = scanResult.getCursor();
       }
     } while (!cursor.equals("0"));
