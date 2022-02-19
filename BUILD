@@ -15,7 +15,7 @@ buildifier(
 # When deploying buildfarm, you may want to include additional dependencies within your deployment.
 # These dependencies can enable features related to the observability and runtime of the system.
 # For example, "debgging tools", "introspection tools", and "exeution wrappers" are examples of dependencies
-# that many need included within deployed containers.  This BUILD file creates docker images and bundles
+# that many need included within deployed containers.  This BUILD file creates docker images that bundle
 # additional dependencies alongside the buildfarm agents.
 
 # == Execution Wrappers ==
@@ -25,13 +25,13 @@ buildifier(
 # can be stacked (i.e. actions can run under multiple wrappers).  Buildfarm may also choose different
 # execution wrappers dynamically based on exec_properties.  In order to have them available to the worker, they should
 # be provided to a java_image as a "runtime_dep".  Buildfarm workers will warn about any missing execution wrappers
-# during startup and what features become unavailable.
+# during startup and what features are unavailable due to their absence.
 
 # == Execution Wrapper Compatibility ==
 # "process-wrapper" and "linux-sandbox" are sourced directly from bazel.  Users may want to ensure that the same
 # bazel version is used in buildfarm agents as is used by bazel clients.  There has not been any known issues due
 # to version mismatch, but we state the possibility here.  Some execution wrappers will not be compatible with all
-# operating systems.  We make a best effort and ensure they all work in the example docker images.
+# operating systems.  We make a best effort and ensure they all work in the below images.
 java_library(
     name = "execution_wrappers",
     data = [
