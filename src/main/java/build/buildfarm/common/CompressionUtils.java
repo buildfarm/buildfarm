@@ -16,6 +16,7 @@ package build.buildfarm.common;
 
 import com.github.luben.zstd.Zstd;
 import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 
 /**
  * @class CompressionUtils
