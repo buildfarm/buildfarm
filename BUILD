@@ -11,20 +11,27 @@ buildifier(
     name = "buildifier",
 )
 
+# == Docker Image Creation ==
 # When deploying buildfarm, you may want to include additional dependencies within your deployment.
-# These dependencies can cover different areas related to the observability and runtime of the system.
-# "Debgging tools", "Introspection tools", and "Exeution wrappers" are examples of dependencies that
-# many need included within a deployment.  This BUILD file creates docker images that bundle additional
-# features alongside the standard buildfarm application.
+# These dependencies can enable features related to the observability and runtime of the system.
+# For example, "debgging tools", "introspection tools", and "exeution wrappers" are examples of dependencies
+# that many need included within deployed containers.  This BUILD file creates docker images and bundles
+# additional dependencies alongside the buildfarm agents.
 
-# Execution wrappers are programs that buildfarm chooses when running REAPI actions.  They are used for
+# == Execution Wrappers ==
+# Execution wrappers are programs that buildfarm chooses to use when running REAPI actions.  They are used for
 # both sandboxing, as well as changing runtime behavior of actions.  Buildfarm workers can be configured
 # to use execution wrappers directly through a configuration called "execution policy".  Execution wrappers
 # can be stacked (i.e. actions can run under multiple wrappers).  Buildfarm may also choose different
-# execution wrappers dynamically based on exec_properties.  For their availability on a worker, they should
-# be provided to a java_image as a "runtime_dep".  Note: "process-wrapper" and "linux-sandbox" come from bazel
-# itself.  Users may want to ensure that the same bazel version is sourced here as is used by clients.
-# Although we have not had any known issues reported due to version differences.
+# execution wrappers dynamically based on exec_properties.  In order to have them available to the worker, they should
+# be provided to a java_image as a "runtime_dep".  Buildfarm workers will warn about any missing execution wrappers
+# during startup and what features become unavailable.
+
+# == Execution Wrapper Compatibility ==
+# "process-wrapper" and "linux-sandbox" are sourced directly from bazel.  Users may want to ensure that the same
+# bazel version is used in buildfarm agents as is used by bazel clients.  There has not been any known issues due
+# to version mismatch, but we state the possibility here.  Some execution wrappers will not be compatible with all
+# operating systems.  We make a best effort and ensure they all work in the example docker images.
 java_library(
     name = "execution_wrappers",
     data = [
@@ -115,6 +122,8 @@ java_image(
     ],
     jvm_flags = [
         "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+        
+        # Flags related to OpenTelemetry
         "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
         "-Dotel.resource.attributes=service.name=server",
         "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
@@ -170,6 +179,8 @@ java_image(
     ],
     jvm_flags = [
         "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+        
+        # Flags related to OpenTelemetry
         "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
         "-Dotel.resource.attributes=service.name=worker",
         "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
