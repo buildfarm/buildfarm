@@ -25,8 +25,8 @@ import java.util.Base64;
 public class CompressionUtils {
   /**
    * @brief Compress a string with zstandard compression.
-   * @details Usually done with byte buffers. Not for performance, but testing underlying
-   *     implementation.
+   * @details This is usually done with byte buffers. It's not going to give ideal performance, but
+   *     it's useful for String manipulation testing the underlying implementation.
    * @param data The string to compress
    * @return The string in compressed format.
    * @note Suggested return identifier: compressedData
@@ -38,8 +38,8 @@ public class CompressionUtils {
 
   /**
    * @brief Decompress a zstandard compressed string.
-   * @details Usually done with byte buffers. Not for performance, but testing underlying
-   *     implementation.
+   * @details This is usually done with byte buffers. It's not going to give ideal performance, but
+   *     it's useful for String manipulation testing the underlying implementation.
    * @param data The string to decompress
    * @return The string in decompressed format.
    * @note Suggested return identifier: data
