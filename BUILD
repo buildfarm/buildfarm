@@ -115,7 +115,6 @@ java_image(
     ],
     jvm_flags = [
         "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-<<<<<<< HEAD
         "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
         "-Dotel.resource.attributes=service.name=server",
         "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
@@ -123,8 +122,6 @@ java_image(
         "-Dotel.instrumentation.http.capture-headers.client.response",
         "-Dotel.instrumentation.http.capture-headers.server.request",
         "-Dotel.instrumentation.http.capture-headers.server.response",
-=======
->>>>>>> main
     ],
     main_class = "build.buildfarm.server.BuildFarmServer",
     tags = ["container"],
@@ -173,7 +170,6 @@ java_image(
     ],
     jvm_flags = [
         "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-<<<<<<< HEAD
         "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
         "-Dotel.resource.attributes=service.name=worker",
         "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
@@ -181,8 +177,6 @@ java_image(
         "-Dotel.instrumentation.http.capture-headers.client.response",
         "-Dotel.instrumentation.http.capture-headers.server.request",
         "-Dotel.instrumentation.http.capture-headers.server.response",
-=======
->>>>>>> main
     ],
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
