@@ -122,7 +122,7 @@ java_image(
     ],
     jvm_flags = [
         "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-        
+
         # Flags related to OpenTelemetry
         "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
         "-Dotel.resource.attributes=service.name=server",
@@ -179,7 +179,7 @@ java_image(
     ],
     jvm_flags = [
         "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-        
+
         # Flags related to OpenTelemetry
         "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
         "-Dotel.resource.attributes=service.name=worker",
@@ -197,4 +197,3 @@ java_image(
         "//src/main/java/build/buildfarm/worker/shard",
     ],
 )
-
