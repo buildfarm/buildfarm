@@ -19,7 +19,6 @@ import static com.google.common.truth.Truth.assertThat;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import java.nio.charset.StandardCharsets;
 
 /**
  * @class CompressionUtilsTest
@@ -70,21 +69,5 @@ public class CompressionUtilsTest {
 
     // ASSERT
     assertThat(data).isEqualTo(result);
-  }
-  
-  // Function under test: zstdCompress
-  // Reason for testing: Test command line compatibility.
-  // Failure explanation: The results are not the same as running standard CLI tools.
-  @Test
-  public void cliCompatibility() throws Exception {
-    // ARRANGE
-    String data = "a";
-
-    // ACT
-    // echo -n "Hello World" | zstd --stdout | base64
-    String result = CompressionUtils.zstdCompress(data);
-
-    // ASSERT
-    assertThat(result).isEqualTo("KLUv/QRYWQAASGVsbG8gV29ybGTCWyQZ");
   }
 }
