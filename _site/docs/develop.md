@@ -7,7 +7,10 @@ nav_order: 7
 ## Developer Information
 
 The recommended solution for deploying a complete dev environment is to use [tilt](https://tilt.dev/).
-Go to the root of the repo and run `tilt up`.
+Follow the installation instructions [here](https://docs.tilt.dev/).
+Make sure you can use a local kubernetes cluster by following [these steps](https://docs.tilt.dev/choosing_clusters.html).
+If everything is installed correctly, you can go to the root of the repo and run `tilt up`.
+Tilt will prompt you to open a web UI and see all the running services.
 
 Below is information for running services directly.
 
