@@ -70,4 +70,22 @@ public class CompressionUtilsTest {
     // ASSERT
     assertThat(data).isEqualTo(result);
   }
+
+  // Function under test: zstdCompress
+  // Reason for testing: Test command line compatibility.
+  // Failure explanation: The results are not the same as running standard CLI tools.
+  @Test
+  public void cliCompatibility() throws Exception {
+    // ARRANGE
+    String data = "Hello World";
+
+    // ACT
+    String result = CompressionUtils.zstdCompress(data);
+
+    // ASSERT
+    // This should be equivalent to the following command:
+    // echo -n "Hello World" > /tmp/out.txt; zstd --stdout --no-check /tmp/out.txt | base64
+    // The temporary file is required to create a matching frame header.
+    assertThat(result).isEqualTo("KLUv/SALWQAASGVsbG8gV29ybGQ=");
+  }
 }
