@@ -15,6 +15,7 @@
 package build.buildfarm.common;
 
 import com.github.luben.zstd.Zstd;
+import com.google.protobuf.ByteString;
 import java.util.Base64;
 
 /**
@@ -27,7 +28,8 @@ public class CompressionUtils {
    * @brief Compress a string with zstandard compression.
    * @details For optimal performance you should use byte buffers or streams. We provide a string
    *     interface due to the ubiquity of strings and as an easy way to test the underlying
-   *     implementation.
+   *     implementation. After the string information is zstd compressed they are encoded in base64
+   *     to avoid losing information between byte[] and String.
    * @param data The string to compress
    * @return The string in compressed format.
    * @note Suggested return identifier: compressedData
@@ -41,7 +43,8 @@ public class CompressionUtils {
    * @brief Decompress a zstandard compressed string.
    * @details For optimal performance you should use byte buffers or streams. We provide a string
    *     interface due to the ubiquity of strings and as an easy way to test the underlying
-   *     implementation.
+   *     implementation. After the string information is zstd compressed they are encoded in base64
+   *     to avoid losing information between byte[] and String.
    * @param data The string to decompress
    * @return The string in decompressed format.
    * @note Suggested return identifier: data
@@ -51,5 +54,30 @@ public class CompressionUtils {
     int size = (int) Zstd.decompressedSize(src);
     byte[] data = Zstd.decompress(src, size);
     return new String(data);
+  }
+
+  /**
+   * @brief Compress a bytestring with zstandard compression.
+   * @details creates a new bytestream.
+   * @param data The string to compress
+   * @return The string in compressed format.
+   * @note Suggested return identifier: compressedData
+   */
+  public static ByteString zstdCompress(ByteString data) {
+    byte[] compressed = Zstd.compress(data.toByteArray());
+    return ByteString.copyFrom(compressed);
+  }
+
+  /**
+   * @brief Decompress a zstandard compressed bytestring.
+   * @details creates a new bytestream.
+   * @param data The string to decompress
+   * @return The string in decompressed format.
+   * @note Suggested return identifier: data
+   */
+  public static ByteString zstdDecompress(ByteString compressedData) {
+    int size = (int) Zstd.decompressedSize(compressedData.toByteArray());
+    byte[] data = Zstd.decompress(compressedData.toByteArray(), size);
+    return ByteString.copyFrom(data);
   }
 }
