@@ -94,6 +94,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.protobuf:protobuf-java-util:3.10.0",
                         "com.google.protobuf:protobuf-java:3.10.0",
                         "com.google.truth:truth:0.44",
+                        "org.slf4j:slf4j-simple:1.7.35",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
                         "io.github.lognet:grpc-spring-boot-starter:4.5.4",
