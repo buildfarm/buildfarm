@@ -5,6 +5,8 @@ java_test(
     data = ["//examples:example_configs"],
     test_class = "build.buildfarm.AllTests",
     deps = [
+        "//src/main/java/build/buildfarm/common/resources:ResourceParser",
+        "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "//third_party/jedis",
@@ -21,7 +23,5 @@ java_test(
         "@maven//:io_grpc_grpc_testing",
         "@maven//:org_mockito_mockito_core",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
-                "//src/main/java/build/buildfarm/common/resources:ResourceParser",
-        "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
     ],
 )
