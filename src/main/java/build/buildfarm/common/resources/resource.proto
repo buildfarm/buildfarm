@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package build.buildfarm.common.resources;
+import "build/bazel/remote/execution/v2/remote_execution.proto";
+
+option java_multiple_files = true;
+
+
+// Interacting with the CAS (content-addressable storage) can be done through google's ByteStream API.
+// The ByteStream API contains ReadRequest and WriteRequest types which carry an attribute known as resource_name.
+// The resource_name is a URI that must be parsed in order to derive specific resource information defined by REAPI.
+// REAPI describes how this information will be encoded in the resource_name path.
+// Here we define specific request types based on the extraction of resource_name information.
+
+
+// The URI formats of uploading a blob:
+// `{instance_name}/uploads/{uuid}/blobs/{hash}/{size}{/optional_metadata}`
+// `{instance_name}/uploads/{uuid}/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}{/optional_metadata}`
+message UploadBlobRequest {
+    string instance_name = 1;
+    
+    string uuid = 2;
+    
+    BlobInformation blob = 3;
+    
+    string metadata = 4;
+}
+
+// The URI formats of downloading a blob:
+// `{instance_name}/blobs/{hash}/{size}`
+// `{instance_name}/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}`
+message DownloadBlobRequest {
+    string instance_name = 1;
+    
+    BlobInformation blob = 2;
+}
+
+// The URI formats of requesting an operation stream:
+// {instance_name=**}/operations/{uuid}/streams/{stream}
+message StreamOperationRequest {
+    string instance_name = 1;
+    
+    string uuid = 2;
+    
+    string stream = 3;
+}
+
+// The blob portion of resource name URIs:
+// `/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}`
+// `/blobs/{hash}/{size}`
+message BlobInformation {
+    build.bazel.remote.execution.v2.Compressor.Value compression = 1;
+    
+    build.bazel.remote.execution.v2.Digest digest = 2;
+}
+
+message Resource {
+    
+    oneof type {
+        UploadBlobRequest upload_blob_request = 1;
+        DownloadBlobRequest download_blob_request = 2;
+        StreamOperationRequest stream_operation_request = 3;
+    }  
+}
