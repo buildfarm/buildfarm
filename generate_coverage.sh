@@ -145,7 +145,16 @@ if [ "${BUILDFARM_SKIP_COVERAGE_HOST:-false}" = false ]; then
     genhtml -f $traces
 
     command -v python >/dev/null 2>&1 || { echo >&2 'python could not be found, so the coverage report cannot be locally hosted.'; exit 1; }
-    python3 -m http.server 8080
+
+    # Get python version
+    pythonVersion=`python -c 'import platform; major, minor, patch = platform.python_version_tuple(); print(major);'`
+
+    # Host code coverage based on python version
+    if [ $pythonVersion -eq 2 ];then
+        python -m SimpleHTTPServer 8080
+    else
+        python -m http.server 8080
+    fi
 else
     echo "Skipped coverage hosting."
 fi
