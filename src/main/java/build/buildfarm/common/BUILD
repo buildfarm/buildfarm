@@ -18,6 +18,7 @@ java_library(
         "@maven//:com_github_jnr_jnr_constants",
         "@maven//:com_github_jnr_jnr_ffi",
         "@maven//:com_github_jnr_jnr_posix",
+        "@maven//:com_github_luben_zstd_jni",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_failureaccess",
         "@maven//:com_google_guava_guava",
