@@ -115,7 +115,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
       throws IOException {
     client.run(
         jedis -> {
-
           // Pipeline p = jedis.pipelined();
           // for (Digest blobDigest : blobDigests) {
           //   String key = redisCasKey(blobDigest);
