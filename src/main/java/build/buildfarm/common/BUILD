@@ -9,7 +9,8 @@ java_library(
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "//third_party/jedis",
+        #"//third_party/jedis",
+        "@maven//:redis_clients_jedis",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",

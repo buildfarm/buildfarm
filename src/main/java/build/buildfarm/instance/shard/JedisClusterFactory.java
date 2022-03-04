@@ -22,13 +22,15 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 import javax.naming.ConfigurationException;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import redis.clients.jedis.Connection;
+import redis.clients.jedis.ConnectionPool;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class JedisClusterFactory
@@ -88,8 +90,8 @@ public class JedisClusterFactory {
    * @note Overloaded.
    */
   private static void deleteExistingKeys(JedisCluster cluster) throws Exception {
-    for (JedisPool pool : cluster.getClusterNodes().values()) {
-      Jedis node = pool.getResource();
+    for (ConnectionPool pool : cluster.getClusterNodes().values()) {
+      Jedis node = new Jedis(pool.getResource());
       deleteExistingKeys(node);
     }
   }
@@ -143,6 +145,7 @@ public class JedisClusterFactory {
    */
   private static Supplier<JedisCluster> createJedisClusterFactory(
       URI redisUri, int timeout, int maxAttempts, String password, JedisPoolConfig poolConfig) {
+    GenericObjectPoolConfig<Connection> poolConfig2 = new GenericObjectPoolConfig<Connection>();
     return () ->
         new JedisCluster(
             new HostAndPort(redisUri.getHost(), redisUri.getPort()),
@@ -150,7 +153,7 @@ public class JedisClusterFactory {
             /* soTimeout=*/ Integer.max(2000, timeout),
             Integer.max(5, maxAttempts),
             password,
-            poolConfig);
+            poolConfig2);
   }
 
   /**

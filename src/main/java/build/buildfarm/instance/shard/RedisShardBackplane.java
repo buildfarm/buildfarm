@@ -15,7 +15,7 @@
 package build.buildfarm.instance.shard;
 
 import static java.lang.String.format;
-import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
+import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
@@ -102,13 +102,13 @@ import javax.naming.ConfigurationException;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import redis.clients.jedis.ConnectionPool;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisClusterPipeline;
-import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Response;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 public class RedisShardBackplane implements Backplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
@@ -444,7 +444,7 @@ public class RedisShardBackplane implements Backplane {
 
     Instant now = Instant.now();
     List<Map.Entry<String, Response<String>>> operations = new ArrayList(operationChannels.size());
-    JedisClusterPipeline p = jedis.pipelined();
+    Pipeline p = jedis.pipelined();
     for (String operationName :
         operationChannels.stream()
             .map(RedisShardBackplane::parseOperationChannel)
@@ -747,9 +747,9 @@ public class RedisShardBackplane implements Backplane {
     // get all workers
     List<String> activeWorkers = new ArrayList<>(getWorkers());
     List<String> allUptimeKeys = new ArrayList<>();
-    Map<String, JedisPool> clusterNodes = client.call(jedis -> jedis.getClusterNodes());
-    for (Map.Entry<String, JedisPool> entry : clusterNodes.entrySet()) {
-      Jedis singlejedis = entry.getValue().getResource();
+    Map<String, ConnectionPool> clusterNodes = client.call(jedis -> jedis.getClusterNodes());
+    for (Map.Entry<String, ConnectionPool> entry : clusterNodes.entrySet()) {
+      Jedis singlejedis = new Jedis(entry.getValue().getResource());
       allUptimeKeys.addAll(client.call(jedis -> singlejedis.keys("startTime/*:8981")));
     }
     List<String> nonactiveWorkers = new ArrayList<>();
@@ -946,7 +946,7 @@ public class RedisShardBackplane implements Backplane {
               List<String> keyResults = scanResult.getResult();
 
               List<Response<String>> actionResults = new ArrayList<>(keyResults.size());
-              JedisClusterPipeline p = jedis.pipelined();
+              Pipeline p = jedis.pipelined();
               for (String key : keyResults) {
                 actionResults.add(p.get(key));
               }
@@ -1174,7 +1174,7 @@ public class RedisShardBackplane implements Backplane {
     if (hasInvalid) {
       client.run(
           jedis -> {
-            JedisClusterPipeline p = jedis.pipelined();
+            Pipeline p = jedis.pipelined();
             for (String invalidOperationName : invalidOperationNames.build()) {
               p.hdel(config.getDispatchedOperationsHashName(), invalidOperationName);
             }

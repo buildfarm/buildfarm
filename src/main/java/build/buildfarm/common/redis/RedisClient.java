@@ -27,7 +27,6 @@ import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
-import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
 
 public class RedisClient implements Closeable {
   private static final String MISCONF_RESPONSE = "MISCONF";
@@ -121,7 +120,7 @@ public class RedisClient implements Closeable {
         }
         throw e;
       }
-    } catch (JedisMisconfigurationException | JedisNoReachableClusterNodeException e) {
+    } catch (JedisMisconfigurationException e) {
       // In regards to a Jedis misconfiguration,
       // the backplane is configured not to accept writes currently
       // as a result of an error. The error is meant to indicate

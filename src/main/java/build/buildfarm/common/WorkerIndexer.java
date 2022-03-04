@@ -17,8 +17,8 @@ package build.buildfarm.common;
 import java.util.List;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class WorkerIndexer
@@ -48,7 +48,7 @@ public class WorkerIndexer {
         .values()
         .forEach(
             pool -> {
-              try (Jedis node = pool.getResource()) {
+              try (Jedis node = new Jedis(pool.getResource())) {
                 reindexNode(cluster, node, settings, results);
               }
             });

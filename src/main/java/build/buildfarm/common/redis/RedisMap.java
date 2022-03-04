@@ -15,8 +15,9 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.ScanCount;
+import java.util.ArrayList;
+import java.util.List;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisClusterPipeline;
 
 /**
  * @class RedisMap
@@ -91,11 +92,13 @@ public class RedisMap {
    * @note Overloaded.
    */
   public void remove(JedisCluster jedis, Iterable<String> keys) {
-    JedisClusterPipeline p = jedis.pipelined();
+    List<String> keyList = new ArrayList<String>();
     for (String key : keys) {
-      p.del(createKeyName(key));
+      keyList.add(createKeyName(key));
     }
-    p.sync();
+
+    String keyArray[] = keyList.toArray(new String[keyList.size()]);
+    jedis.del(keyArray);
   }
 
   /**

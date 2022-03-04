@@ -17,11 +17,10 @@ package build.buildfarm.common.redis;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
+import redis.clients.jedis.ConnectionPool;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.exceptions.JedisException;
-import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
 
 /**
  * @class RedisNodeHashes
@@ -123,9 +122,9 @@ public class RedisNodeHashes {
    */
   private static List<Object> getClusterSlots(JedisCluster jedis) {
     JedisException nodeException = null;
-    for (Map.Entry<String, JedisPool> node : jedis.getClusterNodes().entrySet()) {
-      JedisPool pool = node.getValue();
-      try (Jedis resource = pool.getResource()) {
+    for (Map.Entry<String, ConnectionPool> node : jedis.getClusterNodes().entrySet()) {
+      ConnectionPool pool = node.getValue();
+      try (Jedis resource = new Jedis(pool.getResource())) {
         return resource.clusterSlots();
       } catch (JedisException e) {
         nodeException = e;
@@ -135,6 +134,6 @@ public class RedisNodeHashes {
     if (nodeException != null) {
       throw nodeException;
     }
-    throw new JedisNoReachableClusterNodeException("No reachable node in cluster");
+    throw new JedisException("No reachable node in cluster");
   }
 }

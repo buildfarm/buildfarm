@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Map;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class OperationsFinder
@@ -59,7 +59,7 @@ public class OperationsFinder {
         .values()
         .forEach(
             pool -> {
-              try (Jedis node = pool.getResource()) {
+              try (Jedis node = new Jedis(pool.getResource())) {
                 findOperationNode(cluster, node, instance, settings, results);
               }
             });

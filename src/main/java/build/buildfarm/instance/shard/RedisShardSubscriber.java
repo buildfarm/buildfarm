@@ -36,7 +36,7 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
-import redis.clients.jedis.Client;
+import redis.clients.jedis.Connection;
 import redis.clients.jedis.JedisPubSub;
 
 class RedisShardSubscriber extends JedisPubSub {
@@ -332,7 +332,7 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   @Override
-  public void proceed(Client client, String... channels) {
+  public void proceed(Connection client, String... channels) {
     if (channels.length == 0) {
       channels = placeholderChannel();
     }

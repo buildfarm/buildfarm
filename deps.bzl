@@ -133,14 +133,14 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
     # Other changes are redis version-forward treatment of spop and visibility
     # into errors in cluster unreachable and cluster retry exhaustion.
     # Details at https://github.com/werkt/jedis/releases/tag/3.2.0-e82e68e2f7
-    maybe(
-        http_jar,
-        "jedis",
-        sha256 = "294ff5e4e6ae3fda5ff00f0a3c398fa50c1ffa3bc9313800b32e34a75fbb93f3",
-        urls = [
-            "https://github.com/werkt/jedis/releases/download/3.2.0-e82e68e2f7/jedis-3.2.0-e82e68e2f7.jar",
-        ],
-    )
+    # maybe(
+    #     http_jar,
+    #     "jedis",
+    #     sha256 = "294ff5e4e6ae3fda5ff00f0a3c398fa50c1ffa3bc9313800b32e34a75fbb93f3",
+    #     urls = [
+    #         "https://github.com/werkt/jedis/releases/download/3.2.0-e82e68e2f7/jedis-3.2.0-e82e68e2f7.jar",
+    #     ],
+    # )
 
     http_file(
         name = "tini",

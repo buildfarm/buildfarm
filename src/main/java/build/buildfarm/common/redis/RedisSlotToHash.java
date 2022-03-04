@@ -14,7 +14,7 @@
 
 package build.buildfarm.common.redis;
 
-import static redis.clients.jedis.JedisCluster.HASHSLOTS;
+import static redis.clients.jedis.Protocol.CLUSTER_HASHSLOTS;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -43,7 +43,7 @@ public class RedisSlotToHash {
    * @note Suggested return identifier: hashtag.
    */
   public static String correlate(long slotNumber) {
-    Preconditions.checkState(slotNumber >= 0 && slotNumber < HASHSLOTS);
+    Preconditions.checkState(slotNumber >= 0 && slotNumber < CLUSTER_HASHSLOTS);
     return staticLookup(slotNumber);
   }
 
@@ -58,7 +58,7 @@ public class RedisSlotToHash {
    * @note Suggested return identifier: hashtag.
    */
   public static String correlateRange(long start, long end) {
-    Preconditions.checkState(start >= 0 && end < HASHSLOTS);
+    Preconditions.checkState(start >= 0 && end < CLUSTER_HASHSLOTS);
 
     long hashNumber = 0;
     int slotNumber = JedisClusterCRC16.getSlot(Long.toString(hashNumber));
@@ -81,7 +81,7 @@ public class RedisSlotToHash {
    * @note Suggested return identifier: hashtag.
    */
   public static String correlateRangeWithPrefix(long start, long end, String prefix) {
-    Preconditions.checkState(start >= 0 && end < HASHSLOTS);
+    Preconditions.checkState(start >= 0 && end < CLUSTER_HASHSLOTS);
 
     long hashNumber = 0;
     int slotNumber = JedisClusterCRC16.getSlot(createHashtag(prefix, hashNumber));

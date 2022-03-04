@@ -98,6 +98,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.slf4j:slf4j-simple:1.7.35",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
+                        "redis.clients:jedis:4.1.1",
                         "io.github.lognet:grpc-spring-boot-starter:4.5.4",
                         "net.jcip:jcip-annotations:1.0",
                     ] + ["io.netty:netty-%s:4.1.65.Final" % module for module in IO_NETTY_MODULES] +
@@ -144,10 +145,10 @@ def buildfarm_init(name = "buildfarm"):
 
     k8s_repositories()
 
-    native.bind(
-        name = "jar/redis/clients/jedis",
-        actual = "@jedis//jar",
-    )
+    # native.bind(
+    #     name = "jar/redis/clients/jedis",
+    #     actual = "@jedis//jar",
+    # )
 
     llvm_toolchain(
         name = "llvm_toolchain",

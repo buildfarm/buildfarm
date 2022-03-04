@@ -18,8 +18,8 @@ import com.google.common.collect.Sets;
 import java.util.Set;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class ScanCount
@@ -50,7 +50,7 @@ public class ScanCount {
         .values()
         .forEach(
             pool -> {
-              try (Jedis node = pool.getResource()) {
+              try (Jedis node = new Jedis(pool.getResource())) {
                 addKeys(node, keys, query, scanCount);
               }
             });
