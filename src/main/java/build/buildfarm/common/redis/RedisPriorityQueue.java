@@ -91,7 +91,7 @@ public class RedisPriorityQueue {
    * @note Suggested return identifier: wasRemoved.
    */
   public boolean removeAll(JedisCluster jedis, String val) {
-    return jedis.lrem(name, 0, val) != 0;
+    return jedis.zrem(name, val) != 0;
   }
 
   /**
@@ -129,9 +129,7 @@ public class RedisPriorityQueue {
     List<String> args = Arrays.asList(name, getDequeueName());
     Object obj_val = jedis.eval(getLuaScript(jedis, "zpoplpush.lua"), keys, args);
     String val = String.valueOf(obj_val);
-    System.out.println("Here is your value:" + val);
     if (val != null && !val.isEmpty()) {
-      System.out.println("It's not null");
       return val;
     }
     if (Thread.currentThread().isInterrupted()) {
@@ -168,7 +166,7 @@ public class RedisPriorityQueue {
    * @note Suggested return identifier: length.
    */
   public long size(JedisCluster jedis) {
-    return jedis.llen(name);
+    return jedis.zcard(name);
   }
 
   /**
@@ -230,8 +228,6 @@ public class RedisPriorityQueue {
         new BufferedReader(new InputStreamReader(luaInputStream))
           .lines()
           .collect(Collectors.joining("\n"));
-    //String sha = jedis.scriptLoad(luaScript, name);
-    //System.out.println("Script sha:" + sha);
     return luaScript;
   }
 }
