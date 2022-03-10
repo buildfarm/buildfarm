@@ -68,7 +68,7 @@ public class BalancedRedisQueue {
    * @details Although these are multiple queues, the balanced redis queue treats them as one in its
    *     interface.
    */
-  private final List<RedisQueue> queues = new ArrayList<>();
+  private final List<RedisPriorityQueue> queues = new ArrayList<>();
 
   /**
    * @field currentPushQueue
@@ -132,7 +132,7 @@ public class BalancedRedisQueue {
    * @note Suggested return identifier: wasRemoved.
    */
   public boolean removeFromDequeue(JedisCluster jedis, String val) {
-    for (RedisQueue queue : partialIterationQueueOrder()) {
+    for (RedisPriorityQueue queue : partialIterationQueueOrder()) {
       if (queue.removeFromDequeue(jedis, val)) {
         return true;
       }
@@ -173,7 +173,7 @@ public class BalancedRedisQueue {
     int currentTimeout_s = START_TIMEOUT_SECONDS;
     while (true) {
       final String val;
-      RedisQueue queue = queues.get(roundRobinPopIndex());
+      RedisPriorityQueue queue = queues.get(roundRobinPopIndex());
       if (blocking) {
         val = queue.dequeue(jedis, currentTimeout_s);
       } else {
@@ -201,7 +201,7 @@ public class BalancedRedisQueue {
    * @return The queue that the balanced queue intends to pop from next.
    * @note Suggested return identifier: currentPopQueue.
    */
-  public RedisQueue getCurrentPopQueue() {
+  public RedisPriorityQueue getCurrentPopQueue() {
     return queues.get(currentPopQueue);
   }
 
@@ -222,7 +222,7 @@ public class BalancedRedisQueue {
    * @return The internal queue found at that index.
    * @note Suggested return identifier: internalQueue.
    */
-  public RedisQueue getInternalQueue(int index) {
+  public RedisPriorityQueue getInternalQueue(int index) {
     return queues.get(index);
   }
 
@@ -257,7 +257,7 @@ public class BalancedRedisQueue {
   public long size(JedisCluster jedis) {
     // the accumulated size of all of the queues
     long size = 0;
-    for (RedisQueue queue : queues) {
+    for (RedisPriorityQueue queue : queues) {
       size += queue.size(jedis);
     }
     return size;
@@ -273,7 +273,7 @@ public class BalancedRedisQueue {
     // get properties
     long size = size(jedis);
     List<Long> sizes = new ArrayList<>();
-    for (RedisQueue queue : queues) {
+    for (RedisPriorityQueue queue : queues) {
       sizes.add(queue.size(jedis));
     }
 
@@ -287,7 +287,7 @@ public class BalancedRedisQueue {
    * @param visitor A visitor for each visited element in the queue.
    */
   public void visit(JedisCluster jedis, StringVisitor visitor) {
-    for (RedisQueue queue : fullIterationQueueOrder()) {
+    for (RedisPriorityQueue queue : fullIterationQueueOrder()) {
       queue.visit(jedis, visitor);
     }
   }
@@ -298,7 +298,7 @@ public class BalancedRedisQueue {
    * @param visitor A visitor for each visited element in the queue.
    */
   public void visitDequeue(JedisCluster jedis, StringVisitor visitor) {
-    for (RedisQueue queue : fullIterationQueueOrder()) {
+    for (RedisPriorityQueue queue : fullIterationQueueOrder()) {
       queue.visitDequeue(jedis, visitor);
     }
   }
@@ -313,7 +313,7 @@ public class BalancedRedisQueue {
    */
   public boolean isEvenlyDistributed(JedisCluster jedis) {
     long size = queues.get(0).size(jedis);
-    for (RedisQueue queue : partialIterationQueueOrder()) {
+    for (RedisPriorityQueue queue : partialIterationQueueOrder()) {
       if (queue.size(jedis) != size) {
         return false;
       }
@@ -342,7 +342,7 @@ public class BalancedRedisQueue {
   private void createHashedQueues(String name, List<String> hashtags) {
     // create an internal queue for each of the provided hashtags
     for (String hashtag : hashtags) {
-      queues.add(new RedisQueue(RedisHashtags.hashedName(name, hashtag)));
+      queues.add(new RedisPriorityQueue(RedisHashtags.hashedName(name, hashtag)));
     }
 
     // if there were no hashtags, we'll create a single internal queue
@@ -354,9 +354,9 @@ public class BalancedRedisQueue {
     // to the same redis slot.
     if (hashtags.isEmpty()) {
       if (!originalHashtag.isEmpty()) {
-        queues.add(new RedisQueue(RedisHashtags.hashedName(name, originalHashtag)));
+        queues.add(new RedisPriorityQueue(RedisHashtags.hashedName(name, originalHashtag)));
       } else {
-        queues.add(new RedisQueue(RedisHashtags.hashedName(name, "06S")));
+        queues.add(new RedisPriorityQueue(RedisHashtags.hashedName(name, "06S")));
       }
     }
   }
@@ -407,7 +407,7 @@ public class BalancedRedisQueue {
    * @return An ordered list of queues.
    * @note Suggested return identifier: queues.
    */
-  private List<RedisQueue> fullIterationQueueOrder() {
+  private List<RedisPriorityQueue> fullIterationQueueOrder() {
     // if we are going to iterate over all of the queues
     // there will be no noticeable side effects from the order
     return queues;
@@ -423,11 +423,11 @@ public class BalancedRedisQueue {
    * @return An ordered list of queues.
    * @note Suggested return identifier: queues.
    */
-  private List<RedisQueue> partialIterationQueueOrder() {
+  private List<RedisPriorityQueue> partialIterationQueueOrder() {
     // to improve cpu utilization, we can try randomizing
     // the order we traverse the internal queues for operations
     // that may return early
-    List<RedisQueue> randomQueues = new ArrayList<>(queues);
+    List<RedisPriorityQueue> randomQueues = new ArrayList<>(queues);
     Collections.shuffle(randomQueues);
     return randomQueues;
   }
