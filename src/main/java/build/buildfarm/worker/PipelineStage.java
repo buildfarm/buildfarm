@@ -30,6 +30,7 @@ public abstract class PipelineStage implements Runnable {
   private volatile boolean closed = false;
   private Thread tickThread = null;
   private boolean tickCancelledFlag = false;
+  private boolean restartStageOnFailure = true;
 
   PipelineStage(
       String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -47,41 +48,35 @@ public abstract class PipelineStage implements Runnable {
 
   @Override
   public void run() {
-    
-    
     boolean runStage = true;
-    while (runStage){
+    while (runStage) {
       try {
         runInterruptible();
         runStage = false;
-      
+
       } catch (Exception e) {
         runStage = handleTermination(e);
       }
     }
-    
+
     close();
-    
   }
-  
-  
-  private boolean handleTermination(Exception e){
-    
-      // This is a normal way for a pipeline stage to terminate.
-      if(e instanceof InterruptedException){
+
+  private boolean handleTermination(Exception e) {
+    // This is a normal way for a pipeline stage to terminate.
+    // If an interrupt is received, there is no reason to continue the pipeline stage.
+    if (e instanceof InterruptedException) {
       getLogger()
-          .log(
-              Level.INFO, String.format("%s::run(): stage terminated due to interrupt", name));
+          .log(Level.INFO, String.format("%s::run(): stage terminated due to interrupt", name));
       return false;
-      }
-      
-      // This is an abnormal way for a pipeline stage to terminate.
-      // For robustness of the distributed system we may want to log the error, but continue the pipeline stage.
-      getLogger()
-          .log(
-              Level.SEVERE, String.format("%s::run(): stage terminated due to exception", name), e);
-      
-      return true;
+    }
+
+    // This is an abnormal way for a pipeline stage to terminate.
+    // For robustness of the distributed system we may want to log the error but continue the
+    // pipeline stage.
+    getLogger()
+        .log(Level.SEVERE, String.format("%s::run(): stage terminated due to exception", name), e);
+    return restartStageOnFailure;
   }
 
   public String name() {
