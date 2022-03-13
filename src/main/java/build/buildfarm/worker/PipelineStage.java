@@ -47,24 +47,41 @@ public abstract class PipelineStage implements Runnable {
 
   @Override
   public void run() {
-    try {
-      runInterruptible();
-    } catch (InterruptedException e) {
-      // ignore
-    } catch (Exception e) {
+    
+    
+    boolean runStage = true;
+    while (runStage){
+      try {
+        runInterruptible();
+        runStage = false;
+      
+      } catch (Exception e) {
+        runStage = handleTermination(e);
+      }
+    }
+    
+    close();
+    
+  }
+  
+  
+  private boolean handleTermination(Exception e){
+    
+      // This is a normal way for a pipeline stage to terminate.
+      if(e instanceof InterruptedException){
+      getLogger()
+          .log(
+              Level.INFO, String.format("%s::run(): stage terminated due to interrupt", name));
+      return false;
+      }
+      
+      // This is an abnormal way for a pipeline stage to terminate.
+      // For robustness of the distributed system we may want to log the error, but continue the pipeline stage.
       getLogger()
           .log(
               Level.SEVERE, String.format("%s::run(): stage terminated due to exception", name), e);
-    } finally {
-      boolean wasInterrupted = Thread.interrupted();
-      try {
-        close();
-      } finally {
-        if (wasInterrupted) {
-          Thread.currentThread().interrupt();
-        }
-      }
-    }
+      
+      return true;
   }
 
   public String name() {
