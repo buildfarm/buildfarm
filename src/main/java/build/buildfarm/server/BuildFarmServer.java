@@ -97,7 +97,7 @@ public class BuildFarmServer extends LoggingMain {
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     if (!config.getSslCertificatePath().equals("")) {
       // There are different Public Key Cryptography Standards (PKCS) that users may format their
-      // certificate files to.  By default, the JDK cannot parse all of them.  In particular, it
+      // certificate files in.  By default, the JDK cannot parse all of them.  In particular, it
       // cannot parse PKCS #1 (RSA Cryptography Standard).  When enabling TLS for GRPC, java's
       // underlying Security module is used. To improve the robustness of this parsing and the
       // overall accepted certificate formats, we add an additional security provider. BouncyCastle
