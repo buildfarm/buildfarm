@@ -250,7 +250,6 @@ instance {
   }
 }
 
-ssl_certificate_path: "/home/luxe/Desktop/rsa.pem"
 ac_policy: READ_AND_WRITE
 
 # the listening port of the buildfarm grpc server
