@@ -46,6 +46,7 @@ java_library(
         "@maven//:org_springframework_spring_context",
         "@maven//:org_springframework_spring_core",
         "@maven//:org_threeten_threetenbp",
+        "@maven//:org_bouncycastle_bcprov_jdk15on",
         "@remote_apis//:build_bazel_remote_asset_v1_remote_asset_java_grpc",
         "@remote_apis//:build_bazel_remote_asset_v1_remote_asset_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
