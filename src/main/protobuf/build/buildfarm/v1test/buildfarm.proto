@@ -211,6 +211,8 @@ message PollOperationRequest {
 
 message BuildFarmServerConfig {
   InstanceConfig instance = 1;
+  
+  ActionCacheAccessPolicy ac_policy = 12;
 
   int32 port = 2;
 
@@ -653,6 +655,9 @@ message ShardWorkerConfig {
 
   // symlink cas input-only directories
   bool link_input_directories = 17;
+  
+  // a list of paths that will not be symlinked as input directories
+  repeated string real_input_directories = 41;
 
   // selected hash function
   build.bazel.remote.execution.v2.DigestFunction.Value digest_function = 18;
@@ -698,7 +703,6 @@ message ShardWorkerConfig {
 
   // a limit on time (in seconds) for input fetch stage to fetch inputs
   int32 input_fetch_deadline = 39;
-  
 }
 
 message ShardWorker {
@@ -966,6 +970,12 @@ enum CASInsertionPolicy {
   ALWAYS_INSERT = 1;
 
   INSERT_ABOVE_LIMIT = 2;
+};
+
+enum ActionCacheAccessPolicy {
+  READ_AND_WRITE = 0;
+
+  READ_ONLY = 1;
 };
 
 message InstanceEndpoint {

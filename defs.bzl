@@ -73,6 +73,7 @@ def buildfarm_init(name = "buildfarm"):
                     [
                         "com.fasterxml.jackson.core:jackson-databind:2.9.8",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
+                        "com.github.docker-java:docker-java:3.2.11",
                         "com.github.jnr:jffi:1.2.16",
                         "com.github.jnr:jffi:jar:native:1.2.16",
                         "com.github.jnr:jnr-constants:0.9.9",
@@ -80,6 +81,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.github.jnr:jnr-posix:3.0.53",
                         "com.github.pcj:google-options:1.0.0",
                         "com.github.serceman:jnr-fuse:0.5.5",
+                        "com.github.luben:zstd-jni:1.5.2-1",
                         "com.google.auth:google-auth-library-credentials:0.9.1",
                         "com.google.auth:google-auth-library-oauth2-http:0.9.1",
                         "com.google.code.findbugs:jsr305:3.0.1",
@@ -93,9 +95,11 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.protobuf:protobuf-java-util:3.10.0",
                         "com.google.protobuf:protobuf-java:3.10.0",
                         "com.google.truth:truth:0.44",
+                        "org.slf4j:slf4j-simple:1.7.35",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
                         "io.github.lognet:grpc-spring-boot-starter:4.5.4",
+                        "net.jcip:jcip-annotations:1.0",
                     ] + ["io.netty:netty-%s:4.1.65.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
                     [
