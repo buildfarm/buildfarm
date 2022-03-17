@@ -256,10 +256,8 @@ public class RedisPriorityQueue extends QueueInterface {
     if (luaInputStream == null) {
       throw new IllegalArgumentException(filename + " is not found");
     }
-    String luaScript =
-        new BufferedReader(new InputStreamReader(luaInputStream))
+    return new BufferedReader(new InputStreamReader(luaInputStream))
             .lines()
-            .collect(Collectors.joining("\n"));
-    return luaScript;
+            .collect(Collectors.joining("\n"))
   }
 }
