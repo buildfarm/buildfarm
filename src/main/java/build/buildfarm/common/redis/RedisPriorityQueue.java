@@ -258,6 +258,6 @@ public class RedisPriorityQueue extends QueueInterface {
     }
     return new BufferedReader(new InputStreamReader(luaInputStream))
             .lines()
-            .collect(Collectors.joining("\n"))
+            .collect(Collectors.joining("\n"));
   }
 }

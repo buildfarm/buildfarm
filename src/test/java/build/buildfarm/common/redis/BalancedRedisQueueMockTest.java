@@ -231,18 +231,17 @@ public class BalancedRedisQueueMockTest {
   @Test
   public void visitCheckVisitOfEachElement() throws Exception {
     // MOCK
-    when(redis.zrange(any(String.class), any(Long.class), any(Long.class)))
+    when(redis.lrange(any(String.class), any(Long.class), any(Long.class)))
         .thenReturn(
-            Stream.of(
-                    "element 1",
-                    "element 2",
-                    "element 3",
-                    "element 4",
-                    "element 5",
-                    "element 6",
-                    "element 7",
-                    "element 8")
-                .collect(Collectors.toSet()));
+            Arrays.asList(
+                "element 1",
+                "element 2",
+                "element 3",
+                "element 4",
+                "element 5",
+                "element 6",
+                "element 7",
+                "element 8"));
 
     // ARRANGE
     BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
