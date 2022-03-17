@@ -257,7 +257,7 @@ public class RedisPriorityQueue extends QueueInterface {
       throw new IllegalArgumentException(filename + " is not found");
     }
     return new BufferedReader(new InputStreamReader(luaInputStream))
-            .lines()
-            .collect(Collectors.joining("\n"));
+        .lines()
+        .collect(Collectors.joining("\n"));
   }
 }
