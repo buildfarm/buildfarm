@@ -251,7 +251,7 @@ public class RedisPriorityQueue extends QueueInterface {
    * @brief Adds additional functionality to the jedis client.
    * @details Load the custom lua script so we can have zpoplpush.
    */
-  private String getLuaScript(JedisCluster jedis, String filename) {
+  private String getLuaScript(String filename) {
     InputStream luaInputStream = this.getClass().getClassLoader().getResourceAsStream(filename);
     if (luaInputStream == null) {
       throw new IllegalArgumentException(filename + " is not found");
