@@ -25,17 +25,16 @@ package build.buildfarm.common.redis;
  */
 public class RedisQueueFactory {
 
-    public QueueInterface getQueue(String queueType, String name){
-        if(queueType == null){
-            return null;
-        }
-        if(queueType.equalsIgnoreCase("regular")){
-            return new RedisQueue(name);
-
-        } else if(queueType.equalsIgnoreCase("priority")){
-            return new RedisPriorityQueue(name);
-
-        }
-        return null;
+  public QueueInterface getQueue(String queueType, String name) {
+    if (queueType == null) {
+      return null;
     }
+    if (queueType.equalsIgnoreCase("regular")) {
+      return new RedisQueue(name);
+
+    } else if (queueType.equalsIgnoreCase("priority")) {
+      return new RedisPriorityQueue(name);
+    }
+    return null;
+  }
 }

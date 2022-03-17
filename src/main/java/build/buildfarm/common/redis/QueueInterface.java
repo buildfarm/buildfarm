@@ -14,8 +14,8 @@
 
 package build.buildfarm.common.redis;
 
-import redis.clients.jedis.JedisCluster;
 import build.buildfarm.common.StringVisitor;
+import redis.clients.jedis.JedisCluster;
 
 /**
  * @class QueueInterface
@@ -28,7 +28,7 @@ import build.buildfarm.common.StringVisitor;
  */
 public abstract class QueueInterface {
 
-  //void push(JedisCluster jedis, String val, double priority);
+  // void push(JedisCluster jedis, String val, double priority);
 
   /**
    * @brief Push a value onto the queue with default priority of 1.
@@ -122,5 +122,4 @@ public abstract class QueueInterface {
    * @param visitor A visitor for each visited element in the queue.
    */
   abstract void visitDequeue(JedisCluster jedis, StringVisitor visitor);
-
 }

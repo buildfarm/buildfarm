@@ -42,6 +42,7 @@ public class BalancedRedisQueue {
    *     Hashtags are added to this base name. This name will not contain a redis hashtag.
    */
   private final String name;
+
   private final String type;
 
   /**
@@ -71,7 +72,7 @@ public class BalancedRedisQueue {
    */
   private final List<QueueInterface> queues = new ArrayList<>();
 
-  //private final List<QueueInterface> queuesTest;
+  // private final List<QueueInterface> queuesTest;
 
   /**
    * @field currentPushQueue
@@ -102,7 +103,6 @@ public class BalancedRedisQueue {
     this.type = "regular";
     this.maxQueueSize = -1; // infinite size
     createHashedQueues(this.name, hashtags, this.type);
-
   }
 
   /**
@@ -131,10 +131,10 @@ public class BalancedRedisQueue {
   }
 
   /**
-  * @brief Push a value onto the queue.
-  * @details Adds the value into one of the internal backend redis queues.
-  * @param val The value to push onto the queue.
-  */
+   * @brief Push a value onto the queue.
+   * @details Adds the value into one of the internal backend redis queues.
+   * @param val The value to push onto the queue.
+   */
   public void push(JedisCluster jedis, String val, double priority) {
     queues.get(roundRobinPushIndex()).push(jedis, val, priority);
   }
@@ -369,7 +369,9 @@ public class BalancedRedisQueue {
     // to the same redis slot.
     if (hashtags.isEmpty()) {
       if (!originalHashtag.isEmpty()) {
-        queues.add(new RedisQueueFactory().getQueue(type, RedisHashtags.hashedName(name, originalHashtag)));
+        queues.add(
+            new RedisQueueFactory()
+                .getQueue(type, RedisHashtags.hashedName(name, originalHashtag)));
       } else {
         queues.add(new RedisQueueFactory().getQueue(type, RedisHashtags.hashedName(name, "06S")));
       }

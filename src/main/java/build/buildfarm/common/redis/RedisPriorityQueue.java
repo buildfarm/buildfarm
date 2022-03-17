@@ -14,21 +14,15 @@
 
 package build.buildfarm.common.redis;
 
-import java.time.Clock;
 import build.buildfarm.common.StringVisitor;
-import java.util.List;
-import redis.clients.jedis.JedisCluster;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.HashSet;
 import java.util.stream.Collectors;
-import java.util.Arrays;
-import java.util.ArrayList;
+import redis.clients.jedis.JedisCluster;
 
 /**
  * @class RedisQueue
@@ -39,7 +33,7 @@ import java.util.ArrayList;
  *     Therefore, two redis queues with the same name, would in fact be the same underlying redis
  *     queue.
  */
-public class RedisPriorityQueue extends QueueInterface{
+public class RedisPriorityQueue extends QueueInterface {
   /**
    * @field name
    * @brief The unique name of the queue.
@@ -47,6 +41,7 @@ public class RedisPriorityQueue extends QueueInterface{
    *     had the same name, they would be instances of the same underlying redis queue.
    */
   private final String name;
+
   private Timestamp time;
   private final List<String> keys;
 
@@ -61,10 +56,10 @@ public class RedisPriorityQueue extends QueueInterface{
     this.keys = Arrays.asList(name);
   }
 
-    /**
+  /**
    * @brief Constructor.
-   * @details Construct a named redis queue with an established redis cluster. Used to ease
-   *      the testing of the order of the queued actions
+   * @details Construct a named redis queue with an established redis cluster. Used to ease the
+   *     testing of the order of the queued actions
    * @param name The global name of the queue.
    * @param time Timestamp of the operation.
    */
@@ -257,17 +252,14 @@ public class RedisPriorityQueue extends QueueInterface{
    * @details Load the custom lua script so we can have zpoplpush.
    */
   private String getLuaScript(JedisCluster jedis, String filename) {
-    InputStream luaInputStream =
-        this.getClass()
-          .getClassLoader()
-          .getResourceAsStream(filename);
+    InputStream luaInputStream = this.getClass().getClassLoader().getResourceAsStream(filename);
     if (luaInputStream == null) {
-        throw new IllegalArgumentException(filename + " is not found");
+      throw new IllegalArgumentException(filename + " is not found");
     }
     String luaScript =
         new BufferedReader(new InputStreamReader(luaInputStream))
-          .lines()
-          .collect(Collectors.joining("\n"));
+            .lines()
+            .collect(Collectors.joining("\n"));
     return luaScript;
   }
 }
