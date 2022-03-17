@@ -42,6 +42,7 @@ public class RedisPriorityQueue extends QueueInterface {
    */
   private final String name;
 
+  private final String script;
   private Timestamp time;
   private final List<String> keys;
 
@@ -54,6 +55,7 @@ public class RedisPriorityQueue extends QueueInterface {
     this.name = name;
     this.time = new Timestamp();
     this.keys = Arrays.asList(name);
+    this.script = getLuaScript("zpoplpush.lua");
   }
 
   /**
@@ -67,6 +69,7 @@ public class RedisPriorityQueue extends QueueInterface {
     this.name = name;
     this.time = time;
     this.keys = Arrays.asList(name);
+    this.script = getLuaScript("zpoplpush.lua");
   }
 
   /**
@@ -127,7 +130,7 @@ public class RedisPriorityQueue extends QueueInterface {
   public String dequeue(JedisCluster jedis, int timeout_s) throws InterruptedException {
     List<String> args = Arrays.asList(name, getDequeueName(), "true");
     for (int i = 0; i < timeout_s; ++i) {
-      Object obj_val = jedis.eval(getLuaScript(jedis, "zpoplpush.lua"), keys, args);
+      Object obj_val = jedis.eval(script, keys, args);
       String val = String.valueOf(obj_val);
       if (val != null && !val.isEmpty() && !val.equals("null")) {
         return val;
@@ -146,7 +149,7 @@ public class RedisPriorityQueue extends QueueInterface {
   @Override
   public String nonBlockingDequeue(JedisCluster jedis) throws InterruptedException {
     List<String> args = Arrays.asList(name, getDequeueName());
-    Object obj_val = jedis.eval(getLuaScript(jedis, "zpoplpush.lua"), keys, args);
+    Object obj_val = jedis.eval(script, keys, args);
     String val = String.valueOf(obj_val);
     if (val != null && !val.isEmpty() && !val.equals("null")) {
       return val;
