@@ -6,7 +6,7 @@ package(
 )
 
 filegroup(
-    name = "lua_file",
+    name = "lua_resources",
     srcs = ["zpoplpush.lua"],
     visibility = ["//visibility:public"],
 )
@@ -28,7 +28,7 @@ java_binary(
     name = "buildfarm-server",
     classpath_resources = [
         ":configs",
-        ":lua_file",
+        ":lua_resources",
     ],
     jvm_flags = ensure_accurate_metadata(),
     main_class = "build.buildfarm.server.BuildFarmServer",

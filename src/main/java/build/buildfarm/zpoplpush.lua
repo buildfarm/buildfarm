@@ -19,18 +19,17 @@ if not isempty(ARGV[3]) then
     isblocking = stringtoboolean[ARGV[3]]
 end
 
-repeat
-    -- Retrieve item
-    local popped = redis.call('ZRANGE', zset, 0, 0)
-    -- Rotate thru popped item
-    if next(popped) ~= nil then
-      for _,item in ipairs(popped) do
-        value = item
-        -- Remove item
-        redis.call('ZREM', zset, item)
-        -- Push to the dequeue
-        redis.call('LPUSH', dequeueName, item)
-      end
+  -- Retrieve item
+  local popped = redis.call('ZRANGE', zset, 0, 0)
+  -- Rotate thru popped item
+  if next(popped) ~= nil then
+    for _,item in ipairs(popped) do
+      -- Remove leading timestamp on dequeue
+      value = item:gsub("^%d*:", "")
+      -- Remove item
+      redis.call('ZREM', zset, item)
+      -- Push to the dequeue
+      redis.call('LPUSH', dequeueName, value)
     end
-until(not isblocking)
+  end
 return value

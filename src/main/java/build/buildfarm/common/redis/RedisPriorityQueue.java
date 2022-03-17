@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.redis;
 
+import java.time.Clock;
 import build.buildfarm.common.StringVisitor;
 import java.util.List;
 import redis.clients.jedis.JedisCluster;
@@ -23,6 +24,8 @@ import java.io.InputStreamReader;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -36,7 +39,7 @@ import java.util.ArrayList;
  *     Therefore, two redis queues with the same name, would in fact be the same underlying redis
  *     queue.
  */
-public class RedisPriorityQueue {
+public class RedisPriorityQueue extends QueueInterface{
   /**
    * @field name
    * @brief The unique name of the queue.
@@ -44,6 +47,8 @@ public class RedisPriorityQueue {
    *     had the same name, they would be instances of the same underlying redis queue.
    */
   private final String name;
+  private Timestamp time;
+  private final List<String> keys;
 
   /**
    * @brief Constructor.
@@ -52,6 +57,21 @@ public class RedisPriorityQueue {
    */
   public RedisPriorityQueue(String name) {
     this.name = name;
+    this.time = new Timestamp();
+    this.keys = Arrays.asList(name);
+  }
+
+    /**
+   * @brief Constructor.
+   * @details Construct a named redis queue with an established redis cluster. Used to ease
+   *      the testing of the order of the queued actions
+   * @param name The global name of the queue.
+   * @param time Timestamp of the operation.
+   */
+  public RedisPriorityQueue(String name, Timestamp time) {
+    this.name = name;
+    this.time = time;
+    this.keys = Arrays.asList(name);
   }
 
   /**
@@ -59,8 +79,9 @@ public class RedisPriorityQueue {
    * @details Adds the value into the backend redis ordered set.
    * @param val The value to push onto the priority queue.
    */
+  @Override
   public void push(JedisCluster jedis, String val, double priority) {
-    jedis.zadd(name, priority, val);
+    jedis.zadd(name, priority, time.getNanos() + ":" + val);
   }
 
   /**
@@ -68,6 +89,7 @@ public class RedisPriorityQueue {
    * @details Adds the value into the backend rdered set.
    * @param val The value to push onto the priority queue.
    */
+  @Override
   public void push(JedisCluster jedis, String val) {
     push(jedis, val, 1);
   }
@@ -79,6 +101,7 @@ public class RedisPriorityQueue {
    * @return Whether or not the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
+  @Override
   public boolean removeFromDequeue(JedisCluster jedis, String val) {
     return jedis.lrem(getDequeueName(), -1, val) != 0;
   }
@@ -90,6 +113,7 @@ public class RedisPriorityQueue {
    * @return Whether or not the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
+  @Override
   public boolean removeAll(JedisCluster jedis, String val) {
     return jedis.zrem(name, val) != 0;
   }
@@ -104,13 +128,13 @@ public class RedisPriorityQueue {
    * @note Overloaded.
    * @note Suggested return identifier: val.
    */
+  @Override
   public String dequeue(JedisCluster jedis, int timeout_s) throws InterruptedException {
-    List<String> keys = Arrays.asList(name);
-    List<String> args = Arrays.asList(name, getDequeueName());
+    List<String> args = Arrays.asList(name, getDequeueName(), "true");
     for (int i = 0; i < timeout_s; ++i) {
       Object obj_val = jedis.eval(getLuaScript(jedis, "zpoplpush.lua"), keys, args);
       String val = String.valueOf(obj_val);
-      if (val != null && !val.isEmpty()) {
+      if (val != null && !val.isEmpty() && !val.equals("null")) {
         return val;
       }
     }
@@ -124,12 +148,12 @@ public class RedisPriorityQueue {
    * @return The value of the transfered element. null if nothing was dequeued.
    * @note Suggested return identifier: val.
    */
+  @Override
   public String nonBlockingDequeue(JedisCluster jedis) throws InterruptedException {
-    List<String> keys = Arrays.asList(name);
     List<String> args = Arrays.asList(name, getDequeueName());
     Object obj_val = jedis.eval(getLuaScript(jedis, "zpoplpush.lua"), keys, args);
     String val = String.valueOf(obj_val);
-    if (val != null && !val.isEmpty()) {
+    if (val != null && !val.isEmpty() && !val.equals("null")) {
       return val;
     }
     if (Thread.currentThread().isInterrupted()) {
@@ -144,6 +168,7 @@ public class RedisPriorityQueue {
    * @return The name of the queue.
    * @note Suggested return identifier: name.
    */
+  @Override
   public String getName() {
     return name;
   }
@@ -165,6 +190,7 @@ public class RedisPriorityQueue {
    * @return The current length of the queue.
    * @note Suggested return identifier: length.
    */
+  @Override
   public long size(JedisCluster jedis) {
     return jedis.zcard(name);
   }
@@ -175,6 +201,7 @@ public class RedisPriorityQueue {
    * @param visitor A visitor for each visited element in the queue.
    * @note Overloaded.
    */
+  @Override
   public void visit(JedisCluster jedis, StringVisitor visitor) {
     visit(jedis, name, visitor);
   }
@@ -184,8 +211,21 @@ public class RedisPriorityQueue {
    * @details Enacts a visitor over each element in the dequeue.
    * @param visitor A visitor for each visited element in the queue.
    */
+  @Override
   public void visitDequeue(JedisCluster jedis, StringVisitor visitor) {
-    visit(jedis, getDequeueName(), visitor);
+    int listPageSize = 10000;
+    int index = 0;
+    int nextIndex = listPageSize;
+    List<String> entries;
+
+    do {
+      entries = jedis.lrange(getDequeueName(), index, nextIndex - 1);
+      for (String entry : entries) {
+        visitor.visit(entry);
+      }
+      index = nextIndex;
+      nextIndex += entries.size();
+    } while (entries.size() == listPageSize);
   }
 
   /**
@@ -197,15 +237,15 @@ public class RedisPriorityQueue {
    */
   private void visit(JedisCluster jedis, String queueName, StringVisitor visitor) {
     int listPageSize = 10000;
-
     int index = 0;
     int nextIndex = listPageSize;
-    List<String> entries;
+    Set<String> entries;
 
     do {
-      entries = jedis.lrange(queueName, index, nextIndex - 1);
+      entries = jedis.zrange(queueName, index, nextIndex - 1);
       for (String entry : entries) {
-        visitor.visit(entry);
+        // Clear the appended timestamp
+        visitor.visit(entry.replaceFirst("^([0-9]+):(?!$)", ""));
       }
       index = nextIndex;
       nextIndex += entries.size();

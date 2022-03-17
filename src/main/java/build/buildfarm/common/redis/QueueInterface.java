@@ -14,54 +14,35 @@
 
 package build.buildfarm.common.redis;
 
-import build.buildfarm.common.StringVisitor;
-import java.util.List;
 import redis.clients.jedis.JedisCluster;
+import build.buildfarm.common.StringVisitor;
 
 /**
- * @class RedisQueue
- * @brief A redis queue.
+ * @class QueueInterface
+ * @brief A redis queue interface.
  * @details A redis queue is an implementation of a queue data structure which internally uses redis
  *     to store and distribute the data. Its important to know that the lifetime of the queue
  *     persists before and after the queue data structure is created (since it exists in redis).
  *     Therefore, two redis queues with the same name, would in fact be the same underlying redis
  *     queue.
  */
-public class RedisQueue extends QueueInterface {
-  /**
-   * @field name
-   * @brief The unique name of the queue.
-   * @details The name is used by the redis cluster client to access the queue data. If two queues
-   *     had the same name, they would be instances of the same underlying redis queue.
-   */
-  private final String name;
+public abstract class QueueInterface {
+
+  //void push(JedisCluster jedis, String val, double priority);
 
   /**
-   * @brief Constructor.
-   * @details Construct a named redis queue with an established redis cluster.
-   * @param name The global name of the queue.
+   * @brief Push a value onto the queue with default priority of 1.
+   * @details Adds the value into the backend rdered set.
+   * @param val The value to push onto the priority queue.
    */
-  public RedisQueue(String name) {
-    this.name = name;
-  }
+  abstract void push(JedisCluster jedis, String val);
 
   /**
-   * @brief Push a value onto the queue.
-   * @details Adds the value into the backend redis queue.
-   * @param val The value to push onto the queue.
+   * @brief Push a value onto the queue with defined priority.
+   * @details Adds the value into the backend rdered set.
+   * @param val The value to push onto the priority queue.
    */
-  public void push(JedisCluster jedis, String val) {
-    jedis.lpush(name, val);
-  }
-
-  /**
-   * @brief Push a value onto the queue.
-   * @details Adds the value into the backend redis queue.
-   * @param val The value to push onto the queue.
-   */
-  public void push(JedisCluster jedis, String val, double priority) {
-    throw new IllegalArgumentException("That's not a priority queue");
-  }
+  abstract void push(JedisCluster jedis, String val, double priority);
 
   /**
    * @brief Remove element from dequeue.
@@ -70,9 +51,7 @@ public class RedisQueue extends QueueInterface {
    * @return Whether or not the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
-  public boolean removeFromDequeue(JedisCluster jedis, String val) {
-    return jedis.lrem(getDequeueName(), -1, val) != 0;
-  }
+  abstract boolean removeFromDequeue(JedisCluster jedis, String val);
 
   /**
    * @brief Remove all elements that match from queue.
@@ -81,9 +60,7 @@ public class RedisQueue extends QueueInterface {
    * @return Whether or not the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
-  public boolean removeAll(JedisCluster jedis, String val) {
-    return jedis.lrem(name, 0, val) != 0;
-  }
+  abstract boolean removeAll(JedisCluster jedis, String val);
 
   /**
    * @brief Pop element into internal dequeue and return value.
@@ -95,15 +72,7 @@ public class RedisQueue extends QueueInterface {
    * @note Overloaded.
    * @note Suggested return identifier: val.
    */
-  public String dequeue(JedisCluster jedis, int timeout_s) throws InterruptedException {
-    for (int i = 0; i < timeout_s; ++i) {
-      String val = jedis.brpoplpush(name, getDequeueName(), 1);
-      if (val != null) {
-        return val;
-      }
-    }
-    return null;
-  }
+  abstract String dequeue(JedisCluster jedis, int timeout_s) throws InterruptedException;
 
   /**
    * @brief Pop element into internal dequeue and return value.
@@ -112,16 +81,7 @@ public class RedisQueue extends QueueInterface {
    * @return The value of the transfered element. null if nothing was dequeued.
    * @note Suggested return identifier: val.
    */
-  public String nonBlockingDequeue(JedisCluster jedis) throws InterruptedException {
-    String val = jedis.rpoplpush(name, getDequeueName());
-    if (val != null) {
-      return val;
-    }
-    if (Thread.currentThread().isInterrupted()) {
-      throw new InterruptedException();
-    }
-    return null;
-  }
+  abstract String nonBlockingDequeue(JedisCluster jedis) throws InterruptedException;
 
   /**
    * @brief Get name.
@@ -129,9 +89,7 @@ public class RedisQueue extends QueueInterface {
    * @return The name of the queue.
    * @note Suggested return identifier: name.
    */
-  public String getName() {
-    return name;
-  }
+  abstract String getName();
 
   /**
    * @brief Get dequeue name.
@@ -140,9 +98,7 @@ public class RedisQueue extends QueueInterface {
    * @return The name of the queue.
    * @note Suggested return identifier: name.
    */
-  public String getDequeueName() {
-    return name + "_dequeue";
-  }
+  abstract String getDequeueName();
 
   /**
    * @brief Get size.
@@ -150,9 +106,7 @@ public class RedisQueue extends QueueInterface {
    * @return The current length of the queue.
    * @note Suggested return identifier: length.
    */
-  public long size(JedisCluster jedis) {
-    return jedis.llen(name);
-  }
+  abstract long size(JedisCluster jedis);
 
   /**
    * @brief Visit each element in the queue.
@@ -160,40 +114,13 @@ public class RedisQueue extends QueueInterface {
    * @param visitor A visitor for each visited element in the queue.
    * @note Overloaded.
    */
-  public void visit(JedisCluster jedis, StringVisitor visitor) {
-    visit(jedis, name, visitor);
-  }
+  abstract void visit(JedisCluster jedis, StringVisitor visitor);
 
   /**
    * @brief Visit each element in the dequeue.
    * @details Enacts a visitor over each element in the dequeue.
    * @param visitor A visitor for each visited element in the queue.
    */
-  public void visitDequeue(JedisCluster jedis, StringVisitor visitor) {
-    visit(jedis, getDequeueName(), visitor);
-  }
+  abstract void visitDequeue(JedisCluster jedis, StringVisitor visitor);
 
-  /**
-   * @brief Visit each element in the queue via queue name.
-   * @details Enacts a visitor over each element in the queue.
-   * @param queueName The name of the queue to visit.
-   * @param visitor A visitor for each visited element in the queue.
-   * @note Overloaded.
-   */
-  private void visit(JedisCluster jedis, String queueName, StringVisitor visitor) {
-    int listPageSize = 10000;
-
-    int index = 0;
-    int nextIndex = listPageSize;
-    List<String> entries;
-
-    do {
-      entries = jedis.lrange(queueName, index, nextIndex - 1);
-      for (String entry : entries) {
-        visitor.visit(entry);
-      }
-      index = nextIndex;
-      nextIndex += entries.size();
-    } while (entries.size() == listPageSize);
-  }
 }
