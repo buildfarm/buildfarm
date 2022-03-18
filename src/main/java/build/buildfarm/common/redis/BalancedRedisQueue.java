@@ -96,11 +96,18 @@ public class BalancedRedisQueue {
    * @note Overloaded.
    */
   public BalancedRedisQueue(String name, List<String> hashtags) {
-    this.originalHashtag = RedisHashtags.existingHash(name);
-    this.name = RedisHashtags.unhashedName(name);
-    this.type = "regular";
-    this.maxQueueSize = -1; // infinite size
-    createHashedQueues(this.name, hashtags, this.type);
+    this(name, hashtags, -1, "regular");
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct a named redis queue with an established redis cluster.
+   * @param name The global name of the queue.
+   * @param hashtags Hashtags to distribute queue data.
+   * @note Overloaded.
+   */
+  public BalancedRedisQueue(String name, List<String> hashtags, String queueType) {
+    this(name, hashtags, -1, queueType);
   }
 
   /**
@@ -112,9 +119,23 @@ public class BalancedRedisQueue {
    * @note Overloaded.
    */
   public BalancedRedisQueue(String name, List<String> hashtags, int maxQueueSize) {
+    this(name, hashtags, maxQueueSize, "regular");
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct a named redis queue with an established redis cluster.
+   * @param name The global name of the queue.
+   * @param hashtags Hashtags to distribute queue data.
+   * @param maxQueueSize The maximum amount of elements that should be added to the queue.
+   * @param queueTYpe Type of the queue
+   * @note Overloaded.
+   */
+  public BalancedRedisQueue(
+      String name, List<String> hashtags, int maxQueueSize, String queueType) {
     this.originalHashtag = RedisHashtags.existingHash(name);
     this.name = RedisHashtags.unhashedName(name);
-    this.type = "regular";
+    this.type = queueType;
     this.maxQueueSize = maxQueueSize;
     createHashedQueues(this.name, hashtags, this.type);
   }
