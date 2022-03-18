@@ -29,7 +29,7 @@ filegroup(
 )
 
 java_test(
-    name = "tests",
+    name = "mock_tests",
     size = "small",
     srcs = glob(
         ["*.java"],
@@ -46,10 +46,8 @@ java_test(
 java_test(
     name = "priority_queue_test",
     size = "small",
-    srcs = select({
-        ":native-redis": ["RedisPriorityQueueTest.java"],
-        "//conditions:default": [],
-    }),
+    tags = ["priority_native"],
+    srcs = [ "RedisPriorityQueueTest.java"],
     classpath_resources = [":lua_resources"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
@@ -58,10 +56,8 @@ java_test(
 java_test(
     name = "queue_test",
     size = "small",
-    srcs = select({
-        ":native-redis": ["RedisQueueTest.java"],
-        "//conditions:default": [],
-    }),
+    tags = ["queue_native"],
+    srcs = ["RedisQueueTest.java"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
 )
@@ -69,10 +65,8 @@ java_test(
 java_test(
     name = "balanced_queue_test",
     size = "small",
-    srcs = select({
-        ":native-redis": ["BalancedRedisQueueTest.java"],
-        "//conditions:default": [],
-    }),
+    tags = ["balanced_native"],
+    srcs = ["BalancedRedisQueueTest.java"],
     classpath_resources = [":lua_resources"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
