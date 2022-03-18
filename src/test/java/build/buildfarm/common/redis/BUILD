@@ -46,9 +46,10 @@ java_test(
 java_test(
     name = "priority_queue_test",
     size = "small",
-    srcs = [
-        "RedisPriorityQueueTest.java",
-    ],
+    srcs = select({
+        ":native-redis": "RedisPriorityQueueTest.java",
+        "//conditions:default": [],
+    }),
     classpath_resources = [":lua_resources"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
@@ -57,9 +58,10 @@ java_test(
 java_test(
     name = "queue_test",
     size = "small",
-    srcs = [
-        "RedisQueueTest.java",
-    ],
+    srcs = select({
+        ":native-redis": "RedisQueueTest.java",
+        "//conditions:default": [],
+    }),
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
 )
@@ -67,9 +69,10 @@ java_test(
 java_test(
     name = "balanced_queue_test",
     size = "small",
-    srcs = [
-        "BalancedRedisQueueTest.java",
-    ],
+    srcs = select({
+        ":native-redis": "BalancedRedisQueueTest.java",
+        "//conditions:default": [],
+    }),
     classpath_resources = [":lua_resources"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,

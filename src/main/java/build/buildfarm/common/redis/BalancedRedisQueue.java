@@ -72,8 +72,6 @@ public class BalancedRedisQueue {
    */
   private final List<QueueInterface> queues = new ArrayList<>();
 
-  // private final List<QueueInterface> queuesTest;
-
   /**
    * @field currentPushQueue
    * @brief The current queue to act push on.

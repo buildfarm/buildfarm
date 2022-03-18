@@ -60,7 +60,7 @@ public class RedisQueue extends QueueInterface {
    * @param val The value to push onto the queue.
    */
   public void push(JedisCluster jedis, String val, double priority) {
-    throw new IllegalArgumentException("That's not a priority queue");
+    jedis.lpush(name, val);
   }
 
   /**

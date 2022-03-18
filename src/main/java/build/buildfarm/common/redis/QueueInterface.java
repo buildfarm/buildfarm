@@ -28,8 +28,6 @@ import redis.clients.jedis.JedisCluster;
  */
 public abstract class QueueInterface {
 
-  // void push(JedisCluster jedis, String val, double priority);
-
   /**
    * @brief Push a value onto the queue with default priority of 1.
    * @details Adds the value into the backend rdered set.
