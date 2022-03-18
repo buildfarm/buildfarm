@@ -17,11 +17,6 @@ package build.buildfarm.common.redis;
 /**
  * @class RedisQueueFactory
  * @brief A redis queue factory.
- * @details A redis queue is an implementation of a queue data structure which internally uses redis
- *     to store and distribute the data. Its important to know that the lifetime of the queue
- *     persists before and after the queue data structure is created (since it exists in redis).
- *     Therefore, two redis queues with the same name, would in fact be the same underlying redis
- *     queue.
  */
 public class RedisQueueFactory {
 

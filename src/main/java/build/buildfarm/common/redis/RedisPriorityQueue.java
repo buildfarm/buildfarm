@@ -52,10 +52,7 @@ public class RedisPriorityQueue extends QueueInterface {
    * @param name The global name of the queue.
    */
   public RedisPriorityQueue(String name) {
-    this.name = name;
-    this.time = new Timestamp();
-    this.keys = Arrays.asList(name);
-    this.script = getLuaScript("zpoplpush.lua");
+    this(name, new Timestamp());
   }
 
   /**
@@ -129,12 +126,15 @@ public class RedisPriorityQueue extends QueueInterface {
   @Override
   public String dequeue(JedisCluster jedis, int timeout_s) throws InterruptedException {
     List<String> args = Arrays.asList(name, getDequeueName(), "true");
+    String val;
     for (int i = 0; i < timeout_s; ++i) {
-      Object obj_val = jedis.eval(script, keys, args);
-      String val = String.valueOf(obj_val);
-      if (val != null && !val.isEmpty() && !val.equals("null")) {
-        return val;
-      }
+      do {
+        Object obj_val = jedis.eval(script, keys, args);
+        val = String.valueOf(obj_val);
+        if (!isEmpty(val)) {
+          return val;
+        }
+      } while (!isEmpty(val));
     }
     return null;
   }
@@ -151,7 +151,7 @@ public class RedisPriorityQueue extends QueueInterface {
     List<String> args = Arrays.asList(name, getDequeueName());
     Object obj_val = jedis.eval(script, keys, args);
     String val = String.valueOf(obj_val);
-    if (val != null && !val.isEmpty() && !val.equals("null")) {
+    if (!isEmpty(val)) {
       return val;
     }
     if (Thread.currentThread().isInterrupted()) {
@@ -262,5 +262,14 @@ public class RedisPriorityQueue extends QueueInterface {
     return new BufferedReader(new InputStreamReader(luaInputStream))
         .lines()
         .collect(Collectors.joining("\n"));
+  }
+
+  /**
+   * @brief Implement handy isEmpty method.
+   * @details Compare the value for null, (empty string) or "null" string. For some reason
+   *     redis/jedis returns 'null' as string
+   */
+  private boolean isEmpty(String val) {
+    return val == null || val.isEmpty() || val.equalsIgnoreCase("null");
   }
 }

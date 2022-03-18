@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020-2022 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,11 +20,6 @@ import redis.clients.jedis.JedisCluster;
 /**
  * @class QueueInterface
  * @brief A redis queue interface.
- * @details A redis queue is an implementation of a queue data structure which internally uses redis
- *     to store and distribute the data. Its important to know that the lifetime of the queue
- *     persists before and after the queue data structure is created (since it exists in redis).
- *     Therefore, two redis queues with the same name, would in fact be the same underlying redis
- *     queue.
  */
 public abstract class QueueInterface {
 

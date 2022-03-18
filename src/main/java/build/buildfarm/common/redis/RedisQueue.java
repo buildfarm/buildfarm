@@ -51,7 +51,7 @@ public class RedisQueue extends QueueInterface {
    * @param val The value to push onto the queue.
    */
   public void push(JedisCluster jedis, String val) {
-    jedis.lpush(name, val);
+    push(jedis, val, 1);
   }
 
   /**

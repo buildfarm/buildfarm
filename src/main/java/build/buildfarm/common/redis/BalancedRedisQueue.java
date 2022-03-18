@@ -43,7 +43,12 @@ public class BalancedRedisQueue {
    */
   private final String name;
 
-  private final String type;
+  /**
+   * @field queueType
+   * @brief Type of the queue.
+   * @details It's used for selecting between regular and priority queues
+   */
+  private final String queueType;
 
   /**
    * @field originalHashtag
@@ -104,6 +109,7 @@ public class BalancedRedisQueue {
    * @details Construct a named redis queue with an established redis cluster.
    * @param name The global name of the queue.
    * @param hashtags Hashtags to distribute queue data.
+   * @param queueType Type of the queue in use
    * @note Overloaded.
    */
   public BalancedRedisQueue(String name, List<String> hashtags, String queueType) {
@@ -128,16 +134,16 @@ public class BalancedRedisQueue {
    * @param name The global name of the queue.
    * @param hashtags Hashtags to distribute queue data.
    * @param maxQueueSize The maximum amount of elements that should be added to the queue.
-   * @param queueTYpe Type of the queue
+   * @param queueType Type of the queue in use
    * @note Overloaded.
    */
   public BalancedRedisQueue(
       String name, List<String> hashtags, int maxQueueSize, String queueType) {
     this.originalHashtag = RedisHashtags.existingHash(name);
     this.name = RedisHashtags.unhashedName(name);
-    this.type = queueType;
+    this.queueType = queueType;
     this.maxQueueSize = maxQueueSize;
-    createHashedQueues(this.name, hashtags, this.type);
+    createHashedQueues(this.name, hashtags, this.queueType);
   }
 
   /**
@@ -373,10 +379,11 @@ public class BalancedRedisQueue {
    * @param name The global name of the queue.
    * @param hashtags Hashtags to distribute queue data.
    */
-  private void createHashedQueues(String name, List<String> hashtags, String type) {
+  private void createHashedQueues(String name, List<String> hashtags, String queueType) {
     // create an internal queue for each of the provided hashtags
     for (String hashtag : hashtags) {
-      queues.add(new RedisQueueFactory().getQueue(type, RedisHashtags.hashedName(name, hashtag)));
+      queues.add(
+          new RedisQueueFactory().getQueue(queueType, RedisHashtags.hashedName(name, hashtag)));
     }
 
     // if there were no hashtags, we'll create a single internal queue
@@ -390,9 +397,10 @@ public class BalancedRedisQueue {
       if (!originalHashtag.isEmpty()) {
         queues.add(
             new RedisQueueFactory()
-                .getQueue(type, RedisHashtags.hashedName(name, originalHashtag)));
+                .getQueue(queueType, RedisHashtags.hashedName(name, originalHashtag)));
       } else {
-        queues.add(new RedisQueueFactory().getQueue(type, RedisHashtags.hashedName(name, "06S")));
+        queues.add(
+            new RedisQueueFactory().getQueue(queueType, RedisHashtags.hashedName(name, "06S")));
       }
     }
   }
