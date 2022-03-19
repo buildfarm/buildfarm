@@ -36,9 +36,9 @@ java_test(
         exclude = NATIVE_REDIS_TESTS,
     ),
     classpath_resources = [":lua_resources"],
+    tags = ["exclusive"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
-    tags = ["exclusive"],
 )
 
 java_test(
