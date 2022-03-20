@@ -42,6 +42,9 @@ public class RedisQueue extends QueueInterface {
    * @param name The global name of the queue.
    */
   public RedisQueue(String name) {
+    // In order for dequeue properly, the queue needs o have a hashtag.  Otherwise it will error
+    // with: "No way to dispatch this command to Redis Cluster because keys have different slots."
+    // when trying to brpoplpush. If no hashtag was given we provide a default.
     this.name = name;
   }
 

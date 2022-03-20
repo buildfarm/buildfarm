@@ -34,11 +34,9 @@ java_test(
     srcs = glob(
         ["*.java"],
         exclude = NATIVE_REDIS_TESTS,
-    ) + select({
-        ":native-redis": NATIVE_REDIS_TESTS,
-        "//conditions:default": [],
-    }),
+    ),
     classpath_resources = [":lua_resources"],
+    tags = ["exclusive"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
 )
@@ -51,7 +49,7 @@ java_test(
         "//conditions:default": ["RedisPriorityQueueMockTest.java"],
     }),
     classpath_resources = [":lua_resources"],
-    tags = ["priority_native"],
+    tags = ["exclusive"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
 )
@@ -63,7 +61,7 @@ java_test(
         ":native-redis": ["RedisQueueTest.java"],
         "//conditions:default": ["RedisQueueMockTest.java"],
     }),
-    tags = ["queue_native"],
+    tags = ["exclusive"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
 )
@@ -76,7 +74,7 @@ java_test(
         "//conditions:default": ["BalancedRedisQueueMockTest.java"],
     }),
     classpath_resources = [":lua_resources"],
-    tags = ["balanced_native"],
+    tags = ["exclusive"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
 )
