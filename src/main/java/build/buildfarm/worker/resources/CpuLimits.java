@@ -43,7 +43,7 @@ public class CpuLimits {
    * @brief The minimum CPU cores required.
    * @details Client can suggest this though exec_properties.
    */
-  public int min = 0;
+  public int min = 1;
 
   /**
    * @field max
