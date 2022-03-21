@@ -22,7 +22,6 @@ import redis.clients.jedis.JedisCluster;
  * @brief A redis queue interface.
  */
 public abstract class QueueInterface {
-
   /**
    * @brief Push a value onto the queue with default priority of 1.
    * @details Adds the value into the backend rdered set.
