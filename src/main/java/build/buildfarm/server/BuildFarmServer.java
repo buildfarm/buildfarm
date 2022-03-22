@@ -159,14 +159,6 @@ public class BuildFarmServer extends LoggingMain {
         grpcConfig = grpcConfig.allMetrics();
       }
 
-      // Enable latency buckets with status codes.
-      if (config.getGrpcMetrics().getTagLatenciesByCode()) {
-        // TODO(luxe):
-        // The feature is not yet included in latest release.
-        // Once the feature is available, we can enable this code:
-        // grpcConfig = grpcConfig.withCodeLabelInLatencyHistogram();
-      }
-
       // Apply config to create an interceptor and apply it to the GRPC server.
       MonitoringServerInterceptor monitoringInterceptor =
           MonitoringServerInterceptor.create(grpcConfig);
