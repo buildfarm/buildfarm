@@ -62,9 +62,9 @@ def archive_dependencies(third_party):
             "build_file": "%s:BUILD.remote_apis" % third_party,
             "patch_args": ["-p1"],
             "patches": ["%s/remote-apis:remote-apis.patch" % third_party],
-            "sha256": "1d69f5f2f694fe93ee78a630f196047892ae51878297a89601c98964486655c6",
-            "strip_prefix": "remote-apis-6345202a036a297b22b0a0e7531ef702d05f2130",
-            "url": "https://github.com/bazelbuild/remote-apis/archive/6345202a036a297b22b0a0e7531ef702d05f2130.zip",
+            "sha256": "743d2d5b5504029f3f825beb869ce0ec2330b647b3ee465a4f39ca82df83f8bf",
+            "strip_prefix": "remote-apis-636121a32fa7b9114311374e4786597d8e7a69f3",
+            "url": "https://github.com/bazelbuild/remote-apis/archive/636121a32fa7b9114311374e4786597d8e7a69f3.zip",
         },
         {
             "name": "rules_cc",
