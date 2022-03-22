@@ -32,6 +32,7 @@ public final class ResourceDecider {
    * @param command The command to decide resource limitations for.
    * @param workerName The name of the worker taking on the action.
    * @param onlyMulticoreTests Only allow tests to be multicore.
+   * @param defaultMaxCores The unspecified maximum constraint for cores.
    * @param limitGlobalExecution Whether cpu limiting should be explicitly performed.
    * @param executeStageWidth The maximum amount of cores available for the operation.
    * @return Default resource limits.
@@ -40,6 +41,7 @@ public final class ResourceDecider {
   public static ResourceLimits decideResourceLimitations(
       Command command,
       String workerName,
+      int defaultMaxCores,
       boolean onlyMulticoreTests,
       boolean limitGlobalExecution,
       int executeStageWidth) {
@@ -48,7 +50,13 @@ public final class ResourceDecider {
 
     // Further modify the resource limits based on user selection and buildfarm constraints.
     adjustLimits(
-        limits, command, workerName, onlyMulticoreTests, limitGlobalExecution, executeStageWidth);
+        limits,
+        command,
+        workerName,
+        defaultMaxCores,
+        onlyMulticoreTests,
+        limitGlobalExecution,
+        executeStageWidth);
 
     return limits;
   }
@@ -59,6 +67,7 @@ public final class ResourceDecider {
    * @param limits Existing limits chosen by the user's exec_properties.
    * @param command The command to decide resource limitations for.
    * @param workerName The name of the worker taking on the action.
+   * @param defaultMaxCores The unspecified maximum constraint for cores.
    * @param onlyMulticoreTests Only allow tests to be multicore.
    * @param limitGlobalExecution Whether cpu limiting should be explicitly performed.
    * @param executeStageWidth The maximum amount of cores available for the operation.
@@ -67,6 +76,7 @@ public final class ResourceDecider {
       ResourceLimits limits,
       Command command,
       String workerName,
+      int defaultMaxCores,
       boolean onlyMulticoreTests,
       boolean limitGlobalExecution,
       int executeStageWidth) {
@@ -75,24 +85,45 @@ public final class ResourceDecider {
 
     // force limits on non-test actions
     if (onlyMulticoreTests && !CommandUtils.isTest(command)) {
+      if (limits.cpu.min > 1 || limits.cpu.max > defaultMaxCores) {
+        limits.cpu.description.add(
+            String.format(
+                "cores restricted to %d because this is enforced on non-test actions",
+                defaultMaxCores));
+      }
       limits.cpu.min = 1;
-      limits.cpu.max = 1;
-      limits.cpu.description.add(
-          "cores restricted to 1 because this is enforced on non-test actions");
+      limits.cpu.max = defaultMaxCores;
+    } else if (limits.cpu.max <= 0) {
+      if (defaultMaxCores > 0) {
+        limits.cpu.description.add(
+            String.format("cores restricted to %d by default", defaultMaxCores));
+      }
+      limits.cpu.max = defaultMaxCores;
     }
 
-    // avoid 0 cores when limiting
-    if (limitGlobalExecution) {
-      if (limits.cpu.min == 0) {
-        limits.cpu.min = 1;
-        limits.cpu.description.add(
-            "min cores set to 1 as it cannot be 0 with limit global execution");
+    // avoid 0 cores, just in general, since it informs our claim
+    if (limits.cpu.min <= 0) {
+      limits.cpu.min = 1;
+      limits.cpu.description.add(
+          "min cores set to 1 as it cannot be 0 with limit global execution");
+    }
+
+    // compel a specified max to be <= executeStageWidth
+    if (limits.cpu.max > 0) {
+      if (limits.cpu.max > executeStageWidth) {
+        limits.cpu.description.add(String.format("max cores limited to %d", executeStageWidth));
       }
-      if (limits.cpu.max == 0) {
-        limits.cpu.max = 1;
+      limits.cpu.max = Math.min(limits.cpu.max, executeStageWidth);
+    }
+
+    // compel the range to be min <= max
+    if (limits.cpu.max > 0) {
+      if (limits.cpu.min > limits.cpu.max) {
         limits.cpu.description.add(
-            "max cores set to 1 as it cannot be 0 with limit global execution");
+            String.format(
+                "min cores %d limited to specified max %d", limits.cpu.min, limits.cpu.max));
       }
+      limits.cpu.min = Math.min(limits.cpu.max, limits.cpu.min);
     }
 
     // perform resource overrides based on test size
@@ -103,22 +134,24 @@ public final class ResourceDecider {
       limits.cpu.max = override.coreMax;
       limits.cpu.description.add(
           String.format(
-              "cores are overridden due to test size (min=%s / max=%s",
+              "cores are overridden due to test size (min=%d / max=%d",
               override.coreMin, override.coreMax));
     }
 
     adjustDebugFlags(command, limits);
 
-    // Should we limit the cores of the action during execution? by default, no.
-    // If the action has suggested core restrictions on itself, then yes.
+    // Should we limit the cores of the action during execution? by default, per
+    // limitGlobalExecution.
+    // Otherwise, if the action has suggested core restrictions on itself, then yes.
     // Claim minimal core amount with regards to execute stage width.
-    limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0);
+    limits.cpu.limit =
+        limitGlobalExecution || (limits.cpu.max > 0 && limits.cpu.max < executeStageWidth);
     limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
 
     // Should we limit the memory of the action during execution? by default, no.
     // If the action has suggested memory restrictions on itself, then yes.
     // Claim minimal memory amount based on action's suggestion.
-    limits.mem.limit = (limits.mem.min > 0 || limits.mem.max > 0);
+    limits.mem.limit = limits.mem.max > 0;
     limits.mem.claimed = limits.mem.min;
 
     // Avoid using the existing execution policies when using the linux sandbox.

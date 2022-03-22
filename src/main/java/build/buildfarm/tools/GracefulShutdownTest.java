@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm;
+package build.buildfarm.tools;
 
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;

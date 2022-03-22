@@ -49,6 +49,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.Security;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -59,6 +60,7 @@ import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 import me.dinowernli.grpc.prometheus.Configuration;
 import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 @SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
@@ -101,6 +103,14 @@ public class BuildFarmServer extends LoggingMain {
       throws InterruptedException, ConfigurationException {
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     if (!config.getSslCertificatePath().equals("")) {
+      // There are different Public Key Cryptography Standards (PKCS) that users may format their
+      // certificate files in.  By default, the JDK cannot parse all of them.  In particular, it
+      // cannot parse PKCS #1 (RSA Cryptography Standard).  When enabling TLS for GRPC, java's
+      // underlying Security module is used. To improve the robustness of this parsing and the
+      // overall accepted certificate formats, we add an additional security provider. BouncyCastle
+      // is a library that will parse additional formats and allow users to provide certificates in
+      // an otherwise unsupported format.
+      Security.addProvider(new BouncyCastleProvider());
       File ssl_certificate_path = new File(config.getSslCertificatePath());
       serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }

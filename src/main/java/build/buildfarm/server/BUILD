@@ -40,6 +40,8 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
         "@maven//:me_dinowernli_java_grpc_prometheus",
+        "@maven//:org_bouncycastle_bcprov_jdk15on",
+        "@maven//:org_slf4j_slf4j_simple",
         "@maven//:org_springframework_boot_spring_boot",
         "@maven//:org_springframework_boot_spring_boot_autoconfigure",
         "@maven//:org_springframework_spring_beans",

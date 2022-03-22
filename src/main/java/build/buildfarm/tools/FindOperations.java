@@ -1,4 +1,4 @@
-// Copyright 2022 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,21 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm;
+package build.buildfarm.tools;
 
-import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
-import com.google.protobuf.ByteString;
+import com.google.common.collect.ImmutableList;
+import com.google.longrunning.Operation;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 
-// This tool can be used to interact directly with the Action Cache API.
-// ./tool <URL> shard SHA256 <command>
-class Ac {
+// This tool can be used to find Operations based on their particular properties.
+// For example, it could find all of the operations executed by a particular user or particular
+// program.
+// ./tool <URL> shard SHA256 <user>
+// The operations that match the query will be printed.
+class FindOperations {
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
         NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
@@ -39,16 +41,22 @@ class Ac {
     String instanceName = args[1];
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
 
+    // decide filter predicate
+    String filterPredicate = "*";
+    if (args.length >= 4) {
+      filterPredicate = args[3];
+    }
+
     // create instance
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
 
-    // upload fake data to the Action Cache.
-    DigestUtil hash = new DigestUtil(HashFunction.SHA256);
-    DigestUtil.ActionKey key =
-        DigestUtil.asActionKey(hash.compute(ByteString.copyFromUtf8("Hello, World")));
-    ActionResult.Builder result = ActionResult.newBuilder();
-    instance.putActionResult(key, result.build());
+    // get operations and print them
+    ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
+    instance.listOperations(100, "/operations", filterPredicate, operations);
+    for (Operation operation : operations.build()) {
+      System.out.println(operation.getName());
+    }
 
     instance.stop();
   }
