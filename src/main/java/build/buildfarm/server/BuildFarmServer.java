@@ -92,15 +92,10 @@ public class BuildFarmServer extends LoggingMain {
       throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
 
-    healthStatusManager = new HealthStatusManager();
     instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
-    server = createServer(serverBuilder, instance, config);
-    logger.log(Level.INFO, String.format("%s initialized", session));
-  }
 
-  private Server createServer(
-      ServerBuilder<?> serverBuilder, Instance instance, BuildFarmServerConfig config)
-      throws InterruptedException, ConfigurationException {
+    healthStatusManager = new HealthStatusManager();
+
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     if (!config.getSslCertificatePath().equals("")) {
       // There are different Public Key Cryptography Standards (PKCS) that users may format their
@@ -114,38 +109,40 @@ public class BuildFarmServer extends LoggingMain {
       File ssl_certificate_path = new File(config.getSslCertificatePath());
       serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }
-
-    serverBuilder.addService(healthStatusManager.getHealthService());
-    serverBuilder.addService(new ActionCacheService(instance, config.getAcPolicy()));
-    serverBuilder.addService(new CapabilitiesService(instance));
-    serverBuilder.addService(
-        new ContentAddressableStorageService(
-            instance, /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(), TimeUnit.SECONDS
-            /* requestLogLevel=*/ ));
-    serverBuilder.addService(
-        new ByteStreamService(
-            instance,
-            /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
-            TimeUnit.SECONDS));
-    serverBuilder.addService(
-        new ExecutionService(
-            instance,
-            config.getExecuteKeepaliveAfterSeconds(),
-            TimeUnit.SECONDS,
-            keepaliveScheduler,
-            getMetricsPublisher(config.getMetricsConfig())));
-    serverBuilder.addService(new OperationQueueService(instance));
-    serverBuilder.addService(new OperationsService(instance));
-    serverBuilder.addService(new AdminService(config.getAdminConfig(), instance));
-    serverBuilder.addService(new FetchService(instance));
-    serverBuilder.addService(ProtoReflectionService.newInstance());
-    serverBuilder.addService(new PublishBuildEventService(config.getBuildEventConfig()));
-
-    serverBuilder.intercept(TransmitStatusRuntimeExceptionInterceptor.instance());
-    serverBuilder.intercept(headersInterceptor);
+    serverBuilder
+        .addService(healthStatusManager.getHealthService())
+        .addService(new ActionCacheService(instance, config.getAcPolicy()))
+        .addService(new CapabilitiesService(instance))
+        .addService(
+            new ContentAddressableStorageService(
+                instance,
+                /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
+                TimeUnit.SECONDS
+                /* requestLogLevel=*/ ))
+        .addService(
+            new ByteStreamService(
+                instance,
+                /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
+                TimeUnit.SECONDS))
+        .addService(
+            new ExecutionService(
+                instance,
+                config.getExecuteKeepaliveAfterSeconds(),
+                TimeUnit.SECONDS,
+                keepaliveScheduler,
+                getMetricsPublisher(config.getMetricsConfig())))
+        .addService(new OperationQueueService(instance))
+        .addService(new OperationsService(instance))
+        .addService(new AdminService(config.getAdminConfig(), instance))
+        .addService(new FetchService(instance))
+        .addService(ProtoReflectionService.newInstance())
+        .addService(new PublishBuildEventService(config.getBuildEventConfig()))
+        .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
+        .intercept(headersInterceptor);
     handleGrpcMetricIntercepts(serverBuilder, config);
+    server = serverBuilder.build();
 
-    return serverBuilder.build();
+    logger.log(Level.INFO, String.format("%s initialized", session));
   }
 
   private static void handleGrpcMetricIntercepts(
