@@ -67,6 +67,15 @@ tasks:
     shell_commands:
     - ./bazelw build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
 
+  # This will run unit tests that integrate with redis.
+  # Outside of this step, similar functionality may be tested with mocks.
+  redis_unit_tests:
+    name: "Redis Unit Tests"
+    bazel: "4.2.2"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/redis_unit_tests.sh
+
   # We want to run the unit tests again inside of a docker container.
   # This is because test cases may behave different while in docker due to user permissions.
   # This is more of a sanity check between a defined docker file and running tests directly on the host.

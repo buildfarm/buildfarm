@@ -211,6 +211,8 @@ message PollOperationRequest {
 
 message BuildFarmServerConfig {
   InstanceConfig instance = 1;
+  
+  ActionCacheAccessPolicy ac_policy = 12;
 
   int32 port = 2;
 
@@ -679,13 +681,15 @@ message ShardWorkerConfig {
   // with an action's platform for selection
   repeated ExecutionPolicy execution_policies = 25;
 
-  // support any execution limiting, whether global or specified
-  bool limit_execution = 31;
+  reserved 31, 33;
+
+  // default max-cores specification for executions, unlimited if not set
+  int32 default_max_cores = 42;
 
   // limit the available cores to execute_stage_width for unmetered execution if set
   bool limit_global_execution = 29;
 
-  // only allow test executions to be multicore (min-cores > 1), limiting both to 1 if not a test
+  // only allow test executions to respect min-cores > 1, limiting range to 1 -> default_max_cores if not a test
   bool only_multicore_tests = 30;
 
   // user principal name for executions
@@ -968,6 +972,12 @@ enum CASInsertionPolicy {
   ALWAYS_INSERT = 1;
 
   INSERT_ABOVE_LIMIT = 2;
+};
+
+enum ActionCacheAccessPolicy {
+  READ_AND_WRITE = 0;
+
+  READ_ONLY = 1;
 };
 
 message InstanceEndpoint {

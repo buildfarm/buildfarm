@@ -58,7 +58,7 @@ public class RedisNodeHashesTest {
     JedisCluster redis = JedisClusterFactory.createTest();
 
     // ACT
-    List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis, "Execution");
+    List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
 
     // ASSERT
     assertThat(hashtags.isEmpty()).isFalse();
