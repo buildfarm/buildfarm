@@ -218,7 +218,7 @@ message GrpcPrometheusMetrics {
   bool enabled = 1;
 
   // These metrics are more expensive to calculate. If disabled, you only
-  // receive "cheap" metrics. Cheap metrics include send/receive totals tagged
+  // receive core metrics. Core metrics include send/receive totals tagged
   // with return codes.  No latencies.
   bool provide_latency_histograms = 2;
 

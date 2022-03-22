@@ -270,7 +270,7 @@ grpc_metrics: {
   enabled: False
   
   # These metrics are more expensive to calculate. If disabled, you only
-  # receive "cheap" metrics. Cheap metrics include send/receive totals tagged
+  # receive core metrics. Core metrics include send/receive totals tagged
   # with return codes.  No latencies.
   provide_latency_histograms: False
   
