@@ -99,6 +99,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
                         "io.github.lognet:grpc-spring-boot-starter:4.5.4",
+                        "org.bouncycastle:bcprov-jdk15on:1.70",
                         "net.jcip:jcip-annotations:1.0",
                     ] + ["io.netty:netty-%s:4.1.65.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
