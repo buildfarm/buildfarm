@@ -150,8 +150,8 @@ public class BuildFarmServer extends LoggingMain {
     // Decide how to capture GRPC Prometheus metrics.
     // By default, we don't capture any.
     if (config.getGrpcMetrics().getEnabled()) {
-      // Assume cheap metrics.
-      // Cheap metrics include send/receive totals tagged with return codes.  No latencies.
+      // Assume core metrics.
+      // Core metrics include send/receive totals tagged with return codes.  No latencies.
       Configuration grpcConfig = Configuration.cheapMetricsOnly();
 
       // Enable latency buckets.
