@@ -145,7 +145,7 @@ public class BuildFarmServer extends LoggingMain {
     logger.log(Level.INFO, String.format("%s initialized", session));
   }
 
-  private static void handleGrpcMetricIntercepts(
+  public static void handleGrpcMetricIntercepts(
       ServerBuilder<?> serverBuilder, BuildFarmServerConfig config) {
     // Decide how to capture GRPC Prometheus metrics.
     // By default, we don't capture any.

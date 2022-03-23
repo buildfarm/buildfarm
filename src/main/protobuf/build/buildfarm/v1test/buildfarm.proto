@@ -221,14 +221,6 @@ message GrpcPrometheusMetrics {
   // receive core metrics. Core metrics include send/receive totals tagged
   // with return codes.  No latencies.
   bool provide_latency_histograms = 2;
-
-  // A status code label will be added to latency histogram. If latency
-  // histogram itself is disabled, this takes no effect. Warning: this will
-  // increase the number of histograms by a factor of actually happened codes
-  // (up to io.grpc.Status.Code values count), which could lead to additional
-  // local memory usage and load on prometheus (storage and memory usage,
-  // query-time complexity)
-  bool tag_latencies_by_code = 3;
 }
 
 message BuildFarmServerConfig {

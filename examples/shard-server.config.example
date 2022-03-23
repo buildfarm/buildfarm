@@ -273,14 +273,6 @@ grpc_metrics: {
   # receive core metrics. Core metrics include send/receive totals tagged
   # with return codes.  No latencies.
   provide_latency_histograms: False
-  
-  # A status code label will be added to latency histogram. If latency
-  # histogram itself is disabled, this takes no effect. Warning: this will
-  # increase the number of histograms by a factor of actually happened codes
-  # (up to io.grpc.Status.Code values count), which could lead to additional
-  # local memory usage and load on prometheus (storage and memory usage,
-  # query-time complexity)
-  tag_latencies_by_code: False
 }
 
 # cas write timeout
