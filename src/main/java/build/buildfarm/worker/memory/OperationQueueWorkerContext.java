@@ -21,7 +21,6 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.logging.Level.INFO;
-import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -34,6 +33,7 @@ import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
+import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
@@ -61,7 +61,6 @@ import com.google.common.hash.HashCode;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -260,24 +259,13 @@ class OperationQueueWorkerContext implements WorkerContext {
   @Override
   public QueuedOperation getQueuedOperation(QueueEntry queueEntry)
       throws IOException, InterruptedException {
-    Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
     ByteString queuedOperationBlob =
         getBlob(
-            casInstance, queuedOperationDigest, queueEntry.getExecuteEntry().getRequestMetadata());
-    if (queuedOperationBlob == null) {
-      return null;
-    }
-    try {
-      return QueuedOperation.parseFrom(queuedOperationBlob);
-    } catch (InvalidProtocolBufferException e) {
-      logger.log(
-          WARNING,
-          format(
-              "invalid queued operation: %s(%s)",
-              queueEntry.getExecuteEntry().getOperationName(),
-              DigestUtil.toString(queuedOperationDigest)));
-      return null;
-    }
+            casInstance,
+            queueEntry.getQueuedOperationDigest(),
+            queueEntry.getExecuteEntry().getRequestMetadata());
+
+    return ProtoUtils.getQueuedOperation(queuedOperationBlob, queueEntry);
   }
 
   @Override
