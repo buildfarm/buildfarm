@@ -24,7 +24,7 @@ NATIVE_REDIS_TESTS = [
 
 filegroup(
     name = "lua_resources",
-    srcs = ["//src/main/java/build/buildfarm:zpoplpush.lua"],
+    srcs = ["//src/main/java/build/buildfarm/common/redis:zpoplpush.lua"],
     visibility = ["//visibility:public"],
 )
 
