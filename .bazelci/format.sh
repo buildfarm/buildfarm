@@ -7,7 +7,7 @@ FORMAT_JAVA=true
 JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/google-java-format-1.7/google-java-format-1.7-all-deps.jar
 LOCAL_FORMATTER="java_formatter.jar"
 
-FORMAT_PROTO=false
+FORMAT_PROTO=true
 CLANG_FORMAT=@llvm_toolchain//:bin/clang-format
 BAZEL_WRAPPER=bazelw
 
