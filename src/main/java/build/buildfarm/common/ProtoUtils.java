@@ -24,7 +24,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * @class Proto
+ * @class ProtoUtils
  * @brief Utilities related to parsing proto data.
  * @details Performs validation and error reporting of proto data.
  */

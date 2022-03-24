@@ -266,7 +266,6 @@ class ShardWorkerContext implements WorkerContext {
   public QueuedOperation getQueuedOperation(QueueEntry queueEntry)
       throws IOException, InterruptedException {
     ByteString queuedOperationBlob = getBlob(queueEntry.getQueuedOperationDigest());
-
     return ProtoUtils.getQueuedOperation(queuedOperationBlob, queueEntry);
   }
 
