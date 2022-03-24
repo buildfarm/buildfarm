@@ -89,13 +89,11 @@ public class ProvisionedRedisQueue {
    * @note Overloaded.
    */
   public ProvisionedRedisQueue(
-      String name,
-      List<String> hashtags,
-      SetMultimap<String, String> filterProvisions) {
+      String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
     this(name, "regular", hashtags, filterProvisions, false);
   }
 
-    /**
+  /**
    * @brief Constructor.
    * @details Construct the provision queue.
    * @param name The global name of the queue.
