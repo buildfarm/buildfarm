@@ -9,7 +9,7 @@ LOCAL_FORMATTER="java_formatter.jar"
 
 FORMAT_PROTO=true
 CLANG_FORMAT=@llvm_toolchain//:bin/clang-format
-BAZEL_WRAPPER=bazelw
+BAZEL_WRAPPER=./bazelw
 
 FORMAT_BUILD=true
 BUILDIFIER=//:buildifier
@@ -72,17 +72,17 @@ run_proto_formatter () {
     # This is intended to be done by the CI.
     if [[ "$@" == "--check" ]]
     then
-        find . -name '*.proto' -exec $BAZEL_WRAPPER run $CLANG_FORMAT -- -i --dry-run --Werror {} + > /dev/null 2>&1
+        find . -name '*.proto' -exec $BAZEL_WRAPPER run $CLANG_FORMAT -- -i --dry-run --Werror {} +
         handle_format_error_check
         return
     fi
 
     # Fixes formatting issues
-    find . -name '*.proto' -exec $BAZEL_WRAPPER run $CLANG_FORMAT -- -i {} + > /dev/null 2>&1
+    find . -name '*.proto' -exec $BAZEL_WRAPPER run $CLANG_FORMAT -- -i {} +
 }
 
 run_buildifier () {
-    ./$BAZEL_WRAPPER run $BUILDIFIER -- -r > /dev/null 2>&1
+    $BAZEL_WRAPPER run $BUILDIFIER -- -r > /dev/null 2>&1
 }
 
 if [ "${FORMAT_JAVA:-false}" = true ]; then
