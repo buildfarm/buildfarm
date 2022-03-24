@@ -89,14 +89,13 @@ public class ProvisionedRedisQueue {
    * @note Overloaded.
    */
   public ProvisionedRedisQueue(
-      String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
-    this.queue = new BalancedRedisQueue(name, hashtags);
-    isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
-    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard);
-    allowUserUnmatched = false;
+      String name,
+      List<String> hashtags,
+      SetMultimap<String, String> filterProvisions) {
+    this(name, "regular", hashtags, filterProvisions, false);
   }
 
-  /**
+    /**
    * @brief Constructor.
    * @details Construct the provision queue.
    * @param name The global name of the queue.
@@ -111,7 +110,44 @@ public class ProvisionedRedisQueue {
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions,
       boolean allowUserUnmatched) {
-    this.queue = new BalancedRedisQueue(name, hashtags);
+    this(name, "regular", hashtags, filterProvisions, allowUserUnmatched);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct the provision queue.
+   * @param name The global name of the queue.
+   * @param type The type of the redis queue (regular or priority).
+   * @param hashtags Hashtags to distribute queue data.
+   * @param filterProvisions The filtered provisions of the queue.
+   * @note Overloaded.
+   */
+  public ProvisionedRedisQueue(
+      String name,
+      String type,
+      List<String> hashtags,
+      SetMultimap<String, String> filterProvisions) {
+    this(name, type, hashtags, filterProvisions, false);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct the provision queue.
+   * @param name The global name of the queue.
+   * @param type The type of the redis queue (regular or priority).
+   * @param hashtags Hashtags to distribute queue data.
+   * @param filterProvisions The filtered provisions of the queue.
+   * @param allowUserUnmatched Whether the user can provide extra platform properties and still
+   *     match the queue.
+   * @note Overloaded.
+   */
+  public ProvisionedRedisQueue(
+      String name,
+      String type,
+      List<String> hashtags,
+      SetMultimap<String, String> filterProvisions,
+      boolean allowUserUnmatched) {
+    this.queue = new BalancedRedisQueue(name, hashtags, type);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
     provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard);
     this.allowUserUnmatched = allowUserUnmatched;
