@@ -35,10 +35,23 @@ import org.apache.commons.lang3.mutable.MutableInt;
  *     with types.
  */
 public class ResourceParser {
+  /**
+   * @field RESOURCE_SEPERATOR
+   * @brief Path seperator to use when parsing.
+   * @details Part of REAPI's format of resource name.
+   */
+  private static final String RESOURCE_SEPERATOR = "/";
+
+  /**
+   * @field COMPRESSED_BLOBS_KEYWORD
+   * @brief Path keyword for identifying the blob is compressed.
+   * @details Used to detect URI format based on compression.
+   */
+  private static final String COMPRESSED_BLOBS_KEYWORD = "compressed-blobs";
 
   /**
    * @brief Categorize the resource type by analyzing a resource name URI.
-   * @details The URI is parsed to indentify one of the possible Resource types it is in reference
+   * @details The URI is parsed to identify one of the possible Resource types it is in reference
    *     to.
    * @param resourceName The resource name URI defined by REAPI.
    * @return The resource type derived from the URI.
@@ -85,12 +98,12 @@ public class ResourceParser {
     // `{instance_name}/uploads/{uuid}/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}{/optional_metadata}`
     UploadBlobRequest.Builder builder = UploadBlobRequest.newBuilder();
     builder.setInstanceName(
-        String.join("/", Arrays.copyOfRange(segments, 0, index.getAndIncrement())));
+        asResourcePath(Arrays.copyOfRange(segments, 0, index.getAndIncrement())));
     builder.setUuid(segments[index.getAndIncrement()]);
     builder.setBlob(parseBlobInformation(segments, index));
     if (index.intValue() < segments.length) {
       builder.setMetadata(
-          String.join("/", Arrays.copyOfRange(segments, index.intValue(), segments.length)));
+          asResourcePath(Arrays.copyOfRange(segments, index.intValue(), segments.length)));
     }
     return builder.build();
   }
@@ -111,7 +124,7 @@ public class ResourceParser {
     // Extract each of the following segments: `{instance_name}/blobs/{hash}/{size}` or
     // `{instance_name}/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}`
     DownloadBlobRequest.Builder builder = DownloadBlobRequest.newBuilder();
-    builder.setInstanceName(String.join("/", Arrays.copyOfRange(segments, 0, index.intValue())));
+    builder.setInstanceName(asResourcePath(Arrays.copyOfRange(segments, 0, index.intValue())));
     builder.setBlob(parseBlobInformation(segments, index));
     return builder.build();
   }
@@ -124,7 +137,7 @@ public class ResourceParser {
   private static HashMap<String, Resource.TypeCase> keywordResourceMap() {
     HashMap<String, Resource.TypeCase> keywords = new HashMap<>();
     keywords.put("blobs", Resource.TypeCase.DOWNLOAD_BLOB_REQUEST);
-    keywords.put("compressed-blobs", Resource.TypeCase.DOWNLOAD_BLOB_REQUEST);
+    keywords.put(COMPRESSED_BLOBS_KEYWORD, Resource.TypeCase.DOWNLOAD_BLOB_REQUEST);
     keywords.put("uploads", Resource.TypeCase.UPLOAD_BLOB_REQUEST);
     keywords.put("operations", Resource.TypeCase.STREAM_OPERATION_REQUEST);
     return keywords;
@@ -137,7 +150,7 @@ public class ResourceParser {
    * @note Suggested return identifier: uRITokens.
    */
   private static String[] tokenize(String resourceName) {
-    return resourceName.split("/");
+    return resourceName.split(RESOURCE_SEPERATOR);
   }
   /**
    * @brief The index to start parsing resource name segments from.
@@ -179,7 +192,7 @@ public class ResourceParser {
    */
   private static BlobInformation parseBlobInformation(String[] segments, MutableInt index) {
     BlobInformation.Builder builder = BlobInformation.newBuilder();
-    boolean isCompressed = segments[index.getAndIncrement()].equals("compressed-blobs");
+    boolean isCompressed = segments[index.getAndIncrement()].equals(COMPRESSED_BLOBS_KEYWORD);
     if (isCompressed) {
       builder.setCompression(
           Compressor.Value.valueOf(segments[index.getAndIncrement()].toUpperCase()));
@@ -201,5 +214,15 @@ public class ResourceParser {
    */
   private static Digest parseDigest(String hash, String size) {
     return Digest.newBuilder().setHash(hash).setSizeBytes(Long.parseLong(size)).build();
+  }
+  /**
+   * @brief Combine a list of path segments into the resource_name path format.
+   * @details Used on a set of previously tokenized segments.
+   * @param pathSegments Path segments to make a resource path.
+   * @return Combined segments.
+   * @note Suggested return identifier: resourcePath.
+   */
+  private static String asResourcePath(String[] pathSegments) {
+    return String.join(RESOURCE_SEPERATOR, pathSegments);
   }
 }
