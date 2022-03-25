@@ -35,6 +35,7 @@ import org.apache.commons.lang3.mutable.MutableInt;
  *     with types.
  */
 public class ResourceParser {
+
   /**
    * @brief Categorize the resource type by analyzing a resource name URI.
    * @details The URI is parsed to indentify one of the possible Resource types it is in reference
@@ -44,6 +45,7 @@ public class ResourceParser {
    * @note Suggested return identifier: resourceType.
    */
   public static Resource.TypeCase getResourceType(String resourceName) {
+
     // Each "resource name" starts with an optional "instance name" which might consist of multiple
     // path segments Each "resource name" might also end with "optional metadata" which might also
     // consist of multiple path segments In order to parse the resource type effectively and without
@@ -66,12 +68,13 @@ public class ResourceParser {
   }
   /**
    * @brief Parse the resource name into a specific type.
-   * @details Assumes the URI is already is already in the upload blob format.
+   * @details Assumes the URI is already in the upload blob format.
    * @param resourceName The resource name URI defined by REAPI.
    * @return The resource type derived from the URI.
    * @note Suggested return identifier: request.
    */
   public static UploadBlobRequest parseUploadBlobRequest(String resourceName) {
+
     // Find the index of the keyword.  This will give us an initial index to extract information
     // from.
     String[] segments = tokenize(resourceName);
@@ -93,12 +96,13 @@ public class ResourceParser {
   }
   /**
    * @brief Parse the resource name into a specific type.
-   * @details Assumes the URI is already is already in the download blob format.
+   * @details Assumes the URI is already in the download blob format.
    * @param resourceName The resource name URI defined by REAPI.
    * @return The resource type derived from the URI.
    * @note Suggested return identifier: request.
    */
   public static DownloadBlobRequest parseDownloadBlobRequest(String resourceName) {
+
     // Find the index of the keyword.  This will give us an initial index to extract information
     // from.
     String[] segments = tokenize(resourceName);

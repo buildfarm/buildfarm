@@ -24,7 +24,7 @@ java_proto_library(
 )
 
 java_library(
-    name = "ResourceParser",
+    name = "resources",
     srcs = ["ResourceParser.java"],
     visibility = ["//visibility:public"],
     deps = [
