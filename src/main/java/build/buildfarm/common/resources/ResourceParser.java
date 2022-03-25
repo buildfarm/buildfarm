@@ -50,6 +50,13 @@ public class ResourceParser {
   private static final String COMPRESSED_BLOBS_KEYWORD = "compressed-blobs";
 
   /**
+   * @field KEYWORDS
+   * @brief A list of keywords to their corresponding types.
+   * @details This lookup table is used for parsing resource_names.
+   */
+  private static final HashMap<String, Resource.TypeCase> KEYWORDS = keywordResourceMap();;
+
+  /**
    * @brief Categorize the resource type by analyzing a resource name URI.
    * @details The URI is parsed to identify one of the possible Resource types it is in reference
    *     to.
@@ -67,17 +74,16 @@ public class ResourceParser {
     // `actions`, `actionResults`, `operations`,`capabilities` or `compressed-blobs`." Therefore we
     // have to scan linearly to identify the resource type by the first known keyword.
     // https://github.com/bazelbuild/remote-apis/blob/04784f4a830cc0df1f419a492cde9fc323f728db/build/bazel/remote/execution/v2/remote_execution.proto#L215
-    HashMap<String, Resource.TypeCase> keywords = keywordResourceMap();
 
     // Find the first instance of such a keyword.
     String type =
         Stream.of(tokenize(resourceName))
-            .filter(segment -> keywords.containsKey(segment))
+            .filter(segment -> KEYWORDS.containsKey(segment))
             .findFirst()
             .orElse("");
 
     // Return the resource type. If no resource type was identified, return null.
-    return keywords.get(type);
+    return KEYWORDS.get(type);
   }
   /**
    * @brief Parse the resource name into a specific type.
@@ -162,8 +168,7 @@ public class ResourceParser {
    * @note Suggested return identifier: startIndex.
    */
   private static MutableInt startIndex(String[] segments, Resource.TypeCase type) {
-    HashMap<String, Resource.TypeCase> keywords = keywordResourceMap();
-    return new MutableInt(findKeywordIndex(segments, keywords, type));
+    return new MutableInt(findKeywordIndex(segments, KEYWORDS, type));
   }
   /**
    * @brief The index to start parsing resource name segments from.
