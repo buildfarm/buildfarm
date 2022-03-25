@@ -16,6 +16,7 @@ package build.buildfarm.common.resources;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.stream.IntStream;
@@ -54,7 +55,8 @@ public class ResourceParser {
    * @brief A list of keywords to their corresponding types.
    * @details This lookup table is used for parsing resource_names.
    */
-  private static final HashMap<String, Resource.TypeCase> KEYWORDS = keywordResourceMap();;
+  private static final ImmutableMap<String, Resource.TypeCase> KEYWORDS =
+      ImmutableMap.copyOf(keywordResourceMap());
 
   /**
    * @brief Categorize the resource type by analyzing a resource name URI.
@@ -65,7 +67,6 @@ public class ResourceParser {
    * @note Suggested return identifier: resourceType.
    */
   public static Resource.TypeCase getResourceType(String resourceName) {
-
     // Each "resource name" starts with an optional "instance name" which might consist of multiple
     // path segments Each "resource name" might also end with "optional metadata" which might also
     // consist of multiple path segments In order to parse the resource type effectively and without
@@ -93,7 +94,6 @@ public class ResourceParser {
    * @note Suggested return identifier: request.
    */
   public static UploadBlobRequest parseUploadBlobRequest(String resourceName) {
-
     // Find the index of the keyword.  This will give us an initial index to extract information
     // from.
     String[] segments = tokenize(resourceName);
@@ -121,7 +121,6 @@ public class ResourceParser {
    * @note Suggested return identifier: request.
    */
   public static DownloadBlobRequest parseDownloadBlobRequest(String resourceName) {
-
     // Find the index of the keyword.  This will give us an initial index to extract information
     // from.
     String[] segments = tokenize(resourceName);
@@ -181,7 +180,7 @@ public class ResourceParser {
    * @note Suggested return identifier: keywordIndex.
    */
   private static int findKeywordIndex(
-      String[] segments, HashMap<String, Resource.TypeCase> keywords, Resource.TypeCase type) {
+      String[] segments, ImmutableMap<String, Resource.TypeCase> keywords, Resource.TypeCase type) {
     return IntStream.range(0, segments.length)
         .filter(i -> keywords.get(segments[i]) == type)
         .findFirst()
