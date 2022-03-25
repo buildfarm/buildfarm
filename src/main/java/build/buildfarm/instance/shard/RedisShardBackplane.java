@@ -586,7 +586,8 @@ public class RedisShardBackplane implements Backplane {
     return new BalancedRedisQueue(
         config.getPreQueuedOperationsListName(),
         getQueueHashes(client, config.getPreQueuedOperationsListName()),
-        config.getMaxPreQueueDepth());
+        config.getMaxPreQueueDepth(),
+        config.getRedisQueueType());
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -602,6 +603,7 @@ public class RedisShardBackplane implements Backplane {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               queueConfig.getName(),
+              config.getRedisQueueType(),
               getQueueHashes(client, queueConfig.getName()),
               toMultimap(queueConfig.getPlatform().getPropertiesList()),
               queueConfig.getAllowUnmatched());
@@ -621,6 +623,7 @@ public class RedisShardBackplane implements Backplane {
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
               config.getQueuedOperationsListName(),
+              config.getRedisQueueType(),
               getQueueHashes(client, config.getQueuedOperationsListName()),
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
