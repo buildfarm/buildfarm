@@ -23,6 +23,16 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ResourceParserTest {
+    
+  // Function under test: constructor
+  // Reason for testing: code coverage
+  // Failure explanation: Although static methods are generally used, this tests that the class can be constructed.  Without it, the test coverage shows incompleteness.
+  @Test
+  public void DefaultConstruction() {
+    // ARRANGE
+    ResourceParser parser = new ResourceParser();
+  }
+  
   // Function under test: getResourceType, parseUploadBlobRequest
   // Reason for testing: valid URI example for upload blob requests
   // Failure explanation: parser failed to identify URI correctly

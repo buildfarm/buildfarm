@@ -16,9 +16,9 @@ package build.buildfarm.common.resources;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.mutable.MutableInt;
@@ -37,11 +37,11 @@ import org.apache.commons.lang3.mutable.MutableInt;
  */
 public class ResourceParser {
   /**
-   * @field RESOURCE_SEPERATOR
-   * @brief Path seperator to use when parsing.
+   * @field RESOURCE_SEPARATOR
+   * @brief Path separator to use when parsing.
    * @details Part of REAPI's format of resource name.
    */
-  private static final String RESOURCE_SEPERATOR = "/";
+  private static final String RESOURCE_SEPARATOR = "/";
 
   /**
    * @field COMPRESSED_BLOBS_KEYWORD
@@ -55,8 +55,7 @@ public class ResourceParser {
    * @brief A list of keywords to their corresponding types.
    * @details This lookup table is used for parsing resource_names.
    */
-  private static final ImmutableMap<String, Resource.TypeCase> KEYWORDS =
-      ImmutableMap.copyOf(keywordResourceMap());
+  private static final HashMap<String, Resource.TypeCase> KEYWORDS = keywordResourceMap();;
 
   /**
    * @brief Categorize the resource type by analyzing a resource name URI.
@@ -67,6 +66,7 @@ public class ResourceParser {
    * @note Suggested return identifier: resourceType.
    */
   public static Resource.TypeCase getResourceType(String resourceName) {
+
     // Each "resource name" starts with an optional "instance name" which might consist of multiple
     // path segments Each "resource name" might also end with "optional metadata" which might also
     // consist of multiple path segments In order to parse the resource type effectively and without
@@ -94,6 +94,7 @@ public class ResourceParser {
    * @note Suggested return identifier: request.
    */
   public static UploadBlobRequest parseUploadBlobRequest(String resourceName) {
+
     // Find the index of the keyword.  This will give us an initial index to extract information
     // from.
     String[] segments = tokenize(resourceName);
@@ -103,13 +104,12 @@ public class ResourceParser {
     // `{instance_name}/uploads/{uuid}/blobs/{hash}/{size}{/optional_metadata}` or
     // `{instance_name}/uploads/{uuid}/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}{/optional_metadata}`
     UploadBlobRequest.Builder builder = UploadBlobRequest.newBuilder();
-    builder.setInstanceName(
-        asResourcePath(Arrays.copyOfRange(segments, 0, index.getAndIncrement())));
+    builder.setInstanceName(asResourcePath(previousSegments(segments, index)));
+    index.increment();
     builder.setUuid(segments[index.getAndIncrement()]);
     builder.setBlob(parseBlobInformation(segments, index));
     if (index.intValue() < segments.length) {
-      builder.setMetadata(
-          asResourcePath(Arrays.copyOfRange(segments, index.intValue(), segments.length)));
+      builder.setMetadata(asResourcePath(remainingSegments(segments, index)));
     }
     return builder.build();
   }
@@ -121,6 +121,7 @@ public class ResourceParser {
    * @note Suggested return identifier: request.
    */
   public static DownloadBlobRequest parseDownloadBlobRequest(String resourceName) {
+
     // Find the index of the keyword.  This will give us an initial index to extract information
     // from.
     String[] segments = tokenize(resourceName);
@@ -129,7 +130,7 @@ public class ResourceParser {
     // Extract each of the following segments: `{instance_name}/blobs/{hash}/{size}` or
     // `{instance_name}/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}`
     DownloadBlobRequest.Builder builder = DownloadBlobRequest.newBuilder();
-    builder.setInstanceName(asResourcePath(Arrays.copyOfRange(segments, 0, index.intValue())));
+    builder.setInstanceName(asResourcePath(previousSegments(segments, index)));
     builder.setBlob(parseBlobInformation(segments, index));
     return builder.build();
   }
@@ -155,7 +156,7 @@ public class ResourceParser {
    * @note Suggested return identifier: uRITokens.
    */
   private static String[] tokenize(String resourceName) {
-    return resourceName.split(RESOURCE_SEPERATOR);
+    return resourceName.split(RESOURCE_SEPARATOR);
   }
   /**
    * @brief The index to start parsing resource name segments from.
@@ -180,7 +181,7 @@ public class ResourceParser {
    * @note Suggested return identifier: keywordIndex.
    */
   private static int findKeywordIndex(
-      String[] segments, ImmutableMap<String, Resource.TypeCase> keywords, Resource.TypeCase type) {
+      String[] segments, HashMap<String, Resource.TypeCase> keywords, Resource.TypeCase type) {
     return IntStream.range(0, segments.length)
         .filter(i -> keywords.get(segments[i]) == type)
         .findFirst()
@@ -226,7 +227,29 @@ public class ResourceParser {
    * @return Combined segments.
    * @note Suggested return identifier: resourcePath.
    */
-  private static String asResourcePath(String[] pathSegments) {
-    return String.join(RESOURCE_SEPERATOR, pathSegments);
+  private static String asResourcePath(Iterable<String> pathSegments) {
+    return String.join(RESOURCE_SEPARATOR, pathSegments);
+  }
+  /**
+   * @brief Collect a list of the previous segments from the given index.
+   * @details Used for instance name extraction.
+   * @param segments Path segments to make a resource path.
+   * @param index Index to extract from.
+   * @return Extracted segments from given index.
+   * @note Suggested return identifier: extractedSegments.
+   */
+  private static List<String> previousSegments(String[] segments, MutableInt index) {
+    return Arrays.asList(Arrays.copyOfRange(segments, 0, index.intValue()));
+  }
+  /**
+   * @brief Collect a list of the remaining segments from the given index.
+   * @details Used for metadata extraction.
+   * @param segments Path segments to make a resource path.
+   * @param index Index to extract from.
+   * @return Remaining segments from given index.
+   * @note Suggested return identifier: remainingSegments.
+   */
+  private static List<String> remainingSegments(String[] segments, MutableInt index) {
+    return Arrays.asList(Arrays.copyOfRange(segments, index.intValue(), segments.length));
   }
 }
