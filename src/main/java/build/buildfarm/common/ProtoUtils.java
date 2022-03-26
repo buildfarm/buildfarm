@@ -19,7 +19,6 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -32,17 +31,16 @@ public class ProtoUtils {
   private static final Logger logger = Logger.getLogger(ProtoUtils.class.getName());
 
   public static QueuedOperation getQueuedOperation(
-      ByteString queuedOperationBlob, QueueEntry queueEntry)
-      throws IOException, InterruptedException {
+      ByteString queuedOperationBlob, QueueEntry queueEntry) {
     Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
+    String operationName = queueEntry.getExecuteEntry().getOperationName();
 
     if (queuedOperationBlob == null) {
       logger.log(
           Level.WARNING,
           String.format(
               "missing queued operation: %s(%s)",
-              queueEntry.getExecuteEntry().getOperationName(),
-              DigestUtil.toString(queuedOperationDigest)));
+              operationName, DigestUtil.toString(queuedOperationDigest)));
       return null;
     }
     try {
@@ -52,9 +50,7 @@ public class ProtoUtils {
           Level.WARNING,
           String.format(
               "invalid queued operation: %s(%s).  Cannot parse operation blob: %s",
-              queueEntry.getExecuteEntry().getOperationName(),
-              DigestUtil.toString(queuedOperationDigest),
-              e));
+              operationName, DigestUtil.toString(queuedOperationDigest), e));
       return null;
     }
   }
