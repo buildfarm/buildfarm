@@ -142,6 +142,15 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
         ],
     )
 
+    maybe(
+        http_jar,
+        "opentelemetry",
+        sha256 = "0523287984978c091be0d22a5c61f0bce8267eeafbbae58c98abaf99c9396832",
+        urls = [
+            "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.11.0/opentelemetry-javaagent.jar",
+        ],
+    )
+
     http_file(
         name = "tini",
         urls = ["https://github.com/krallin/tini/releases/download/v0.18.0/tini"],
