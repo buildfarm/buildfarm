@@ -30,7 +30,7 @@ import java.util.logging.Logger;
 public class ProtoUtils {
   private static final Logger logger = Logger.getLogger(ProtoUtils.class.getName());
 
-  public static QueuedOperation getQueuedOperation(
+  public static QueuedOperation parseQueuedOperation(
       ByteString queuedOperationBlob, QueueEntry queueEntry) {
     Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
     String operationName = queueEntry.getExecuteEntry().getOperationName();

@@ -264,7 +264,7 @@ class OperationQueueWorkerContext implements WorkerContext {
             casInstance,
             queueEntry.getQueuedOperationDigest(),
             queueEntry.getExecuteEntry().getRequestMetadata());
-    return ProtoUtils.getQueuedOperation(queuedOperationBlob, queueEntry);
+    return ProtoUtils.parseQueuedOperation(queuedOperationBlob, queueEntry);
   }
 
   @Override
