@@ -66,7 +66,6 @@ public class ResourceParser {
    * @note Suggested return identifier: resourceType.
    */
   public static Resource.TypeCase getResourceType(String resourceName) {
-
     // Each "resource name" starts with an optional "instance name" which might consist of multiple
     // path segments Each "resource name" might also end with "optional metadata" which might also
     // consist of multiple path segments In order to parse the resource type effectively and without
@@ -94,7 +93,6 @@ public class ResourceParser {
    * @note Suggested return identifier: request.
    */
   public static UploadBlobRequest parseUploadBlobRequest(String resourceName) {
-
     // Find the index of the keyword.  This will give us an initial index to extract information
     // from.
     String[] segments = tokenize(resourceName);
@@ -121,7 +119,6 @@ public class ResourceParser {
    * @note Suggested return identifier: request.
    */
   public static DownloadBlobRequest parseDownloadBlobRequest(String resourceName) {
-
     // Find the index of the keyword.  This will give us an initial index to extract information
     // from.
     String[] segments = tokenize(resourceName);
