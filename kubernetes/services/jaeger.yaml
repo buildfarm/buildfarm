@@ -1,0 +1,305 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  creationTimestamp: null
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: service-account
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest
+    app.kubernetes.io/part-of: jaeger
+  name: simplest
+---
+apiVersion: v1
+data:
+  sampling: '{"default_strategy":{"param":1,"type":"probabilistic"}}'
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: sampling-configuration
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest-sampling-configuration
+    app.kubernetes.io/part-of: jaeger
+  name: simplest-sampling-configuration
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  creationTimestamp: null
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: query-ingress
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest-query
+    app.kubernetes.io/part-of: jaeger
+  name: simplest-query
+spec:
+  defaultBackend:
+    service:
+      name: simplest-query
+      port:
+        number: 16686
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "false"
+    service.beta.openshift.io/serving-cert-secret-name: simplest-collector-headless-tls
+  creationTimestamp: null
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: service-collector
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest-collector
+    app.kubernetes.io/part-of: jaeger
+  name: simplest-collector-headless
+spec:
+  clusterIP: None
+  ports:
+  - name: http-zipkin
+    port: 9411
+    targetPort: 0
+  - name: grpc-http
+    port: 14250
+    targetPort: 0
+  - name: c-tchan-trft
+    port: 14267
+    targetPort: 0
+  - name: http-c-binary-trft
+    port: 14268
+    targetPort: 0
+  selector:
+    app: jaeger
+    app.kubernetes.io/component: all-in-one
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest
+    app.kubernetes.io/part-of: jaeger
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: service-collector
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest-collector
+    app.kubernetes.io/part-of: jaeger
+  name: simplest-collector
+spec:
+  ports:
+  - name: http-zipkin
+    port: 9411
+    targetPort: 0
+  - name: grpc-http
+    port: 14250
+    targetPort: 0
+  - name: c-tchan-trft
+    port: 14267
+    targetPort: 0
+  - name: http-c-binary-trft
+    port: 14268
+    targetPort: 0
+  selector:
+    app: jaeger
+    app.kubernetes.io/component: all-in-one
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest
+    app.kubernetes.io/part-of: jaeger
+  type: ClusterIP
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: service-query
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest-query
+    app.kubernetes.io/part-of: jaeger
+  name: simplest-query
+spec:
+  ports:
+  - name: http-query
+    port: 16686
+    targetPort: 16686
+  - name: grpc-query
+    port: 16685
+    targetPort: 16685
+  selector:
+    app: jaeger
+    app.kubernetes.io/component: all-in-one
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest
+    app.kubernetes.io/part-of: jaeger
+  type: ClusterIP
+status:
+  loadBalancer: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: service-agent
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest-agent
+    app.kubernetes.io/part-of: jaeger
+  name: simplest-agent
+spec:
+  clusterIP: None
+  ports:
+  - name: zk-compact-trft
+    port: 5775
+    protocol: UDP
+    targetPort: 0
+  - name: config-rest
+    port: 5778
+    targetPort: 0
+  - name: jg-compact-trft
+    port: 6831
+    protocol: UDP
+    targetPort: 0
+  - name: jg-binary-trft
+    port: 6832
+    protocol: UDP
+    targetPort: 0
+  selector:
+    app: jaeger
+    app.kubernetes.io/component: all-in-one
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest
+    app.kubernetes.io/part-of: jaeger
+status:
+  loadBalancer: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    linkerd.io/inject: disabled
+    prometheus.io/port: "14269"
+    prometheus.io/scrape: "true"
+    sidecar.istio.io/inject: "false"
+  creationTimestamp: null
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: all-in-one
+    app.kubernetes.io/instance: simplest
+    app.kubernetes.io/managed-by: jaeger-operator
+    app.kubernetes.io/name: simplest
+    app.kubernetes.io/part-of: jaeger
+  name: simplest
+spec:
+  selector:
+    matchLabels:
+      app: jaeger
+      app.kubernetes.io/component: all-in-one
+      app.kubernetes.io/instance: simplest
+      app.kubernetes.io/managed-by: jaeger-operator
+      app.kubernetes.io/name: simplest
+      app.kubernetes.io/part-of: jaeger
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: disabled
+        prometheus.io/port: "14269"
+        prometheus.io/scrape: "true"
+        sidecar.istio.io/inject: "false"
+      creationTimestamp: null
+      labels:
+        app: jaeger
+        app.kubernetes.io/component: all-in-one
+        app.kubernetes.io/instance: simplest
+        app.kubernetes.io/managed-by: jaeger-operator
+        app.kubernetes.io/name: simplest
+        app.kubernetes.io/part-of: jaeger
+    spec:
+      containers:
+      - args:
+        - --sampling.strategies-file=/etc/jaeger/sampling/sampling.json
+        env:
+        - name: SPAN_STORAGE_TYPE
+          value: memory
+        - name: COLLECTOR_ZIPKIN_HOST_PORT
+          value: :9411
+        - name: JAEGER_DISABLED
+          value: "false"
+        image: jaegertracing/all-in-one:1.30.0
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 5
+          periodSeconds: 15
+        name: jaeger
+        ports:
+        - containerPort: 5775
+          name: zk-compact-trft
+          protocol: UDP
+        - containerPort: 5778
+          name: config-rest
+        - containerPort: 6831
+          name: jg-compact-trft
+          protocol: UDP
+        - containerPort: 6832
+          name: jg-binary-trft
+          protocol: UDP
+        - containerPort: 9411
+          name: zipkin
+        - containerPort: 14267
+          name: c-tchan-trft
+        - containerPort: 14268
+          name: c-binary-trft
+        - containerPort: 16686
+          name: query
+        - containerPort: 14269
+          name: admin-http
+        - containerPort: 14250
+          name: grpc
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 1
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/jaeger/sampling
+          name: simplest-sampling-configuration-volume
+          readOnly: true
+      enableServiceLinks: false
+      serviceAccountName: simplest
+      volumes:
+      - configMap:
+          items:
+          - key: sampling
+            path: sampling.json
+          name: simplest-sampling-configuration
+        name: simplest-sampling-configuration-volume
+status: {}
