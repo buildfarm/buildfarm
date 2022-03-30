@@ -1047,6 +1047,8 @@ public abstract class AbstractServerInstance implements Instance {
     validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
   }
 
+
+  //TODO: duplicate
   protected void validateQueuedOperation(Digest actionDigest, QueuedOperation queuedOperation)
       throws StatusException {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
@@ -1248,7 +1250,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  protected void logFailedStatus(Digest actionDigest, com.google.rpc.Status status) {
+  public static void logFailedStatus(Digest actionDigest, com.google.rpc.Status status, Logger logger) {
     String message =
         format(
             "%s: %s: %s\n",
@@ -1274,7 +1276,7 @@ public abstract class AbstractServerInstance implements Instance {
         message += "  Unknown Detail\n";
       }
     }
-    getLogger().info(message);
+    logger.info(message);
   }
 
   // this deserves a real async execute, but not now
@@ -1299,7 +1301,7 @@ public abstract class AbstractServerInstance implements Instance {
                 .setCode(Status.fromThrowable(e).getCode().value())
                 .build();
       }
-      logFailedStatus(actionDigest, status);
+      logFailedStatus(actionDigest, status,getLogger());
       Operation operation =
           Operation.newBuilder()
               .setDone(true)
@@ -1749,7 +1751,7 @@ public abstract class AbstractServerInstance implements Instance {
                 .setCode(Status.fromThrowable(e).getCode().value())
                 .build();
       }
-      logFailedStatus(actionDigest, status);
+      logFailedStatus(actionDigest, status,getLogger());
       errorOperation(operation, requestMetadata, status);
       return false;
     }

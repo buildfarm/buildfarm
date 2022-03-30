@@ -55,6 +55,7 @@ import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.AbstractServerInstance;
+import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_ACTION;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -144,6 +145,7 @@ import static java.lang.String.format;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static build.buildfarm.common.Actions.asExecutionStatus;
@@ -160,8 +162,7 @@ public class OperationQueuer {
     private static final BlockingQueue transformTokensQueue = new LinkedBlockingQueue(256);
     
     public static Thread createThread(Backplane backplane, Duration queueTimeout, ListeningExecutorService operationTransformService, ScheduledExecutorService contextDeadlineScheduler, String name, 
-                                      BiFunction<ActionKey, RequestMetadata,ListenableFuture<ActionResult>> getActionResult, Cache<RequestMetadata, Boolean> recentCacheServedExecutions,
-                                      Cache<RequestMetadata, Boolean> recentCacheServedExecutions){
+                                      BiFunction<ActionKey, RequestMetadata,ListenableFuture<ActionResult>> getActionResult, Cache<RequestMetadata, Boolean> recentCacheServedExecutions, ReadThroughActionCache readThroughActionCache, Writes writes){
         return           new Thread(
               new Runnable() {
                 final Stopwatch stopwatch = Stopwatch.createUnstarted();
@@ -196,7 +197,7 @@ public class OperationQueuer {
                       Deadline.after(5, MINUTES));
                   try {
                     logger.log(Level.FINE, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(backplane,executeEntry, poller, queueTimeout, name, operationTransformService, contextDeadlineScheduler, getActionResult, recentCacheServedExecutions);
+                    ListenableFuture<Void> queueFuture = queue(backplane,executeEntry, poller, queueTimeout, name, operationTransformService, contextDeadlineScheduler, getActionResult, recentCacheServedExecutions, readThroughActionCache, writes);
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {
@@ -283,7 +284,7 @@ public class OperationQueuer {
   
   @VisibleForTesting
   public static ListenableFuture<Void> queue(Backplane backplane, ExecuteEntry executeEntry, Poller poller, Duration timeout, String name, ListeningExecutorService operationTransformService, ScheduledExecutorService contextDeadlineScheduler, BiFunction<ActionKey,
-                                             RequestMetadata,ListenableFuture<ActionResult>> getActionResult, Cache<RequestMetadata, Boolean> recentCacheServedExecutions) {
+                                             RequestMetadata,ListenableFuture<ActionResult>> getActionResult, Cache<RequestMetadata, Boolean> recentCacheServedExecutions, ReadThroughActionCache readThroughActionCache, Writes writes) {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(executeEntry.getActionDigest())
@@ -319,7 +320,7 @@ public class OperationQueuer {
                     name, operation.getName(), checkCacheUSecs));
             return Futures.immediateFuture(null);
           }
-          return transformAndQueue(backplane,name, executeEntry, poller, operation, stopwatch, timeout, operationTransformService);
+          return transformAndQueue(backplane,name, executeEntry, poller, operation, stopwatch, timeout, operationTransformService, readThroughActionCache,writes);
         },
         operationTransformService);
   }
@@ -395,7 +396,9 @@ public class OperationQueuer {
       Operation operation,
       Stopwatch stopwatch,
       Duration timeout,
-      ListeningExecutorService operationTransformService) {
+      ListeningExecutorService operationTransformService,
+      ReadThroughActionCache readThroughActionCache,
+      Writes writes) {
     long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
     ExecuteOperationMetadata metadata;
     try {
@@ -517,7 +520,7 @@ public class OperationQueuer {
               long startUploadUSecs = stopwatch.elapsed(MICROSECONDS);
               return transform(
                   writeBlobFuture(
-                      queuedOperationDigest, queuedOperationBlob, requestMetadata, timeout),
+                      writes,queuedOperationDigest, queuedOperationBlob, requestMetadata, timeout),
                   (committedSize) ->
                       profiledQueuedMetadata
                           .setUploadedIn(
@@ -546,7 +549,7 @@ public class OperationQueuer {
                         profiledQueuedMetadata.getQueuedOperation().getCommand().getPlatform())
                     .build();
             try {
-              ensureCanQueue(stopwatch);
+              ensureCanQueue(backplane,stopwatch);
               long startQueueUSecs = stopwatch.elapsed(MICROSECONDS);
               poller.pause();
               backplane.queue(queueEntry, queueOperation);
@@ -594,12 +597,87 @@ public class OperationQueuer {
                       .setMessage("SUPPRESSED DEADLINE_EXCEEDED: " + t.getMessage())
                       .build();
             }
-            logFailedStatus(actionDigest, status);
+            AbstractServerInstance.logFailedStatus(actionDigest, status,logger);
             errorOperationFuture(operation, requestMetadata, status, queueFuture);
           }
         },
         operationTransformService);
     return queueFuture;
+  }
+  
+  private static ListenableFuture<QueuedOperation> transformQueuedOperation(
+      String operationName,
+      Action action,
+      Digest commandDigest,
+      Digest inputRootDigest,
+      QueuedOperation.Builder queuedOperationBuilder,
+      ExecutorService service,
+      RequestMetadata requestMetadata) {
+    return transform(
+        allAsList(
+            transform(
+                expectCommand(commandDigest, requestMetadata),
+                (command) -> {
+                  logger.log(
+                      Level.FINE,
+                      format("transformQueuedOperation(%s): fetched command", operationName));
+                  if (command != null) {
+                    queuedOperationBuilder.setCommand(command);
+                  }
+                  return queuedOperationBuilder;
+                },
+                service),
+            transform(
+                getTreeFuture(operationName, inputRootDigest, service, requestMetadata),
+                queuedOperationBuilder::setTree,
+                service)),
+        (result) -> queuedOperationBuilder.setAction(action).build(),
+        service);
+  }
+  
+  private static ListenableFuture<Long> writeBlobFuture(Writes writes,
+      Digest digest, ByteString content, RequestMetadata requestMetadata, Duration timeout)
+      throws EntryLimitException {
+    checkState(digest.getSizeBytes() == content.size());
+    SettableFuture<Long> writtenFuture = SettableFuture.create();
+    Write write = getBlobWrite(writes,digest, UUID.randomUUID(), requestMetadata);
+    addCallback(
+        write.getFuture(),
+        new FutureCallback<Long>() {
+          @Override
+          public void onSuccess(Long committedSize) {
+            writtenFuture.set(committedSize);
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            writtenFuture.setException(t);
+          }
+        },
+        directExecutor());
+    try (OutputStream out = write.getOutput(timeout.getSeconds(), SECONDS, () -> {})) {
+      content.writeTo(out);
+    } catch (IOException e) {
+      // if the stream is complete already, we will have already set the future value
+      writtenFuture.setException(e);
+    }
+    return writtenFuture;
+  }
+  
+  private static Write getBlobWrite(Writes writes, Digest digest, UUID uuid, RequestMetadata requestMetadata)
+      throws EntryLimitException {
+    try {
+      if (inDenyList(requestMetadata)) {
+        throw Status.UNAVAILABLE.withDescription(BLOCK_LIST_ERROR).asRuntimeException();
+      }
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+    if (maxEntrySizeBytes > 0 && digest.getSizeBytes() > maxEntrySizeBytes) {
+      throw new EntryLimitException(digest.getSizeBytes(), maxEntrySizeBytes);
+    }
+    // FIXME small blob write to proto cache
+    return writes.get(digest, uuid, requestMetadata);
   }
   
   
@@ -635,6 +713,18 @@ public class OperationQueuer {
     backplane.putOperation(completedOperation, completeMetadata.getStage());
   }
   
+  private static void validateQueuedOperation(Digest actionDigest, QueuedOperation queuedOperation)
+      throws StatusException {
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+    validateAction(
+        queuedOperation.getAction(),
+        queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
+        DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap()),
+        digest -> {},
+        preconditionFailure);
+    checkPreconditionFailure(actionDigest, preconditionFailure.build());
+  }
+  
   
     private static ListenableFuture<Action> expectAction(Digest actionBlobDigest, RequestMetadata requestMetadata) {
     BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
@@ -651,7 +741,18 @@ public class OperationQueuer {
 
     return toListenableFuture(digestToActionCache.get(actionBlobDigest, getCallback));
   }
-    
+
+  private static QueuedOperationMetadata buildQueuedOperationMetadata(
+      ExecuteOperationMetadata executeOperationMetadata,
+      RequestMetadata requestMetadata,
+      QueuedOperation queuedOperation) {
+    return QueuedOperationMetadata.newBuilder()
+        .setExecuteOperationMetadata(
+            executeOperationMetadata.toBuilder().setStage(ExecutionStage.Value.QUEUED))
+        .setRequestMetadata(requestMetadata)
+        .setQueuedOperationDigest(getDigestUtil().compute(queuedOperation))
+        .build();
+  }
     
     
 }

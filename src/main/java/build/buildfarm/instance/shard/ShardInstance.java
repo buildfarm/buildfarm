@@ -346,7 +346,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     if (runOperationQueuer) {
-      operationQueuer = OperationQueuer.createThread(backplane,queueTimeout,operationTransformService,getName(),this::getActionResult,recentCacheServedExecutions);
+      operationQueuer = OperationQueuer.createThread(backplane,queueTimeout,operationTransformService,getName(),this::getActionResult,recentCacheServedExecutions,readThroughActionCache,writes);
     } else {
       operationQueuer = null;
     }
@@ -457,7 +457,7 @@ public class ShardInstance extends AbstractServerInstance {
   
     @VisibleForTesting
   public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout) {
-    return OperationQueuer.queue(backplane, executeEntry, poller, timeout, operationTransformService, contextDeadlineScheduler, getName(),this::getActionResult, recentCacheServedExecutions);
+    return OperationQueuer.queue(backplane, executeEntry, poller, timeout, operationTransformService, contextDeadlineScheduler, getName(),this::getActionResult, recentCacheServedExecutions,readThroughActionCache,writes);
   }
 
   @Override
@@ -921,6 +921,8 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
+
+  //TODO: duplicate
   @Override
   public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException {
@@ -1169,6 +1171,8 @@ public class ShardInstance extends AbstractServerInstance {
         requestMetadata);
   }
 
+
+  //TODO: duplicate
   private QueuedOperationMetadata buildQueuedOperationMetadata(
       ExecuteOperationMetadata executeOperationMetadata,
       RequestMetadata requestMetadata,
@@ -1181,6 +1185,7 @@ public class ShardInstance extends AbstractServerInstance {
         .build();
   }
 
+  //TODO: duplicate
   private ListenableFuture<QueuedOperation> transformQueuedOperation(
       String operationName,
       Action action,
@@ -1262,6 +1267,7 @@ public class ShardInstance extends AbstractServerInstance {
         service);
   }
 
+  //TODO: duplicate
   private ListenableFuture<Long> writeBlobFuture(
       Digest digest, ByteString content, RequestMetadata requestMetadata, Duration timeout)
       throws EntryLimitException {
