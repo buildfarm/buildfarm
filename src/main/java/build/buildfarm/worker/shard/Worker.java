@@ -465,7 +465,7 @@ public class Worker extends LoggingMain {
             instance,
             config.getDefaultActionTimeout(),
             config.getMaximumActionTimeout(),
-            config.getLimitExecution(),
+            config.getDefaultMaxCores(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
             config.getErrorOperationRemainingResources(),
@@ -740,6 +740,7 @@ public class Worker extends LoggingMain {
         fileCache,
         owner,
         config.getLinkInputDirectories(),
+        config.getRealInputDirectoriesList(),
         removeDirectoryService,
         accessRecorder
         /* deadlineAfter=*/

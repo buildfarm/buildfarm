@@ -46,6 +46,8 @@ tasks:
     - "..."
   macos:
     name: "Unit Tests"
+    build_flags:
+    - "--build_tag_filters=-container"
     build_targets:
     - "..."
     test_targets:
@@ -64,6 +66,15 @@ tasks:
     platform: centos7
     shell_commands:
     - ./bazelw build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
+
+  # This will run unit tests that integrate with redis.
+  # Outside of this step, similar functionality may be tested with mocks.
+  redis_unit_tests:
+    name: "Redis Unit Tests"
+    bazel: "4.2.2"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/redis_unit_tests.sh
 
   # We want to run the unit tests again inside of a docker container.
   # This is because test cases may behave different while in docker due to user permissions.

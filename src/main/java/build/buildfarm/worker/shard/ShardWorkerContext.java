@@ -39,6 +39,7 @@ import build.buildfarm.common.ExecutionWrappers;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LinuxSandboxOptions;
 import build.buildfarm.common.Poller;
+import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
@@ -70,7 +71,6 @@ import com.google.common.collect.SetMultimap;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Deadline;
 import io.grpc.Status;
@@ -118,7 +118,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Instance instance;
   private final Duration defaultActionTimeout;
   private final Duration maximumActionTimeout;
-  private final boolean limitExecution;
+  private final int defaultMaxCores;
   private final boolean limitGlobalExecution;
   private final boolean onlyMulticoreTests;
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
@@ -154,7 +154,7 @@ class ShardWorkerContext implements WorkerContext {
       Instance instance,
       Duration defaultActionTimeout,
       Duration maximumActionTimeout,
-      boolean limitExecution,
+      int defaultMaxCores,
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests,
       boolean errorOperationRemainingResources,
@@ -175,17 +175,11 @@ class ShardWorkerContext implements WorkerContext {
     this.instance = instance;
     this.defaultActionTimeout = defaultActionTimeout;
     this.maximumActionTimeout = maximumActionTimeout;
-    this.limitExecution = limitExecution;
+    this.defaultMaxCores = defaultMaxCores;
     this.limitGlobalExecution = limitGlobalExecution;
     this.onlyMulticoreTests = onlyMulticoreTests;
     this.errorOperationRemainingResources = errorOperationRemainingResources;
     this.writer = writer;
-    Preconditions.checkState(
-        !limitGlobalExecution || limitExecution,
-        "limit_global_execution is meaningless without limit_execution");
-    Preconditions.checkState(
-        !onlyMulticoreTests || limitExecution,
-        "only_multicore_tests is meaningless without limit_execution");
   }
 
   private static Retrier createBackplaneRetrier() {
@@ -271,28 +265,8 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public QueuedOperation getQueuedOperation(QueueEntry queueEntry)
       throws IOException, InterruptedException {
-    Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
-    ByteString queuedOperationBlob = getBlob(queuedOperationDigest);
-    if (queuedOperationBlob == null) {
-      logger.log(
-          Level.WARNING,
-          format(
-              "missing queued operation: %s(%s)",
-              queueEntry.getExecuteEntry().getOperationName(),
-              DigestUtil.toString(queuedOperationDigest)));
-      return null;
-    }
-    try {
-      return QueuedOperation.parseFrom(queuedOperationBlob);
-    } catch (InvalidProtocolBufferException e) {
-      logger.log(
-          Level.WARNING,
-          format(
-              "invalid queued operation: %s(%s)",
-              queueEntry.getExecuteEntry().getOperationName(),
-              DigestUtil.toString(queuedOperationDigest)));
-      return null;
-    }
+    ByteString queuedOperationBlob = getBlob(queueEntry.getQueuedOperationDigest());
+    return ProtoUtils.parseQueuedOperation(queuedOperationBlob, queueEntry);
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -775,7 +749,7 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public void createExecutionLimits() {
-    if (limitExecution) {
+    if (limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0) {
       createOperationExecutionLimits();
     }
   }
@@ -829,7 +803,12 @@ class ShardWorkerContext implements WorkerContext {
 
   public ResourceLimits commandExecutionSettings(Command command) {
     return ResourceDecider.decideResourceLimitations(
-        command, name, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
+        command,
+        name,
+        defaultMaxCores,
+        onlyMulticoreTests,
+        limitGlobalExecution,
+        getExecuteStageWidth());
   }
 
   @Override
@@ -838,7 +817,7 @@ class ShardWorkerContext implements WorkerContext {
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory) {
-    if (limitExecution) {
+    if (limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0) {
       ResourceLimits limits = commandExecutionSettings(command);
       return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
     }

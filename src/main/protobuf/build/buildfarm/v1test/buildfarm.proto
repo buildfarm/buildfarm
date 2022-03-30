@@ -14,70 +14,86 @@ option java_package = "build.buildfarm.v1test";
 option java_multiple_files = true;
 option java_outer_classname = "OperationQueueProto";
 
-// The Admin API is used to perform administrative functions on Buildfarm infrastructure
+// The Admin API is used to perform administrative functions on Buildfarm
+// infrastructure
 service Admin {
   rpc TerminateHost(TerminateHostRequest) returns (google.rpc.Status) {
-    option (google.api.http) = { get: "/v1test/admin:terminateHost" };
+    option (google.api.http) = {
+      get : "/v1test/admin:terminateHost"
+    };
   }
 
   rpc StopContainer(StopContainerRequest) returns (google.rpc.Status) {
-    option (google.api.http) = { get: "/v1test/admin:stopContainer" };
+    option (google.api.http) = {
+      get : "/v1test/admin:stopContainer"
+    };
   }
 
   rpc GetHosts(GetHostsRequest) returns (GetHostsResult) {
-    option (google.api.http) = { get: "/v1test/admin:getHosts" };
+    option (google.api.http) = {
+      get : "/v1test/admin:getHosts"
+    };
   }
 
-  rpc GetClientStartTime(GetClientStartTimeRequest) returns (GetClientStartTimeResult) {
-    option (google.api.http) = { get: "/v1test/admin:getClientStartTime" };
+  rpc GetClientStartTime(GetClientStartTimeRequest)
+      returns (GetClientStartTimeResult) {
+    option (google.api.http) = {
+      get : "/v1test/admin:getClientStartTime"
+    };
   }
 
   rpc ScaleCluster(ScaleClusterRequest) returns (google.rpc.Status) {
-    option (google.api.http) = { get: "/v1test/admin:scaleCluster" };
+    option (google.api.http) = {
+      get : "/v1test/admin:scaleCluster"
+    };
   }
 
   rpc ReindexCas(ReindexCasRequest) returns (ReindexCasRequestResults) {
-    option (google.api.http) = { get: "/v1test/admin:reindexCas" };
+    option (google.api.http) = {
+      get : "/v1test/admin:reindexCas"
+    };
   }
   rpc ReindexAllCas(ReindexAllCasRequest) returns (ReindexCasRequestResults) {
-    option (google.api.http) = { get: "/v1test/admin:reindexAllCas" };
-  }
-  
-  rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest) returns (ShutDownWorkerGracefullyRequestResults) {
-    option (google.api.http) = { get: "/v1test/admin:deregisterWorker" };
+    option (google.api.http) = {
+      get : "/v1test/admin:reindexAllCas"
+    };
   }
 
-  rpc DisableScaleInProtection(DisableScaleInProtectionRequest) returns (DisableScaleInProtectionRequestResults) {
-    option (google.api.http) = { get: "/v1test/admin:disableScaleInProtection" };
+  rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest)
+      returns (ShutDownWorkerGracefullyRequestResults) {
+    option (google.api.http) = {
+      get : "/v1test/admin:deregisterWorker"
+    };
+  }
+
+  rpc DisableScaleInProtection(DisableScaleInProtectionRequest)
+      returns (DisableScaleInProtectionRequestResults) {
+    option (google.api.http) = {
+      get : "/v1test/admin:disableScaleInProtection"
+    };
   }
 }
 
-message ShutDownWorkerGracefullyRequest{
+message ShutDownWorkerGracefullyRequest {
   string instance_name = 1;
-  
+
   string worker_name = 2;
 }
 
-message ShutDownWorkerGracefullyRequestResults {
-}
+message ShutDownWorkerGracefullyRequestResults {}
 
-message DisableScaleInProtectionRequest{
-  string instance_name = 1;
-}
+message DisableScaleInProtectionRequest { string instance_name = 1; }
 
-message DisableScaleInProtectionRequestResults{
-}
+message DisableScaleInProtectionRequestResults {}
 
 message ReindexCasRequest {
   string instance_name = 1;
 
   // format: ip:port
   string host_id = 2;
-  }
-
-message ReindexAllCasRequest {
-  string instance_name = 1;
 }
+
+message ReindexAllCasRequest { string instance_name = 1; }
 
 message ReindexCasRequestResults {
   int32 removedHosts = 1;
@@ -166,25 +182,32 @@ message ScaleClusterRequest {
 // The OperationQueue API is used internally to communicate with Workers
 service OperationQueue {
   rpc Take(TakeOperationRequest) returns (QueueEntry) {
-    option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:take" };
+    option (google.api.http) = {
+      get : "/v1test/{instance_name=**}/operation:take"
+    };
   }
 
   rpc Put(google.longrunning.Operation) returns (google.rpc.Status) {
-    option (google.api.http) = { post: "/v1test/{instance_name=**}/operation:put" body: "*" };
+    option (google.api.http) = {
+      post : "/v1test/{instance_name=**}/operation:put"
+      body : "*"
+    };
   }
 
   rpc Poll(PollOperationRequest) returns (google.rpc.Status) {
-    option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:poll" };
+    option (google.api.http) = {
+      get : "/v1test/{instance_name=**}/operation:poll"
+    };
   }
 
   rpc Status(BackplaneStatusRequest) returns (BackplaneStatus) {
-    option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:status" };
+    option (google.api.http) = {
+      get : "/v1test/{instance_name=**}/operation:status"
+    };
   }
 }
 
-message BackplaneStatusRequest {
-  string instance_name = 1;
-}
+message BackplaneStatusRequest { string instance_name = 1; }
 
 message TakeOperationRequest {
   // The instance of the execution system to operate against. A server may
@@ -194,9 +217,9 @@ message TakeOperationRequest {
   // omitted.
   string instance_name = 1;
 
-  // The platform features available for the execution environment. The server MAY
-  // choose to execute the action on any worker satisfying the requirements, so
-  // the client SHOULD ensure that running the action on any such worker will
+  // The platform features available for the execution environment. The server
+  // MAY choose to execute the action on any worker satisfying the requirements,
+  // so the client SHOULD ensure that running the action on any such worker will
   // have the same result.
   build.bazel.remote.execution.v2.Platform platform = 5;
 }
@@ -212,6 +235,8 @@ message PollOperationRequest {
 message BuildFarmServerConfig {
   InstanceConfig instance = 1;
 
+  ActionCacheAccessPolicy ac_policy = 12;
+
   int32 port = 2;
 
   int32 execute_keepalive_after_seconds = 3;
@@ -221,11 +246,11 @@ message BuildFarmServerConfig {
   AdminConfig admin_config = 5;
 
   PrometheusConfig prometheus_config = 6;
-  
+
   BuildEventConfig build_event_config = 7;
-  
-  // Absolute path to the PEM file containing both the required certificates and any
-  // associated private key.
+
+  // Absolute path to the PEM file containing both the required certificates and
+  // any associated private key.
   optional string ssl_certificate_path = 8;
 
   // CAS write deadline
@@ -257,21 +282,13 @@ message AwsMetricsConfig {
   string region = 4;
 }
 
-message GcpMetricsConfig {
-  string operations_metrics_topic = 1;
-}
+message GcpMetricsConfig { string operations_metrics_topic = 1; }
 
-message LogMetricsConfig {
-  string log_level = 1;
-}
+message LogMetricsConfig { string log_level = 1; }
 
-message PrometheusConfig {
-  int32 port = 1;
-}
+message PrometheusConfig { int32 port = 1; }
 
-message BuildEventConfig {
-  bool record_events = 1;
-}
+message BuildEventConfig { bool record_events = 1; }
 
 message AdminConfig {
   string deployment_environment = 1;
@@ -288,12 +305,9 @@ message AdminConfig {
   bool enable_graceful_shutdown = 5;
 }
 
-message AwsAdminConfig {
-  string region = 1;
-}
+message AwsAdminConfig { string region = 1; }
 
-message GcpAdminConfig {
-}
+message GcpAdminConfig {}
 
 message MemoryCASConfig {
   // limit for CAS total content size
@@ -326,8 +340,8 @@ message FilesystemCASConfig {
   // 0 (default) here will put all entries at the cache root
   int32 hex_bucket_levels = 5;
 
-  // whether the file directories bidirectional mapping should be stored in memory (HashMap) or
-  // in sqlite
+  // whether the file directories bidirectional mapping should be stored in
+  // memory (HashMap) or in sqlite
   bool file_directories_index_in_memory = 4;
 }
 
@@ -348,13 +362,13 @@ message ContentAddressableStorageConfig {
     FilesystemCASConfig filesystem = 3;
     FuseCASConfig fuse = 4;
   }
-  
-  // whether the transient data on the worker should be loaded into the CAS on worker startup
+
+  // whether the transient data on the worker should be loaded into the CAS on
+  // worker startup
   bool skip_load = 5;
 }
 
-message DelegateCASConfig {
-}
+message DelegateCASConfig {}
 
 message GrpcACConfig {
   // AC requests can contain instance names
@@ -410,15 +424,13 @@ message MemoryInstanceConfig {
 
 message ProvisionedQueue {
   string name = 1;
-  
+
   bool allow_unmatched = 3;
-  
+
   build.bazel.remote.execution.v2.Platform platform = 2;
 }
 
-message ProvisionedQueuesConfig {
-  repeated ProvisionedQueue queues = 1;
-}
+message ProvisionedQueuesConfig { repeated ProvisionedQueue queues = 1; }
 
 message RedisShardBackplaneConfig {
   // the uri endpoint of the redis target. This must be a single host entry
@@ -429,6 +441,9 @@ message RedisShardBackplaneConfig {
 
   // the password used to authenticate to redis via `auth`
   string redis_password = 34;
+
+  // the type of the redis queue (regular or priority)
+  optional string redis_queue_type = 12;
 
   // the size of the pool of jedis connections per-cluster-member
   int32 jedis_pool_max_total = 15;
@@ -503,22 +518,22 @@ message RedisShardBackplaneConfig {
 
   // the expiration time in seconds for cas sets
   int32 cas_expire = 11;
-  
-  //whether or not to cache the cas set in memory
+
+  // whether or not to cache the cas set in memory
   bool cache_cas = 35;
 
-  // whether to listen to the backplane communication streams for shard lifecycle
-  // events and watched operations. This is required for failsafe operation below
-  // and realtime notification for watched operations.
-  // This is nearly required for schedulers, and may be useful elsewhere
+  // whether to listen to the backplane communication streams for shard
+  // lifecycle events and watched operations. This is required for failsafe
+  // operation below and realtime notification for watched operations. This is
+  // nearly required for schedulers, and may be useful elsewhere
   bool subscribe_to_backplane = 26;
 
   // whether to run the failsafe operation monitor, which establishes watchdogs
   // on watched operations, to ensure they are in a known or recently refreshed
   // state, and guaranteeing a watch's termination on expiry
-  // This monitor also effects processing/dispatching expirations globally, required
-  // to ensure queue reliability.
-  // This is recommended for schedulers, meaningless for others
+  // This monitor also effects processing/dispatching expirations globally,
+  // required to ensure queue reliability. This is recommended for schedulers,
+  // meaningless for others
   bool run_failsafe_operation = 27;
 
   // the maximum size allowed for the ready-to-run queue before rejection
@@ -547,22 +562,23 @@ message ShardInstanceConfig {
   oneof backplane {
     RedisShardBackplaneConfig redis_shard_backplane_config = 4;
   }
-  
+
   bool ensure_outputs_present = 12;
 
   int64 max_entry_size_bytes = 5;
-  
+
   int32 max_cpu = 9;
 
   // maximum selectable timeout
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
   google.protobuf.Duration maximum_action_timeout = 7;
-  
+
   // default timeouts on grpc requests made by instances
   google.protobuf.Duration grpc_timeout = 8;
-  
-  // Whether the instance should consult a denylist when looking up actions & invocations.
+
+  // Whether the instance should consult a denylist when looking up actions &
+  // invocations.
   bool use_deny_list = 10;
 
   int32 max_requeue_attempts = 11;
@@ -586,32 +602,33 @@ message ShardWorkerInstanceConfig {
 
   // page size for getTree request
   uint32 tree_page_size = 12;
-  
+
   // default timeouts on grpc requests made by instances
   google.protobuf.Duration grpc_timeout = 13;
 }
 
 message DequeueMatchSettings {
-  
+
   // whether a worker should accept everything it gets off the queue.
   bool accept_everything = 1;
 
-  // whether a worker should accept platform properties that it does not match with.
+  // whether a worker should accept platform properties that it does not match
+  // with.
   bool allow_unmatched = 2;
-  
+
   // worker platform used to match operations
   build.bazel.remote.execution.v2.Platform platform = 3;
 }
 
 message WorkerCapabilities {
-  
-  // This determines whether the shard instance will participate in the backplane
-  // and cache it's operation outputs in its own cache file CAS.
-  // When omitted from CAS, the worker will send its execution outputs.
+
+  // This determines whether the shard instance will participate in the
+  // backplane and cache it's operation outputs in its own cache file CAS. When
+  // omitted from CAS, the worker will send its execution outputs.
   bool cas = 1;
-  
-  // This determines whether the shard instance will participate in the execution pool.
-  // Workers that don't execute may be used for storage only.
+
+  // This determines whether the shard instance will participate in the
+  // execution pool. Workers that don't execute may be used for storage only.
   bool execution = 2;
 }
 
@@ -631,7 +648,7 @@ message ShardWorkerConfig {
   // period of poll requests during execution
   google.protobuf.Duration operation_poll_period = 13;
 
-  //settings used to match with operations
+  // settings used to match with operations
   DequeueMatchSettings dequeue_match_settings = 36;
 
   // total size of the inline content for
@@ -644,15 +661,19 @@ message ShardWorkerConfig {
   // execute width
   oneof execute_stage_width_setting {
     int32 execute_stage_width = 16;
-    
+
     // An offset width used when deriving the execute stage width.
-    // Some cores of a machine are reserved for usage other than buildfarm's execution.
-    // Provide that offset here when deriving the execute stage width to avoid over saturation.
+    // Some cores of a machine are reserved for usage other than buildfarm's
+    // execution. Provide that offset here when deriving the execute stage width
+    // to avoid over saturation.
     int32 execute_stage_width_offset = 40;
   }
 
   // symlink cas input-only directories
   bool link_input_directories = 17;
+
+  // a list of paths that will not be symlinked as input directories
+  repeated string real_input_directories = 41;
 
   // selected hash function
   build.bazel.remote.execution.v2.DigestFunction.Value digest_function = 18;
@@ -676,20 +697,24 @@ message ShardWorkerConfig {
   // with an action's platform for selection
   repeated ExecutionPolicy execution_policies = 25;
 
-  // support any execution limiting, whether global or specified
-  bool limit_execution = 31;
+  reserved 31, 33;
 
-  // limit the available cores to execute_stage_width for unmetered execution if set
+  // default max-cores specification for executions, unlimited if not set
+  int32 default_max_cores = 42;
+
+  // limit the available cores to execute_stage_width for unmetered execution if
+  // set
   bool limit_global_execution = 29;
 
-  // only allow test executions to be multicore (min-cores > 1), limiting both to 1 if not a test
+  // only allow test executions to respect min-cores > 1, limiting range to 1 ->
+  // default_max_cores if not a test
   bool only_multicore_tests = 30;
 
   // user principal name for executions
   string exec_owner = 32;
-  
+
   WorkerCapabilities capabilities = 38;
-  
+
   bool error_operation_remaining_resources = 34;
 
   AdminConfig admin_config = 35;
@@ -698,7 +723,6 @@ message ShardWorkerConfig {
 
   // a limit on time (in seconds) for input fetch stage to fetch inputs
   int32 input_fetch_deadline = 39;
-  
 }
 
 message ShardWorker {
@@ -708,8 +732,7 @@ message ShardWorker {
 }
 
 message WorkerChange {
-  message Add {
-  }
+  message Add {}
 
   message Remove {
     string source = 1;
@@ -735,9 +758,7 @@ message OperationChange {
     google.longrunning.Operation operation = 2;
   }
 
-  message Expire {
-    bool force = 1;
-  }
+  message Expire { bool force = 1; }
 
   google.protobuf.Timestamp effectiveAt = 1;
 
@@ -802,44 +823,46 @@ message QueueStatus {
   int64 size = 1;
 
   repeated int64 internal_sizes = 2;
-  
+
   string name = 3;
 }
 
 message OperationQueueStatus {
   repeated QueueStatus provisions = 1;
-  
+
   int64 size = 2;
 }
 
 message LabeledCount {
   string name = 1;
-  
+
   int64 size = 2;
 }
 
 message DispatchedOperationsStatus {
-  
+
   // the total number of currently dispatched operations
   int64 size = 1;
-  
+
   // how many of the current dispatched operations are 'build' related
   int64 build_action_amount = 2;
-  
+
   // how many of the current dispatched operations are 'test' related
   int64 test_action_amount = 3;
-  
-  // how many of the current dispatched operations cannot be fetched and determine the type
+
+  // how many of the current dispatched operations cannot be fetched and
+  // determine the type
   int64 unknown_action_amount = 4;
-  
+
   // count dispatched operations by the queue they originated in
   // for example, "how many cpu vs gpu operations are running?"
   repeated LabeledCount from_queues = 5;
-  
+
   // count dispatched operations by the tool they originated from
-  // for example, "Is anyone using a build tool or bazel version not supported by the main repo?"
+  // for example, "Is anyone using a build tool or bazel version not supported
+  // by the main repo?"
   repeated LabeledCount tools = 6;
-  
+
   // count the kinds of action mnemonics occurring.
   // for example, CppCompile or GoLink.
   repeated LabeledCount action_mnemonics = 7;
@@ -847,20 +870,21 @@ message DispatchedOperationsStatus {
   // count the program names being run for the command
   // for example, clang, bash.
   repeated LabeledCount command_tools = 8;
-  
+
   // count the unique targets being resolved
   repeated LabeledCount target_ids = 9;
-  
+
   // count the unique configurations being used
   repeated LabeledCount config_ids = 10;
-  
+
   // platform properties used by the dispatched operations
   repeated LabeledCount platform_properties = 11;
-  
+
   // how many unique clients are currently being served.
-  // This is based on the uniqueness of tool_id for currently dispatched operations.
+  // This is based on the uniqueness of tool_id for currently dispatched
+  // operations.
   int64 unique_clients_amount = 12;
-  
+
   // how many of the dispatched operations have been requeued.
   // many requeued operations could be a sign of a problem.
   int64 requeued_operations_amount = 13;
@@ -870,26 +894,27 @@ message BackplaneStatus {
   QueueStatus prequeue = 1;
 
   OperationQueueStatus operation_queue = 2;
-  
+
   DispatchedOperationsStatus dispatched_operations = 9;
 
   repeated string active_workers = 4;
-  
+
   int64 cas_lookup_size = 5;
-  
+
   int64 action_cache_size = 6;
-  
+
   int64 blocked_actions_size = 7;
-  
+
   int64 blocked_invocations_size = 8;
-  
+
   int64 fetch_time_ms = 10;
 
   int64 dispatched_size = 11;
 }
 
 message QueuedOperationMetadata {
-  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 1;
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata
+      execute_operation_metadata = 1;
 
   build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
 
@@ -918,7 +943,8 @@ message QueuedOperation {
 }
 
 message ExecutingOperationMetadata {
-  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 1;
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata
+      execute_operation_metadata = 1;
 
   build.bazel.remote.execution.v2.RequestMetadata request_metadata = 2;
 
@@ -928,7 +954,8 @@ message ExecutingOperationMetadata {
 }
 
 message CompletedOperationMetadata {
-  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 1;
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata
+      execute_operation_metadata = 1;
 
   build.bazel.remote.execution.v2.RequestMetadata request_metadata = 2;
 
@@ -942,7 +969,8 @@ message OperationRequestMetadata {
 
   build.bazel.remote.execution.v2.RequestMetadata request_metadata = 3;
 
-  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 4;
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata
+      execute_operation_metadata = 4;
 
   build.bazel.remote.execution.v2.ExecuteResponse execute_response = 5;
 
@@ -968,6 +996,12 @@ enum CASInsertionPolicy {
   INSERT_ABOVE_LIMIT = 2;
 };
 
+enum ActionCacheAccessPolicy {
+  READ_AND_WRITE = 0;
+
+  READ_ONLY = 1;
+};
+
 message InstanceEndpoint {
   // target suitable for grpc channel creation: host:port is common
   string target = 1;
@@ -990,9 +1024,7 @@ message ExecutionWrapper {
 message ExecutionPolicy {
   string name = 1;
 
-  oneof policy {
-    ExecutionWrapper wrapper = 2;
-  }
+  oneof policy { ExecutionWrapper wrapper = 2; }
 }
 
 message WorkerConfig {
@@ -1027,8 +1059,8 @@ message WorkerConfig {
   // 0 (default) here will put all entries at the cache root
   int32 cas_cache_hex_bucket_levels = 27;
 
-  // whether the file directories bidirectional mapping should be stored in memory (HashMap) or
-  // in sqlite
+  // whether the file directories bidirectional mapping should be stored in
+  // memory (HashMap) or in sqlite
   bool cas_cache_file_directories_index_in_memory = 28;
 
   // total size of the inline content for
@@ -1070,10 +1102,11 @@ message WorkerConfig {
   // execute width
   oneof execute_stage_width_setting {
     int32 execute_stage_width = 18;
-    
+
     // An offset width used when deriving the execute stage width.
-    // Some cores of a machine are reserved for usage other than buildfarm's execution.
-    // Provide that offset here when deriving the execute stage width to avoid over saturation.
+    // Some cores of a machine are reserved for usage other than buildfarm's
+    // execution. Provide that offset here when deriving the execute stage width
+    // to avoid over saturation.
     int32 execute_stage_width_offset = 31;
   }
 
@@ -1094,7 +1127,7 @@ message WorkerConfig {
   // available execution policies, will be used to match
   // with an action's platform for selection
   repeated ExecutionPolicy execution_policies = 22;
-  
+
   bool error_operation_remaining_resources = 26;
 
   // user principal name for executions
@@ -1108,9 +1141,7 @@ message TreeIteratorToken {
   repeated build.bazel.remote.execution.v2.Digest directories = 1;
 }
 
-message OperationIteratorToken {
-  string operation_name = 1;
-}
+message OperationIteratorToken { string operation_name = 1; }
 
 message BlobWriteKey {
   build.bazel.remote.execution.v2.Digest digest = 1;
@@ -1182,15 +1213,11 @@ message WorkerProfileMessage {
   repeated OperationTimesBetweenStages times = 10;
 }
 
-message WorkerProfileRequest {
-}
+message WorkerProfileRequest {}
 
-message WorkerListRequest {
-}
+message WorkerListRequest {}
 
-message WorkerListMessage {
-  repeated string workers = 1;
-}
+message WorkerListMessage { repeated string workers = 1; }
 
 service WorkerProfile {
   rpc GetWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}
@@ -1198,16 +1225,15 @@ service WorkerProfile {
   rpc GetWorkerList(WorkerListRequest) returns (WorkerListMessage) {}
 }
 
-message PrepareWorkerForGracefulShutDownRequest{
+message PrepareWorkerForGracefulShutDownRequest {
   string instance_name = 1;
 
   string worker_name = 2;
 }
 
-message PrepareWorkerForGracefulShutDownRequestResults{
-}
+message PrepareWorkerForGracefulShutDownRequestResults {}
 
 service ShutDownWorker {
-  rpc PrepareWorkerForGracefulShutdown(PrepareWorkerForGracefulShutDownRequest) returns (PrepareWorkerForGracefulShutDownRequestResults) {}
+  rpc PrepareWorkerForGracefulShutdown(PrepareWorkerForGracefulShutDownRequest)
+      returns (PrepareWorkerForGracefulShutDownRequestResults) {}
 }
-

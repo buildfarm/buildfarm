@@ -20,10 +20,13 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.metrics.MetricsPublisher;
+import build.buildfarm.v1test.ActionCacheAccessPolicy;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Status;
@@ -41,18 +44,23 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
       Counter.build().name("action_results").help("Action results.").register();
 
   private final Instance instance;
+  private final boolean isWritable;
+  private final MetricsPublisher metricsPublisher;
 
-  public ActionCacheService(Instance instance) {
+  public ActionCacheService(
+      Instance instance, ActionCacheAccessPolicy policy, MetricsPublisher metricsPublisher) {
     this.instance = instance;
+    this.isWritable = !policy.equals(ActionCacheAccessPolicy.READ_ONLY);
+    this.metricsPublisher = metricsPublisher;
   }
 
   @Override
   public void getActionResult(
       GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
+    RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
     ListenableFuture<ActionResult> resultFuture =
         instance.getActionResult(
-            DigestUtil.asActionKey(request.getActionDigest()),
-            TracingMetadataUtils.fromCurrentContext());
+            DigestUtil.asActionKey(request.getActionDigest()), requestMetadata);
 
     addCallback(
         resultFuture,
@@ -95,11 +103,22 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
         },
         directExecutor());
     actionResultsMetric.inc();
+    metricsPublisher.publishRequestMetadata(requestMetadata);
   }
 
   @Override
   public void updateActionResult(
       UpdateActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
+    // A user with write access to the cache can write anything, including malicious code and
+    // binaries, which can then be returned to other users on cache lookups.  This is a security
+    // concern.  To counteract this, we allow enforcing a policy where clients cannot upload to the
+    // action cache.  In this paradigm, it is only the remote execution engine itself that populates
+    // the action cache.
+    if (!isWritable) {
+      responseObserver.onError(Status.PERMISSION_DENIED.asException());
+      return;
+    }
+
     ActionResult actionResult = request.getActionResult();
     try {
       instance.putActionResult(DigestUtil.asActionKey(request.getActionDigest()), actionResult);

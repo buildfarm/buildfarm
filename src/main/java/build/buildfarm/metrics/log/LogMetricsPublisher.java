@@ -44,11 +44,25 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
     try {
       logger.log(
           logLevel,
-          formatRequestMetadataToJson(populateRequestMetadata(operation, requestMetadata)));
+          formatExecutionMetadataToJson(populateExecutionMetadata(operation, requestMetadata)));
     } catch (Exception e) {
       logger.log(
           Level.WARNING,
-          String.format("Could not publish request metadata to LOG for %s.", operation.getName()),
+          String.format(
+              "Could not publish request metadata to LOG for %s.", requestMetadata.getTargetId()),
+          e);
+    }
+  }
+
+  @Override
+  public void publishRequestMetadata(RequestMetadata requestMetadata) {
+    try {
+      logger.log(logLevel, formatActionResultMetadataToJson(requestMetadata));
+    } catch (Exception e) {
+      logger.log(
+          Level.WARNING,
+          String.format(
+              "Could not publish request metadata to LOG for %s.", requestMetadata.getTargetId()),
           e);
     }
   }
