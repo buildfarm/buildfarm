@@ -98,7 +98,6 @@ import com.google.rpc.PreconditionFailure;
 import io.grpc.Context;
 import io.grpc.Deadline;
 import io.grpc.Status;
-import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
@@ -155,6 +154,11 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import io.grpc.Context;
+import io.grpc.Deadline;
+import io.grpc.Status;
+import com.google.rpc.Code;
+import io.grpc.Status;
 
 
 public class OperationQueuer {
@@ -438,7 +442,7 @@ public class OperationQueuer {
             StatusException.class,
             (e) -> {
               Status st = Status.fromThrowable(e);
-              if (st.getCode() == Code.NOT_FOUND) {
+              if (st.getCode() == Status.Code.NOT_FOUND) {
                 PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
                 preconditionFailure
                     .addViolationsBuilder()
