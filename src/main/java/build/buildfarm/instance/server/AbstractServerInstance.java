@@ -1409,6 +1409,7 @@ public abstract class AbstractServerInstance implements Instance {
     return watchFuture;
   }
 
+  //TODO: duplicate
   protected static QueuedOperationMetadata maybeQueuedOperationMetadata(String name, Any metadata) {
     if (metadata.is(QueuedOperationMetadata.class)) {
       try {
@@ -1420,6 +1421,7 @@ public abstract class AbstractServerInstance implements Instance {
     return null;
   }
 
+  //TODO: duplicate
   protected static ExecutingOperationMetadata maybeExecutingOperationMetadata(
       String name, Any metadata) {
     if (metadata.is(ExecutingOperationMetadata.class)) {
@@ -1431,7 +1433,8 @@ public abstract class AbstractServerInstance implements Instance {
     }
     return null;
   }
-
+  
+  //TODO: duplicate
   protected static CompletedOperationMetadata maybeCompletedOperationMetadata(
       String name, Any metadata) {
     if (metadata.is(CompletedOperationMetadata.class)) {
@@ -1464,6 +1467,7 @@ public abstract class AbstractServerInstance implements Instance {
     return RequestMetadata.getDefaultInstance();
   }
 
+  //TODO: duplicate
   protected static ExecuteOperationMetadata expectExecuteOperationMetadata(Operation operation) {
     String name = operation.getName();
     Any metadata = operation.getMetadata();
@@ -1526,6 +1530,7 @@ public abstract class AbstractServerInstance implements Instance {
     return future;
   }
 
+  //TODO: duplicate
   @SuppressWarnings("ConstantConditions")
   protected static boolean isErrored(Operation operation) {
     return operation.getDone()
@@ -1558,6 +1563,7 @@ public abstract class AbstractServerInstance implements Instance {
     return null;
   }
 
+  //TODO: duplicate
   private static ExecuteResponse expectExecuteResponse(Operation operation) {
     try {
       return operation.getResponse().unpack(ExecuteResponse.class);
@@ -1765,6 +1771,7 @@ public abstract class AbstractServerInstance implements Instance {
     return putOperation(operation);
   }
 
+  //TODO: duplicate
   protected void errorOperation(
       Operation operation, RequestMetadata requestMetadata, com.google.rpc.Status status)
       throws InterruptedException {

@@ -1008,6 +1008,8 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
+
+  //TODO: duplicate
   @Override
   protected ListenableFuture<Tree> getTreeFuture(
       String reason, Digest inputRoot, ExecutorService service, RequestMetadata requestMetadata) {
@@ -1817,6 +1819,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
+  //TODO: duplicate
   @Override
   public boolean putOperation(Operation operation) {
     if (isErrored(operation)) {

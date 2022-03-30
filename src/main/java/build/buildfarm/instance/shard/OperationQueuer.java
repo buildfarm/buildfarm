@@ -153,6 +153,8 @@ import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.ExecutingOperationMetadata;
 
 
 public class OperationQueuer {
@@ -461,6 +463,7 @@ public class OperationQueuer {
               Stopwatch transformStopwatch = Stopwatch.createStarted();
               return transform(
                   transformQueuedOperation(
+                      backplane,
                       operation.getName(),
                       action,
                       action.getCommandDigest(),
@@ -600,7 +603,7 @@ public class OperationQueuer {
                       .build();
             }
             AbstractServerInstance.logFailedStatus(actionDigest, status,logger);
-            errorOperationFuture(operation, requestMetadata, status, queueFuture, operationDeletionService);
+            errorOperationFuture(backplane,operation, requestMetadata, status, queueFuture, operationDeletionService);
           }
         },
         operationTransformService);
@@ -608,6 +611,7 @@ public class OperationQueuer {
   }
   
   private static <T> void errorOperationFuture(
+      Backplane backplane,
       Operation operation,
       RequestMetadata requestMetadata,
       com.google.rpc.Status status,
@@ -621,7 +625,7 @@ public class OperationQueuer {
           @Override
           public void run() {
             try {
-              errorOperation(operation, requestMetadata, status);
+              errorOperation(backplane,operation, requestMetadata, status);
               errorFuture.setException(StatusProto.toStatusException(status));
             } catch (StatusRuntimeException e) {
               if (attempt % 100 == 0) {
@@ -642,7 +646,165 @@ public class OperationQueuer {
         });
   }
   
+  private static void errorOperation(
+      Backplane backplane, Operation operation, RequestMetadata requestMetadata, com.google.rpc.Status status)
+      throws InterruptedException {
+    if (operation.getDone()) {
+      throw new IllegalStateException("Trying to error already completed operation [" + operation.getName() + "]");
+    }
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    if (metadata == null) {
+      metadata = ExecuteOperationMetadata.getDefaultInstance();
+    }
+    CompletedOperationMetadata completedMetadata =
+        CompletedOperationMetadata.newBuilder()
+            .setExecuteOperationMetadata(
+                metadata.toBuilder().setStage(ExecutionStage.Value.COMPLETED).build())
+            .setRequestMetadata(requestMetadata)
+            .build();
+    putOperation(
+        backplane,
+        operation
+            .toBuilder()
+            .setDone(true)
+            .setMetadata(Any.pack(completedMetadata))
+            .setResponse(Any.pack(ExecuteResponse.newBuilder().setStatus(status).build()))
+            .build());
+  }
+  
+  private static ExecuteOperationMetadata expectExecuteOperationMetadata(Operation operation) {
+    String name = operation.getName();
+    Any metadata = operation.getMetadata();
+    QueuedOperationMetadata queuedOperationMetadata = maybeQueuedOperationMetadata(name, metadata);
+    if (queuedOperationMetadata != null) {
+      return queuedOperationMetadata.getExecuteOperationMetadata();
+    }
+    ExecutingOperationMetadata executingOperationMetadata =
+        maybeExecutingOperationMetadata(name, metadata);
+    if (executingOperationMetadata != null) {
+      return executingOperationMetadata.getExecuteOperationMetadata();
+    }
+    CompletedOperationMetadata completedOperationMetadata =
+        maybeCompletedOperationMetadata(name, metadata);
+    if (completedOperationMetadata != null) {
+      return completedOperationMetadata.getExecuteOperationMetadata();
+    }
+    try {
+      return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
+    } catch (InvalidProtocolBufferException e) {
+      logger.log(
+          Level.SEVERE, format("invalid execute operation metadata %s", operation.getName()), e);
+    }
+    return null;
+  }
+  
+  private static boolean putOperation(Backplane backplane, Operation operation) {
+    if (isErrored(operation)) {
+      try {
+        return backplane.putOperation(operation, ExecutionStage.Value.COMPLETED);
+      } catch (IOException e) {
+        throw Status.fromThrowable(e).asRuntimeException();
+      }
+    }
+    throw new UnsupportedOperationException();
+  }
+  
+  private static QueuedOperationMetadata maybeQueuedOperationMetadata(String name, Any metadata) {
+    if (metadata.is(QueuedOperationMetadata.class)) {
+      try {
+        return metadata.unpack(QueuedOperationMetadata.class);
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
+      }
+    }
+    return null;
+  }
+  
+  private static ExecutingOperationMetadata maybeExecutingOperationMetadata(
+      String name, Any metadata) {
+    if (metadata.is(ExecutingOperationMetadata.class)) {
+      try {
+        return metadata.unpack(ExecutingOperationMetadata.class);
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
+      }
+    }
+    return null;
+  }
+
+  private static CompletedOperationMetadata maybeCompletedOperationMetadata(
+      String name, Any metadata) {
+    if (metadata.is(CompletedOperationMetadata.class)) {
+      try {
+        return metadata.unpack(CompletedOperationMetadata.class);
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(Level.SEVERE, format("invalid completed operation metadata %s", name), e);
+      }
+    }
+    return null;
+  }
+  
+  private static boolean isErrored(Operation operation) {
+    return operation.getDone()
+        && operation.getResultCase() == Operation.ResultCase.RESPONSE
+        && operation.getResponse().is(ExecuteResponse.class)
+        && expectExecuteResponse(operation).getStatus().getCode() != Code.OK.getNumber();
+  }
+  
+  
+  private static ListenableFuture<Tree> getTreeFuture(
+      String reason, Digest inputRoot, ExecutorService service, RequestMetadata requestMetadata) {
+    SettableFuture<Void> future = SettableFuture.create();
+    Tree.Builder tree = Tree.newBuilder().setRootDigest(inputRoot);
+    Set<Digest> digests = Sets.newConcurrentHashSet();
+    Queue<Digest> remaining = new ConcurrentLinkedQueue();
+    remaining.offer(inputRoot);
+    Context ctx = Context.current();
+    TreeCallback callback =
+        new TreeCallback(future) {
+          @Override
+          protected void onDirectory(Digest digest, Directory directory) {
+            tree.putDirectories(digest.getHash(), directory);
+            for (DirectoryNode childNode : directory.getDirectoriesList()) {
+              Digest child = childNode.getDigest();
+              if (digests.add(child)) {
+                remaining.offer(child);
+              }
+            }
+          }
+
+          @Override
+          boolean next() {
+            Digest nextDigest = remaining.poll();
+            if (!future.isDone() && nextDigest != null) {
+              ctx.run(
+                  () ->
+                      addCallback(
+                          transform(
+                              expectDirectory(reason, nextDigest, requestMetadata),
+                              directory -> new DirectoryEntry(nextDigest, directory),
+                              service),
+                          this,
+                          service));
+              return true;
+            }
+            return false;
+          }
+        };
+    callback.next();
+    return transform(future, (result) -> tree.build(), service);
+  }
+  
+  private static ExecuteResponse expectExecuteResponse(Operation operation) {
+    try {
+      return operation.getResponse().unpack(ExecuteResponse.class);
+    } catch (InvalidProtocolBufferException e) {
+      return null;
+    }
+  }
+  
   private static ListenableFuture<QueuedOperation> transformQueuedOperation(
+      Backplane backplane,
       String operationName,
       Action action,
       Digest commandDigest,
@@ -677,7 +839,7 @@ public class OperationQueuer {
       throws EntryLimitException {
     checkState(digest.getSizeBytes() == content.size());
     SettableFuture<Long> writtenFuture = SettableFuture.create();
-    Write write = getBlobWrite(writes,digest, UUID.randomUUID(), requestMetadata);
+    Write write = getBlobWrite(backplane, writes,digest, UUID.randomUUID(), requestMetadata);
     addCallback(
         write.getFuture(),
         new FutureCallback<Long>() {
@@ -701,7 +863,7 @@ public class OperationQueuer {
     return writtenFuture;
   }
   
-  private static Write getBlobWrite(Writes writes, Digest digest, UUID uuid, RequestMetadata requestMetadata)
+  private static Write getBlobWrite(Backplane backplane, Writes writes, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException {
     try {
       if (inDenyList(requestMetadata)) {
