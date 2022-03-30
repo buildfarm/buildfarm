@@ -162,7 +162,8 @@ public class OperationQueuer {
     private static final BlockingQueue transformTokensQueue = new LinkedBlockingQueue(256);
     
     public static Thread createThread(Backplane backplane, Duration queueTimeout, ListeningExecutorService operationTransformService, ScheduledExecutorService contextDeadlineScheduler, String name, 
-                                      BiFunction<ActionKey, RequestMetadata,ListenableFuture<ActionResult>> getActionResult, Cache<RequestMetadata, Boolean> recentCacheServedExecutions, ReadThroughActionCache readThroughActionCache, Writes writes){
+                                      BiFunction<ActionKey, RequestMetadata,ListenableFuture<ActionResult>> getActionResult, Cache<RequestMetadata, Boolean> recentCacheServedExecutions,
+                                      ReadThroughActionCache readThroughActionCache, Writes writes, ExecutorService operationDeletionService){
         return           new Thread(
               new Runnable() {
                 final Stopwatch stopwatch = Stopwatch.createUnstarted();
@@ -197,7 +198,7 @@ public class OperationQueuer {
                       Deadline.after(5, MINUTES));
                   try {
                     logger.log(Level.FINE, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(backplane,executeEntry, poller, queueTimeout, name, operationTransformService, contextDeadlineScheduler, getActionResult, recentCacheServedExecutions, readThroughActionCache, writes);
+                    ListenableFuture<Void> queueFuture = queue(backplane,executeEntry, poller, queueTimeout, name, operationTransformService, contextDeadlineScheduler, getActionResult, recentCacheServedExecutions, readThroughActionCache, writes, operationDeletionService);
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {
@@ -284,7 +285,7 @@ public class OperationQueuer {
   
   @VisibleForTesting
   public static ListenableFuture<Void> queue(Backplane backplane, ExecuteEntry executeEntry, Poller poller, Duration timeout, String name, ListeningExecutorService operationTransformService, ScheduledExecutorService contextDeadlineScheduler, BiFunction<ActionKey,
-                                             RequestMetadata,ListenableFuture<ActionResult>> getActionResult, Cache<RequestMetadata, Boolean> recentCacheServedExecutions, ReadThroughActionCache readThroughActionCache, Writes writes) {
+                                             RequestMetadata,ListenableFuture<ActionResult>> getActionResult, Cache<RequestMetadata, Boolean> recentCacheServedExecutions, ReadThroughActionCache readThroughActionCache, Writes writes, ExecutorService operationDeletionService) {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(executeEntry.getActionDigest())
@@ -320,7 +321,7 @@ public class OperationQueuer {
                     name, operation.getName(), checkCacheUSecs));
             return Futures.immediateFuture(null);
           }
-          return transformAndQueue(backplane,name, executeEntry, poller, operation, stopwatch, timeout, operationTransformService, readThroughActionCache,writes);
+          return transformAndQueue(backplane,name, executeEntry, poller, operation, stopwatch, timeout, operationTransformService, readThroughActionCache,writes, operationDeletionService);
         },
         operationTransformService);
   }
@@ -398,7 +399,8 @@ public class OperationQueuer {
       Duration timeout,
       ListeningExecutorService operationTransformService,
       ReadThroughActionCache readThroughActionCache,
-      Writes writes) {
+      Writes writes,
+      ExecutorService operationDeletionService) {
     long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
     ExecuteOperationMetadata metadata;
     try {
@@ -598,11 +600,46 @@ public class OperationQueuer {
                       .build();
             }
             AbstractServerInstance.logFailedStatus(actionDigest, status,logger);
-            errorOperationFuture(operation, requestMetadata, status, queueFuture);
+            errorOperationFuture(operation, requestMetadata, status, queueFuture, operationDeletionService);
           }
         },
         operationTransformService);
     return queueFuture;
+  }
+  
+  private static <T> void errorOperationFuture(
+      Operation operation,
+      RequestMetadata requestMetadata,
+      com.google.rpc.Status status,
+      SettableFuture<T> errorFuture,
+      ExecutorService operationDeletionService) {
+    operationDeletionService.execute(
+        new Runnable() {
+          // we must make all efforts to delete this thing
+          int attempt = 1;
+
+          @Override
+          public void run() {
+            try {
+              errorOperation(operation, requestMetadata, status);
+              errorFuture.setException(StatusProto.toStatusException(status));
+            } catch (StatusRuntimeException e) {
+              if (attempt % 100 == 0) {
+                logger.log(
+                    Level.SEVERE,
+                    format(
+                        "On attempt %d to cancel %s: %s",
+                        attempt, operation.getName(), e.getLocalizedMessage()),
+                    e);
+              }
+              // hopefully as deferred execution...
+              operationDeletionService.execute(this);
+              attempt++;
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          }
+        });
   }
   
   private static ListenableFuture<QueuedOperation> transformQueuedOperation(

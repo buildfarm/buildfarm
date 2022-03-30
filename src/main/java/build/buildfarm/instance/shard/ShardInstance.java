@@ -346,7 +346,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     if (runOperationQueuer) {
-      operationQueuer = OperationQueuer.createThread(backplane,queueTimeout,operationTransformService,getName(),this::getActionResult,recentCacheServedExecutions,readThroughActionCache,writes);
+      operationQueuer = OperationQueuer.createThread(backplane,queueTimeout,operationTransformService,getName(),this::getActionResult,recentCacheServedExecutions,readThroughActionCache,writes,operationDeletionService);
     } else {
       operationQueuer = null;
     }
@@ -457,7 +457,7 @@ public class ShardInstance extends AbstractServerInstance {
   
     @VisibleForTesting
   public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller, Duration timeout) {
-    return OperationQueuer.queue(backplane, executeEntry, poller, timeout, operationTransformService, contextDeadlineScheduler, getName(),this::getActionResult, recentCacheServedExecutions,readThroughActionCache,writes);
+    return OperationQueuer.queue(backplane, executeEntry, poller, timeout, operationTransformService, contextDeadlineScheduler, getName(),this::getActionResult, recentCacheServedExecutions,readThroughActionCache,writes,operationDeletionService);
   }
 
   @Override
@@ -1767,6 +1767,7 @@ public class ShardInstance extends AbstractServerInstance {
         .build();
   }
 
+  //TODO: duplicate
   private <T> void errorOperationFuture(
       Operation operation,
       RequestMetadata requestMetadata,
