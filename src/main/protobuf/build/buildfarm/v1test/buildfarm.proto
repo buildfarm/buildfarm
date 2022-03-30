@@ -275,7 +275,8 @@ message BuildFarmServerConfig {
 
   // Publish GRPC metrics to promethesus for each server endpoint.
   // We use this for SLAs at the API boundary.
-  // You may want something similar at the proxy level to compare frontend/backend performance.
+  // You may want something similar at the proxy level to compare
+  // frontend/backend performance.
   GrpcPrometheusMetrics grpc_metrics = 11;
 }
 
