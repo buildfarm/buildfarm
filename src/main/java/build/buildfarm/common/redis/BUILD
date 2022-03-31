@@ -1,3 +1,5 @@
+exports_files(["zpoplpush.lua"])
+
 java_library(
     name = "redis",
     srcs = glob(["*.java"]),

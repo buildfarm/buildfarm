@@ -78,8 +78,8 @@ public class MetricsPublisherTest {
 
     AwsMetricsPublisher metricsPublisher = new AwsMetricsPublisher(metricsConfig);
     assertThat(
-            AbstractMetricsPublisher.formatRequestMetadataToJson(
-                metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata)))
+            AbstractMetricsPublisher.formatExecutionMetadataToJson(
+                metricsPublisher.populateExecutionMetadata(operation, defaultRequestMetadata)))
         .isNotNull();
 
     OperationRequestMetadata operationRequestMetadata =
@@ -94,10 +94,13 @@ public class MetricsPublisherTest {
             .build();
 
     assertThat(
-            AbstractMetricsPublisher.formatRequestMetadataToJson(
-                metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata)))
+            AbstractMetricsPublisher.formatExecutionMetadataToJson(
+                metricsPublisher.populateExecutionMetadata(operation, defaultRequestMetadata)))
         .isEqualTo(
-            JsonFormat.printer().omittingInsignificantWhitespace().print(operationRequestMetadata));
+            "EXECUTE_METADATA:"
+                + JsonFormat.printer()
+                    .omittingInsignificantWhitespace()
+                    .print(operationRequestMetadata));
   }
 
   @Test
@@ -107,7 +110,7 @@ public class MetricsPublisherTest {
 
     assertThat(
             new AwsMetricsPublisher(metricsConfig)
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+                .populateExecutionMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 
@@ -118,7 +121,7 @@ public class MetricsPublisherTest {
 
     assertThat(
             new AwsMetricsPublisher(metricsConfig)
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+                .populateExecutionMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 
@@ -136,7 +139,7 @@ public class MetricsPublisherTest {
 
     assertThat(
             new AwsMetricsPublisher(metricsConfig)
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+                .populateExecutionMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 
@@ -147,7 +150,7 @@ public class MetricsPublisherTest {
 
     assertThat(
             new LogMetricsPublisher(MetricsConfig.getDefaultInstance())
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+                .populateExecutionMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 }

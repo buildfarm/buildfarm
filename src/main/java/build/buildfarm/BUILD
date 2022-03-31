@@ -7,7 +7,7 @@ package(
 
 filegroup(
     name = "lua_resources",
-    srcs = ["zpoplpush.lua"],
+    srcs = ["//src/main/java/build/buildfarm/common/redis:zpoplpush.lua"],
     visibility = ["//visibility:public"],
 )
 

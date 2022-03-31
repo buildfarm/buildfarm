@@ -22,7 +22,9 @@ import static org.mockito.Mockito.verify;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.v1test.ActionCacheAccessPolicy;
+import build.buildfarm.v1test.MetricsConfig;
 import io.grpc.stub.StreamObserver;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -38,7 +40,10 @@ public class ActionCacheServiceTest {
     // ARRANGE
     Instance instance = mock(Instance.class);
     ActionCacheService service =
-        new ActionCacheService(instance, ActionCacheAccessPolicy.READ_ONLY);
+        new ActionCacheService(
+            instance,
+            ActionCacheAccessPolicy.READ_ONLY,
+            new LogMetricsPublisher(MetricsConfig.getDefaultInstance()));
 
     // ACT
     StreamObserver<ActionResult> response = mock(StreamObserver.class);
@@ -57,7 +62,10 @@ public class ActionCacheServiceTest {
     // ARRANGE
     Instance instance = mock(Instance.class);
     ActionCacheService service =
-        new ActionCacheService(instance, ActionCacheAccessPolicy.READ_AND_WRITE);
+        new ActionCacheService(
+            instance,
+            ActionCacheAccessPolicy.READ_AND_WRITE,
+            new LogMetricsPublisher(MetricsConfig.getDefaultInstance()));
 
     // ACT
     StreamObserver<ActionResult> response = mock(StreamObserver.class);
