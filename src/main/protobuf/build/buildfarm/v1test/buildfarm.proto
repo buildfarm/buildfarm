@@ -422,6 +422,12 @@ message ProvisionedQueuesConfig {
   repeated ProvisionedQueue queues = 1;
 }
 
+enum QueueType {
+  // the type of the redis queue
+  REGULAR = 0;
+  PRIORITY = 1;
+};
+
 message RedisShardBackplaneConfig {
   // the uri endpoint of the redis target. This must be a single host entry
   // with cluster discoverability enabled if the redis service is configured
@@ -432,8 +438,7 @@ message RedisShardBackplaneConfig {
   // the password used to authenticate to redis via `auth`
   string redis_password = 34;
 
-  // the type of the redis queue (regular or priority)
-  optional string redis_queue_type = 12;
+  QueueType redis_queue_type = 12;
 
   // the size of the pool of jedis connections per-cluster-member
   int32 jedis_pool_max_total = 15;
