@@ -20,10 +20,12 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.metrics.MetricsPublisher;
 import build.buildfarm.v1test.ActionCacheAccessPolicy;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -43,19 +45,22 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
 
   private final Instance instance;
   private final boolean isWritable;
+  private final MetricsPublisher metricsPublisher;
 
-  public ActionCacheService(Instance instance, ActionCacheAccessPolicy policy) {
+  public ActionCacheService(
+      Instance instance, ActionCacheAccessPolicy policy, MetricsPublisher metricsPublisher) {
     this.instance = instance;
     this.isWritable = !policy.equals(ActionCacheAccessPolicy.READ_ONLY);
+    this.metricsPublisher = metricsPublisher;
   }
 
   @Override
   public void getActionResult(
       GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
+    RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
     ListenableFuture<ActionResult> resultFuture =
         instance.getActionResult(
-            DigestUtil.asActionKey(request.getActionDigest()),
-            TracingMetadataUtils.fromCurrentContext());
+            DigestUtil.asActionKey(request.getActionDigest()), requestMetadata);
 
     addCallback(
         resultFuture,
@@ -98,6 +103,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
         },
         directExecutor());
     actionResultsMetric.inc();
+    metricsPublisher.publishRequestMetadata(requestMetadata);
   }
 
   @Override
