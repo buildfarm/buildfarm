@@ -17,6 +17,7 @@ package build.buildfarm.worker.resources;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.buildfarm.common.CommandUtils;
+import build.buildfarm.common.StringUtils;
 
 /**
  * @class ResourceDecider
@@ -172,6 +173,13 @@ public final class ResourceDecider {
   }
 
   private static void adjustContainerFlags(ResourceLimits limits) {
+    // bazelbuild/bazel-toolchains provides container images that start with "docker://".
+    // However, docker is unable to fetch images that have this as a prefix in the URI.
+    // Our solution is to remove the prefix when we see it.
+    // https://github.com/bazelbuild/bazel-buildfarm/issues/1060
+    limits.containerSettings.containerImage =
+        StringUtils.removePrefix(limits.containerSettings.containerImage, "docker://");
+
     if (!limits.containerSettings.containerImage.isEmpty()) {
       // Avoid using the existing execution policies when running actions under docker.
       // The programs used in the execution policies likely won't exist in the container images.

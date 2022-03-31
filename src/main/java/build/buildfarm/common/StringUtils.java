@@ -14,7 +14,6 @@
 
 package build.buildfarm.common;
 
-
 /**
  * @class StringUtils
  * @brief Utilities for working with Java Strings.
