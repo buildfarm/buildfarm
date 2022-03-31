@@ -20,7 +20,5 @@ import com.google.longrunning.Operation;
 public interface MetricsPublisher {
   void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata);
 
-  void publishRequestMetadata(RequestMetadata requestMetadata);
-
   void publishMetric(String metricName, Object metricValue);
 }

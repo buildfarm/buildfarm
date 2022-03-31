@@ -110,9 +110,7 @@ public class BuildFarmServer extends LoggingMain {
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
-            .addService(
-                new ActionCacheService(
-                    instance, config.getAcPolicy(), getMetricsPublisher(config.getMetricsConfig())))
+            .addService(new ActionCacheService(instance, config.getAcPolicy()))
             .addService(new CapabilitiesService(instance))
             .addService(
                 new ContentAddressableStorageService(
