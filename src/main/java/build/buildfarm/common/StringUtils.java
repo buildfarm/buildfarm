@@ -14,8 +14,6 @@
 
 package build.buildfarm.common;
 
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * @class StringUtils
@@ -28,19 +26,10 @@ public class StringUtils {
    * @param str The string to remove prefix on.
    * @param prefix The prefix to look for and remove.
    */
-    public static String removePrefix(String str, String prefix)
-    {
-        if (str.startsWith(prefix)) {
-            return str.substring(prefix.length());
-        }
-        return str;
+  public static String removePrefix(String str, String prefix) {
+    if (str.startsWith(prefix)) {
+      return str.substring(prefix.length());
     }
-
+    return str;
+  }
 }
-
-
-
-
-
-
-
