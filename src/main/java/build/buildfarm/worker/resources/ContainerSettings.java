@@ -27,6 +27,14 @@ import java.util.ArrayList;
  */
 public class ContainerSettings {
   /**
+   * @field enabled
+   * @brief Whether the action should run in the custom container.
+   * @details This will be enabled when specific exec_properties are used. Global buildfarm settings
+   *     may also effect whether the feature is available.
+   */
+  public boolean enabled = false;
+
+  /**
    * @field containerImage
    * @brief The container image to use.
    * @details In example format may look like:
