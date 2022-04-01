@@ -715,6 +715,12 @@ message ShardWorkerConfig {
   // default_max_cores if not a test
   bool only_multicore_tests = 30;
 
+  // Some actions may need to run in a container specified by the client.  By
+  // using exec_properties clients can request the container for buildfarm to
+  // pull and use.  This feature is known as "bring your own container".  If the
+  // feature is disabled the corresponding exec_properties will be ignored.
+  bool allow_bring_your_own_container = 43;
+
   // user principal name for executions
   string exec_owner = 32;
 
