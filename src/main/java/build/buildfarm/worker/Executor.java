@@ -447,7 +447,7 @@ class Executor {
     }
 
     // run the action under docker
-    if (!limits.containerSettings.containerImage.isEmpty()) {
+    if (limits.containerSettings.enabled) {
       DockerClient dockerClient = DockerClientBuilder.getInstance().build();
 
       // create settings

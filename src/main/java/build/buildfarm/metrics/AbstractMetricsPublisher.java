@@ -73,15 +73,10 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
   }
 
   @Override
-  public void publishRequestMetadata(RequestMetadata requestMetadata) {
-    throw new UnsupportedOperationException("Not Implemented.");
-  }
-
-  @Override
   public abstract void publishMetric(String metricName, Object metricValue);
 
   @VisibleForTesting
-  protected OperationRequestMetadata populateExecutionMetadata(
+  protected OperationRequestMetadata populateRequestMetadata(
       Operation operation, RequestMetadata requestMetadata) {
     try {
       actionsCounter.inc();
@@ -164,7 +159,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
     }
   }
 
-  protected static String formatExecutionMetadataToJson(
+  protected static String formatRequestMetadataToJson(
       OperationRequestMetadata operationRequestMetadata) throws InvalidProtocolBufferException {
     JsonFormat.TypeRegistry typeRegistry =
         JsonFormat.TypeRegistry.newBuilder()
@@ -179,20 +174,6 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
             .omittingInsignificantWhitespace()
             .print(operationRequestMetadata);
     logger.log(Level.FINE, "{}", formattedRequestMetadata);
-    return "EXECUTE_METADATA:" + formattedRequestMetadata;
-  }
-
-  protected static String formatActionResultMetadataToJson(RequestMetadata requestMetadata)
-      throws InvalidProtocolBufferException {
-    JsonFormat.TypeRegistry typeRegistry =
-        JsonFormat.TypeRegistry.newBuilder().add(PreconditionFailure.getDescriptor()).build();
-
-    String formattedRequestMetadata =
-        JsonFormat.printer()
-            .usingTypeRegistry(typeRegistry)
-            .omittingInsignificantWhitespace()
-            .print(requestMetadata);
-    logger.log(Level.FINE, "{}", formattedRequestMetadata);
-    return "ACTION_RESULT_METADATA:" + formattedRequestMetadata;
+    return formattedRequestMetadata;
   }
 }

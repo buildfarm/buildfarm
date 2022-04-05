@@ -468,6 +468,7 @@ public class Worker extends LoggingMain {
             config.getDefaultMaxCores(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
+            config.getAllowBringYourOwnContainer(),
             config.getErrorOperationRemainingResources(),
             writer);
 
