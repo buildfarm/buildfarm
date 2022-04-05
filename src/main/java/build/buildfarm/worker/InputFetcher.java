@@ -32,10 +32,13 @@ import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -56,20 +59,33 @@ public class InputFetcher implements Runnable {
     this.owner = owner;
   }
 
-  private boolean isQueuedOperationValid(QueuedOperation queuedOperation) {
-    Action action = queuedOperation.getAction();
+  private List<String> validateQueuedOperation(QueuedOperation queuedOperation) {
+    // Capture a list of all validation failures on the queued operation.
+    // A successful validation is a an empty list of failures.
+    List<String> constraintFailures = new ArrayList<>();
 
+    if (queuedOperation == null) {
+      constraintFailures.add("QueuedOperation is missing.");
+      return constraintFailures;
+    }
+
+    // Ensure the timeout is not too long by comparing it to the maximum allowed timeout
+    Action action = queuedOperation.getAction();
     if (action.hasTimeout() && workerContext.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
       Duration maximum = workerContext.getMaximumActionTimeout();
-      if (timeout.getSeconds() > maximum.getSeconds()
-          || (timeout.getSeconds() == maximum.getSeconds()
-              && timeout.getNanos() > maximum.getNanos())) {
-        return false;
+      if (Durations.compare(timeout, maximum) > 0) {
+        constraintFailures.add(
+            String.format(
+                "Timeout is too long (%s > %s).", timeout.getSeconds(), maximum.getSeconds()));
       }
     }
 
-    return !queuedOperation.getCommand().getArgumentsList().isEmpty();
+    if (queuedOperation.getCommand().getArgumentsList().isEmpty()) {
+      constraintFailures.add("Argument list is empty.");
+    }
+
+    return constraintFailures;
   }
 
   private long runInterruptibly(Stopwatch stopwatch) throws InterruptedException {
@@ -80,7 +96,7 @@ public class InputFetcher implements Runnable {
         operationContext.queueEntry,
         QUEUED,
         fetcherThread::interrupt,
-        Deadline.after(60, SECONDS));
+        Deadline.after(workerContext.getInputFetchDeadline(), SECONDS));
     try {
       return fetchPolled(stopwatch);
     } finally {
@@ -106,8 +122,7 @@ public class InputFetcher implements Runnable {
     if (runfilesProgramDigest == null) {
       return programPath;
     }
-    //noinspection EqualsBetweenInconvertibleTypes
-    if (!programDigest.equals(runfilesProgramPath)) {
+    if (!programDigest.equals(runfilesProgramDigest)) {
       return programPath;
     }
     return runfilesProgramPath;
@@ -161,8 +176,11 @@ public class InputFetcher implements Runnable {
     Path execDir;
     try {
       queuedOperation = workerContext.getQueuedOperation(operationContext.queueEntry);
-      if (queuedOperation == null || !isQueuedOperationValid(queuedOperation)) {
-        logger.log(Level.SEVERE, format("invalid queued operation: %s", operationName));
+      List<String> constraintFailures = validateQueuedOperation(queuedOperation);
+      if (!constraintFailures.isEmpty()) {
+        logger.log(
+            Level.SEVERE,
+            format("invalid queued operation: %s", String.join(" ", constraintFailures)));
         owner.error().put(operationContext);
         return 0;
       }

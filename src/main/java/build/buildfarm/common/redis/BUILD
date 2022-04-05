@@ -1,3 +1,5 @@
+exports_files(["zpoplpush.lua"])
+
 java_library(
     name = "redis",
     srcs = glob(["*.java"]),
@@ -8,5 +10,6 @@ java_library(
         "//third_party/jedis",
         "@maven//:com_google_guava_guava",
         "@maven//:io_grpc_grpc_api",
+        "@maven//:org_redisson_redisson",
     ],
 )

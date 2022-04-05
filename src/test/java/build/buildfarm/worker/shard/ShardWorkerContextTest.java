@@ -88,6 +88,7 @@ public class ShardWorkerContextTest {
         /* inlineContentLimit=*/
         /* inputFetchStageWidth=*/ 0,
         /* executeStageWidth=*/ 0,
+        /* inputFetchDeadline=*/ 60,
         backplane,
         execFileSystem,
         inputStreamFactory,
@@ -97,9 +98,10 @@ public class ShardWorkerContextTest {
         /* deadlineAfterUnits=*/
         /* defaultActionTimeout=*/ Duration.getDefaultInstance(),
         /* maximumActionTimeout=*/ Duration.getDefaultInstance(),
-        /* limitExecution=*/ false,
+        /* defaultMaxCores=*/ 0,
         /* limitGlobalExecution=*/ false,
         /* onlyMulticoreTests=*/ false,
+        /* allowBringYourOwnContainer=*/ false,
         /* errorOperationRemainingResources=*/ false,
         writer);
   }

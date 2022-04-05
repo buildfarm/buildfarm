@@ -64,7 +64,7 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
-  private final Instances instances;
+  private final Instance instance;
 
   static class UnexpectedEndOfStreamException extends IOException {
     private final long remaining;
@@ -85,8 +85,8 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
   }
 
-  public ByteStreamService(Instances instances, long deadlineAfter, TimeUnit deadlineAfterUnits) {
-    this.instances = instances;
+  public ByteStreamService(Instance instance, long deadlineAfter, TimeUnit deadlineAfterUnits) {
+    this.instance = instance;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
   }
@@ -300,23 +300,13 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   void maybeInstanceRead(
       String resourceName, long offset, long limit, StreamObserver<ReadResponse> responseObserver)
-      throws InstanceNotFoundException, InvalidResourceNameException {
+      throws InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
-        readBlob(
-            instances.getFromBlob(resourceName),
-            parseBlobDigest(resourceName),
-            offset,
-            limit,
-            responseObserver);
+        readBlob(instance, parseBlobDigest(resourceName), offset, limit, responseObserver);
         break;
       case OperationStream:
-        readOperationStream(
-            instances.getFromOperationStream(resourceName),
-            resourceName,
-            offset,
-            limit,
-            responseObserver);
+        readOperationStream(instance, resourceName, offset, limit, responseObserver);
         break;
       case UploadBlob:
       default:
@@ -336,8 +326,6 @@ public class ByteStreamService extends ByteStreamImplBase {
 
     try {
       maybeInstanceRead(resourceName, offset, limit, responseObserver);
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
     } catch (InvalidResourceNameException e) {
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     }
@@ -361,9 +349,6 @@ public class ByteStreamService extends ByteStreamImplBase {
           format(
               "queryWriteStatus(%s) => committed_size = %d, complete = %s",
               resourceName, write.getCommittedSize(), write.isComplete()));
-    } catch (InstanceNotFoundException e) {
-      logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
     } catch (IllegalArgumentException | InvalidResourceNameException e) {
       logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
@@ -427,19 +412,15 @@ public class ByteStreamService extends ByteStreamImplBase {
     return instance.getOperationStreamWrite(resourceName);
   }
 
-  Write getWrite(String resourceName)
-      throws EntryLimitException, InstanceNotFoundException, InvalidResourceNameException {
+  Write getWrite(String resourceName) throws EntryLimitException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
-        return getBlobWrite(instances.getFromBlob(resourceName), parseBlobDigest(resourceName));
+        return getBlobWrite(instance, parseBlobDigest(resourceName));
       case UploadBlob:
         return getUploadBlobWrite(
-            instances.getFromUploadBlob(resourceName),
-            parseUploadBlobDigest(resourceName),
-            parseUploadBlobUUID(resourceName));
+            instance, parseUploadBlobDigest(resourceName), parseUploadBlobUUID(resourceName));
       case OperationStream:
-        return getOperationStreamWrite(
-            instances.getFromOperationStream(resourceName), resourceName);
+        return getOperationStreamWrite(instance, resourceName);
       default:
         throw new IllegalArgumentException();
     }
@@ -459,7 +440,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     ServerCallStreamObserver<WriteResponse> serverCallStreamObserver =
         initializeBackPressure(responseObserver);
     return new WriteStreamObserver(
-        instances,
+        instance,
         deadlineAfter,
         deadlineAfterUnits,
         () -> serverCallStreamObserver.request(1),
