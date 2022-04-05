@@ -66,6 +66,9 @@ start_server_and_worker(){
     if [ "${TEST_SHARD:-false}" = true ]; then
 
         echo "Testing with Shard Instances."
+        
+        # Build first to create more predictable run time.
+        ./bazel build $BUILDFARM_SERVER_TARGET $BUILDFARM_SHARD_WORKER_TAERGET
 
         # Start the server.
         ./bazel run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SHARD_SERVER_CONFIG > server.log 2>&1 &
@@ -79,6 +82,9 @@ start_server_and_worker(){
     else
 
         echo "Testing with Memory Instances."
+        
+        # Build first to create more predictable run time.
+        ./bazel build $BUILDFARM_SERVER_TARGET $BUILDFARM_WORKER_TARGET
 
         # Start the server.
         ./bazel run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
