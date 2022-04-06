@@ -65,7 +65,7 @@ tasks:
     bazel: "4.2.2"
     platform: centos7
     shell_commands:
-    - ./bazelw build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
+    - bazel build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
 
   # This will run unit tests that integrate with redis.
   # Outside of this step, similar functionality may be tested with mocks.
