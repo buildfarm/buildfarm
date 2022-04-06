@@ -54,7 +54,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(7);
@@ -86,7 +87,8 @@ public class ResourceDeciderTest {
             defaultMaxCores,
             /* onlyMulticoreTests=*/ true,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(1);
@@ -117,7 +119,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.cpu.claimed).isGreaterThan(0);
@@ -147,7 +150,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ true,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.cpu.limit).isTrue();
@@ -177,7 +181,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.cpu.limit).isFalse();
@@ -207,7 +212,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.cpu.claimed).isEqualTo(3);
@@ -236,7 +242,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.mem.min).isEqualTo(5);
@@ -260,7 +267,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -288,7 +296,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -319,7 +328,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -352,7 +362,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -387,7 +398,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(0);
@@ -422,7 +434,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -455,7 +468,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -489,7 +503,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -523,7 +538,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -558,7 +574,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isTrue();
@@ -591,7 +608,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.debugAfterExecution).isTrue();
@@ -624,7 +642,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isFalse();
@@ -646,7 +665,8 @@ public class ResourceDeciderTest {
             /* defaultMaxCores=*/ 0,
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
-            100);
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.workerName).isEqualTo("foo");
