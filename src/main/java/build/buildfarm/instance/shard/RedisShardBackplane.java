@@ -543,6 +543,10 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  private static String getQueuedOperationsListName(RedisShardBackplaneConfig config) {
+    return config.getQueuedOperationsListName() + "_" + getRedisQueueType(config);
+  }
+
   private static String getPreQueuedOperationsListName(RedisShardBackplaneConfig config) {
     return config.getPreQueuedOperationsListName() + "_" + getRedisQueueType(config);
   }
@@ -640,9 +644,9 @@ public class RedisShardBackplane implements Backplane {
           ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
-              getPreQueuedOperationsListName(config),
+              getQueuedOperationsListName(config),
               getRedisQueueType(config),
-              getQueueHashes(client, getPreQueuedOperationsListName(config)),
+              getQueueHashes(client, getQueuedOperationsListName(config)),
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }

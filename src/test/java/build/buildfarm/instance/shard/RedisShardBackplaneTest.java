@@ -128,7 +128,9 @@ public class RedisShardBackplaneTest {
             config.getOperationExpire(),
             RedisShardBackplane.operationPrinter.print(op));
     verify(jedisCluster, times(1))
-        .lpush(config.getPreQueuedOperationsListName(), JsonFormat.printer().print(executeEntry));
+        .lpush(
+            config.getPreQueuedOperationsListName() + "_regular",
+            JsonFormat.printer().print(executeEntry));
     verifyChangePublished(jedisCluster);
   }
 
@@ -179,7 +181,9 @@ public class RedisShardBackplaneTest {
     verify(mockJedisClusterFactory, times(1)).get();
     verify(jedisCluster, times(1)).hdel(config.getDispatchedOperationsHashName(), opName);
     verify(jedisCluster, times(1))
-        .lpush(config.getQueuedOperationsListName(), JsonFormat.printer().print(queueEntry));
+        .lpush(
+            config.getQueuedOperationsListName() + "_regular",
+            JsonFormat.printer().print(queueEntry));
     verifyChangePublished(jedisCluster);
   }
 
