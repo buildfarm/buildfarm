@@ -543,6 +543,14 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  private static String getPreQueuedOperationsListName(RedisShardBackplaneConfig config) {
+    return config.getPreQueuedOperationsListName() + "_" + getRedisQueueType(config);
+  }
+
+  private static String getQueueName(ProvisionedQueue pconfig, RedisShardBackplaneConfig rconfig) {
+    return pconfig.getName() + "_" + getRedisQueueType(rconfig);
+  }
+
   @Override
   public void start(String clientPublicName) throws IOException {
     // Construct a single redis client to be used throughout the entire backplane.
@@ -594,8 +602,8 @@ public class RedisShardBackplane implements Backplane {
       throws IOException {
     // Construct the prequeue so that elements are balanced across all redis nodes.
     return new BalancedRedisQueue(
-        config.getPreQueuedOperationsListName(),
-        getQueueHashes(client, config.getPreQueuedOperationsListName()),
+        getPreQueuedOperationsListName(config),
+        getQueueHashes(client, getPreQueuedOperationsListName(config)),
         config.getMaxPreQueueDepth(),
         getRedisQueueType(config));
   }
@@ -612,9 +620,9 @@ public class RedisShardBackplane implements Backplane {
     for (ProvisionedQueue queueConfig : config.getProvisionedQueues().getQueuesList()) {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
-              queueConfig.getName(),
+              getQueueName(queueConfig, config),
               getRedisQueueType(config),
-              getQueueHashes(client, queueConfig.getName()),
+              getQueueHashes(client, getQueueName(queueConfig, config)),
               toMultimap(queueConfig.getPlatform().getPropertiesList()),
               queueConfig.getAllowUnmatched());
       provisionedQueues.add(provisionedQueue);
@@ -632,9 +640,9 @@ public class RedisShardBackplane implements Backplane {
           ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
-              config.getQueuedOperationsListName(),
+              getPreQueuedOperationsListName(config),
               getRedisQueueType(config),
-              getQueueHashes(client, config.getQueuedOperationsListName()),
+              getQueueHashes(client, getPreQueuedOperationsListName(config)),
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }
