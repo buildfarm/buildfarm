@@ -28,7 +28,7 @@ import org.junit.runners.JUnit4;
 import redis.clients.jedis.JedisCluster;
 
 /**
- * @class RedisQueueTest
+ * @class RedisPriorityQueueTest
  * @brief tests A redis queue.
  * @details A redis queue is an implementation of a queue data structure which internally uses redis
  *     to store and distribute the data. Its important to know that the lifetime of the queue
@@ -37,7 +37,7 @@ import redis.clients.jedis.JedisCluster;
  *     queue.
  */
 @RunWith(JUnit4.class)
-public class RedisQueueTest {
+public class RedisPriorityQueueTest {
   private JedisCluster redis;
 
   @Before
@@ -50,13 +50,13 @@ public class RedisQueueTest {
     redis.close();
   }
 
-  // Function under test: RedisQueue
+  // Function under test: RedisPriorityQueue
   // Reason for testing: the queue can be constructed with a valid cluster instance and name
   // Failure explanation: the queue is throwing an exception upon construction
   @Test
-  public void redisQueueConstructsWithoutError() throws Exception {
+  public void redisPriorityQueueConstructsWithoutError() throws Exception {
     // ACT
-    new RedisQueue("test");
+    new RedisPriorityQueue("test");
   }
 
   // Function under test: push
@@ -65,7 +65,7 @@ public class RedisQueueTest {
   @Test
   public void pushPushWithoutError() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
 
     // ACT
     queue.push(redis, "foo");
@@ -77,7 +77,7 @@ public class RedisQueueTest {
   @Test
   public void pushPushDifferentWithoutError() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
 
     // ACT
     queue.push(redis, "foo");
@@ -90,7 +90,7 @@ public class RedisQueueTest {
   @Test
   public void pushPushSameWithoutError() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
 
     // ACT
     queue.push(redis, "foo");
@@ -103,7 +103,7 @@ public class RedisQueueTest {
   @Test
   public void pushPushMany() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
 
     // ACT
     for (int i = 0; i < 1000; ++i) {
@@ -117,29 +117,29 @@ public class RedisQueueTest {
   @Test
   public void pushPushIncreasesSize() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
 
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
     queue.push(redis, "foo");
     assertThat(queue.size(redis)).isEqualTo(1);
-    queue.push(redis, "foo");
+    queue.push(redis, "foo1");
     assertThat(queue.size(redis)).isEqualTo(2);
-    queue.push(redis, "foo");
+    queue.push(redis, "foo2");
     assertThat(queue.size(redis)).isEqualTo(3);
-    queue.push(redis, "foo");
+    queue.push(redis, "foo3");
     assertThat(queue.size(redis)).isEqualTo(4);
-    queue.push(redis, "foo");
+    queue.push(redis, "foo4");
     assertThat(queue.size(redis)).isEqualTo(5);
-    queue.push(redis, "foo");
+    queue.push(redis, "foo5");
     assertThat(queue.size(redis)).isEqualTo(6);
-    queue.push(redis, "foo");
+    queue.push(redis, "foo6");
     assertThat(queue.size(redis)).isEqualTo(7);
-    queue.push(redis, "foo");
+    queue.push(redis, "foo7");
     assertThat(queue.size(redis)).isEqualTo(8);
-    queue.push(redis, "foo");
+    queue.push(redis, "foo8");
     assertThat(queue.size(redis)).isEqualTo(9);
-    queue.push(redis, "foo");
+    queue.push(redis, "foo9");
     assertThat(queue.size(redis)).isEqualTo(10);
   }
 
@@ -149,7 +149,7 @@ public class RedisQueueTest {
   @Test
   public void getNameNameIsStored() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("queue_name");
+    RedisPriorityQueue queue = new RedisPriorityQueue("queue_name");
 
     // ACT
     String name = queue.getName();
@@ -164,7 +164,7 @@ public class RedisQueueTest {
   @Test
   public void getDequeueNameNameIsStored() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("queue_name");
+    RedisPriorityQueue queue = new RedisPriorityQueue("queue_name");
 
     // ACT
     String name = queue.getDequeueName();
@@ -179,7 +179,8 @@ public class RedisQueueTest {
   @Test
   public void sizeAdjustPushDequeue() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("{hash}test");
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
     queue.push(redis, "foo");
@@ -188,11 +189,11 @@ public class RedisQueueTest {
     assertThat(queue.size(redis)).isEqualTo(2);
     queue.push(redis, "baz");
     assertThat(queue.size(redis)).isEqualTo(3);
-    queue.push(redis, "baz");
+    queue.push(redis, "baz2");
     assertThat(queue.size(redis)).isEqualTo(4);
-    queue.push(redis, "baz");
+    queue.push(redis, "baz3");
     assertThat(queue.size(redis)).isEqualTo(5);
-    queue.push(redis, "baz");
+    queue.push(redis, "baz4");
     assertThat(queue.size(redis)).isEqualTo(6);
     queue.dequeue(redis, 1);
     assertThat(queue.size(redis)).isEqualTo(5);
@@ -208,13 +209,55 @@ public class RedisQueueTest {
     assertThat(queue.size(redis)).isEqualTo(0);
   }
 
+  // Function under test: size
+  // Reason for testing: size adjusts with push and dequeue
+  // Failure explanation: size is incorrectly reporting the expected queue size
+  @Test
+  public void checkPriorityOnDequeue() throws Exception {
+    // ARRANGE
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    String val;
+    // ACT / ASSERT
+    assertThat(queue.size(redis)).isEqualTo(0);
+    queue.push(redis, "foo", 2);
+    assertThat(queue.size(redis)).isEqualTo(1);
+    queue.push(redis, "bar", 1);
+    assertThat(queue.size(redis)).isEqualTo(2);
+    queue.push(redis, "baz", 3);
+    assertThat(queue.size(redis)).isEqualTo(3);
+    queue.push(redis, "baz2", 1);
+    assertThat(queue.size(redis)).isEqualTo(4);
+    queue.push(redis, "baz3", 2);
+    assertThat(queue.size(redis)).isEqualTo(5);
+    queue.push(redis, "baz4", 1);
+    assertThat(queue.size(redis)).isEqualTo(6);
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("bar");
+    assertThat(queue.size(redis)).isEqualTo(5);
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("baz2");
+    assertThat(queue.size(redis)).isEqualTo(4);
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("baz4");
+    assertThat(queue.size(redis)).isEqualTo(3);
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("foo");
+    assertThat(queue.size(redis)).isEqualTo(2);
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("baz3");
+    assertThat(queue.size(redis)).isEqualTo(1);
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("baz");
+    assertThat(queue.size(redis)).isEqualTo(0);
+  }
+
   // Function under test: visit
   // Reason for testing: each element in the queue can be visited
   // Failure explanation: we are unable to visit each element in the queue
   @Test
   public void visitCheckVisitOfEachElement() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
     queue.push(redis, "element 1");
     queue.push(redis, "element 2");
     queue.push(redis, "element 3");
@@ -252,7 +295,7 @@ public class RedisQueueTest {
   @Test
   public void visitVisitManyOverPageSize() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
     for (int i = 0; i < 2500; ++i) {
       queue.push(redis, "foo" + i);
     }

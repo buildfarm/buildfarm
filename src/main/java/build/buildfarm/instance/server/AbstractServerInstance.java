@@ -1839,7 +1839,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected CacheCapabilities getCacheCapabilities() {
     return CacheCapabilities.newBuilder()
-        .addDigestFunction(digestUtil.getDigestFunction())
+        .addDigestFunctions(digestUtil.getDigestFunction())
         .setActionCacheUpdateCapabilities(
             ActionCacheUpdateCapabilities.newBuilder().setUpdateEnabled(true))
         .setMaxBatchTotalSizeBytes(Size.mbToBytes(4))

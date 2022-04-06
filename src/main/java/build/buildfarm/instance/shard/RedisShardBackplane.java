@@ -55,6 +55,7 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueueType;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
@@ -533,6 +534,15 @@ public class RedisShardBackplane implements Backplane {
     return set;
   }
 
+  private static String getRedisQueueType(RedisShardBackplaneConfig config) {
+    QueueType queue = config.getRedisQueueType();
+    if (queue.equals(QueueType.REGULAR)) {
+      return "regular";
+    } else {
+      return "priority";
+    }
+  }
+
   @Override
   public void start(String clientPublicName) throws IOException {
     // Construct a single redis client to be used throughout the entire backplane.
@@ -586,7 +596,8 @@ public class RedisShardBackplane implements Backplane {
     return new BalancedRedisQueue(
         config.getPreQueuedOperationsListName(),
         getQueueHashes(client, config.getPreQueuedOperationsListName()),
-        config.getMaxPreQueueDepth());
+        config.getMaxPreQueueDepth(),
+        getRedisQueueType(config));
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -602,6 +613,7 @@ public class RedisShardBackplane implements Backplane {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               queueConfig.getName(),
+              getRedisQueueType(config),
               getQueueHashes(client, queueConfig.getName()),
               toMultimap(queueConfig.getPlatform().getPropertiesList()),
               queueConfig.getAllowUnmatched());
@@ -621,6 +633,7 @@ public class RedisShardBackplane implements Backplane {
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
               config.getQueuedOperationsListName(),
+              getRedisQueueType(config),
               getQueueHashes(client, config.getQueuedOperationsListName()),
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
