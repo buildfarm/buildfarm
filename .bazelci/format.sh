@@ -9,7 +9,7 @@ LOCAL_FORMATTER="java_formatter.jar"
 
 FORMAT_PROTO=true
 CLANG_FORMAT=@llvm_toolchain//:bin/clang-format
-BAZEL_WRAPPER=./bazelw
+BAZEL_WRAPPER=bazel
 
 FORMAT_BUILD=true
 BUILDIFIER=//:buildifier
