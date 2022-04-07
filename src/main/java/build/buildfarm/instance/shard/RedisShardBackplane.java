@@ -544,15 +544,27 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private static String getQueuedOperationsListName(RedisShardBackplaneConfig config) {
-    return config.getQueuedOperationsListName() + "_" + getRedisQueueType(config);
+    String queue_type = getRedisQueueType(config);
+    String operations_list_name = config.getQueuedOperationsListName();
+    return ((queue_type.equals("priority"))
+        ? operations_list_name + "_" + queue_type
+        : operations_list_name);
   }
 
   private static String getPreQueuedOperationsListName(RedisShardBackplaneConfig config) {
-    return config.getPreQueuedOperationsListName() + "_" + getRedisQueueType(config);
+    String queue_type = getRedisQueueType(config);
+    String prequeue_operations = config.getPreQueuedOperationsListName();
+    return ((queue_type.equals("priority"))
+        ? prequeue_operations + "_" + queue_type
+        : prequeue_operations);
   }
 
   private static String getQueueName(ProvisionedQueue pconfig, RedisShardBackplaneConfig rconfig) {
-    return pconfig.getName() + "_" + getRedisQueueType(rconfig);
+    String queue_type = getRedisQueueType(rconfig);
+    String provisioned_queue = pconfig.getName();
+    return ((queue_type.equals("priority"))
+        ? provisioned_queue + "_" + queue_type
+        : provisioned_queue);
   }
 
   @Override
