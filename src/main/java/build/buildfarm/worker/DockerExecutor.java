@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.buildfarm.common.MapUtils;
 import build.buildfarm.common.io.Utils;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CopyArchiveFromContainerCmd;
@@ -42,7 +43,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -312,7 +312,7 @@ public class DockerExecutor {
     createContainerCmd.withAttachStdout(true);
     createContainerCmd.withTty(true);
     createContainerCmd.withHostConfig(getHostConfig(settings.execDir));
-    createContainerCmd.withEnv(envMapToList(settings.envVars));
+    createContainerCmd.withEnv(MapUtils.envMapToList(settings.envVars));
     createContainerCmd.withNetworkDisabled(!settings.limits.containerSettings.network);
     createContainerCmd.withStopTimeout((int) settings.timeout.getSeconds());
     // run container creation and log any warnings
@@ -377,20 +377,5 @@ public class DockerExecutor {
     } catch (Exception e) {
       logger.log(Level.WARNING, "Could not extract file from container: ", e);
     }
-  }
-  /**
-   * @brief Convert map to docker env list.
-   * @details Docker configuration needs the environment variables in the format VAR=VAL.
-   * @param envVars Environment vars to make visible in the container.
-   * @return Enviornment vars in docker list format.
-   * @note Suggested return identifier: envList.
-   */
-  private static List<String> envMapToList(Map<String, String> envVars) {
-    List<String> envList = new ArrayList<>();
-    for (Map.Entry<String, String> environmentVariable : envVars.entrySet()) {
-      envList.add(environmentVariable.getKey() + "=" + environmentVariable.getValue());
-    }
-
-    return envList;
   }
 }

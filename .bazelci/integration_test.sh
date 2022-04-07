@@ -8,6 +8,7 @@
 docker run -d --name buildfarm-redis --network host redis:5.0.9 --bind localhost
 
 # Build a container for buildfarm services
+cp `which bazel` bazel
 docker build -t buildfarm .
 
 # Start the servies and do a test build
