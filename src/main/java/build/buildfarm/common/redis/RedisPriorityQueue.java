@@ -15,7 +15,13 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.StringVisitor;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import redis.clients.jedis.JedisCluster;
 
 /**
@@ -27,7 +33,7 @@ import redis.clients.jedis.JedisCluster;
  *     Therefore, two redis queues with the same name, would in fact be the same underlying redis
  *     queue.
  */
-public class RedisQueue extends QueueInterface {
+public class RedisPriorityQueue extends QueueInterface {
   /**
    * @field name
    * @brief The unique name of the queue.
@@ -36,34 +42,51 @@ public class RedisQueue extends QueueInterface {
    */
   private final String name;
 
+  private final String script;
+  private Timestamp time;
+  private final List<String> keys;
+
   /**
    * @brief Constructor.
    * @details Construct a named redis queue with an established redis cluster.
    * @param name The global name of the queue.
    */
-  public RedisQueue(String name) {
-    // In order for dequeue properly, the queue needs o have a hashtag.  Otherwise it will error
-    // with: "No way to dispatch this command to Redis Cluster because keys have different slots."
-    // when trying to brpoplpush. If no hashtag was given we provide a default.
-    this.name = name;
+  public RedisPriorityQueue(String name) {
+    this(name, new Timestamp());
   }
 
   /**
-   * @brief Push a value onto the queue.
-   * @details Adds the value into the backend redis queue.
-   * @param val The value to push onto the queue.
+   * @brief Constructor.
+   * @details Construct a named redis queue with an established redis cluster. Used to ease the
+   *     testing of the order of the queued actions
+   * @param name The global name of the queue.
+   * @param time Timestamp of the operation.
    */
+  public RedisPriorityQueue(String name, Timestamp time) {
+    this.name = name;
+    this.time = time;
+    this.keys = Arrays.asList(name);
+    this.script = getLuaScript("zpoplpush.lua");
+  }
+
+  /**
+   * @brief Push a value onto the queue with specified priority.
+   * @details Adds the value into the backend redis ordered set.
+   * @param val The value to push onto the priority queue.
+   */
+  @Override
+  public void push(JedisCluster jedis, String val, double priority) {
+    jedis.zadd(name, priority, time.getNanos() + ":" + val);
+  }
+
+  /**
+   * @brief Push a value onto the queue with default priority of 1.
+   * @details Adds the value into the backend rdered set.
+   * @param val The value to push onto the priority queue.
+   */
+  @Override
   public void push(JedisCluster jedis, String val) {
     push(jedis, val, 1);
-  }
-
-  /**
-   * @brief Push a value onto the queue.
-   * @details Adds the value into the backend redis queue.
-   * @param val The value to push onto the queue.
-   */
-  public void push(JedisCluster jedis, String val, double priority) {
-    jedis.lpush(name, val);
   }
 
   /**
@@ -73,6 +96,7 @@ public class RedisQueue extends QueueInterface {
    * @return Whether or not the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
+  @Override
   public boolean removeFromDequeue(JedisCluster jedis, String val) {
     return jedis.lrem(getDequeueName(), -1, val) != 0;
   }
@@ -84,8 +108,9 @@ public class RedisQueue extends QueueInterface {
    * @return Whether or not the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
+  @Override
   public boolean removeAll(JedisCluster jedis, String val) {
-    return jedis.lrem(name, 0, val) != 0;
+    return jedis.zrem(name, val) != 0;
   }
 
   /**
@@ -98,12 +123,18 @@ public class RedisQueue extends QueueInterface {
    * @note Overloaded.
    * @note Suggested return identifier: val.
    */
+  @Override
   public String dequeue(JedisCluster jedis, int timeout_s) throws InterruptedException {
+    List<String> args = Arrays.asList(name, getDequeueName(), "true");
+    String val;
     for (int i = 0; i < timeout_s; ++i) {
-      String val = jedis.brpoplpush(name, getDequeueName(), 1);
-      if (val != null) {
-        return val;
-      }
+      do {
+        Object obj_val = jedis.eval(script, keys, args);
+        val = String.valueOf(obj_val);
+        if (!isEmpty(val)) {
+          return val;
+        }
+      } while (!isEmpty(val));
     }
     return null;
   }
@@ -115,9 +146,12 @@ public class RedisQueue extends QueueInterface {
    * @return The value of the transfered element. null if nothing was dequeued.
    * @note Suggested return identifier: val.
    */
+  @Override
   public String nonBlockingDequeue(JedisCluster jedis) throws InterruptedException {
-    String val = jedis.rpoplpush(name, getDequeueName());
-    if (val != null) {
+    List<String> args = Arrays.asList(name, getDequeueName());
+    Object obj_val = jedis.eval(script, keys, args);
+    String val = String.valueOf(obj_val);
+    if (!isEmpty(val)) {
       return val;
     }
     if (Thread.currentThread().isInterrupted()) {
@@ -132,6 +166,7 @@ public class RedisQueue extends QueueInterface {
    * @return The name of the queue.
    * @note Suggested return identifier: name.
    */
+  @Override
   public String getName() {
     return name;
   }
@@ -153,8 +188,9 @@ public class RedisQueue extends QueueInterface {
    * @return The current length of the queue.
    * @note Suggested return identifier: length.
    */
+  @Override
   public long size(JedisCluster jedis) {
-    return jedis.llen(name);
+    return jedis.zcard(name);
   }
 
   /**
@@ -163,6 +199,7 @@ public class RedisQueue extends QueueInterface {
    * @param visitor A visitor for each visited element in the queue.
    * @note Overloaded.
    */
+  @Override
   public void visit(JedisCluster jedis, StringVisitor visitor) {
     visit(jedis, name, visitor);
   }
@@ -172,8 +209,21 @@ public class RedisQueue extends QueueInterface {
    * @details Enacts a visitor over each element in the dequeue.
    * @param visitor A visitor for each visited element in the queue.
    */
+  @Override
   public void visitDequeue(JedisCluster jedis, StringVisitor visitor) {
-    visit(jedis, getDequeueName(), visitor);
+    int listPageSize = 10000;
+    int index = 0;
+    int nextIndex = listPageSize;
+    List<String> entries;
+
+    do {
+      entries = jedis.lrange(getDequeueName(), index, nextIndex - 1);
+      for (String entry : entries) {
+        visitor.visit(entry);
+      }
+      index = nextIndex;
+      nextIndex += entries.size();
+    } while (entries.size() == listPageSize);
   }
 
   /**
@@ -185,18 +235,41 @@ public class RedisQueue extends QueueInterface {
    */
   private void visit(JedisCluster jedis, String queueName, StringVisitor visitor) {
     int listPageSize = 10000;
-
     int index = 0;
     int nextIndex = listPageSize;
-    List<String> entries;
+    Set<String> entries;
 
     do {
-      entries = jedis.lrange(queueName, index, nextIndex - 1);
+      entries = jedis.zrange(queueName, index, nextIndex - 1);
       for (String entry : entries) {
-        visitor.visit(entry);
+        // Clear the appended timestamp
+        visitor.visit(entry.replaceFirst("^([0-9]+):(?!$)", ""));
       }
       index = nextIndex;
       nextIndex += entries.size();
     } while (entries.size() == listPageSize);
+  }
+
+  /**
+   * @brief Adds additional functionality to the jedis client.
+   * @details Load the custom lua script so we can have zpoplpush.
+   */
+  private String getLuaScript(String filename) {
+    InputStream luaInputStream = this.getClass().getClassLoader().getResourceAsStream(filename);
+    if (luaInputStream == null) {
+      throw new IllegalArgumentException(filename + " is not found");
+    }
+    return new BufferedReader(new InputStreamReader(luaInputStream))
+        .lines()
+        .collect(Collectors.joining("\n"));
+  }
+
+  /**
+   * @brief Implement handy isEmpty method.
+   * @details Compare the value for null, (empty string) or "null" string. For some reason
+   *     redis/jedis returns 'null' as string
+   */
+  private boolean isEmpty(String val) {
+    return val == null || val.isEmpty() || val.equalsIgnoreCase("null");
   }
 }

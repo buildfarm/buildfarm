@@ -465,9 +465,10 @@ public class Worker extends LoggingMain {
             instance,
             config.getDefaultActionTimeout(),
             config.getMaximumActionTimeout(),
-            config.getLimitExecution(),
+            config.getDefaultMaxCores(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
+            config.getAllowBringYourOwnContainer(),
             config.getErrorOperationRemainingResources(),
             writer);
 

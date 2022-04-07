@@ -55,6 +55,7 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueueType;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
@@ -533,6 +534,39 @@ public class RedisShardBackplane implements Backplane {
     return set;
   }
 
+  private static String getRedisQueueType(RedisShardBackplaneConfig config) {
+    QueueType queue = config.getRedisQueueType();
+    if (queue.equals(QueueType.REGULAR)) {
+      return "regular";
+    } else {
+      return "priority";
+    }
+  }
+
+  private static String getQueuedOperationsListName(RedisShardBackplaneConfig config) {
+    String queue_type = getRedisQueueType(config);
+    String operations_list_name = config.getQueuedOperationsListName();
+    return ((queue_type.equals("priority"))
+        ? operations_list_name + "_" + queue_type
+        : operations_list_name);
+  }
+
+  private static String getPreQueuedOperationsListName(RedisShardBackplaneConfig config) {
+    String queue_type = getRedisQueueType(config);
+    String prequeue_operations = config.getPreQueuedOperationsListName();
+    return ((queue_type.equals("priority"))
+        ? prequeue_operations + "_" + queue_type
+        : prequeue_operations);
+  }
+
+  private static String getQueueName(ProvisionedQueue pconfig, RedisShardBackplaneConfig rconfig) {
+    String queue_type = getRedisQueueType(rconfig);
+    String provisioned_queue = pconfig.getName();
+    return ((queue_type.equals("priority"))
+        ? provisioned_queue + "_" + queue_type
+        : provisioned_queue);
+  }
+
   @Override
   public void start(String clientPublicName) throws IOException {
     // Construct a single redis client to be used throughout the entire backplane.
@@ -584,9 +618,10 @@ public class RedisShardBackplane implements Backplane {
       throws IOException {
     // Construct the prequeue so that elements are balanced across all redis nodes.
     return new BalancedRedisQueue(
-        config.getPreQueuedOperationsListName(),
-        getQueueHashes(client, config.getPreQueuedOperationsListName()),
-        config.getMaxPreQueueDepth());
+        getPreQueuedOperationsListName(config),
+        getQueueHashes(client, getPreQueuedOperationsListName(config)),
+        config.getMaxPreQueueDepth(),
+        getRedisQueueType(config));
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -601,8 +636,9 @@ public class RedisShardBackplane implements Backplane {
     for (ProvisionedQueue queueConfig : config.getProvisionedQueues().getQueuesList()) {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
-              queueConfig.getName(),
-              getQueueHashes(client, queueConfig.getName()),
+              getQueueName(queueConfig, config),
+              getRedisQueueType(config),
+              getQueueHashes(client, getQueueName(queueConfig, config)),
               toMultimap(queueConfig.getPlatform().getPropertiesList()),
               queueConfig.getAllowUnmatched());
       provisionedQueues.add(provisionedQueue);
@@ -620,8 +656,9 @@ public class RedisShardBackplane implements Backplane {
           ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
-              config.getQueuedOperationsListName(),
-              getQueueHashes(client, config.getQueuedOperationsListName()),
+              getQueuedOperationsListName(config),
+              getRedisQueueType(config),
+              getQueueHashes(client, getQueuedOperationsListName(config)),
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }
