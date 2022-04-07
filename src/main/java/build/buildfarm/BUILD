@@ -62,6 +62,7 @@ java_binary(
     name = "buildfarm-shard-worker",
     classpath_resources = [
         ":configs",
+        ":lua_resources",
     ],
     jvm_flags = ensure_accurate_metadata(),
     main_class = "build.buildfarm.worker.shard.Worker",

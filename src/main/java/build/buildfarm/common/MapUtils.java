@@ -14,6 +14,8 @@
 
 package build.buildfarm.common;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -43,5 +45,22 @@ public class MapUtils {
     return map.keySet().stream()
         .map(key -> key + "=" + map.get(key))
         .collect(Collectors.joining(", ", "{", "}"));
+  }
+
+  /**
+   * @brief Convert map to env list assignment format.
+   * @details An example use-case is for Docker configuration which needs the environment variables
+   *     in the format VAR=VAL.
+   * @param envVars Environment vars to convert to list elements of VAR=VAL.
+   * @return Enviornment vars in list assignment format.
+   * @note Suggested return identifier: envList.
+   */
+  public static List<String> envMapToList(Map<String, String> envVars) {
+    List<String> envList = new ArrayList<>();
+    for (Map.Entry<String, String> environmentVariable : envVars.entrySet()) {
+      envList.add(environmentVariable.getKey() + "=" + environmentVariable.getValue());
+    }
+
+    return envList;
   }
 }

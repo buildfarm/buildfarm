@@ -17,6 +17,7 @@ package build.buildfarm.common;
 import static com.google.common.truth.Truth.assertThat;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -132,5 +133,40 @@ public class MapUtilsTest {
 
     // ASSERT
     assertThat(result).isEqualTo("{bar=2, foo=1, baz=456}");
+  }
+
+  // Function under test: envMapToList
+  // Reason for testing: empty maps produce empty lists
+  // Failure explanation: edge case not met
+  @Test
+  public void envMapToListEmpty() throws Exception {
+    // ARRANGE
+    Map<String, String> map = new HashMap();
+
+    // ACT
+    List<String> result = MapUtils.envMapToList(map);
+
+    // ASSERT
+    assertThat(result).isEmpty();
+  }
+
+  // Function under test: envMapToList
+  // Reason for testing: test conversions are in expected format
+  // Failure explanation: conversion not correct
+  @Test
+  public void envMapToListConversion() throws Exception {
+    // ARRANGE
+    Map<String, String> map = new HashMap();
+    map.put("KEY1", "VAL1");
+    map.put("KEY2", "VAL2");
+    map.put("KEY3", "VAL3");
+
+    // ACT
+    List<String> result = MapUtils.envMapToList(map);
+
+    // ASSERT
+    assertThat(result).contains("KEY1=VAL1");
+    assertThat(result).contains("KEY2=VAL2");
+    assertThat(result).contains("KEY3=VAL3");
   }
 }

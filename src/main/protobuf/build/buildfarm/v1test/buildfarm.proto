@@ -452,6 +452,12 @@ message ProvisionedQueue {
 
 message ProvisionedQueuesConfig { repeated ProvisionedQueue queues = 1; }
 
+enum QueueType {
+  // the type of the redis queue
+  REGULAR = 0;
+  PRIORITY = 1;
+};
+
 message RedisShardBackplaneConfig {
   // the uri endpoint of the redis target. This must be a single host entry
   // with cluster discoverability enabled if the redis service is configured
@@ -462,8 +468,7 @@ message RedisShardBackplaneConfig {
   // the password used to authenticate to redis via `auth`
   string redis_password = 34;
 
-  // the type of the redis queue (regular or priority)
-  optional string redis_queue_type = 12;
+  QueueType redis_queue_type = 12;
 
   // the size of the pool of jedis connections per-cluster-member
   int32 jedis_pool_max_total = 15;
@@ -729,6 +734,12 @@ message ShardWorkerConfig {
   // only allow test executions to respect min-cores > 1, limiting range to 1 ->
   // default_max_cores if not a test
   bool only_multicore_tests = 30;
+
+  // Some actions may need to run in a container specified by the client.  By
+  // using exec_properties clients can request the container for buildfarm to
+  // pull and use.  This feature is known as "bring your own container".  If the
+  // feature is disabled the corresponding exec_properties will be ignored.
+  bool allow_bring_your_own_container = 43;
 
   // user principal name for executions
   string exec_owner = 32;
