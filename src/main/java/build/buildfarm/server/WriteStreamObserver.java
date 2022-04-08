@@ -119,14 +119,14 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private Write getWrite(String resourceName)
       throws EntryLimitException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
-      case UploadBlob:
+      case UPLOAD_BLOB_REQUEST:
         Digest uploadBlobDigest = parseUploadBlobDigest(resourceName);
         expectedCommittedSize = uploadBlobDigest.getSizeBytes();
         return ByteStreamService.getUploadBlobWrite(
             instance, uploadBlobDigest, parseUploadBlobUUID(resourceName));
-      case OperationStream:
+      case STREAM_OPERATION_REQUEST:
         return ByteStreamService.getOperationStreamWrite(instance, resourceName);
-      case Blob:
+      case DOWNLOAD_BLOB_REQUEST:
       default:
         throw INVALID_ARGUMENT
             .withDescription("unknown resource operation for " + resourceName)
