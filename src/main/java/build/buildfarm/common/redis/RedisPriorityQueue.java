@@ -71,7 +71,7 @@ public class RedisPriorityQueue extends QueueInterface {
 
   /**
    * @brief Push a value onto the queue with default priority of 0.
-   * @details Adds the value into the backend rdered set.
+   * @details Adds the value into the backend ordered set.
    * @param val The value to push onto the priority queue.
    */
   @Override
