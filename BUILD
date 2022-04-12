@@ -3,6 +3,7 @@ load("@io_bazel_rules_docker//java:image.bzl", "java_image")
 load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "download_pkgs")
 load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+load("@oss_audit//java:oss_audit.bzl", "oss_audit")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -138,6 +139,13 @@ java_image(
         ":telemetry_tools",
         "//src/main/java/build/buildfarm/server",
     ],
+)
+
+oss_audit(
+    name = "buildfarm-server-audit",
+    src = "//src/main/java/build/buildfarm/server",
+    #approved_list = "//your-project:approved_list.yaml",
+    #denied_list = "//your-project:denied_list.yaml",
 )
 
 # A worker image may need additional packages installed that are not in the base image.

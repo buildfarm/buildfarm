@@ -105,6 +105,13 @@ def archive_dependencies(third_party):
             "strip_prefix": "TARDIS-f54fa4743e67763bb1ad77039b3d15be64e2e564",
             "url": "https://github.com/Unilang/TARDIS/archive/f54fa4743e67763bb1ad77039b3d15be64e2e564.zip",
         },
+        
+        {
+            "name": "rules_oss_audit",
+            "sha256": "87cd76d9e33a1e70fd99ab795b9e431a41feaeed8e96caaf7dba300fab804116",
+            "strip_prefix": "rules_oss_audit-3885863c6953668c6a696b908d138264b76e3d63",
+            "url": "https://github.com/vmware/rules_oss_audit/archive/3885863c6953668c6a696b908d138264b76e3d63.zip",
+        }
     ]
 
 def buildfarm_dependencies(repository_name = "build_buildfarm"):
