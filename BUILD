@@ -144,8 +144,6 @@ java_image(
 oss_audit(
     name = "buildfarm-server-audit",
     src = "//src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm",
-    #approved_list = "//your-project:approved_list.yaml",
-    #denied_list = "//your-project:denied_list.yaml",
 )
 
 # A worker image may need additional packages installed that are not in the base image.
