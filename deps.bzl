@@ -108,9 +108,9 @@ def archive_dependencies(third_party):
         
         {
             "name": "rules_oss_audit",
-            "sha256": "87cd76d9e33a1e70fd99ab795b9e431a41feaeed8e96caaf7dba300fab804116",
-            "strip_prefix": "rules_oss_audit-3885863c6953668c6a696b908d138264b76e3d63",
-            "url": "https://github.com/vmware/rules_oss_audit/archive/3885863c6953668c6a696b908d138264b76e3d63.zip",
+            "sha256": "6f9e3e108e8dd67275485a5d2e7fff7451b1657cd169ef0442a3d4fd8f286627",
+            "strip_prefix": "rules_oss_audit-2d33395730eaf96cd0626955cd9ed78707ce167d",
+            "url": "https://github.com/luxe/rules_oss_audit/archive/2d33395730eaf96cd0626955cd9ed78707ce167d.zip",
         }
     ]
 
