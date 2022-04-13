@@ -3,7 +3,7 @@ load("@io_bazel_rules_docker//java:image.bzl", "java_image")
 load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "download_pkgs")
 load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
-load("@rules_oss_audit//oss_audit/java:oss_audit.bzl", "oss_audit")
+load("@rules_oss_audit//oss_audit:java/oss_audit.bzl", "oss_audit")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -143,7 +143,7 @@ java_image(
 
 oss_audit(
     name = "buildfarm-server-audit",
-    src = "//src/main/java/build/buildfarm/server",
+    src = "//src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm",
     #approved_list = "//your-project:approved_list.yaml",
     #denied_list = "//your-project:denied_list.yaml",
 )
