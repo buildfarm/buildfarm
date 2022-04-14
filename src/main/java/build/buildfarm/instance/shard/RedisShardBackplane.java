@@ -1138,11 +1138,12 @@ public class RedisShardBackplane implements Backplane {
       JedisCluster jedis,
       String operationName,
       List<Platform.Property> provisions,
-      String queueEntryJson) {
+      String queueEntryJson,
+      int priority) {
     if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
       logger.log(Level.WARNING, format("removed dispatched operation %s", operationName));
     }
-    operationQueue.push(jedis, provisions, queueEntryJson);
+    operationQueue.push(jedis, provisions, queueEntryJson, priority);
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -1152,6 +1153,7 @@ public class RedisShardBackplane implements Backplane {
     String operationJson = operationPrinter.print(operation);
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
     Operation publishOperation = onPublish.apply(operation);
+    int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
     client.run(
         jedis -> {
           jedis.setex(operationKey(operationName), config.getOperationExpire(), operationJson);
@@ -1159,7 +1161,8 @@ public class RedisShardBackplane implements Backplane {
               jedis,
               operation.getName(),
               queueEntry.getPlatform().getPropertiesList(),
-              queueEntryJson);
+              queueEntryJson,
+              priority);
           publishReset(jedis, publishOperation);
         });
   }
@@ -1342,8 +1345,9 @@ public class RedisShardBackplane implements Backplane {
                 operation != null && !operation.getDone(); // operation removed or completed somehow
             if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1
                 && requeue) {
+              int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
               operationQueue.push(
-                  jedis, queueEntry.getPlatform().getPropertiesList(), queueEntryJson);
+                  jedis, queueEntry.getPlatform().getPropertiesList(), queueEntryJson, priority);
             }
           }
         });
@@ -1384,10 +1388,11 @@ public class RedisShardBackplane implements Backplane {
     String operationJson = operationPrinter.print(operation);
     String executeEntryJson = JsonFormat.printer().print(executeEntry);
     Operation publishOperation = onPublish.apply(operation);
+    int priority = executeEntry.getExecutionPolicy().getPriority();
     client.run(
         jedis -> {
           jedis.setex(operationKey(operationName), config.getOperationExpire(), operationJson);
-          prequeue.push(jedis, executeEntryJson);
+          prequeue.push(jedis, executeEntryJson, priority);
           publishReset(jedis, publishOperation);
         });
   }
@@ -1410,9 +1415,15 @@ public class RedisShardBackplane implements Backplane {
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     Operation publishOperation = keepaliveOperation(operationName);
+    int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
     client.run(
         jedis -> {
-          queue(jedis, operationName, queueEntry.getPlatform().getPropertiesList(), queueEntryJson);
+          queue(
+              jedis,
+              operationName,
+              queueEntry.getPlatform().getPropertiesList(),
+              queueEntryJson,
+              priority);
           publishReset(jedis, publishOperation);
         });
   }
