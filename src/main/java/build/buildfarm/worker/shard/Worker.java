@@ -989,7 +989,6 @@ public class Worker extends LoggingMain {
       logger.log(SEVERE, "error starting worker", e);
       return;
     }
-
     pipeline.start();
     healthCheckMetric.labels("start").inc();
     executionSlotsTotal.set(config.getExecuteStageWidth());
