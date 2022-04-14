@@ -179,8 +179,7 @@ public class RedisQueueTest {
   @Test
   public void sizeAdjustPushDequeue() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("test");
-
+    RedisQueue queue = new RedisQueue("{hash}test");
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
     queue.push(redis, "foo");

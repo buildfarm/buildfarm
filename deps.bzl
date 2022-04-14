@@ -17,6 +17,14 @@ def archive_dependencies(third_party):
             "url": "https://github.com/bazelbuild/rules_jvm_external/archive/%s.zip" % RULES_JVM_EXTERNAL_TAG,
         },
 
+        # Kubernetes rules.  Useful for local development with tilt.
+        {
+            "name": "io_bazel_rules_k8s",
+            "strip_prefix": "rules_k8s-0.5",
+            "url": "https://github.com/bazelbuild/rules_k8s/archive/v0.5.tar.gz",
+            "sha256": "773aa45f2421a66c8aa651b8cecb8ea51db91799a405bd7b913d77052ac7261a",
+        },
+
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
         {
             "name": "com_google_protobuf",
@@ -54,9 +62,9 @@ def archive_dependencies(third_party):
             "build_file": "%s:BUILD.remote_apis" % third_party,
             "patch_args": ["-p1"],
             "patches": ["%s/remote-apis:remote-apis.patch" % third_party],
-            "sha256": "1d69f5f2f694fe93ee78a630f196047892ae51878297a89601c98964486655c6",
-            "strip_prefix": "remote-apis-6345202a036a297b22b0a0e7531ef702d05f2130",
-            "url": "https://github.com/bazelbuild/remote-apis/archive/6345202a036a297b22b0a0e7531ef702d05f2130.zip",
+            "sha256": "743d2d5b5504029f3f825beb869ce0ec2330b647b3ee465a4f39ca82df83f8bf",
+            "strip_prefix": "remote-apis-636121a32fa7b9114311374e4786597d8e7a69f3",
+            "url": "https://github.com/bazelbuild/remote-apis/archive/636121a32fa7b9114311374e4786597d8e7a69f3.zip",
         },
         {
             "name": "rules_cc",
@@ -72,19 +80,11 @@ def archive_dependencies(third_party):
             "strip_prefix": "bazel-toolchain-76ce37e977a304acf8948eadabb82c516320e286",
             "url": "https://github.com/grailbio/bazel-toolchain/archive/76ce37e977a304acf8948eadabb82c516320e286.tar.gz",
         },
-
-        # Ideally we would use the 0.14.4 release of rules_docker,
-        # but that version introduced new pypi and pkg dependncies on tar-related targets making the upgrade difficult.
-        # Those dependencies were then removed afterward.  We pick a stable commit after 0.14.4 instead of cherry-picking in the different changes.
-        # https://github.com/bazelbuild/rules_docker/issues/1622
-        # When a new version after 0.14.4 is released, we can go back to a pinned version.
         {
             "name": "io_bazel_rules_docker",
-            "patch_args": ["-p1"],
-            "patches": ["%s/io_bazel_rules_docker:entrypoint.patch" % third_party],
-            "sha256": "d5609b7858246fa11e76237aa9b3e681615bdc8acf2ed29058426cf7c4cea099",
-            "strip_prefix": "rules_docker-f4822f3921f0c343dd9e5ae65c760d0fb70be1b3",
-            "urls": ["https://github.com/bazelbuild/rules_docker/archive/f4822f3921f0c343dd9e5ae65c760d0fb70be1b3.tar.gz"],
+            "sha256": "59536e6ae64359b716ba9c46c39183403b01eabfbd57578e84398b4829ca499a",
+            "strip_prefix": "rules_docker-0.22.0",
+            "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.22.0/rules_docker-v0.22.0.tar.gz"],
         },
 
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
@@ -139,6 +139,15 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
         sha256 = "294ff5e4e6ae3fda5ff00f0a3c398fa50c1ffa3bc9313800b32e34a75fbb93f3",
         urls = [
             "https://github.com/werkt/jedis/releases/download/3.2.0-e82e68e2f7/jedis-3.2.0-e82e68e2f7.jar",
+        ],
+    )
+
+    maybe(
+        http_jar,
+        "opentelemetry",
+        sha256 = "0523287984978c091be0d22a5c61f0bce8267eeafbbae58c98abaf99c9396832",
+        urls = [
+            "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.11.0/opentelemetry-javaagent.jar",
         ],
     )
 

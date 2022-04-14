@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: shard-worker-service
+spec:
+  selector:
+    name: shard-worker
+  ports:
+    - protocol: TCP
+      port: 8981
+      targetPort: 8981

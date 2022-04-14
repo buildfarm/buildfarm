@@ -8,6 +8,8 @@ java_library(
     ]),
     visibility = ["//visibility:public"],
     deps = [
+        "//src/main/java/build/buildfarm/common/resources",
+        "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//third_party/jedis",
         "@googleapis//:google_longrunning_operations_java_proto",
@@ -16,6 +18,7 @@ java_library(
         "@maven//:com_github_jnr_jnr_constants",
         "@maven//:com_github_jnr_jnr_ffi",
         "@maven//:com_github_jnr_jnr_posix",
+        "@maven//:com_github_luben_zstd_jni",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_failureaccess",
         "@maven//:com_google_guava_guava",

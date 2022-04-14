@@ -52,6 +52,8 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.PriorityCapabilities;
+import build.bazel.remote.execution.v2.PriorityCapabilities.PriorityRange;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
@@ -143,6 +145,7 @@ public abstract class AbstractServerInstance implements Instance {
   protected final OperationsMap completedOperations;
   protected final Map<Digest, ByteString> activeBlobWrites;
   protected final DigestUtil digestUtil;
+  protected final boolean ensureOutputsPresent;
 
   public static final String ACTION_INPUT_ROOT_DIRECTORY_PATH = "";
 
@@ -227,7 +230,8 @@ public abstract class AbstractServerInstance implements Instance {
       ActionCache actionCache,
       OperationsMap outstandingOperations,
       OperationsMap completedOperations,
-      Map<Digest, ByteString> activeBlobWrites) {
+      Map<Digest, ByteString> activeBlobWrites,
+      boolean ensureOutputsPresent) {
     this.name = name;
     this.digestUtil = digestUtil;
     this.contentAddressableStorage = contentAddressableStorage;
@@ -235,6 +239,7 @@ public abstract class AbstractServerInstance implements Instance {
     this.outstandingOperations = outstandingOperations;
     this.completedOperations = completedOperations;
     this.activeBlobWrites = activeBlobWrites;
+    this.ensureOutputsPresent = ensureOutputsPresent;
   }
 
   @Override
@@ -326,7 +331,21 @@ public abstract class AbstractServerInstance implements Instance {
             directExecutor()));
   }
 
-  private static boolean shouldEnsureOutputsPresent(RequestMetadata requestMetadata) {
+  private static boolean shouldEnsureOutputsPresent(
+      boolean ensureOutputsPresent, RequestMetadata requestMetadata) {
+    // The 'ensure outputs present' setting means that the AC will only return results to the client
+    // when all of the action output blobs are present in the CAS.  If any one blob is missing, the
+    // system will return a cache miss.  Although this is a more expensive check to perform, some
+    // users may want to enable this feature. It may be useful if you cannot rely on requestMetadata
+    // of incoming messages (perhaps due to a proxy). Or other build systems may not be reliable
+    // without this extra check.
+
+    // We perform the outputs present check if the system is globally configured to check for it.
+    // Otherwise the behavior is determined dynamically from optional URI parameters.
+    if (ensureOutputsPresent) {
+      return true;
+    }
+
     try {
       URI uri = new URI(requestMetadata.getCorrelatedInvocationsId());
       QueryStringDecoder decoder = new QueryStringDecoder(uri);
@@ -344,7 +363,7 @@ public abstract class AbstractServerInstance implements Instance {
   public ListenableFuture<ActionResult> getActionResult(
       ActionKey actionKey, RequestMetadata requestMetadata) {
     ListenableFuture<ActionResult> result = checkNotNull(actionCache.get(actionKey));
-    if (shouldEnsureOutputsPresent(requestMetadata)) {
+    if (shouldEnsureOutputsPresent(ensureOutputsPresent, requestMetadata)) {
       result = checkNotNull(ensureOutputsPresent(result, requestMetadata));
     }
     return result;
@@ -386,7 +405,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ByteString getBlob(Digest blobDigest) throws InterruptedException {
-    return getBlob(blobDigest, /* offset=*//* count=*/ blobDigest.getSizeBytes());
+    return getBlob(blobDigest, /* count=*/ blobDigest.getSizeBytes());
   }
 
   ByteString getBlob(Digest blobDigest, long count) throws IndexOutOfBoundsException {
@@ -413,8 +432,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected ListenableFuture<ByteString> getBlobFuture(
       Digest blobDigest, RequestMetadata requestMetadata) {
-    return getBlobFuture(
-        blobDigest, /* offset=*//* count=*/ blobDigest.getSizeBytes(), requestMetadata);
+    return getBlobFuture(blobDigest, /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
@@ -422,7 +440,7 @@ public abstract class AbstractServerInstance implements Instance {
     SettableFuture<ByteString> future = SettableFuture.create();
     getBlob(
         blobDigest,
-        0,
+        /* offset=*/ 0,
         count,
         new ServerCallStreamObserver<ByteString>() {
           ByteString content = ByteString.EMPTY;
@@ -1823,7 +1841,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected CacheCapabilities getCacheCapabilities() {
     return CacheCapabilities.newBuilder()
-        .addDigestFunction(digestUtil.getDigestFunction())
+        .addDigestFunctions(digestUtil.getDigestFunction())
         .setActionCacheUpdateCapabilities(
             ActionCacheUpdateCapabilities.newBuilder().setUpdateEnabled(true))
         .setMaxBatchTotalSizeBytes(Size.mbToBytes(4))
@@ -1835,6 +1853,9 @@ public abstract class AbstractServerInstance implements Instance {
     return ExecutionCapabilities.newBuilder()
         .setDigestFunction(digestUtil.getDigestFunction())
         .setExecEnabled(true)
+        .setExecutionPriorityCapabilities(
+            PriorityCapabilities.newBuilder()
+                .addPriorities(PriorityRange.newBuilder().setMinPriority(0).setMaxPriority(1)))
         .build();
   }
 

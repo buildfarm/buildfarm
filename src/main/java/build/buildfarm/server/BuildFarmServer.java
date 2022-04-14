@@ -21,6 +21,8 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.LoggingMain;
+import build.buildfarm.common.config.ConfigAdjuster;
+import build.buildfarm.common.config.ServerOptions;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.MetricsPublisher;
@@ -47,6 +49,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.Security;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -55,6 +58,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 @SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
@@ -92,13 +96,21 @@ public class BuildFarmServer extends LoggingMain {
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     if (!config.getSslCertificatePath().equals("")) {
+      // There are different Public Key Cryptography Standards (PKCS) that users may format their
+      // certificate files in.  By default, the JDK cannot parse all of them.  In particular, it
+      // cannot parse PKCS #1 (RSA Cryptography Standard).  When enabling TLS for GRPC, java's
+      // underlying Security module is used. To improve the robustness of this parsing and the
+      // overall accepted certificate formats, we add an additional security provider. BouncyCastle
+      // is a library that will parse additional formats and allow users to provide certificates in
+      // an otherwise unsupported format.
+      Security.addProvider(new BouncyCastleProvider());
       File ssl_certificate_path = new File(config.getSslCertificatePath());
       serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instance))
+            .addService(new ActionCacheService(instance, config.getAcPolicy()))
             .addService(new CapabilitiesService(instance))
             .addService(
                 new ContentAddressableStorageService(
@@ -132,12 +144,10 @@ public class BuildFarmServer extends LoggingMain {
   }
 
   private static BuildFarmServerConfig toBuildFarmServerConfig(
-      Readable input, BuildFarmServerOptions options) throws IOException {
+      Readable input, ServerOptions options) throws IOException {
     BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
     TextFormat.merge(input, builder);
-    if (options.port > 0) {
-      builder.setPort(options.port);
-    }
+    ConfigAdjuster.adjust(builder, options);
     return builder.build();
   }
 
@@ -220,7 +230,7 @@ public class BuildFarmServer extends LoggingMain {
     // unknown stream 11369
     nettyLogger.setLevel(SEVERE);
 
-    OptionsParser parser = OptionsParser.newOptionsParser(BuildFarmServerOptions.class);
+    OptionsParser parser = OptionsParser.newOptionsParser(ServerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
@@ -229,7 +239,7 @@ public class BuildFarmServer extends LoggingMain {
     }
 
     Path configPath = Paths.get(residue.get(0));
-    BuildFarmServerOptions options = parser.getOptions(BuildFarmServerOptions.class);
+    ServerOptions options = parser.getOptions(ServerOptions.class);
 
     String session = "buildfarm-server";
     if (!options.publicName.isEmpty()) {
