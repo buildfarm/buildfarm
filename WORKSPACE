@@ -8,9 +8,19 @@ load(":defs.bzl", "buildfarm_init")
 
 buildfarm_init()
 
-load("@rules_oss_audit//oss_audit:setup.bzl", "rules_oss_audit_setup")
+load("@rules_oss_audit//oss_audit:repositories.bzl", "rules_oss_audit_dependencies")
+rules_oss_audit_dependencies()
 
+load("@rules_oss_audit//oss_audit:setup.bzl", "rules_oss_audit_setup")
 rules_oss_audit_setup()
+
+load("@rules_pkg//toolchains:rpmbuild_configure.bzl", "find_system_rpmbuild")
+
+find_system_rpmbuild(name = "rules_pkg_rpmbuild")
+
+load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
+
+rules_pkg_dependencies()
 
 load("@maven//:compat.bzl", "compat_repositories")
 
