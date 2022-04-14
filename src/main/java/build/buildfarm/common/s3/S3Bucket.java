@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.common.s3;
 
 import build.buildfarm.v1test.AwsSecret;
 import build.buildfarm.v1test.S3BucketConfig;
@@ -67,7 +67,7 @@ public class S3Bucket {
 
   /**
    * @brief Constructor.
-   * @details Construct and S3 bucket for uploading / downloading blobs.
+   * @details Construct an S3 bucket for uploading / downloading blobs.
    * @param config Configuration information for establishing the bucket.
    */
   S3Bucket(S3BucketConfig config) {
@@ -77,18 +77,33 @@ public class S3Bucket {
   }
 
   /**
+   * @brief Constructor.
+   * @details Construct an S3 bucket with existing bucket and s3 instance.
+   * @param config Configuration information for establishing the bucket.
+   * @param s3 An established S3 instance
+   * @param bucket An established bucket instance
+   */
+  S3Bucket(AmazonS3 s3, Bucket bucket) {
+    this.s3 = s3;
+    this.bucket = bucket;
+  }
+
+  /**
    * @brief Upload a blob into the bucket.
    * @details If the the blob already exists at key name, it will be overwritten.
    * @param keyName Key name for storing the blob and looking it up later.
    * @param filePath The file to upload.
+   * @return whether the file was uploaded.
    */
-  public void put(String keyName, String filePath) {
+  public boolean put(String keyName, String filePath) {
     try {
       s3.putObject(bucket.getName(), keyName, new File(filePath));
     } catch (AmazonServiceException e) {
       logger.log(
           Level.SEVERE, String.format("Blob could not be uploaded: %s", e.getErrorMessage()));
+      return false;
     }
+    return true;
   }
 
   /**
@@ -119,6 +134,8 @@ public class S3Bucket {
       logger.log(
           Level.SEVERE,
           String.format("Failure creating file from downloaded blob: %s", e.getMessage()));
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, String.format("Unknown Failure: %s", e.getMessage()));
     }
   }
 
