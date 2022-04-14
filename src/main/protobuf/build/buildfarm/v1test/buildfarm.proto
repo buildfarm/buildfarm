@@ -281,13 +281,12 @@ message AwsSecret {
 message S3BucketConfig {
 
   string region = 1;
-  
+
   string name = 2;
-    
+
   int32 max_connections = 3;
 
   string secret_name = 4;
-
 }
 
 message AwsMetricsConfig {

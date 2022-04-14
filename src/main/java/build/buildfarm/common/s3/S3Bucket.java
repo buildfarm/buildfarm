@@ -47,7 +47,6 @@ import java.util.logging.Logger;
  *     bucket does not already exist remotely, it is created upon construction.
  */
 public class S3Bucket {
-
   /**
    * @field logger
    * @brief Used for printing error information.
@@ -72,7 +71,6 @@ public class S3Bucket {
    * @param config Configuration information for establishing the bucket.
    */
   S3Bucket(S3BucketConfig config) {
-
     // Establish client and bucket.
     s3 = createS3Client(config);
     bucket = createBucket(s3, config.getName());
@@ -100,7 +98,6 @@ public class S3Bucket {
    * @param filePath The file to save the blob to.
    */
   public void get(String keyName, String filePath) {
-
     try {
       S3Object o = s3.getObject(bucket.getName(), keyName);
       S3ObjectInputStream s3is = o.getObjectContent();
@@ -134,7 +131,6 @@ public class S3Bucket {
    * @note null is returned if the bucket could not be created.
    */
   private static Bucket createBucket(AmazonS3 s3, String bucketName) {
-
     // If the bucket already exists, find and return it.
     if (s3.doesBucketExistV2(bucketName)) {
       Bucket b = getExistingBucket(s3, bucketName);
@@ -161,7 +157,6 @@ public class S3Bucket {
    * @return an established S3 bucket.
    */
   private static Bucket getExistingBucket(AmazonS3 s3, String bucketName) {
-
     // return the bucket found by name
     for (Bucket b : s3.listBuckets()) {
       if (b.getName().equals(bucketName)) {
@@ -180,7 +175,6 @@ public class S3Bucket {
    * @return an established S3 client.
    */
   private static AmazonS3 createS3Client(S3BucketConfig config) {
-
     // obtain secrets
     AwsSecret secret = getAwsSecret(config.getRegion(), config.getSecretName());
 
@@ -215,7 +209,6 @@ public class S3Bucket {
    * @return AWS secrets for interacting with the bucket.
    */
   private static AwsSecret getAwsSecret(String region, String secretName) {
-
     // create secret manager for fetching secrets
     AWSSecretsManager client = AWSSecretsManagerClientBuilder.standard().withRegion(region).build();
 
