@@ -108,15 +108,9 @@ def archive_dependencies(third_party):
         
         {
             "name": "rules_oss_audit",
-            "sha256": "cabb4d985eb9efe40326436e683a90e74603dd282ae2a0af2a21bf078f07cf1b",
-            "strip_prefix": "rules_oss_audit-5ae338712005a616c11d69a669d669e3742c1c83",
-            "url": "https://github.com/vmware/rules_oss_audit/archive/5ae338712005a616c11d69a669d669e3742c1c83.zip",
-        },
-        
-        {
-            "name": "rules_pkg",
-            "sha256": "a89e203d3cf264e564fcb96b6e06dd70bc0557356eb48400ce4b5d97c2c3720d",
-            "url": "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.5.1/rules_pkg-0.5.1.tar.gz",
+            "sha256": "bf07416b6726cf1796856f47c9e3c6e2ef916626ecbfd9c2d101193e2300dcd8",
+            "strip_prefix": "rules_oss_audit-3c2f96d85ee1c063ac27a67b4bcafa611ecec2bb",
+            "url": "https://github.com/vmware/rules_oss_audit/archive/3c2f96d85ee1c063ac27a67b4bcafa611ecec2bb.zip",
         },
     ]
 
