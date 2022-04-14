@@ -118,7 +118,7 @@ public class S3Bucket {
       S3ObjectInputStream s3is = o.getObjectContent();
       FileOutputStream fos = new FileOutputStream(new File(filePath));
       byte[] read_buf = new byte[1024];
-      Integer read_len = 0;
+      int read_len;
       while ((read_len = s3is.read(read_buf)) > 0) {
         fos.write(read_buf, 0, read_len);
       }
