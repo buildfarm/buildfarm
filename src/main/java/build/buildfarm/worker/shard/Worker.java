@@ -57,7 +57,6 @@ import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
-import build.buildfarm.worker.CasReplicationStage;
 import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
@@ -492,8 +491,7 @@ public class Worker extends LoggingMain {
     // We will build a worker's server based on it's capabilities.
     // A worker that is capable of execution will construct an execution pipeline.
     // It will use various execution phases for it's profile service.
-    // On the other hand, a worker that is only capable of CAS storage will construct a pipeline for
-    // storage replication.
+    // On the other hand, a worker that is only capable of CAS storage does not need a pipeline.
     if (hasExecutionCapability) {
       PipelineStage completeStage =
           new PutOperationStage((operation) -> context.deactivate(operation.getName()));
@@ -513,16 +511,9 @@ public class Worker extends LoggingMain {
       serverBuilder.addService(
           new WorkerProfileService(
               storage, inputFetchStage, executeActionStage, context, completeStage, backplane));
-    } else {
-      createStorageOnlyPipeline(pipeline);
     }
 
     return serverBuilder.build();
-  }
-
-  private void createStorageOnlyPipeline(Pipeline pipeline) {
-    PipelineStage casReplicationStage = new CasReplicationStage();
-    pipeline.add(casReplicationStage, 1);
   }
 
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
@@ -826,7 +817,12 @@ public class Worker extends LoggingMain {
   private void blockUntilShutdown() throws InterruptedException {
     // should really be waiting for either server or pipeline shutdown
     try {
-      pipeline.join();
+      if (pipeline.hasStages()) {
+        pipeline.join();
+      } else {
+        logger.log(INFO, "No pipeline stages.  Block until interruption.");
+        while (!Thread.interrupted()) {}
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
@@ -993,6 +989,7 @@ public class Worker extends LoggingMain {
       logger.log(SEVERE, "error starting worker", e);
       return;
     }
+
     pipeline.start();
     healthCheckMetric.labels("start").inc();
     executionSlotsTotal.set(config.getExecuteStageWidth());
