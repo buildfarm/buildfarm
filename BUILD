@@ -143,7 +143,8 @@ java_image(
 
 oss_audit(
     name = "buildfarm-server-audit",
-    src = "//src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm",
+    #src = "//src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm",
+    src = "//src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm2",
     #src = "//src/main/java/build/buildfarm:buildfarm-server_deploy.jar"
     #src = "//src/main/java/build/buildfarm:buildfarm-server"
 )
