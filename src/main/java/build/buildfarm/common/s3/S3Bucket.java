@@ -118,7 +118,7 @@ public class S3Bucket {
       S3ObjectInputStream s3is = o.getObjectContent();
       FileOutputStream fos = new FileOutputStream(new File(filePath));
       byte[] read_buf = new byte[1024];
-      int read_len = 0;
+      Integer read_len = 0;
       while ((read_len = s3is.read(read_buf)) > 0) {
         fos.write(read_buf, 0, read_len);
       }
@@ -150,16 +150,14 @@ public class S3Bucket {
   private static Bucket createBucket(AmazonS3 s3, String bucketName) {
     // If the bucket already exists, find and return it.
     if (s3.doesBucketExistV2(bucketName)) {
-      Bucket b = getExistingBucket(s3, bucketName);
-      return b;
+      return getExistingBucket(s3, bucketName);
     }
 
     // Otherwise create the bucket.
     try {
-      Bucket b = s3.createBucket(bucketName);
-      return b;
+      return s3.createBucket(bucketName);
     } catch (AmazonS3Exception e) {
-      System.err.println(e.getErrorMessage());
+      logger.log(Level.SEVERE, e.getMessage());
     }
 
     // The bucket could not be created.
@@ -196,26 +194,24 @@ public class S3Bucket {
     AwsSecret secret = getAwsSecret(config.getRegion(), config.getSecretName());
 
     // create client
-    final AmazonS3 s3 =
-        AmazonS3ClientBuilder.standard()
-            .withRegion(config.getRegion())
-            .withClientConfiguration(
-                new ClientConfiguration().withMaxConnections(config.getMaxConnections()))
-            .withCredentials(
-                new AWSStaticCredentialsProvider(
-                    new AWSCredentials() {
-                      @Override
-                      public String getAWSAccessKeyId() {
-                        return secret.getAccessKeyId();
-                      }
+    return AmazonS3ClientBuilder.standard()
+        .withRegion(config.getRegion())
+        .withClientConfiguration(
+            new ClientConfiguration().withMaxConnections(config.getMaxConnections()))
+        .withCredentials(
+            new AWSStaticCredentialsProvider(
+                new AWSCredentials() {
+                  @Override
+                  public String getAWSAccessKeyId() {
+                    return secret.getAccessKeyId();
+                  }
 
-                      @Override
-                      public String getAWSSecretKey() {
-                        return secret.getSecretKey();
-                      }
-                    }))
-            .build();
-    return s3;
+                  @Override
+                  public String getAWSSecretKey() {
+                    return secret.getSecretKey();
+                  }
+                }))
+        .build();
   }
 
   /**
@@ -240,7 +236,7 @@ public class S3Bucket {
     }
 
     // decode secret
-    String secret = null;
+    String secret;
     if (getSecretValueResult.getSecretString() != null) {
       secret = getSecretValueResult.getSecretString();
     } else {
@@ -256,9 +252,7 @@ public class S3Bucket {
 
         final String accessKeyId = secretMap.get("access_key");
         final String secretKey = secretMap.get("secret_key");
-        AwsSecret secretResult =
-            AwsSecret.newBuilder().setAccessKeyId(accessKeyId).setSecretKey(secretKey).build();
-        return secretResult;
+        return AwsSecret.newBuilder().setAccessKeyId(accessKeyId).setSecretKey(secretKey).build();
       } catch (IOException e) {
         logger.log(Level.SEVERE, String.format("Could not parse secret %s from AWS", secretName));
       }
