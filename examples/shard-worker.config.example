@@ -13,7 +13,7 @@ capabilities {
   
   # This determines whether the shard instance will participate in the execution pool.
   # Workers that don't execute may be used for storage only.
-  execution: false
+  execution: true
 }
 
 # the digest function for this worker, required
