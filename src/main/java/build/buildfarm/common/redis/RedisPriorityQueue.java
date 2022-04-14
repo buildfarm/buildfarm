@@ -70,23 +70,24 @@ public class RedisPriorityQueue extends QueueInterface {
   }
 
   /**
-   * @brief Push a value onto the queue with specified priority.
-   * @details Adds the value into the backend redis ordered set.
-   * @param val The value to push onto the priority queue.
-   */
-  @Override
-  public void push(JedisCluster jedis, String val, double priority) {
-    jedis.zadd(name, priority, time.getNanos() + ":" + val);
-  }
-
-  /**
-   * @brief Push a value onto the queue with default priority of 1.
-   * @details Adds the value into the backend rdered set.
+   * @brief Push a value onto the queue with default priority of 0.
+   * @details Adds the value into the backend ordered set.
    * @param val The value to push onto the priority queue.
    */
   @Override
   public void push(JedisCluster jedis, String val) {
-    push(jedis, val, 1);
+    push(jedis, val, 0);
+  }
+
+  /**
+   * @brief Push a value onto the queue with specified priority.
+   * @details Adds the value into the backend redis ordered set.
+   * @param val The value to push onto the priority queue.
+   * @param priority The priority of action 0 means highest
+   */
+  @Override
+  public void push(JedisCluster jedis, String val, double priority) {
+    jedis.zadd(name, priority, time.getNanos() + ":" + val);
   }
 
   /**

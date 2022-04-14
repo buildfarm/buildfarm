@@ -75,7 +75,7 @@ public class RedisPriorityQueueMockTest {
     queue.push(redis, "foo");
 
     // ASSERT
-    verify(redis, times(1)).zadd("test", 1, "123:foo");
+    verify(redis, times(1)).zadd("test", 0, "123:foo");
   }
 
   // Function under test: push
@@ -92,8 +92,8 @@ public class RedisPriorityQueueMockTest {
     queue.push(redis, "bar");
 
     // ASSERT
-    verify(redis, times(1)).zadd("test", 1, "123:foo");
-    verify(redis, times(1)).zadd("test", 1, "124:bar");
+    verify(redis, times(1)).zadd("test", 0, "123:foo");
+    verify(redis, times(1)).zadd("test", 0, "124:bar");
   }
 
   // Function under test: push
@@ -110,8 +110,8 @@ public class RedisPriorityQueueMockTest {
     queue.push(redis, "foo");
 
     // ASSERT
-    verify(redis, times(1)).zadd("test", 1, "123:foo");
-    verify(redis, times(1)).zadd("test", 1, "124:foo");
+    verify(redis, times(1)).zadd("test", 0, "123:foo");
+    verify(redis, times(1)).zadd("test", 0, "124:foo");
   }
 
   // Function under test: push
@@ -148,7 +148,7 @@ public class RedisPriorityQueueMockTest {
 
     // ASSERT
     for (int i = 0; i < 1000; ++i) {
-      verify(redis, times(1)).zadd("test", 1, "123:foo" + i);
+      verify(redis, times(1)).zadd("test", 0, "123:foo" + i);
     }
   }
 
@@ -162,13 +162,13 @@ public class RedisPriorityQueueMockTest {
     RedisPriorityQueue queue = new RedisPriorityQueue("test", time);
 
     // ACT
-    queue.push(redis, "foo");
+    queue.push(redis, "foo", 0);
     queue.push(redis, "foo1", 2);
     queue.push(redis, "foo2", 2);
 
     // ASSERT
     verify(time, times(3)).getNanos();
-    verify(redis, times(1)).zadd("test", 1, "123:foo");
+    verify(redis, times(1)).zadd("test", 0, "123:foo");
     verify(redis, times(1)).zadd("test", 2, "124:foo1");
     verify(redis, times(1)).zadd("test", 2, "125:foo2");
   }
