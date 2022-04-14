@@ -48,6 +48,7 @@ COM_AWS_MODULES = [
     "secretsmanager",
     "sns",
     "ssm",
+    "s3",
 ]
 
 ORG_SPRING_MODULES = [
