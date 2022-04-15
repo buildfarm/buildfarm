@@ -115,7 +115,6 @@ class ShardActionCache {
     }
   }
 
-  @SuppressWarnings("ConstantConditions")
   private ActionResult getActionResult(RedisClient client, ActionKey actionKey) throws IOException {
     String json = client.call(jedis -> actionCache.get(jedis, asDigestStr(actionKey)));
     if (json == null) {
@@ -129,7 +128,6 @@ class ShardActionCache {
     return actionResult;
   }
 
-  @SuppressWarnings("ConstantConditions")
   private void putActionResult(RedisClient client, ActionKey actionKey, ActionResult actionResult)
       throws IOException {
     String json = JsonFormat.printer().print(actionResult);
