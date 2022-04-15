@@ -52,6 +52,8 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.PriorityCapabilities;
+import build.bazel.remote.execution.v2.PriorityCapabilities.PriorityRange;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
@@ -1844,7 +1846,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected CacheCapabilities getCacheCapabilities() {
     return CacheCapabilities.newBuilder()
-        .addDigestFunction(digestUtil.getDigestFunction())
+        .addDigestFunctions(digestUtil.getDigestFunction())
         .setActionCacheUpdateCapabilities(
             ActionCacheUpdateCapabilities.newBuilder().setUpdateEnabled(true))
         .setMaxBatchTotalSizeBytes(Size.mbToBytes(4))
@@ -1856,6 +1858,9 @@ public abstract class AbstractServerInstance implements Instance {
     return ExecutionCapabilities.newBuilder()
         .setDigestFunction(digestUtil.getDigestFunction())
         .setExecEnabled(true)
+        .setExecutionPriorityCapabilities(
+            PriorityCapabilities.newBuilder()
+                .addPriorities(PriorityRange.newBuilder().setMinPriority(0).setMaxPriority(1)))
         .build();
   }
 

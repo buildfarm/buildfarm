@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm;
+package build.buildfarm.tools;
 
 import static build.buildfarm.instance.Utils.getBlob;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;

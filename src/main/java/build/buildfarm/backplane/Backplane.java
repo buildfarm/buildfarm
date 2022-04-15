@@ -21,7 +21,6 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.instance.Instance;
@@ -40,7 +39,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import net.jcip.annotations.ThreadSafe;
 
+@ThreadSafe
 public interface Backplane {
   final class ActionCacheScanResult {
     public final String token;
@@ -63,19 +64,15 @@ public interface Backplane {
   void setOnUnsubscribe(InterruptingRunnable onUnsubscribe);
 
   /** Start the backplane's operation */
-  @ThreadSafe
   void start(String publicClientName) throws IOException;
 
   /** Stop the backplane's operation */
-  @ThreadSafe
   void stop() throws InterruptedException;
 
   /** Indicates whether the backplane has been stopped */
-  @ThreadSafe
   boolean isStopped();
 
   /** Adds a worker to the set of active workers. */
-  @ThreadSafe
   void addWorker(ShardWorker shardWorker) throws IOException;
 
   /**
@@ -83,21 +80,16 @@ public interface Backplane {
    *
    * <p>Return true if the worker was removed, and false if it was not a member of the set.
    */
-  @ThreadSafe
   boolean removeWorker(String workerName, String reason) throws IOException;
 
-  @ThreadSafe
   CasIndexResults reindexCas(String workerName) throws IOException;
 
-  @ThreadSafe
   void deregisterWorker(String hostName) throws IOException;
 
-  @ThreadSafe
   FindOperationsResults findOperations(Instance instance, String filterPredicate)
       throws IOException;
 
   /** Returns a set of the names of all active workers. */
-  @ThreadSafe
   Set<String> getWorkers() throws IOException;
 
   /**
@@ -106,13 +98,10 @@ public interface Backplane {
    *
    * <p>Retrieves and returns an action result from the hash map.
    */
-  @ThreadSafe
   ActionResult getActionResult(ActionKey actionKey) throws Exception;
 
-  @ThreadSafe
   void invalidate(ActionKey actionKey);
 
-  @ThreadSafe
   void readThrough(ActionKey actionKey, ActionResult actionResult);
 
   /**
@@ -121,18 +110,15 @@ public interface Backplane {
    *
    * <p>Remove an action result from the hash map.
    */
-  @ThreadSafe
   void removeActionResult(ActionKey actionKey) throws IOException;
 
   /** Bulk remove action results */
-  @ThreadSafe
   void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException;
 
   /**
    * Identify an action that should not be executed, and respond to all requests it matches with
    * failover-compatible responses.
    */
-  @ThreadSafe
   void blacklistAction(String actionId) throws IOException;
 
   /**
@@ -141,7 +127,6 @@ public interface Backplane {
    *
    * <p>Stores an action result in the hash map.
    */
-  @ThreadSafe
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException;
 
   /**
@@ -150,11 +135,9 @@ public interface Backplane {
    *
    * <p>Adds the name of a worker to the set of workers that store a blob.
    */
-  @ThreadSafe
   void addBlobLocation(Digest blobDigest, String workerName) throws IOException;
 
   /** Remove or add workers to a blob's location set as requested */
-  @ThreadSafe
   void adjustBlobLocations(Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
       throws IOException;
 
@@ -164,7 +147,6 @@ public interface Backplane {
    *
    * <p>Adds the name of a worker to the set of workers that store multiple blobs.
    */
-  @ThreadSafe
   void addBlobsLocation(Iterable<Digest> blobDigest, String workerName) throws IOException;
 
   /**
@@ -173,7 +155,6 @@ public interface Backplane {
    *
    * <p>Removes the name of a worker from the set of workers that store a blob.
    */
-  @ThreadSafe
   void removeBlobLocation(Digest blobDigest, String workerName) throws IOException;
 
   /**
@@ -182,7 +163,6 @@ public interface Backplane {
    *
    * <p>Removes the name of a worker from the set of workers that store multiple blobs.
    */
-  @ThreadSafe
   void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException;
 
   /**
@@ -191,7 +171,6 @@ public interface Backplane {
    *
    * <p>Returns a random worker from the set of workers that store a blob.
    */
-  @ThreadSafe
   String getBlobLocation(Digest blobDigest) throws IOException;
 
   /**
@@ -200,10 +179,8 @@ public interface Backplane {
    *
    * <p>Returns the set of the names of all workers that store a blob.
    */
-  @ThreadSafe
   Set<String> getBlobLocationSet(Digest blobDigest) throws IOException;
 
-  @ThreadSafe
   Map<Digest, Set<String>> getBlobDigestsWorkers(Iterable<Digest> blobDigests) throws IOException;
 
   /**
@@ -212,7 +189,6 @@ public interface Backplane {
    *
    * <p>Retrieves and returns an operation from the hash map.
    */
-  @ThreadSafe
   Operation getOperation(String operationName) throws IOException;
 
   /**
@@ -221,10 +197,8 @@ public interface Backplane {
    *
    * <p>Stores an operation in the hash map.
    */
-  @ThreadSafe
   boolean putOperation(Operation operation, ExecutionStage.Value stage) throws IOException;
 
-  @ThreadSafe
   ExecuteEntry deprequeueOperation() throws IOException, InterruptedException;
 
   /**
@@ -233,7 +207,6 @@ public interface Backplane {
    *
    * <p>Moves an operation from the list of queued operations to the list of dispatched operations.
    */
-  @ThreadSafe
   QueueEntry dispatchOperation(List<Platform.Property> provisions)
       throws IOException, InterruptedException;
 
@@ -241,14 +214,12 @@ public interface Backplane {
    * Pushes an operation onto the head of the list of queued operations after a rejection which does
    * not require revalidation
    */
-  @ThreadSafe
   void rejectOperation(QueueEntry queueEntry) throws IOException;
 
   /**
    * Updates the backplane to indicate that the operation is being queued and should not be
    * considered immediately lost
    */
-  @ThreadSafe
   void queueing(String operationName) throws IOException;
 
   /**
@@ -257,62 +228,46 @@ public interface Backplane {
    *
    * <p>Updates a dispatchedOperation requeue_at and returns whether the operation is still valid.
    */
-  @ThreadSafe
   boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
       throws IOException;
 
   /** Complete an operation */
-  @ThreadSafe
   void completeOperation(String operationName) throws IOException;
 
   /** Delete an operation */
-  @ThreadSafe
   void deleteOperation(String operationName) throws IOException;
 
   /** Register a watcher for an operation */
-  @ThreadSafe
   ListenableFuture<Void> watchOperation(String operationName, Watcher watcher);
 
   /** Get all dispatched operations */
-  @ThreadSafe
   ImmutableList<DispatchedOperation> getDispatchedOperations() throws IOException;
 
   /** Get all operations */
-  @ThreadSafe
   Iterable<String> getOperations();
 
   /** Requeue a dispatched operation */
-  @ThreadSafe
   void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException;
 
-  @ThreadSafe
   void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException;
 
-  @ThreadSafe
   void queue(QueueEntry queueEntry, Operation operation) throws IOException;
 
   /** Page through action cache */
-  @ThreadSafe
   ActionCacheScanResult scanActionCache(String scanToken, int count) throws IOException;
 
   /** Test for whether a request is blacklisted */
-  @ThreadSafe
   boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException;
 
   /** Test for whether an operation may be queued */
-  @ThreadSafe
   boolean canQueue() throws IOException;
 
   /** Test for whether an operation may be prequeued */
-  @ThreadSafe
   boolean canPrequeue() throws IOException;
 
-  @ThreadSafe
   BackplaneStatus backplaneStatus() throws IOException;
 
-  @ThreadSafe
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
 
-  @ThreadSafe
   GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) throws IOException;
 }

@@ -48,7 +48,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", false, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(7);
@@ -56,10 +63,10 @@ public class ResourceDeciderTest {
   }
 
   // Function under test: decideResourceLimitations
-  // Reason for testing: test that cores are skipped
+  // Reason for testing: test that cores are defaulted
   // Failure explanation: cores were not decided as expected
   @Test
-  public void decideResourceLimitationsTestCoreSettingSkippedOnNontest() throws Exception {
+  public void decideResourceLimitationsTestCoreSettingDefaultedOnNontest() throws Exception {
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -72,17 +79,25 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
+    int defaultMaxCores = 3;
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            defaultMaxCores,
+            /* onlyMulticoreTests=*/ true,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(1);
-    assertThat(limits.cpu.max).isEqualTo(1);
+    assertThat(limits.cpu.max).isEqualTo(defaultMaxCores);
   }
 
   // Function under test: decideResourceLimitations
-  // Reason for testing: test that claims remains 0 because of min-cores.
-  // Failure explanation: claims were not 0 as expected
+  // Reason for testing: test that claims are >0 despite min-cores == 0.
+  // Failure explanation: claims were not >0 as expected
   @Test
   public void decideResourceLimitationsEnsureClaimsOne() throws Exception {
     // ARRANGE
@@ -98,14 +113,21 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", false, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
-    assertThat(limits.cpu.claimed).isEqualTo(0);
+    assertThat(limits.cpu.claimed).isGreaterThan(0);
   }
 
   // Function under test: decideResourceLimitations
-  // Reason for testing: test that we limit cpu is globalLimitExecution is given.
+  // Reason for testing: test that we limit cpu if limitGlobalExecution is given.
   // Failure explanation: expected limit flag set.
   @Test
   public void decideResourceLimitationsEnsureLimitGlobalSet() throws Exception {
@@ -122,14 +144,21 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", false, true, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ true,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.cpu.limit).isTrue();
   }
 
   // Function under test: decideResourceLimitations
-  // Reason for testing: test that we do not limit cpu is globalLimitExecution is false.
+  // Reason for testing: test that we do not limit cpu if globalLimitExecution is false.
   // Failure explanation: Did not expect limit flag set.
   @Test
   public void decideResourceLimitationsEnsureNoLimitNoGlobalSet() throws Exception {
@@ -146,7 +175,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", false, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.cpu.limit).isFalse();
@@ -170,7 +206,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", false, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.cpu.claimed).isEqualTo(3);
@@ -193,7 +236,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", false, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.mem.min).isEqualTo(5);
@@ -211,7 +261,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -233,7 +290,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -258,7 +322,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -285,7 +356,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -314,7 +392,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(0);
@@ -343,7 +428,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", false, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -370,7 +462,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -398,7 +497,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -426,7 +532,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -455,7 +568,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isTrue();
@@ -482,7 +602,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.debugAfterExecution).isTrue();
@@ -509,7 +636,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "worker", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "worker",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isFalse();
@@ -525,7 +659,14 @@ public class ResourceDeciderTest {
 
     // ACT
     ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(command, "foo", true, false, 100);
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "foo",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false);
 
     // ASSERT
     assertThat(limits.workerName).isEqualTo("foo");
