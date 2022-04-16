@@ -39,12 +39,12 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import redis.clients.jedis.JedisCluster;
 
-class ShardActionCache {
+public class ShardActionCache {
   private final RedisMap actionCache;
   private final AsyncLoadingCache<ActionKey, ActionResult> actionResultCache;
   private final int actionCacheExpire;
 
-  ShardActionCache(
+  public ShardActionCache(
       RedisClient client,
       String cachePrefix,
       int actionCacheExpire,
