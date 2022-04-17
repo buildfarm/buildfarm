@@ -223,31 +223,31 @@ public class ShardInstanceTest {
       provideBlob(actionDigest, actionBlob);
     }
 
-    doAnswer(
-            (Answer<Void>)
-                invocation -> {
-                  StreamObserver<ByteString> blobObserver =
-                      (StreamObserver) invocation.getArguments()[3];
-                  if (provideAction) {
-                    blobObserver.onNext(action.toByteString());
-                    blobObserver.onCompleted();
-                  } else {
-                    blobObserver.onError(Status.NOT_FOUND.asException());
-                  }
-                  return null;
-                })
-        .when(mockWorkerInstance)
-        .getBlob(
-            eq(actionDigest),
-            eq(0L),
-            eq(actionDigest.getSizeBytes()),
-            any(ServerCallStreamObserver.class),
-            any(RequestMetadata.class));
-    when(mockBackplane.getBlobLocationSet(eq(actionDigest)))
-        .thenReturn(provideAction ? workers : ImmutableSet.of());
-    when(mockWorkerInstance.findMissingBlobs(
-            eq(ImmutableList.of(actionDigest)), any(RequestMetadata.class)))
-        .thenReturn(immediateFuture(ImmutableList.of()));
+    // doAnswer(
+    //         (Answer<Void>)
+    //             invocation -> {
+    //               StreamObserver<ByteString> blobObserver =
+    //                   (StreamObserver) invocation.getArguments()[3];
+    //               if (provideAction) {
+    //                 blobObserver.onNext(action.toByteString());
+    //                 blobObserver.onCompleted();
+    //               } else {
+    //                 blobObserver.onError(Status.NOT_FOUND.asException());
+    //               }
+    //               return null;
+    //             })
+    //     .when(mockWorkerInstance)
+    //     .getBlob(
+    //         eq(actionDigest),
+    //         eq(0L),
+    //         eq(actionDigest.getSizeBytes()),
+    //         any(ServerCallStreamObserver.class),
+    //         any(RequestMetadata.class));
+    // when(mockBackplane.getBlobLocationSet(eq(actionDigest)))
+    //     .thenReturn(provideAction ? workers : ImmutableSet.of());
+    // when(mockWorkerInstance.findMissingBlobs(
+    //         eq(ImmutableList.of(actionDigest)), any(RequestMetadata.class)))
+    //     .thenReturn(immediateFuture(ImmutableList.of()));
 
     return action;
   }
@@ -755,22 +755,22 @@ public class ShardInstanceTest {
   private void provideBlob(Digest digest, ByteString content) {
     blobDigests.add(digest);
     // FIXME use better answer definitions, without indexes
-    doAnswer(
-            (Answer<Void>)
-                invocation -> {
-                  StreamObserver<ByteString> blobObserver =
-                      (StreamObserver) invocation.getArguments()[3];
-                  blobObserver.onNext(content);
-                  blobObserver.onCompleted();
-                  return null;
-                })
-        .when(mockWorkerInstance)
-        .getBlob(
-            eq(digest),
-            eq(0L),
-            eq(digest.getSizeBytes()),
-            any(ServerCallStreamObserver.class),
-            any(RequestMetadata.class));
+    // doAnswer(
+    //         (Answer<Void>)
+    //             invocation -> {
+    //               StreamObserver<ByteString> blobObserver =
+    //                   (StreamObserver) invocation.getArguments()[3];
+    //               blobObserver.onNext(content);
+    //               blobObserver.onCompleted();
+    //               return null;
+    //             })
+    //     .when(mockWorkerInstance)
+    //     .getBlob(
+    //         eq(digest),
+    //         eq(0L),
+    //         eq(digest.getSizeBytes()),
+    //         any(ServerCallStreamObserver.class),
+    //         any(RequestMetadata.class));
   }
 
   @Test

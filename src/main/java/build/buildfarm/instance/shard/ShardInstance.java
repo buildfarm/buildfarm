@@ -152,6 +152,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import build.buildfarm.common.resources.DownloadBlobRequest;
+import build.buildfarm.common.resources.BlobInformation;
 
 public class ShardInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardInstance.class.getName());
@@ -745,9 +747,13 @@ public class ShardInstance extends AbstractServerInstance {
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
     String worker = workers.removeFirst();
+    
+      DownloadBlobRequest.Builder builder = DownloadBlobRequest.newBuilder();
+      builder.setBlob(BlobInformation.newBuilder().setDigest(blobDigest).build());
+    
     workerStub(worker)
         .getBlob(
-            blobDigest,
+            builder.build(),
             offset,
             count,
             new UniformDelegateServerCallStreamObserver<ByteString>(blobObserver) {
@@ -821,7 +827,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public void getBlob(
-      Digest blobDigest,
+      DownloadBlobRequest downloadBlobRequest,
       long offset,
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
@@ -829,6 +835,7 @@ public class ShardInstance extends AbstractServerInstance {
     List<String> workersList;
     Set<String> workerSet;
     Set<String> locationSet;
+    Digest blobDigest = downloadBlobRequest.getBlob().getDigest();
     try {
       workerSet = backplane.getWorkers();
       locationSet = backplane.getBlobLocationSet(blobDigest);

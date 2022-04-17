@@ -50,6 +50,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import build.buildfarm.common.resources.DownloadBlobRequest;
+import build.buildfarm.common.resources.BlobInformation;
 
 public interface Instance {
   String getName();
@@ -73,7 +75,7 @@ public interface Instance {
   String getBlobName(Digest blobDigest);
 
   void getBlob(
-      Digest blobDigest,
+      DownloadBlobRequest downloadBlobRequest,
       long offset,
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,

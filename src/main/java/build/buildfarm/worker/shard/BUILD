@@ -34,5 +34,6 @@ java_library(
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
+        "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
     ],
 )

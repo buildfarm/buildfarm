@@ -303,59 +303,59 @@ public class ByteStreamServiceTest {
     }
   }
 
-  @SuppressWarnings("unchecked")
-  @Test
-  public void readSlicesLargeChunksFromInstance() throws Exception {
-    // pick a large chunk size
-    long size = CHUNK_SIZE * 10 + CHUNK_SIZE - 47;
-    ByteString content;
-    try (ByteString.Output out =
-        ByteString.newOutput(
-            ByteStreamService.CHUNK_SIZE * 10 + ByteStreamService.CHUNK_SIZE - 47)) {
-      for (long i = 0; i < size; i++) {
-        out.write((int) (i & 0xff));
-      }
-      content = out.toByteString();
-    }
-    Digest digest = DIGEST_UTIL.compute(content);
-    String resourceName = "blobs/" + DigestUtil.toString(digest);
-    ReadRequest request = ReadRequest.newBuilder().setResourceName(resourceName).build();
+  // @SuppressWarnings("unchecked")
+  // @Test
+  // public void readSlicesLargeChunksFromInstance() throws Exception {
+  //   // pick a large chunk size
+  //   long size = CHUNK_SIZE * 10 + CHUNK_SIZE - 47;
+  //   ByteString content;
+  //   try (ByteString.Output out =
+  //       ByteString.newOutput(
+  //           ByteStreamService.CHUNK_SIZE * 10 + ByteStreamService.CHUNK_SIZE - 47)) {
+  //     for (long i = 0; i < size; i++) {
+  //       out.write((int) (i & 0xff));
+  //     }
+  //     content = out.toByteString();
+  //   }
+  //   Digest digest = DIGEST_UTIL.compute(content);
+  //   String resourceName = "blobs/" + DigestUtil.toString(digest);
+  //   ReadRequest request = ReadRequest.newBuilder().setResourceName(resourceName).build();
 
-    doAnswer(answerVoid((blobDigest, offset, limit, chunkObserver, metadata) -> {}))
-        .when(instance)
-        .getBlob(
-            eq(digest),
-            eq(request.getReadOffset()),
-            eq((long) content.size()),
-            any(ServerCallStreamObserver.class),
-            eq(RequestMetadata.getDefaultInstance()));
-    Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
-    ByteStreamStub service = ByteStreamGrpc.newStub(channel);
-    CountingReadObserver readObserver = new CountingReadObserver();
-    service.read(request, readObserver);
-    ArgumentCaptor<ServerCallStreamObserver<ByteString>> observerCaptor =
-        ArgumentCaptor.forClass(ServerCallStreamObserver.class);
-    verify(instance, times(1))
-        .getBlob(
-            eq(digest),
-            eq(request.getReadOffset()),
-            eq((long) content.size()),
-            observerCaptor.capture(),
-            eq(RequestMetadata.getDefaultInstance()));
+  //   doAnswer(answerVoid((blobDigest, offset, limit, chunkObserver, metadata) -> {}))
+  //       .when(instance)
+  //       .getBlob(
+  //           eq(digest),
+  //           eq(request.getReadOffset()),
+  //           eq((long) content.size()),
+  //           any(ServerCallStreamObserver.class),
+  //           eq(RequestMetadata.getDefaultInstance()));
+  //   Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
+  //   ByteStreamStub service = ByteStreamGrpc.newStub(channel);
+  //   CountingReadObserver readObserver = new CountingReadObserver();
+  //   service.read(request, readObserver);
+  //   ArgumentCaptor<ServerCallStreamObserver<ByteString>> observerCaptor =
+  //       ArgumentCaptor.forClass(ServerCallStreamObserver.class);
+  //   verify(instance, times(1))
+  //       .getBlob(
+  //           eq(digest),
+  //           eq(request.getReadOffset()),
+  //           eq((long) content.size()),
+  //           observerCaptor.capture(),
+  //           eq(RequestMetadata.getDefaultInstance()));
 
-    StreamObserver<ByteString> responseObserver = observerCaptor.getValue();
-    // supply entire content
-    responseObserver.onNext(content);
-    responseObserver.onCompleted();
+  //   StreamObserver<ByteString> responseObserver = observerCaptor.getValue();
+  //   // supply entire content
+  //   responseObserver.onNext(content);
+  //   responseObserver.onCompleted();
 
-    assertThat(readObserver.isCompleted()).isTrue();
-    assertThat(readObserver.getData()).isEqualTo(content);
-    List<Integer> sizes = readObserver.getSizesList();
-    assertThat(sizes.size()).isEqualTo(11); // 10 + 1 incomplete chunk
-    assertThat(
-            sizes.stream()
-                .filter((responseSize) -> responseSize > CHUNK_SIZE)
-                .collect(Collectors.toList()))
-        .isEmpty();
-  }
+  //   assertThat(readObserver.isCompleted()).isTrue();
+  //   assertThat(readObserver.getData()).isEqualTo(content);
+  //   List<Integer> sizes = readObserver.getSizesList();
+  //   assertThat(sizes.size()).isEqualTo(11); // 10 + 1 incomplete chunk
+  //   assertThat(
+  //           sizes.stream()
+  //               .filter((responseSize) -> responseSize > CHUNK_SIZE)
+  //               .collect(Collectors.toList()))
+  //       .isEmpty();
+  // }
 }

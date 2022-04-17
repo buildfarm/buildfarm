@@ -126,6 +126,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import build.buildfarm.common.resources.DownloadBlobRequest;
+import build.buildfarm.common.resources.BlobInformation;
 
 public class MemoryInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(MemoryInstance.class.getName());
@@ -504,7 +506,11 @@ public class MemoryInstance extends AbstractServerInstance {
       status.setCode(com.google.rpc.Code.INTERNAL.getNumber()).setMessage(message);
       return null;
     }
-    ByteString actionBlob = getBlob(actionDigest);
+    
+
+      //DownloadBlobRequest.Builder builder = DownloadBlobRequest.newBuilder();
+      //builder.setBlob(BlobInformation.newBuilder().setDigest(actionDigest).build());
+      ByteString  actionBlob = getBlob(actionDigest);
     if (actionBlob == null) {
       logger.log(
           Level.WARNING,

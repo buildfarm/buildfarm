@@ -145,6 +145,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
+import build.buildfarm.common.resources.DownloadBlobRequest;
+import build.buildfarm.common.resources.BlobInformation;
 
 public class StubInstance implements Instance {
   private static final Logger logger = Logger.getLogger(StubInstance.class.getName());
@@ -572,12 +574,13 @@ public class StubInstance implements Instance {
 
   @Override
   public void getBlob(
-      Digest blobDigest,
+      DownloadBlobRequest downloadBlobRequest,
       long offset,
       long limit,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
     throwIfStopped();
+    Digest blobDigest = downloadBlobRequest.getBlob().getDigest();
     bsStub
         .get()
         .withInterceptors(attachMetadataInterceptor(requestMetadata))

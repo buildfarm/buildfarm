@@ -21,6 +21,7 @@ java_library(
         "//src/main/java/build/buildfarm/metrics/prometheus",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/java/build/buildfarm/common/resources",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_devtools_build_v1_build_events_java_proto",

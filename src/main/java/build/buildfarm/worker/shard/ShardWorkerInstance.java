@@ -60,6 +60,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import build.buildfarm.common.resources.DownloadBlobRequest;
+import build.buildfarm.common.resources.BlobInformation;
 
 public class ShardWorkerInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardWorkerInstance.class.getName());
@@ -112,12 +114,14 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   public void getBlob(
-      Digest digest,
+      DownloadBlobRequest downloadBlobRequest,
       long offset,
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
     Preconditions.checkState(count != 0);
+    
+    Digest digest = downloadBlobRequest.getBlob().getDigest();
     contentAddressableStorage.get(
         digest,
         offset,

@@ -134,6 +134,8 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
+import build.buildfarm.common.resources.DownloadBlobRequest;
+import build.buildfarm.common.resources.BlobInformation;
 
 public abstract class AbstractServerInstance implements Instance {
   private static final Logger logger = Logger.getLogger(AbstractServerInstance.class.getName());
@@ -438,8 +440,13 @@ public abstract class AbstractServerInstance implements Instance {
   protected ListenableFuture<ByteString> getBlobFuture(
       Digest blobDigest, long count, RequestMetadata requestMetadata) {
     SettableFuture<ByteString> future = SettableFuture.create();
+    
+      DownloadBlobRequest.Builder builder = DownloadBlobRequest.newBuilder();
+      builder.setBlob(BlobInformation.newBuilder().setDigest(blobDigest).build());
+
+    
     getBlob(
-        blobDigest,
+        builder.build(),
         /* offset=*/ 0,
         count,
         new ServerCallStreamObserver<ByteString>() {
@@ -496,12 +503,12 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void getBlob(
-      Digest blobDigest,
+      DownloadBlobRequest downloadBlobRequest,
       long offset,
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
-    contentAddressableStorage.get(blobDigest, offset, count, blobObserver, requestMetadata);
+    contentAddressableStorage.get(downloadBlobRequest.getBlob().getDigest(), offset, count, blobObserver, requestMetadata);
   }
 
   @Override

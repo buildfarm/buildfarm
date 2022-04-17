@@ -28,6 +28,8 @@ import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
+import build.buildfarm.common.resources.ResourceParser;
+import build.buildfarm.common.resources.DownloadBlobRequest;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
@@ -228,18 +230,18 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   void readLimitedBlob(
       Instance instance,
-      Digest digest,
+      DownloadBlobRequest downloadBlobRequest,
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
     ServerCallStreamObserver<ReadResponse> target =
         onErrorLogReadObserver(
-            format("%s(%s)", DigestUtil.toString(digest), instance.getName()),
+            format("%s(%s)", DigestUtil.toString(downloadBlobRequest.getBlob().getDigest()), instance.getName()),
             offset,
             (ServerCallStreamObserver<ReadResponse>) responseObserver);
     try {
       instance.getBlob(
-          digest,
+          downloadBlobRequest,
           offset,
           limit,
           newChunkObserver(target),
@@ -251,11 +253,11 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   void readBlob(
       Instance instance,
-      Digest digest,
+      DownloadBlobRequest downloadBlobRequest,
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
-    long available = digest.getSizeBytes() - offset;
+    long available = downloadBlobRequest.getBlob().getDigest().getSizeBytes() - offset;
     if (available == 0) {
       responseObserver.onCompleted();
     } else if (available < 0) {
@@ -266,7 +268,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       } else {
         limit = Math.min(available, limit);
       }
-      readLimitedBlob(instance, digest, offset, limit, responseObserver);
+      readLimitedBlob(instance, downloadBlobRequest, offset, limit, responseObserver);
     }
   }
 
@@ -303,7 +305,8 @@ public class ByteStreamService extends ByteStreamImplBase {
       throws InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case DOWNLOAD_BLOB_REQUEST:
-        readBlob(instance, parseBlobDigest(resourceName), offset, limit, responseObserver);
+        DownloadBlobRequest downloadBlobRequest = ResourceParser.parseDownloadBlobRequest(resourceName);
+        readBlob(instance, downloadBlobRequest, offset, limit, responseObserver);
         break;
       case STREAM_OPERATION_REQUEST:
         readOperationStream(instance, resourceName, offset, limit, responseObserver);
