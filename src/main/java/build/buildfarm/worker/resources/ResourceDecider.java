@@ -36,6 +36,8 @@ public final class ResourceDecider {
    * @param defaultMaxCores The unspecified maximum constraint for cores.
    * @param limitGlobalExecution Whether cpu limiting should be explicitly performed.
    * @param executeStageWidth The maximum amount of cores available for the operation.
+   * @param allowBringYourOwnContainer Whether or not the feature of "bringing your own containers"
+   *     is allowed.
    * @return Default resource limits.
    * @note Suggested return identifier: resourceLimits.
    */
@@ -45,7 +47,8 @@ public final class ResourceDecider {
       int defaultMaxCores,
       boolean onlyMulticoreTests,
       boolean limitGlobalExecution,
-      int executeStageWidth) {
+      int executeStageWidth,
+      boolean allowBringYourOwnContainer) {
     // Get all of the user suggested resource changes.
     ResourceLimits limits = ExecutionPropertiesParser.Parse(command);
 
@@ -57,7 +60,8 @@ public final class ResourceDecider {
         defaultMaxCores,
         onlyMulticoreTests,
         limitGlobalExecution,
-        executeStageWidth);
+        executeStageWidth,
+        allowBringYourOwnContainer);
 
     return limits;
   }
@@ -72,6 +76,8 @@ public final class ResourceDecider {
    * @param onlyMulticoreTests Only allow tests to be multicore.
    * @param limitGlobalExecution Whether cpu limiting should be explicitly performed.
    * @param executeStageWidth The maximum amount of cores available for the operation.
+   * @param allowBringYourOwnContainer Whether or not the feature of "bringing your own containers"
+   *     is allowed.
    */
   private static void adjustLimits(
       ResourceLimits limits,
@@ -80,7 +86,8 @@ public final class ResourceDecider {
       int defaultMaxCores,
       boolean onlyMulticoreTests,
       boolean limitGlobalExecution,
-      int executeStageWidth) {
+      int executeStageWidth,
+      boolean allowBringYourOwnContainer) {
     // store worker name
     limits.workerName = workerName;
 
@@ -165,8 +172,14 @@ public final class ResourceDecider {
       limits.description.add("configured execution policies skipped because of choosing sandbox");
     }
 
-    // Adjust flags for when a container image is chosen for the action.
-    adjustContainerFlags(limits);
+    // Decide whether the action will run in a container
+    if (allowBringYourOwnContainer && !limits.containerSettings.containerImage.isEmpty()) {
+      // enable container execution
+      limits.containerSettings.enabled = true;
+
+      // Adjust additional flags for when a container is being used.
+      adjustContainerFlags(limits);
+    }
 
     // we choose to resolve variables after the other variable values have been decided
     resolveEnvironmentVariables(limits);
@@ -186,13 +199,12 @@ public final class ResourceDecider {
       limits.useExecutionPolicies = false;
       limits.description.add("configured execution policies skipped because of choosing docker");
 
-      // avoid limiting resources as cgroups may not be available in the container.
-      // in fact, we will use docker's cgroup settings explicitly.
-      // TODO(thickey): use docker's cgroup settings given existing resource limitations.
-      limits.cpu.limit = false;
-      limits.mem.limit = false;
-      limits.description.add("resource limiting disabled because of choosing docker");
-    }
+    // avoid limiting resources as cgroups may not be available in the container.
+    // in fact, we will use docker's cgroup settings explicitly.
+    // TODO(thickey): use docker's cgroup settings given existing resource limitations.
+    limits.cpu.limit = false;
+    limits.mem.limit = false;
+    limits.description.add("resource limiting disabled because of choosing docker");
   }
 
   private static void adjustDebugFlags(Command command, ResourceLimits limits) {

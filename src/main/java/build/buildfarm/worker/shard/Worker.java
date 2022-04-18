@@ -159,8 +159,6 @@ public class Worker extends LoggingMain {
   private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
 
-  public class CasReplicationStage extends PipelineStage.NullStage {};
-
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
       insertStream(digest, () -> Files.newInputStream(file));
@@ -468,6 +466,7 @@ public class Worker extends LoggingMain {
             config.getDefaultMaxCores(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
+            config.getAllowBringYourOwnContainer(),
             config.getErrorOperationRemainingResources(),
             writer);
 
@@ -492,8 +491,7 @@ public class Worker extends LoggingMain {
     // We will build a worker's server based on it's capabilities.
     // A worker that is capable of execution will construct an execution pipeline.
     // It will use various execution phases for it's profile service.
-    // On the other hand, a worker that is only capable of CAS storage will construct a pipeline for
-    // storage replication.
+    // On the other hand, a worker that is only capable of CAS storage does not need a pipeline.
     if (hasExecutionCapability) {
       PipelineStage completeStage =
           new PutOperationStage((operation) -> context.deactivate(operation.getName()));
@@ -513,9 +511,6 @@ public class Worker extends LoggingMain {
       serverBuilder.addService(
           new WorkerProfileService(
               storage, inputFetchStage, executeActionStage, context, completeStage, backplane));
-    } else {
-      PipelineStage casReplicationStage = new CasReplicationStage();
-      pipeline.add(casReplicationStage, 1);
     }
 
     return serverBuilder.build();
@@ -822,10 +817,16 @@ public class Worker extends LoggingMain {
   private void blockUntilShutdown() throws InterruptedException {
     // should really be waiting for either server or pipeline shutdown
     try {
-      pipeline.join();
+      if (pipeline.hasStages()) {
+        pipeline.join();
+      } else {
+        logger.log(INFO, "No pipeline stages.  Block until interruption.");
+        while (!Thread.interrupted()) {}
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+    logger.log(INFO, "Shutting down because pipeline finished.");
     stop();
   }
 

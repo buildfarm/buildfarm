@@ -70,8 +70,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
         snsClient.publishAsync(
             new PublishRequest(
                 snsTopicOperations,
-                formatExecutionMetadataToJson(
-                    populateExecutionMetadata(operation, requestMetadata))),
+                formatRequestMetadataToJson(populateRequestMetadata(operation, requestMetadata))),
             new AsyncHandler<PublishRequest, PublishResult>() {
               @Override
               public void onError(Exception e) {
@@ -85,34 +84,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     } catch (Exception e) {
       logger.log(
           Level.WARNING,
-          String.format(
-              "Could not publish request metadata to SNS for %s.", requestMetadata.getTargetId()),
-          e);
-    }
-  }
-
-  @Override
-  public void publishRequestMetadata(RequestMetadata requestMetadata) {
-    try {
-      if (snsClient != null) {
-        snsClient.publishAsync(
-            new PublishRequest(
-                snsTopicOperations, formatActionResultMetadataToJson(requestMetadata)),
-            new AsyncHandler<PublishRequest, PublishResult>() {
-              @Override
-              public void onError(Exception e) {
-                logger.log(Level.WARNING, "Could not publish metrics data to SNS.", e);
-              }
-
-              @Override
-              public void onSuccess(PublishRequest request, PublishResult publishResult) {}
-            });
-      }
-    } catch (Exception e) {
-      logger.log(
-          Level.WARNING,
-          String.format(
-              "Could not publish request metadata to SNS for %s.", requestMetadata.getTargetId()),
+          String.format("Could not publish request metadata to SNS for %s.", operation.getName()),
           e);
     }
   }
