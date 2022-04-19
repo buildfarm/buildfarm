@@ -58,6 +58,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
+import me.dinowernli.grpc.prometheus.Configuration;
+import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 @SuppressWarnings("deprecation")
@@ -107,40 +109,62 @@ public class BuildFarmServer extends LoggingMain {
       File ssl_certificate_path = new File(config.getSslCertificatePath());
       serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }
-    server =
-        serverBuilder
-            .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instance, config.getAcPolicy()))
-            .addService(new CapabilitiesService(instance))
-            .addService(
-                new ContentAddressableStorageService(
-                    instance,
-                    /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
-                    TimeUnit.SECONDS
-                    /* requestLogLevel=*/ ))
-            .addService(
-                new ByteStreamService(
-                    instance,
-                    /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
-                    TimeUnit.SECONDS))
-            .addService(
-                new ExecutionService(
-                    instance,
-                    config.getExecuteKeepaliveAfterSeconds(),
-                    TimeUnit.SECONDS,
-                    keepaliveScheduler,
-                    getMetricsPublisher(config.getMetricsConfig())))
-            .addService(new OperationQueueService(instance))
-            .addService(new OperationsService(instance))
-            .addService(new AdminService(config.getAdminConfig(), instance))
-            .addService(new FetchService(instance))
-            .addService(ProtoReflectionService.newInstance())
-            .addService(new PublishBuildEventService(config.getBuildEventConfig()))
-            .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
-            .intercept(headersInterceptor)
-            .build();
+
+    serverBuilder
+        .addService(healthStatusManager.getHealthService())
+        .addService(new ActionCacheService(instance, config.getAcPolicy()))
+        .addService(new CapabilitiesService(instance))
+        .addService(
+            new ContentAddressableStorageService(
+                instance,
+                /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
+                TimeUnit.SECONDS
+                /* requestLogLevel=*/ ))
+        .addService(
+            new ByteStreamService(
+                instance,
+                /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
+                TimeUnit.SECONDS))
+        .addService(
+            new ExecutionService(
+                instance,
+                config.getExecuteKeepaliveAfterSeconds(),
+                TimeUnit.SECONDS,
+                keepaliveScheduler,
+                getMetricsPublisher(config.getMetricsConfig())))
+        .addService(new OperationQueueService(instance))
+        .addService(new OperationsService(instance))
+        .addService(new AdminService(config.getAdminConfig(), instance))
+        .addService(new FetchService(instance))
+        .addService(ProtoReflectionService.newInstance())
+        .addService(new PublishBuildEventService(config.getBuildEventConfig()))
+        .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
+        .intercept(headersInterceptor);
+    handleGrpcMetricIntercepts(serverBuilder, config);
+    server = serverBuilder.build();
 
     logger.log(Level.INFO, String.format("%s initialized", session));
+  }
+
+  public static void handleGrpcMetricIntercepts(
+      ServerBuilder<?> serverBuilder, BuildFarmServerConfig config) {
+    // Decide how to capture GRPC Prometheus metrics.
+    // By default, we don't capture any.
+    if (config.getGrpcMetrics().getEnabled()) {
+      // Assume core metrics.
+      // Core metrics include send/receive totals tagged with return codes.  No latencies.
+      Configuration grpcConfig = Configuration.cheapMetricsOnly();
+
+      // Enable latency buckets.
+      if (config.getGrpcMetrics().getProvideLatencyHistograms()) {
+        grpcConfig = grpcConfig.allMetrics();
+      }
+
+      // Apply config to create an interceptor and apply it to the GRPC server.
+      MonitoringServerInterceptor monitoringInterceptor =
+          MonitoringServerInterceptor.create(grpcConfig);
+      serverBuilder.intercept(monitoringInterceptor);
+    }
   }
 
   private static BuildFarmServerConfig toBuildFarmServerConfig(
