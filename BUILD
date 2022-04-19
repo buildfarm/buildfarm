@@ -143,7 +143,7 @@ java_image(
 
 oss_audit(
     name = "buildfarm-server-audit",
-    src = "//src/main/java/build/buildfarm:buildfarm-server"
+    src = "//src/main/java/build/buildfarm:buildfarm-server",
 )
 
 # A worker image may need additional packages installed that are not in the base image.
