@@ -193,11 +193,10 @@ public final class ResourceDecider {
     limits.containerSettings.containerImage =
         StringUtils.removePrefix(limits.containerSettings.containerImage, "docker://");
 
-    if (!limits.containerSettings.containerImage.isEmpty()) {
-      // Avoid using the existing execution policies when running actions under docker.
-      // The programs used in the execution policies likely won't exist in the container images.
-      limits.useExecutionPolicies = false;
-      limits.description.add("configured execution policies skipped because of choosing docker");
+    // Avoid using the existing execution policies when running actions under docker.
+    // The programs used in the execution policies likely won't exist in the container images.
+    limits.useExecutionPolicies = false;
+    limits.description.add("configured execution policies skipped because of choosing docker");
 
     // avoid limiting resources as cgroups may not be available in the container.
     // in fact, we will use docker's cgroup settings explicitly.
