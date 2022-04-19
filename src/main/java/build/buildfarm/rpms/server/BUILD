@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 load("@rules_pkg//:rpm.bzl", "pkg_rpm")
 
 pkg_rpm(
