@@ -203,3 +203,8 @@ java_image(
         "//src/main/java/build/buildfarm/worker/shard",
     ],
 )
+
+oss_audit(
+    name = "buildfarm-shard-worker-audit",
+    src = "//src/main/java/build/buildfarm:buildfarm-shard-worker",
+)

@@ -105,7 +105,6 @@ def archive_dependencies(third_party):
             "strip_prefix": "TARDIS-f54fa4743e67763bb1ad77039b3d15be64e2e564",
             "url": "https://github.com/Unilang/TARDIS/archive/f54fa4743e67763bb1ad77039b3d15be64e2e564.zip",
         },
-        
         {
             "name": "rules_oss_audit",
             #"sha256": "a7f580929e840f12737170304da727369c8650b2f5cd505af92ce70629d47e20",

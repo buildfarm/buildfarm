@@ -1,7 +1,7 @@
 package(default_visibility = ["//visibility:public"])
+
 load("@rules_pkg//:rpm.bzl", "pkg_rpm")
 load("@rules_pkg//:mappings.bzl", "pkg_filegroup", "pkg_files")
-
 
 pkg_rpm(
     name = "buildfarm-server-rpm",
