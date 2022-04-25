@@ -257,6 +257,7 @@ class Executor {
       // based on the exit code observed from the main process. The test runner may kill any stray
       // processes. Tests should not leak processes in this fashion.
       // Based on configuration, we will decide whether remaining resources should be an error.
+
       if (workerContext.shouldErrorOperationOnRemainingResources()
           && resource.isReferenced()
           && statusCode == Code.OK) {
@@ -299,15 +300,19 @@ class Executor {
             operationName, resultBuilder.getExitCode()));
 
     operationContext.executeResponse.getStatusBuilder().setCode(statusCode.getNumber());
+
     OperationContext reportOperationContext =
         operationContext.toBuilder().setOperation(operation).build();
     boolean claimed = owner.output().claim(reportOperationContext);
+
     operationContext.poller.pause();
+
     if (claimed) {
       try {
         owner.output().put(reportOperationContext);
       } catch (InterruptedException e) {
         owner.output().release();
+
         throw e;
       }
     } else {
@@ -427,20 +432,6 @@ class Executor {
       environment.put(environmentVariable.getKey(), environmentVariable.getValue());
     }
 
-    final Write stdoutWrite;
-    final Write stderrWrite;
-
-    if ("" != null && !"".isEmpty() && workerContext.getStreamStdout()) {
-      stdoutWrite = workerContext.getOperationStreamWrite("");
-    } else {
-      stdoutWrite = new NullWrite();
-    }
-    if ("" != null && !"".isEmpty() && workerContext.getStreamStderr()) {
-      stderrWrite = workerContext.getOperationStreamWrite("");
-    } else {
-      stderrWrite = new NullWrite();
-    }
-
     // allow debugging before an execution
     if (limits.debugBeforeExecution) {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
@@ -489,8 +480,10 @@ class Executor {
       return Code.INVALID_ARGUMENT;
     }
 
-    stdoutWrite.reset();
-    stderrWrite.reset();
+    // Create threads to extract stdout/stderr from a process.
+    // The readers attach to the process's input/error streams.
+    final Write stdoutWrite = new NullWrite();
+    final Write stderrWrite = new NullWrite();
     ByteStringWriteReader stdoutReader =
         new ByteStringWriteReader(
             process.getInputStream(), stdoutWrite, (int) workerContext.getStandardOutputLimit());
@@ -535,23 +528,21 @@ class Executor {
         }
       }
     }
-    stdoutReaderThread.join();
-    stderrReaderThread.join();
 
+    // Now that the process is completed, extract the final stdout/stderr.
+    ByteString stdout = ByteString.EMPTY;
+    ByteString stderr = ByteString.EMPTY;
     try {
-      resultBuilder
-          .setExitCode(exitCode)
-          .setStdoutRaw(stdoutReader.getData())
-          .setStderrRaw(stderrReader.getData());
-    } catch (IOException e) {
-      if (statusCode != Code.DEADLINE_EXCEEDED) {
-        throw e;
-      }
-      logger.log(
-          Level.INFO,
-          format("error getting process outputs for %s after timeout", operationName),
-          e);
+      stdoutReaderThread.join();
+      stderrReaderThread.join();
+      stdout = stdoutReader.getData();
+      stderr = stderrReader.getData();
+
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, "error extracting stdout/stderr: ", e.getMessage());
     }
+
+    resultBuilder.setExitCode(exitCode).setStdoutRaw(stdout).setStderrRaw(stderr);
 
     // allow debugging after an execution
     if (limits.debugAfterExecution) {
@@ -569,7 +560,6 @@ class Executor {
       return ExecutionDebugger.performAfterExecutionDebug(
           processBuilder, exitCode, limits, executionStatistics, resultBuilder);
     }
-
     return statusCode;
   }
 }
