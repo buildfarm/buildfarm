@@ -303,7 +303,6 @@ class Executor {
         operationContext.toBuilder().setOperation(operation).build();
     boolean claimed = owner.output().claim(reportOperationContext);
     operationContext.poller.pause();
-
     if (claimed) {
       try {
         owner.output().put(reportOperationContext);
