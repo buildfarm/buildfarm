@@ -555,6 +555,7 @@ class Executor {
       return ExecutionDebugger.performAfterExecutionDebug(
           processBuilder, exitCode, limits, executionStatistics, resultBuilder);
     }
+
     return statusCode;
   }
 }
