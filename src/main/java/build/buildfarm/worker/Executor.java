@@ -257,7 +257,6 @@ class Executor {
       // based on the exit code observed from the main process. The test runner may kill any stray
       // processes. Tests should not leak processes in this fashion.
       // Based on configuration, we will decide whether remaining resources should be an error.
-
       if (workerContext.shouldErrorOperationOnRemainingResources()
           && resource.isReferenced()
           && statusCode == Code.OK) {
@@ -300,11 +299,9 @@ class Executor {
             operationName, resultBuilder.getExitCode()));
 
     operationContext.executeResponse.getStatusBuilder().setCode(statusCode.getNumber());
-
     OperationContext reportOperationContext =
         operationContext.toBuilder().setOperation(operation).build();
     boolean claimed = owner.output().claim(reportOperationContext);
-
     operationContext.poller.pause();
 
     if (claimed) {
@@ -312,7 +309,6 @@ class Executor {
         owner.output().put(reportOperationContext);
       } catch (InterruptedException e) {
         owner.output().release();
-
         throw e;
       }
     } else {
