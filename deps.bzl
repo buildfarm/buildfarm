@@ -5,8 +5,8 @@ buildfarm dependencies that can be imported into other WORKSPACE files
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
-RULES_JVM_EXTERNAL_TAG = "3.3"
-RULES_JVM_EXTERNAL_SHA = "d85951a92c0908c80bd8551002d66cb23c3434409c814179c0ff026b53544dab"
+RULES_JVM_EXTERNAL_TAG = "4.2"
+RULES_JVM_EXTERNAL_SHA = "cd1a77b7b02e8e008439ca76fd34f5b07aecb8c752961f9640dea15e9e5ba1ca"
 
 def archive_dependencies(third_party):
     return [
