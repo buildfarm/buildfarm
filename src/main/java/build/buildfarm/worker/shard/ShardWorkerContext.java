@@ -39,6 +39,7 @@ import build.buildfarm.common.ExecutionWrappers;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LinuxSandboxOptions;
 import build.buildfarm.common.Poller;
+import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
@@ -70,7 +71,6 @@ import com.google.common.collect.SetMultimap;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Deadline;
 import io.grpc.Status;
@@ -121,6 +121,7 @@ class ShardWorkerContext implements WorkerContext {
   private final int defaultMaxCores;
   private final boolean limitGlobalExecution;
   private final boolean onlyMulticoreTests;
+  private final boolean allowBringYourOwnContainer;
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
@@ -157,6 +158,7 @@ class ShardWorkerContext implements WorkerContext {
       int defaultMaxCores,
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests,
+      boolean allowBringYourOwnContainer,
       boolean errorOperationRemainingResources,
       CasWriter writer) {
     this.name = name;
@@ -178,6 +180,7 @@ class ShardWorkerContext implements WorkerContext {
     this.defaultMaxCores = defaultMaxCores;
     this.limitGlobalExecution = limitGlobalExecution;
     this.onlyMulticoreTests = onlyMulticoreTests;
+    this.allowBringYourOwnContainer = allowBringYourOwnContainer;
     this.errorOperationRemainingResources = errorOperationRemainingResources;
     this.writer = writer;
   }
@@ -265,28 +268,8 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public QueuedOperation getQueuedOperation(QueueEntry queueEntry)
       throws IOException, InterruptedException {
-    Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
-    ByteString queuedOperationBlob = getBlob(queuedOperationDigest);
-    if (queuedOperationBlob == null) {
-      logger.log(
-          Level.WARNING,
-          format(
-              "missing queued operation: %s(%s)",
-              queueEntry.getExecuteEntry().getOperationName(),
-              DigestUtil.toString(queuedOperationDigest)));
-      return null;
-    }
-    try {
-      return QueuedOperation.parseFrom(queuedOperationBlob);
-    } catch (InvalidProtocolBufferException e) {
-      logger.log(
-          Level.WARNING,
-          format(
-              "invalid queued operation: %s(%s)",
-              queueEntry.getExecuteEntry().getOperationName(),
-              DigestUtil.toString(queuedOperationDigest)));
-      return null;
-    }
+    ByteString queuedOperationBlob = getBlob(queueEntry.getQueuedOperationDigest());
+    return ProtoUtils.parseQueuedOperation(queuedOperationBlob, queueEntry);
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -505,24 +488,30 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     if (Files.isDirectory(outputPath)) {
-      logger.log(Level.FINE, "ReportResultStage: " + outputFile + " is a directory");
+      String message =
+          String.format(
+              "ReportResultStage: %s is a directory but it should have been a file", outputPath);
+      logger.log(Level.FINE, message);
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(outputFile)
-          .setDescription("An output file was a directory");
+          .setDescription(message);
       return;
     }
 
     long size = Files.size(outputPath);
     long maxEntrySize = execFileSystem.getStorage().maxEntrySize();
     if (maxEntrySize != UNLIMITED_ENTRY_SIZE_MAX && size > maxEntrySize) {
+      String message =
+          String.format(
+              "ReportResultStage: The output %s could not be uploaded because it exceeded the maximum size of an entry (%d > %d)",
+              outputPath, size, maxEntrySize);
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject(outputFile + ": " + size)
-          .setDescription(
-              "An output could not be uploaded because it exceeded the maximum size of an entry");
+          .setDescription(message);
       return;
     }
 
@@ -828,7 +817,8 @@ class ShardWorkerContext implements WorkerContext {
         defaultMaxCores,
         onlyMulticoreTests,
         limitGlobalExecution,
-        getExecuteStageWidth());
+        getExecuteStageWidth(),
+        allowBringYourOwnContainer);
   }
 
   @Override

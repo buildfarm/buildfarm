@@ -232,6 +232,20 @@ message PollOperationRequest {
   build.bazel.remote.execution.v2.ExecutionStage.Value stage = 3;
 }
 
+// Publish GRPC metrics to promethesus for each server endpoint. This is used
+// for SLAs at API boundaries. You may want something similar at the proxy level
+// to see frontend/backend performance.
+message GrpcPrometheusMetrics {
+  // Whether to enable this metric gathering at all. If disabled, there should
+  // be no related metrics registered in prometheus.
+  bool enabled = 1;
+
+  // These metrics are more expensive to calculate. If disabled, you only
+  // receive core metrics. Core metrics include send/receive totals tagged
+  // with return codes.  No latencies.
+  bool provide_latency_histograms = 2;
+}
+
 message BuildFarmServerConfig {
   InstanceConfig instance = 1;
 
@@ -258,6 +272,12 @@ message BuildFarmServerConfig {
 
   // Bytestream upload blob deadline
   google.protobuf.Duration bytestream_timeout = 10;
+
+  // Publish GRPC metrics to promethesus for each server endpoint.
+  // We use this for SLAs at the API boundary.
+  // You may want something similar at the proxy level to compare
+  // frontend/backend performance.
+  GrpcPrometheusMetrics grpc_metrics = 11;
 }
 
 message MetricsConfig {
@@ -270,6 +290,23 @@ message MetricsConfig {
     GcpMetricsConfig gcp_metrics_config = 4;
     LogMetricsConfig log_metrics_config = 5;
   }
+}
+
+message AwsSecret {
+
+  string access_key_id = 1;
+  string secret_key = 2;
+}
+
+message S3BucketConfig {
+
+  string region = 1;
+
+  string name = 2;
+
+  int32 max_connections = 3;
+
+  string secret_name = 4;
 }
 
 message AwsMetricsConfig {
@@ -432,6 +469,12 @@ message ProvisionedQueue {
 
 message ProvisionedQueuesConfig { repeated ProvisionedQueue queues = 1; }
 
+enum QueueType {
+  // the type of the redis queue
+  REGULAR = 0;
+  PRIORITY = 1;
+};
+
 message RedisShardBackplaneConfig {
   // the uri endpoint of the redis target. This must be a single host entry
   // with cluster discoverability enabled if the redis service is configured
@@ -442,8 +485,7 @@ message RedisShardBackplaneConfig {
   // the password used to authenticate to redis via `auth`
   string redis_password = 34;
 
-  // the type of the redis queue (regular or priority)
-  optional string redis_queue_type = 12;
+  QueueType redis_queue_type = 12;
 
   // the size of the pool of jedis connections per-cluster-member
   int32 jedis_pool_max_total = 15;
@@ -709,6 +751,12 @@ message ShardWorkerConfig {
   // only allow test executions to respect min-cores > 1, limiting range to 1 ->
   // default_max_cores if not a test
   bool only_multicore_tests = 30;
+
+  // Some actions may need to run in a container specified by the client.  By
+  // using exec_properties clients can request the container for buildfarm to
+  // pull and use.  This feature is known as "bring your own container".  If the
+  // feature is disabled the corresponding exec_properties will be ignored.
+  bool allow_bring_your_own_container = 43;
 
   // user principal name for executions
   string exec_owner = 32;

@@ -302,13 +302,13 @@ public class ByteStreamService extends ByteStreamImplBase {
       String resourceName, long offset, long limit, StreamObserver<ReadResponse> responseObserver)
       throws InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
-      case Blob:
+      case DOWNLOAD_BLOB_REQUEST:
         readBlob(instance, parseBlobDigest(resourceName), offset, limit, responseObserver);
         break;
-      case OperationStream:
+      case STREAM_OPERATION_REQUEST:
         readOperationStream(instance, resourceName, offset, limit, responseObserver);
         break;
-      case UploadBlob:
+      case UPLOAD_BLOB_REQUEST:
       default:
         responseObserver.onError(INVALID_ARGUMENT.asException());
         break;
@@ -414,12 +414,12 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   Write getWrite(String resourceName) throws EntryLimitException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
-      case Blob:
+      case DOWNLOAD_BLOB_REQUEST:
         return getBlobWrite(instance, parseBlobDigest(resourceName));
-      case UploadBlob:
+      case UPLOAD_BLOB_REQUEST:
         return getUploadBlobWrite(
             instance, parseUploadBlobDigest(resourceName), parseUploadBlobUUID(resourceName));
-      case OperationStream:
+      case STREAM_OPERATION_REQUEST:
         return getOperationStreamWrite(instance, resourceName);
       default:
         throw new IllegalArgumentException();
