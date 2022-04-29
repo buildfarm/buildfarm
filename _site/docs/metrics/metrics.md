@@ -188,3 +188,9 @@ Total size of the worker's CAS in bytes
 **cas_entry_count**
 
 The total number of entries in the worker's CAS
+
+Java interceptors can be used to monitor Grpc services using Prometheus.  To enable [these metrics](https://github.com/grpc-ecosystem/java-grpc-prometheus), add the following configuration to your server:
+```
+grpc_metrics: {
+  enabled: True
+```
