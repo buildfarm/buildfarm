@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm;
+package build.buildfarm.tools;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.config.ShardWorkerOptions;
@@ -184,7 +184,7 @@ class WorkerProfile {
           e.printStackTrace();
         }
       }
-      if (workers == null || workers.size() == 0) {
+      if (workers == null || workers.isEmpty()) {
         System.out.println(
             "cannot find any workers, check the redis url and make sure there are workers in the cluster");
       } else {

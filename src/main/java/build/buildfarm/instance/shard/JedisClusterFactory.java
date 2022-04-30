@@ -68,7 +68,7 @@ public class JedisClusterFactory {
     // configuration values (port chosen by redis create-clusters).
     RedisShardBackplaneConfig config =
         RedisShardBackplaneConfig.newBuilder()
-            .setRedisUri("redis://localhost:30001")
+            .setRedisUri("redis://localhost:6379")
             .setJedisPoolMaxTotal(3)
             .build();
     JedisCluster redis = JedisClusterFactory.create(config).get();
@@ -118,7 +118,7 @@ public class JedisClusterFactory {
 
     } while (!nextCursor.equals("0"));
 
-    if (matchingKeys.size() == 0) {
+    if (matchingKeys.isEmpty()) {
       return;
     }
 
