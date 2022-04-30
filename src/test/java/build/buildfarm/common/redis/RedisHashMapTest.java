@@ -14,8 +14,13 @@
 
 package build.buildfarm.common.redis;
 
+import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.instance.shard.JedisClusterFactory;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -52,5 +57,51 @@ public class RedisHashMapTest {
   public void redisPriorityQueueConstructsWithoutError() throws Exception {
     // ACT
     new RedisHashMap("test");
+  }
+
+  // Function under test: insert & keys
+  // Reason for testing: elements can be inserted and keys received
+  // Failure explanation: inserting or fetching keys does not work as expected
+  @Test
+  public void redisInsertAndGetKeys() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    map.insert(redis, "key1", "value1");
+    map.insert(redis, "key2", "value2");
+    map.insert(redis, "key3", "value3");
+
+    Set<String> expected = new HashSet<>();
+    expected.add("key1");
+    expected.add("key2");
+    expected.add("key3");
+
+    // ASSERT
+    Set<String> keys = map.keys(redis);
+    assertThat(keys.equals(expected)).isTrue();
+  }
+
+  // Function under test: insert & asMap
+  // Reason for testing: elements can be inserted and received back as a java map
+  // Failure explanation: inserting or fetching elements does not work as expected
+  @Test
+  public void redisInsertAndAsMap() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    map.insert(redis, "key1", "value1");
+    map.insert(redis, "key2", "value2");
+    map.insert(redis, "key3", "value3");
+
+    Map<String, String> expected = new HashMap<>();
+    expected.put("key1", "value1");
+    expected.put("key2", "value2");
+    expected.put("key3", "value3");
+
+    // ASSERT
+    Map<String, String> elements = map.asMap(redis);
+    assertThat(elements.equals(expected)).isTrue();
   }
 }

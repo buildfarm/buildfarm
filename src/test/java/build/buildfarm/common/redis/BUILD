@@ -15,6 +15,7 @@ NATIVE_REDIS_TESTS = [
     "RedisNodeHashesTest.java",
     "RedisQueueTest.java",
     "RedisPriorityQueueTest.java",
+    "RedisHashMapTest.java",
 ]
 
 filegroup(

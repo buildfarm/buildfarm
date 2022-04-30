@@ -14,6 +14,8 @@
 
 package build.buildfarm.common.redis;
 
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -47,5 +49,24 @@ public class RedisHashMapMockTest {
   public void redisPriorityQueueConstructsWithoutError() throws Exception {
     // ACT
     new RedisHashMap("test");
+  }
+
+  // Function under test: insert
+  // Reason for testing: elements can be inserted into the map
+  // Failure explanation: inserting keys not call the expected implementation.
+  @Test
+  public void redisInsert() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    map.insert(redis, "key1", "value1");
+    map.insert(redis, "key2", "value2");
+    map.insert(redis, "key3", "value3");
+
+    // ASSERT
+    verify(redis, times(1)).hset("test", "key1", "value1");
+    verify(redis, times(1)).hset("test", "key2", "value2");
+    verify(redis, times(1)).hset("test", "key3", "value3");
   }
 }
