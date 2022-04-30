@@ -817,7 +817,7 @@ public class Worker extends LoggingMain {
   private void blockUntilShutdown() throws InterruptedException {
     // should really be waiting for either server or pipeline shutdown
     try {
-      if (pipeline.hasStages()) {
+      if (pipeline.hasStages() || hasExecutionCapability) {
         pipeline.join();
       } else {
         logger.log(INFO, "No pipeline stages.  Block until interruption.");
