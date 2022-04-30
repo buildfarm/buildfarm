@@ -98,3 +98,23 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
 )
+
+java_test(
+    name = "hashmap",
+    size = "small",
+    srcs = ["RedisHashMapMockTest.java"],
+    test_class = "build.buildfarm.AllTests",
+    deps = COMMON_DEPS,
+)
+
+java_test(
+    name = "hashmap-redis",
+    size = "small",
+    srcs = ["RedisHashMapTest.java"],
+    tags = [
+        "exclusive",
+        "redis",
+    ],
+    test_class = "build.buildfarm.AllTests",
+    deps = COMMON_DEPS,
+)
