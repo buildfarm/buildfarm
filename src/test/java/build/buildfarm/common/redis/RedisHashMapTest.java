@@ -104,4 +104,28 @@ public class RedisHashMapTest {
     Map<String, String> elements = map.asMap(redis);
     assertThat(elements.equals(expected)).isTrue();
   }
+
+  // Function under test: remove
+  // Reason for testing: elements can be removed
+  // Failure explanation: the selected element was not removed
+  @Test
+  public void redisElementRemoved() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    map.insert(redis, "key1", "value1");
+    map.insert(redis, "key2", "value2");
+    map.insert(redis, "key3", "value3");
+
+    map.remove(redis, "key2");
+
+    Map<String, String> expected = new HashMap<>();
+    expected.put("key1", "value1");
+    expected.put("key3", "value3");
+
+    // ASSERT
+    Map<String, String> elements = map.asMap(redis);
+    assertThat(elements.equals(expected)).isTrue();
+  }
 }

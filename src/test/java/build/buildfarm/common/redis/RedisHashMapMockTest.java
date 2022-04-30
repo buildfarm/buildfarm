@@ -69,4 +69,38 @@ public class RedisHashMapMockTest {
     verify(redis, times(1)).hset("test", "key2", "value2");
     verify(redis, times(1)).hset("test", "key3", "value3");
   }
+
+  // Function under test: remove
+  // Reason for testing: element can be removed by key
+  // Failure explanation: removing keys does not call the expected implementation.
+  @Test
+  public void redisRemove() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    map.insert(redis, "key1", "value1");
+    map.remove(redis, "key1");
+
+    // ASSERT
+    verify(redis, times(1)).hset("test", "key1", "value1");
+    verify(redis, times(1)).hdel("test", "key1");
+  }
+
+  // Function under test: keys & asMap
+  // Reason for testing: representations of the map can be fetched.
+  // Failure explanation: getting representations does not call the expected implementation.
+  @Test
+  public void redisRepresentation() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    map.keys(redis);
+    map.asMap(redis);
+
+    // ASSERT
+    verify(redis, times(1)).hkeys("test");
+    verify(redis, times(1)).hgetAll("test");
+  }
 }
