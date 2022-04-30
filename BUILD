@@ -6,17 +6,32 @@ load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 
 package(default_visibility = ["//visibility:public"])
 
+# Made available for formatting
 buildifier(
     name = "buildifier",
 )
 
-# These are execution wrappers that buildfarm may choose to use when executing actions.
-# For their availability on a worker, they should be provided to a java_image as a "runtime_dep".
-# The relevant configuration for workers is the "execution policy".
-# That is where these binaries can be used and stacked.
-# Buildfarm may also choose different execution wrappers dynamically based on exec_properties.
-# Be aware that the process-wrapper and linux-sandbox come from bazel itself.
-# Therefore, users may want to ensure that the same bazel version is sourced here as is used locally.
+# == Docker Image Creation ==
+# When deploying buildfarm, you may want to include additional dependencies within your deployment.
+# These dependencies can enable features related to the observability and runtime of the system.
+# For example, "debgging tools", "introspection tools", and "exeution wrappers" are examples of dependencies
+# that many need included within deployed containers.  This BUILD file creates docker images that bundle
+# additional dependencies alongside the buildfarm agents.
+
+# == Execution Wrappers ==
+# Execution wrappers are programs that buildfarm chooses to use when running REAPI actions.  They are used for
+# both sandboxing, as well as changing runtime behavior of actions.  Buildfarm workers can be configured
+# to use execution wrappers directly through a configuration called "execution policy".  Execution wrappers
+# can be stacked (i.e. actions can run under multiple wrappers).  Buildfarm may also choose different
+# execution wrappers dynamically based on exec_properties.  In order to have them available to the worker, they should
+# be provided to a java_image as a "runtime_dep".  Buildfarm workers will warn about any missing execution wrappers
+# during startup and what features are unavailable due to their absence.
+
+# == Execution Wrapper Compatibility ==
+# "process-wrapper" and "linux-sandbox" are sourced directly from bazel.  Users may want to ensure that the same
+# bazel version is used in buildfarm agents as is used by bazel clients.  There has not been any known issues due
+# to version mismatch, but we state the possibility here.  Some execution wrappers will not be compatible with all
+# operating systems.  We make a best effort and ensure they all work in the below images.
 java_library(
     name = "execution_wrappers",
     data = [
@@ -27,6 +42,13 @@ java_library(
         ":skip_sleep.binary",
         ":skip_sleep.preload",
         ":tini.binary",
+    ],
+)
+
+java_library(
+    name = "telemetry_tools",
+    data = [
+        ":opentelemetry-javaagent",
     ],
 )
 
@@ -49,6 +71,13 @@ genrule(
     srcs = ["@tini//file"],
     outs = ["tini"],
     cmd = "cp $< $@ && chmod +x $@",
+)
+
+genrule(
+    name = "opentelemetry-javaagent",
+    srcs = ["@opentelemetry//jar"],
+    outs = ["opentelemetry-javaagent.jar"],
+    cmd = "cp $< $@;",
 )
 
 cc_binary(
@@ -93,10 +122,20 @@ java_image(
     ],
     jvm_flags = [
         "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+
+        # Flags related to OpenTelemetry
+        "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
+        "-Dotel.resource.attributes=service.name=server",
+        "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
+        "-Dotel.instrumentation.http.capture-headers.client.request",
+        "-Dotel.instrumentation.http.capture-headers.client.response",
+        "-Dotel.instrumentation.http.capture-headers.server.request",
+        "-Dotel.instrumentation.http.capture-headers.server.response",
     ],
     main_class = "build.buildfarm.server.BuildFarmServer",
     tags = ["container"],
     runtime_deps = [
+        ":telemetry_tools",
         "//src/main/java/build/buildfarm/server",
     ],
 )
@@ -140,11 +179,21 @@ java_image(
     ],
     jvm_flags = [
         "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+
+        # Flags related to OpenTelemetry
+        "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
+        "-Dotel.resource.attributes=service.name=worker",
+        "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
+        "-Dotel.instrumentation.http.capture-headers.client.request",
+        "-Dotel.instrumentation.http.capture-headers.client.response",
+        "-Dotel.instrumentation.http.capture-headers.server.request",
+        "-Dotel.instrumentation.http.capture-headers.server.response",
     ],
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
     runtime_deps = [
         ":execution_wrappers",
+        ":telemetry_tools",
         "//src/main/java/build/buildfarm/worker/shard",
     ],
 )

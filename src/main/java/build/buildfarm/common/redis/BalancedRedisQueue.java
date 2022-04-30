@@ -141,7 +141,7 @@ public class BalancedRedisQueue {
       String name, List<String> hashtags, int maxQueueSize, String queueType) {
     this.originalHashtag = RedisHashtags.existingHash(name);
     this.name = RedisHashtags.unhashedName(name);
-    this.queueType = queueType;
+    this.queueType = queueType.toLowerCase();
     this.maxQueueSize = maxQueueSize;
     createHashedQueues(this.name, hashtags, this.queueType);
   }

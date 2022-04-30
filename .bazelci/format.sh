@@ -7,9 +7,12 @@ FORMAT_JAVA=true
 JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/google-java-format-1.7/google-java-format-1.7-all-deps.jar
 LOCAL_FORMATTER="java_formatter.jar"
 
-FORMAT_PROTO=false
+FORMAT_PROTO=true
 CLANG_FORMAT=@llvm_toolchain//:bin/clang-format
-BAZEL_WRAPPER=bazelw
+BAZEL_WRAPPER=bazel
+
+FORMAT_BUILD=true
+BUILDIFIER=//:buildifier
 
 # Print an error such that it will surface in the context of buildkite
 print_error () {
@@ -78,10 +81,18 @@ run_proto_formatter () {
     find . -name '*.proto' -exec $BAZEL_WRAPPER run $CLANG_FORMAT -- -i {} +
 }
 
+run_buildifier () {
+    $BAZEL_WRAPPER run $BUILDIFIER -- -r > /dev/null 2>&1
+}
+
 if [ "${FORMAT_JAVA:-false}" = true ]; then
     run_java_formatter "$@"
 fi;
 
 if [ "${FORMAT_PROTO:-false}" = true ]; then
     run_proto_formatter "$@"
+fi;
+
+if [ "${FORMAT_BUILD:-false}" = true ]; then
+    run_buildifier "$@"
 fi;
