@@ -1473,7 +1473,7 @@ public class ShardInstance extends AbstractServerInstance {
           .setSubject(INVALID_PLATFORM)
           .setDescription(
               format(
-                  "properties are not valid for queue eligibility: %s",
+                  "properties are not valid for queue eligibility: %s.  If you think your queue should still accept these poperties without them being specified in queue configuration, consider configuring the queue with `allow_unmatched: True`",
                   platform.getPropertiesList()));
     }
 
