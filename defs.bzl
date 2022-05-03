@@ -48,6 +48,7 @@ COM_AWS_MODULES = [
     "secretsmanager",
     "sns",
     "ssm",
+    "s3",
 ]
 
 ORG_SPRING_MODULES = [
@@ -113,6 +114,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.apache.commons:commons-pool2:2.9.0",
                         "org.apache.commons:commons-lang3:3.12.0",
                         "commons-io:commons-io:2.11.0",
+                        "me.dinowernli:java-grpc-prometheus:0.5.0",
                         "org.apache.tomcat:annotations-api:6.0.53",
                         "org.checkerframework:checker-qual:2.5.2",
                         "org.mockito:mockito-core:2.25.0",

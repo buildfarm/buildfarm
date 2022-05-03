@@ -19,6 +19,10 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
@@ -49,6 +53,7 @@ import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DelegateCASConfig;
+import build.buildfarm.v1test.GrpcPrometheusMetrics;
 import build.buildfarm.v1test.MemoryCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationQueueGrpc;
@@ -75,6 +80,7 @@ import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import io.grpc.ManagedChannel;
+import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
@@ -84,6 +90,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
+import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -461,5 +468,34 @@ public class BuildFarmServerTest {
         .isEqualTo(WriteResponse.newBuilder().setCommittedSize(content.size()).build());
 
     assertThat(getBlob(digest)).isEqualTo(content);
+  }
+
+  @Test
+  public void grpcMetricsOffByDefault() {
+    // ARRANGE
+    ServerBuilder serverBuilder = mock(ServerBuilder.class);
+    BuildFarmServerConfig config = BuildFarmServerConfig.newBuilder().build();
+
+    // ACT
+    BuildFarmServer.handleGrpcMetricIntercepts(serverBuilder, config);
+
+    // ASSERT
+    verify(serverBuilder, times(0)).intercept(any(MonitoringServerInterceptor.class));
+  }
+
+  @Test
+  public void grpcMetricsEnabled() {
+    // ARRANGE
+    ServerBuilder serverBuilder = mock(ServerBuilder.class);
+    GrpcPrometheusMetrics metricsConfig =
+        GrpcPrometheusMetrics.newBuilder().setEnabled(true).build();
+    BuildFarmServerConfig config =
+        BuildFarmServerConfig.newBuilder().setGrpcMetrics(metricsConfig).build();
+
+    // ACT
+    BuildFarmServer.handleGrpcMetricIntercepts(serverBuilder, config);
+
+    // ASSERT
+    verify(serverBuilder, times(1)).intercept(any(MonitoringServerInterceptor.class));
   }
 }

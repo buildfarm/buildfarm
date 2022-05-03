@@ -232,6 +232,20 @@ message PollOperationRequest {
   build.bazel.remote.execution.v2.ExecutionStage.Value stage = 3;
 }
 
+// Publish GRPC metrics to promethesus for each server endpoint. This is used
+// for SLAs at API boundaries. You may want something similar at the proxy level
+// to see frontend/backend performance.
+message GrpcPrometheusMetrics {
+  // Whether to enable this metric gathering at all. If disabled, there should
+  // be no related metrics registered in prometheus.
+  bool enabled = 1;
+
+  // These metrics are more expensive to calculate. If disabled, you only
+  // receive core metrics. Core metrics include send/receive totals tagged
+  // with return codes.  No latencies.
+  bool provide_latency_histograms = 2;
+}
+
 message BuildFarmServerConfig {
   InstanceConfig instance = 1;
 
@@ -258,6 +272,12 @@ message BuildFarmServerConfig {
 
   // Bytestream upload blob deadline
   google.protobuf.Duration bytestream_timeout = 10;
+
+  // Publish GRPC metrics to promethesus for each server endpoint.
+  // We use this for SLAs at the API boundary.
+  // You may want something similar at the proxy level to compare
+  // frontend/backend performance.
+  GrpcPrometheusMetrics grpc_metrics = 11;
 }
 
 message MetricsConfig {
@@ -270,6 +290,23 @@ message MetricsConfig {
     GcpMetricsConfig gcp_metrics_config = 4;
     LogMetricsConfig log_metrics_config = 5;
   }
+}
+
+message AwsSecret {
+
+  string access_key_id = 1;
+  string secret_key = 2;
+}
+
+message S3BucketConfig {
+
+  string region = 1;
+
+  string name = 2;
+
+  int32 max_connections = 3;
+
+  string secret_name = 4;
 }
 
 message AwsMetricsConfig {
