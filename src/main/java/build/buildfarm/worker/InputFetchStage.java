@@ -14,9 +14,10 @@
 
 package build.buildfarm.worker;
 
-import com.google.common.collect.Sets;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -34,7 +35,7 @@ public class InputFetchStage extends SuperscalarPipelineStage {
           .help("Input fetch stall time in ms.")
           .register();
 
-  private final Set<Thread> fetchers = Sets.newHashSet();
+  private final Set<Thread> fetchers = Collections.synchronizedSet(new HashSet<>());
   private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -56,19 +57,19 @@ public class InputFetchStage extends SuperscalarPipelineStage {
     queue.put(operationContext);
   }
 
-  synchronized int removeAndRelease(String operationName) {
+  void removeAndRelease(String operationName) {
     if (!fetchers.remove(Thread.currentThread())) {
       throw new IllegalStateException("tried to remove unknown fetcher thread");
     }
     releaseClaim(operationName, 1);
-    return fetchers.size();
   }
 
   public void releaseInputFetcher(
       String operationName, long usecs, long stallUSecs, boolean success) {
-    int size = removeAndRelease(operationName);
+    removeAndRelease(operationName);
     inputFetchTime.observe(usecs / 1000.0);
     inputFetchStallTime.observe(stallUSecs / 1000.0);
+    int size = getSlotUsage();
     inputFetchSlotUsage.set(size);
     logComplete(
         operationName,
@@ -98,12 +99,9 @@ public class InputFetchStage extends SuperscalarPipelineStage {
     OperationContext operationContext = take();
     Thread fetcher = new Thread(new InputFetcher(workerContext, operationContext, this));
 
-    synchronized (this) {
-      fetchers.add(fetcher);
-      logStart(
-          operationContext.queueEntry.getExecuteEntry().getOperationName(),
-          getUsage(fetchers.size()));
-      fetcher.start();
-    }
+    fetchers.add(fetcher);
+    logStart(
+        operationContext.queueEntry.getExecuteEntry().getOperationName(), getUsage(getSlotUsage()));
+    fetcher.start();
   }
 }
