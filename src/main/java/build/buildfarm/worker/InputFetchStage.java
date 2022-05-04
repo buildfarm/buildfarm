@@ -57,7 +57,7 @@ public class InputFetchStage extends SuperscalarPipelineStage {
     queue.put(operationContext);
   }
 
-  void removeAndRelease(String operationName) {
+  synchronized void removeAndRelease(String operationName) {
     if (!fetchers.remove(Thread.currentThread())) {
       throw new IllegalStateException("tried to remove unknown fetcher thread");
     }

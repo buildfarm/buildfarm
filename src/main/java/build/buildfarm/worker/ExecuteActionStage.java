@@ -91,7 +91,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
     throw new InterruptedException("stage closed");
   }
 
-  void removeAndRelease(String operationName, int claims) {
+  synchronized void removeAndRelease(String operationName, int claims) {
     if (!executors.remove(Thread.currentThread())) {
       throw new IllegalStateException(
           "tried to remove unknown executor thread for " + operationName);
