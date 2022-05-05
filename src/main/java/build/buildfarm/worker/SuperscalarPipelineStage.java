@@ -120,6 +120,10 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
     return true;
   }
 
+  public int getSlotUsage() {
+    return slots.claims.get();
+  }
+
   @Override
   public boolean claim(OperationContext operationContext) throws InterruptedException {
     return claim(claimsRequired(operationContext));

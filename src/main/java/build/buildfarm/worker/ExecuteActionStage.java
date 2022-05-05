@@ -105,10 +105,6 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
         String.format("exit code: %d, %s", exitCode, getUsage(size)));
   }
 
-  public int getSlotUsage() {
-    return slots.claims.get();
-  }
-
   @Override
   protected synchronized void interruptAll() {
     for (Thread executor : slots.jobs) {
