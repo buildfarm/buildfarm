@@ -14,12 +14,8 @@
 
 package build.buildfarm.worker;
 
-import com.google.common.collect.Sets;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
 
 public class InputFetchStage extends SuperscalarPipelineStage {
@@ -34,9 +30,6 @@ public class InputFetchStage extends SuperscalarPipelineStage {
           .help("Input fetch stall time in ms.")
           .register();
 
-  private final Set<Thread> fetchers = Sets.newHashSet();
-  private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
-
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super("InputFetchStage", workerContext, output, error, workerContext.getInputFetchStageWidth());
   }
@@ -48,20 +41,20 @@ public class InputFetchStage extends SuperscalarPipelineStage {
 
   @Override
   public OperationContext take() throws InterruptedException {
-    return takeOrDrain(queue);
+    return takeOrDrain(slots.intake);
   }
 
   @Override
   public void put(OperationContext operationContext) throws InterruptedException {
-    queue.put(operationContext);
+    slots.intake.put(operationContext);
   }
 
   synchronized int removeAndRelease(String operationName) {
-    if (!fetchers.remove(Thread.currentThread())) {
+    if (!slots.jobs.remove(Thread.currentThread())) {
       throw new IllegalStateException("tried to remove unknown fetcher thread");
     }
     releaseClaim(operationName, 1);
-    return fetchers.size();
+    return slots.jobs.size();
   }
 
   public void releaseInputFetcher(
@@ -78,12 +71,12 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   }
 
   public int getSlotUsage() {
-    return fetchers.size();
+    return slots.jobs.size();
   }
 
   @Override
   protected synchronized void interruptAll() {
-    for (Thread fetcher : fetchers) {
+    for (Thread fetcher : slots.jobs) {
       fetcher.interrupt();
     }
   }
@@ -99,10 +92,10 @@ public class InputFetchStage extends SuperscalarPipelineStage {
     Thread fetcher = new Thread(new InputFetcher(workerContext, operationContext, this));
 
     synchronized (this) {
-      fetchers.add(fetcher);
+      slots.jobs.add(fetcher);
       logStart(
           operationContext.queueEntry.getExecuteEntry().getOperationName(),
-          getUsage(fetchers.size()));
+          getUsage(slots.jobs.size()));
       fetcher.start();
     }
   }

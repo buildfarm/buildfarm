@@ -15,7 +15,6 @@
 package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
-import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.junit.Assert.fail;
 
 import com.google.longrunning.Operation;
@@ -70,12 +69,15 @@ public class SuperscalarPipelineStageTest {
     }
 
     boolean isFull() {
-      return claims.size() == width;
+      return slots.claims.get() == slots.width;
     }
   }
 
+  // A new job can not make partial claims. The super-scalar stage acquires all claims or fails.
+  // In this case, we are requesting more claims than are available.  Our total claims do not
+  // change, and the claim fails.
   @Test
-  public void interruptedClaimReleasesPartial() throws InterruptedException {
+  public void noRoomToClaim() throws InterruptedException {
     AbstractSuperscalarPipelineStage stage =
         new AbstractSuperscalarPipelineStage("too-narrow", /* output=*/ null, /* width=*/ 3) {
           @Override
@@ -84,32 +86,9 @@ public class SuperscalarPipelineStageTest {
           }
         };
 
-    final Thread target = Thread.currentThread();
-
-    Thread interruptor =
-        new Thread(
-            () -> {
-              while (!stage.isFull()) {
-                try {
-                  MICROSECONDS.sleep(1);
-                } catch (InterruptedException e) {
-                  // ignore
-                }
-              }
-              target.interrupt();
-            });
-    interruptor.start();
-    // start a thread, when the stage is exhausted, interrupt this one
-
-    try {
-      stage.claim(/* operationContext=*/ null);
-      fail("should not get here");
-    } catch (InterruptedException e) {
-      // ignore
-    } finally {
-      interruptor.join();
-      assertThat(stage.isClaimed()).isFalse();
-    }
+    boolean claimed = stage.claim(/* operationContext=*/ null);
+    assertThat(claimed).isFalse();
+    assertThat(stage.isFull()).isFalse();
   }
 
   @Test

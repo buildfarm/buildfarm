@@ -15,15 +15,10 @@
 package build.buildfarm.worker;
 
 import build.buildfarm.worker.resources.ResourceLimits;
-import com.google.common.collect.Sets;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
 import java.io.IOException;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -38,11 +33,6 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
           .name("execution_stall_time_ms")
           .help("Execution stall time in ms.")
           .register();
-
-  private final Set<Thread> executors = Sets.newHashSet();
-  private final AtomicInteger executorClaims = new AtomicInteger(0);
-  private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
-  private volatile int size = 0;
 
   public ExecuteActionStage(
       WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -78,13 +68,13 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
 
   @Override
   public OperationContext take() throws InterruptedException {
-    return takeOrDrain(queue);
+    return takeOrDrain(slots.intake);
   }
 
   @Override
   public void put(OperationContext operationContext) throws InterruptedException {
     while (!isClosed() && !output.isClosed()) {
-      if (queue.offer(operationContext, 10, TimeUnit.MILLISECONDS)) {
+      if (slots.intake.offer(operationContext, 10, TimeUnit.MILLISECONDS)) {
         return;
       }
     }
@@ -92,19 +82,21 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   synchronized int removeAndRelease(String operationName, int claims) {
-    if (!executors.remove(Thread.currentThread())) {
+    if (!slots.jobs.remove(Thread.currentThread())) {
       throw new IllegalStateException(
           "tried to remove unknown executor thread for " + operationName);
     }
     releaseClaim(operationName, claims);
-    return executorClaims.addAndGet(-claims);
+    return slots.claims.addAndGet(-claims);
   }
 
   public void releaseExecutor(
       String operationName, int claims, long usecs, long stallUSecs, int exitCode) {
-    size = removeAndRelease(operationName, claims);
+    removeAndRelease(operationName, claims);
     executionTime.observe(usecs / 1000.0);
     executionStallTime.observe(stallUSecs / 1000.0);
+
+    int size = slots.claims.get();
     executionSlotUsage.set(size);
     logComplete(
         operationName,
@@ -114,12 +106,12 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   public int getSlotUsage() {
-    return size;
+    return slots.claims.get();
   }
 
   @Override
   protected synchronized void interruptAll() {
-    for (Thread executor : executors) {
+    for (Thread executor : slots.jobs) {
       executor.interrupt();
     }
   }
@@ -137,8 +129,8 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
     Thread executorThread = new Thread(() -> executor.run(limits));
 
     synchronized (this) {
-      executors.add(executorThread);
-      size = executorClaims.addAndGet(limits.cpu.claimed);
+      slots.jobs.add(executorThread);
+      int size = slots.claims.addAndGet(limits.cpu.claimed);
       logStart(operationContext.operation.getName(), getUsage(size));
       executorThread.start();
     }
