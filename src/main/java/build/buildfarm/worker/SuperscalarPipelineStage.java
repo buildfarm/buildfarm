@@ -119,7 +119,6 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
       }
     }
 
-    return true;
   }
 
   public int getSlotUsage() {
