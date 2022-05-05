@@ -21,19 +21,18 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Slots {
-  // input queue
-  // these inputs should become jobs and take claims
+  // Each stage has an input context queue.  These contexts are evaluated to become jobs that take
+  // claims.
   public BlockingQueue<OperationContext> intake = new ArrayBlockingQueue<>(1);
 
-  // the number of work units to share among jobs.
+  // The total number of claims available between jobs.  If every job took 1 claim, the width would
+  // correspond to the total number of jobs that can run concurrently in a stage.
   public int width = 0;
 
-  // the total number of work units currently claimed
+  // The current number of claims currently held by all the jobs.  Keep in mind, that claims amount
+  // isn't necessarily job amount.
   public AtomicInteger claims = new AtomicInteger(0);
 
-  // BlockingQueue claims;
-
-  // number of concurrent jobs running
-  // should this be a thread pool?
+  // The number of concurrent jobs running.  Should this be a thread pool?
   public Set<Thread> jobs = Sets.newHashSet();
 }
