@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 abstract class SuperscalarPipelineStage extends PipelineStage {
   @SuppressWarnings("rawtypes")
-  protected Slots slots = new Slots();
+  protected Slots slots;
 
   private volatile boolean catastrophic = false;
 
@@ -35,6 +35,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
       int width) {
     super(name, workerContext, output, error);
 
+    slots = new Slots();
     slots.width = width;
   }
 
