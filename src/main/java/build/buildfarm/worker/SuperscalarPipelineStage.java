@@ -92,19 +92,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
   }
 
   protected synchronized void releaseClaim(String operationName, int count) {
-    // clear interrupted flag for take
-    boolean interrupted = Thread.interrupted();
-    if (interrupted) {
-      Thread.currentThread().interrupt();
-      close();
-    }
-
-    try {
-      slots.claims.addAndGet(count * -1);
-
-    } finally {
-      notify();
-    }
+    slots.claims.addAndGet(count * -1);
   }
 
   protected String getUsage(int size) {
@@ -113,12 +101,6 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
 
   @SuppressWarnings("unchecked")
   private boolean claim(int count) throws InterruptedException {
-    boolean interrupted = Thread.interrupted();
-    if (interrupted) {
-      Thread.currentThread().interrupt();
-      close();
-    }
-
     // Can't claim if stage is closed
     if (isClosed()) {
       return false;
@@ -136,37 +118,6 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
     }
 
     return true;
-
-    // Object handle = new Object();
-    // int claimed = 0;
-    // synchronized (claimLock) {
-    //   while (count > 0 && !isClosed()) {
-    //     try {
-    //       if (claims.offer(handle, 10, TimeUnit.MILLISECONDS)) {
-    //         claimed++;
-    //         count--;
-    //       }
-    //     } catch (InterruptedException e) {
-    //       boolean interrupted = Thread.interrupted();
-    //       while (claimed != 0) {
-    //         interrupted = Thread.interrupted() || interrupted;
-    //         try {
-    //           claims.take();
-    //           claimed--;
-    //         } catch (InterruptedException intEx) {
-    //           // ignore, we must release our claims
-    //           e.addSuppressed(intEx);
-    //         }
-    //       }
-    //       if (interrupted) {
-    //         Thread.currentThread().interrupt();
-    //       }
-    //       throw e;
-    //     }
-    //   }
-    // }
-    // return count == 0;
-
   }
 
   @Override
