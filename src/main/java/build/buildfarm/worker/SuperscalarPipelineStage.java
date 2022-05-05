@@ -107,14 +107,16 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
     }
 
     // Attempt to claim
-    synchronized (claimLock) {
-      // Not enough room to claim
-      if (slots.claims.get() + count > slots.width) {
-        return false;
-      }
+    while (true) {
+      synchronized (claimLock) {
+        // Not enough room to claim
+        if (slots.claims.get() + count > slots.width) {
+          return false;
+        }
 
-      // Perform claim
-      slots.claims.addAndGet(count);
+        // Perform claim
+        slots.claims.addAndGet(count);
+      }
     }
 
     return true;
