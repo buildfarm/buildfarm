@@ -90,6 +90,22 @@ public class SuperscalarPipelineStageTest {
     assertThat(claimed).isFalse();
     assertThat(stage.isFull()).isFalse();
   }
+  
+  // There is room to claim and everything is claimed.
+  @Test
+  public void fillsClaims() throws InterruptedException {
+    AbstractSuperscalarPipelineStage stage =
+        new AbstractSuperscalarPipelineStage("too-narrow", /* output=*/ null, /* width=*/ 3) {
+          @Override
+          protected int claimsRequired(OperationContext operationContext) {
+            return 3;
+          }
+        };
+
+    boolean claimed = stage.claim(/* operationContext=*/ null);
+    assertThat(claimed).isTrue();
+    assertThat(stage.isFull()).isTrue();
+  }
 
   @Test
   public void takeReleasesQueueClaims() throws InterruptedException {
