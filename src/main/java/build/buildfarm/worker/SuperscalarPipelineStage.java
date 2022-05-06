@@ -94,7 +94,6 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
 
   protected synchronized void releaseClaim(String operationName, int count) {
     slots.claims.addAndGet(-count);
-    notify();
   }
 
   protected String getUsage(int size) {
@@ -108,18 +107,15 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
       return false;
     }
 
-    // Attempt to claim
+    // Wait until there is enough room to claim
     synchronized (claimLock) {
-      // Not enough room to claim
-      if (slots.claims.get() + count > slots.width) {
-        return false;
+      while (true) {
+        if (slots.claims.get() + count <= slots.width) {
+          slots.claims.addAndGet(count);
+          return true;
+        }
       }
-
-      // Perform claim
-      slots.claims.addAndGet(count);
     }
-
-    return true;
   }
 
   public int getSlotUsage() {

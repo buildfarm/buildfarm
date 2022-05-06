@@ -90,7 +90,7 @@ public class SuperscalarPipelineStageTest {
     assertThat(claimed).isFalse();
     assertThat(stage.isFull()).isFalse();
   }
-  
+
   // There is room to claim and everything is claimed.
   @Test
   public void fillsClaims() throws InterruptedException {
