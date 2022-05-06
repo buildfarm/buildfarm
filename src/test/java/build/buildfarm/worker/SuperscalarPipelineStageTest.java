@@ -73,7 +73,8 @@ public class SuperscalarPipelineStageTest {
     }
   }
 
-  // There is room to claim and everything is claimed.
+  // There are no partial claims.  You wait until all your claims are available.
+  // In this example, there is room to claim and everything is claimed.
   @Test
   public void fillsClaims() throws InterruptedException {
     AbstractSuperscalarPipelineStage stage =
@@ -87,6 +88,22 @@ public class SuperscalarPipelineStageTest {
     boolean claimed = stage.claim(/* operationContext=*/ null);
     assertThat(claimed).isTrue();
     assertThat(stage.isFull()).isTrue();
+  }
+
+  // In this example, there is room to claim and there are claims left over.
+  @Test
+  public void TakesSomeClaims() throws InterruptedException {
+    AbstractSuperscalarPipelineStage stage =
+        new AbstractSuperscalarPipelineStage("too-narrow", /* output=*/ null, /* width=*/ 3) {
+          @Override
+          protected int claimsRequired(OperationContext operationContext) {
+            return 2;
+          }
+        };
+
+    boolean claimed = stage.claim(/* operationContext=*/ null);
+    assertThat(claimed).isTrue();
+    assertThat(stage.isFull()).isFalse();
   }
 
   @Test
