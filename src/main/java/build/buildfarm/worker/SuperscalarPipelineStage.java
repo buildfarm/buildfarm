@@ -24,9 +24,6 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
 
   private volatile boolean catastrophic = false;
 
-  // ensure that only a single claim waits for available slots for core count
-  private final Object claimLock = new Object();
-
   @SuppressWarnings("rawtypes")
   public SuperscalarPipelineStage(
       String name,
