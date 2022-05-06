@@ -73,24 +73,6 @@ public class SuperscalarPipelineStageTest {
     }
   }
 
-  // A new job can not make partial claims. The super-scalar stage acquires all claims or fails.
-  // In this case, we are requesting more claims than are available.  Our total claims do not
-  // change, and the claim fails.
-  @Test
-  public void noRoomToClaim() throws InterruptedException {
-    AbstractSuperscalarPipelineStage stage =
-        new AbstractSuperscalarPipelineStage("too-narrow", /* output=*/ null, /* width=*/ 3) {
-          @Override
-          protected int claimsRequired(OperationContext operationContext) {
-            return 5;
-          }
-        };
-
-    boolean claimed = stage.claim(/* operationContext=*/ null);
-    assertThat(claimed).isFalse();
-    assertThat(stage.isFull()).isFalse();
-  }
-
   // There is room to claim and everything is claimed.
   @Test
   public void fillsClaims() throws InterruptedException {
