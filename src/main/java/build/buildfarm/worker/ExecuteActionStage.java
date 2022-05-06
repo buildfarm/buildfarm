@@ -81,13 +81,12 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
     throw new InterruptedException("stage closed");
   }
 
-  synchronized int removeAndRelease(String operationName, int claims) {
+  synchronized void removeAndRelease(String operationName, int claims) {
     if (!slots.jobs.remove(Thread.currentThread())) {
       throw new IllegalStateException(
           "tried to remove unknown executor thread for " + operationName);
     }
     releaseClaim(operationName, claims);
-    return slots.claims.addAndGet(-claims);
   }
 
   public void releaseExecutor(
@@ -96,7 +95,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
     executionTime.observe(usecs / 1000.0);
     executionStallTime.observe(stallUSecs / 1000.0);
 
-    int size = slots.claims.get();
+    int size = getSlotUsage();
     executionSlotUsage.set(size);
     logComplete(
         operationName,
@@ -126,7 +125,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
 
     synchronized (this) {
       slots.jobs.add(executorThread);
-      int size = slots.claims.addAndGet(limits.cpu.claimed);
+      int size = getSlotUsage();
       logStart(operationContext.operation.getName(), getUsage(size));
       executorThread.start();
     }

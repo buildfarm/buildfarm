@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 abstract class SuperscalarPipelineStage extends PipelineStage {
@@ -37,6 +38,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
 
     slots = new Slots();
     slots.width = width;
+    slots.claims = new Semaphore(width, true);
   }
 
   protected abstract void interruptAll();
@@ -93,7 +95,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
   }
 
   protected synchronized void releaseClaim(String operationName, int count) {
-    slots.claims.addAndGet(-count);
+    slots.claims.release(count);
   }
 
   protected String getUsage(int size) {
@@ -101,25 +103,19 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
   }
 
   @SuppressWarnings("unchecked")
-  private boolean claim(int count) throws InterruptedException {
+  public boolean claim(int count) throws InterruptedException {
     // Can't claim if stage is closed
     if (isClosed()) {
       return false;
     }
 
     // Wait until there is enough room to claim
-    synchronized (claimLock) {
-      while (true) {
-        if (slots.claims.get() + count <= slots.width) {
-          slots.claims.addAndGet(count);
-          return true;
-        }
-      }
-    }
+    slots.claims.acquire(count);
+    return true;
   }
 
   public int getSlotUsage() {
-    return slots.claims.get();
+    return slots.width - slots.claims.availablePermits();
   }
 
   @Override
@@ -134,6 +130,6 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
 
   @Override
   protected boolean isClaimed() {
-    return slots.claims.get() > 0;
+    return getSlotUsage() > 0;
   }
 }

@@ -18,7 +18,7 @@ import com.google.common.collect.Sets;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.Semaphore;
 
 public class Slots {
   // Each stage has an input context queue.  These contexts are evaluated to become jobs that take
@@ -31,7 +31,7 @@ public class Slots {
 
   // The current number of claims currently held by all the jobs.  Keep in mind, that claims amount
   // isn't necessarily job amount.
-  public AtomicInteger claims = new AtomicInteger(0);
+  public Semaphore claims = new Semaphore(1);
 
   // The number of concurrent jobs running.  Should this be a thread pool?
   public Set<Thread> jobs = Sets.newHashSet();

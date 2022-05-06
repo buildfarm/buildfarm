@@ -69,7 +69,7 @@ public class SuperscalarPipelineStageTest {
     }
 
     boolean isFull() {
-      return slots.claims.get() == slots.width;
+      return getSlotUsage() == slots.width;
     }
   }
 
