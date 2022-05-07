@@ -5,11 +5,6 @@ port: 8981
 # by all shard cluster servers
 public_name: "localhost:8981"
 
-# the publishing port of the buildfarm prometheus metrics
-prometheus_config: {
-  port: 9091
-}
-
 
 capabilities {
   # This determines whether the worker is a shard of the cas.
