@@ -56,11 +56,11 @@ k8s_yaml(local('./bazelw run //kubernetes/services:open-telemetry'))
 k8s_yaml(local('./bazelw run //kubernetes/services:jaeger'))
 
 # Expose endpoints outside the kubernetes cluster.
-k8s_resource('server', port_forwards=8980, labels="buildfarm-cluster")
+k8s_resource('server', port_forwards=[8980,9092], labels="buildfarm-cluster")
 k8s_resource('shard-worker', port_forwards=[8981,9091], labels="buildfarm-cluster")
 k8s_resource('redis-cluster', port_forwards=6379, labels="buildfarm-cluster")
 k8s_resource('otel-agent', labels="tracing")
 k8s_resource('otel-collector', port_forwards=[4317,4318], labels="tracing")
 k8s_resource('simplest', port_forwards=[14269,16686], labels="tracing")
 k8s_resource('kubernetes-dashboard', port_forwards=8443)
-k8s_resource('grafana', port_forwards=3000)
+k8s_resource('grafana', port_forwards=3000, labels="metrics")
