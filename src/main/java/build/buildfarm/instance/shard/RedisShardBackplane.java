@@ -167,7 +167,7 @@ public class RedisShardBackplane implements Backplane {
   private RedisMap processingOperations;
   private RedisMap dispatchingOperations;
   private RedisHashMap dispatchedOperations;
-  
+
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
   private CasWorkerMap casWorkerMap;
@@ -1146,7 +1146,7 @@ public class RedisShardBackplane implements Backplane {
       List<Platform.Property> provisions,
       String queueEntryJson,
       int priority) {
-    if (dispatchedOperations.remove(jedis,operationName)) {
+    if (dispatchedOperations.remove(jedis, operationName)) {
       logger.log(Level.WARNING, format("removed dispatched operation %s", operationName));
     }
     operationQueue.push(jedis, provisions, queueEntryJson, priority);
@@ -1178,8 +1178,7 @@ public class RedisShardBackplane implements Backplane {
     ImmutableMap.Builder<String, String> builder = new ImmutableMap.Builder<>();
     client.run(
         jedis -> {
-          for (Map.Entry<String, String> entry :
-              dispatchedOperations.asMap(jedis).entrySet()) {
+          for (Map.Entry<String, String> entry : dispatchedOperations.asMap(jedis).entrySet()) {
             builder.put(entry.getKey(), entry.getValue());
           }
         });
@@ -1195,9 +1194,8 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public ImmutableList<DispatchedOperation> getDispatchedOperations() throws IOException {
     ImmutableList.Builder<DispatchedOperation> builder = new ImmutableList.Builder<>();
-    Map<String, String> operations =  client.call(jedis -> dispatchedOperations.asMap(jedis));
-    
-    
+    Map<String, String> operations = client.call(jedis -> dispatchedOperations.asMap(jedis));
+
     ImmutableList.Builder<String> invalidOperationNames = new ImmutableList.Builder<>();
     boolean hasInvalid = false;
     // executor work queue?
@@ -1221,11 +1219,7 @@ public class RedisShardBackplane implements Backplane {
     if (hasInvalid) {
       client.run(
           jedis -> {
-            JedisClusterPipeline p = jedis.pipelined();
-            for (String invalidOperationName : invalidOperationNames.build()) {
-              p.hdel(config.getDispatchedOperationsHashName(), invalidOperationName);
-            }
-            p.sync();
+            dispatchedOperations.remove(jedis, invalidOperationNames.build());
           });
     }
     return builder.build();
@@ -1296,10 +1290,7 @@ public class RedisShardBackplane implements Backplane {
       String dispatchedOperationJson = JsonFormat.printer().print(o);
 
       /* if the operation is already in the dispatch list, fail the dispatch */
-      long result =
-          jedis.hsetnx(
-              config.getDispatchedOperationsHashName(), operationName, dispatchedOperationJson);
-      success = result == 1;
+      success = dispatchedOperations.insertIfMissing(jedis, operationName, dispatchedOperationJson);
     } catch (InvalidProtocolBufferException e) {
       logger.log(Level.SEVERE, "error printing dispatched operation", e);
       // very unlikely, printer would have to fail
@@ -1350,8 +1341,7 @@ public class RedisShardBackplane implements Backplane {
             Operation operation = parseOperationJson(getOperation(jedis, operationName));
             boolean requeue =
                 operation != null && !operation.getDone(); // operation removed or completed somehow
-            if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1
-                && requeue) {
+            if (dispatchedOperations.remove(jedis, operationName) && requeue) {
               int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
               operationQueue.push(
                   jedis, queueEntry.getPlatform().getPropertiesList(), queueEntryJson, priority);
@@ -1376,14 +1366,12 @@ public class RedisShardBackplane implements Backplane {
   }
 
   boolean pollOperation(JedisCluster jedis, String operationName, String dispatchedOperationJson) {
-    if (jedis.hexists(config.getDispatchedOperationsHashName(), operationName)) {
-      if (jedis.hset(
-              config.getDispatchedOperationsHashName(), operationName, dispatchedOperationJson)
-          == 0) {
+    if (dispatchedOperations.exists(jedis, operationName)) {
+      if (!dispatchedOperations.insert(jedis, operationName, dispatchedOperationJson)) {
         return true;
       }
       /* someone else beat us to the punch, delete our incorrectly added key */
-      jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
+      dispatchedOperations.remove(jedis, operationName);
     }
     return false;
   }
@@ -1436,7 +1424,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private void completeOperation(JedisCluster jedis, String operationName) {
-    dispatchedOperations.remove(jedis,operationName);
+    dispatchedOperations.remove(jedis, operationName);
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -1524,8 +1512,7 @@ public class RedisShardBackplane implements Backplane {
   public BackplaneStatus backplaneStatus() throws IOException {
     BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
     builder.addAllActiveWorkers(client.call(jedis -> workers.keys(jedis)));
-    builder.setDispatchedSize(
-        client.call(jedis -> jedis.hlen(config.getDispatchedOperationsHashName())));
+    builder.setDispatchedSize(client.call(jedis -> dispatchedOperations.size(jedis)));
     builder.setOperationQueue(operationQueue.status(client.call(jedis -> jedis)));
     builder.setPrequeue(prequeue.status(client.call(jedis -> jedis)));
     return builder.build();
