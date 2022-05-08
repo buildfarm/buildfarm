@@ -1281,8 +1281,8 @@ public class RedisShardBackplane implements Backplane {
     QueueEntry queueEntry = queueEntryBuilder.build();
 
     String operationName = queueEntry.getExecuteEntry().getOperationName();
-    Operation operation = keepaliveOperation(operationName);
-    publishReset(jedis, operation);
+    //Operation operation = keepaliveOperation(operationName);
+    //publishReset(jedis, operation);
 
     long requeueAt = System.currentTimeMillis() + config.getDispatchingTimeoutMillis();
     DispatchedOperation o =
