@@ -165,7 +165,9 @@ public class RedisShardBackplane implements Backplane {
   private RedisMap blockedActions;
   private RedisMap blockedInvocations;
   private RedisMap processingOperations;
-  private RedisMap dispatchedOperations;
+  private RedisMap dispatchingOperations;
+  private RedisHashMap dispatchedOperations;
+  
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
   private CasWorkerMap casWorkerMap;
@@ -278,7 +280,7 @@ public class RedisShardBackplane implements Backplane {
           @Override
           protected void visit(QueueEntry queueEntry, String queueEntryJson) {
             String operationName = queueEntry.getExecuteEntry().getOperationName();
-            String value = dispatchedOperations.get(jedis, operationName);
+            String value = dispatchingOperations.get(jedis, operationName);
             long defaultTimeout_ms = config.getDispatchingTimeoutMillis();
 
             // get the operation's expiration
@@ -289,7 +291,7 @@ public class RedisShardBackplane implements Backplane {
               expiresAt = now.plusMillis(defaultTimeout_ms);
               String keyValue = String.format("%d", expiresAt.toEpochMilli());
               long timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
-              dispatchedOperations.insert(jedis, operationName, keyValue, timeout_s);
+              dispatchingOperations.insert(jedis, operationName, keyValue, timeout_s);
             }
 
             // handle expiration
@@ -297,7 +299,7 @@ public class RedisShardBackplane implements Backplane {
               onOperationName.accept(operationName);
             } else {
               if (operationQueue.removeFromDequeue(jedis, queueEntryJson)) {
-                dispatchedOperations.remove(jedis, operationName);
+                dispatchingOperations.remove(jedis, operationName);
               }
             }
           }
@@ -327,7 +329,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private void scanDispatched(JedisCluster jedis, Consumer<String> onOperationName) {
-    for (String operationName : jedis.hkeys(config.getDispatchedOperationsHashName())) {
+    for (String operationName : dispatchedOperations.keys(jedis)) {
       onOperationName.accept(operationName);
     }
   }
@@ -584,7 +586,8 @@ public class RedisShardBackplane implements Backplane {
     blockedActions = new RedisMap(config.getActionBlacklistPrefix());
     blockedInvocations = new RedisMap(config.getInvocationBlacklistPrefix());
     processingOperations = new RedisMap(config.getProcessingPrefix());
-    dispatchedOperations = new RedisMap(config.getDispatchingPrefix());
+    dispatchingOperations = new RedisMap(config.getDispatchingPrefix());
+    dispatchedOperations = new RedisHashMap(config.getDispatchedOperationsHashName());
     workers = new RedisHashMap(config.getWorkersHashName());
 
     if (config.getSubscribeToBackplane()) {
@@ -1143,7 +1146,7 @@ public class RedisShardBackplane implements Backplane {
       List<Platform.Property> provisions,
       String queueEntryJson,
       int priority) {
-    if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
+    if (dispatchedOperations.remove(jedis,operationName)) {
       logger.log(Level.WARNING, format("removed dispatched operation %s", operationName));
     }
     operationQueue.push(jedis, provisions, queueEntryJson, priority);
@@ -1176,7 +1179,7 @@ public class RedisShardBackplane implements Backplane {
     client.run(
         jedis -> {
           for (Map.Entry<String, String> entry :
-              jedis.hgetAll(config.getDispatchedOperationsHashName()).entrySet()) {
+              dispatchedOperations.asMap(jedis).entrySet()) {
             builder.put(entry.getKey(), entry.getValue());
           }
         });
@@ -1192,12 +1195,13 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public ImmutableList<DispatchedOperation> getDispatchedOperations() throws IOException {
     ImmutableList.Builder<DispatchedOperation> builder = new ImmutableList.Builder<>();
-    Map<String, String> dispatchedOperations =
-        client.call(jedis -> jedis.hgetAll(config.getDispatchedOperationsHashName()));
+    Map<String, String> operations =  client.call(jedis -> dispatchedOperations.asMap(jedis));
+    
+    
     ImmutableList.Builder<String> invalidOperationNames = new ImmutableList.Builder<>();
     boolean hasInvalid = false;
     // executor work queue?
-    for (Map.Entry<String, String> entry : dispatchedOperations.entrySet()) {
+    for (Map.Entry<String, String> entry : operations.entrySet()) {
       try {
         DispatchedOperation.Builder dispatchedOperationBuilder = DispatchedOperation.newBuilder();
         JsonFormat.parser().merge(entry.getValue(), dispatchedOperationBuilder);
@@ -1309,7 +1313,7 @@ public class RedisShardBackplane implements Backplane {
                 "operation %s was missing in %s, may be orphaned",
                 operationName, operationQueue.getDequeueName()));
       }
-      dispatchedOperations.remove(jedis, operationName);
+      dispatchingOperations.remove(jedis, operationName);
 
       // Return an entry so that if it needs re-queued, it will have the correct "requeue attempts".
       return queueEntryBuilder.setRequeueAttempts(queueEntry.getRequeueAttempts() + 1).build();
@@ -1432,7 +1436,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private void completeOperation(JedisCluster jedis, String operationName) {
-    jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
+    dispatchedOperations.remove(jedis,operationName);
   }
 
   @SuppressWarnings("ConstantConditions")
