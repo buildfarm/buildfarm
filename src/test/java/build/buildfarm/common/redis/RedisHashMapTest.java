@@ -19,6 +19,7 @@ import static com.google.common.truth.Truth.assertThat;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.After;
@@ -168,5 +169,87 @@ public class RedisHashMapTest {
     Map<String, String> elements = map.asMap(redis);
     assertThat(elements.equals(expected)).isTrue();
     assertThat(wasAdded).isFalse();
+  }
+
+  // Function under test: exists
+  // Reason for testing: exists fails as expected
+  // Failure explanation: Exist did not fail but it should have
+  @Test
+  public void redisExistFails() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    boolean exists = map.exists(redis, "key");
+
+    // ASSERT
+    assertThat(exists).isFalse();
+  }
+
+  // Function under test: exists
+  // Reason for testing: exists succeeds as expected
+  // Failure explanation: Exist did not succeed but it should have
+  @Test
+  public void redisExistSucceeds() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+    map.insert(redis, "key", "value");
+
+    // ACT
+    boolean exists = map.exists(redis, "key");
+
+    // ASSERT
+    assertThat(exists).isTrue();
+  }
+
+  // Function under test: size
+  // Reason for testing: size grows as elements are added.
+  // Failure explanation: Size is not growing as expected
+  @Test
+  public void redisSizeGrowth() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    map.insert(redis, "key1", "value1");
+
+    // ASSERT
+    assertThat(map.size(redis)).isEqualTo(1);
+
+    // ACT
+    map.insert(redis, "key2", "value2");
+
+    // ASSERT
+    assertThat(map.size(redis)).isEqualTo(2);
+
+    // ACT
+    map.insert(redis, "key3", "value3");
+
+    // ASSERT
+    assertThat(map.size(redis)).isEqualTo(3);
+  }
+
+  // Function under test: remove
+  // Reason for testing: Test that remove removes multiple items.
+  // Failure explanation: Elements are not being removed.
+  @Test
+  public void redisRemoveAll() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+    Map<String, String> expected = new HashMap<>();
+    expected.put("key1", "value1");
+    expected.put("key4", "value4");
+
+    // ACT
+    map.insert(redis, "key1", "value1");
+    map.insert(redis, "key2", "value2");
+    map.insert(redis, "key3", "value3");
+    map.insert(redis, "key4", "value4");
+    Iterable<String> removals = List.of("key2", "key3");
+    map.remove(redis, removals);
+
+    // ASSERT
+    Map<String, String> elements = map.asMap(redis);
+    assertThat(elements.equals(expected)).isTrue();
   }
 }
