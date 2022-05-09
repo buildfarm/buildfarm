@@ -128,4 +128,45 @@ public class RedisHashMapTest {
     Map<String, String> elements = map.asMap(redis);
     assertThat(elements.equals(expected)).isTrue();
   }
+
+  // Function under test: insertIfMissing
+  // Reason for testing: element is inserted for the first time.
+  // Failure explanation: Element is not inserted for the first time.
+  @Test
+  public void redisInsertWasMissing() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    boolean wasAdded = map.insertIfMissing(redis, "key1", "value1");
+
+    Map<String, String> expected = new HashMap<>();
+    expected.put("key1", "value1");
+
+    // ASSERT
+    Map<String, String> elements = map.asMap(redis);
+    assertThat(elements.equals(expected)).isTrue();
+    assertThat(wasAdded).isTrue();
+  }
+
+  // Function under test: insertIfMissing
+  // Reason for testing: element is not inserted the second time.
+  // Failure explanation: Element is not inserted for the second time.
+  @Test
+  public void redisInsertWasNotMissing() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    map.insertIfMissing(redis, "key1", "value1");
+    boolean wasAdded = map.insertIfMissing(redis, "key1", "value1");
+
+    Map<String, String> expected = new HashMap<>();
+    expected.put("key1", "value1");
+
+    // ASSERT
+    Map<String, String> elements = map.asMap(redis);
+    assertThat(elements.equals(expected)).isTrue();
+    assertThat(wasAdded).isFalse();
+  }
 }
