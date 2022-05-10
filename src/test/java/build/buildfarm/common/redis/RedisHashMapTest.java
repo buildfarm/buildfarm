@@ -17,9 +17,9 @@ package build.buildfarm.common.redis;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.instance.shard.JedisClusterFactory;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.After;
@@ -245,7 +245,7 @@ public class RedisHashMapTest {
     map.insert(redis, "key2", "value2");
     map.insert(redis, "key3", "value3");
     map.insert(redis, "key4", "value4");
-    Iterable<String> removals = List.of("key2", "key3");
+    Iterable<String> removals = Arrays.asList("key2", "key3");
     map.remove(redis, removals);
 
     // ASSERT
