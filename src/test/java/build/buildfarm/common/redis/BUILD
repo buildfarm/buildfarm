@@ -15,6 +15,7 @@ NATIVE_REDIS_TESTS = [
     "RedisNodeHashesTest.java",
     "RedisQueueTest.java",
     "RedisPriorityQueueTest.java",
+    "RedisHashMapTest.java",
 ]
 
 filegroup(
@@ -91,6 +92,26 @@ java_test(
     size = "small",
     srcs = ["BalancedRedisQueueTest.java"],
     classpath_resources = [":lua_resources"],
+    tags = [
+        "exclusive",
+        "redis",
+    ],
+    test_class = "build.buildfarm.AllTests",
+    deps = COMMON_DEPS,
+)
+
+java_test(
+    name = "hashmap",
+    size = "small",
+    srcs = ["RedisHashMapMockTest.java"],
+    test_class = "build.buildfarm.AllTests",
+    deps = COMMON_DEPS,
+)
+
+java_test(
+    name = "hashmap-redis",
+    size = "small",
+    srcs = ["RedisHashMapTest.java"],
     tags = [
         "exclusive",
         "redis",
