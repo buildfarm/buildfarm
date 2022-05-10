@@ -194,7 +194,9 @@ public class Worker extends LoggingMain {
 
   class RemoteCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
-      insertFileToCasMember(digest, file);
+      if (digest.getSizeBytes() > 0) {
+        insertFileToCasMember(digest, file);
+      }
     }
 
     private void insertFileToCasMember(Digest digest, Path file)
