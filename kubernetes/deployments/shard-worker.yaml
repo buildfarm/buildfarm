@@ -24,6 +24,9 @@ spec:
             cpu: "2"
         ports:
         - containerPort: 8981
+          name: "worker-comm"
+        - containerPort: 9091
+          name: "worker-metrics"
         env:
         - name: REDIS_URI
           value: "redis://redis-cluster-service:6379"
