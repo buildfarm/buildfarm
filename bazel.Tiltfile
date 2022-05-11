@@ -5,7 +5,7 @@
 # In order to achieve proper live-reload we need a function to query bazel dependencies.
 
 BAZEL_SOURCES_CMD_TEMPLATE = """
-  ./bazelw query 'filter("^//", kind("source file", deps(set(%s))))' --order_output=no
+  bazel query 'filter("^//", kind("source file", deps(set(%s))))' --order_output=no
   """.strip()
 
 def bazel_labels_to_files(labels):
