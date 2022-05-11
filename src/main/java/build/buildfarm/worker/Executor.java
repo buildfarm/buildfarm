@@ -426,20 +426,6 @@ class Executor {
       environment.put(environmentVariable.getKey(), environmentVariable.getValue());
     }
 
-    final Write stdoutWrite;
-    final Write stderrWrite;
-
-    if ("" != null && !"".isEmpty() && workerContext.getStreamStdout()) {
-      stdoutWrite = workerContext.getOperationStreamWrite("");
-    } else {
-      stdoutWrite = new NullWrite();
-    }
-    if ("" != null && !"".isEmpty() && workerContext.getStreamStderr()) {
-      stderrWrite = workerContext.getOperationStreamWrite("");
-    } else {
-      stderrWrite = new NullWrite();
-    }
-
     // allow debugging before an execution
     if (limits.debugBeforeExecution) {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
@@ -486,8 +472,10 @@ class Executor {
       return Code.INVALID_ARGUMENT;
     }
 
-    stdoutWrite.reset();
-    stderrWrite.reset();
+    // Create threads to extract stdout/stderr from a process.
+    // The readers attach to the process's input/error streams.
+    final Write stdoutWrite = new NullWrite();
+    final Write stderrWrite = new NullWrite();
     ByteStringWriteReader stdoutReader =
         new ByteStringWriteReader(
             process.getInputStream(), stdoutWrite, (int) workerContext.getStandardOutputLimit());
@@ -532,23 +520,21 @@ class Executor {
         }
       }
     }
-    stdoutReaderThread.join();
-    stderrReaderThread.join();
 
+    // Now that the process is completed, extract the final stdout/stderr.
+    ByteString stdout = ByteString.EMPTY;
+    ByteString stderr = ByteString.EMPTY;
     try {
-      resultBuilder
-          .setExitCode(exitCode)
-          .setStdoutRaw(stdoutReader.getData())
-          .setStderrRaw(stderrReader.getData());
-    } catch (IOException e) {
-      if (statusCode != Code.DEADLINE_EXCEEDED) {
-        throw e;
-      }
-      logger.log(
-          Level.INFO,
-          format("error getting process outputs for %s after timeout", operationName),
-          e);
+      stdoutReaderThread.join();
+      stderrReaderThread.join();
+      stdout = stdoutReader.getData();
+      stderr = stderrReader.getData();
+
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, "error extracting stdout/stderr: ", e.getMessage());
     }
+
+    resultBuilder.setExitCode(exitCode).setStdoutRaw(stdout).setStderrRaw(stderr);
 
     // allow debugging after an execution
     if (limits.debugAfterExecution) {

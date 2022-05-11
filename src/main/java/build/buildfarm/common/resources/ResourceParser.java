@@ -55,7 +55,7 @@ public class ResourceParser {
    * @brief A list of keywords to their corresponding types.
    * @details This lookup table is used for parsing resource_names.
    */
-  private static final HashMap<String, Resource.TypeCase> KEYWORDS = keywordResourceMap();;
+  private static final HashMap<String, Resource.TypeCase> KEYWORDS = keywordResourceMap();
 
   /**
    * @brief Categorize the resource type by analyzing a resource name URI.
