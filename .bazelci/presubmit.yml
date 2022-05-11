@@ -34,6 +34,8 @@ tasks:
   # Typical unit tests that run across a variety of operation systems.
   ubuntu1604:
     name: "Unit Tests"
+    build_flags:
+    - "--build_tag_filters=-audit"
     build_targets:
     - "..."
     test_targets:
@@ -55,7 +57,7 @@ tasks:
   windows:
     name: "Unit Tests"
     build_flags:
-    - "--build_tag_filters=-container"
+    - "--build_tag_filters=-container,-audit"
     build_targets:
     - "..."
     test_targets:
