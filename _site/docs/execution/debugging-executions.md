@@ -70,15 +70,15 @@ It is more convenient to debug things by passing the global exec properties, but
 ### Finding Operations
 All buildfarm operations can be found using the following query:  
 ```
-./bazelw run //src/main/java/build/buildfarm:bf-find-operations localhost:8980 shard SHA256 
+bazel run //src/main/java/build/buildfarm:bf-find-operations localhost:8980 shard SHA256 
 ```
 
 When you run a build invocation with bazel, bazel will you give you an invocation id.  You can use that to query your specific operations:  
 ```
-./bazelw run //src/main/java/build/buildfarm:bf-find-operations localhost:8980 shard SHA256 "[?(@.operation.metadata.requestMetadata.toolInvocationId == '1877f43a-9b33-4eca-9d6b-aef71b47bf47')]"
+bazel run //src/main/java/build/buildfarm:bf-find-operations localhost:8980 shard SHA256 "[?(@.operation.metadata.requestMetadata.toolInvocationId == '1877f43a-9b33-4eca-9d6b-aef71b47bf47')]"
 ```
 
 You can find the operation of a specific test name like this:  
 ```
-./bazelw run //src/main/java/build/buildfarm:bf-find-operations localhost:8980 shard SHA256 "$.command.environmentVariables[?(@.value == '//code/tools/example_tests/bash_hello_world2:main')]"
+bazel run //src/main/java/build/buildfarm:bf-find-operations localhost:8980 shard SHA256 "$.command.environmentVariables[?(@.value == '//code/tools/example_tests/bash_hello_world2:main')]"
 ```
