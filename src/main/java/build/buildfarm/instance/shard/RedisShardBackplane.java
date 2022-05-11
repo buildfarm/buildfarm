@@ -33,13 +33,7 @@ import build.buildfarm.common.Time;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.common.function.InterruptingRunnable;
-import build.buildfarm.common.redis.BalancedRedisQueue;
-import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;
-import build.buildfarm.common.redis.RedisHashMap;
-import build.buildfarm.common.redis.RedisHashtags;
-import build.buildfarm.common.redis.RedisMap;
-import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
@@ -54,21 +48,17 @@ import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
-import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.QueueType;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
-import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
@@ -101,9 +91,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
-import org.redisson.Redisson;
-import org.redisson.api.RedissonClient;
-import org.redisson.config.Config;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
@@ -160,7 +147,7 @@ public class RedisShardBackplane implements Backplane {
 
   private final Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
   private long workerSetExpiresAt = 0;
-  
+
   private DistributedState state = new DistributedState();
 
   public RedisShardBackplane(
@@ -520,47 +507,6 @@ public class RedisShardBackplane implements Backplane {
     failsafeOperationThread.start();
   }
 
-  private static SetMultimap<String, String> toMultimap(List<Platform.Property> provisions) {
-    SetMultimap<String, String> set = LinkedHashMultimap.create();
-    for (Platform.Property property : provisions) {
-      set.put(property.getName(), property.getValue());
-    }
-    return set;
-  }
-
-  private static String getRedisQueueType(RedisShardBackplaneConfig config) {
-    QueueType queue = config.getRedisQueueType();
-    if (queue.equals(QueueType.REGULAR)) {
-      return "regular";
-    } else {
-      return "priority";
-    }
-  }
-
-  private static String getQueuedOperationsListName(RedisShardBackplaneConfig config) {
-    String queue_type = getRedisQueueType(config);
-    String operations_list_name = config.getQueuedOperationsListName();
-    return ((queue_type.equals("priority"))
-        ? operations_list_name + "_" + queue_type
-        : operations_list_name);
-  }
-
-  private static String getPreQueuedOperationsListName(RedisShardBackplaneConfig config) {
-    String queue_type = getRedisQueueType(config);
-    String prequeue_operations = config.getPreQueuedOperationsListName();
-    return ((queue_type.equals("priority"))
-        ? prequeue_operations + "_" + queue_type
-        : prequeue_operations);
-  }
-
-  private static String getQueueName(ProvisionedQueue pconfig, RedisShardBackplaneConfig rconfig) {
-    String queue_type = getRedisQueueType(rconfig);
-    String provisioned_queue = pconfig.getName();
-    return ((queue_type.equals("priority"))
-        ? provisioned_queue + "_" + queue_type
-        : provisioned_queue);
-  }
-
   @Override
   public void start(String clientPublicName) throws IOException {
     // Construct a single redis client to be used throughout the entire backplane.
@@ -569,16 +515,7 @@ public class RedisShardBackplane implements Backplane {
     client = new RedisClient(jedisClusterFactory.get());
 
     // Create containers that make up the backplane
-    state.casWorkerMap = createCasWorkerMap(config);
-    state.actionCache = createActionCache(config);
-    state.prequeue = createPrequeue(client, config);
-    state.operationQueue = createOperationQueue(client, config);
-    state.blockedActions = new RedisMap(config.getActionBlacklistPrefix());
-    state.blockedInvocations = new RedisMap(config.getInvocationBlacklistPrefix());
-    state.processingOperations = new RedisMap(config.getProcessingPrefix());
-    state.dispatchingOperations = new RedisMap(config.getDispatchingPrefix());
-    state.dispatchedOperations = new RedisHashMap(config.getDispatchedOperationsHashName());
-    state.workers = new RedisHashMap(config.getWorkersHashName());
+    state = DistributedStateCreator.create(client, config);
 
     if (config.getSubscribeToBackplane()) {
       startSubscriptionThread();
@@ -590,83 +527,6 @@ public class RedisShardBackplane implements Backplane {
     // Record client start time
     client.call(
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
-  }
-
-  CasWorkerMap createCasWorkerMap(RedisShardBackplaneConfig config) throws IOException {
-    if (config.getCacheCas()) {
-      RedissonClient redissonClient = createRedissonClient();
-      return new RedissonCasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire());
-    } else {
-      return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
-    }
-  }
-
-  static RedissonClient createRedissonClient() {
-    Config redissonConfig = new Config();
-    return Redisson.create(redissonConfig);
-  }
-
-  static RedisMap createActionCache(RedisShardBackplaneConfig config) {
-    return new RedisMap(config.getActionCachePrefix());
-  }
-
-  static BalancedRedisQueue createPrequeue(RedisClient client, RedisShardBackplaneConfig config)
-      throws IOException {
-    // Construct the prequeue so that elements are balanced across all redis nodes.
-    return new BalancedRedisQueue(
-        getPreQueuedOperationsListName(config),
-        getQueueHashes(client, getPreQueuedOperationsListName(config)),
-        config.getMaxPreQueueDepth(),
-        getRedisQueueType(config));
-  }
-
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  static OperationQueue createOperationQueue(RedisClient client, RedisShardBackplaneConfig config)
-      throws IOException {
-    // Construct an operation queue based on configuration.
-    // An operation queue consists of multiple provisioned queues in which the order dictates the
-    // eligibility and placement of operations.
-    // Therefore, it is recommended to have a final provision queue with no actual platform
-    // requirements.  This will ensure that all operations are eligible for the final queue.
-    ImmutableList.Builder<ProvisionedRedisQueue> provisionedQueues = new ImmutableList.Builder<>();
-    for (ProvisionedQueue queueConfig : config.getProvisionedQueues().getQueuesList()) {
-      ProvisionedRedisQueue provisionedQueue =
-          new ProvisionedRedisQueue(
-              getQueueName(queueConfig, config),
-              getRedisQueueType(config),
-              getQueueHashes(client, getQueueName(queueConfig, config)),
-              toMultimap(queueConfig.getPlatform().getPropertiesList()),
-              queueConfig.getAllowUnmatched());
-      provisionedQueues.add(provisionedQueue);
-    }
-    // If there is no configuration for provisioned queues, we might consider that an error.
-    // After all, the operation queue is made up of n provisioned queues, and if there were no
-    // provisioned queues provided, we can not properly construct the operation queue.
-    // In this case however, we will automatically provide a default queue will full eligibility on
-    // all operations.
-    // This will ensure the expected behavior for the paradigm in which all work is put on the same
-    // queue.
-    if (config.getProvisionedQueues().getQueuesList().isEmpty()) {
-      SetMultimap defaultProvisions = LinkedHashMultimap.create();
-      defaultProvisions.put(
-          ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
-      ProvisionedRedisQueue defaultQueue =
-          new ProvisionedRedisQueue(
-              getQueuedOperationsListName(config),
-              getRedisQueueType(config),
-              getQueueHashes(client, getQueuedOperationsListName(config)),
-              defaultProvisions);
-      provisionedQueues.add(defaultQueue);
-    }
-
-    return new OperationQueue(provisionedQueues.build(), config.getMaxQueueDepth());
-  }
-
-  static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
-    return client.call(
-        jedis ->
-            RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(
-                jedis, RedisHashtags.existingHash(queueName)));
   }
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -930,7 +790,8 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void blacklistAction(String actionId) throws IOException {
     client.run(
-        jedis -> state.blockedActions.insert(jedis, actionId, "", config.getActionBlacklistExpire()));
+        jedis ->
+            state.blockedActions.insert(jedis, actionId, "", config.getActionBlacklistExpire()));
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -939,7 +800,8 @@ public class RedisShardBackplane implements Backplane {
     String json = JsonFormat.printer().print(actionResult);
     client.run(
         jedis ->
-            state.actionCache.insert(jedis, asDigestStr(actionKey), json, config.getActionCacheExpire()));
+            state.actionCache.insert(
+                jedis, asDigestStr(actionKey), json, config.getActionCacheExpire()));
   }
 
   private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
@@ -1168,7 +1030,8 @@ public class RedisShardBackplane implements Backplane {
     ImmutableMap.Builder<String, String> builder = new ImmutableMap.Builder<>();
     client.run(
         jedis -> {
-          for (Map.Entry<String, String> entry : state.dispatchedOperations.asMap(jedis).entrySet()) {
+          for (Map.Entry<String, String> entry :
+              state.dispatchedOperations.asMap(jedis).entrySet()) {
             builder.put(entry.getKey(), entry.getValue());
           }
         });
@@ -1280,7 +1143,8 @@ public class RedisShardBackplane implements Backplane {
       String dispatchedOperationJson = JsonFormat.printer().print(o);
 
       /* if the operation is already in the dispatch list, fail the dispatch */
-      success = state.dispatchedOperations.insertIfMissing(jedis, operationName, dispatchedOperationJson);
+      success =
+          state.dispatchedOperations.insertIfMissing(jedis, operationName, dispatchedOperationJson);
     } catch (InvalidProtocolBufferException e) {
       logger.log(Level.SEVERE, "error printing dispatched operation", e);
       // very unlikely, printer would have to fail

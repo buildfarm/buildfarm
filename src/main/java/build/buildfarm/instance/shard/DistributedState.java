@@ -14,17 +14,11 @@
 
 package build.buildfarm.instance.shard;
 
-import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue;
-import build.buildfarm.common.redis.ProvisionedRedisQueue;
-import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.RedisHashMap;
-import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisMap;
-import build.buildfarm.common.redis.RedisNodeHashes;
 
 public class DistributedState {
-    
 
   public RedisMap actionCache;
   public RedisMap blockedActions;
@@ -37,5 +31,4 @@ public class DistributedState {
   public OperationQueue operationQueue;
   public CasWorkerMap casWorkerMap;
   public RedisHashMap workers;
-  
 }
