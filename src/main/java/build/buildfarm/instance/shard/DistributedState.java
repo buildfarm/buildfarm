@@ -70,7 +70,7 @@ public class DistributedState {
 
   /**
    * @field dispatchingOperations
-   * @brief Operations that are in the process of being dispached from the operation queue.
+   * @brief Operations that are in the process of being dispatched from the operation queue.
    * @details We keep track of them in the distributed state to avoid them getting lost if a
    *     particular machine goes down.
    */
