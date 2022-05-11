@@ -365,7 +365,8 @@ public class ShardInstanceTest {
                 Violation.newBuilder()
                     .setType(VIOLATION_TYPE_INVALID)
                     .setSubject(INVALID_PLATFORM)
-                    .setDescription("properties are not valid for queue eligibility: []"))
+                    .setDescription(
+                        "properties are not valid for queue eligibility: [].  If you think your queue should still accept these poperties without them being specified in queue configuration, consider configuring the queue with `allow_unmatched: True`"))
             .build();
     ExecuteResponse executeResponse =
         ExecuteResponse.newBuilder()
