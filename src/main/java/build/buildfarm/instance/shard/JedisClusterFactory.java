@@ -225,7 +225,7 @@ public class JedisClusterFactory {
    * @return A parsed and valid HostAndPort set.
    */
   private static Set<HostAndPort> list2Set(Iterable<String> nodes) throws ConfigurationException {
-    Set<HostAndPort> jedisClusterNodes = new HashSet<HostAndPort>();
+    Set<HostAndPort> jedisClusterNodes = new HashSet<>();
     try {
       for (String node : nodes) {
         URI redisUri = new URI(node);
