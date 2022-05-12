@@ -48,13 +48,13 @@ public class JedisClusterFactory {
       throws ConfigurationException {
     // null password is required to elicit no auth in jedis
     List<String> redisNodes = config.getRedisNodesUrisList();
-    if(redisNodes != null && !redisNodes.isEmpty()){
+    if (redisNodes != null && !redisNodes.isEmpty()) {
       return createJedisClusterFactory(
-        list2Set(redisNodes),
-        config.getTimeout(),
-        config.getMaxAttempts(),
-        config.getRedisPassword().isEmpty() ? null : config.getRedisPassword(),
-        createJedisPoolConfig(config));
+          list2Set(redisNodes),
+          config.getTimeout(),
+          config.getMaxAttempts(),
+          config.getRedisPassword().isEmpty() ? null : config.getRedisPassword(),
+          createJedisPoolConfig(config));
     }
     return createJedisClusterFactory(
         parseUri(config.getRedisUri()),
@@ -162,10 +162,10 @@ public class JedisClusterFactory {
             poolConfig);
   }
 
-    /**
+  /**
    * @brief Create a jedis cluster instance with connection settings.
-   * @details Use the nodes addresses, pool and connection information to
-   * connect to a redis cluster server and provide a jedis client.
+   * @details Use the nodes addresses, pool and connection information to connect to a redis cluster
+   *     server and provide a jedis client.
    * @param redisUrisNodes A valid uri set to a redis nodes instances.
    * @param timeout Connection timeout
    * @param maxAttempts Number of connection attempts
@@ -174,9 +174,12 @@ public class JedisClusterFactory {
    * @note Suggested return identifier: jedis.
    */
   private static Supplier<JedisCluster> createJedisClusterFactory(
-      Set<HostAndPort> redisUrisNodes, int timeout, int maxAttempts,
-      String password, JedisPoolConfig poolConfig) {
-        return () ->
+      Set<HostAndPort> redisUrisNodes,
+      int timeout,
+      int maxAttempts,
+      String password,
+      JedisPoolConfig poolConfig) {
+    return () ->
         new JedisCluster(
             redisUrisNodes,
             /* connectionTimeout=*/ Integer.max(2000, timeout),
@@ -184,7 +187,7 @@ public class JedisClusterFactory {
             Integer.max(5, maxAttempts),
             password,
             poolConfig);
-      }
+  }
   /**
    * @brief Create a jedis pool config.
    * @details Use configuration to build the appropriate jedis pool configuration.
@@ -216,8 +219,8 @@ public class JedisClusterFactory {
 
   /**
    * @brief Convert protobuff list to set
-   * @details Convert the string list representation of the nodes URIs into a set of HostAndPort objects. If the URI object is
-   *     invalid a configuration exception will be thrown.
+   * @details Convert the string list representation of the nodes URIs into a set of HostAndPort
+   *     objects. If the URI object is invalid a configuration exception will be thrown.
    * @param nodes The redis nodes.
    * @return A parsed and valid HostAndPort set.
    */
@@ -233,5 +236,4 @@ public class JedisClusterFactory {
       throw new ConfigurationException(e.getMessage());
     }
   }
-
 }
