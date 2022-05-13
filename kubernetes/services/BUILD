@@ -23,3 +23,9 @@ k8s_object(
     kind = "service",
     template = ":jaeger.yaml",
 )
+
+k8s_object(
+    name = "grafana",
+    kind = "service",
+    template = ":grafana.yaml",
+)
