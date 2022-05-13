@@ -510,6 +510,9 @@ message RedisShardBackplaneConfig {
   // the expiration time in seconds for action cache entries
   int32 action_cache_expire = 4;
 
+  // L1 in memory cache size
+  int32 action_cache_local_size = 37;
+
   // the prefix of keys which identify actions that are to be rejected
   // from any request endpoint
   string action_blacklist_prefix = 28;

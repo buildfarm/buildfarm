@@ -14,7 +14,6 @@
 
 package build.buildfarm.common.redis;
 
-
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
@@ -26,7 +25,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ShardActionCacheTest {
-
   @Test
   public void X() throws Exception {
     // ARRANGE

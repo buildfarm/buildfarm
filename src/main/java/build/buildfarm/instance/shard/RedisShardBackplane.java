@@ -14,9 +14,7 @@
 
 package build.buildfarm.instance.shard;
 
-import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.lang.String.format;
-import static java.util.concurrent.Executors.newFixedThreadPool;
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
 import build.bazel.remote.execution.v2.ActionResult;
@@ -104,9 +102,6 @@ import redis.clients.jedis.ScanResult;
 
 public class RedisShardBackplane implements Backplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
-
-  // TODO(luxe): move to config in follow-up PR
-  private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
 
   private static final JsonFormat.Parser operationParser =
       JsonFormat.parser()
@@ -535,18 +530,6 @@ public class RedisShardBackplane implements Backplane {
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
   }
 
-
-
-  ShardActionCache createActionCache(RedisShardBackplaneConfig config) {
-    return new ShardActionCache(
-        client,
-        config.getActionCachePrefix(),
-        config.getActionCacheExpire(),
-        DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE,
-        listeningDecorator(newFixedThreadPool(24)));
-  }
-
-
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public synchronized void stop() throws InterruptedException {
@@ -792,7 +775,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public ActionResult getActionResult(ActionKey actionKey)
       throws IOException, InterruptedException, ExecutionException {
-    return actionCache.get(actionKey).get();
+    return state.actionCache.get(actionKey).get();
   }
 
   // we do this by action hash only, so that we can use RequestMetadata to filter
@@ -807,11 +790,11 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
-    actionCache.put(client, actionKey, actionResult);
+    state.actionCache.put(client, actionKey, actionResult);
   }
 
   private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
-    actionCache.remove(jedis, actionKey);
+    state.actionCache.remove(jedis, actionKey);
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -823,17 +806,17 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
-    actionCache.remove(client, actionKeys);
+    state.actionCache.remove(client, actionKeys);
   }
 
   @Override
   public void invalidate(ActionKey actionKey) {
-    actionCache.invalidate(actionKey);
+    state.actionCache.invalidate(actionKey);
   }
 
   @Override
   public void readThrough(ActionKey actionKey, ActionResult actionResult) {
-    actionCache.readThrough(actionKey, actionResult);
+    state.actionCache.readThrough(actionKey, actionResult);
   }
 
   @SuppressWarnings("ConstantConditions")
