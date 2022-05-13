@@ -37,7 +37,6 @@ import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 
 public class DistributedStateCreator {
-
   public static DistributedState create(RedisClient client, RedisShardBackplaneConfig config)
       throws IOException {
     DistributedState state = new DistributedState();

@@ -14,23 +14,192 @@
 
 package build.buildfarm.common.redis;
 
-import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
-import static java.util.concurrent.Executors.newFixedThreadPool;
-
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.ExecutedActionMetadata;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import build.buildfarm.instance.shard.ShardActionCache;
+import com.google.common.truth.Truth;
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.protobuf.ByteString;
+import java.util.concurrent.Executors;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ShardActionCacheTest {
+  // Function under test: ShardActionCach
+  // Reason for testing: Test that the action cache can be constructed without issue.
+  // Failure explanation: This will catch any issues with initial setup of object.
   @Test
-  public void X() throws Exception {
+  public void TestConstruction() throws Exception {
     // ARRANGE
     RedisClient client = new RedisClient(JedisClusterFactory.createTest());
     ShardActionCache cache =
         new ShardActionCache(
-            client, "action-cache", 10000, 10000, listeningDecorator(newFixedThreadPool(24)));
+            client,
+            "action-cache",
+            10000,
+            10000,
+            MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+  }
+
+  // Function under test: put
+  // Reason for testing: Test that action cache results can be put into the cache.
+  // Failure explanation: Catch any failures putting cache results.
+  @Test
+  public void PutsSucceed() throws Exception {
+    // ARRANGE
+    RedisClient client = new RedisClient(JedisClusterFactory.createTest());
+    ShardActionCache cache =
+        new ShardActionCache(
+            client,
+            "action-cache",
+            10000,
+            10000,
+            MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+
+    // Add an element
+    {
+      // ACT
+      DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+      ActionKey actionKey =
+          digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo1")));
+      ActionResult actionResult = ActionResult.newBuilder().build();
+      cache.put(client, actionKey, actionResult);
+
+      // ASSERT
+      int size = client.call(jedis -> cache.size(jedis));
+      Truth.assertThat(size).isEqualTo(1);
+    }
+
+    // Add an element
+    {
+      // ACT
+      DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+      ActionKey actionKey =
+          digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo2")));
+      ActionResult actionResult = ActionResult.newBuilder().build();
+      cache.put(client, actionKey, actionResult);
+
+      // ASSERT
+      int size = client.call(jedis -> cache.size(jedis));
+      Truth.assertThat(size).isEqualTo(2);
+    }
+
+    // Add an element
+    {
+      // ACT
+      DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+      ActionKey actionKey =
+          digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo3")));
+      ActionResult actionResult = ActionResult.newBuilder().build();
+      cache.put(client, actionKey, actionResult);
+
+      // ASSERT
+      int size = client.call(jedis -> cache.size(jedis));
+      Truth.assertThat(size).isEqualTo(3);
+    }
+  }
+
+  // Function under test: put
+  // Reason for testing: Test that duplicate action cache results are not put into the cache.
+  // Failure explanation: Catch any failures putting duplicate cache results.
+  @Test
+  public void PutsAvoidDuplicate() throws Exception {
+    // ARRANGE
+    RedisClient client = new RedisClient(JedisClusterFactory.createTest());
+    ShardActionCache cache =
+        new ShardActionCache(
+            client,
+            "action-cache",
+            10000,
+            10000,
+            MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+
+    // Add an element
+    {
+      // ACT
+      DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+      ActionKey actionKey =
+          digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo")));
+      ActionResult actionResult = ActionResult.newBuilder().build();
+      cache.put(client, actionKey, actionResult);
+
+      // ASSERT
+      int size = client.call(jedis -> cache.size(jedis));
+      Truth.assertThat(size).isEqualTo(1);
+    }
+
+    // Add a duplicate element
+    {
+      // ACT
+      DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+      ActionKey actionKey =
+          digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo")));
+      ActionResult actionResult = ActionResult.newBuilder().build();
+      cache.put(client, actionKey, actionResult);
+
+      // ASSERT
+      int size = client.call(jedis -> cache.size(jedis));
+      Truth.assertThat(size).isEqualTo(1);
+    }
+  }
+
+  // Function under test: put / get
+  // Reason for testing: Test that put actions can be found
+  // Failure explanation: Unable to get a saved action result
+  @Test
+  public void PutsCanGet() throws Exception {
+    // ARRANGE
+    RedisClient client = new RedisClient(JedisClusterFactory.createTest());
+    ShardActionCache cache =
+        new ShardActionCache(
+            client,
+            "action-cache",
+            10000,
+            10000,
+            MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+
+    // ACT
+    DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+    ActionKey actionKey =
+        digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo")));
+    ActionResult actionResult =
+        ActionResult.newBuilder()
+            .setExecutionMetadata(ExecutedActionMetadata.newBuilder().setWorker("worker1").build())
+            .build();
+    cache.put(client, actionKey, actionResult);
+
+    // ASSERT
+    ActionResult fetched = cache.get(actionKey).get();
+    Truth.assertThat(fetched).isEqualTo(actionResult);
+  }
+
+  // Function under test: get
+  // Reason for testing: Missing item returns null
+  // Failure explanation: Did not get null as expected
+  @Test
+  public void MissingGetIsNull() throws Exception {
+    // ARRANGE
+    RedisClient client = new RedisClient(JedisClusterFactory.createTest());
+    ShardActionCache cache =
+        new ShardActionCache(
+            client,
+            "action-cache",
+            10000,
+            10000,
+            MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+
+    // ACT
+    DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+    ActionKey actionKey =
+        digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo")));
+    ActionResult fetched = cache.get(actionKey).get();
+
+    // ASSERT
+    Truth.assertThat(fetched).isEqualTo(null);
   }
 }

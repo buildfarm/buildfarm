@@ -67,22 +67,24 @@ public class ShardActionCache {
     actionCache = new RedisMap(cachePrefix);
   }
 
+  // L1->L2
+  public void put(RedisClient client, ActionKey actionKey, ActionResult actionResult) {
+    try {
+      putL2(client, actionKey, actionResult);
+    } catch (IOException e) {
+      // this should be a non-grpc runtime exception
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+    readThrough(actionKey, actionResult);
+  }
+
+  // L1<-L2
   public ListenableFuture<ActionResult> get(ActionKey actionKey) {
     return catching(
         toListenableFuture(actionResultCache.get(actionKey)),
         InvalidCacheLoadException.class,
         e -> null,
         directExecutor());
-  }
-
-  public void put(RedisClient client, ActionKey actionKey, ActionResult actionResult) {
-    try {
-      putActionResult(client, actionKey, actionResult);
-    } catch (IOException e) {
-      // this should be a non-grpc runtime exception
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
-    readThrough(actionKey, actionResult);
   }
 
   public void remove(JedisCluster jedis, ActionKey actionKey) {
@@ -97,12 +99,18 @@ public class ShardActionCache {
     client.run(jedis -> actionCache.remove(jedis, keyNames));
   }
 
+  // Invalidate L1 cache only
   public void invalidate(ActionKey actionKey) {
     actionResultCache.synchronous().invalidate(actionKey);
   }
 
+  // Add to L1 cache only
   public void readThrough(ActionKey actionKey, ActionResult actionResult) {
     actionResultCache.put(actionKey, CompletableFuture.completedFuture(actionResult));
+  }
+
+  public int size(JedisCluster jedis) {
+    return actionCache.size(jedis);
   }
 
   private static ActionResult parseActionResult(String json) {
@@ -128,7 +136,7 @@ public class ShardActionCache {
     return actionResult;
   }
 
-  private void putActionResult(RedisClient client, ActionKey actionKey, ActionResult actionResult)
+  private void putL2(RedisClient client, ActionKey actionKey, ActionResult actionResult)
       throws IOException {
     String json = JsonFormat.printer().print(actionResult);
     client.run(jedis -> actionCache.insert(jedis, asDigestStr(actionKey), json, actionCacheExpire));
