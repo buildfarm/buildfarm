@@ -793,30 +793,14 @@ public class RedisShardBackplane implements Backplane {
     state.actionCache.put(client, actionKey, actionResult);
   }
 
-  private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
-    state.actionCache.remove(jedis, actionKey);
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  @Override
-  public void removeActionResult(ActionKey actionKey) throws IOException {
-    client.run(jedis -> removeActionResult(jedis, actionKey));
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  @Override
-  public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
-    state.actionCache.remove(client, actionKeys);
-  }
-
   @Override
   public void invalidate(ActionKey actionKey) {
-    state.actionCache.invalidate(actionKey);
+    state.actionCache.removeL1(actionKey);
   }
 
   @Override
   public void readThrough(ActionKey actionKey, ActionResult actionResult) {
-    state.actionCache.readThrough(actionKey, actionResult);
+    state.actionCache.putL1(actionKey, actionResult);
   }
 
   @SuppressWarnings("ConstantConditions")

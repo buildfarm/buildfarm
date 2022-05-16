@@ -34,14 +34,15 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.Status;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import redis.clients.jedis.JedisCluster;
 
 public class ShardActionCache {
+  // L1 in-memory readthrough cache
+  private final AsyncLoadingCache<ActionKey, ActionResult> readThroughCache;
+
+  // L2 distributed cache
   private final RedisMap actionCache;
-  private final AsyncLoadingCache<ActionKey, ActionResult> actionResultCache;
   private final int actionCacheExpire;
 
   public ShardActionCache(
@@ -61,7 +62,7 @@ public class ShardActionCache {
                     },
                     executor));
 
-    actionResultCache = Caffeine.newBuilder().maximumSize(maxLocalCacheSize).buildAsync(loader);
+    readThroughCache = Caffeine.newBuilder().maximumSize(maxLocalCacheSize).buildAsync(loader);
 
     this.actionCacheExpire = actionCacheExpire;
     actionCache = new RedisMap(cachePrefix);
@@ -75,42 +76,43 @@ public class ShardActionCache {
       // this should be a non-grpc runtime exception
       throw Status.fromThrowable(e).asRuntimeException();
     }
-    readThrough(actionKey, actionResult);
+    putL1(actionKey, actionResult);
   }
 
   // L1<-L2
   public ListenableFuture<ActionResult> get(ActionKey actionKey) {
     return catching(
-        toListenableFuture(actionResultCache.get(actionKey)),
+        toListenableFuture(readThroughCache.get(actionKey)),
         InvalidCacheLoadException.class,
         e -> null,
         directExecutor());
   }
 
   public void remove(JedisCluster jedis, ActionKey actionKey) {
-    actionCache.remove(jedis, asDigestStr(actionKey));
-  }
-
-  public void remove(RedisClient client, Iterable<ActionKey> actionKeys) throws IOException {
-    // convert action keys to strings
-    List<String> keyNames = new ArrayList<>();
-    actionKeys.forEach(key -> keyNames.add(asDigestStr(key)));
-
-    client.run(jedis -> actionCache.remove(jedis, keyNames));
-  }
-
-  // Invalidate L1 cache only
-  public void invalidate(ActionKey actionKey) {
-    actionResultCache.synchronous().invalidate(actionKey);
-  }
-
-  // Add to L1 cache only
-  public void readThrough(ActionKey actionKey, ActionResult actionResult) {
-    actionResultCache.put(actionKey, CompletableFuture.completedFuture(actionResult));
+    removeL2(jedis, actionKey);
+    removeL1(actionKey);
   }
 
   public int size(JedisCluster jedis) {
     return actionCache.size(jedis);
+  }
+
+  public void putL1(ActionKey actionKey, ActionResult actionResult) {
+    readThroughCache.put(actionKey, CompletableFuture.completedFuture(actionResult));
+  }
+
+  public void putL2(RedisClient client, ActionKey actionKey, ActionResult actionResult)
+      throws IOException {
+    String json = JsonFormat.printer().print(actionResult);
+    client.run(jedis -> actionCache.insert(jedis, asDigestStr(actionKey), json, actionCacheExpire));
+  }
+
+  public void removeL1(ActionKey actionKey) {
+    readThroughCache.synchronous().invalidate(actionKey);
+  }
+
+  public void removeL2(JedisCluster jedis, ActionKey actionKey) {
+    actionCache.remove(jedis, asDigestStr(actionKey));
   }
 
   private static ActionResult parseActionResult(String json) {
@@ -134,12 +136,6 @@ public class ShardActionCache {
       client.run(jedis -> removeActionResult(jedis, actionKey));
     }
     return actionResult;
-  }
-
-  private void putL2(RedisClient client, ActionKey actionKey, ActionResult actionResult)
-      throws IOException {
-    String json = JsonFormat.printer().print(actionResult);
-    client.run(jedis -> actionCache.insert(jedis, asDigestStr(actionKey), json, actionCacheExpire));
   }
 
   private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {

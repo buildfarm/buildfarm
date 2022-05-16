@@ -202,4 +202,130 @@ public class ShardActionCacheTest {
     // ASSERT
     Truth.assertThat(fetched).isEqualTo(null);
   }
+
+  // Function under test: remove
+  // Reason for testing: Key is correctly removed.
+  // Failure explanation: Key is not removed as expected
+  @Test
+  public void ItemRemoved() throws Exception {
+    // ARRANGE
+    RedisClient client = new RedisClient(JedisClusterFactory.createTest());
+    ShardActionCache cache =
+        new ShardActionCache(
+            client,
+            "action-cache",
+            10000,
+            10000,
+            MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+
+    DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+    ActionKey actionKey =
+        digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo")));
+    ActionResult actionResult =
+        ActionResult.newBuilder()
+            .setExecutionMetadata(ExecutedActionMetadata.newBuilder().setWorker("worker1").build())
+            .build();
+    cache.put(client, actionKey, actionResult);
+
+    // ACT
+    client.run(jedis -> cache.remove(jedis, actionKey));
+
+    // ASSERT
+    Truth.assertThat(cache.get(actionKey).get()).isEqualTo(null);
+    int size = client.call(jedis -> cache.size(jedis));
+    Truth.assertThat(size).isEqualTo(0);
+  }
+
+  // Function under test: removeL2
+  // Reason for testing: Items are fetched from L1.
+  // Failure explanation: Cache not working as expected
+  @Test
+  public void L1CacheCanGet() throws Exception {
+    // ARRANGE
+    RedisClient client = new RedisClient(JedisClusterFactory.createTest());
+    ShardActionCache cache =
+        new ShardActionCache(
+            client,
+            "action-cache",
+            10000,
+            10000,
+            MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+
+    DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+    ActionKey actionKey =
+        digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo")));
+    ActionResult actionResult =
+        ActionResult.newBuilder()
+            .setExecutionMetadata(ExecutedActionMetadata.newBuilder().setWorker("worker1").build())
+            .build();
+    cache.put(client, actionKey, actionResult);
+
+    // ACT
+    client.run(jedis -> cache.removeL2(jedis, actionKey));
+
+    // ASSERT
+    Truth.assertThat(cache.get(actionKey).get()).isEqualTo(actionResult);
+  }
+
+  // Function under test: removeL1
+  // Reason for testing: Items are fetched from L2.
+  // Failure explanation: Cache not working as expected
+  @Test
+  public void L2CacheCanGet() throws Exception {
+    // ARRANGE
+    RedisClient client = new RedisClient(JedisClusterFactory.createTest());
+    ShardActionCache cache =
+        new ShardActionCache(
+            client,
+            "action-cache",
+            10000,
+            10000,
+            MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+
+    DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+    ActionKey actionKey =
+        digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo")));
+    ActionResult actionResult =
+        ActionResult.newBuilder()
+            .setExecutionMetadata(ExecutedActionMetadata.newBuilder().setWorker("worker1").build())
+            .build();
+    cache.put(client, actionKey, actionResult);
+
+    // ACT
+    cache.removeL1(actionKey);
+
+    // ASSERT
+    Truth.assertThat(cache.get(actionKey).get()).isEqualTo(actionResult);
+  }
+
+  // Function under test: putL2
+  // Reason for testing: Items fetched from L2 are saved in L1.
+  // Failure explanation: Item cannot be fetched from L1 as expected.
+  @Test
+  public void L2PopulatesL1() throws Exception {
+    // ARRANGE
+    RedisClient client = new RedisClient(JedisClusterFactory.createTest());
+    ShardActionCache cache =
+        new ShardActionCache(
+            client,
+            "action-cache",
+            10000,
+            10000,
+            MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+
+    // ACT
+    DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+    ActionKey actionKey =
+        digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo")));
+    ActionResult actionResult =
+        ActionResult.newBuilder()
+            .setExecutionMetadata(ExecutedActionMetadata.newBuilder().setWorker("worker1").build())
+            .build();
+    cache.putL2(client, actionKey, actionResult);
+    cache.get(actionKey).get();
+    client.run(jedis -> cache.removeL2(jedis, actionKey));
+
+    // ASSERT
+    Truth.assertThat(cache.get(actionKey).get()).isEqualTo(actionResult);
+  }
 }

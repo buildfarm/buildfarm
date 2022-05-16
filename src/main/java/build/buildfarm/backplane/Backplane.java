@@ -105,17 +105,6 @@ public interface Backplane {
   void readThrough(ActionKey actionKey, ActionResult actionResult);
 
   /**
-   * The AC stores full ActionResult objects in a hash map where the key is the digest of the action
-   * result and the value is the actual ActionResult object.
-   *
-   * <p>Remove an action result from the hash map.
-   */
-  void removeActionResult(ActionKey actionKey) throws IOException;
-
-  /** Bulk remove action results */
-  void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException;
-
-  /**
    * Identify an action that should not be executed, and respond to all requests it matches with
    * failover-compatible responses.
    */
