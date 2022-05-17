@@ -397,4 +397,13 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       throw Status.fromThrowable(e).asRuntimeException();
     }
   }
+
+  @Override
+  public void clearActionCache() {
+    try {
+      backplane.clearActionCache();
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
 }

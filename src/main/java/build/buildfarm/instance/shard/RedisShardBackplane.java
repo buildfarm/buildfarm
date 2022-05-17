@@ -803,6 +803,11 @@ public class RedisShardBackplane implements Backplane {
     state.actionCache.putL1(actionKey, actionResult);
   }
 
+  @Override
+  public void clearActionCache() throws IOException {
+    client.run(jedis -> state.actionCache.clear(jedis));
+  }
+
   @SuppressWarnings("ConstantConditions")
   @Override
   public ActionCacheScanResult scanActionCache(String scanToken, int count) throws IOException {

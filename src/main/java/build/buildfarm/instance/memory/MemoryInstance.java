@@ -1058,4 +1058,9 @@ public class MemoryInstance extends AbstractServerInstance {
   public void deregisterWorker(String workerName) {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public void clearActionCache() {
+    throw new UnsupportedOperationException();
+  }
 }

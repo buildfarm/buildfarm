@@ -23,6 +23,8 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;
+import build.buildfarm.v1test.ClearActionCacheRequest;
+import build.buildfarm.v1test.ClearActionCacheResults;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.DisableScaleInProtectionRequestResults;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
@@ -175,6 +177,17 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onCompleted();
     } catch (Exception e) {
       logger.log(Level.SEVERE, "Could not reindex CAS.", e);
+      responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
+    }
+  }
+
+  @Override
+  public void clearActionCache(
+      ClearActionCacheRequest request, StreamObserver<ClearActionCacheResults> responseObserver) {
+    try {
+      instance.clearActionCache();
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, "Could not clear the ActionCache", e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }

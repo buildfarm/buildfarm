@@ -2497,6 +2497,15 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
+  @Override
+  public void clearActionCache() {
+    try {
+      backplane.clearActionCache();
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
   private boolean inDenyList(RequestMetadata requestMetadata) throws IOException {
     if (!useDenyList) {
       return false;
