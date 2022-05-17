@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common.redis;
+package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
@@ -37,13 +37,12 @@ public class ShardActionCacheTest {
   public void TestConstruction() throws Exception {
     // ARRANGE
     RedisClient client = new RedisClient(JedisClusterFactory.createTest());
-    ShardActionCache cache =
-        new ShardActionCache(
-            client,
-            "action-cache",
-            10000,
-            10000,
-            MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+    new ShardActionCache(
+        client,
+        "action-cache",
+        10000,
+        10000,
+        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
   }
 
   // Function under test: put
@@ -327,5 +326,37 @@ public class ShardActionCacheTest {
 
     // ASSERT
     Truth.assertThat(cache.get(actionKey).get()).isEqualTo(actionResult);
+  }
+
+  // Function under test: clear
+  // Reason for testing: All items can be removed from the cache.
+  // Failure explanation: Clear functionality not working.
+  @Test
+  public void Clear() throws Exception {
+    // ARRANGE
+    RedisClient client = new RedisClient(JedisClusterFactory.createTest());
+    ShardActionCache cache =
+        new ShardActionCache(
+            client,
+            "action-cache",
+            10000,
+            10000,
+            MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+
+    // ACT
+    DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+    ActionKey actionKey =
+        digestUtil.asActionKey(digestUtil.compute(ByteString.copyFromUtf8("foo")));
+    ActionResult actionResult =
+        ActionResult.newBuilder()
+            .setExecutionMetadata(ExecutedActionMetadata.newBuilder().setWorker("worker1").build())
+            .build();
+    cache.put(client, actionKey, actionResult);
+    client.run(jedis -> cache.clear(jedis));
+
+    // ASSERT
+    Truth.assertThat(cache.get(actionKey).get()).isEqualTo(null);
+    int size = client.call(jedis -> cache.size(jedis));
+    Truth.assertThat(size).isEqualTo(0);
   }
 }

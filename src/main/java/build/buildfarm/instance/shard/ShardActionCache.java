@@ -51,24 +51,12 @@ public class ShardActionCache {
       int actionCacheExpire,
       int maxLocalCacheSize,
       ListeningExecutorService service) {
-    AsyncCacheLoader<ActionKey, ActionResult> loader =
-        (actionKey, executor) ->
-            toCompletableFuture(
-                catching(
-                    service.submit(() -> getActionResult(client, actionKey)),
-                    IOException.class,
-                    e -> {
-                      throw Status.fromThrowable(e).asRuntimeException();
-                    },
-                    executor));
-
-    readThroughCache = Caffeine.newBuilder().maximumSize(maxLocalCacheSize).buildAsync(loader);
-
     this.actionCacheExpire = actionCacheExpire;
+    readThroughCache = createReadThroughCache(client, service, maxLocalCacheSize);
     actionCache = new RedisMap(cachePrefix);
   }
 
-  // L1->L2
+  // Put key into all levels of cache.
   public void put(RedisClient client, ActionKey actionKey, ActionResult actionResult) {
     try {
       putL2(client, actionKey, actionResult);
@@ -79,7 +67,7 @@ public class ShardActionCache {
     putL1(actionKey, actionResult);
   }
 
-  // L1<-L2
+  // Get key by checking all levels of cache.
   public ListenableFuture<ActionResult> get(ActionKey actionKey) {
     return catching(
         toListenableFuture(readThroughCache.get(actionKey)),
@@ -88,6 +76,7 @@ public class ShardActionCache {
         directExecutor());
   }
 
+  // Remove key from all levels of cache.
   public void remove(JedisCluster jedis, ActionKey actionKey) {
     removeL2(jedis, actionKey);
     removeL1(actionKey);
@@ -95,6 +84,11 @@ public class ShardActionCache {
 
   public int size(JedisCluster jedis) {
     return actionCache.size(jedis);
+  }
+
+  public void clear(JedisCluster jedis) {
+    actionCache.clear(jedis);
+    readThroughCache.synchronous().invalidateAll();
   }
 
   public void putL1(ActionKey actionKey, ActionResult actionResult) {
@@ -115,7 +109,23 @@ public class ShardActionCache {
     actionCache.remove(jedis, asDigestStr(actionKey));
   }
 
-  private static ActionResult parseActionResult(String json) {
+  private AsyncLoadingCache<ActionKey, ActionResult> createReadThroughCache(
+      RedisClient client, ListeningExecutorService service, int maxLocalCacheSize) {
+    AsyncCacheLoader<ActionKey, ActionResult> loader =
+        (actionKey, executor) ->
+            toCompletableFuture(
+                catching(
+                    service.submit(() -> getActionResult(client, actionKey)),
+                    IOException.class,
+                    e -> {
+                      throw Status.fromThrowable(e).asRuntimeException();
+                    },
+                    executor));
+
+    return Caffeine.newBuilder().maximumSize(maxLocalCacheSize).buildAsync(loader);
+  }
+
+  private ActionResult parseActionResult(String json) {
     try {
       ActionResult.Builder builder = ActionResult.newBuilder();
       JsonFormat.parser().merge(json, builder);
@@ -127,19 +137,12 @@ public class ShardActionCache {
 
   private ActionResult getActionResult(RedisClient client, ActionKey actionKey) throws IOException {
     String json = client.call(jedis -> actionCache.get(jedis, asDigestStr(actionKey)));
-    if (json == null) {
-      return null;
-    }
 
     ActionResult actionResult = parseActionResult(json);
     if (actionResult == null) {
-      client.run(jedis -> removeActionResult(jedis, actionKey));
+      client.run(jedis -> removeL2(jedis, actionKey));
     }
     return actionResult;
-  }
-
-  private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
-    actionCache.remove(jedis, asDigestStr(actionKey));
   }
 
   private String asDigestStr(ActionKey actionKey) {
