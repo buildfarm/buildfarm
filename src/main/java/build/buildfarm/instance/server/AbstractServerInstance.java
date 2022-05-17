@@ -1169,9 +1169,9 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
   
-  public void validateActionTree(Action action, Map<Digest, Directory> directoriesIndex){
+  public void validateActionTree(Action action, Map<Digest, Directory> directoriesIndex, PreconditionFailure.Builder preconditionFailure){
     
-    // start at the root of the action's input tree
+    // Start at the root of the action's input tree
     Stack<Digest> digestsToTraverse = new Stack<>();
     digestsToTraverse.push(action.getInputRootDigest());
     
@@ -1179,6 +1179,17 @@ public abstract class AbstractServerInstance implements Instance {
     while (!digestsToTraverse.isEmpty()){
       Digest digest = digestsToTraverse.pop();
       Directory directory = digestToDirectory(digest,directoriesIndex);
+      
+      // report invalid directories
+      if (directory == null){
+      preconditionFailure
+          .addViolationsBuilder()
+          .setType(VIOLATION_TYPE_MISSING)
+          .setSubject("blobs/" + DigestUtil.toString(digest))
+          .setDescription("The directory was not found in the CAS.");
+      break;
+      }
+      
       //TODO validate directory
       
       for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
