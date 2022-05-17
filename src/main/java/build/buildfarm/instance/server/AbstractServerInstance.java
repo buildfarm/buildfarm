@@ -1168,6 +1168,34 @@ public abstract class AbstractServerInstance implements Instance {
           preconditionFailure);
     }
   }
+  
+  public void validateActionTree(Action action, Map<Digest, Directory> directoriesIndex){
+    
+    // start at the root of the action's input tree
+    Stack<Digest> digestsToTraverse = new Stack<>();
+    digestsToTraverse.push(action.getInputRootDigest());
+    
+    // Perform a DFS traversal on the input tree
+    while (!digestsToTraverse.isEmpty()){
+      Digest digest = digestsToTraverse.pop();
+      Directory directory = digestToDirectory(digest,directoriesIndex);
+      //TODO validate directory
+      
+      for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
+        
+        // add the next depth of directory nodes
+        digestsToTraverse.push(directoryNode.getDigest());
+      }
+    }
+    
+  }
+  
+  public Directory digestToDirectory(Digest directoryDigest, Map<Digest, Directory> directoriesIndex) {
+    if (directoryDigest.getSizeBytes() == 0) {
+      return Directory.getDefaultInstance();
+    }
+    return directoriesIndex.get(directoryDigest);
+  }
 
   @VisibleForTesting
   static void validateOutputs(
