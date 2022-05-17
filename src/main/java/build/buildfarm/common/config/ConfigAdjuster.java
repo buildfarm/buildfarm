@@ -66,7 +66,6 @@ public class ConfigAdjuster {
     if (executionStageWidth != null) {
       builder.setExecuteStageWidth(Integer.parseInt(executionStageWidth));
     }
-    
 
     if (!Strings.isNullOrEmpty(options.root)) {
       logger.log(Level.INFO, "setting root from CLI: " + options.root);
