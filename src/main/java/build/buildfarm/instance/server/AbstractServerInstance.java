@@ -1855,7 +1855,8 @@ public abstract class AbstractServerInstance implements Instance {
         .setExecEnabled(true)
         .setExecutionPriorityCapabilities(
             PriorityCapabilities.newBuilder()
-                .addPriorities(PriorityRange.newBuilder().setMinPriority(0).setMaxPriority(Integer.MAX_VALUE)))
+                .addPriorities(
+                    PriorityRange.newBuilder().setMinPriority(0).setMaxPriority(Integer.MAX_VALUE)))
         .build();
   }
 
