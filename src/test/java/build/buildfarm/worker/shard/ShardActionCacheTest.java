@@ -18,6 +18,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import build.buildfarm.instance.shard.ShardActionCache;
 import com.google.common.truth.Truth;
