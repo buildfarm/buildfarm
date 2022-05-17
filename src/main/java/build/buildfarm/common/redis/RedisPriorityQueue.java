@@ -249,12 +249,11 @@ public class RedisPriorityQueue extends QueueInterface {
 
   /**
    * @brief Adds additional functionality to the jedis client.
-   * @details Load the custom lua script so we can have zpoplpush functionality on our container.
+   * @details Load the custom lua script so we can have zpoplpush functionality in our container.
    */
   private String getLuaScript() {
     // We return the lua code in-line to avoid any build complexities having to bundle lua code with
     // the buildfarm artifacts.  Lua code is fed to redis via the eval call.
-
     return String.join(
         "\n",
         "local zset = ARGV[1]",
