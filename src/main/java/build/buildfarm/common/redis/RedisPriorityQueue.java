@@ -15,13 +15,9 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.StringVisitor;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import redis.clients.jedis.JedisCluster;
 
 /**
@@ -66,7 +62,7 @@ public class RedisPriorityQueue extends QueueInterface {
     this.name = name;
     this.time = time;
     this.keys = Arrays.asList(name);
-    this.script = getLuaScript("zpoplpush.lua");
+    this.script = getLuaScript();
   }
 
   /**
@@ -253,16 +249,36 @@ public class RedisPriorityQueue extends QueueInterface {
 
   /**
    * @brief Adds additional functionality to the jedis client.
-   * @details Load the custom lua script so we can have zpoplpush.
+   * @details Load the custom lua script so we can have zpoplpush functionality in our container.
    */
-  private String getLuaScript(String filename) {
-    InputStream luaInputStream = this.getClass().getClassLoader().getResourceAsStream(filename);
-    if (luaInputStream == null) {
-      throw new IllegalArgumentException(filename + " is not found");
-    }
-    return new BufferedReader(new InputStreamReader(luaInputStream))
-        .lines()
-        .collect(Collectors.joining("\n"));
+  private String getLuaScript() {
+    // We return the lua code in-line to avoid any build complexities having to bundle lua code with
+    // the buildfarm artifacts.  Lua code is fed to redis via the eval call.
+    return String.join(
+        "\n",
+        "local zset = ARGV[1]",
+        "local dequeueName = ARGV[2]",
+        "local value = ''",
+        "local function isempty(s)",
+        "   return s == nil or s == '' or type(s) == 'userdata'",
+        "end",
+        "-- Making sure required fields are not nil",
+        "assert(not isempty(zset), 'ERR1: zset name is missing')",
+        "assert(not isempty(dequeueName), 'ERR2: Dequeue name is missing')",
+        "  -- Retrieve item",
+        "  local popped = redis.call('ZRANGE', zset, 0, 0)",
+        "  -- Rotate thru popped item",
+        "  if next(popped) ~= nil then",
+        "    for _,item in ipairs(popped) do",
+        "      -- Remove leading timestamp on dequeue",
+        "      value = item:gsub('^%d*:', '')",
+        "      -- Remove item",
+        "      redis.call('ZREM', zset, item)",
+        "      -- Push to the dequeue",
+        "      redis.call('LPUSH', dequeueName, value)",
+        "    end",
+        "  end",
+        "return value");
   }
 
   /**
