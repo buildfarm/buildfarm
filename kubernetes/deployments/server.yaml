@@ -19,6 +19,9 @@ spec:
         image: buildfarm-server-image
         ports:
         - containerPort: 8980
+          name: "server-comm"
+        - containerPort: 9092
+          name: "server-metrics"
         env:
         - name: REDIS_URI
           value: "redis://redis-cluster-service:6379"

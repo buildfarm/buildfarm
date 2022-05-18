@@ -267,6 +267,29 @@ class OperationQueueWorkerContext implements WorkerContext {
     return ProtoUtils.parseQueuedOperation(queuedOperationBlob, queueEntry);
   }
 
+  // container for inputs fetched and rolls back unless committed
+  private static class ReferenceTransaction implements AutoCloseable {
+    public final ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
+    public final ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
+    public boolean rollback = true;
+    private final CASFileCache fileCache;
+
+    public ReferenceTransaction(CASFileCache fileCache) {
+      this.fileCache = fileCache;
+    }
+
+    @Override
+    public void close() throws IOException, InterruptedException {
+      if (rollback) {
+        fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
+      }
+    }
+
+    public void commit() {
+      rollback = false;
+    }
+  }
+
   @Override
   public Path createExecDir(
       String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
@@ -283,39 +306,34 @@ class OperationQueueWorkerContext implements WorkerContext {
     }
     Files.createDirectories(execDir);
 
-    ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
-    ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
-
-    boolean fetched = false;
-    try {
+    try (ReferenceTransaction refXact = new ReferenceTransaction(fileCache)) {
       fetchInputs(
           execDir,
           action.getInputRootDigest(),
           directoriesIndex,
           outputDirectory,
-          inputFiles,
-          inputDirectories);
-      fetched = true;
-    } finally {
-      if (!fetched) {
-        fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
-      }
+          refXact.inputFiles,
+          refXact.inputDirectories);
+      refXact.commit();
+      rootInputFiles.put(execDir, refXact.inputFiles.build());
+      rootInputDirectories.put(execDir, refXact.inputDirectories.build());
     }
 
-    rootInputFiles.put(execDir, inputFiles.build());
-    rootInputDirectories.put(execDir, inputDirectories.build());
-
-    boolean stamped = false;
     try {
       outputDirectory.stamp(execDir);
-      stamped = true;
-    } finally {
-      if (!stamped) {
-        destroyExecDir(execDir);
+      if (owner != null) {
+        Directories.setAllOwner(execDir, owner);
       }
-    }
-    if (owner != null) {
-      Directories.setAllOwner(execDir, owner);
+    } catch (Exception e) {
+      try {
+        destroyExecDir(execDir);
+      } catch (Exception cleanupEx) {
+        e.addSuppressed(cleanupEx);
+      }
+      Throwables.throwIfUnchecked(e);
+      Throwables.propagateIfInstanceOf(e, IOException.class);
+      Throwables.propagateIfInstanceOf(e, InterruptedException.class);
+      throw new RuntimeException(e);
     }
     return execDir;
   }

@@ -103,4 +103,50 @@ public class RedisHashMapMockTest {
     verify(redis, times(1)).hkeys("test");
     verify(redis, times(1)).hgetAll("test");
   }
+
+  // Function under test: insertIfMissing
+  // Reason for testing: the correct implementation is used.
+  // Failure explanation: Unexpected implementation used
+  @Test
+  public void redisInsertIfMissing() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    map.insertIfMissing(redis, "key", "value");
+    map.insertIfMissing(redis, "key", "value");
+
+    // ASSERT
+    verify(redis, times(2)).hsetnx("test", "key", "value");
+  }
+
+  // Function under test: exists
+  // Reason for testing: the correct implementation is used.
+  // Failure explanation: Unexpected implementation used
+  @Test
+  public void redisExists() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    map.exists(redis, "key");
+
+    // ASSERT
+    verify(redis, times(1)).hexists("test", "key");
+  }
+
+  // Function under test: size
+  // Reason for testing: the correct implementation is used.
+  // Failure explanation: Unexpected implementation used
+  @Test
+  public void redisSize() throws Exception {
+    // ARRANGE
+    RedisHashMap map = new RedisHashMap("test");
+
+    // ACT
+    map.size(redis);
+
+    // ASSERT
+    verify(redis, times(1)).hlen("test");
+  }
 }
