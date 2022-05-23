@@ -81,19 +81,25 @@ public class RedisClient implements Closeable {
   }
 
   public void run(Consumer<JedisCluster> withJedis) throws IOException {
-    call(
+    forceCall(
         (JedisContext<Void>)
             jedis -> {
               withJedis.accept(jedis);
               return null;
             });
   }
+  
 
   public <T> T blockingCall(JedisInterruptibleContext<T> withJedis)
       throws IOException, InterruptedException {
+    return defaultBlockingCall(withJedis);
+  }
+  
+  private <T> T defaultBlockingCall(JedisInterruptibleContext<T> withJedis)
+      throws IOException, InterruptedException {
     AtomicReference<InterruptedException> interruption = new AtomicReference<>(null);
     T result =
-        call(
+        forceCall(
             jedis -> {
               try {
                 return withJedis.run(jedis);
@@ -111,6 +117,27 @@ public class RedisClient implements Closeable {
 
   @SuppressWarnings("ConstantConditions")
   public <T> T call(JedisContext<T> withJedis) throws IOException {
+    return forceCall(withJedis);
+  }
+  
+  @SuppressWarnings("ConstantConditions")
+  private <T> T forceCall(JedisContext<T> withJedis) {
+    while(true){
+      try {
+        T result = defaultCall(withJedis);
+        return result;
+      }
+      catch (Exception e){
+        System.out.println("Failure in RedisClient::call");
+        System.out.println(e.toString());
+      }
+    }
+    
+  }
+
+
+  @SuppressWarnings("ConstantConditions")
+  private <T> T defaultCall(JedisContext<T> withJedis) throws IOException {
     throwIfClosed();
     try {
       try {
