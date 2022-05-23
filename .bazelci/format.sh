@@ -8,7 +8,7 @@ JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/downloa
 LOCAL_FORMATTER="java_formatter.jar"
 
 FORMAT_PROTO=true
-CLANG_FORMAT=@llvm_toolchain//:clang-format
+CLANG_FORMAT=@llvm_toolchain//:bin/clang-format
 BAZEL_WRAPPER=bazel
 
 FORMAT_BUILD=true
