@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.server;
 
+import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.instance.server.AbstractServerInstance.ACTION_INPUT_ROOT_DIRECTORY_PATH;
 import static build.buildfarm.instance.server.AbstractServerInstance.DIRECTORY_NOT_SORTED;
@@ -69,6 +70,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
+import io.grpc.StatusException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
@@ -247,6 +249,37 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("/: foo");
     assertThat(violation.getDescription()).isEqualTo(DUPLICATE_DIRENT);
+  }
+
+  @Test
+  public void duplicateEmptyDirectoryCheckPasses() throws StatusException {
+    Directory emptyDirectory = Directory.getDefaultInstance();
+    Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+    AbstractServerInstance.validateActionInputDirectory(
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
+        Directory.newBuilder()
+            .addAllDirectories(
+                ImmutableList.of(
+                    DirectoryNode.newBuilder()
+                        .setName("bar")
+                        .setDigest(emptyDirectoryDigest)
+                        .build(),
+                    DirectoryNode.newBuilder()
+                        .setName("foo")
+                        .setDigest(emptyDirectoryDigest)
+                        .build()))
+            .build(),
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ ImmutableMap.of(Digest.getDefaultInstance(), emptyDirectory),
+        /* onInputFiles=*/ file -> {},
+        /* onInputDirectories=*/ directory -> {},
+        /* onInputDigests=*/ digest -> {},
+        preconditionFailure);
+
+    checkPreconditionFailure(
+        Digest.newBuilder().setHash("should not fail").build(), preconditionFailure.build());
   }
 
   @Test

@@ -35,7 +35,10 @@ import java.util.logging.Logger;
  * @brief Modify the loaded configuration to avoid any unsuitable defaults.
  * @details Users may exclude certain options from their configuration files. The default values
  *     given to these options may also be invalid. Since protobuf does not allow custom defaults, we
- *     will adjust accordingly after a configuration is loaded.
+ *     will adjust accordingly after a configuration is loaded. This is primarily useful when adding
+ *     new configuration values that aren't an existing config files. Adjusting the defaults here
+ *     allow users to upgrade buildfarm in forwards compatible way (i.e. not needing to adjust their
+ *     configs during upgrades).
  */
 public class ConfigAdjuster {
   private static final Logger logger = Logger.getLogger(ConfigAdjuster.class.getName());
@@ -58,6 +61,10 @@ public class ConfigAdjuster {
     if (instanceName != null) {
       logger.log(Level.INFO, String.format("Overwriting public name: %s", instanceName));
       builder.setPublicName(instanceName);
+    }
+    String executionStageWidth = System.getenv("EXECUTION_STAGE_WIDTH");
+    if (executionStageWidth != null) {
+      builder.setExecuteStageWidth(Integer.parseInt(executionStageWidth));
     }
 
     if (!Strings.isNullOrEmpty(options.root)) {
