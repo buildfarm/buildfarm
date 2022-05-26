@@ -112,7 +112,7 @@ tasks:
     shell_commands:
     - export CACHE_TEST=true
     - export TEST_SHARD=true
-    - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_double_test.sh
     - export TEST_ARG1=--experimental_remote_grpc_log='./grpc.log'
     - export TEST_ARG2=--experimental_remote_grpc_log='./grpc2.log'
     - ./.bazelci/cache_test.sh

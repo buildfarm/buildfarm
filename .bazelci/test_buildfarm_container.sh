@@ -1,7 +1,7 @@
 #!/bin/bash
 # This script is to be called within a built container reflecting the changes of a PR
 # We start the server and the worker, and test that they can complete builds for a bazel client.
-cd buildfarm
+cd buildfarm;
 
 #Various targets to be tested
 BUILDFARM_SERVER_TARGET="//src/main/java/build/buildfarm:buildfarm-server"
@@ -105,8 +105,7 @@ init_grpc_parser(){
     if [ "${CACHE_TEST:-false}" = true ]; then
         echo "Fetch tools_remote from git"
 
-        #git clone https://github.com/bazelbuild/tools_remote.git
-        git clone https://github.com/krisstakos/tools_remote.git
+        git clone https://github.com/bazelbuild/tools_remote.git
         cd tools_remote;
         ../bazel build //:remote_client
         cd /buildfarm;
