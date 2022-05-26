@@ -6,12 +6,6 @@ package(
 )
 
 filegroup(
-    name = "lua_resources",
-    srcs = ["//src/main/java/build/buildfarm/common/redis:zpoplpush.lua"],
-    visibility = ["//visibility:public"],
-)
-
-filegroup(
     name = "configs",
     srcs = ["logging.properties"],
     visibility = ["//visibility:public"],
@@ -28,7 +22,6 @@ java_binary(
     name = "buildfarm-server",
     classpath_resources = [
         ":configs",
-        ":lua_resources",
     ],
     jvm_flags = ensure_accurate_metadata(),
     main_class = "build.buildfarm.server.BuildFarmServer",
@@ -62,7 +55,6 @@ java_binary(
     name = "buildfarm-shard-worker",
     classpath_resources = [
         ":configs",
-        ":lua_resources",
     ],
     jvm_flags = ensure_accurate_metadata(),
     main_class = "build.buildfarm.worker.shard.Worker",

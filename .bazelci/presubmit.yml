@@ -92,6 +92,7 @@ tasks:
     shell_commands:
     - export TEST_SHARD=false
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
   integration_test_many_shard:
     name: "Integration Test (Shard)"
@@ -99,6 +100,7 @@ tasks:
     shell_commands:
     - export TEST_SHARD=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
     
   # Memory integration test is too slow.
@@ -119,6 +121,7 @@ tasks:
     shell_commands:
     - export TEST_SHARD=true
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
+    - export EXECUTION_STAGE_WIDTH=10
     - ./.bazelci/integration_test.sh
 
   buildfarm_admin_test:

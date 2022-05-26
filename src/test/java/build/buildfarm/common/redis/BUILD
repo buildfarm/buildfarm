@@ -18,12 +18,6 @@ NATIVE_REDIS_TESTS = [
     "RedisHashMapTest.java",
 ]
 
-filegroup(
-    name = "lua_resources",
-    srcs = ["//src/main/java/build/buildfarm/common/redis:zpoplpush.lua"],
-    visibility = ["//visibility:public"],
-)
-
 java_test(
     name = "tests",
     size = "small",
@@ -31,7 +25,6 @@ java_test(
         ["*.java"],
         exclude = NATIVE_REDIS_TESTS,
     ),
-    classpath_resources = [":lua_resources"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
 )
@@ -40,7 +33,6 @@ java_test(
     name = "priorityqueue",
     size = "small",
     srcs = ["RedisPriorityQueueMockTest.java"],
-    classpath_resources = [":lua_resources"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
 )
@@ -49,7 +41,6 @@ java_test(
     name = "priorityqueue-redis",
     size = "small",
     srcs = ["RedisPriorityQueueTest.java"],
-    classpath_resources = [":lua_resources"],
     tags = [
         "exclusive",
         "redis",
@@ -82,7 +73,6 @@ java_test(
     name = "balancedqueue",
     size = "small",
     srcs = ["BalancedRedisQueueMockTest.java"],
-    classpath_resources = [":lua_resources"],
     test_class = "build.buildfarm.AllTests",
     deps = COMMON_DEPS,
 )
@@ -91,7 +81,6 @@ java_test(
     name = "balancedqueue-redis",
     size = "small",
     srcs = ["BalancedRedisQueueTest.java"],
-    classpath_resources = [":lua_resources"],
     tags = [
         "exclusive",
         "redis",
