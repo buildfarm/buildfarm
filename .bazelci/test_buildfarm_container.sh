@@ -116,8 +116,8 @@ parse_grpc_logs(){
         echo "Parse grpc log"
         ./tools_remote/bazel-bin/remote_client --grpc_log src/test/many/grpc.log printlog --format_json > $GRPC_LOGS1
         ./tools_remote/bazel-bin/remote_client --grpc_log src/test/many/grpc2.log printlog --format_json > $GRPC_LOGS2
+        calculate_cache_statistics "$GRPC_LOGS1" "$GRPC_LOGS2"
     fi
-    calculate_cache_statistics "$GRPC_LOGS1" "$GRPC_LOGS2"
 }
 
 calculate_cache_statistics(){
