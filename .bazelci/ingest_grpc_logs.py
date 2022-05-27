@@ -15,12 +15,15 @@ ACTION_CACHE_REQUESTS = ("build.bazel.remote.execution.v2.ActionCache/"
 def main():
     n = len(sys.argv)
     for i in range(1, n):
-        print("=====================")
-        print("Build #%d results" % i)
         methods = defaultdict(list)
         parsed = parse_file(sys.argv[i])
-        count_remote_actions(parsed, methods)
+        print("=====================")
+        print("Build #%d results" % i)
+        not_fully_cached = count_remote_actions(parsed, methods, i)
         calculate_latency(methods)
+        if not_fully_cached:
+            print("Not fully cached")
+            exit(1)
 
 
 def date_to_millis(dt):
@@ -33,7 +36,7 @@ def parse_file(file):
     return json.loads(data)
 
 
-def count_remote_actions(json_data, methods):
+def count_remote_actions(json_data, methods, build_n):
     remote_executions = 0
     cas_uploads = 0
     cas_downloads = 0
@@ -55,6 +58,10 @@ def count_remote_actions(json_data, methods):
     print("CAS uploads made: %d" % cas_uploads)
     print("CAS downloads made: %d" % cas_downloads)
     print("Action Cache requests made: %d" % action_cache_requests)
+    if build_n == 2:
+        if remote_executions > 0 or cas_uploads > 0:
+            return 1
+    return 0
 
 
 def calculate_latency(methods):
