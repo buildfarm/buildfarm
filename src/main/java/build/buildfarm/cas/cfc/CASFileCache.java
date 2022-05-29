@@ -153,9 +153,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final LoadingCache<BlobWriteKey, Write> writes =
       CacheBuilder.newBuilder()
           .expireAfterAccess(1, HOURS)
-          .removalListener(
-              (RemovalListener<BlobWriteKey, Write>)
-                  notification -> notification.getValue().reset())
+          // .removalListener(
+          //     (RemovalListener<BlobWriteKey, Write>)
+          //         notification -> notification.getValue().reset())
           .build(
               new CacheLoader<BlobWriteKey, Write>() {
                 @SuppressWarnings("NullableProblems")
