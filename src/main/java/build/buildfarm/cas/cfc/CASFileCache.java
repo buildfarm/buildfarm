@@ -152,7 +152,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   @Nullable private final ContentAddressableStorage delegate;
   private final LoadingCache<BlobWriteKey, Write> writes =
       CacheBuilder.newBuilder()
-          .expireAfterAccess(1, HOURS)
+          .expireAfterAccess(15, MINUTES)
           // .removalListener(
           //     (RemovalListener<BlobWriteKey, Write>)
           //         notification -> notification.getValue().reset())
@@ -166,7 +166,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               });
   private final LoadingCache<Digest, SettableFuture<Long>> writesInProgress =
       CacheBuilder.newBuilder()
-          .expireAfterAccess(1, HOURS)
+          .expireAfterAccess(15, MINUTES)
           .removalListener(
               (RemovalListener<Digest, SettableFuture<Long>>)
                   notification -> {
