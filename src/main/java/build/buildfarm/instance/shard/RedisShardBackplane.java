@@ -79,6 +79,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -772,17 +773,9 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public ActionResult getActionResult(ActionKey actionKey) throws IOException {
-    String json = client.call(jedis -> state.actionCache.get(jedis, asDigestStr(actionKey)));
-    if (json == null) {
-      return null;
-    }
-
-    ActionResult actionResult = parseActionResult(json);
-    if (actionResult == null) {
-      client.run(jedis -> removeActionResult(jedis, actionKey));
-    }
-    return actionResult;
+  public ActionResult getActionResult(ActionKey actionKey)
+      throws IOException, InterruptedException, ExecutionException {
+    return state.actionCache.get(actionKey).get();
   }
 
   // we do this by action hash only, so that we can use RequestMetadata to filter
@@ -797,31 +790,22 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
-    String json = JsonFormat.printer().print(actionResult);
-    client.run(
-        jedis ->
-            state.actionCache.insert(
-                jedis, asDigestStr(actionKey), json, config.getActionCacheExpire()));
+    state.actionCache.put(client, actionKey, actionResult);
   }
 
-  private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
-    state.actionCache.remove(jedis, asDigestStr(actionKey));
-  }
-
-  @SuppressWarnings("ConstantConditions")
   @Override
-  public void removeActionResult(ActionKey actionKey) throws IOException {
-    client.run(jedis -> removeActionResult(jedis, actionKey));
+  public void invalidate(ActionKey actionKey) {
+    state.actionCache.removeL1(actionKey);
   }
 
-  @SuppressWarnings("ConstantConditions")
   @Override
-  public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
-    // convert action keys to strings
-    List<String> keyNames = new ArrayList<>();
-    actionKeys.forEach(key -> keyNames.add(asDigestStr(key)));
+  public void readThrough(ActionKey actionKey, ActionResult actionResult) {
+    state.actionCache.putL1(actionKey, actionResult);
+  }
 
-    client.run(jedis -> state.actionCache.remove(jedis, keyNames));
+  @Override
+  public void clearActionCache() throws IOException {
+    client.run(jedis -> state.actionCache.clear(jedis));
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -1306,10 +1290,6 @@ public class RedisShardBackplane implements Backplane {
 
           publishReset(jedis, o);
         });
-  }
-
-  private String asDigestStr(ActionKey actionKey) {
-    return DigestUtil.toString(actionKey.getDigest());
   }
 
   String operationKey(String operationName) {

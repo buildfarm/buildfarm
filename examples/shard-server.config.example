@@ -94,6 +94,9 @@ instance {
       # The ttl maintained for ActionCache entries. This is not
       # refreshed on getActionResult hit
       action_cache_expire: 2419200 # 4 weeks
+      
+      # L1 in memory cache size
+      action_cache_local_size: 1000000
 
       # A redis key prefix for all blacklisted actions, suffixed
       # with the action's key hash. An action which is blacklisted

@@ -49,7 +49,7 @@ public class DistributedState {
    *     https://github.com/bazelbuild/remote-apis/blob/3b4b6402103539d66fcdd1a4d945f660742665ca/build/bazel/remote/execution/v2/remote_execution.proto#L144
    *     for the remote API definition of an action cache.
    */
-  public RedisMap actionCache;
+  public ShardActionCache actionCache;
 
   /**
    * @field operationQueue

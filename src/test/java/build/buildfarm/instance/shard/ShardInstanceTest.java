@@ -26,7 +26,6 @@ import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_COM
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.AdditionalAnswers.answer;
@@ -132,14 +131,11 @@ public class ShardInstanceTest {
   public void setUp() throws InterruptedException {
     MockitoAnnotations.initMocks(this);
     blobDigests = Sets.newHashSet();
-    ReadThroughActionCache actionCache =
-        new ShardActionCache(10, mockBackplane, newDirectExecutorService());
     instance =
         new ShardInstance(
             "shard",
             DIGEST_UTIL,
             mockBackplane,
-            actionCache,
             /* runDispatchedMonitor=*/ false,
             /* dispatchedMonitorIntervalSeconds=*/ 0,
             /* runOperationQueuer=*/ false,
@@ -942,6 +938,7 @@ public class ShardInstanceTest {
         ActionResult.newBuilder()
             .setStdoutDigest(Digest.newBuilder().setHash("stdout").setSizeBytes(1))
             .build();
+    when(mockBackplane.getActionResult(eq(actionKey))).thenReturn(actionResult);
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder().setResult(actionResult).build();
     Operation completedOperation =
         Operation.newBuilder().setDone(true).setResponse(Any.pack(executeResponse)).build();

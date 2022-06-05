@@ -28,8 +28,10 @@ import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.Executors;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
@@ -41,7 +43,7 @@ public class DistributedStateCreator {
 
     // Create containers that make up the backplane
     state.casWorkerMap = createCasWorkerMap(config);
-    state.actionCache = createActionCache(config);
+    state.actionCache = createActionCache(client, config);
     state.prequeue = createPrequeue(client, config);
     state.operationQueue = createOperationQueue(client, config);
     state.blockedActions = new RedisMap(config.getActionBlacklistPrefix());
@@ -54,6 +56,16 @@ public class DistributedStateCreator {
     return state;
   }
 
+  private static ShardActionCache createActionCache(
+      RedisClient client, RedisShardBackplaneConfig config) {
+    return new ShardActionCache(
+        client,
+        config.getActionCachePrefix(),
+        config.getActionCacheExpire(),
+        config.getActionCacheLocalSize(),
+        MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
+  }
+
   private static CasWorkerMap createCasWorkerMap(RedisShardBackplaneConfig config) {
     if (config.getCacheCas()) {
       RedissonClient redissonClient = createRedissonClient();
@@ -61,10 +73,6 @@ public class DistributedStateCreator {
     } else {
       return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
     }
-  }
-
-  private static RedisMap createActionCache(RedisShardBackplaneConfig config) {
-    return new RedisMap(config.getActionCachePrefix());
   }
 
   private static RedissonClient createRedissonClient() {

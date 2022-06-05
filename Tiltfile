@@ -42,6 +42,7 @@ custom_build(
 )
 
 local_resource("unit tests",'bazel test --javabase=@bazel_tools//tools/jdk:remote_jdk11 //src/test/java/...')
+local_resource("redis integration tests",'bazel test --test_tag_filters=redis --javabase=@bazel_tools//tools/jdk:remote_jdk11 //src/test/java/...')
 
 # Object definitions for kubernetes.
 # Tilt will automatically correlate them to any above docker images.

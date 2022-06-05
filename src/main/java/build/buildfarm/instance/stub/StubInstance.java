@@ -896,6 +896,9 @@ public class StubInstance implements Instance {
     return results;
   }
 
+  @Override
+  public void clearActionCache() {}
+
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void deregisterWorker(String workerName) {

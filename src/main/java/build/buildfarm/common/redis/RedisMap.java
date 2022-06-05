@@ -15,8 +15,12 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.ScanCount;
+import java.util.List;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
+import redis.clients.jedis.ScanParams;
+import redis.clients.jedis.ScanResult;
 
 /**
  * @class RedisMap
@@ -99,6 +103,41 @@ public class RedisMap {
   }
 
   /**
+   * @brief Remove all the elements from the map.
+   * @details Deletes all the key/value pairs.
+   * @param jedis Jedis cluster client.
+   */
+  public void clear(JedisCluster jedis) {
+    jedis
+        .getClusterNodes()
+        .values()
+        .forEach(
+            pool -> {
+              try (Jedis node = pool.getResource()) {
+                // construct query
+                ScanParams params = new ScanParams();
+                params.match(allKeyNames());
+                params.count(1000);
+
+                // iterate over all entries via scanning
+                String cursor = "0";
+                ScanResult scanResult;
+                do {
+                  scanResult = node.scan(cursor, params);
+                  if (scanResult != null) {
+                    List<String> keyResults = scanResult.getResult();
+                    for (String key : keyResults) {
+                      jedis.del(key);
+                    }
+                    cursor = scanResult.getCursor();
+                  }
+
+                } while (!cursor.equals("0"));
+              }
+            });
+  }
+
+  /**
    * @brief Get the value of the key.
    * @details If the key does not exist, null is returned.
    * @param jedis Jedis cluster client.
@@ -142,5 +181,15 @@ public class RedisMap {
    */
   private String createKeyName(String keyName) {
     return name + ":" + keyName;
+  }
+
+  /**
+   * @brief The wildcard expression to all map key names.
+   * @details Used for running commands on all of the keys. For example: deleting.
+   * @return The expression to match with all key names.
+   * @note Suggested return identifier: allKeyNames.
+   */
+  private String allKeyNames() {
+    return name + ":*";
   }
 }

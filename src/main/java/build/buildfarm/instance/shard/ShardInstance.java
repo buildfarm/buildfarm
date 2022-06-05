@@ -161,8 +161,6 @@ public class ShardInstance extends AbstractServerInstance {
   private static final String TIMEOUT_OUT_OF_BOUNDS =
       "A timeout specified is out of bounds with a configured range";
 
-  private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
-
   // Prometheus metrics
   private static final Counter executionSuccess =
       Counter.build().name("execution_success").help("Execution success.").register();
@@ -199,7 +197,6 @@ public class ShardInstance extends AbstractServerInstance {
   private final Runnable onStop;
   private final long maxEntrySizeBytes;
   private final Backplane backplane;
-  private final ReadThroughActionCache readThroughActionCache;
   private final RemoteInputStreamFactory remoteInputStreamFactory;
   private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
   private final Thread dispatchedMonitor;
@@ -278,8 +275,6 @@ public class ShardInstance extends AbstractServerInstance {
         name,
         digestUtil,
         backplane,
-        new ShardActionCache(
-            DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE, backplane, actionCacheFetchService),
         config.getRunDispatchedMonitor(),
         config.getDispatchedMonitorIntervalSeconds(),
         config.getRunOperationQueuer(),
@@ -298,7 +293,6 @@ public class ShardInstance extends AbstractServerInstance {
       String name,
       DigestUtil digestUtil,
       Backplane backplane,
-      ReadThroughActionCache readThroughActionCache,
       boolean runDispatchedMonitor,
       int dispatchedMonitorIntervalSeconds,
       boolean runOperationQueuer,
@@ -315,13 +309,12 @@ public class ShardInstance extends AbstractServerInstance {
         name,
         digestUtil,
         /* contentAddressableStorage=*/ null,
-        /* actionCache=*/ readThroughActionCache,
+        /* actionCache=*/ null,
         /* outstandingOperations=*/ null,
         /* completedOperations=*/ null,
         /* activeBlobWrites=*/ null,
         ensureOutputsPresent);
     this.backplane = backplane;
-    this.readThroughActionCache = readThroughActionCache;
     this.workerStubs = workerStubs;
     this.onStop = onStop;
     this.maxEntrySizeBytes = maxEntrySizeBytes;
@@ -484,6 +477,31 @@ public class ShardInstance extends AbstractServerInstance {
               }
             },
             "Prometheus Metrics Collector");
+  }
+
+  @Override
+  public ListenableFuture<ActionResult> getActionResult(
+      ActionKey actionKey, RequestMetadata requestMetadata) {
+    // ListenableFuture<ActionResult> result = checkNotNull(readThroughActionCache.get(actionKey));
+    ListenableFuture<ActionResult> result = immediateFuture(null);
+    try {
+      result = immediateFuture(backplane.getActionResult(actionKey));
+      return extendWithEnsureOutputsCheck(result, requestMetadata);
+    } catch (Exception e) {
+      return result;
+    }
+  }
+
+  @Override
+  public void putActionResult(ActionKey actionKey, ActionResult actionResult)
+      throws InterruptedException {
+    try {
+      if (actionResult.getExitCode() == 0) {
+        backplane.putActionResult(actionKey, actionResult);
+      }
+    } catch (IOException e) {
+      logger.log(Level.SEVERE, "actionKey not stored in ActionCache", e);
+    }
   }
 
   private void updateQueueSizes(List<QueueStatus> queues) {
@@ -1770,11 +1788,11 @@ public class ShardInstance extends AbstractServerInstance {
         if (operation != null && writeThrough) {
           ActionResult actionResult = getCacheableActionResult(operation);
           if (actionResult != null) {
-            readThroughActionCache.readThrough(actionKey, actionResult);
+            backplane.readThrough(actionKey, actionResult);
           } else if (wasCompletelyExecuted(operation)) {
             // we want to avoid presenting any results for an action which
             // was not completely executed
-            readThroughActionCache.invalidate(actionKey);
+            backplane.invalidate(actionKey);
           }
         }
         if (operation != null && operation.getMetadata().is(Action.class)) {
@@ -1819,7 +1837,7 @@ public class ShardInstance extends AbstractServerInstance {
               .append(DigestUtil.toString(actionDigest))
               .toString());
 
-      readThroughActionCache.invalidate(DigestUtil.asActionKey(actionDigest));
+      backplane.invalidate(DigestUtil.asActionKey(actionDigest));
       if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
         logger.log(
             Level.FINE,
@@ -2088,7 +2106,7 @@ public class ShardInstance extends AbstractServerInstance {
                     throw Status.NOT_FOUND.asException();
                   } else if (action.getDoNotCache()) {
                     // invalidate our action cache result as well as watcher owner
-                    readThroughActionCache.invalidate(DigestUtil.asActionKey(actionDigest));
+                    backplane.invalidate(DigestUtil.asActionKey(actionDigest));
                     backplane.putOperation(
                         operation.toBuilder().setMetadata(Any.pack(action)).build(),
                         metadata.getStage());
@@ -2474,6 +2492,15 @@ public class ShardInstance extends AbstractServerInstance {
   public void deregisterWorker(String workerName) {
     try {
       backplane.deregisterWorker(workerName);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  @Override
+  public void clearActionCache() {
+    try {
+      backplane.clearActionCache();
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

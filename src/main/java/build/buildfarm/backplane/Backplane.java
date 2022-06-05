@@ -98,18 +98,11 @@ public interface Backplane {
    *
    * <p>Retrieves and returns an action result from the hash map.
    */
-  ActionResult getActionResult(ActionKey actionKey) throws IOException;
+  ActionResult getActionResult(ActionKey actionKey) throws Exception;
 
-  /**
-   * The AC stores full ActionResult objects in a hash map where the key is the digest of the action
-   * result and the value is the actual ActionResult object.
-   *
-   * <p>Remove an action result from the hash map.
-   */
-  void removeActionResult(ActionKey actionKey) throws IOException;
+  void invalidate(ActionKey actionKey);
 
-  /** Bulk remove action results */
-  void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException;
+  void readThrough(ActionKey actionKey, ActionResult actionResult);
 
   /**
    * Identify an action that should not be executed, and respond to all requests it matches with
@@ -266,4 +259,6 @@ public interface Backplane {
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
 
   GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) throws IOException;
+
+  void clearActionCache() throws IOException;
 }
