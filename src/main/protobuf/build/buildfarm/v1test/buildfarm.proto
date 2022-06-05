@@ -523,6 +523,9 @@ message RedisShardBackplaneConfig {
 
   // L1 in memory cache size
   int32 action_cache_local_size = 37;
+  
+  // L1 in memory cache size
+  string action_cache_http_bucket_key = 38;
 
   // the prefix of keys which identify actions that are to be rejected
   // from any request endpoint

@@ -36,6 +36,8 @@ import io.grpc.Status;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import redis.clients.jedis.JedisCluster;
+import build.buildfarm.common.grpc.TracingMetadataUtils;
+import build.bazel.remote.execution.v2.Platform.Property;
 
 public class ShardActionCache {
   // L1 in-memory readthrough cache
@@ -44,14 +46,17 @@ public class ShardActionCache {
   // L2 distributed cache
   private final RedisMap actionCache;
   private final int actionCacheExpire;
+  private final String bucketHttpHeader;
 
   public ShardActionCache(
       RedisClient client,
       String cachePrefix,
       int actionCacheExpire,
       int maxLocalCacheSize,
+      String bucketHttpHeader,
       ListeningExecutorService service) {
     this.actionCacheExpire = actionCacheExpire;
+    this.bucketHttpHeader = bucketHttpHeader;
     readThroughCache = createReadThroughCache(client, service, maxLocalCacheSize);
     actionCache = new RedisMap(cachePrefix);
   }
@@ -146,6 +151,30 @@ public class ShardActionCache {
   }
 
   private String asDigestStr(ActionKey actionKey) {
-    return DigestUtil.toString(actionKey.getDigest());
+    String key = DigestUtil.toString(actionKey.getDigest());
+    
+    // Bucketing is the concept of ensuring that action results are only seen by certain clients.  This is a way of giving different groups of users separate caches.
+    // For example, you may have a development environment and production environment, and you may want to avoid the dev env from affecting prod.
+    // This was considered a security issue.  By accepting a token through an http header, we can modify the keys so that they are bucketed.
+    key = ApplyBucket(key);
+    return key;
   }
+  
+  private String ApplyBucket(String key) {
+    
+   Property bucketProperty = TracingMetadataUtils.headersFromCurrentContext().stream()
+  .filter(property -> bucketHttpHeader.equals(property.getName()))
+  .findAny()
+  .orElse(null);
+  
+  String bucketName = "";
+  if (bucketProperty != null){
+    bucketName = bucketProperty.getValue() + "_";
+  }
+  
+  return bucketName + key;
+    
+  }
+  
+  
 }

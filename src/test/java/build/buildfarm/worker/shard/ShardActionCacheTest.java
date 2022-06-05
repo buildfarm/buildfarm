@@ -43,6 +43,7 @@ public class ShardActionCacheTest {
         "action-cache",
         10000,
         10000,
+        "bucketKey",
         MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
   }
 
@@ -59,6 +60,7 @@ public class ShardActionCacheTest {
             "action-cache",
             10000,
             10000,
+            "bucketKey",
             MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
 
     // Add an element
@@ -117,6 +119,7 @@ public class ShardActionCacheTest {
             "action-cache",
             10000,
             10000,
+            "bucketKey",
             MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
 
     // Add an element
@@ -161,6 +164,7 @@ public class ShardActionCacheTest {
             "action-cache",
             10000,
             10000,
+            "bucketKey",
             MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
 
     // ACT
@@ -191,6 +195,7 @@ public class ShardActionCacheTest {
             "action-cache",
             10000,
             10000,
+            "bucketKey",
             MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
 
     // ACT
@@ -216,6 +221,7 @@ public class ShardActionCacheTest {
             "action-cache",
             10000,
             10000,
+            "bucketKey",
             MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
 
     DigestUtil digestUtil = DigestUtil.forHash("SHA256");
@@ -249,6 +255,7 @@ public class ShardActionCacheTest {
             "action-cache",
             10000,
             10000,
+            "bucketKey",
             MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
 
     DigestUtil digestUtil = DigestUtil.forHash("SHA256");
@@ -280,6 +287,7 @@ public class ShardActionCacheTest {
             "action-cache",
             10000,
             10000,
+            "bucketKey",
             MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
 
     DigestUtil digestUtil = DigestUtil.forHash("SHA256");
@@ -311,6 +319,7 @@ public class ShardActionCacheTest {
             "action-cache",
             10000,
             10000,
+            "bucketKey",
             MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
 
     // ACT
@@ -342,6 +351,7 @@ public class ShardActionCacheTest {
             "action-cache",
             10000,
             10000,
+            "bucketKey",
             MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
 
     // ACT

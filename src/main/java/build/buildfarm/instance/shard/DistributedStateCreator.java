@@ -63,6 +63,7 @@ public class DistributedStateCreator {
         config.getActionCachePrefix(),
         config.getActionCacheExpire(),
         config.getActionCacheLocalSize(),
+        config.getActionCacheHttpBucketKey(),
         MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24)));
   }
 
