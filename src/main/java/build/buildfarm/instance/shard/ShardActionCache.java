@@ -40,6 +40,7 @@ import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.bazel.remote.execution.v2.Platform.Property;
 
 public class ShardActionCache {
+  
   // L1 in-memory readthrough cache
   private final AsyncLoadingCache<ActionKey, ActionResult> readThroughCache;
 
@@ -161,6 +162,13 @@ public class ShardActionCache {
   }
   
   private String ApplyBucket(String key) {
+    
+    
+   //debug
+    System.out.println("HTTP HEADERS:");
+   for (Property property: TracingMetadataUtils.headersFromCurrentContext()){
+      System.out.println(property.getName() + ": " + property.getValue());
+   }
     
    Property bucketProperty = TracingMetadataUtils.headersFromCurrentContext().stream()
   .filter(property -> bucketHttpHeader.equals(property.getName()))
