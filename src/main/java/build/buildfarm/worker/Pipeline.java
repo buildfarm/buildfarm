@@ -102,6 +102,10 @@ public class Pipeline {
     return true;
   }
 
+  public boolean hasStages() {
+    return !stageThreads.isEmpty();
+  }
+
   public void join() throws InterruptedException {
     synchronized (this) {
       joiningThread = Thread.currentThread();

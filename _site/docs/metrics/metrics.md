@@ -159,11 +159,11 @@ Histogram for the input fetch stall time on a worker (in milliseconds)
 
 **queued_time_ms**
 
-Summary for the operation queued time (in milliseconds)
+Histogram for the operation queued time (in milliseconds)
 
 **output_upload_time_ms**
 
-Summary for the output upload time (in milliseconds)
+Histogram for the output upload time (in milliseconds)
 
 **completed_operations**
 
@@ -188,3 +188,9 @@ Total size of the worker's CAS in bytes
 **cas_entry_count**
 
 The total number of entries in the worker's CAS
+
+Java interceptors can be used to monitor Grpc services using Prometheus.  To enable [these metrics](https://github.com/grpc-ecosystem/java-grpc-prometheus), add the following configuration to your server:
+```
+grpc_metrics: {
+  enabled: True
+```

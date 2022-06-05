@@ -54,6 +54,7 @@ import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.FilesystemCASConfig;
+import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.worker.DequeueMatchSettings;
@@ -142,6 +143,7 @@ public class Worker extends LoggingMain {
   private final boolean hasExecutionCapability;
 
   private boolean inGracefulShutdown = false;
+  private boolean isPaused = false;
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
@@ -156,8 +158,6 @@ public class Worker extends LoggingMain {
   private final Pipeline pipeline;
   private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
-
-  public class CasReplicationStage extends PipelineStage.NullStage {};
 
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
@@ -194,7 +194,9 @@ public class Worker extends LoggingMain {
 
   class RemoteCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
-      insertFileToCasMember(digest, file);
+      if (digest.getSizeBytes() > 0) {
+        insertFileToCasMember(digest, file);
+      }
     }
 
     private void insertFileToCasMember(Digest digest, Path file)
@@ -463,9 +465,10 @@ public class Worker extends LoggingMain {
             instance,
             config.getDefaultActionTimeout(),
             config.getMaximumActionTimeout(),
-            config.getLimitExecution(),
+            config.getDefaultMaxCores(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
+            config.getAllowBringYourOwnContainer(),
             config.getErrorOperationRemainingResources(),
             writer);
 
@@ -490,8 +493,7 @@ public class Worker extends LoggingMain {
     // We will build a worker's server based on it's capabilities.
     // A worker that is capable of execution will construct an execution pipeline.
     // It will use various execution phases for it's profile service.
-    // On the other hand, a worker that is only capable of CAS storage will construct a pipeline for
-    // storage replication.
+    // On the other hand, a worker that is only capable of CAS storage does not need a pipeline.
     if (hasExecutionCapability) {
       PipelineStage completeStage =
           new PutOperationStage((operation) -> context.deactivate(operation.getName()));
@@ -511,9 +513,6 @@ public class Worker extends LoggingMain {
       serverBuilder.addService(
           new WorkerProfileService(
               storage, inputFetchStage, executeActionStage, context, completeStage, backplane));
-    } else {
-      PipelineStage casReplicationStage = new CasReplicationStage();
-      pipeline.add(casReplicationStage, 1);
     }
 
     return serverBuilder.build();
@@ -738,6 +737,7 @@ public class Worker extends LoggingMain {
         fileCache,
         owner,
         config.getLinkInputDirectories(),
+        config.getRealInputDirectoriesList(),
         removeDirectoryService,
         accessRecorder
         /* deadlineAfter=*/
@@ -819,10 +819,16 @@ public class Worker extends LoggingMain {
   private void blockUntilShutdown() throws InterruptedException {
     // should really be waiting for either server or pipeline shutdown
     try {
-      pipeline.join();
+      if (pipeline.hasStages() || hasExecutionCapability) {
+        pipeline.join();
+      } else {
+        logger.log(INFO, "No pipeline stages.  Block until interruption.");
+        while (!Thread.interrupted()) {}
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+    logger.log(INFO, "Shutting down because pipeline finished.");
     stop();
   }
 
@@ -868,6 +874,28 @@ public class Worker extends LoggingMain {
     throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
+  private void runIndexerForWorker() {
+    String clusterEndpoint = config.getAdminConfig().getClusterEndpoint();
+    if (clusterEndpoint.isEmpty()) {
+      logger.warning("Cluster endpoint is not set. Indexer will not run.");
+      return;
+    }
+    ManagedChannel channel = null;
+    try {
+      NettyChannelBuilder builder =
+          NettyChannelBuilder.forTarget(clusterEndpoint).negotiationType(NegotiationType.PLAINTEXT);
+      channel = builder.build();
+      AdminGrpc.AdminFutureStub adminFuture = AdminGrpc.newFutureStub(channel);
+      adminFuture.reindexCas(
+          ReindexCasRequest.newBuilder().setHostId(config.getPublicName()).build());
+      logger.info("Running Indexer for paused worker: " + config.getPublicName());
+    } finally {
+      if (channel != null) {
+        channel.shutdown();
+      }
+    }
+  }
+
   private void startFailsafeRegistration() {
     String endpoint = config.getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
@@ -888,16 +916,17 @@ public class Worker extends LoggingMain {
               boolean isWorkerPausedFromNewWork() {
                 try {
                   File pausedFile = new File(config.getRoot() + "/.paused");
-                  if (pausedFile.exists()) {
+                  if (pausedFile.exists() && !isPaused) {
+                    isPaused = true;
                     logger.log(Level.INFO, "The current worker is paused from taking on new work!");
                     pipeline.stopMatchingOperations();
                     workerPausedMetric.inc();
-                    return true;
+                    runIndexerForWorker();
                   }
                 } catch (Exception e) {
                   logger.log(Level.WARNING, "Could not open .paused file.", e);
                 }
-                return false;
+                return isPaused;
               }
 
               void registerIfExpired() {

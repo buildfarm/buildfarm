@@ -27,7 +27,7 @@ import redis.clients.jedis.JedisCluster;
  *     Therefore, two redis queues with the same name, would in fact be the same underlying redis
  *     queue.
  */
-public class RedisQueue {
+public class RedisQueue extends QueueInterface {
   /**
    * @field name
    * @brief The unique name of the queue.
@@ -42,6 +42,9 @@ public class RedisQueue {
    * @param name The global name of the queue.
    */
   public RedisQueue(String name) {
+    // In order for dequeue properly, the queue needs o have a hashtag.  Otherwise it will error
+    // with: "No way to dispatch this command to Redis Cluster because keys have different slots."
+    // when trying to brpoplpush. If no hashtag was given we provide a default.
     this.name = name;
   }
 
@@ -51,6 +54,15 @@ public class RedisQueue {
    * @param val The value to push onto the queue.
    */
   public void push(JedisCluster jedis, String val) {
+    push(jedis, val, 1);
+  }
+
+  /**
+   * @brief Push a value onto the queue.
+   * @details Adds the value into the backend redis queue.
+   * @param val The value to push onto the queue.
+   */
+  public void push(JedisCluster jedis, String val, double priority) {
     jedis.lpush(name, val);
   }
 

@@ -23,7 +23,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
-import build.buildfarm.common.UrlPath.ResourceOperation;
+import build.buildfarm.common.resources.Resource;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
@@ -129,8 +129,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
 
     try {
-      ResourceOperation resourceOperation = detectResourceOperation(resourceName);
-      if (resourceOperation == ResourceOperation.Blob) {
+      Resource.TypeCase resourceOperation = detectResourceOperation(resourceName);
+      if (resourceOperation == Resource.TypeCase.DOWNLOAD_BLOB_REQUEST) {
         readBlob(request, responseObserver);
       } else {
         throw new InvalidResourceNameException(resourceName, "Unsupported service");
@@ -165,11 +165,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       return write;
     }
 
-    ResourceOperation resourceOperation = detectResourceOperation(resourceName);
+    Resource.TypeCase resourceOperation = detectResourceOperation(resourceName);
     switch (resourceOperation) {
-      case UploadBlob:
+      case UPLOAD_BLOB_REQUEST:
         return findBlobWrite(resourceName);
-      case OperationStream:
+      case STREAM_OPERATION_REQUEST:
       default:
         throw Status.INVALID_ARGUMENT.asRuntimeException();
     }
@@ -209,11 +209,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
   private WriteObserver createWriteObserver(String resourceName)
       throws InvalidResourceNameException {
-    ResourceOperation resourceOperation = detectResourceOperation(resourceName);
+    Resource.TypeCase resourceOperation = detectResourceOperation(resourceName);
     switch (resourceOperation) {
-      case UploadBlob:
+      case UPLOAD_BLOB_REQUEST:
         return new BlobWriteObserver(resourceName, simpleBlobStore);
-      case OperationStream:
+      case STREAM_OPERATION_REQUEST:
       default:
         throw Status.INVALID_ARGUMENT.asRuntimeException();
     }
