@@ -842,7 +842,16 @@ public abstract class AbstractServerInstance implements Instance {
         String subDirectoryPath =
             directoryPath.isEmpty() ? directoryName : (directoryPath + "/" + directoryName);
         onInputDirectory.accept(subDirectoryPath);
-        if (!visited.contains(directoryDigest)) {
+        if (visited.contains(directoryDigest)) {
+          Directory subDirectory;
+          if (directoryDigest.getSizeBytes() == 0) {
+            subDirectory = Directory.getDefaultInstance();
+          } else {
+            subDirectory = directoriesIndex.get(directoryDigest);
+          }
+          enumerateActionInputDirectory(
+              subDirectoryPath, subDirectory, directoriesIndex, onInputFile, onInputDirectory);
+        } else {
           validateActionInputDirectoryDigest(
               subDirectoryPath,
               directoryDigest,
@@ -853,13 +862,6 @@ public abstract class AbstractServerInstance implements Instance {
               onInputDirectory,
               onInputDigest,
               preconditionFailure);
-        } else {
-          enumerateActionInputDirectory(
-              subDirectoryPath,
-              directoriesIndex.get(directoryDigest),
-              directoriesIndex,
-              onInputFile,
-              onInputDirectory);
         }
       }
     }
