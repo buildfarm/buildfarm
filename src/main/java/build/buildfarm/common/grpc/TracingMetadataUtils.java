@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.grpc;
 
+import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import com.google.common.annotations.VisibleForTesting;
 import io.grpc.ClientInterceptor;
@@ -26,6 +27,7 @@ import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 import io.grpc.protobuf.ProtoUtils;
 import io.grpc.stub.MetadataUtils;
+import java.util.ArrayList;
 import javax.annotation.Nullable;
 
 /** Utility functions to handle Metadata for remote Grpc calls. */
@@ -34,6 +36,8 @@ public class TracingMetadataUtils {
 
   private static final Context.Key<RequestMetadata> CONTEXT_KEY =
       Context.key("remote-grpc-metadata");
+
+  private static ArrayList<Property> capturedHeaders = new ArrayList<>();
 
   @VisibleForTesting
   public static final Metadata.Key<RequestMetadata> METADATA_KEY =
@@ -45,7 +49,12 @@ public class TracingMetadataUtils {
     if (metadata == null) {
       metadata = RequestMetadata.getDefaultInstance();
     }
+
     return metadata;
+  }
+
+  public static ArrayList<Property> headersFromCurrentContext() {
+    return capturedHeaders;
   }
 
   /**
@@ -71,8 +80,25 @@ public class TracingMetadataUtils {
       if (meta == null) {
         meta = RequestMetadata.getDefaultInstance();
       }
+
+      capturedHeaders = extractHeaders(headers);
+
       Context ctx = Context.current().withValue(CONTEXT_KEY, meta);
       return Contexts.interceptCall(ctx, call, headers, next);
+    }
+
+    private static ArrayList<Property> extractHeaders(Metadata headers) {
+      ArrayList<Property> capturedHeaders = new ArrayList<>();
+      for (String key : headers.keys()) {
+        if (!key.endsWith(Metadata.BINARY_HEADER_SUFFIX)) {
+          String val = headers.get(Metadata.Key.of(key, Metadata.ASCII_STRING_MARSHALLER));
+          Property.Builder property = Property.newBuilder();
+          property.setName(key);
+          property.setValue(val);
+          capturedHeaders.add(property.build());
+        }
+      }
+      return capturedHeaders;
     }
   }
 }

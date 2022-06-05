@@ -18,6 +18,7 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.MapUtils;
+import build.buildfarm.common.grpc.TracingMetadataUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -72,6 +73,10 @@ public class ExecutionPropertiesParser {
         .getPlatform()
         .getPropertiesList()
         .forEach((property) -> evaluateProperty(parser, limits, property));
+
+    TracingMetadataUtils.headersFromCurrentContext()
+        .forEach((property) -> evaluateProperty(parser, limits, property));
+
     return limits;
   }
 
