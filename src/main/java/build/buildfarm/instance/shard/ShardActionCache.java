@@ -165,10 +165,10 @@ public class ShardActionCache {
     
     
    //debug
-    System.out.println("HTTP HEADERS:");
-   for (Property property: TracingMetadataUtils.headersFromCurrentContext()){
-      System.out.println(property.getName() + ": " + property.getValue());
-   }
+   //  System.out.println("HTTP HEADERS:");
+   // for (Property property: TracingMetadataUtils.headersFromCurrentContext()){
+   //    System.out.println(property.getName() + ": " + property.getValue());
+   // }
     
    Property bucketProperty = TracingMetadataUtils.headersFromCurrentContext().stream()
   .filter(property -> bucketHttpHeader.equals(property.getName()))
