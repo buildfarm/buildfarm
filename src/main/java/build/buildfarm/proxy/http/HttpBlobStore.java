@@ -179,7 +179,15 @@ public final class HttpBlobStore implements SimpleBlobStore {
       @Nullable final Credentials creds,
       @Nullable SocketAddress socketAddress)
       throws URISyntaxException, SSLException {
-        this(newEventLoopGroup, channelClass, uri, timeoutMillis, remoteMaxConnections, false, creds, socketAddress);
+    this(
+        newEventLoopGroup,
+        channelClass,
+        uri,
+        timeoutMillis,
+        remoteMaxConnections,
+        false,
+        creds,
+        socketAddress);
   }
 
   private HttpBlobStore(
