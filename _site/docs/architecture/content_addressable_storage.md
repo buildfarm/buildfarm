@@ -69,7 +69,7 @@ The HTTP/1 CAS proxy hosts a GRPC service definition for a configurable target H
 
 Since the HTTP/1 proxy is a separate process, there are no configuration options for it. Instead, run the proxy in a known location (address and port), and use a grpc configuration indicated above, pointing to its address and instance name. The proxy can be run with:
 
-`bazel run //src/main/java/build/buildfarm:buildfarm-http-proxy -- -p 8081 -c "http://your-http-endpoint"`
+`bazel run src/main/java/build/buildfarm/tools:buildfarm-http-proxy -- -p 8081 -c "http://your-http-endpoint" --noreadonly`
 
 And will result in a listening grpc service on port 8081 on all interfaces, relaying requests to the endpoint in question. Use `--help` to see more options.
 
