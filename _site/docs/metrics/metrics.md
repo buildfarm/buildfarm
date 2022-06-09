@@ -159,11 +159,11 @@ Histogram for the input fetch stall time on a worker (in milliseconds)
 
 **queued_time_ms**
 
-Summary for the operation queued time (in milliseconds)
+Histogram for the operation queued time (in milliseconds)
 
 **output_upload_time_ms**
 
-Summary for the output upload time (in milliseconds)
+Histogram for the output upload time (in milliseconds)
 
 **completed_operations**
 

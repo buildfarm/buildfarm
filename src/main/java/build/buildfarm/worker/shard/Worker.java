@@ -194,7 +194,9 @@ public class Worker extends LoggingMain {
 
   class RemoteCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
-      insertFileToCasMember(digest, file);
+      if (digest.getSizeBytes() > 0) {
+        insertFileToCasMember(digest, file);
+      }
     }
 
     private void insertFileToCasMember(Digest digest, Path file)
@@ -817,11 +819,11 @@ public class Worker extends LoggingMain {
   private void blockUntilShutdown() throws InterruptedException {
     // should really be waiting for either server or pipeline shutdown
     try {
-      if (pipeline.hasStages()) {
+      if (pipeline.hasStages() || hasExecutionCapability) {
         pipeline.join();
       } else {
         logger.log(INFO, "No pipeline stages.  Block until interruption.");
-        while (!Thread.interrupted()) {}
+        server.awaitTermination();
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

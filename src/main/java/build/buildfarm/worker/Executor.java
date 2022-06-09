@@ -30,6 +30,7 @@ import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.common.ProcessUtils;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
@@ -66,8 +67,6 @@ import java.util.logging.Logger;
 class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
   private static final Logger logger = Logger.getLogger(Executor.class.getName());
-
-  private static final Object execLock = new Object();
 
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
@@ -452,9 +451,7 @@ class Executor {
     long startNanoTime = System.nanoTime();
     Process process;
     try {
-      synchronized (execLock) {
-        process = processBuilder.start();
-      }
+      process = ProcessUtils.threadSafeStart(processBuilder);
       process.getOutputStream().close();
     } catch (IOException e) {
       logger.log(Level.SEVERE, format("error starting process for %s", operationName), e);
