@@ -28,6 +28,7 @@ import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
+import java.util.function.Supplier;
 
 public class RedisClient implements Closeable {
   private static final String MISCONF_RESPONSE = "MISCONF";
@@ -56,12 +57,18 @@ public class RedisClient implements Closeable {
     }
   }
 
-  private final JedisCluster jedis;
+  private Supplier<JedisCluster> jedisClusterFactory;
+  private JedisCluster jedis;
 
   private boolean closed = false;
 
   public RedisClient(JedisCluster jedis) {
     this.jedis = jedis;
+  }
+  
+  public RedisClient(JedisCluster jedis, Supplier<JedisCluster> jedisClusterFactory) {
+    this.jedis = jedis;
+    this.jedisClusterFactory = jedisClusterFactory;
   }
 
   @Override
@@ -130,8 +137,21 @@ public class RedisClient implements Closeable {
       catch (Exception e){
         System.out.println("Failure in RedisClient::call");
         System.out.println(e.toString());
+        rebuildJedisCluser();
       }
     }
+    
+  }
+  
+  private void rebuildJedisCluser(){
+        try {
+          System.out.println("Rebuilding redis client");
+           jedis = jedisClusterFactory.get();
+        }
+        catch (Exception e){
+          System.out.println("Failed to rebuild redis client");
+          System.out.println(e.toString());
+        }
     
   }
 
