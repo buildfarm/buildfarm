@@ -37,7 +37,7 @@ public class Slots {
 
   // The current number of claims currently held by all the jobs.  Keep in mind, that claims amount
   // isn't necessarily job amount.
-  public Semaphore claims = new Semaphore(1);
+  public Semaphore claims;
 
   // The number of concurrent jobs running.  Should this be a thread pool?
   public Set<Thread> jobs = Sets.newHashSet();
