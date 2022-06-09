@@ -102,13 +102,13 @@ def buildfarm_init(name = "buildfarm"):
                         "io.github.lognet:grpc-spring-boot-starter:4.5.4",
                         "org.bouncycastle:bcprov-jdk15on:1.70",
                         "net.jcip:jcip-annotations:1.0",
-                    ] + ["io.netty:netty-%s:4.1.65.Final" % module for module in IO_NETTY_MODULES] +
+                    ] + ["io.netty:netty-%s:4.1.68.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
                     [
                         "io.prometheus:simpleclient:0.10.0",
                         "io.prometheus:simpleclient_hotspot:0.10.0",
                         "io.prometheus:simpleclient_httpserver:0.10.0",
-                        "junit:junit:4.12",
+                        "junit:junit:4.13.1",
                         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
                         "org.apache.commons:commons-compress:1.21",
                         "org.apache.commons:commons-pool2:2.9.0",
