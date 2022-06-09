@@ -44,6 +44,13 @@ public class HttpProxyOptions extends OptionsBase {
   public String httpCache;
 
   @Option(
+      name = "readonly",
+      abbrev = 'r',
+      defaultValue = "true",
+      help = "Whether or not the http_cache is read-only. Defaults to true.")
+  public boolean readOnly;
+
+  @Option(
       name = "tree_default_page_size",
       defaultValue = "1024",
       help = "The default number of directories per tree page.")

@@ -268,7 +268,7 @@ java_binary(
 
 java_binary(
     name = "buildfarm-http-proxy",
-    main_class = "build.buildfarm.tools.proxy.http.HttpProxy",
+    main_class = "build.buildfarm.proxy.http.HttpProxy",
     visibility = ["//visibility:public"],
     runtime_deps = ["//src/main/java/build/buildfarm/proxy/http"],
 )
