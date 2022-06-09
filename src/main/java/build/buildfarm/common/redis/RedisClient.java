@@ -29,8 +29,13 @@ import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
 import java.util.function.Supplier;
+import io.prometheus.client.Counter;
 
 public class RedisClient implements Closeable {
+
+  private static final Counter redisErrorCounter = Counter.build().name("redis_client_error").help("Count of redis client failures").register();
+  private static final Counter redisClientRebuildErrorCounter = Counter.build().name("redis_client_rebuild_error").help("Count of failures rebuilding redis client").register();
+      
   private static final String MISCONF_RESPONSE = "MISCONF";
 
   @FunctionalInterface
@@ -135,6 +140,7 @@ public class RedisClient implements Closeable {
         return result;
       }
       catch (Exception e){
+        redisErrorCounter.inc();
         System.out.println("Failure in RedisClient::call");
         System.out.println(e.toString());
         rebuildJedisCluser();
@@ -149,6 +155,7 @@ public class RedisClient implements Closeable {
            jedis = jedisClusterFactory.get();
         }
         catch (Exception e){
+          redisClientRebuildErrorCounter.inc();
           System.out.println("Failed to rebuild redis client");
           System.out.println(e.toString());
         }
