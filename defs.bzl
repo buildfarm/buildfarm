@@ -72,7 +72,7 @@ def buildfarm_init(name = "buildfarm"):
     maven_install(
         artifacts = ["com.amazonaws:aws-java-sdk-%s:1.11.729" % module for module in COM_AWS_MODULES] +
                     [
-                        "com.fasterxml.jackson.core:jackson-databind:2.9.8",
+                        "com.fasterxml.jackson.core:jackson-databind:2.13.3",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
                         "com.github.docker-java:docker-java:3.2.11",
                         "com.github.jnr:jffi:1.2.16",
@@ -86,7 +86,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.auth:google-auth-library-credentials:0.9.1",
                         "com.google.auth:google-auth-library-oauth2-http:0.9.1",
                         "com.google.code.findbugs:jsr305:3.0.1",
-                        "com.google.code.gson:gson:2.8.6",
+                        "com.google.code.gson:gson:2.9.0",
                         "com.google.errorprone:error_prone_annotations:2.9.0",
                         "com.google.errorprone:error_prone_core:0.92",
                         "com.google.guava:failureaccess:1.0.1",
