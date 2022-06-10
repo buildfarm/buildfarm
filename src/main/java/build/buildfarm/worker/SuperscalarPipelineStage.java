@@ -15,7 +15,6 @@
 package build.buildfarm.worker;
 
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 abstract class SuperscalarPipelineStage extends PipelineStage {

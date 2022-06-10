@@ -21,12 +21,11 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Semaphore;
 
 public class Slots {
-  
-  public Slots(int width){
+  public Slots(int width) {
     this.width = width;
     this.claims = new Semaphore(width, true);
   }
-  
+
   // Each stage has an input context queue.  These contexts are evaluated to become jobs that take
   // claims.
   public BlockingQueue<OperationContext> intake = new ArrayBlockingQueue<>(1);
