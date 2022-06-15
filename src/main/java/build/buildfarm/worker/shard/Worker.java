@@ -823,7 +823,7 @@ public class Worker extends LoggingMain {
         pipeline.join();
       } else {
         logger.log(INFO, "No pipeline stages.  Block until interruption.");
-        while (!Thread.interrupted()) {}
+        server.awaitTermination();
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
