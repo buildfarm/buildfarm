@@ -139,6 +139,7 @@ init_grpc_parser
 
 echo "Kkosev test"
 pwd
+ls -al
 #Run a test against the cluster
 $RUN_TEST $TEST_ARG1 $TEST_ARG2
 
