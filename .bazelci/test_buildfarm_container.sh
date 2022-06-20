@@ -14,8 +14,8 @@ BUILDFARM_WORKER_CONFIG="/buildfarm/examples/worker.config.example"
 BUILDFARM_SHARD_SERVER_CONFIG="/buildfarm/examples/shard-server.config.example"
 BUILDFARM_SHARD_WORKER_CONFIG="/buildfarm/examples/shard-worker.config.example"
 
-GRPC_LOGS1="src/test/many/parsed-grpc.log"
-GRPC_LOGS2="src/test/many/parsed-grpc2.log"
+GRPC_LOGS1="/tmp/parsed-grpc.log"
+GRPC_LOGS2="/tmp/parsed-grpc2.log"
 
 ensure_server_is_up(){
     # We cannot do a test build until the server is properly started.
