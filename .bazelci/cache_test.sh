@@ -21,4 +21,5 @@ docker run \
     --env RUN_TEST=$RUN_TEST \
     --env TEST_ARG1=$TEST_ARG1 \
     --env TEST_ARG2=$TEST_ARG2 \
+    --env SHA1_TOOLS_REMOTE=$SHA1_TOOLS_REMOTE \
     buildfarm buildfarm/.bazelci/test_buildfarm_container.sh

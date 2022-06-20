@@ -107,6 +107,7 @@ init_grpc_parser(){
 
         git clone https://github.com/bazelbuild/tools_remote.git
         cd tools_remote;
+        git reset --hard $SHA1_TOOLS_REMOTE
         ../bazel build //:remote_client
         cd /buildfarm;
     fi
@@ -136,6 +137,8 @@ check_for_crashes &
 
 init_grpc_parser
 
+echo "Kkosev test"
+pwd
 #Run a test against the cluster
 $RUN_TEST $TEST_ARG1 $TEST_ARG2
 
