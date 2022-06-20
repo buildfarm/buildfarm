@@ -17,7 +17,7 @@ echo "OPsi daysy"
 ls -al $absolute_sources_path/src/test/
 ls -al $absolute_sources_path/src/test/many
 docker run \
-    -v $absolute_sources_path/src/test/many:/buildfarm/src/test/many \
+    -v $absolute_sources_path:/buildfarm \
     --network host  \
     --env CACHE_TEST=$CACHE_TEST \
     --env TEST_SHARD=$TEST_SHARD \
