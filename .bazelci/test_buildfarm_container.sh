@@ -137,14 +137,6 @@ check_for_crashes &
 
 init_grpc_parser
 
-echo "Kkosev test"
-pwd
-ls -al
-ls -al src
-echo "###"
-ls -al src/test
-echo "###"
-ls -al src/test/many
 #Run a test against the cluster
 $RUN_TEST $TEST_ARG1 $TEST_ARG2
 
