@@ -11,7 +11,7 @@ docker run -d --name buildfarm-redis --network host redis:5.0.9 --bind localhost
 cp `which bazel` bazel
 docker build -t buildfarm .
 
-Start the servies and do a test build
+#Start the servies and do a test build
 absolute_sources_path=$(pwd)
 docker run \
     -v $absolute_sources_path/src/test/many:/buildfarm/src/test/many \
