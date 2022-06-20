@@ -13,6 +13,9 @@ docker build -t buildfarm .
 
 #Start the servies and do a test build
 absolute_sources_path=$(pwd)
+echo "OPsi daysy"
+ls -al
+pwd
 docker run \
     -v $absolute_sources_path/src/test/many:/buildfarm/src/test/many \
     --network host  \
