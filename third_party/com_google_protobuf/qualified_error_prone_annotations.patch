@@ -4,7 +4,7 @@ index b54f12b6..0ae54c70 100644
 +++ b/protobuf_deps.bzl
 @@ -1,6 +1,16 @@
  """Load dependencies needed to compile the protobuf library as a 3rd-party consumer."""
- 
+
  load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 +load("@bazel_tools//tools/build_defs/repo:jvm.bzl", "jvm_maven_import_external")
 +
@@ -16,7 +16,7 @@ index b54f12b6..0ae54c70 100644
 +        artifact_sha256 = "357cd6cfb067c969226c442451502aee13800a24e950fdfde77bcdb4565a668d",
 +        licenses = ["notice"],  # Apache 2.0
 +    )
- 
+
  def protobuf_deps():
      """Loads common dependencies needed to compile the protobuf library."""
 @@ -18,3 +28,11 @@ def protobuf_deps():
