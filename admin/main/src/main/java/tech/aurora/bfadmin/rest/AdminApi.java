@@ -20,7 +20,7 @@ import java.util.List;
 @RequestMapping(value = "admin", method = RequestMethod.POST)
 public class AdminApi {
   private static final Logger logger = LoggerFactory.getLogger(AdminApi.class);
-  
+
   @Autowired
   AdminService adminService;
 

@@ -4,9 +4,9 @@ index 9f64e09..e7679d3 100644
 +++ b/src/main/tools/BUILD
 @@ -1,6 +1,6 @@
  load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
- 
+
 -package(default_visibility = ["//src:__subpackages__"])
 +package(default_visibility = ["//visibility:public"])
- 
+
  cc_binary(
      name = "daemonize",

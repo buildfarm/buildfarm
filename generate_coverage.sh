@@ -55,7 +55,7 @@ print_error () {
 # Download lcov if we don't already have it.
 download_lcov() {
     if [ ! -f "$LCOV_TOOL" ] ; then
-        
+
         #download and extract tool
         wget -O $LCOV_TOOL $LCOV_TOOL_URL
         tar -xf $LCOV_TOOL
@@ -66,17 +66,17 @@ download_lcov() {
 }
 
 gate_lcov_results() {
-    
+
     # get lcov results
     download_lcov
     lcov_results=`$LCOV_TOOL --summary $traces 2>&1`
-    
+
     # extract our percentage numbers
     local line_percentage=$(echo "$lcov_results" | tr '\n' ' ' | awk '{print $8}' | sed 's/.$//')
     local function_percentage=$(echo "$lcov_results" | tr '\n' ' ' | awk '{print $14}' | sed 's/.$//')
     line_percentage=${line_percentage%.*}
     function_percentage=${function_percentage%.*}
-    
+
     # gate on configured code coverage threshold
     if [ "$line_percentage" -lt "$GATING_LINE_PERCENTAGE" ]; then
         print_error "line coverage is below gating percentage: "
@@ -85,7 +85,7 @@ gate_lcov_results() {
     else
         echo "current line coverage: " $line_percentage%
     fi
-    
+
     if [ "$function_percentage" -lt "$GATING_FUNC_PERCENTAGE" ]; then
         print_error "function coverage is below gating percentage: "
         print_error "$function_percentage < $GATING_FUNC_PERCENTAGE"
@@ -93,7 +93,7 @@ gate_lcov_results() {
     else
         echo "current function coverage: " $function_percentage%
     fi
-    
+
     exit 0
 }
 
