@@ -32,7 +32,7 @@ public class Slots {
 
   // The total number of claims available between jobs.  If every job took 1 claim, the width would
   // correspond to the total number of jobs that can run concurrently in a stage.
-  public int width = 0;
+  public int width;
 
   // The current number of claims currently held by all the jobs.  Keep in mind, that claims amount
   // isn't necessarily job amount.
