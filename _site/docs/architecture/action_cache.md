@@ -5,7 +5,7 @@ parent: Architecture
 nav_order: 5
 ---
 
-ActionCahe is a service that can be used to query whether a defined action has already been executed and, if so, download its result. The service API is defined in the [Remote Execution API](https://github.com/bazelbuild/remote-apis). `ActionCache` service would require [`ContentAddressableStorage`](https://github.com/bazelbuild/bazel-buildfarm/wiki/ContentAddressableStorage) service to store file data. 
+ActionCahe is a service that can be used to query whether a defined action has already been executed and, if so, download its result. The service API is defined in the [Remote Execution API](https://github.com/bazelbuild/remote-apis). `ActionCache` service would require [`ContentAddressableStorage`](https://github.com/bazelbuild/bazel-buildfarm/wiki/ContentAddressableStorage) service to store file data.
 
 An `Action` encapsulates all the information required to execute an action. Such information includes the command, input tree containing subdirectory/file tree, environment variables, platform information. All the information will contribute to the digest computation of an `Action` so that execution of an `Action` multiple times will produce the same output. With this, hash of an `Action` can be used as a key to cached `ActionResult`, which store result and output of an `Action` after an `Action` is completed. `ActionResult`s can be populated in `ActionCache` service after `Action`s get completed by an `Execution` service. They can also come from a local Bazel client that has executed the `Action`s and put the `ActionResults` into the cache by using the `UpdateActionCache` method. In other words, The `ActionCache` service can be used without using/implementing the `Execution` service.
 
@@ -14,7 +14,7 @@ By leveraging `Action` definition, `ActionCache` service is responsible for mapp
 # Methods
 
 ## GetActionResult
-Essentially the "get" method, which is responsible for finding an ActionResult and retrieving it. Before invoking this method, Bazel client should compute the input tree and the `Action` message for the action needs to be done. Then Bazel can use this `GetActionCache` method to see if the action has been completed successfully and, if so, use `bytestream.Read` to download the outputs. 
+Essentially the "get" method, which is responsible for finding an ActionResult and retrieving it. Before invoking this method, Bazel client should compute the input tree and the `Action` message for the action needs to be done. Then Bazel can use this `GetActionCache` method to see if the action has been completed successfully and, if so, use `bytestream.Read` to download the outputs.
 ## UpdateActionResult
 As mentioned above, the `ActionCache` service doesn't necessarily need an `Execution` Service. In this case, a "put" method is required so that an `ActionResult` can be directly put into the cache. This is what `UpdateActionResult` is designed for. With this method, Bazel clients running different machines can upload their build results into a cache pool, which can be available to other users through `GetActionResult`.
 

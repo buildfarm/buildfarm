@@ -40,10 +40,10 @@ The process wrapper also used by bazel to allow Java to reliably kill processes.
 The sandbox bazel uses when running actions client-side.  This provides many isolations for actions such as tmpfs and block-network.  It may also have performance issues.  We include it with buildfarm to ensure additional consistency between local/remote actions.
 
 ### tini
-tini is a [a tiny but valid init for containers](https://github.com/krallin/tini).  Depending on how buildfarm is containerized you may want to use. 
+tini is a [a tiny but valid init for containers](https://github.com/krallin/tini).  Depending on how buildfarm is containerized you may want to use.
 
 ### as-nobody
-This is used to set the action's user to "nobody".  Otherwise buildfarm will run the action as root which may be undesirable. 
+This is used to set the action's user to "nobody".  Otherwise buildfarm will run the action as root which may be undesirable.
 
 ### skip_sleep (skip_sleep.preload + delay)
 These wrappers are used for detecting actions that rely on time.  Below is a demonstration of how they can be used.
@@ -65,7 +65,7 @@ bazel test --runs_per_test=10 --config=remote //cloud/buildfarm:sleep_test
   Stats over 10 runs: max = 10.2s, min = 10.1s, avg = 10.2s, dev = 0.0s
 ```
 
-We can check for performance improvements by using the `skip-sleep` option.  
+We can check for performance improvements by using the `skip-sleep` option.
 ```
 bazel test --runs_per_test=10 --config=remote --remote_default_exec_properties='skip-sleep=true' //cloud/buildfarm:sleep_test
 //cloud/buildfarm:sleep_test                                             PASSED in 1.0s
