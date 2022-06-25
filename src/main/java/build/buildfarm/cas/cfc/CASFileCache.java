@@ -705,11 +705,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private static class UniqueWriteOutputStream extends CancellableOutputStream {
     private final CancellableOutputStream out;
-    private final Runnable onClosed;
+    private final Consumer<Boolean> onClosed;
     private final long size;
     private boolean closed = false;
 
-    UniqueWriteOutputStream(CancellableOutputStream out, Runnable onClosed, long size) {
+    UniqueWriteOutputStream(CancellableOutputStream out, Consumer<Boolean> onClosed, long size) {
       super(out);
       this.out = out;
       this.onClosed = onClosed;
@@ -744,17 +744,25 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     @Override
     public void close() throws IOException {
-      // we ignore closes below the complete size
-      if (out.getWritten() >= size) {
-        super.close();
-      }
+      // disallow any further writes
       closed = true;
-      onClosed.run();
+      try {
+        // we ignore closes below the complete size
+        if (out.getWritten() >= size) {
+          super.close();
+        }
+      } finally {
+        onClosed.accept(/* cancelled=*/ false);
+      }
     }
 
     @Override
     public void cancel() throws IOException {
-      out.cancel();
+      try {
+        out.cancel();
+      } finally {
+        onClosed.accept(/* cancelled=*/ true);
+      }
     }
   }
 
@@ -865,7 +873,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     out,
                     key.getDigest(),
                     UUID.fromString(key.getIdentifier()),
-                    () -> outClosedFuture.set(null),
+                    cancelled -> {
+                      if (cancelled) {
+                        out = null;
+                        isReset = true;
+                      }
+                      outClosedFuture.set(null);
+                    },
                     this::isComplete,
                     isReset);
             commitOpenState(uniqueOut.delegate(), outClosedFuture);
@@ -900,12 +914,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       CancellableOutputStream out,
       Digest digest,
       UUID uuid,
-      Runnable onClosed,
+      Consumer<Boolean> onClosed,
       BooleanSupplier isComplete,
       boolean isReset)
       throws IOException {
     if (out == null) {
-      out = newOutput(digest, uuid, onClosed, isComplete, isReset);
+      out = newOutput(digest, uuid, isComplete, isReset);
     }
     if (out == null) {
       // duplicate output stream
@@ -934,8 +948,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   CancellableOutputStream newOutput(
-      Digest digest, UUID uuid, Runnable onClosed, BooleanSupplier isComplete, boolean isReset)
-      throws IOException {
+      Digest digest, UUID uuid, BooleanSupplier isComplete, boolean isReset) throws IOException {
     String key = getKey(digest, false);
     final CancellableOutputStream cancellableOut;
     try {
@@ -995,28 +1008,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public void cancel() throws IOException {
-        try {
-          if (closed.compareAndSet(/* expected=*/ false, /* update=*/ true)) {
-            cancellableOut.cancel();
-          }
-        } finally {
-          onClosed.run();
+        if (closed.compareAndSet(/* expected=*/ false, /* update=*/ true)) {
+          cancellableOut.cancel();
         }
       }
 
       @Override
       public void close() throws IOException {
-        try {
-          if (closed.compareAndSet(/* expected=*/ false, /* update=*/ true)) {
-            try {
-              out.close();
-              decrementReference(key);
-            } catch (IncompleteBlobException e) {
-              // ignore
-            }
+        if (closed.compareAndSet(/* expected=*/ false, /* update=*/ true)) {
+          try {
+            out.close();
+            decrementReference(key);
+          } catch (IncompleteBlobException e) {
+            // ignore
           }
-        } finally {
-          onClosed.run();
         }
       }
     };
@@ -2298,7 +2303,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     void run() throws IOException;
   }
 
-  private abstract static class CancellableOutputStream extends WriteOutputStream {
+  @VisibleForTesting
+  abstract static class CancellableOutputStream extends WriteOutputStream {
     CancellableOutputStream(OutputStream out) {
       super(out);
     }
@@ -2546,10 +2552,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     if (!isReset && Files.exists(writePath)) {
       committedSize = Files.size(writePath);
       try (InputStream in = Files.newInputStream(writePath)) {
+        // TODO this might not be completely safe - best to maybe avoid opening the
+        // file for write before we're ready to write to it, could do it with a lazy
+        // open
         SkipOutputStream skipStream =
             new SkipOutputStream(Files.newOutputStream(writePath, APPEND), committedSize);
         hashOut = digestUtil.newHashingOutputStream(skipStream);
         ByteStreams.copy(in, hashOut);
+        in.close();
         checkState(skipStream.isSkipped());
       }
     } else {
@@ -2573,6 +2583,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       @Override
       public void cancel() throws IOException {
         try {
+          written = 0;
           hashOut.close();
           Files.delete(writePath);
         } finally {

@@ -416,33 +416,31 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private FeedbackOutputStream getOutput() throws IOException {
     if (out == null) {
       out = write.getOutput(deadlineAfter, deadlineAfterUnits, this::onNewlyReadyRequestNext);
+      if (out != null) {
+        withCancellation.addListener(
+            context -> {
+              if (out != null) {
+                try {
+                  out.close();
+                } catch (IOException e) {
+                  logger.log(Level.SEVERE, format("error closing on cancellation for %s", name), e);
+                }
+                out = null;
+              }
+            },
+            directExecutor());
+      }
     }
     return out;
   }
 
   @Override
   public void onError(Throwable t) {
-    Status status = Status.fromThrowable(t);
-    if (initialized) {
-      try {
-        getOutput().close();
-      } catch (IOException e) {
-        logger.log(Level.SEVERE, "error closing output stream after error", e);
-      }
-      out = null;
-    } else {
-      if (!withCancellation.isCancelled()) {
-        logger.log(
-            status.getCode() == Status.Code.CANCELLED ? Level.FINE : Level.SEVERE,
-            format("cancelling context for %s", name),
-            t);
-        withCancellation.cancel(t);
-      }
-    }
+    logger.log(Level.FINE, format("write error for %s", name), t);
   }
 
   @Override
   public void onCompleted() {
-    logger.log(Level.FINE, format("got completed for %s", name));
+    logger.log(Level.FINE, format("write completed for %s", name));
   }
 }

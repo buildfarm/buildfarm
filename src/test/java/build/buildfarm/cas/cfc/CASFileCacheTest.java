@@ -38,6 +38,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.DigestMismatchException;
+import build.buildfarm.cas.cfc.CASFileCache.CancellableOutputStream;
 import build.buildfarm.cas.cfc.CASFileCache.Entry;
 import build.buildfarm.cas.cfc.CASFileCache.PutDirectoryException;
 import build.buildfarm.cas.cfc.CASFileCache.StartupCacheResults;
@@ -535,6 +536,49 @@ class CASFileCacheTest {
   }
 
   @Test
+  public void cancelDischargesWriteSize() throws IOException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    Write cancellingWrite = getWrite(digest);
+    OutputStream out = cancellingWrite.getOutput(1, SECONDS, () -> {});
+    assertThat(out).isInstanceOf(CancellableOutputStream.class);
+    CancellableOutputStream cancelOut = (CancellableOutputStream) out;
+    assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes());
+    cancelOut.cancel();
+    assertThat(fileCache.size()).isEqualTo(0);
+    assertThat(cancellingWrite.getCommittedSize()).isEqualTo(0);
+    assertThat(cancellingWrite.isComplete()).isFalse();
+  }
+
+  @Test
+  public void cancelNegatesProgressAndCanRestart() throws IOException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    Write cancellingWrite = getWrite(digest);
+    AtomicBoolean notified = new AtomicBoolean(false);
+    cancellingWrite.getFuture().addListener(() -> notified.set(true), directExecutor());
+    OutputStream out = cancellingWrite.getOutput(1, SECONDS, () -> {});
+    assertThat(out).isInstanceOf(CancellableOutputStream.class);
+    CancellableOutputStream cancelOut = (CancellableOutputStream) out;
+    assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes());
+    content.substring(0, 6).writeTo(out);
+    assertThat(cancellingWrite.getCommittedSize()).isEqualTo(6);
+    assertThat(cancellingWrite.isComplete()).isFalse();
+    cancelOut.cancel();
+    assertThat(cancellingWrite.getCommittedSize()).isEqualTo(0);
+    assertThat(cancellingWrite.isComplete()).isFalse();
+    try (OutputStream restartedOut = cancellingWrite.getOutput(1, SECONDS, () -> {})) {
+      content.writeTo(restartedOut);
+    }
+    assertThat(notified.get()).isTrue();
+    assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes());
+    assertThat(cancellingWrite.getCommittedSize()).isEqualTo(digest.getSizeBytes());
+    assertThat(cancellingWrite.isComplete()).isTrue();
+  }
+
+  @Test
   public void incompleteWriteFileIsResumed() throws IOException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Digest digest = DIGEST_UTIL.compute(content);
@@ -550,7 +594,12 @@ class CASFileCacheTest {
     write.getFuture().addListener(() -> notified.set(true), directExecutor());
     assertThat(write.getCommittedSize()).isEqualTo(6);
     try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
-      content.substring(6).writeTo(out);
+      content.substring(6, 9).writeTo(out);
+    }
+    // ensure that we can continue via a full call to getOutput
+    assertThat(write.getCommittedSize()).isEqualTo(9);
+    try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
+      content.substring(9).writeTo(out);
     }
     assertThat(notified.get()).isTrue();
     assertThat(write.getCommittedSize()).isEqualTo(digest.getSizeBytes());
