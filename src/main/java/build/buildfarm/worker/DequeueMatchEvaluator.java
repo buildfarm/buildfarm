@@ -161,6 +161,21 @@ public class DequeueMatchEvaluator {
       return true;
     }
 
+    // validate min or max amount of memory
+    if (property.getName().equals(ExecutionProperties.MIN_MEM)
+        || property.getName().equals(ExecutionProperties.MAX_MEM)) {
+      // Consider unlimited memory if the worker have not set the MAX_CORES property.
+      if (!workerProvisions.containsKey(ExecutionProperties.MAX_MEM)) {
+        return true;
+      }
+
+      long memBytesRequested = Long.parseLong(property.getValue());
+      long possibleMemories =
+          Long.parseLong(
+              Iterables.getOnlyElement(workerProvisions.get(ExecutionProperties.MAX_MEM)));
+      return possibleMemories >= memBytesRequested;
+    }
+
     // accept other properties not specified on the worker
     if (matchSettings.allowUnmatched) {
       return true;
