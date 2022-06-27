@@ -45,51 +45,51 @@ Counterfor number of operations that failed to requeue
 
 Gauge of the number of dispatched operations
 
-**dispatched_operations_build_amount**  
+**dispatched_operations_build_amount**
 
 Gauge for the number of dispatched operations that are build actions
 
-**dispatched_operations_test_amount**  
+**dispatched_operations_test_amount**
 
 Gauge for the number of dispatched operations that are test actions
 
-**dispatched_operations_unknown_amount**  
+**dispatched_operations_unknown_amount**
 
 Gauge for the number of dispatched operations that could not be identified as build / test
 
-**dispatched_operations_from_queue_amount**  
+**dispatched_operations_from_queue_amount**
 
 Gauge for the number of dispatched operations that came from each queue (using "queue_name" as label)
 
-**dispatched_operations_tools_amount**  
+**dispatched_operations_tools_amount**
 
 Gauge for the number of dispatched operations by tool name (using "tool_name" as label)
 
-**dispatched_operations_mnemonics_amount**  
+**dispatched_operations_mnemonics_amount**
 
 Gauge for the number of dispatched operations by mnemonic (using "mnemonic" as label)
 
-**dispatched_operations_command_tools**  
+**dispatched_operations_command_tools**
 
 Gauge for the number of dispatched operations by cli tool (using "tool" as label)
 
-**dispatched_operations_targets_amount**  
+**dispatched_operations_targets_amount**
 
 Gauge for the number of dispatched operations by target (using "target" as label)
 
-**dispatched_operations_config_amount**  
+**dispatched_operations_config_amount**
 
 Gauge for the number of dispatched operations by config (using "config" as label)
 
-**dispatched_operations_platform_properties**  
+**dispatched_operations_platform_properties**
 
 Gauge for the number of dispatched operations by platform properties (using "config" as label)
 
-**dispatched_operations_clients_being_served**  
+**dispatched_operations_clients_being_served**
 
 The number of build clients currently being served
 
-**dispatched_operations_requeued_operations_amount**  
+**dispatched_operations_requeued_operations_amount**
 
 The number of dispatched operations that have been requeued
 
@@ -159,11 +159,11 @@ Histogram for the input fetch stall time on a worker (in milliseconds)
 
 **queued_time_ms**
 
-Summary for the operation queued time (in milliseconds)
+Histogram for the operation queued time (in milliseconds)
 
 **output_upload_time_ms**
 
-Summary for the output upload time (in milliseconds)
+Histogram for the output upload time (in milliseconds)
 
 **completed_operations**
 
@@ -188,3 +188,9 @@ Total size of the worker's CAS in bytes
 **cas_entry_count**
 
 The total number of entries in the worker's CAS
+
+Java interceptors can be used to monitor Grpc services using Prometheus.  To enable [these metrics](https://github.com/grpc-ecosystem/java-grpc-prometheus), add the following configuration to your server:
+```
+grpc_metrics: {
+  enabled: True
+```

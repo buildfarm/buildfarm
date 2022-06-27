@@ -168,9 +168,10 @@ public class OperationQueue {
    * @param provisions Provisions used to select an eligible queue.
    * @param val The value to push onto the queue.
    */
-  public void push(JedisCluster jedis, List<Platform.Property> provisions, String val) {
+  public void push(
+      JedisCluster jedis, List<Platform.Property> provisions, String val, int priority) {
     BalancedRedisQueue queue = chooseEligibleQueue(provisions);
-    queue.push(jedis, val);
+    queue.push(jedis, val, (double) priority);
   }
 
   /**

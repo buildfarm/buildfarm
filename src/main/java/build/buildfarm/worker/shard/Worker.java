@@ -54,6 +54,7 @@ import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.FilesystemCASConfig;
+import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.worker.DequeueMatchSettings;
@@ -88,6 +89,8 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.services.HealthStatusManager;
 import io.prometheus.client.Counter;
+import io.prometheus.client.Gauge;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -122,11 +125,25 @@ public class Worker extends LoggingMain {
           .labelNames("lifecycle")
           .help("Service health check.")
           .register();
+  private static final Counter workerPausedMetric =
+      Counter.build().name("worker_paused").help("Worker paused.").register();
+  private static final Gauge executionSlotsTotal =
+      Gauge.build()
+          .name("execution_slots_total")
+          .help("Total execution slots configured on worker.")
+          .register();
+  private static final Gauge inputFetchSlotsTotal =
+      Gauge.build()
+          .name("input_fetch_slots_total")
+          .help("Total input fetch slots configured on worker.")
+          .register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
-  private final boolean isCasShard;
+  private final boolean hasCasCapability;
+  private final boolean hasExecutionCapability;
 
   private boolean inGracefulShutdown = false;
+  private boolean isPaused = false;
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
@@ -177,7 +194,9 @@ public class Worker extends LoggingMain {
 
   class RemoteCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
-      insertFileToCasMember(digest, file);
+      if (digest.getSizeBytes() > 0) {
+        insertFileToCasMember(digest, file);
+      }
     }
 
     private void insertFileToCasMember(Digest digest, Path file)
@@ -365,7 +384,8 @@ public class Worker extends LoggingMain {
       throws ConfigurationException {
     super("BuildFarmShardWorker");
     this.config = config;
-    isCasShard = config.getCapabilities().getCas();
+    hasCasCapability = config.getCapabilities().getCas();
+    hasExecutionCapability = config.getCapabilities().getExecution();
     String identifier = "buildfarm-worker-" + config.getPublicName() + "-" + session;
     root = getValidRoot(config);
     if (config.getPublicName().isEmpty()) {
@@ -416,7 +436,7 @@ public class Worker extends LoggingMain {
 
     // Create the appropriate writer for the context
     CasWriter writer;
-    if (!isCasShard) {
+    if (!hasCasCapability) {
       writer = new RemoteCasWriter();
     } else {
       writer = new LocalCasWriter();
@@ -445,48 +465,57 @@ public class Worker extends LoggingMain {
             instance,
             config.getDefaultActionTimeout(),
             config.getMaximumActionTimeout(),
-            config.getLimitExecution(),
+            config.getDefaultMaxCores(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
+            config.getAllowBringYourOwnContainer(),
             config.getErrorOperationRemainingResources(),
             writer);
 
-    PipelineStage completeStage =
-        new PutOperationStage((operation) -> context.deactivate(operation.getName()));
-    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, completeStage);
-    PipelineStage executeActionStage =
-        new ExecuteActionStage(context, reportResultStage, completeStage);
-    PipelineStage inputFetchStage =
-        new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
-    PipelineStage matchStage = new MatchStage(context, inputFetchStage, completeStage);
-
     pipeline = new Pipeline();
-    // pipeline.add(errorStage, 0);
-    pipeline.add(matchStage, 4);
-    pipeline.add(inputFetchStage, 3);
-    pipeline.add(executeActionStage, 2);
-    pipeline.add(reportResultStage, 1);
-
-    server =
-        serverBuilder
-            .addService(healthStatusManager.getHealthService())
-            .addService(
-                new ContentAddressableStorageService(
-                    instance, /* deadlineAfter=*/ 1, DAYS
-                    /* requestLogLevel=*/ ))
-            .addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, DAYS))
-            .addService(
-                new WorkerProfileService(
-                    storage,
-                    inputFetchStage,
-                    executeActionStage,
-                    context,
-                    completeStage,
-                    backplane))
-            .addService(new ShutDownWorkerGracefully(this, config))
-            .build();
+    server = createServer(serverBuilder, storage, instance, pipeline, context);
 
     logger.log(INFO, String.format("%s initialized", identifier));
+  }
+
+  private Server createServer(
+      ServerBuilder<?> serverBuilder,
+      ContentAddressableStorage storage,
+      Instance instance,
+      Pipeline pipeline,
+      ShardWorkerContext context) {
+    serverBuilder.addService(healthStatusManager.getHealthService());
+    serverBuilder.addService(
+        new ContentAddressableStorageService(instance, /* deadlineAfter=*/ 1, DAYS));
+    serverBuilder.addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, DAYS));
+    serverBuilder.addService(new ShutDownWorkerGracefully(this, config));
+
+    // We will build a worker's server based on it's capabilities.
+    // A worker that is capable of execution will construct an execution pipeline.
+    // It will use various execution phases for it's profile service.
+    // On the other hand, a worker that is only capable of CAS storage does not need a pipeline.
+    if (hasExecutionCapability) {
+      PipelineStage completeStage =
+          new PutOperationStage((operation) -> context.deactivate(operation.getName()));
+      PipelineStage errorStage = completeStage; /* new ErrorStage(); */
+      PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
+      PipelineStage executeActionStage =
+          new ExecuteActionStage(context, reportResultStage, errorStage);
+      PipelineStage inputFetchStage =
+          new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
+      PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
+
+      pipeline.add(matchStage, 4);
+      pipeline.add(inputFetchStage, 3);
+      pipeline.add(executeActionStage, 2);
+      pipeline.add(reportResultStage, 1);
+
+      serverBuilder.addService(
+          new WorkerProfileService(
+              storage, inputFetchStage, executeActionStage, context, completeStage, backplane));
+    }
+
+    return serverBuilder.build();
   }
 
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
@@ -708,6 +737,7 @@ public class Worker extends LoggingMain {
         fileCache,
         owner,
         config.getLinkInputDirectories(),
+        config.getRealInputDirectoriesList(),
         removeDirectoryService,
         accessRecorder
         /* deadlineAfter=*/
@@ -729,6 +759,8 @@ public class Worker extends LoggingMain {
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     healthCheckMetric.labels("stop").inc();
+    executionSlotsTotal.set(0);
+    inputFetchSlotsTotal.set(0);
     if (execFileSystem != null) {
       logger.log(INFO, "Stopping exec filesystem");
       execFileSystem.stop();
@@ -765,7 +797,7 @@ public class Worker extends LoggingMain {
   private void onStoragePut(Digest digest) {
     try {
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
-      if (isCasShard) {
+      if (hasCasCapability) {
         backplane.addBlobLocation(digest, config.getPublicName());
       }
     } catch (IOException e) {
@@ -774,7 +806,7 @@ public class Worker extends LoggingMain {
   }
 
   private void onStorageExpire(Iterable<Digest> digests) {
-    if (isCasShard) {
+    if (hasCasCapability) {
       try {
         // if the worker is a CAS member, it can send/modify blobs in the backplane.
         backplane.removeBlobsLocation(digests, config.getPublicName());
@@ -787,10 +819,16 @@ public class Worker extends LoggingMain {
   private void blockUntilShutdown() throws InterruptedException {
     // should really be waiting for either server or pipeline shutdown
     try {
-      pipeline.join();
+      if (pipeline.hasStages() || hasExecutionCapability) {
+        pipeline.join();
+      } else {
+        logger.log(INFO, "No pipeline stages.  Block until interruption.");
+        server.awaitTermination();
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+    logger.log(INFO, "Shutting down because pipeline finished.");
     stop();
   }
 
@@ -836,6 +874,28 @@ public class Worker extends LoggingMain {
     throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
+  private void runIndexerForWorker() {
+    String clusterEndpoint = config.getAdminConfig().getClusterEndpoint();
+    if (clusterEndpoint.isEmpty()) {
+      logger.warning("Cluster endpoint is not set. Indexer will not run.");
+      return;
+    }
+    ManagedChannel channel = null;
+    try {
+      NettyChannelBuilder builder =
+          NettyChannelBuilder.forTarget(clusterEndpoint).negotiationType(NegotiationType.PLAINTEXT);
+      channel = builder.build();
+      AdminGrpc.AdminFutureStub adminFuture = AdminGrpc.newFutureStub(channel);
+      adminFuture.reindexCas(
+          ReindexCasRequest.newBuilder().setHostId(config.getPublicName()).build());
+      logger.info("Running Indexer for paused worker: " + config.getPublicName());
+    } finally {
+      if (channel != null) {
+        channel.shutdown();
+      }
+    }
+  }
+
   private void startFailsafeRegistration() {
     String endpoint = config.getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
@@ -853,9 +913,27 @@ public class Worker extends LoggingMain {
                 return now + registrationIntervalMillis;
               }
 
+              boolean isWorkerPausedFromNewWork() {
+                try {
+                  File pausedFile = new File(config.getRoot() + "/.paused");
+                  if (pausedFile.exists() && !isPaused) {
+                    isPaused = true;
+                    logger.log(Level.INFO, "The current worker is paused from taking on new work!");
+                    pipeline.stopMatchingOperations();
+                    workerPausedMetric.inc();
+                    runIndexerForWorker();
+                  }
+                } catch (Exception e) {
+                  logger.log(Level.WARNING, "Could not open .paused file.", e);
+                }
+                return isPaused;
+              }
+
               void registerIfExpired() {
                 long now = System.currentTimeMillis();
-                if (now >= workerRegistrationExpiresAt && !inGracefulShutdown) {
+                if (now >= workerRegistrationExpiresAt
+                    && !inGracefulShutdown
+                    && !isWorkerPausedFromNewWork()) {
                   // worker must be registered to match
                   addWorker(nextRegistration(now));
                   // update every 10 seconds
@@ -903,7 +981,7 @@ public class Worker extends LoggingMain {
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
-      if (isCasShard) {
+      if (hasCasCapability) {
         startFailsafeRegistration();
       } else {
         logger.log(INFO, "Skipping worker registration");
@@ -915,6 +993,8 @@ public class Worker extends LoggingMain {
     }
     pipeline.start();
     healthCheckMetric.labels("start").inc();
+    executionSlotsTotal.set(config.getExecuteStageWidth());
+    inputFetchSlotsTotal.set(config.getInputFetchStageWidth());
   }
 
   @Override

@@ -11,3 +11,21 @@ k8s_object(
     kind = "service",
     template = ":shard-worker.yaml",
 )
+
+k8s_object(
+    name = "open-telemetry",
+    kind = "service",
+    template = ":open-telemetry.yaml",
+)
+
+k8s_object(
+    name = "jaeger",
+    kind = "service",
+    template = ":jaeger.yaml",
+)
+
+k8s_object(
+    name = "grafana",
+    kind = "service",
+    template = ":grafana.yaml",
+)

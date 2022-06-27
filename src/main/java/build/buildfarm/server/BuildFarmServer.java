@@ -49,6 +49,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.Security;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -57,6 +58,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
+import me.dinowernli.grpc.prometheus.Configuration;
+import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 @SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
@@ -94,43 +98,73 @@ public class BuildFarmServer extends LoggingMain {
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     if (!config.getSslCertificatePath().equals("")) {
+      // There are different Public Key Cryptography Standards (PKCS) that users may format their
+      // certificate files in.  By default, the JDK cannot parse all of them.  In particular, it
+      // cannot parse PKCS #1 (RSA Cryptography Standard).  When enabling TLS for GRPC, java's
+      // underlying Security module is used. To improve the robustness of this parsing and the
+      // overall accepted certificate formats, we add an additional security provider. BouncyCastle
+      // is a library that will parse additional formats and allow users to provide certificates in
+      // an otherwise unsupported format.
+      Security.addProvider(new BouncyCastleProvider());
       File ssl_certificate_path = new File(config.getSslCertificatePath());
       serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }
-    server =
-        serverBuilder
-            .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instance))
-            .addService(new CapabilitiesService(instance))
-            .addService(
-                new ContentAddressableStorageService(
-                    instance,
-                    /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
-                    TimeUnit.SECONDS
-                    /* requestLogLevel=*/ ))
-            .addService(
-                new ByteStreamService(
-                    instance,
-                    /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
-                    TimeUnit.SECONDS))
-            .addService(
-                new ExecutionService(
-                    instance,
-                    config.getExecuteKeepaliveAfterSeconds(),
-                    TimeUnit.SECONDS,
-                    keepaliveScheduler,
-                    getMetricsPublisher(config.getMetricsConfig())))
-            .addService(new OperationQueueService(instance))
-            .addService(new OperationsService(instance))
-            .addService(new AdminService(config.getAdminConfig(), instance))
-            .addService(new FetchService(instance))
-            .addService(ProtoReflectionService.newInstance())
-            .addService(new PublishBuildEventService(config.getBuildEventConfig()))
-            .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
-            .intercept(headersInterceptor)
-            .build();
+
+    serverBuilder
+        .addService(healthStatusManager.getHealthService())
+        .addService(new ActionCacheService(instance, config.getAcPolicy()))
+        .addService(new CapabilitiesService(instance))
+        .addService(
+            new ContentAddressableStorageService(
+                instance,
+                /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
+                TimeUnit.SECONDS
+                /* requestLogLevel=*/ ))
+        .addService(
+            new ByteStreamService(
+                instance,
+                /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
+                TimeUnit.SECONDS))
+        .addService(
+            new ExecutionService(
+                instance,
+                config.getExecuteKeepaliveAfterSeconds(),
+                TimeUnit.SECONDS,
+                keepaliveScheduler,
+                getMetricsPublisher(config.getMetricsConfig())))
+        .addService(new OperationQueueService(instance))
+        .addService(new OperationsService(instance))
+        .addService(new AdminService(config.getAdminConfig(), instance))
+        .addService(new FetchService(instance))
+        .addService(ProtoReflectionService.newInstance())
+        .addService(new PublishBuildEventService(config.getBuildEventConfig()))
+        .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
+        .intercept(headersInterceptor);
+    handleGrpcMetricIntercepts(serverBuilder, config);
+    server = serverBuilder.build();
 
     logger.log(Level.INFO, String.format("%s initialized", session));
+  }
+
+  public static void handleGrpcMetricIntercepts(
+      ServerBuilder<?> serverBuilder, BuildFarmServerConfig config) {
+    // Decide how to capture GRPC Prometheus metrics.
+    // By default, we don't capture any.
+    if (config.getGrpcMetrics().getEnabled()) {
+      // Assume core metrics.
+      // Core metrics include send/receive totals tagged with return codes.  No latencies.
+      Configuration grpcConfig = Configuration.cheapMetricsOnly();
+
+      // Enable latency buckets.
+      if (config.getGrpcMetrics().getProvideLatencyHistograms()) {
+        grpcConfig = grpcConfig.allMetrics();
+      }
+
+      // Apply config to create an interceptor and apply it to the GRPC server.
+      MonitoringServerInterceptor monitoringInterceptor =
+          MonitoringServerInterceptor.create(grpcConfig);
+      serverBuilder.intercept(monitoringInterceptor);
+    }
   }
 
   private static BuildFarmServerConfig toBuildFarmServerConfig(

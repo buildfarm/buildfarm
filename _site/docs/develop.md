@@ -7,7 +7,10 @@ nav_order: 7
 ## Developer Information
 
 The recommended solution for deploying a complete dev environment is to use [tilt](https://tilt.dev/).
-Go to the root of the repo and run `tilt up`.
+Follow the installation instructions [here](https://docs.tilt.dev/).
+Make sure you can use a local kubernetes cluster by following [these steps](https://docs.tilt.dev/choosing_clusters.html).
+If everything is installed correctly, you can go to the root of the repo and run `tilt up`.
+Tilt will prompt you to open a web UI and see all the running services.
 
 Below is information for running services directly.
 
@@ -71,4 +74,4 @@ bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/s
 Now, you should have something like this, and you can now run / debug Buildfarm
 Server from inside of IntelliJ, just like any other program:
 
-![IntelliJ Buildfarm Server run configuration]]({{site.url}}{{site.baseurl}}/assets/images/intellij-server-run-config.png)  
+![IntelliJ Buildfarm Server run configuration]]({{site.url}}{{site.baseurl}}/assets/images/intellij-server-run-config.png)

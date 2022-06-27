@@ -10,7 +10,7 @@ capabilities {
   # This determines whether the worker is a shard of the cas.
   # When not a shard, it will upload execution outputs.
   cas: true
-  
+
   # This determines whether the shard instance will participate in the execution pool.
   # Workers that don't execute may be used for storage only.
   execution: true
@@ -124,6 +124,20 @@ input_fetch_deadline: 60
 # spent manufacturing the same read-only input hierarchy over
 # multiple actions' executions.
 link_input_directories: true
+
+# A list of paths that will not be subject to the effects of the above
+# link_input_directories setting.
+# Relative to the input root, any directory in the input tree which matches
+# this path completely will have a real directory created for its inputs
+# for every action that executes on the worker. The example 'external' is
+# provided based on the characteristics of bazel's population of a top-level
+# external compendium which will exhibit poor directory caching performance.
+# This may also be used to provide writable directories as input roots for
+# actions which expect to be able to write to an input location and will fail
+# if they cannot.
+real_input_directories: "external"
+
+# real_input_directories: "path/to/uncached/directory"
 
 # an imposed action-key-invariant timeout used in the unspecified timeout case
 default_action_timeout: {
@@ -275,6 +289,7 @@ redis_shard_backplane_config: {
           value: "*"
         }
       }
+      allow_unmatched: True
     }
   }
 
@@ -283,6 +298,19 @@ redis_shard_backplane_config: {
   # Redis maximum attempts (default: 5, minimum value: 5)
   #max_attempts: 10
 }
+
+# Constrain all executions to a pool of logical cores specified in execute_stage_width
+# The default (empty) does not limit the pool of logical cores available by executions
+#limit_global_execution: false
+
+# Constrain all executions to this logical core count unless otherwise specified via min/max-cores
+# The default (0) value does not limit executions within the global pool
+#default_max_cores: 1
+
+# Only permit tests to exceed the default_cores value for their min/max-cores range specification
+# This setting is meaningless without a non-zero default_cores
+# The default (false) value does not place restrictions on which executions can specify >1 min/max-cores
+#only_multicore_tests: false
 
 # Create exec trees containing directories that are owned by
 # this user

@@ -5,8 +5,8 @@ buildfarm dependencies that can be imported into other WORKSPACE files
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
-RULES_JVM_EXTERNAL_TAG = "3.3"
-RULES_JVM_EXTERNAL_SHA = "d85951a92c0908c80bd8551002d66cb23c3434409c814179c0ff026b53544dab"
+RULES_JVM_EXTERNAL_TAG = "4.2"
+RULES_JVM_EXTERNAL_SHA = "cd1a77b7b02e8e008439ca76fd34f5b07aecb8c752961f9640dea15e9e5ba1ca"
 
 def archive_dependencies(third_party):
     return [
@@ -62,9 +62,9 @@ def archive_dependencies(third_party):
             "build_file": "%s:BUILD.remote_apis" % third_party,
             "patch_args": ["-p1"],
             "patches": ["%s/remote-apis:remote-apis.patch" % third_party],
-            "sha256": "1d69f5f2f694fe93ee78a630f196047892ae51878297a89601c98964486655c6",
-            "strip_prefix": "remote-apis-6345202a036a297b22b0a0e7531ef702d05f2130",
-            "url": "https://github.com/bazelbuild/remote-apis/archive/6345202a036a297b22b0a0e7531ef702d05f2130.zip",
+            "sha256": "743d2d5b5504029f3f825beb869ce0ec2330b647b3ee465a4f39ca82df83f8bf",
+            "strip_prefix": "remote-apis-636121a32fa7b9114311374e4786597d8e7a69f3",
+            "url": "https://github.com/bazelbuild/remote-apis/archive/636121a32fa7b9114311374e4786597d8e7a69f3.zip",
         },
         {
             "name": "rules_cc",
@@ -76,9 +76,9 @@ def archive_dependencies(third_party):
         # Used to format proto files
         {
             "name": "com_grail_bazel_toolchain",
-            "sha256": "54b54eedc71b93b278c44b6c056a737dc68545c6da75f63d0810676e1181f559",
-            "strip_prefix": "bazel-toolchain-76ce37e977a304acf8948eadabb82c516320e286",
-            "url": "https://github.com/grailbio/bazel-toolchain/archive/76ce37e977a304acf8948eadabb82c516320e286.tar.gz",
+            "sha256": "98e9fe7bcd2035164efa948ba91ea01ccbc4f933fd19f0320c9cbc536cfe22b7",
+            "strip_prefix": "bazel-toolchain-f14a8a5de8f7e98a011a52163d4855572c07a1a3",
+            "url": "https://github.com/grailbio/bazel-toolchain/archive/f14a8a5de8f7e98a011a52163d4855572c07a1a3.tar.gz",
         },
         {
             "name": "io_bazel_rules_docker",
@@ -139,6 +139,15 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
         sha256 = "294ff5e4e6ae3fda5ff00f0a3c398fa50c1ffa3bc9313800b32e34a75fbb93f3",
         urls = [
             "https://github.com/werkt/jedis/releases/download/3.2.0-e82e68e2f7/jedis-3.2.0-e82e68e2f7.jar",
+        ],
+    )
+
+    maybe(
+        http_jar,
+        "opentelemetry",
+        sha256 = "0523287984978c091be0d22a5c61f0bce8267eeafbbae58c98abaf99c9396832",
+        urls = [
+            "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.11.0/opentelemetry-javaagent.jar",
         ],
     )
 

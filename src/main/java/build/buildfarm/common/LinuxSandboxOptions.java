@@ -127,7 +127,7 @@ public class LinuxSandboxOptions {
    * @brief Set the username inside the sandbox to 'nobody'.
    * @details Flag value: -U.
    */
-  public final boolean fakeUsername = false;
+  public boolean fakeUsername = false;
 
   /**
    * @field debug

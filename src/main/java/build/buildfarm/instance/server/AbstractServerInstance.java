@@ -52,6 +52,8 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.PriorityCapabilities;
+import build.bazel.remote.execution.v2.PriorityCapabilities.PriorityRange;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
@@ -331,7 +333,6 @@ public abstract class AbstractServerInstance implements Instance {
 
   private static boolean shouldEnsureOutputsPresent(
       boolean ensureOutputsPresent, RequestMetadata requestMetadata) {
-
     // The 'ensure outputs present' setting means that the AC will only return results to the client
     // when all of the action output blobs are present in the CAS.  If any one blob is missing, the
     // system will return a cache miss.  Although this is a more expensive check to perform, some
@@ -836,7 +837,16 @@ public abstract class AbstractServerInstance implements Instance {
         String subDirectoryPath =
             directoryPath.isEmpty() ? directoryName : (directoryPath + "/" + directoryName);
         onInputDirectory.accept(subDirectoryPath);
-        if (!visited.contains(directoryDigest)) {
+        if (visited.contains(directoryDigest)) {
+          Directory subDirectory;
+          if (directoryDigest.getSizeBytes() == 0) {
+            subDirectory = Directory.getDefaultInstance();
+          } else {
+            subDirectory = directoriesIndex.get(directoryDigest);
+          }
+          enumerateActionInputDirectory(
+              subDirectoryPath, subDirectory, directoriesIndex, onInputFile, onInputDirectory);
+        } else {
           validateActionInputDirectoryDigest(
               subDirectoryPath,
               directoryDigest,
@@ -847,13 +857,6 @@ public abstract class AbstractServerInstance implements Instance {
               onInputDirectory,
               onInputDigest,
               preconditionFailure);
-        } else {
-          enumerateActionInputDirectory(
-              subDirectoryPath,
-              directoriesIndex.get(directoryDigest),
-              directoriesIndex,
-              onInputFile,
-              onInputDirectory);
         }
       }
     }
@@ -1840,7 +1843,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected CacheCapabilities getCacheCapabilities() {
     return CacheCapabilities.newBuilder()
-        .addDigestFunction(digestUtil.getDigestFunction())
+        .addDigestFunctions(digestUtil.getDigestFunction())
         .setActionCacheUpdateCapabilities(
             ActionCacheUpdateCapabilities.newBuilder().setUpdateEnabled(true))
         .setMaxBatchTotalSizeBytes(Size.mbToBytes(4))
@@ -1852,6 +1855,10 @@ public abstract class AbstractServerInstance implements Instance {
     return ExecutionCapabilities.newBuilder()
         .setDigestFunction(digestUtil.getDigestFunction())
         .setExecEnabled(true)
+        .setExecutionPriorityCapabilities(
+            PriorityCapabilities.newBuilder()
+                .addPriorities(
+                    PriorityRange.newBuilder().setMinPriority(0).setMaxPriority(Integer.MAX_VALUE)))
         .build();
   }
 

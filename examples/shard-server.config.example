@@ -41,7 +41,7 @@ instance {
     # The operation queuer is exclusive and should run on
     # multiple instances concurrently.
     run_operation_queuer: true
-    
+
     # When checking the action cache, decide whether all outputs are also present in the CAS.
     # If any output is missing, a cache miss is returned to the client.
     ensure_outputs_present: false
@@ -60,7 +60,7 @@ instance {
 
     # Maximum number of requeue attempts for an operation
     max_requeue_attempts: 5
-    
+
     # Whether the instance should consult a denylist when looking up actions & invocations.
     # For cache-only systems users may want to disable this check.
     use_deny_list: True
@@ -250,8 +250,30 @@ instance {
   }
 }
 
+ac_policy: READ_AND_WRITE
+
 # the listening port of the buildfarm grpc server
 port: 8980
+
+# the publishing port of the buildfarm prometheus metrics
+prometheus_config: {
+  port: 9090
+}
+
+# Publish GRPC metrics to promethesus for each server endpoint. This is used
+# for SLAs at API boundaries. You may want something similar at the proxy level
+# to see frontend/backend performance.
+grpc_metrics: {
+
+  # Whether to enable this metric gathering at all. If disabled, there should
+  # be no related metrics registered in prometheus.
+  enabled: False
+
+  # These metrics are more expensive to calculate. If disabled, you only
+  # receive core metrics. Core metrics include send/receive totals tagged
+  # with return codes.  No latencies.
+  provide_latency_histograms: False
+}
 
 # cas write timeout
 cas_write_timeout: {

@@ -21,7 +21,6 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.logging.Level.INFO;
-import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -34,6 +33,7 @@ import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
+import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
@@ -61,7 +61,6 @@ import com.google.common.hash.HashCode;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -260,23 +259,34 @@ class OperationQueueWorkerContext implements WorkerContext {
   @Override
   public QueuedOperation getQueuedOperation(QueueEntry queueEntry)
       throws IOException, InterruptedException {
-    Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
     ByteString queuedOperationBlob =
         getBlob(
-            casInstance, queuedOperationDigest, queueEntry.getExecuteEntry().getRequestMetadata());
-    if (queuedOperationBlob == null) {
-      return null;
+            casInstance,
+            queueEntry.getQueuedOperationDigest(),
+            queueEntry.getExecuteEntry().getRequestMetadata());
+    return ProtoUtils.parseQueuedOperation(queuedOperationBlob, queueEntry);
+  }
+
+  // container for inputs fetched and rolls back unless committed
+  private static class ReferenceTransaction implements AutoCloseable {
+    public final ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
+    public final ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
+    public boolean rollback = true;
+    private final CASFileCache fileCache;
+
+    public ReferenceTransaction(CASFileCache fileCache) {
+      this.fileCache = fileCache;
     }
-    try {
-      return QueuedOperation.parseFrom(queuedOperationBlob);
-    } catch (InvalidProtocolBufferException e) {
-      logger.log(
-          WARNING,
-          format(
-              "invalid queued operation: %s(%s)",
-              queueEntry.getExecuteEntry().getOperationName(),
-              DigestUtil.toString(queuedOperationDigest)));
-      return null;
+
+    @Override
+    public void close() throws IOException, InterruptedException {
+      if (rollback) {
+        fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
+      }
+    }
+
+    public void commit() {
+      rollback = false;
     }
   }
 
@@ -296,39 +306,34 @@ class OperationQueueWorkerContext implements WorkerContext {
     }
     Files.createDirectories(execDir);
 
-    ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
-    ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
-
-    boolean fetched = false;
-    try {
+    try (ReferenceTransaction refXact = new ReferenceTransaction(fileCache)) {
       fetchInputs(
           execDir,
           action.getInputRootDigest(),
           directoriesIndex,
           outputDirectory,
-          inputFiles,
-          inputDirectories);
-      fetched = true;
-    } finally {
-      if (!fetched) {
-        fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
-      }
+          refXact.inputFiles,
+          refXact.inputDirectories);
+      refXact.commit();
+      rootInputFiles.put(execDir, refXact.inputFiles.build());
+      rootInputDirectories.put(execDir, refXact.inputDirectories.build());
     }
 
-    rootInputFiles.put(execDir, inputFiles.build());
-    rootInputDirectories.put(execDir, inputDirectories.build());
-
-    boolean stamped = false;
     try {
       outputDirectory.stamp(execDir);
-      stamped = true;
-    } finally {
-      if (!stamped) {
-        destroyExecDir(execDir);
+      if (owner != null) {
+        Directories.setAllOwner(execDir, owner);
       }
-    }
-    if (owner != null) {
-      Directories.setAllOwner(execDir, owner);
+    } catch (Exception e) {
+      try {
+        destroyExecDir(execDir);
+      } catch (Exception cleanupEx) {
+        e.addSuppressed(cleanupEx);
+      }
+      Throwables.throwIfUnchecked(e);
+      Throwables.propagateIfInstanceOf(e, IOException.class);
+      Throwables.propagateIfInstanceOf(e, InterruptedException.class);
+      throw new RuntimeException(e);
     }
     return execDir;
   }

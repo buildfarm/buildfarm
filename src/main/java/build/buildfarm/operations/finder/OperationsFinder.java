@@ -149,7 +149,6 @@ public class OperationsFinder {
    */
   private static boolean shouldKeepOperation(EnrichedOperation operation, String filterPredicate) {
     String json = operation.asJsonString();
-    System.out.println(json);
 
     // test the predicate
     try {

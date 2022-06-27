@@ -16,16 +16,22 @@ package build.buildfarm.worker;
 
 import static build.buildfarm.v1test.ExecutionPolicy.PolicyCase.WRAPPER;
 import static com.google.common.collect.Maps.uniqueIndex;
+import static com.google.protobuf.util.Durations.add;
+import static com.google.protobuf.util.Durations.compare;
+import static com.google.protobuf.util.Durations.fromSeconds;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
+import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.common.ProcessUtils;
+import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -33,6 +39,8 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.resources.ResourceLimits;
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.core.DockerClientBuilder;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
@@ -41,6 +49,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import io.grpc.Deadline;
@@ -58,8 +67,6 @@ import java.util.logging.Logger;
 class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
   private static final Logger logger = Logger.getLogger(Executor.class.getName());
-
-  private static final Object execLock = new Object();
 
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
@@ -135,29 +142,14 @@ class Executor {
       return 0;
     }
 
-    Duration timeout;
-    boolean isDefaultTimeout;
-    if (operationContext.action.hasTimeout()) {
-      timeout = operationContext.action.getTimeout();
-      isDefaultTimeout = false;
-    } else {
-      timeout = null;
-      isDefaultTimeout = true;
-    }
+    // settings for deciding timeout
+    TimeoutSettings timeoutSettings = new TimeoutSettings();
+    timeoutSettings.defaultTimeout = workerContext.getDefaultActionTimeout();
+    timeoutSettings.maxTimeout = workerContext.getMaximumActionTimeout();
 
-    if (timeout == null && workerContext.hasDefaultActionTimeout()) {
-      timeout = workerContext.getDefaultActionTimeout();
-    }
-
-    Deadline pollDeadline;
-    if (timeout == null) {
-      pollDeadline = Deadline.after(10, DAYS);
-    } else {
-      pollDeadline =
-          Deadline.after(
-              // 10s of padding for the timeout in question, so that we can guarantee cleanup
-              (timeout.getSeconds() + 10) * 1000000 + timeout.getNanos() / 1000, MICROSECONDS);
-    }
+    // decide timeout and begin deadline
+    Duration timeout = decideTimeout(timeoutSettings, operationContext.action);
+    Deadline pollDeadline = Time.toDeadline(timeout);
 
     workerContext.resumePoller(
         operationContext.poller,
@@ -168,10 +160,36 @@ class Executor {
         pollDeadline);
 
     try {
-      return executePolled(operation, limits, policies, timeout, isDefaultTimeout, stopwatch);
+      return executePolled(operation, limits, policies, timeout, stopwatch);
     } finally {
       operationContext.poller.pause();
     }
+  }
+
+  private static Duration decideTimeout(TimeoutSettings settings, Action action) {
+    // First we need to acquire the appropriate timeout duration for the action.
+    // We begin with a default configured timeout.
+    Duration timeout = settings.defaultTimeout;
+
+    // Typically the timeout comes from the client as a part of the action.
+    // We will use this if the client has provided a value.
+    if (action.hasTimeout()) {
+      timeout = action.getTimeout();
+    }
+
+    // Now that a timeout is chosen, it may be adjusted further based on execution considerations.
+    // For example, an additional padding time may be added to guarantee resource cleanup around the
+    // action's execution.
+    if (settings.applyTimeoutPadding) {
+      timeout = add(timeout, fromSeconds(settings.timeoutPaddingSeconds));
+    }
+
+    // Ensure the timeout is not too long by comparing it to the maximum allowed timeout
+    if (compare(timeout, settings.maxTimeout) > 0) {
+      timeout = settings.maxTimeout;
+    }
+
+    return timeout;
   }
 
   private long executePolled(
@@ -179,7 +197,6 @@ class Executor {
       ResourceLimits limits,
       Iterable<ExecutionPolicy> policies,
       Duration timeout,
-      boolean isDefaultTimeout,
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
@@ -229,7 +246,6 @@ class Executor {
               command.getEnvironmentVariablesList(),
               limits,
               timeout,
-              isDefaultTimeout,
               // executingMetadata.getStdoutStreamName(),
               // executingMetadata.getStderrStreamName(),
               resultBuilder);
@@ -395,7 +411,6 @@ class Executor {
       List<EnvironmentVariable> environmentVariables,
       ResourceLimits limits,
       Duration timeout,
-      boolean isDefaultTimeout,
       ActionResult.Builder resultBuilder)
       throws IOException, InterruptedException {
     ProcessBuilder processBuilder =
@@ -411,31 +426,32 @@ class Executor {
       environment.put(environmentVariable.getKey(), environmentVariable.getValue());
     }
 
-    final Write stdoutWrite;
-    final Write stderrWrite;
-
-    if ("" != null && !"".isEmpty() && workerContext.getStreamStdout()) {
-      stdoutWrite = workerContext.getOperationStreamWrite("");
-    } else {
-      stdoutWrite = new NullWrite();
-    }
-    if ("" != null && !"".isEmpty() && workerContext.getStreamStderr()) {
-      stderrWrite = workerContext.getOperationStreamWrite("");
-    } else {
-      stderrWrite = new NullWrite();
-    }
-
     // allow debugging before an execution
     if (limits.debugBeforeExecution) {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
     }
 
+    // run the action under docker
+    if (limits.containerSettings.enabled) {
+      DockerClient dockerClient = DockerClientBuilder.getInstance().build();
+
+      // create settings
+      DockerExecutorSettings settings = new DockerExecutorSettings();
+      settings.fetchTimeout = Durations.fromMinutes(1);
+      settings.operationContext = operationContext;
+      settings.execDir = execDir;
+      settings.limits = limits;
+      settings.envVars = environment;
+      settings.timeout = timeout;
+      settings.arguments = arguments;
+
+      return DockerExecutor.runActionWithDocker(dockerClient, settings, resultBuilder);
+    }
+
     long startNanoTime = System.nanoTime();
     Process process;
     try {
-      synchronized (execLock) {
-        process = processBuilder.start();
-      }
+      process = ProcessUtils.threadSafeStart(processBuilder);
       process.getOutputStream().close();
     } catch (IOException e) {
       logger.log(Level.SEVERE, format("error starting process for %s", operationName), e);
@@ -456,8 +472,10 @@ class Executor {
       return Code.INVALID_ARGUMENT;
     }
 
-    stdoutWrite.reset();
-    stderrWrite.reset();
+    // Create threads to extract stdout/stderr from a process.
+    // The readers attach to the process's input/error streams.
+    final Write stdoutWrite = new NullWrite();
+    final Write stderrWrite = new NullWrite();
     ByteStringWriteReader stdoutReader =
         new ByteStringWriteReader(
             process.getInputStream(), stdoutWrite, (int) workerContext.getStandardOutputLimit());
@@ -485,9 +503,7 @@ class Executor {
         } else {
           logger.log(
               Level.INFO,
-              format(
-                  "process timed out for %s after %ds with %s timeout",
-                  operationName, timeout.getSeconds(), isDefaultTimeout ? "default" : "action"));
+              format("process timed out for %s after %ds", operationName, timeout.getSeconds()));
           statusCode = Code.DEADLINE_EXCEEDED;
         }
       }
@@ -504,23 +520,21 @@ class Executor {
         }
       }
     }
-    stdoutReaderThread.join();
-    stderrReaderThread.join();
 
+    // Now that the process is completed, extract the final stdout/stderr.
+    ByteString stdout = ByteString.EMPTY;
+    ByteString stderr = ByteString.EMPTY;
     try {
-      resultBuilder
-          .setExitCode(exitCode)
-          .setStdoutRaw(stdoutReader.getData())
-          .setStderrRaw(stderrReader.getData());
-    } catch (IOException e) {
-      if (statusCode != Code.DEADLINE_EXCEEDED) {
-        throw e;
-      }
-      logger.log(
-          Level.INFO,
-          format("error getting process outputs for %s after timeout", operationName),
-          e);
+      stdoutReaderThread.join();
+      stderrReaderThread.join();
+      stdout = stdoutReader.getData();
+      stderr = stderrReader.getData();
+
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, "error extracting stdout/stderr: ", e.getMessage());
     }
+
+    resultBuilder.setExitCode(exitCode).setStdoutRaw(stdout).setStderrRaw(stderr);
 
     // allow debugging after an execution
     if (limits.debugAfterExecution) {
