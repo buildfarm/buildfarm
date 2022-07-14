@@ -192,7 +192,11 @@ public class ShardInstance extends AbstractServerInstance {
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
 
   private static final Histogram ioMetric =
-      Histogram.build().name("io_bytes_read").help("I/O (bytes)").register();
+      Histogram.build()
+          .name("io_bytes_read")
+          .buckets(new double[] {10, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000})
+          .help("Read I/O (bytes)")
+          .register();
 
   private final Runnable onStop;
   private final long maxEntrySizeBytes;

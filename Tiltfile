@@ -16,7 +16,7 @@ load('./bazel.Tiltfile', 'bazel_sourcefile_deps')
 # By default, Tilt does not send telemetry.
 # After you successfully run a Tiltfile, the Tilt web UI will nudge you to opt in or opt out of telemetry.
 # This avoids that from happening.
-analytics_settings(False) 
+analytics_settings(False)
 
 # Inform tilt about the custom images built within the repository.
 # When you change code, these images will be re-built and re-deployed.

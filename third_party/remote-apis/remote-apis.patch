@@ -5,7 +5,7 @@ index 2b36886..6ffc75b 100644
 @@ -6,8 +6,6 @@ This is adapted from
  https://github.com/googleapis/googleapis/blob/master/repository_rules.bzl
  """
- 
+
 -load("//:remote_apis_deps.bzl", "remote_apis_go_deps")
 -
  def _switched_rules_impl(ctx):
@@ -17,6 +17,6 @@ index 2b36886..6ffc75b 100644
      )
 -    if go:
 -        remote_apis_go_deps()
- 
+
  def _switch(enabled, enabled_value):
      return enabled_value if enabled else ""
