@@ -100,6 +100,10 @@ public class RedisShardBackplaneTest {
     assertThat(opChange.getReset().getOperation().getName()).isEqualTo("op");
   }
 
+  String OperationName(String name) {
+    return "Operation:" + name;
+  }
+
   @Test
   public void prequeueUpdatesOperationPrequeuesAndPublishes() throws IOException {
     RedisShardBackplaneConfig config =
@@ -124,7 +128,7 @@ public class RedisShardBackplaneTest {
     verify(mockJedisClusterFactory, times(1)).get();
     verify(jedisCluster, times(1))
         .setex(
-            backplane.operationKey(opName),
+            OperationName(opName),
             config.getOperationExpire(),
             RedisShardBackplane.operationPrinter.print(op));
     verify(jedisCluster, times(1))
@@ -349,7 +353,7 @@ public class RedisShardBackplaneTest {
 
     verify(mockJedisClusterFactory, times(1)).get();
     verify(jedisCluster, times(1)).hdel(config.getDispatchedOperationsHashName(), opName);
-    verify(jedisCluster, times(1)).del(backplane.operationKey(opName));
+    verify(jedisCluster, times(1)).del(OperationName(opName));
     verifyChangePublished(jedisCluster);
   }
 

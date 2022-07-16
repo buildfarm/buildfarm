@@ -425,19 +425,14 @@ public class RedisShardBackplane implements Backplane {
     }
 
     Instant now = Instant.now();
-    List<Map.Entry<String, Response<String>>> operations = new ArrayList(operationChannels.size());
-    JedisClusterPipeline p = jedis.pipelined();
-    for (String operationName :
+    List<String> operationChannelNames =
         operationChannels.stream()
             .map(RedisShardBackplane::parseOperationChannel)
-            .collect(Collectors.toList())) {
-      operations.add(
-          new AbstractMap.SimpleEntry<>(operationName, p.get(operationKey(operationName))));
-    }
-    p.sync();
+            .collect(Collectors.toList());
+    List<Map.Entry<String, String>> operations = state.operations.get(jedis, operationChannelNames);
 
-    for (Map.Entry<String, Response<String>> entry : operations) {
-      String json = entry.getValue().get();
+    for (Map.Entry<String, String> entry : operations) {
+      String json = entry.getValue();
       Operation operation = json == null ? null : RedisShardBackplane.parseOperationJson(json);
       String operationName = entry.getKey();
       if (operation == null || operation.getDone()) {
@@ -941,7 +936,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private String getOperation(JedisCluster jedis, String operationName) {
-    return jedis.get(operationKey(operationName));
+    return state.operations.get(jedis, operationName);
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -981,7 +976,7 @@ public class RedisShardBackplane implements Backplane {
     String name = operation.getName();
     client.run(
         jedis -> {
-          jedis.setex(operationKey(name), config.getOperationExpire(), json);
+          state.operations.insert(jedis, name, json, config.getOperationExpire());
           if (publishOperation != null) {
             publishReset(jedis, publishOperation);
           }
@@ -1014,7 +1009,7 @@ public class RedisShardBackplane implements Backplane {
     int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
     client.run(
         jedis -> {
-          jedis.setex(operationKey(operationName), config.getOperationExpire(), operationJson);
+          state.operations.insert(jedis, operationName, operationJson, config.getOperationExpire());
           queue(
               jedis,
               operation.getName(),
@@ -1240,7 +1235,7 @@ public class RedisShardBackplane implements Backplane {
     int priority = executeEntry.getExecutionPolicy().getPriority();
     client.run(
         jedis -> {
-          jedis.setex(operationKey(operationName), config.getOperationExpire(), operationJson);
+          state.operations.insert(jedis, operationName, operationJson, config.getOperationExpire());
           state.prequeue.push(jedis, executeEntryJson, priority);
           publishReset(jedis, publishOperation);
         });
@@ -1302,7 +1297,7 @@ public class RedisShardBackplane implements Backplane {
           completeOperation(jedis, operationName);
           // FIXME find a way to get rid of this thing from the queue by name
           // jedis.lrem(config.getQueuedOperationsListName(), 0, operationName);
-          jedis.del(operationKey(operationName));
+          state.operations.remove(jedis, operationName);
 
           publishReset(jedis, o);
         });
@@ -1310,10 +1305,6 @@ public class RedisShardBackplane implements Backplane {
 
   private String asDigestStr(ActionKey actionKey) {
     return DigestUtil.toString(actionKey.getDigest());
-  }
-
-  String operationKey(String operationName) {
-    return config.getOperationPrefix() + ":" + operationName;
   }
 
   String operationChannel(String operationName) {

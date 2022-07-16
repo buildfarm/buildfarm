@@ -46,6 +46,7 @@ public class DistributedStateCreator {
     state.operationQueue = createOperationQueue(client, config);
     state.blockedActions = new RedisMap(config.getActionBlacklistPrefix());
     state.blockedInvocations = new RedisMap(config.getInvocationBlacklistPrefix());
+    state.operations = new RedisMap(config.getOperationPrefix());
     state.processingOperations = new RedisMap(config.getProcessingPrefix());
     state.dispatchingOperations = new RedisMap(config.getDispatchingPrefix());
     state.dispatchedOperations = new RedisHashMap(config.getDispatchedOperationsHashName());

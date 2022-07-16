@@ -15,6 +15,10 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.ScanCount;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 
@@ -104,10 +108,30 @@ public class RedisMap {
    * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @return The value of the key. null if key does not exist.
+   * @note Overloaded.
    * @note Suggested return identifier: value.
    */
   public String get(JedisCluster jedis, String key) {
     return jedis.get(createKeyName(key));
+  }
+
+  /**
+   * @brief Get the values of the keys.
+   * @details If the key does not exist, null is returned.
+   * @param jedis Jedis cluster client.
+   * @param keys The name of the keys.
+   * @return The values of the keys. null if key does not exist.
+   * @note Overloaded.
+   * @note Suggested return identifier: values.
+   */
+  public List<Map.Entry<String, String>> get(JedisCluster jedis, List<String> keys) {
+    JedisClusterPipeline p = jedis.pipelined();
+    List<Map.Entry<String, String>> values = new ArrayList(keys.size());
+    for (String key : keys) {
+      values.add(new AbstractMap.SimpleEntry<>(key, p.get(createKeyName(key)).get()));
+    }
+    p.sync();
+    return values;
   }
 
   /**
