@@ -976,7 +976,7 @@ public class RedisShardBackplane implements Backplane {
     String name = operation.getName();
     client.run(
         jedis -> {
-          state.operations.insert(jedis, name, json, config.getOperationExpire());
+          state.operations.insert(jedis, name, json);
           if (publishOperation != null) {
             publishReset(jedis, publishOperation);
           }
@@ -1009,7 +1009,7 @@ public class RedisShardBackplane implements Backplane {
     int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
     client.run(
         jedis -> {
-          state.operations.insert(jedis, operationName, operationJson, config.getOperationExpire());
+          state.operations.insert(jedis, operationName, operationJson);
           queue(
               jedis,
               operation.getName(),
@@ -1235,7 +1235,7 @@ public class RedisShardBackplane implements Backplane {
     int priority = executeEntry.getExecutionPolicy().getPriority();
     client.run(
         jedis -> {
-          state.operations.insert(jedis, operationName, operationJson, config.getOperationExpire());
+          state.operations.insert(jedis, operationName, operationJson);
           state.prequeue.push(jedis, executeEntryJson, priority);
           publishReset(jedis, publishOperation);
         });

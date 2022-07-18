@@ -100,7 +100,7 @@ public class RedisShardBackplaneTest {
     assertThat(opChange.getReset().getOperation().getName()).isEqualTo("op");
   }
 
-  String OperationName(String name) {
+  String operationName(String name) {
     return "Operation:" + name;
   }
 
@@ -128,7 +128,7 @@ public class RedisShardBackplaneTest {
     verify(mockJedisClusterFactory, times(1)).get();
     verify(jedisCluster, times(1))
         .setex(
-            OperationName(opName),
+            operationName(opName),
             config.getOperationExpire(),
             RedisShardBackplane.operationPrinter.print(op));
     verify(jedisCluster, times(1))
@@ -353,7 +353,7 @@ public class RedisShardBackplaneTest {
 
     verify(mockJedisClusterFactory, times(1)).get();
     verify(jedisCluster, times(1)).hdel(config.getDispatchedOperationsHashName(), opName);
-    verify(jedisCluster, times(1)).del(OperationName(opName));
+    verify(jedisCluster, times(1)).del(operationName(opName));
     verifyChangePublished(jedisCluster);
   }
 
