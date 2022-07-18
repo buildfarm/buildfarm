@@ -158,15 +158,15 @@ public class RedisMap {
    * @note Overloaded.
    * @note Suggested return identifier: values.
    */
-  public List<Map.Entry<String, String>> get(JedisCluster jedis, List<String> keys) {
+  public Iterable<Map.Entry<String, String>> get(JedisCluster jedis, Iterable<String> keys) {
     JedisClusterPipeline p = jedis.pipelined();
-    List<Map.Entry<String, Response<String>>> values = new ArrayList(keys.size());
+    List<Map.Entry<String, Response<String>>> values = new ArrayList<>();
     for (String key : keys) {
       values.add(new AbstractMap.SimpleEntry<>(key, p.get(createKeyName(key))));
     }
     p.sync();
 
-    List<Map.Entry<String, String>> resolved = new ArrayList(keys.size());
+    List<Map.Entry<String, String>> resolved = new ArrayList<>();
     for (Map.Entry<String, Response<String>> val : values) {
       resolved.add(new AbstractMap.SimpleEntry<>(val.getKey(), val.getValue().get()));
     }

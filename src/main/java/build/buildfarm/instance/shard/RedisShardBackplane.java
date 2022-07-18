@@ -429,9 +429,8 @@ public class RedisShardBackplane implements Backplane {
         operationChannels.stream()
             .map(RedisShardBackplane::parseOperationChannel)
             .collect(Collectors.toList());
-    List<Map.Entry<String, String>> operations = state.operations.get(jedis, operationChannelNames);
 
-    for (Map.Entry<String, String> entry : operations) {
+    for (Map.Entry<String, String> entry : state.operations.get(jedis, operationChannelNames)) {
       String json = entry.getValue();
       Operation operation = json == null ? null : RedisShardBackplane.parseOperationJson(json);
       String operationName = entry.getKey();
