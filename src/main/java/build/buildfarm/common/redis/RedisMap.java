@@ -19,6 +19,7 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.StreamSupport;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.Response;
@@ -158,11 +159,11 @@ public class RedisMap {
    * @note Suggested return identifier: values.
    */
   public Iterable<Map.Entry<String, String>> get(JedisCluster jedis, Iterable<String> keys) {
+    // Fetch items via pipeline
     JedisClusterPipeline p = jedis.pipelined();
     List<Map.Entry<String, Response<String>>> values = new ArrayList<>();
-    for (String key : keys) {
-      values.add(new AbstractMap.SimpleEntry<>(key, p.get(createKeyName(key))));
-    }
+    StreamSupport.stream(keys.spliterator(), false)
+        .forEach(key -> values.add(new AbstractMap.SimpleEntry<>(key, p.get(createKeyName(key)))));
     p.sync();
 
     List<Map.Entry<String, String>> resolved = new ArrayList<>();
