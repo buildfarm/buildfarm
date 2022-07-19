@@ -41,12 +41,12 @@ public class RedisMap {
   private final String name;
 
   /**
-   * @field defaultExpiration_s
+   * @field expiration_s
    * @brief The expiration time to use on inserts when none is given.
    * @details The map can be initialized with a default expiration. In doing so, expirations can be
    *     omitted from calls to insert.
    */
-  private final int defaultExpiration_s;
+  private final int expiration_s;
 
   /**
    * @brief Constructor.
@@ -54,8 +54,7 @@ public class RedisMap {
    * @param name The global name of the map.
    */
   public RedisMap(String name) {
-    this.name = name;
-    this.defaultExpiration_s = 86400;
+    this(name, 86400);
   }
 
   /**
@@ -65,7 +64,7 @@ public class RedisMap {
    */
   public RedisMap(String name, int timeout_s) {
     this.name = name;
-    this.defaultExpiration_s = timeout_s;
+    this.expiration_s = timeout_s;
   }
 
   /**
@@ -107,7 +106,7 @@ public class RedisMap {
   public void insert(JedisCluster jedis, String key, String value) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
-    jedis.setex(createKeyName(key), defaultExpiration_s, value);
+    jedis.setex(createKeyName(key), expiration_s, value);
   }
 
   /**
