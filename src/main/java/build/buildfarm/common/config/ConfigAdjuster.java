@@ -83,6 +83,12 @@ public class ConfigAdjuster {
             builder.getExecuteStageWidth(), builder.getExecuteStageWidthOffset()));
 
     checkExecutionWrapperAvailability();
+
+    if (builder.getRedisShardBackplaneConfigBuilder().getTimeout() == 0) {
+      int defaultDuration = 2000;
+      logger.log(Level.INFO, "No default timeout for redis.  Setting to: " + defaultDuration + "s");
+      builder.getRedisShardBackplaneConfigBuilder().setTimeout(defaultDuration);
+    }
   }
 
   /**
@@ -148,6 +154,21 @@ public class ConfigAdjuster {
       logger.log(
           Level.INFO,
           "Bytestream timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s");
+    }
+
+    if (builder
+            .getInstanceBuilder()
+            .getShardInstanceConfigBuilder()
+            .getRedisShardBackplaneConfigBuilder()
+            .getTimeout()
+        == 0) {
+      int defaultDuration = 2000;
+      logger.log(Level.INFO, "No default timeout for redis.  Setting to: " + defaultDuration + "s");
+      builder
+          .getInstanceBuilder()
+          .getShardInstanceConfigBuilder()
+          .getRedisShardBackplaneConfigBuilder()
+          .setTimeout(defaultDuration);
     }
   }
 
