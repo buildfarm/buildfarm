@@ -11,5 +11,14 @@ docker run -d --name buildfarm-redis --network host redis:5.0.9 --bind localhost
 cp `which bazel` bazel
 docker build -t buildfarm .
 
-# Start the servies and do a test build
-docker run --network host --env TEST_SHARD=$TEST_SHARD --env RUN_TEST=$RUN_TEST --env EXECUTION_STAGE_WIDTH=$EXECUTION_STAGE_WIDTH buildfarm buildfarm/.bazelci/test_buildfarm_container.sh
+#Start the servies and do a test build
+docker run \
+    -v /tmp:/tmp \
+    --network host  \
+    --env CACHE_TEST=$CACHE_TEST \
+    --env TEST_SHARD=$TEST_SHARD \
+    --env RUN_TEST=$RUN_TEST \
+    --env TEST_ARG1=$TEST_ARG1 \
+    --env TEST_ARG2=$TEST_ARG2 \
+    --env SHA1_TOOLS_REMOTE=$SHA1_TOOLS_REMOTE \
+    buildfarm buildfarm/.bazelci/test_buildfarm_container.sh

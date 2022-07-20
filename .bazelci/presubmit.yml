@@ -1,7 +1,7 @@
 ---
 buildifier: 4.2.5
 tasks:
-  
+
   # Linting jobs
   format_check:
     name: "Code Format"
@@ -30,7 +30,7 @@ tasks:
     - export BUILDFARM_SKIP_COVERAGE_HOST=true
     - export BUILDFARM_GATE_LCOV_RESULTS=true
     - ./generate_coverage.sh
-    
+
   # Typical unit tests that run across a variety of operation systems.
   ubuntu1604:
     name: "Unit Tests"
@@ -82,7 +82,7 @@ tasks:
     platform: ubuntu1804
     shell_commands:
     - ./.bazelci/docker_unit_test.sh
-    
+
   # Test that buildfarm can build software using the default configurations.
   # It starts the distributed storage backend and buildfarm services.
   # It performs a realistic build on generated cc targets and gating projects.
@@ -92,6 +92,7 @@ tasks:
     shell_commands:
     - export TEST_SHARD=false
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
   integration_test_many_shard:
     name: "Integration Test (Shard)"
@@ -99,12 +100,29 @@ tasks:
     shell_commands:
     - export TEST_SHARD=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
-    
+
+  # In the same way that clients will want to verify their cache hit rates / latencies.
+  # We as service owners will want a way to verify that our cache hit rate is correct and
+  # that latencies can be captured.
+  cache_check_many_shard:
+    name: "Cache Check"
+    platform: ubuntu1804
+    shell_commands:
+    - export CACHE_TEST=true
+    - export TEST_SHARD=true
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_double_test.sh
+    - export TEST_ARG1=--experimental_remote_grpc_log='./grpc.log'
+    - export TEST_ARG2=--experimental_remote_grpc_log='./grpc2.log'
+    - export SHA1_TOOLS_REMOTE=9969ed6911aea04f7e896cd3958ea933547f933c
+    - export EXECUTION_STAGE_WIDTH=5
+    - ./.bazelci/cache_test.sh
+
   # Memory integration test is too slow.
   # We can re-enable it if memory instance becomes faster or we build less targets.
   # It is preserved here for offline testing.
-  
+
   # integration_test_abseil:
   #   name: "Abseil Test (Memory)"
   #   platform: ubuntu1804
@@ -112,13 +130,14 @@ tasks:
   #   - export TEST_SHARD=false
   #   - export RUN_TEST=./.bazelci/run_abseil_test.sh
   #   - ./.bazelci/integration_test.sh
-  
+
   integration_test_abseil_shard:
     name: "Abseil Test (Shard)"
     platform: ubuntu1804
     shell_commands:
     - export TEST_SHARD=true
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
+    - export EXECUTION_STAGE_WIDTH=10
     - ./.bazelci/integration_test.sh
 
   buildfarm_admin_test:

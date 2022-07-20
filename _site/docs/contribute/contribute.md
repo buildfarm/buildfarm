@@ -7,9 +7,9 @@ nav_order: 7
 
 # Edit the site
 
-The site is rendered with jeykll.  To see changes locally run:  
+The site is rendered with jeykll.  To see changes locally run:
  - cd _site
  - bundle install
- - jekyll serve  
- 
+ - jekyll serve
+
 You should see a local URL like: http://127.0.0.1:4000/bazel-buildfarm/

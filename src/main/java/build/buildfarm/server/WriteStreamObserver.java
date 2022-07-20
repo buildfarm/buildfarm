@@ -53,7 +53,11 @@ import javax.annotation.concurrent.GuardedBy;
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Logger logger = Logger.getLogger(WriteStreamObserver.class.getName());
   private static final Histogram ioMetric =
-      Histogram.build().name("io_bytes_write").help("I/O (bytes)").register();
+      Histogram.build()
+          .name("io_bytes_write")
+          .buckets(new double[] {10, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000})
+          .help("Write I/O (bytes)")
+          .register();
 
   private final Instance instance;
   private final long deadlineAfter;

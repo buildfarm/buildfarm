@@ -10,7 +10,7 @@ capabilities {
   # This determines whether the worker is a shard of the cas.
   # When not a shard, it will upload execution outputs.
   cas: true
-  
+
   # This determines whether the shard instance will participate in the execution pool.
   # Workers that don't execute may be used for storage only.
   execution: true
