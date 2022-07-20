@@ -76,6 +76,12 @@ instance {
 
       # The size of the redis connection pool
       jedis_pool_max_total: 4000
+      
+      # Redis timeout
+      timeout: 2000
+      
+      # Redis connection max attempts
+      max_attempts: 5
 
       # The redis key used to store a hash of registered Workers
       # to their registration expiration time. After a worker's

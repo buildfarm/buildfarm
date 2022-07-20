@@ -78,6 +78,8 @@ public class JedisClusterFactory {
     RedisShardBackplaneConfig config =
         RedisShardBackplaneConfig.newBuilder()
             .setRedisUri("redis://localhost:6379")
+            .setTimeout(2000)
+            .setMaxAttempts(5)
             .setJedisPoolMaxTotal(3)
             .build();
     JedisCluster redis = JedisClusterFactory.create(config).get();
@@ -155,9 +157,9 @@ public class JedisClusterFactory {
     return () ->
         new JedisCluster(
             new HostAndPort(redisUri.getHost(), redisUri.getPort()),
-            /* connectionTimeout=*/ Integer.max(2000, timeout),
-            /* soTimeout=*/ Integer.max(2000, timeout),
-            Integer.max(5, maxAttempts),
+            /* connectionTimeout=*/ timeout,
+            /* soTimeout=*/ timeout,
+            maxAttempts,
             password,
             poolConfig);
   }
