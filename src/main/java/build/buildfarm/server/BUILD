@@ -10,6 +10,7 @@ java_library(
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/common/grpc",
+        "//src/main/java/build/buildfarm/common/resources",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/memory",
@@ -52,6 +53,7 @@ java_library(
         "@remote_apis//:build_bazel_remote_asset_v1_remote_asset_java_grpc",
         "@remote_apis//:build_bazel_remote_asset_v1_remote_asset_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
         "@remote_apis//:build_bazel_semver_java_proto",
     ],
 )

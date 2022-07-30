@@ -56,6 +56,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
+import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.io.FileStatus;
@@ -551,6 +552,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       blobObserver.onError(e);
       return;
     }
+
+    // ZstdCompressingInputStream in;
+    // try {
+    //   in = new ZstdCompressingInputStream(in1);
+    // } catch (IOException e) {
+    //   blobObserver.onError(e);
+    //   return;
+    // }
+
     blobObserver.setOnCancelHandler(
         () -> {
           try {

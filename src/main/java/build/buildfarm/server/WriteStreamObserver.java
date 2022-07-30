@@ -23,14 +23,17 @@ import static io.grpc.Status.ABORTED;
 import static io.grpc.Status.INVALID_ARGUMENT;
 import static java.lang.String.format;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.ZstdDecompressingOutputStream;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.common.resources.ResourceParser;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
@@ -77,6 +80,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private long earliestOffset = -1;
   private long requestCount = 0;
   private long requestBytes = 0;
+  private Compressor.Value compressor;
 
   WriteStreamObserver(
       Instance instance,
@@ -185,6 +189,9 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
   void commitActive(long committedSize) {
     WriteResponse response = WriteResponse.newBuilder().setCommittedSize(committedSize).build();
+    if (compressor == Compressor.Value.ZSTD) {
+      response = WriteResponse.newBuilder().setCommittedSize(-1).build();
+    }
 
     if (exception.compareAndSet(null, null)) {
       try {
@@ -201,6 +208,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   @GuardedBy("this")
   private void initialize(WriteRequest request) {
     String resourceName = request.getResourceName();
+    compressor = ResourceParser.parseUploadBlobRequest(resourceName).getBlob().getCompression();
     if (resourceName.isEmpty()) {
       errorResponse(INVALID_ARGUMENT.withDescription("resource_name is empty").asException());
     } else {
@@ -416,6 +424,10 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private FeedbackOutputStream getOutput() throws IOException {
     if (out == null) {
       out = write.getOutput(deadlineAfter, deadlineAfterUnits, this::onNewlyReadyRequestNext);
+    }
+
+    if (compressor == Compressor.Value.ZSTD) {
+      return new ZstdDecompressingOutputStream(out);
     }
     return out;
   }

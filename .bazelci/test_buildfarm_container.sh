@@ -1,4 +1,7 @@
 #!/bin/bash
+set -e
+set -o pipefail
+
 # This script is to be called within a built container reflecting the changes of a PR
 # We start the server and the worker, and test that they can complete builds for a bazel client.
 cd buildfarm;
