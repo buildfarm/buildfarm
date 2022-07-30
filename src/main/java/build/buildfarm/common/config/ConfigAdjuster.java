@@ -92,14 +92,11 @@ public class ConfigAdjuster {
 
     checkExecutionWrapperAvailability();
 
-    if (builder.getBackplaneCase()
-        == ShardWorkerConfig.BackplaneCase.REDIS_SHARD_BACKPLANE_CONFIG) {
-      if (builder.getRedisShardBackplaneConfigBuilder().getTimeout() == 0) {
-        int defaultDuration = 2000;
-        logger.log(
-            Level.INFO, "No default timeout for redis.  Setting to: " + defaultDuration + "s");
-        builder.getRedisShardBackplaneConfigBuilder().setTimeout(defaultDuration);
-      }
+    if (builder.getBackplaneCase() == ShardWorkerConfig.BackplaneCase.REDIS_SHARD_BACKPLANE_CONFIG
+        && builder.getRedisShardBackplaneConfigBuilder().getTimeout() == 0) {
+      int defaultDuration = 2000;
+      logger.log(Level.INFO, "No default timeout for redis.  Setting to: " + defaultDuration + "s");
+      builder.getRedisShardBackplaneConfigBuilder().setTimeout(defaultDuration);
     }
   }
 
@@ -169,22 +166,20 @@ public class ConfigAdjuster {
     }
 
     if (builder.getInstanceBuilder().getShardInstanceConfigBuilder().getBackplaneCase()
-        == ShardInstanceConfig.BackplaneCase.REDIS_SHARD_BACKPLANE_CONFIG) {
-      if (builder
-              .getInstanceBuilder()
-              .getShardInstanceConfigBuilder()
-              .getRedisShardBackplaneConfigBuilder()
-              .getTimeout()
-          == 0) {
-        int defaultDuration = 2000;
-        logger.log(
-            Level.INFO, "No default timeout for redis.  Setting to: " + defaultDuration + "s");
-        builder
-            .getInstanceBuilder()
-            .getShardInstanceConfigBuilder()
-            .getRedisShardBackplaneConfigBuilder()
-            .setTimeout(defaultDuration);
-      }
+            == ShardInstanceConfig.BackplaneCase.REDIS_SHARD_BACKPLANE_CONFIG
+        && builder
+                .getInstanceBuilder()
+                .getShardInstanceConfigBuilder()
+                .getRedisShardBackplaneConfigBuilder()
+                .getTimeout()
+            == 0) {
+      int defaultDuration = 2000;
+      logger.log(Level.INFO, "No default timeout for redis.  Setting to: " + defaultDuration + "s");
+      builder
+          .getInstanceBuilder()
+          .getShardInstanceConfigBuilder()
+          .getRedisShardBackplaneConfigBuilder()
+          .setTimeout(defaultDuration);
     }
   }
 
