@@ -170,9 +170,9 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
     return response;
     
-    ByteArrayInputStream is = new ByteArrayInputStream(response.getData());
-    ZstdCompressingInputStream in = new ZstdCompressingInputStream(is);
-    in.read(response.getData());
+    // ByteArrayInputStream is = new ByteArrayInputStream(response.getData());
+    // ZstdCompressingInputStream in = new ZstdCompressingInputStream(is);
+    // in.read(response.getData());
   }
 
   ServerCallStreamObserver<ReadResponse> onErrorLogReadObserver(
@@ -223,17 +223,18 @@ public class ByteStreamService extends ByteStreamImplBase {
     return new DelegateServerCallStreamObserver<ByteString, ReadResponse>(responseObserver) {
       @Override
       public void onNext(ByteString data) {
-        while (!data.isEmpty()) {
-          ByteString slice;
-          if (data.size() > CHUNK_SIZE) {
-            slice = data.substring(0, CHUNK_SIZE);
-            data = data.substring(CHUNK_SIZE);
-          } else {
-            slice = data;
-            data = ByteString.EMPTY;
-          }
-          responseObserver.onNext(ReadResponse.newBuilder().setData(slice).build());
-        }
+        // while (!data.isEmpty()) {
+        //   ByteString slice;
+        //   if (data.size() > CHUNK_SIZE) {
+        //     slice = data.substring(0, CHUNK_SIZE);
+        //     data = data.substring(CHUNK_SIZE);
+        //   } else {
+        //     slice = data;
+        //     data = ByteString.EMPTY;
+        //   }
+        //   responseObserver.onNext(ReadResponse.newBuilder().setData(slice).build());
+        // }
+        responseObserver.onNext(ReadResponse.newBuilder().setData(data).build());
       }
 
       @Override
