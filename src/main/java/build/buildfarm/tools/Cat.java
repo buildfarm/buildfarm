@@ -35,6 +35,7 @@ import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
@@ -318,8 +319,7 @@ class Cat {
       DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree)
       throws IOException, InterruptedException {
     Tree tree = reTreeToTree(digestUtil, reTree);
-    printTreeLayout(
-        DigestUtil.proxyDirectoriesIndex(tree.getDirectoriesMap()), tree.getRootDigest());
+    printTreeLayout(new ProxyDirectoriesIndex(tree.getDirectoriesMap()), tree.getRootDigest());
   }
 
   private static void printTreeLayout(Map<Digest, Directory> directoriesIndex, Digest rootDigest) {
@@ -934,7 +934,7 @@ class Cat {
     @Override
     protected void run(Instance instance, Digest digest) throws Exception {
       Tree tree = fetchTree(instance, digest);
-      printTreeLayout(DigestUtil.proxyDirectoriesIndex(tree.getDirectoriesMap()), digest);
+      printTreeLayout(new ProxyDirectoriesIndex(tree.getDirectoriesMap()), digest);
     }
   }
 

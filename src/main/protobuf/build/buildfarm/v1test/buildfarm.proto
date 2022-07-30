@@ -991,7 +991,7 @@ message QueuedOperation {
 
   build.bazel.remote.execution.v2.Command command = 2;
 
-  build.bazel.remote.execution.v2.Tree legacy_tree = 4;
+  reserved 4;
 
   Tree tree = 5;
 }
