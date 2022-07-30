@@ -545,28 +545,28 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
-    InputStream in;
+    // InputStream in;
+    // try {
+    //   in = newInput(digest, offset);
+    // } catch (IOException e) {
+    //   blobObserver.onError(e);
+    //   return;
+    // }
+
+    InputStream in1;
     try {
-      in = newInput(digest, offset);
+      in1 = newInput(digest, offset);
     } catch (IOException e) {
       blobObserver.onError(e);
       return;
     }
-
-    // InputStream in1;
-    // try {
-    //   in1 = newInput(digest, offset);
-    // } catch (IOException e) {
-    //   blobObserver.onError(e);
-    //   return;
-    // }
-    // ZstdCompressingInputStream in;
-    // try {
-    //   in = new ZstdCompressingInputStream(in1);
-    // } catch (IOException e) {
-    //   blobObserver.onError(e);
-    //   return;
-    // }
+    ZstdCompressingInputStream in;
+    try {
+      in = new ZstdCompressingInputStream(in1);
+    } catch (IOException e) {
+      blobObserver.onError(e);
+      return;
+    }
 
     blobObserver.setOnCancelHandler(
         () -> {

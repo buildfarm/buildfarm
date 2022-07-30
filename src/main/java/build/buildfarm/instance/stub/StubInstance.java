@@ -526,7 +526,7 @@ public class StubInstance implements Instance {
       blobObserver.setOnCancelHandler(
           () -> {
             if (!wasCompleted.get()) {
-              requestStream.onError(Status.CANCELLED.asException());
+              //requestStream.onError(Status.CANCELLED.asException());
             }
           });
       blobObserver.setOnReadyHandler(this::onReady);
