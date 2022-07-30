@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
- 
+
     <property name="LOGS" value="/tmp/bfadmin" />
- 
+
     <appender name="Console"
         class="ch.qos.logback.core.ConsoleAppender">
         <layout class="ch.qos.logback.classic.PatternLayout">
@@ -11,7 +11,7 @@
             </Pattern>
         </layout>
     </appender>
- 
+
     <appender name="RollingFile"
         class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOGS}/bfadmin.log</file>
@@ -19,7 +19,7 @@
             class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
             <Pattern>%d %p %C{1.} [%t] %m%n</Pattern>
         </encoder>
- 
+
         <rollingPolicy
             class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- rollover daily and when the file reaches 10 MegaBytes -->
@@ -32,10 +32,10 @@
             <maxHistory>10</maxHistory>
         </rollingPolicy>
     </appender>
-     
+
     <!-- LOG everything at INFO level -->
     <root level="info">
         <appender-ref ref="Console" />
     </root>
- 
+
 </configuration>

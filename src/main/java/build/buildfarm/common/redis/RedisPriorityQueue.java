@@ -15,13 +15,9 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.StringVisitor;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import redis.clients.jedis.JedisCluster;
 
 /**
@@ -66,7 +62,7 @@ public class RedisPriorityQueue extends QueueInterface {
     this.name = name;
     this.time = time;
     this.keys = Arrays.asList(name);
-    this.script = getLuaScript("zpoplpush.lua");
+    this.script = getLuaScript();
   }
 
   /**
@@ -253,16 +249,30 @@ public class RedisPriorityQueue extends QueueInterface {
 
   /**
    * @brief Adds additional functionality to the jedis client.
-   * @details Load the custom lua script so we can have zpoplpush.
+   * @details Load the custom lua script so we can have zpoplpush functionality in our container.
    */
-  private String getLuaScript(String filename) {
-    InputStream luaInputStream = this.getClass().getClassLoader().getResourceAsStream(filename);
-    if (luaInputStream == null) {
-      throw new IllegalArgumentException(filename + " is not found");
-    }
-    return new BufferedReader(new InputStreamReader(luaInputStream))
-        .lines()
-        .collect(Collectors.joining("\n"));
+  private String getLuaScript() {
+    // We return the lua code in-line to avoid any build complexities having to bundle lua code with
+    // the buildfarm artifacts.  Lua code is fed to redis via the eval call.
+    return String.join(
+        "\n",
+        "local zset = ARGV[1]",
+        "local deqName = ARGV[2]",
+        "local val = ''",
+        "local function isempty(s)",
+        "   return s == nil or s == ''",
+        "end",
+        "assert(not isempty(zset), 'ERR1: zset missing')",
+        "assert(not isempty(deqName), 'ERR2: dequeue missing')",
+        "  local pped = redis.call('ZRANGE', zset, 0, 0)",
+        "  if next(pped) ~= nil then",
+        "    for _,item in ipairs(pped) do",
+        "      val = item:gsub('^%d*:', '')",
+        "      redis.call('ZREM', zset, item)",
+        "      redis.call('LPUSH', deqName, val)",
+        "    end",
+        "  end",
+        "return val");
   }
 
   /**

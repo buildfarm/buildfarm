@@ -58,7 +58,11 @@ public class ContentAddressableStorageService
   private static final Logger logger =
       Logger.getLogger(ContentAddressableStorageService.class.getName());
   private static final Histogram missingBlobs =
-      Histogram.build().name("missing_blobs").help("Find missing blobs.").register();
+      Histogram.build()
+          .exponentialBuckets(1, 2, 6)
+          .name("missing_blobs")
+          .help("Find missing blobs.")
+          .register();
 
   private final Instance instance;
   private final long writeDeadlineAfter;

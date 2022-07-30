@@ -482,6 +482,12 @@ message RedisShardBackplaneConfig {
   // adaptive behaviors, specifically queue balancing, will be emulated.
   string redis_uri = 1;
 
+  // the all redis nodes addreses that the JedisCluster can connect to
+  // ideally that's not needed if you have Sentinel set up on some port
+  // but if don't have, probably you will achive better
+  // stability/discoverability that way
+  repeated string redis_nodes_uris = 36;
+
   // the password used to authenticate to redis via `auth`
   string redis_password = 34;
 

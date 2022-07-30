@@ -19,7 +19,7 @@ import java.util.UUID;
 @Controller
 public class AdminController {
   private static final Logger logger = LoggerFactory.getLogger(AdminController.class);
-  
+
   @Autowired
   AdminService adminService;
 
@@ -45,7 +45,7 @@ public class AdminController {
   public String getMainApp() {
     return "redirect:/dashboard";
   }
-  
+
   @RequestMapping("/dashboard")
   public String getDashboard(Model model) {
     if (ui) {

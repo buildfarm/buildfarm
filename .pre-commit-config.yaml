@@ -1,0 +1,28 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+exclude: patches/.*\.patch$
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.2.0
+    hooks:
+      - id: trailing-whitespace
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+  # Uses Google's java formatter.
+  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+    rev: v2.3.0
+    hooks:
+      - id: pretty-format-kotlin
+        args: [--autofix]
+  - repo: local
+    hooks:
+      - id: buildifier
+        name: Buildifier
+        description: Tool for formatting bazel BUILD and .bzl files with a standard convention.
+        language: golang
+        additional_dependencies:
+          - github.com/bazelbuild/buildtools/buildifier@5.0.1
+        files: (BUILD|WORKSPACE|.+\.bazel|.+\.bzl)$
+        entry: buildifier
+        args: ["--lint=fix"]
