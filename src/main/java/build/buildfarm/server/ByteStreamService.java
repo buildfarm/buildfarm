@@ -186,12 +186,12 @@ public class ByteStreamService extends ByteStreamImplBase {
 
       @Override
       public void onNext(ReadResponse response) {
-        int originalSize = response.getData().size();
+        //int originalSize = response.getData().size();
         response = handleCompression(response, compressor);
         delegate.onNext(response);
         responseCount++;
-        //responseBytes += response.getData().size();
-        responseBytes = originalSize;
+        responseBytes += response.getData().size();
+        //responseBytes = originalSize;
       }
 
       @Override
