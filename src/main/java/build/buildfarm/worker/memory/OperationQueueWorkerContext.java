@@ -561,8 +561,8 @@ class OperationQueueWorkerContext implements WorkerContext {
         fetchInputs(
             dirPath, digest, directoriesIndex, childOutputDirectory, inputFiles, inputDirectories);
       } else {
-        inputDirectories.add(digest);
         linkDirectory(dirPath, digest, directoriesIndex);
+        inputDirectories.add(digest);
       }
     }
   }
