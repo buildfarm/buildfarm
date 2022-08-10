@@ -14,6 +14,8 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.cas.ContentAddressableStorage.NOT_FOUND;
+import static build.buildfarm.cas.ContentAddressableStorage.OK;
 import static build.buildfarm.common.Actions.asExecutionStatus;
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
@@ -45,6 +47,7 @@ import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListen
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
@@ -815,6 +818,35 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
+  public ListenableFuture<List<Response>> getAllBlobsFuture(Iterable<Digest> digests) {
+    Executor contextExecutor = Context.current().fixedContextExecutor(directExecutor());
+    return allAsList(
+        Iterables.transform(
+            digests,
+            digest ->
+                catching(
+                    transform(
+                        getBlobFuture(digest, RequestMetadata.getDefaultInstance()),
+                        blob -> {
+                          Response.Builder response = Response.newBuilder().setDigest(digest);
+                          if (blob == null) {
+                            response.setStatus(NOT_FOUND);
+                          } else {
+                            response.setData(blob).setStatus(OK);
+                          }
+                          return response.build();
+                        },
+                        contextExecutor),
+                    Exception.class,
+                    e ->
+                        Response.newBuilder()
+                            .setDigest(digest)
+                            .setStatus(StatusProto.fromThrowable(e))
+                            .build(),
+                    contextExecutor)));
+  }
+
+  @Override
   public void getBlob(
       Digest blobDigest,
       long offset,
@@ -1066,13 +1098,13 @@ public class ShardInstance extends AbstractServerInstance {
                     expectDirectory(
                         reason, directoryBlobDigest, RequestMetadata.getDefaultInstance()),
                     Exception.class,
-                    (t) -> {
+                    e -> {
                       logger.log(
                           Level.SEVERE,
                           format(
                               "transformQueuedOperation(%s): error fetching directory %s",
                               reason, DigestUtil.toString(directoryBlobDigest)),
-                          t);
+                          e);
                       return null;
                     },
                     directExecutor())

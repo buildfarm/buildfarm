@@ -208,7 +208,7 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+  public ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests) {
     // FIXME limit to 4MiB total response
     return transform(
         casFutureStub

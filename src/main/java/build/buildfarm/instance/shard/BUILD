@@ -5,6 +5,7 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/ac",
         "//src/main/java/build/buildfarm/backplane",
+        "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/common/grpc",

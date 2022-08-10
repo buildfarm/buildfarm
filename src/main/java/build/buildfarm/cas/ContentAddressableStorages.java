@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.naming.ConfigurationException;
@@ -194,7 +195,7 @@ public final class ContentAddressableStorages {
       }
 
       @Override
-      public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+      public ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests) {
         return immediateFuture(MemoryCAS.getAll(digests, this::getData));
       }
 

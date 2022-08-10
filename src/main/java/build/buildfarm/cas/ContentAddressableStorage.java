@@ -23,15 +23,22 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
+import com.google.rpc.Code;
+import com.google.rpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.UUID;
 import net.jcip.annotations.ThreadSafe;
 
 @ThreadSafe
 public interface ContentAddressableStorage extends InputStreamFactory {
   long UNLIMITED_ENTRY_SIZE_MAX = -1;
+
+  Status OK = Status.newBuilder().setCode(Code.OK.getNumber()).build();
+
+  Status NOT_FOUND = Status.newBuilder().setCode(Code.NOT_FOUND.getNumber()).build();
 
   /**
    * Blob storage for the CAS. This class should be used at all times when interacting with complete
@@ -83,7 +90,7 @@ public interface ContentAddressableStorage extends InputStreamFactory {
   Blob get(Digest digest);
 
   /** Retrieve a set of blobs from the CAS represented by a future. */
-  ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests);
+  ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests);
 
   InputStream newInput(Digest digest, long offset) throws IOException;
 
