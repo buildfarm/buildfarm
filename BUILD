@@ -38,6 +38,7 @@ java_library(
         ":as-nobody",
         ":delay",
         ":linux-sandbox.binary",
+        ":macos-wrapper",
         ":process-wrapper.binary",
         ":skip_sleep.binary",
         ":skip_sleep.preload",
@@ -106,6 +107,11 @@ genrule(
 sh_binary(
     name = "delay",
     srcs = ["delay.sh"],
+)
+
+sh_binary(
+    name = "macos-wrapper",
+    srcs = ["macos-wrapper.sh"],
 )
 
 # Docker images for buildfarm components
