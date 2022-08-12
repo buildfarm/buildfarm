@@ -6,7 +6,7 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
-import build.buildfarm.v1test.ReindexAllCasRequest;
+import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
@@ -263,11 +263,11 @@ public class AdminServiceImpl implements AdminService {
   }
 
   @Override
-  public void reindexAllCas(){
+  public void reindexCas(){
     ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
     AdminGrpc.AdminFutureStub stub = AdminGrpc.newFutureStub(channel);
-    ReindexAllCasRequest request = ReindexAllCasRequest.newBuilder().setInstanceName("shard").build();
-    stub.reindexAllCas(request);
+    ReindexCasRequest request = ReindexCasRequest.newBuilder().setInstanceName("shard").build();
+    stub.reindexCas(request);
   }
 
   private String getTagValue(String tagName, List<Tag> tags) {
