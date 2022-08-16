@@ -27,7 +27,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.FileNode;
-import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
@@ -185,14 +185,7 @@ public class InputFetcher implements Runnable {
         return 0;
       }
 
-      if (queuedOperation.hasTree()) {
-        directoriesIndex =
-            DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap());
-      } else {
-        // TODO remove legacy interpretation and field after transition
-        directoriesIndex =
-            workerContext.getDigestUtil().createDirectoriesIndex(queuedOperation.getLegacyTree());
-      }
+      directoriesIndex = new ProxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap());
 
       execDir =
           workerContext.createExecDir(

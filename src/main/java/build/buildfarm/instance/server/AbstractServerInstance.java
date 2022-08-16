@@ -67,6 +67,7 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
@@ -990,7 +991,7 @@ public abstract class AbstractServerInstance implements Instance {
       validateAction(
           queuedOperation.getAction(),
           queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
-          DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap()),
+          new ProxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap()),
           inputDigestsBuilder::add,
           preconditionFailure);
       validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
@@ -1045,7 +1046,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateAction(
         action,
         getUnchecked(expect(action.getCommandDigest(), Command.parser(), service, requestMetadata)),
-        DigestUtil.proxyDirectoriesIndex(tree.getDirectoriesMap()),
+        new ProxyDirectoriesIndex(tree.getDirectoriesMap()),
         inputDigestsBuilder::add,
         preconditionFailure);
     validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
@@ -1057,7 +1058,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateAction(
         queuedOperation.getAction(),
         queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
-        DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap()),
+        new ProxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap()),
         digest -> {},
         preconditionFailure);
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
