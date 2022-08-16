@@ -1893,7 +1893,7 @@ public abstract class AbstractServerInstance implements Instance {
   public abstract GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request);
 
   @Override
-  public abstract CasIndexResults reindexCas(String hostName);
+  public abstract CasIndexResults reindexCas();
 
   public abstract FindOperationsResults findOperations(String filterPredicate);
 

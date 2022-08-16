@@ -15,6 +15,9 @@
 package build.buildfarm.common;
 
 import java.util.List;
+import java.util.Set;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.ScanParams;
@@ -27,6 +30,8 @@ import redis.clients.jedis.ScanResult;
  *     that they can no longer obtain CAS data from the missing worker.
  */
 public class WorkerIndexer {
+  private static final Logger logger = Logger.getLogger(WorkerIndexer.class.getName());
+
   /**
    * @brief Handle the reindexing the CAS entries based on a departing worker.
    * @details This is intended to be called by a service endpoint as part of gracefully shutting
@@ -52,7 +57,6 @@ public class WorkerIndexer {
                 reindexNode(cluster, node, settings, results);
               }
             });
-
     return results;
   }
 
@@ -67,6 +71,13 @@ public class WorkerIndexer {
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static void reindexNode(
       JedisCluster cluster, Jedis node, CasIndexSettings settings, CasIndexResults results) {
+
+    Set<String> activeWorkers = cluster.hkeys("Workers");
+    logger.info(
+        String.format(
+            "Initializing CAS Indexer for Node %s with %d active workers.",
+            node.getClient().getHost(), activeWorkers.size()));
+
     // iterate over all CAS entries via scanning
     // and remove worker from the CAS keys.
     // construct CAS query
@@ -79,33 +90,29 @@ public class WorkerIndexer {
     do {
       scanResult = node.scan(cursor, params);
       if (scanResult != null) {
-        for (String hostName : settings.hostNames) {
-          removeWorkerFromCasKeys(cluster, scanResult.getResult(), hostName, results);
+        List<String> casKeys = scanResult.getResult();
+        for (String casKey : casKeys) {
+          results.totalKeys += casKeys.size();
+          Set<String> intersectSource = cluster.smembers(casKey);
+          Set<String> intersectResult =
+              intersectSource.stream()
+                  .distinct()
+                  .filter(activeWorkers::contains)
+                  .collect(Collectors.toSet());
+          results.removedHosts += (intersectSource.size() - intersectResult.size());
+          if (intersectResult.isEmpty()) {
+            results.removedKeys++;
+            cluster.del(casKey);
+          } else {
+            cluster.sadd(casKey, intersectResult.toArray(new String[0]));
+          }
         }
         cursor = scanResult.getCursor();
       }
     } while (!cursor.equals("0"));
-  }
-
-  /**
-   * @brief Delete the worker index from the given cas keys.
-   * @details Accumulates results about the deletion.
-   * @param cluster An established redis cluster.
-   * @param casKeys Keys to remove worker index from.
-   * @param workerName Index to remove.
-   * @param results Accumulating results from performing reindexing.
-   */
-  private static void removeWorkerFromCasKeys(
-      JedisCluster cluster, List<String> casKeys, String workerName, CasIndexResults results) {
-    for (String casKey : casKeys) {
-      results.totalKeys++;
-      if (cluster.srem(casKey, workerName) == 1) {
-        results.removedHosts++;
-      }
-      if (cluster.scard(casKey) == 0) {
-        results.removedKeys++;
-        cluster.del(casKey);
-      }
-    }
+    logger.info(
+        String.format(
+            "CAS Indexer After Node %s Results: %s",
+            node.getClient().getHost(), results.toMessage()));
   }
 }

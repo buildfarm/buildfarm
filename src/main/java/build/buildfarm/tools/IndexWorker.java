@@ -37,10 +37,9 @@ class IndexWorker {
     String host = args[0];
     String instanceName = args[1];
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
-    String reindexworker = args[3];
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
-    CasIndexResults results = instance.reindexCas(reindexworker);
+    CasIndexResults results = instance.reindexCas();
     System.out.println(results.toMessage());
     instance.stop();
   }

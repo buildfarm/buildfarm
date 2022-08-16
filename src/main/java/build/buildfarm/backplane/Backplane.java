@@ -82,7 +82,7 @@ public interface Backplane {
    */
   boolean removeWorker(String workerName, String reason) throws IOException;
 
-  CasIndexResults reindexCas(String workerName) throws IOException;
+  CasIndexResults reindexCas() throws IOException;
 
   void deregisterWorker(String hostName) throws IOException;
 

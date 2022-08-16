@@ -14,21 +14,12 @@
 
 package build.buildfarm.common;
 
-import java.util.List;
-
 /**
  * @class CasIndexSettings
  * @brief Settings used to determine how to index CAS entries and remove worker entries.
  * @details These are used for reindexing when a worker is leaving the cluster.
  */
 public class CasIndexSettings {
-  /**
-   * @field hostName
-   * @brief The name of the worker.
-   * @details This correlates the the worker that needs removed from CAS entries.
-   */
-  public List<String> hostNames;
-
   /**
    * @field scanAmount
    * @brief The number of redis entries to scan at a time.

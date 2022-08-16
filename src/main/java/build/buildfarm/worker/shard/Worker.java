@@ -54,7 +54,6 @@ import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.FilesystemCASConfig;
-import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.worker.DequeueMatchSettings;
@@ -874,28 +873,6 @@ public class Worker extends LoggingMain {
     throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
-  private void runIndexerForWorker() {
-    String clusterEndpoint = config.getAdminConfig().getClusterEndpoint();
-    if (clusterEndpoint.isEmpty()) {
-      logger.warning("Cluster endpoint is not set. Indexer will not run.");
-      return;
-    }
-    ManagedChannel channel = null;
-    try {
-      NettyChannelBuilder builder =
-          NettyChannelBuilder.forTarget(clusterEndpoint).negotiationType(NegotiationType.PLAINTEXT);
-      channel = builder.build();
-      AdminGrpc.AdminFutureStub adminFuture = AdminGrpc.newFutureStub(channel);
-      adminFuture.reindexCas(
-          ReindexCasRequest.newBuilder().setHostId(config.getPublicName()).build());
-      logger.info("Running Indexer for paused worker: " + config.getPublicName());
-    } finally {
-      if (channel != null) {
-        channel.shutdown();
-      }
-    }
-  }
-
   private void startFailsafeRegistration() {
     String endpoint = config.getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
@@ -921,7 +898,6 @@ public class Worker extends LoggingMain {
                     logger.log(Level.INFO, "The current worker is paused from taking on new work!");
                     pipeline.stopMatchingOperations();
                     workerPausedMetric.inc();
-                    runIndexerForWorker();
                   }
                 } catch (Exception e) {
                   logger.log(Level.WARNING, "Could not open .paused file.", e);

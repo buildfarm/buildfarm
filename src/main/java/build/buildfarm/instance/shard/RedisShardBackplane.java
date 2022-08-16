@@ -91,10 +91,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
-import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
-import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
@@ -621,38 +619,11 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public CasIndexResults reindexCas(@Nullable String hostName) throws IOException {
-    List<String> hostNames = new ArrayList<>();
-    if (hostName != null) {
-      hostNames.add(hostName);
-    } else {
-      hostNames = getNonactiveWorkers();
-    }
+  public CasIndexResults reindexCas() throws IOException {
     CasIndexSettings settings = new CasIndexSettings();
-    settings.hostNames = hostNames;
     settings.casQuery = config.getCasPrefix() + ":*";
     settings.scanAmount = 10000;
-    logger.info("Running CAS Indexer with settings: " + settings.toString());
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
-  }
-
-  public List<String> getNonactiveWorkers() throws IOException {
-    // get all workers
-    List<String> activeWorkers = new ArrayList<>(getWorkers());
-    List<String> allUptimeKeys = new ArrayList<>();
-    Map<String, JedisPool> clusterNodes = client.call(jedis -> jedis.getClusterNodes());
-    for (Map.Entry<String, JedisPool> entry : clusterNodes.entrySet()) {
-      Jedis singlejedis = entry.getValue().getResource();
-      allUptimeKeys.addAll(client.call(jedis -> singlejedis.keys("startTime/*:8981")));
-    }
-    List<String> nonactiveWorkers = new ArrayList<>();
-    for (String key : allUptimeKeys) {
-      String hostName = key.split("/")[1];
-      if (!activeWorkers.contains(hostName)) {
-        nonactiveWorkers.add(hostName);
-      }
-    }
-    return nonactiveWorkers;
   }
 
   @SuppressWarnings("ConstantConditions")
