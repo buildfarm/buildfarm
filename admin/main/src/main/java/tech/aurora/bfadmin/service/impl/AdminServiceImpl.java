@@ -7,7 +7,7 @@ import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
 import build.buildfarm.v1test.ReindexCasRequest;
-import build.buildfarm.v1test.ReindexCasRequestResults;
+import com.amazonaws.SdkClientException;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
 import com.amazonaws.services.autoscaling.model.AutoScalingGroup;
@@ -23,6 +23,7 @@ import com.amazonaws.services.ec2.model.DescribeInstancesResult;
 import com.amazonaws.services.ec2.model.Filter;
 import com.amazonaws.services.ec2.model.Reservation;
 import com.amazonaws.services.ec2.model.Tag;
+import com.amazonaws.util.EC2MetadataUtils;
 import com.google.rpc.Status;
 import tech.aurora.bfadmin.model.Asg;
 import tech.aurora.bfadmin.model.ClusterDetails;
@@ -31,6 +32,8 @@ import tech.aurora.bfadmin.model.Instance;
 import tech.aurora.bfadmin.service.AdminService;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+
+import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -122,8 +125,8 @@ public class AdminServiceImpl implements AdminService {
   public ClusterDetails getClusterDetails() {
     ClusterDetails clusterDetails = new ClusterDetails();
     clusterDetails.setClusterId(clusterId);
-    clusterDetails.setServers(getInstances(clusterId,"server"));
-    clusterDetails.setWorkers(getInstances(clusterId,"worker"));
+    clusterDetails.setServers(getInstances(clusterId,"server", true));
+    clusterDetails.setWorkers(getInstances(clusterId,"worker", true));
     return clusterDetails;
   }
 
@@ -174,7 +177,29 @@ public class AdminServiceImpl implements AdminService {
     return response.toString();
   }
 
-  private List<Instance> getInstances(String clusterId, String type) {
+  @Override
+  public void reindexCas(){
+    ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
+    AdminGrpc.AdminFutureStub stub = AdminGrpc.newFutureStub(channel);
+    ReindexCasRequest request = ReindexCasRequest.newBuilder().setInstanceName("shard").build();
+    stub.reindexCas(request);
+  }
+
+  @Override
+  public boolean isPrimaryAdminHost() {
+    String instanceId;
+    try {
+      instanceId = EC2MetadataUtils.getInstanceId();
+      if (getInstances(clusterId, "server", false).get(0).getEc2Instance().getInstanceId().equals(instanceId)) {
+        return true;
+      }
+    } catch (Exception e) {
+      logger.warn("Could not determine if a primary host.", e);
+    }
+    return false;
+  }
+
+  private List<Instance> getInstances(String clusterId, String type, boolean getUptimes) {
     List<Instance> instances = new ArrayList<>();
     for (com.amazonaws.services.ec2.model.Instance e : getEc2Instances(clusterId, type)) {
       Instance instance = new Instance();
@@ -187,7 +212,7 @@ public class AdminServiceImpl implements AdminService {
       instance.setGroupType(type);
       instances.add(instance);
     }
-    return updateContainersUptimes(instances, type);
+    return getUptimes ? updateContainersUptimes(instances, type) : instances;
   }
 
   private List<Instance> updateContainersUptimes(List<Instance> instances, String type) {
@@ -260,14 +285,6 @@ public class AdminServiceImpl implements AdminService {
       }
     }
     return asgNames;
-  }
-
-  @Override
-  public void reindexCas(){
-    ManagedChannel channel = ManagedChannelBuilder.forAddress(deploymentDomain, deploymentPort).usePlaintext().build();
-    AdminGrpc.AdminFutureStub stub = AdminGrpc.newFutureStub(channel);
-    ReindexCasRequest request = ReindexCasRequest.newBuilder().setInstanceName("shard").build();
-    stub.reindexCas(request);
   }
 
   private String getTagValue(String tagName, List<Tag> tags) {
