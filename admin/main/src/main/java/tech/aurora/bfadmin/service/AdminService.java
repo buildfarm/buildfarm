@@ -27,4 +27,6 @@ public interface AdminService {
   String getInstanceIdByPrivateDnsName(String dnsName);
 
   int stopDockerContainer(String instanceId, String containerType, String grpcEndpoint, int grpcPort);
+
+  boolean isPrimaryAdminHost();
 }
