@@ -14,15 +14,10 @@
 
 package build.buildfarm.server;
 
-import static build.buildfarm.common.io.Utils.formatIOError;
-import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
-import static java.util.logging.Level.SEVERE;
-
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.config.ConfigAdjuster;
 import build.buildfarm.common.config.ServerOptions;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.MetricsPublisher;
@@ -34,7 +29,6 @@ import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.MetricsConfig;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.protobuf.TextFormat;
-import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
@@ -42,13 +36,13 @@ import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import io.prometheus.client.Counter;
+import me.dinowernli.grpc.prometheus.Configuration;
+import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
+import javax.naming.ConfigurationException;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.Security;
 import java.util.Collections;
 import java.util.List;
@@ -57,10 +51,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.naming.ConfigurationException;
-import me.dinowernli.grpc.prometheus.Configuration;
-import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
+
+import static build.buildfarm.common.io.Utils.formatIOError;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.util.logging.Level.SEVERE;
 
 @SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
@@ -79,18 +75,19 @@ public class BuildFarmServer extends LoggingMain {
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
   private final Instance instance;
   private final HealthStatusManager healthStatusManager;
-  private final Server server;
+  private final io.grpc.Server server;
   private boolean stopping = false;
 
-  public BuildFarmServer(String session, BuildFarmServerConfig config)
-      throws InterruptedException, ConfigurationException {
-    this(session, ServerBuilder.forPort(config.getPort()), config);
-  }
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   public BuildFarmServer(
-      String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
-      throws InterruptedException, ConfigurationException {
+      String session, BuildFarmServerConfig config, String configLocation)
+          throws InterruptedException, ConfigurationException, IOException {
     super("BuildFarmServer");
+
+    configs.loadConfigs(configLocation);
+
+    ServerBuilder<?> serverBuilder = ServerBuilder.forPort(configs.getServer().getPort());
 
     instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
 
@@ -186,13 +183,13 @@ public class BuildFarmServer extends LoggingMain {
     }
   }
 
-  public synchronized void start(String publicName, int prometheusPort) throws IOException {
+  public synchronized void start(String publicName) throws IOException {
     checkState(!stopping, "must not call start after stop");
     instance.start(publicName);
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    PrometheusPublisher.startHttpServer(prometheusPort);
+    PrometheusPublisher.startHttpServer(configs.getServer().getPrometheusPort());
     healthCheckMetric.labels("start").inc();
   }
 
@@ -262,7 +259,6 @@ public class BuildFarmServer extends LoggingMain {
       return false;
     }
 
-    Path configPath = Paths.get(residue.get(0));
     ServerOptions options = parser.getOptions(ServerOptions.class);
 
     String session = "buildfarm-server";
@@ -271,21 +267,18 @@ public class BuildFarmServer extends LoggingMain {
     }
     session += "-" + UUID.randomUUID();
     BuildFarmServer server;
-    try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      BuildFarmServerConfig config =
-          toBuildFarmServerConfig(new InputStreamReader(configInputStream), options);
-      server = new BuildFarmServer(session, config);
-      configInputStream.close();
-      server.start(options.publicName, config.getPrometheusConfig().getPort());
+    try {
+      server = new BuildFarmServer(session, null, residue.get(0));
+      server.start(options.publicName);
       server.blockUntilShutdown();
       server.stop();
       return true;
     } catch (IOException e) {
       System.err.println("error: " + formatIOError(e));
-    } catch (ConfigurationException e) {
-      System.err.println("error: " + e.getMessage());
     } catch (InterruptedException e) {
       System.err.println("error: interrupted");
+    } catch (ConfigurationException e) {
+      throw new RuntimeException(e);
     }
     return false;
   }

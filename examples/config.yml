@@ -1,0 +1,23 @@
+server:
+  name: shard
+  # The digest function for this instance, required to match out of band between the client and server
+  # since resource names must be determined on the client for a valid upload
+  digestFunction: "SHA256"
+  actionCachePolicy: READ_AND_WRITE
+  # The listening port of the buildfarm grpc server
+  port: 8980
+  # The publishing port of the buildfarm prometheus metrics
+  prometheusPort: 9090
+  # Publish GRPC metrics to promethesus for each server endpoint. This is used
+  # for SLAs at API boundaries. You may want something similar at the proxy level
+  # to see frontend/backend performance.
+  grpcMetrics:
+    # Whether to enable this metric gathering at all. If disabled, there should
+    # be no related metrics registered in prometheus.
+    enabled: false
+    # These metrics are more expensive to calculate. If disabled, you only
+    # receive core metrics. Core metrics include send/receive totals tagged
+    # with return codes.  No latencies.
+    provideLatencyHistograms: false
+  casWriteTimeout: 3600
+  bytestreamTimeout: 3600
