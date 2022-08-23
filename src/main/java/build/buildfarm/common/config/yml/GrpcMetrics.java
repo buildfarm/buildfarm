@@ -4,14 +4,27 @@ public class GrpcMetrics {
     private boolean enabled;
     private boolean provideLatencyHistograms;
 
-    public boolean getEnabled() { return enabled; }
-    public void setEnabled(boolean value) { this.enabled = value; }
-    public boolean getProvideLatencyHistograms() { return provideLatencyHistograms; }
-    public void setProvideLatencyHistograms(boolean value) { this.provideLatencyHistograms = value; }
+    public boolean isEnabled() {
+        return enabled;
+    }
 
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public boolean isProvideLatencyHistograms() {
+        return provideLatencyHistograms;
+    }
+
+    public void setProvideLatencyHistograms(boolean provideLatencyHistograms) {
+        this.provideLatencyHistograms = provideLatencyHistograms;
+    }
+
+    @Override
     public String toString() {
-        return "\n" +
-                "\t\tenabled: " + enabled + "\n" +
-                "\t\tprovideLatencyHistograms: " + provideLatencyHistograms;
+        return "GrpcMetrics{" +
+                "enabled=" + enabled +
+                ", provideLatencyHistograms=" + provideLatencyHistograms +
+                '}';
     }
 }

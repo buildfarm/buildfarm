@@ -1,8 +1,11 @@
 server:
+  # One of SHARD or MEMORY
+  instanceType: SHARD
   name: shard
   # The digest function for this instance, required to match out of band between the client and server
   # since resource names must be determined on the client for a valid upload
   digestFunction: "SHA256"
+  # One of READ_AND_WRITE or READ_ONLY
   actionCachePolicy: READ_AND_WRITE
   # The listening port of the buildfarm grpc server
   port: 8980
@@ -21,3 +24,4 @@ server:
     provideLatencyHistograms: false
   casWriteTimeout: 3600
   bytestreamTimeout: 3600
+  sslCertificatePath:

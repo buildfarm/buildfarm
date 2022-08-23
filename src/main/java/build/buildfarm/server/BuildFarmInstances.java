@@ -16,46 +16,41 @@ package build.buildfarm.server;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.instance.shard.ShardInstance;
-import build.buildfarm.v1test.InstanceConfig;
 import javax.naming.ConfigurationException;
 
 public class BuildFarmInstances {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   public static Instance createInstance(
-      String session, InstanceConfig instanceConfig, Runnable onStop)
-      throws InterruptedException, ConfigurationException {
-    String name = instanceConfig.getName();
-    HashFunction hashFunction = getValidHashFunction(instanceConfig);
+      String session, Runnable onStop)
+          throws InterruptedException, ConfigurationException {
+    System.out.println("TEST CONFIGS: " + configs); //TODO: REMOVE
+    String name = configs.getServer().getName();
+    HashFunction hashFunction = getValidHashFunction();
     DigestUtil digestUtil = new DigestUtil(hashFunction);
     Instance instance;
-    switch (instanceConfig.getTypeCase()) {
-      default:
-      case TYPE_NOT_SET:
-        throw new IllegalArgumentException("Instance type not set in config");
-      case MEMORY_INSTANCE_CONFIG:
-        instance = new MemoryInstance(name, digestUtil, instanceConfig.getMemoryInstanceConfig());
+    switch (configs.getServer().getInstanceType()) {
+      default: throw new IllegalArgumentException("Instance type not set in config");
+      case "MEMORY":
+        instance = new MemoryInstance(name, digestUtil, /* TODO - REMOVE ARG */ null);
         break;
-      case SHARD_INSTANCE_CONFIG:
+      case "SHARD":
         instance =
             new ShardInstance(
                 name,
                 session + "-" + name,
                 digestUtil,
-                instanceConfig.getShardInstanceConfig(),
+                    /* TODO - REMOVE ARG */ null,
                 onStop);
         break;
     }
     return instance;
   }
 
-  private static HashFunction getValidHashFunction(InstanceConfig config)
-      throws ConfigurationException {
-    try {
-      return HashFunction.get(config.getDigestFunction());
-    } catch (IllegalArgumentException e) {
-      throw new ConfigurationException("hash_function value unrecognized");
-    }
+  private static HashFunction getValidHashFunction() {
+    return HashFunction.valueOf(configs.getServer().getDigestFunction());
   }
 }

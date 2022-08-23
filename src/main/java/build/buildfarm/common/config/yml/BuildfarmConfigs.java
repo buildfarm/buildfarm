@@ -11,23 +11,16 @@ import java.util.logging.Logger;
 
 public class BuildfarmConfigs {
     private static final Logger logger = Logger.getLogger(BuildfarmConfigs.class.getName());
-
     private static BuildfarmConfigs buildfarmConfigs;
     private static Server server;
+
+    private BuildfarmConfigs() {}
 
     public static BuildfarmConfigs getInstance() {
         if(buildfarmConfigs == null) {
             buildfarmConfigs = new BuildfarmConfigs();
         }
         return buildfarmConfigs;
-    }
-
-    public void setServer(Server value) {
-        this.server = value;
-    }
-
-    public Server getServer() {
-        return this.server;
     }
 
     public void loadConfigs(String configLocation) throws IOException {
@@ -38,8 +31,26 @@ public class BuildfarmConfigs {
         }
     }
 
+    public BuildfarmConfigs getBuildfarmConfigs() {
+        return buildfarmConfigs;
+    }
+
+    public void setBuildfarmConfigs(BuildfarmConfigs buildfarmConfigs) {
+        this.buildfarmConfigs = buildfarmConfigs;
+    }
+
+    public Server getServer() {
+        return server;
+    }
+
+    public void setServer(Server server) {
+        this.server = server;
+    }
+
+    @Override
     public String toString() {
-        return "Effective Buildfarm Configs: \n" +
-                server.toString() + "\n";
+        return "BuildfarmConfigs{" +
+                "server=" + server +
+                '}';
     }
 }
