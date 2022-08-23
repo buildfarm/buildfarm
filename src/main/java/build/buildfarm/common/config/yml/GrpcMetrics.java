@@ -1,8 +1,8 @@
 package build.buildfarm.common.config.yml;
 
 public class GrpcMetrics {
-    private boolean enabled;
-    private boolean provideLatencyHistograms;
+    private boolean enabled = false;
+    private boolean provideLatencyHistograms = false;
 
     public boolean isEnabled() {
         return enabled;

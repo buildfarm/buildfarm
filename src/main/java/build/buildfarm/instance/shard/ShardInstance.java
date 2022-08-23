@@ -14,34 +14,6 @@
 
 package build.buildfarm.instance.shard;
 
-import static build.buildfarm.common.Actions.asExecutionStatus;
-import static build.buildfarm.common.Actions.checkPreconditionFailure;
-import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
-import static build.buildfarm.instance.shard.Util.correctMissingBlob;
-import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.util.concurrent.Futures.addCallback;
-import static com.google.common.util.concurrent.Futures.allAsList;
-import static com.google.common.util.concurrent.Futures.catching;
-import static com.google.common.util.concurrent.Futures.catchingAsync;
-import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static com.google.common.util.concurrent.Futures.transform;
-import static com.google.common.util.concurrent.Futures.transformAsync;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
-import static java.lang.String.format;
-import static java.util.concurrent.Executors.newFixedThreadPool;
-import static java.util.concurrent.Executors.newSingleThreadExecutor;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
-import static java.util.concurrent.TimeUnit.MICROSECONDS;
-import static java.util.concurrent.TimeUnit.MINUTES;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
-import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
-
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -68,6 +40,7 @@ import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
@@ -83,7 +56,6 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
-import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.Tree;
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -122,6 +94,8 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
+
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -150,8 +124,34 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
-import javax.naming.ConfigurationException;
+
+import static build.buildfarm.common.Actions.asExecutionStatus;
+import static build.buildfarm.common.Actions.checkPreconditionFailure;
+import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
+import static build.buildfarm.instance.shard.Util.correctMissingBlob;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.Futures.catching;
+import static com.google.common.util.concurrent.Futures.catchingAsync;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.Futures.transformAsync;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static java.lang.String.format;
+import static java.util.concurrent.Executors.newFixedThreadPool;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
 
 public class ShardInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardInstance.class.getName());
@@ -235,19 +235,16 @@ public class ShardInstance extends AbstractServerInstance {
   private boolean stopped = true;
   private final Thread prometheusMetricsThread;
 
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   // TODO: move to config
   private static final Duration queueTimeout = Durations.fromSeconds(60);
 
-  private static Backplane createBackplane(ShardInstanceConfig config, String identifier)
-      throws ConfigurationException {
-    ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
-    switch (backplaneCase) {
-      default:
-      case BACKPLANE_NOT_SET:
-        throw new IllegalArgumentException("Shard Backplane not set in config");
-      case REDIS_SHARD_BACKPLANE_CONFIG:
+  private static Backplane createBackplane(String identifier) {
+    switch (configs.getBackplane().getType()) {
+      default: throw new IllegalArgumentException("Shard Backplane not set in config");
+      case "SHARD":
         return new RedisShardBackplane(
-            config.getRedisShardBackplaneConfig(),
             identifier,
             ShardInstance::stripOperation,
             ShardInstance::stripQueuedOperation);
@@ -258,14 +255,12 @@ public class ShardInstance extends AbstractServerInstance {
       String name,
       String identifier,
       DigestUtil digestUtil,
-      ShardInstanceConfig config,
       Runnable onStop)
-      throws InterruptedException, ConfigurationException {
+      throws InterruptedException {
     this(
         name,
         digestUtil,
-        createBackplane(config, identifier),
-        config,
+        createBackplane(identifier),
         onStop,
         /* actionCacheFetchService=*/ listeningDecorator(newFixedThreadPool(24)));
   }
@@ -274,7 +269,6 @@ public class ShardInstance extends AbstractServerInstance {
       String name,
       DigestUtil digestUtil,
       Backplane backplane,
-      ShardInstanceConfig config,
       Runnable onStop,
       ListeningExecutorService actionCacheFetchService)
       throws InterruptedException {
@@ -284,18 +278,18 @@ public class ShardInstance extends AbstractServerInstance {
         backplane,
         new ShardActionCache(
             DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE, backplane, actionCacheFetchService),
-        config.getRunDispatchedMonitor(),
-        config.getDispatchedMonitorIntervalSeconds(),
-        config.getRunOperationQueuer(),
-        config.getMaxEntrySizeBytes(),
-        config.getMaxCpu(),
-        config.getMaxRequeueAttempts(),
-        config.getMaximumActionTimeout(),
-        config.getUseDenyList(),
+            configs.getServer().isRunDispatchedMonitor(),
+            configs.getServer().getDispatchedMonitorIntervalSeconds(),
+            configs.getServer().isRunOperationQueuer(),
+            configs.getServer().getMaxEntrySizeBytes(),
+            configs.getServer().getMaxCpu(),
+            configs.getServer().getMaxRequeueAttempts(),
+            Duration.newBuilder().setSeconds(configs.getServer().getMaximumActionTimeout()).build(),
+            configs.getServer().isUseDenyList(),
         onStop,
-        WorkerStubs.create(digestUtil, config.getGrpcTimeout()),
+        WorkerStubs.create(digestUtil, Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build()),
         actionCacheFetchService,
-        config.getEnsureOutputsPresent());
+        configs.getServer().isEnsureOutputsPresent());
   }
 
   public ShardInstance(

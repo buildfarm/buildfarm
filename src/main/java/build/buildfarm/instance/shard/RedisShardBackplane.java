@@ -50,7 +50,6 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
-import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableList;
@@ -90,7 +89,6 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
-import javax.naming.ConfigurationException;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.Response;
@@ -129,7 +127,6 @@ public class RedisShardBackplane implements Backplane {
     Integer unknown = 0;
   }
 
-  private final RedisShardBackplaneConfig config;
   private final String source; // used in operation change publication
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
@@ -149,21 +146,17 @@ public class RedisShardBackplane implements Backplane {
   private DistributedState state = new DistributedState();
 
   public RedisShardBackplane(
-      RedisShardBackplaneConfig config,
       String source,
       Function<Operation, Operation> onPublish,
-      Function<Operation, Operation> onComplete)
-      throws ConfigurationException {
-    this(config, source, onPublish, onComplete, JedisClusterFactory.create(config));
+      Function<Operation, Operation> onComplete) {
+    this(source, onPublish, onComplete, JedisClusterFactory.create());
   }
 
   public RedisShardBackplane(
-      RedisShardBackplaneConfig config,
       String source,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
       Supplier<JedisCluster> jedisClusterFactory) {
-    this.config = config;
     this.source = source;
     this.onPublish = onPublish;
     this.onComplete = onComplete;

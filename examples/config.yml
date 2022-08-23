@@ -1,27 +1,99 @@
+digestFunction: SHA256
 server:
-  # One of SHARD or MEMORY
   instanceType: SHARD
   name: shard
-  # The digest function for this instance, required to match out of band between the client and server
-  # since resource names must be determined on the client for a valid upload
-  digestFunction: "SHA256"
-  # One of READ_AND_WRITE or READ_ONLY
   actionCachePolicy: READ_AND_WRITE
-  # The listening port of the buildfarm grpc server
   port: 8980
-  # The publishing port of the buildfarm prometheus metrics
   prometheusPort: 9090
-  # Publish GRPC metrics to promethesus for each server endpoint. This is used
-  # for SLAs at API boundaries. You may want something similar at the proxy level
-  # to see frontend/backend performance.
   grpcMetrics:
-    # Whether to enable this metric gathering at all. If disabled, there should
-    # be no related metrics registered in prometheus.
     enabled: false
-    # These metrics are more expensive to calculate. If disabled, you only
-    # receive core metrics. Core metrics include send/receive totals tagged
-    # with return codes.  No latencies.
     provideLatencyHistograms: false
   casWriteTimeout: 3600
   bytestreamTimeout: 3600
   sslCertificatePath:
+  runDispatchedMonitor: true
+  dispatchedMonitorIntervalSeconds: 1
+  runOperationQueuer: true
+  ensureOutputsPresent: false
+  maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+  maxRequeueAttempts: 5
+  useDenyList: true
+  grpcTimeout: 3600
+  maximumActionTimeout: 3600
+  executeKeepaliveAfterSeconds: 60
+  recordBesEvents: false
+  admin:
+    deploymentEnvironment: aws
+    clusterId: local
+    clusterEndpoint: "grpc://localhost"
+    region: us-east-1
+  metrics:
+    logLevel: INFO
+backplane:
+  type: SHARD
+  redisUri: "redis://localhost:6379"
+  jedisPoolMaxTotal: 4000
+  workersHashName: "Workers"
+  workerChannel: "WorkerChannel"
+  actionCachePrefix: "ActionCache"
+  actionCacheExpire: 2419200 # 4 weeks
+  actionBlacklistPrefix: "ActionBlacklist"
+  actionBlacklistExpire: 3600 # 1 hour
+  invocationBlacklistPrefix: "InvocationBlacklist"
+  operationPrefix: "Operation"
+  operationExpire: 604800 # 1 week
+  preQueuedOperationsListName: "{Arrival}:PreQueuedOperations"
+  processingListName: "{Arrival}:ProcessingOperations"
+  processingPrefix: "Processing"
+  processingTimeoutMillis: 20000
+  queuedOperationsListName: "{Execution}:QueuedOperations"
+  dispatchingPrefix: "Dispatching"
+  dispatchingTimeoutMillis: 10000
+  dispatchedOperationsHashName: "DispatchedOperations"
+  operationChannelPrefix: "OperationChannel"
+  casPrefix: "ContentAddressableStorage"
+  casExpire: 604800 # 1 week
+  subscribeToBackplane: true
+  runFailsafeOperation: true
+  maxQueueDepth: 100000
+  maxPreQueueDepth: 1000000
+  redisQueueType: NORMAL
+  queues:
+    - name: "cpu"
+      allowUnmatched: true
+      properties:
+        - name: "min-cores"
+          value: "*"
+        - name: "max-cores"
+          value: "*"
+    - name: "gpu"
+      allowUnmatched: true
+      properties:
+        - name: "gpu"
+          value: "1"
+worker:
+  port: 8981
+  publicName: "localhost:8981"
+  capabilities:
+    cas: true
+    execution: true
+  root: "/tmp/worker"
+  inlineContentLimit: 1048567 # 1024 * 1024
+  operationPollPeriod: 1
+  dequeueMatchSettings:
+    platform:
+    acceptEverything: true
+  cas:
+    path: "cache"
+    maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+    maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+    fileDirectoriesIndexInMemory: false
+    skipLoad: false
+  executeStageWidth: 1
+  inputFetchStageWidth: 1
+  inputFetchDeadline: 60
+  linkInputDirectories: true
+  realInputDirectories: "external"
+  defaultActionTimeout: 600
+  maximumActionTimeout: 3600
+  execOwner:

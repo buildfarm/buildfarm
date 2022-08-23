@@ -27,7 +27,6 @@ public class BuildFarmInstances {
   public static Instance createInstance(
       String session, Runnable onStop)
           throws InterruptedException, ConfigurationException {
-    System.out.println("TEST CONFIGS: " + configs); //TODO: REMOVE
     String name = configs.getServer().getName();
     HashFunction hashFunction = getValidHashFunction();
     DigestUtil digestUtil = new DigestUtil(hashFunction);
@@ -43,7 +42,6 @@ public class BuildFarmInstances {
                 name,
                 session + "-" + name,
                 digestUtil,
-                    /* TODO - REMOVE ARG */ null,
                 onStop);
         break;
     }
@@ -51,6 +49,6 @@ public class BuildFarmInstances {
   }
 
   private static HashFunction getValidHashFunction() {
-    return HashFunction.valueOf(configs.getServer().getDigestFunction());
+    return HashFunction.valueOf(configs.getDigestFunction());
   }
 }

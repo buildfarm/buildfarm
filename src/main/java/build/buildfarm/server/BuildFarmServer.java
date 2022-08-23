@@ -101,13 +101,13 @@ public class BuildFarmServer extends LoggingMain {
         .addService(
             new ContentAddressableStorageService(
                 instance,
-                /* deadlineAfter=*/ configs.getServer().getCasWriteTimeout(),
+                /* deadlineAfter=*/ /* TODO - REMOVE */ configs.getServer().getCasWriteTimeout(),
                 TimeUnit.SECONDS
                 /* requestLogLevel=*/ ))
         .addService(
             new ByteStreamService(
                 instance,
-                /* writeDeadlineAfter=*/ configs.getServer().getBytestreamTimeout(),
+                /* writeDeadlineAfter=*/ /* TODO - REMOVE */ configs.getServer().getBytestreamTimeout(),
                 TimeUnit.SECONDS))
         .addService(
             new ExecutionService(
@@ -124,14 +124,13 @@ public class BuildFarmServer extends LoggingMain {
         .addService(new PublishBuildEventService(/* TODO - REMOVE */ null))
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .intercept(headersInterceptor);
-    handleGrpcMetricIntercepts(serverBuilder, configs);
+    handleGrpcMetricIntercepts(serverBuilder);
     server = serverBuilder.build();
 
     logger.log(Level.INFO, String.format("%s initialized", session));
   }
 
-  public static void handleGrpcMetricIntercepts(
-      ServerBuilder<?> serverBuilder, BuildfarmConfigs configs) {
+  public static void handleGrpcMetricIntercepts(ServerBuilder<?> serverBuilder) {
     // Decide how to capture GRPC Prometheus metrics.
     // By default, we don't capture any.
     if (configs.getServer().getGrpcMetrics().isEnabled()) {

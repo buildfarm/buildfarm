@@ -12,7 +12,13 @@ import java.util.logging.Logger;
 public class BuildfarmConfigs {
     private static final Logger logger = Logger.getLogger(BuildfarmConfigs.class.getName());
     private static BuildfarmConfigs buildfarmConfigs;
+
+    private static String digestFunction = "SHA256";
     private static Server server;
+
+    private static Backplane backplane;
+
+    private static Worker worker;
 
     private BuildfarmConfigs() {}
 
@@ -39,6 +45,14 @@ public class BuildfarmConfigs {
         this.buildfarmConfigs = buildfarmConfigs;
     }
 
+    public String getDigestFunction() {
+        return digestFunction;
+    }
+
+    public void setDigestFunction(String digestFunction) {
+        this.digestFunction = digestFunction;
+    }
+
     public Server getServer() {
         return server;
     }
@@ -47,10 +61,29 @@ public class BuildfarmConfigs {
         this.server = server;
     }
 
+    public Backplane getBackplane() {
+        return backplane;
+    }
+
+    public void setBackplane(Backplane backplane) {
+        this.backplane = backplane;
+    }
+
+    public Worker getWorker() {
+        return worker;
+    }
+
+    public void setWorker(Worker worker) {
+        this.worker = worker;
+    }
+
     @Override
     public String toString() {
         return "BuildfarmConfigs{" +
-                "server=" + server +
+                "digestFunction='" + digestFunction + '\'' +
+                ", server=" + server +
+                ", worker=" + worker +
+                ", backplane=" + backplane +
                 '}';
     }
 }
