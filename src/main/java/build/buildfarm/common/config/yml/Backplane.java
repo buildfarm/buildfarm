@@ -4,34 +4,39 @@ import java.util.Arrays;
 
 public class Backplane {
     private String type;
-    private String redisURI;
-    private long jedisPoolMaxTotal;
+    private String redisUri;
+    private int jedisPoolMaxTotal;
     private String workersHashName;
     private String workerChannel;
     private String actionCachePrefix;
-    private long actionCacheExpire;
+    private int actionCacheExpire;
     private String actionBlacklistPrefix;
-    private long actionBlacklistExpire;
+    private int actionBlacklistExpire;
     private String invocationBlacklistPrefix;
     private String operationPrefix;
-    private long operationExpire;
+    private int operationExpire;
     private String preQueuedOperationsListName;
     private String processingListName;
     private String processingPrefix;
-    private long processingTimeoutMillis;
+    private int processingTimeoutMillis;
     private String queuedOperationsListName;
     private String dispatchingPrefix;
-    private long dispatchingTimeoutMillis;
+    private int dispatchingTimeoutMillis;
     private String dispatchedOperationsHashName;
     private String operationChannelPrefix;
     private String casPrefix;
-    private long casExpire;
+    private int casExpire;
     private boolean subscribeToBackplane;
     private boolean runFailsafeOperation;
-    private long maxQueueDepth;
-    private long maxPreQueueDepth;
+    private int maxQueueDepth;
+    private int maxPreQueueDepth;
     private String redisQueueType;
     private Queue[] queues;
+    private String redisPassword;
+    private int timeout;
+    private String[] redisNodes;
+    private int maxAttempts;
+    private boolean cacheCas;
 
     public String getType() {
         return type;
@@ -41,19 +46,19 @@ public class Backplane {
         this.type = type;
     }
 
-    public String getRedisURI() {
-        return redisURI;
+    public String getRedisUri() {
+        return redisUri;
     }
 
-    public void setRedisURI(String redisURI) {
-        this.redisURI = redisURI;
+    public void setRedisUri(String redisUri) {
+        this.redisUri = redisUri;
     }
 
-    public long getJedisPoolMaxTotal() {
+    public int getJedisPoolMaxTotal() {
         return jedisPoolMaxTotal;
     }
 
-    public void setJedisPoolMaxTotal(long jedisPoolMaxTotal) {
+    public void setJedisPoolMaxTotal(int jedisPoolMaxTotal) {
         this.jedisPoolMaxTotal = jedisPoolMaxTotal;
     }
 
@@ -81,11 +86,11 @@ public class Backplane {
         this.actionCachePrefix = actionCachePrefix;
     }
 
-    public long getActionCacheExpire() {
+    public int getActionCacheExpire() {
         return actionCacheExpire;
     }
 
-    public void setActionCacheExpire(long actionCacheExpire) {
+    public void setActionCacheExpire(int actionCacheExpire) {
         this.actionCacheExpire = actionCacheExpire;
     }
 
@@ -97,11 +102,11 @@ public class Backplane {
         this.actionBlacklistPrefix = actionBlacklistPrefix;
     }
 
-    public long getActionBlacklistExpire() {
+    public int getActionBlacklistExpire() {
         return actionBlacklistExpire;
     }
 
-    public void setActionBlacklistExpire(long actionBlacklistExpire) {
+    public void setActionBlacklistExpire(int actionBlacklistExpire) {
         this.actionBlacklistExpire = actionBlacklistExpire;
     }
 
@@ -121,11 +126,11 @@ public class Backplane {
         this.operationPrefix = operationPrefix;
     }
 
-    public long getOperationExpire() {
+    public int getOperationExpire() {
         return operationExpire;
     }
 
-    public void setOperationExpire(long operationExpire) {
+    public void setOperationExpire(int operationExpire) {
         this.operationExpire = operationExpire;
     }
 
@@ -153,11 +158,11 @@ public class Backplane {
         this.processingPrefix = processingPrefix;
     }
 
-    public long getProcessingTimeoutMillis() {
+    public int getProcessingTimeoutMillis() {
         return processingTimeoutMillis;
     }
 
-    public void setProcessingTimeoutMillis(long processingTimeoutMillis) {
+    public void setProcessingTimeoutMillis(int processingTimeoutMillis) {
         this.processingTimeoutMillis = processingTimeoutMillis;
     }
 
@@ -177,11 +182,11 @@ public class Backplane {
         this.dispatchingPrefix = dispatchingPrefix;
     }
 
-    public long getDispatchingTimeoutMillis() {
+    public int getDispatchingTimeoutMillis() {
         return dispatchingTimeoutMillis;
     }
 
-    public void setDispatchingTimeoutMillis(long dispatchingTimeoutMillis) {
+    public void setDispatchingTimeoutMillis(int dispatchingTimeoutMillis) {
         this.dispatchingTimeoutMillis = dispatchingTimeoutMillis;
     }
 
@@ -209,11 +214,11 @@ public class Backplane {
         this.casPrefix = casPrefix;
     }
 
-    public long getCasExpire() {
+    public int getCasExpire() {
         return casExpire;
     }
 
-    public void setCasExpire(long casExpire) {
+    public void setCasExpire(int casExpire) {
         this.casExpire = casExpire;
     }
 
@@ -233,19 +238,19 @@ public class Backplane {
         this.runFailsafeOperation = runFailsafeOperation;
     }
 
-    public long getMaxQueueDepth() {
+    public int getMaxQueueDepth() {
         return maxQueueDepth;
     }
 
-    public void setMaxQueueDepth(long maxQueueDepth) {
+    public void setMaxQueueDepth(int maxQueueDepth) {
         this.maxQueueDepth = maxQueueDepth;
     }
 
-    public long getMaxPreQueueDepth() {
+    public int getMaxPreQueueDepth() {
         return maxPreQueueDepth;
     }
 
-    public void setMaxPreQueueDepth(long maxPreQueueDepth) {
+    public void setMaxPreQueueDepth(int maxPreQueueDepth) {
         this.maxPreQueueDepth = maxPreQueueDepth;
     }
 
@@ -265,11 +270,51 @@ public class Backplane {
         this.queues = queues;
     }
 
+    public String getRedisPassword() {
+        return redisPassword;
+    }
+
+    public void setRedisPassword(String redisPassword) {
+        this.redisPassword = redisPassword;
+    }
+
+    public int getTimeout() {
+        return timeout;
+    }
+
+    public void setTimeout(int timeout) {
+        this.timeout = timeout;
+    }
+
+    public String[] getRedisNodes() {
+        return redisNodes;
+    }
+
+    public void setRedisNodes(String[] redisNodes) {
+        this.redisNodes = redisNodes;
+    }
+
+    public int getMaxAttempts() {
+        return maxAttempts;
+    }
+
+    public void setMaxAttempts(int maxAttempts) {
+        this.maxAttempts = maxAttempts;
+    }
+
+    public boolean isCacheCas() {
+        return cacheCas;
+    }
+
+    public void setCacheCas(boolean cacheCas) {
+        this.cacheCas = cacheCas;
+    }
+
     @Override
     public String toString() {
         return "Backplane{" +
                 "type='" + type + '\'' +
-                ", redisURI='" + redisURI + '\'' +
+                ", redisUri='" + redisUri + '\'' +
                 ", jedisPoolMaxTotal=" + jedisPoolMaxTotal +
                 ", workersHashName='" + workersHashName + '\'' +
                 ", workerChannel='" + workerChannel + '\'' +
@@ -297,6 +342,11 @@ public class Backplane {
                 ", maxPreQueueDepth=" + maxPreQueueDepth +
                 ", redisQueueType='" + redisQueueType + '\'' +
                 ", queues=" + Arrays.toString(queues) +
+                ", redisPassword='" + redisPassword + '\'' +
+                ", timeout=" + timeout +
+                ", redisNodes=" + Arrays.toString(redisNodes) +
+                ", maxAttempts=" + maxAttempts +
+                ", cacheCas=" + cacheCas +
                 '}';
     }
 }

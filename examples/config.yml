@@ -32,6 +32,8 @@ server:
 backplane:
   type: SHARD
   redisUri: "redis://localhost:6379"
+  redisPassword:
+  redisNodes:
   jedisPoolMaxTotal: 4000
   workersHashName: "Workers"
   workerChannel: "WorkerChannel"
@@ -58,6 +60,9 @@ backplane:
   maxQueueDepth: 100000
   maxPreQueueDepth: 1000000
   redisQueueType: NORMAL
+  timeout: 10000
+  maxAttempts: 20
+  cacheCas: false
   queues:
     - name: "cpu"
       allowUnmatched: true

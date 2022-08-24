@@ -2,7 +2,7 @@ package build.buildfarm.common.config.yml;
 
 public class Admin {
     private String deploymentEnvironment;
-    private String clusterID;
+    private String clusterId;
     private String clusterEndpoint;
     private String region;
 
@@ -14,12 +14,12 @@ public class Admin {
         this.deploymentEnvironment = deploymentEnvironment;
     }
 
-    public String getClusterID() {
-        return clusterID;
+    public String getClusterId() {
+        return clusterId;
     }
 
-    public void setClusterID(String clusterID) {
-        this.clusterID = clusterID;
+    public void setClusterId(String clusterId) {
+        this.clusterId = clusterId;
     }
 
     public String getClusterEndpoint() {
@@ -42,7 +42,7 @@ public class Admin {
     public String toString() {
         return "Admin{" +
                 "deploymentEnvironment='" + deploymentEnvironment + '\'' +
-                ", clusterID='" + clusterID + '\'' +
+                ", clusterId='" + clusterId + '\'' +
                 ", clusterEndpoint='" + clusterEndpoint + '\'' +
                 ", region='" + region + '\'' +
                 '}';

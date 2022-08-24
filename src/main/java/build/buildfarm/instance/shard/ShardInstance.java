@@ -96,6 +96,7 @@ import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
 
 import javax.annotation.Nullable;
+import javax.naming.ConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -240,7 +241,7 @@ public class ShardInstance extends AbstractServerInstance {
   // TODO: move to config
   private static final Duration queueTimeout = Durations.fromSeconds(60);
 
-  private static Backplane createBackplane(String identifier) {
+  private static Backplane createBackplane(String identifier) throws ConfigurationException {
     switch (configs.getBackplane().getType()) {
       default: throw new IllegalArgumentException("Shard Backplane not set in config");
       case "SHARD":
@@ -256,7 +257,7 @@ public class ShardInstance extends AbstractServerInstance {
       String identifier,
       DigestUtil digestUtil,
       Runnable onStop)
-      throws InterruptedException {
+          throws InterruptedException, ConfigurationException {
     this(
         name,
         digestUtil,

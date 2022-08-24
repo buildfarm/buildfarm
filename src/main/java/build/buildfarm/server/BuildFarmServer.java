@@ -81,7 +81,7 @@ public class BuildFarmServer extends LoggingMain {
     healthStatusManager = new HealthStatusManager();
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-    if (!configs.getServer().getSslCertificatePath().isEmpty()) {
+    if (configs.getServer().getSslCertificatePath() != null) {
       // There are different Public Key Cryptography Standards (PKCS) that users may format their
       // certificate files in.  By default, the JDK cannot parse all of them.  In particular, it
       // cannot parse PKCS #1 (RSA Cryptography Standard).  When enabling TLS for GRPC, java's
