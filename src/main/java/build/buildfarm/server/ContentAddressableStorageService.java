@@ -14,15 +14,6 @@
 
 package build.buildfarm.server;
 
-import static build.buildfarm.instance.Utils.putBlobFuture;
-import static com.google.common.util.concurrent.Futures.addCallback;
-import static com.google.common.util.concurrent.Futures.allAsList;
-import static com.google.common.util.concurrent.Futures.catching;
-import static com.google.common.util.concurrent.Futures.transform;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static java.lang.String.format;
-import static java.util.concurrent.TimeUnit.MICROSECONDS;
-
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
@@ -36,6 +27,7 @@ import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Tree;
@@ -47,11 +39,21 @@ import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.stub.StreamObserver;
 import io.prometheus.client.Histogram;
+
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+
+import static build.buildfarm.instance.Utils.putBlobFuture;
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.Futures.catching;
+import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
@@ -66,13 +68,12 @@ public class ContentAddressableStorageService
 
   private final Instance instance;
   private final long writeDeadlineAfter;
-  private final TimeUnit writeDeadlineAfterUnits;
 
-  public ContentAddressableStorageService(
-      Instance instance, long writeDeadlineAfter, TimeUnit writeDeadlineAfterUnits) {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  public ContentAddressableStorageService(Instance instance) {
     this.instance = instance;
-    this.writeDeadlineAfter = writeDeadlineAfter;
-    this.writeDeadlineAfterUnits = writeDeadlineAfterUnits;
+    this.writeDeadlineAfter = configs.getServer().getCasWriteTimeout();
   }
 
   String checkMessage(Digest digest, boolean found) {
@@ -192,7 +193,7 @@ public class ContentAddressableStorageService
                                 instance,
                                 batchRequest.getRequestsList(),
                                 writeDeadlineAfter,
-                                writeDeadlineAfterUnits)
+                                TimeUnit.SECONDS)
                             .spliterator(),
                         false)
                     .map((future) -> transform(future, response::addResponses, directExecutor()))

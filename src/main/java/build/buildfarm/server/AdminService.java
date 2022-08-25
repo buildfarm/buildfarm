@@ -18,8 +18,8 @@ import build.buildfarm.admin.Admin;
 import build.buildfarm.admin.aws.AwsAdmin;
 import build.buildfarm.admin.gcp.GcpAdmin;
 import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.DisableScaleInProtectionRequestResults;
@@ -42,6 +42,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -51,8 +52,10 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   private final Admin adminController;
   private final Instance instance;
 
-  public AdminService(AdminConfig config, Instance instance) {
-    this.adminController = getAdminController(config);
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  public AdminService(Instance instance) {
+    this.adminController = getAdminController();
     this.instance = instance;
   }
 
@@ -239,12 +242,12 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     return hostPrivateIp;
   }
 
-  private static Admin getAdminController(AdminConfig config) {
-    switch (config.getDeploymentEnvironment()) {
+  private static Admin getAdminController() {
+    switch (configs.getServer().getAdmin().getDeploymentEnvironment()) {
       default:
         return null;
       case "aws":
-        return new AwsAdmin(config.getAwsAdminConfig().getRegion());
+        return new AwsAdmin(configs.getServer().getCloudRegion());
       case "gcp":
         return new GcpAdmin();
     }

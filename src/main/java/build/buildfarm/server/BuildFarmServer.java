@@ -96,32 +96,17 @@ public class BuildFarmServer extends LoggingMain {
 
     serverBuilder
         .addService(healthStatusManager.getHealthService())
-        .addService(new ActionCacheService(instance, /* TODO - REMOVE */ null))
+        .addService(new ActionCacheService(instance))
         .addService(new CapabilitiesService(instance))
-        .addService(
-            new ContentAddressableStorageService(
-                instance,
-                /* deadlineAfter=*/ /* TODO - REMOVE */ configs.getServer().getCasWriteTimeout(),
-                TimeUnit.SECONDS
-                /* requestLogLevel=*/ ))
-        .addService(
-            new ByteStreamService(
-                instance,
-                /* writeDeadlineAfter=*/ /* TODO - REMOVE */ configs.getServer().getBytestreamTimeout(),
-                TimeUnit.SECONDS))
-        .addService(
-            new ExecutionService(
-                instance,
-                    /* TODO - REMOVE */ 0,
-                TimeUnit.SECONDS,
-                keepaliveScheduler,
-                    /* TODO - REMOVE */ null))
+        .addService(new ContentAddressableStorageService(instance))
+        .addService(new ByteStreamService(instance))
+        .addService(new ExecutionService(instance, keepaliveScheduler))
         .addService(new OperationQueueService(instance))
         .addService(new OperationsService(instance))
-        .addService(new AdminService(/* TODO - REMOVE */ null, instance))
+        .addService(new AdminService(instance))
         .addService(new FetchService(instance))
         .addService(ProtoReflectionService.newInstance())
-        .addService(new PublishBuildEventService(/* TODO - REMOVE */ null))
+        .addService(new PublishBuildEventService())
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .intercept(headersInterceptor);
     handleGrpcMetricIntercepts(serverBuilder);
@@ -149,19 +134,6 @@ public class BuildFarmServer extends LoggingMain {
       serverBuilder.intercept(monitoringInterceptor);
     }
   }
-
-  /*
-  private static MetricsPublisher getMetricsPublisher(MetricsConfig metricsConfig) {
-    switch (metricsConfig.getMetricsDestination()) {
-      default:
-        return new LogMetricsPublisher(metricsConfig);
-      case "aws":
-        return new AwsMetricsPublisher(metricsConfig);
-      case "gcp":
-        return new GcpMetricsPublisher(metricsConfig);
-    }
-  }
-   */
 
   public synchronized void start(String publicName) throws IOException {
     checkState(!stopping, "must not call start after stop");

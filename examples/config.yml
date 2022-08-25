@@ -2,7 +2,7 @@ digestFunction: SHA256
 server:
   instanceType: SHARD
   name: shard
-  actionCachePolicy: READ_AND_WRITE
+  actionCacheReadOnly: false
   port: 8980
   prometheusPort: 9090
   grpcMetrics:
@@ -22,13 +22,17 @@ server:
   maximumActionTimeout: 3600
   executeKeepaliveAfterSeconds: 60
   recordBesEvents: false
+  clusterId: local
+  cloudRegion: us-east-1
   admin:
     deploymentEnvironment: aws
-    clusterId: local
     clusterEndpoint: "grpc://localhost"
-    region: us-east-1
   metrics:
+    publisher: log
     logLevel: INFO
+    topic: test
+    topicMaxConnections: 1000
+    secretName: test
 backplane:
   type: SHARD
   redisUri: "redis://localhost:6379"

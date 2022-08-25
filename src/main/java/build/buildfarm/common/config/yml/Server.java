@@ -3,7 +3,7 @@ package build.buildfarm.common.config.yml;
 public class Server {
     private String instanceType;
     private String name;
-    private String actionCachePolicy = "READ_AND_WRITE";
+    private boolean actionCacheReadOnly = false;
     private int port = 8980;
     private int prometheusPort = 9090;
     private GrpcMetrics grpcMetrics;
@@ -26,6 +26,10 @@ public class Server {
 
     private int maxCpu;
 
+    private String clusterId;
+
+    private String cloudRegion;
+
     public String getInstanceType() {
         return instanceType;
     }
@@ -42,12 +46,12 @@ public class Server {
         this.name = name;
     }
 
-    public String getActionCachePolicy() {
-        return actionCachePolicy;
+    public boolean isActionCacheReadOnly() {
+        return actionCacheReadOnly;
     }
 
-    public void setActionCachePolicy(String actionCachePolicy) {
-        this.actionCachePolicy = actionCachePolicy;
+    public void setActionCacheReadOnly(boolean actionCacheReadOnly) {
+        this.actionCacheReadOnly = actionCacheReadOnly;
     }
 
     public int getPort() {
@@ -210,12 +214,28 @@ public class Server {
         this.maxCpu = maxCpu;
     }
 
+    public String getClusterId() {
+        return clusterId;
+    }
+
+    public void setClusterId(String clusterId) {
+        this.clusterId = clusterId;
+    }
+
+    public String getCloudRegion() {
+        return cloudRegion;
+    }
+
+    public void setCloudRegion(String cloudRegion) {
+        this.cloudRegion = cloudRegion;
+    }
+
     @Override
     public String toString() {
         return "Server{" +
                 "instanceType='" + instanceType + '\'' +
                 ", name='" + name + '\'' +
-                ", actionCachePolicy='" + actionCachePolicy + '\'' +
+                ", actionCachePolicy='" + actionCacheReadOnly + '\'' +
                 ", port=" + port +
                 ", prometheusPort=" + prometheusPort +
                 ", grpcMetrics=" + grpcMetrics +
@@ -234,6 +254,8 @@ public class Server {
                 ", executeKeepaliveAfterSeconds=" + executeKeepaliveAfterSeconds +
                 ", recordBesEvents=" + recordBesEvents +
                 ", maxCpu=" + maxCpu +
+                ", clusterId=" + clusterId +
+                ", cloudRegion=" + cloudRegion +
                 ", admin=" + admin +
                 ", metrics=" + metrics +
                 '}';

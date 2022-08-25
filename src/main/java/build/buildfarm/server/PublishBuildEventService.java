@@ -14,7 +14,7 @@
 
 package build.buildfarm.server;
 
-import build.buildfarm.v1test.BuildEventConfig;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import com.google.devtools.build.v1.PublishBuildEventGrpc.PublishBuildEventImplBase;
 import com.google.devtools.build.v1.PublishBuildToolEventStreamRequest;
 import com.google.devtools.build.v1.PublishBuildToolEventStreamResponse;
@@ -25,16 +25,16 @@ import com.google.protobuf.TextFormat;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class PublishBuildEventService extends PublishBuildEventImplBase {
   public static final Logger logger = Logger.getLogger(PublishBuildEventService.class.getName());
-  private final BuildEventConfig config;
 
-  public PublishBuildEventService(BuildEventConfig config) {
-    this.config = config;
-  }
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  public PublishBuildEventService() { }
 
   @Override
   public void publishLifecycleEvent(
@@ -72,7 +72,7 @@ public class PublishBuildEventService extends PublishBuildEventImplBase {
   }
 
   private void recordEvent(PublishBuildToolEventStreamRequest in) {
-    if (config.getRecordEvents() && in.hasOrderedBuildEvent()) {
+    if (configs.getServer().isRecordBesEvents() && in.hasOrderedBuildEvent()) {
       logger.log(Level.INFO, TextFormat.shortDebugString(in.getOrderedBuildEvent()));
     }
   }

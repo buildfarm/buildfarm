@@ -15,8 +15,8 @@
 package build.buildfarm.metrics.log;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.metrics.AbstractMetricsPublisher;
-import build.buildfarm.v1test.MetricsConfig;
 import com.google.longrunning.Operation;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -24,19 +24,17 @@ import java.util.logging.Logger;
 public class LogMetricsPublisher extends AbstractMetricsPublisher {
   private static final Logger logger = Logger.getLogger(LogMetricsPublisher.class.getName());
 
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private static Level logLevel;
 
-  public LogMetricsPublisher(MetricsConfig metricsConfig) {
-    super(metricsConfig.getClusterId());
-    if (!metricsConfig.getLogMetricsConfig().getLogLevel().isEmpty()) {
-      logLevel = Level.parse(metricsConfig.getLogMetricsConfig().getLogLevel());
+  public LogMetricsPublisher() {
+    super(configs.getServer().getClusterId());
+    if (configs.getServer().getMetrics().getLogLevel() != null) {
+      logLevel = Level.parse(configs.getServer().getMetrics().getLogLevel());
     } else {
       logLevel = Level.FINEST;
     }
-  }
-
-  public LogMetricsPublisher() {
-    super();
   }
 
   @Override

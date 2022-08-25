@@ -14,22 +14,13 @@
 
 package build.buildfarm.server;
 
-import static build.buildfarm.common.UrlPath.detectResourceOperation;
-import static build.buildfarm.common.UrlPath.parseBlobDigest;
-import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
-import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
-import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
-import static io.grpc.Status.INVALID_ARGUMENT;
-import static io.grpc.Status.NOT_FOUND;
-import static io.grpc.Status.OUT_OF_RANGE;
-import static java.lang.String.format;
-
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
@@ -49,6 +40,7 @@ import io.grpc.Status.Code;
 import io.grpc.stub.CallStreamObserver;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
@@ -57,14 +49,25 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static build.buildfarm.common.UrlPath.detectResourceOperation;
+import static build.buildfarm.common.UrlPath.parseBlobDigest;
+import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
+import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static io.grpc.Status.INVALID_ARGUMENT;
+import static io.grpc.Status.NOT_FOUND;
+import static io.grpc.Status.OUT_OF_RANGE;
+import static java.lang.String.format;
+
 public class ByteStreamService extends ByteStreamImplBase {
   private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());
 
   static final int CHUNK_SIZE = 64 * 1024;
 
   private final long deadlineAfter;
-  private final TimeUnit deadlineAfterUnits;
   private final Instance instance;
+
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   static class UnexpectedEndOfStreamException extends IOException {
     private final long remaining;
@@ -85,10 +88,9 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
   }
 
-  public ByteStreamService(Instance instance, long deadlineAfter, TimeUnit deadlineAfterUnits) {
+  public ByteStreamService(Instance instance) {
     this.instance = instance;
-    this.deadlineAfter = deadlineAfter;
-    this.deadlineAfterUnits = deadlineAfterUnits;
+    this.deadlineAfter = configs.getServer().getBytestreamTimeout();
   }
 
   void readFrom(InputStream in, long limit, CallStreamObserver<ReadResponse> target) {
@@ -442,7 +444,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     return new WriteStreamObserver(
         instance,
         deadlineAfter,
-        deadlineAfterUnits,
+        TimeUnit.SECONDS,
         () -> serverCallStreamObserver.request(1),
         responseObserver);
   }

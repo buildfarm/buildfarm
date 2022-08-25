@@ -14,19 +14,18 @@
 
 package build.buildfarm.server;
 
-import static com.google.common.util.concurrent.Futures.addCallback;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static com.google.common.util.concurrent.Futures.scheduleAsync;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-
 import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.MetricsPublisher;
+import build.buildfarm.metrics.aws.AwsMetricsPublisher;
+import build.buildfarm.metrics.gcp.GcpMetricsPublisher;
+import build.buildfarm.metrics.log.LogMetricsPublisher;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
@@ -34,33 +33,36 @@ import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
+
+import javax.annotation.Nullable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
+
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.Futures.scheduleAsync;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private static final Logger logger = Logger.getLogger(ExecutionService.class.getName());
 
   private final Instance instance;
   private final long keepaliveAfter;
-  private final TimeUnit keepaliveUnit;
   private final ScheduledExecutorService keepaliveScheduler;
   private final MetricsPublisher metricsPublisher;
 
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   public ExecutionService(
       Instance instance,
-      long keepaliveAfter,
-      TimeUnit keepaliveUnit,
-      ScheduledExecutorService keepaliveScheduler,
-      MetricsPublisher metricsPublisher) {
+      ScheduledExecutorService keepaliveScheduler) {
     this.instance = instance;
-    this.keepaliveAfter = keepaliveAfter;
-    this.keepaliveUnit = keepaliveUnit;
+    this.keepaliveAfter = configs.getServer().getExecuteKeepaliveAfterSeconds();
     this.keepaliveScheduler = keepaliveScheduler;
-    this.metricsPublisher = metricsPublisher;
+    this.metricsPublisher = getMetricsPublisher();
   }
 
   private void withCancellation(
@@ -140,7 +142,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
             return immediateFuture(null);
           },
           keepaliveAfter,
-          keepaliveUnit,
+          TimeUnit.SECONDS,
           keepaliveScheduler);
     }
 
@@ -203,6 +205,17 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
               createWatcher(serverCallStreamObserver, requestMetadata)));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+    }
+  }
+
+  private static MetricsPublisher getMetricsPublisher() {
+    switch (configs.getServer().getMetrics().getPublisher()) {
+      default:
+        return new LogMetricsPublisher();
+      case "aws":
+        return new AwsMetricsPublisher();
+      case "gcp":
+        return new GcpMetricsPublisher();
     }
   }
 }
