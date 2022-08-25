@@ -28,6 +28,7 @@ java_library(
         "@maven//:io_grpc_grpc_api",
         "@maven//:io_grpc_grpc_context",
         "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:io_prometheus_simpleclient",
         "@maven//:org_apache_commons_commons_compress",
         "@maven//:org_threeten_threetenbp",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",

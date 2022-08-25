@@ -14,6 +14,7 @@
 
 package build.buildfarm.common;
 
+import io.prometheus.client.Gauge;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -31,6 +32,18 @@ import redis.clients.jedis.ScanResult;
  */
 public class WorkerIndexer {
   private static final Logger logger = Logger.getLogger(WorkerIndexer.class.getName());
+  private static final Gauge indexerKeysRemovedGauge =
+      Gauge.build()
+          .name("cas_indexer_removed_keys")
+          .labelNames("node")
+          .help("Indexer results - Number of keys removed")
+          .register();
+  private static final Gauge indexerHostsRemovedGauge =
+      Gauge.build()
+          .name("cas_indexer_removed_hosts")
+          .labelNames("node")
+          .help("Indexer results - Number of hosts removed")
+          .register();
 
   /**
    * @brief Handle the reindexing the CAS entries based on a departing worker.
@@ -110,9 +123,7 @@ public class WorkerIndexer {
         cursor = scanResult.getCursor();
       }
     } while (!cursor.equals("0"));
-    logger.info(
-        String.format(
-            "CAS Indexer After Node %s Results: %s",
-            node.getClient().getHost(), results.toMessage()));
+    indexerHostsRemovedGauge.labels(node.getClient().getHost()).set(results.removedHosts);
+    indexerKeysRemovedGauge.labels(node.getClient().getHost()).set(results.removedKeys);
   }
 }
