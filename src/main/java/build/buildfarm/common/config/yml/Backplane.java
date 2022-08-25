@@ -3,40 +3,40 @@ package build.buildfarm.common.config.yml;
 import java.util.Arrays;
 
 public class Backplane {
-    private String type;
+    private String type = "SHARD";
     private String redisUri;
-    private int jedisPoolMaxTotal;
-    private String workersHashName;
-    private String workerChannel;
-    private String actionCachePrefix;
-    private int actionCacheExpire;
-    private String actionBlacklistPrefix;
-    private int actionBlacklistExpire;
-    private String invocationBlacklistPrefix;
-    private String operationPrefix;
-    private int operationExpire;
-    private String preQueuedOperationsListName;
-    private String processingListName;
-    private String processingPrefix;
-    private int processingTimeoutMillis;
-    private String queuedOperationsListName;
-    private String dispatchingPrefix;
-    private int dispatchingTimeoutMillis;
-    private String dispatchedOperationsHashName;
-    private String operationChannelPrefix;
-    private String casPrefix;
-    private int casExpire;
-    private boolean subscribeToBackplane;
-    private boolean runFailsafeOperation;
-    private int maxQueueDepth;
-    private int maxPreQueueDepth;
-    private String redisQueueType;
+    private int jedisPoolMaxTotal = 4000;
+    private String workersHashName = "Workers";
+    private String workerChannel = "WorkerChannel";
+    private String actionCachePrefix = "ActionCache";
+    private int actionCacheExpire = 2419200;  //4 Weeks
+    private String actionBlacklistPrefix = "ActionBlacklist";
+    private int actionBlacklistExpire = 3600;  //1 Hour;
+    private String invocationBlacklistPrefix = "InvocationBlacklist";
+    private String operationPrefix = "Operation";
+    private int operationExpire = 604800;  //1 Week
+    private String preQueuedOperationsListName = "{Arrival}:PreQueuedOperations";
+    private String processingListName = "{Arrival}:ProcessingOperations";
+    private String processingPrefix = "Processing";
+    private int processingTimeoutMillis = 20000;
+    private String queuedOperationsListName = "{Execution}:QueuedOperations";
+    private String dispatchingPrefix = "Dispatching";
+    private int dispatchingTimeoutMillis = 10000;
+    private String dispatchedOperationsHashName = "DispatchedOperations";
+    private String operationChannelPrefix = "OperationChannel";
+    private String casPrefix = "ContentAddressableStorage";
+    private int casExpire = 604800; //1 Week
+    private boolean subscribeToBackplane = true;
+    private boolean runFailsafeOperation = true;
+    private int maxQueueDepth = 100000;
+    private int maxPreQueueDepth = 1000000;
+    private String redisQueueType = "NORMAL";
     private Queue[] queues;
     private String redisPassword;
-    private int timeout;
+    private int timeout = 10000;
     private String[] redisNodes;
-    private int maxAttempts;
-    private boolean cacheCas;
+    private int maxAttempts = 20;
+    private boolean cacheCas = false;
 
     public String getType() {
         return type;

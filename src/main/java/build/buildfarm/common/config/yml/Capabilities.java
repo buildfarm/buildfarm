@@ -1,8 +1,8 @@
 package build.buildfarm.common.config.yml;
 
 public class Capabilities {
-    private boolean cas;
-    private boolean execution;
+    private boolean cas = true;
+    private boolean execution = true;
 
     public boolean isCas() {
         return cas;

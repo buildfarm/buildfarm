@@ -1,22 +1,22 @@
 package build.buildfarm.common.config.yml;
 
 public class Worker {
-    private long port;
+    private long port = 8981;
     private String publicName;
-    private Capabilities capabilities;
-    private String root;
-    private long inlineContentLimit;
-    private long operationPollPeriod;
-    private DequeueMatchSettings dequeueMatchSettings;
-    private Cas cas;
-    private long executeStageWidth;
-    private long inputFetchStageWidth;
-    private long inputFetchDeadline;
-    private boolean linkInputDirectories;
-    private String realInputDirectories;
-    private long defaultActionTimeout;
-    private long maximumActionTimeout;
-    private Object execOwner;
+    private Capabilities capabilities = new Capabilities();
+    private String root = "/tmp/worker";
+    private long inlineContentLimit = 1048567; //1024 * 1024
+    private long operationPollPeriod = 1;
+    private DequeueMatchSettings dequeueMatchSettings = new DequeueMatchSettings();
+    private Cas cas = new Cas();
+    private long executeStageWidth = 1;
+    private long inputFetchStageWidth = 1;
+    private long inputFetchDeadline = 60;
+    private boolean linkInputDirectories = true;
+    private String realInputDirectories = "external";
+    private long defaultActionTimeout = 600;
+    private long maximumActionTimeout = 3600;
+    private String execOwner;
 
     public long getPort() {
         return port;
@@ -138,11 +138,11 @@ public class Worker {
         this.maximumActionTimeout = maximumActionTimeout;
     }
 
-    public Object getExecOwner() {
+    public String getExecOwner() {
         return execOwner;
     }
 
-    public void setExecOwner(Object execOwner) {
+    public void setExecOwner(String execOwner) {
         this.execOwner = execOwner;
     }
 

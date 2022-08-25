@@ -2,7 +2,7 @@ package build.buildfarm.common.config.yml;
 
 public class DequeueMatchSettings {
     private String platform;
-    private boolean acceptEverything;
+    private boolean acceptEverything = true;
 
     public String getPlatform() {
         return platform;

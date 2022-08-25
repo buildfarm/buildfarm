@@ -1,7 +1,7 @@
 package build.buildfarm.common.config.yml;
 
 public class Metrics {
-    private String publisher;
+    private String publisher = "log";
     private String logLevel;
 
     private String topic;

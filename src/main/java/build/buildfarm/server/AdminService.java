@@ -243,6 +243,9 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   }
 
   private static Admin getAdminController() {
+    if (configs.getServer().getAdmin().getDeploymentEnvironment() == null) {
+      return null;
+    }
     switch (configs.getServer().getAdmin().getDeploymentEnvironment()) {
       default:
         return null;

@@ -213,14 +213,23 @@ public class BuildFarmServer extends LoggingMain {
 
     ServerOptions options = parser.getOptions(ServerOptions.class);
 
+    try {
+      configs.loadConfigs(residue.get(0));
+    } catch (IOException e) {
+      logger.severe("Could not parse yml configuration file." + e);
+    }
+
     String session = "buildfarm-server";
     if (!options.publicName.isEmpty()) {
       session += "-" + options.publicName;
+      configs.getServer().setPublicName(options.publicName);
+    }
+    if(options.port > 0) {
+      configs.getServer().setPort(options.port);
     }
     session += "-" + UUID.randomUUID();
     BuildFarmServer server;
     try {
-      configs.loadConfigs(residue.get(0));
       server = new BuildFarmServer(session);
       server.start(options.publicName);
       server.blockUntilShutdown();

@@ -6,29 +6,28 @@ public class Server {
     private boolean actionCacheReadOnly = false;
     private int port = 8980;
     private int prometheusPort = 9090;
-    private GrpcMetrics grpcMetrics;
+    private GrpcMetrics grpcMetrics = new GrpcMetrics();
     private int casWriteTimeout = 3600;
     private int bytestreamTimeout = 3600;
     private String sslCertificatePath = null;
-    private boolean runDispatchedMonitor;
-    private int dispatchedMonitorIntervalSeconds;
-    private boolean runOperationQueuer;
-    private boolean ensureOutputsPresent;
-    private long maxEntrySizeBytes;
-    private int maxRequeueAttempts;
-    private boolean useDenyList;
-    private long grpcTimeout;
-    private long maximumActionTimeout;
-    private long executeKeepaliveAfterSeconds;
-    private boolean recordBesEvents;
-    private Admin admin;
-    private Metrics metrics;
-
+    private boolean runDispatchedMonitor = true;
+    private int dispatchedMonitorIntervalSeconds = 1;
+    private boolean runOperationQueuer = true;
+    private boolean ensureOutputsPresent = false;
+    private long maxEntrySizeBytes = 2147483648L; //2 * 1024 * 1024 * 1024
+    private int maxRequeueAttempts = 5;
+    private boolean useDenyList = true;
+    private long grpcTimeout = 3600;
+    private long maximumActionTimeout = 3600;
+    private long executeKeepaliveAfterSeconds = 60;
+    private boolean recordBesEvents = false;
+    private Admin admin = new Admin();
+    private Metrics metrics = new Metrics();
     private int maxCpu;
-
     private String clusterId;
-
     private String cloudRegion;
+
+    private String publicName;
 
     public String getInstanceType() {
         return instanceType;
@@ -230,12 +229,20 @@ public class Server {
         this.cloudRegion = cloudRegion;
     }
 
+    public String getPublicName() {
+        return publicName;
+    }
+
+    public void setPublicName(String publicName) {
+        this.publicName = publicName;
+    }
+
     @Override
     public String toString() {
         return "Server{" +
                 "instanceType='" + instanceType + '\'' +
                 ", name='" + name + '\'' +
-                ", actionCachePolicy='" + actionCacheReadOnly + '\'' +
+                ", actionCacheReadOnly=" + actionCacheReadOnly +
                 ", port=" + port +
                 ", prometheusPort=" + prometheusPort +
                 ", grpcMetrics=" + grpcMetrics +
@@ -253,11 +260,12 @@ public class Server {
                 ", maximumActionTimeout=" + maximumActionTimeout +
                 ", executeKeepaliveAfterSeconds=" + executeKeepaliveAfterSeconds +
                 ", recordBesEvents=" + recordBesEvents +
-                ", maxCpu=" + maxCpu +
-                ", clusterId=" + clusterId +
-                ", cloudRegion=" + cloudRegion +
                 ", admin=" + admin +
                 ", metrics=" + metrics +
+                ", maxCpu=" + maxCpu +
+                ", clusterId='" + clusterId + '\'' +
+                ", cloudRegion='" + cloudRegion + '\'' +
+                ", publicName='" + publicName + '\'' +
                 '}';
     }
 }
