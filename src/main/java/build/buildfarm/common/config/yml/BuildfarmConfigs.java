@@ -14,6 +14,10 @@ public class BuildfarmConfigs {
     private static BuildfarmConfigs buildfarmConfigs;
 
     private static String digestFunction = "SHA256";
+
+    private static long defaultActionTimeout = 600;
+
+    private static long maximumActionTimeout = 3600;
     private static Server server;
 
     private static Backplane backplane;
@@ -53,6 +57,22 @@ public class BuildfarmConfigs {
         this.digestFunction = digestFunction;
     }
 
+    public static long getDefaultActionTimeout() {
+        return defaultActionTimeout;
+    }
+
+    public static void setDefaultActionTimeout(long defaultActionTimeout) {
+        BuildfarmConfigs.defaultActionTimeout = defaultActionTimeout;
+    }
+
+    public static long getMaximumActionTimeout() {
+        return maximumActionTimeout;
+    }
+
+    public static void setMaximumActionTimeout(long maximumActionTimeout) {
+        BuildfarmConfigs.maximumActionTimeout = maximumActionTimeout;
+    }
+
     public Server getServer() {
         return server;
     }
@@ -81,6 +101,8 @@ public class BuildfarmConfigs {
     public String toString() {
         return "BuildfarmConfigs{" +
                 "digestFunction='" + digestFunction + '\'' +
+                ", defaultActionTimeout=" + defaultActionTimeout +
+                ", maximumActionTimeout=" + maximumActionTimeout +
                 ", server=" + server +
                 ", worker=" + worker +
                 ", backplane=" + backplane +

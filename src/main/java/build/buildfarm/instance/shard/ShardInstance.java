@@ -285,7 +285,7 @@ public class ShardInstance extends AbstractServerInstance {
             configs.getServer().getMaxEntrySizeBytes(),
             configs.getServer().getMaxCpu(),
             configs.getServer().getMaxRequeueAttempts(),
-            Duration.newBuilder().setSeconds(configs.getServer().getMaximumActionTimeout()).build(),
+            Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build(),
             configs.getServer().isUseDenyList(),
         onStop,
         WorkerStubs.create(digestUtil, Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build()),

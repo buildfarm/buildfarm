@@ -6,6 +6,9 @@ public class Cas {
     private long maxEntrySizeBytes = 2147483648L; //2 * 1024 * 1024 * 1024
     private boolean fileDirectoriesIndexInMemory = false;
     private boolean skipLoad = false;
+    private String type = "FILESYSTEM";
+
+    private String target;
 
     public String getPath() {
         return path;
@@ -47,6 +50,22 @@ public class Cas {
         this.skipLoad = skipLoad;
     }
 
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public String getTarget() {
+        return target;
+    }
+
+    public void setTarget(String target) {
+        this.target = target;
+    }
+
     @Override
     public String toString() {
         return "Cas{" +
@@ -55,6 +74,8 @@ public class Cas {
                 ", maxEntrySizeBytes=" + maxEntrySizeBytes +
                 ", fileDirectoriesIndexInMemory=" + fileDirectoriesIndexInMemory +
                 ", skipLoad=" + skipLoad +
+                ", type='" + type + '\'' +
+                ", target='" + target + '\'' +
                 '}';
     }
 }

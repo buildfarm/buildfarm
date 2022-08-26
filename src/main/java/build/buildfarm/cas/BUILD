@@ -8,6 +8,7 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/grpc",
+        "//src/main/java/build/buildfarm/common/config/yml",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_bytestream_bytestream_java_grpc",

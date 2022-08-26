@@ -4,6 +4,8 @@ public class DequeueMatchSettings {
     private String platform;
     private boolean acceptEverything = true;
 
+    private boolean allowUnmatched = false;
+
     public String getPlatform() {
         return platform;
     }
@@ -20,11 +22,20 @@ public class DequeueMatchSettings {
         this.acceptEverything = acceptEverything;
     }
 
+    public boolean isAllowUnmatched() {
+        return allowUnmatched;
+    }
+
+    public void setAllowUnmatched(boolean allowUnmatched) {
+        this.allowUnmatched = allowUnmatched;
+    }
+
     @Override
     public String toString() {
         return "DequeueMatchSettings{" +
                 "platform='" + platform + '\'' +
                 ", acceptEverything=" + acceptEverything +
+                ", allowUnmatched=" + allowUnmatched +
                 '}';
     }
 }

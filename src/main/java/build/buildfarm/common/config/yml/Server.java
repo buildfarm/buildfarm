@@ -18,7 +18,6 @@ public class Server {
     private int maxRequeueAttempts = 5;
     private boolean useDenyList = true;
     private long grpcTimeout = 3600;
-    private long maximumActionTimeout = 3600;
     private long executeKeepaliveAfterSeconds = 60;
     private boolean recordBesEvents = false;
     private Admin admin = new Admin();
@@ -165,14 +164,6 @@ public class Server {
         this.grpcTimeout = grpcTimeout;
     }
 
-    public long getMaximumActionTimeout() {
-        return maximumActionTimeout;
-    }
-
-    public void setMaximumActionTimeout(long maximumActionTimeout) {
-        this.maximumActionTimeout = maximumActionTimeout;
-    }
-
     public long getExecuteKeepaliveAfterSeconds() {
         return executeKeepaliveAfterSeconds;
     }
@@ -257,7 +248,6 @@ public class Server {
                 ", maxRequeueAttempts=" + maxRequeueAttempts +
                 ", useDenyList=" + useDenyList +
                 ", grpcTimeout=" + grpcTimeout +
-                ", maximumActionTimeout=" + maximumActionTimeout +
                 ", executeKeepaliveAfterSeconds=" + executeKeepaliveAfterSeconds +
                 ", recordBesEvents=" + recordBesEvents +
                 ", admin=" + admin +

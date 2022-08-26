@@ -1,4 +1,6 @@
 digestFunction: SHA256
+defaultActionTimeout: 600
+maximumActionTimeout: 3600
 server:
   instanceType: SHARD
   name: shard
@@ -19,7 +21,6 @@ server:
   maxRequeueAttempts: 5
   useDenyList: true
   grpcTimeout: 3600
-  maximumActionTimeout: 3600
   executeKeepaliveAfterSeconds: 60
   recordBesEvents: false
   clusterId: local
@@ -27,12 +28,21 @@ server:
   admin:
     deploymentEnvironment: aws
     clusterEndpoint: "grpc://localhost"
+    enabledGracefulShutdown: false
   metrics:
     publisher: log
     logLevel: INFO
     topic: test
     topicMaxConnections: 1000
     secretName: test
+  memory:
+    listOperationsDefaultPageSize: 1024
+    listOperationsMaxPageSize: 16384
+    treeDefaultPageSize: 1024
+    treeMaxPageSize: 16384
+    operationPollTimeout: 30
+    operationCompletedDelay: 10
+    delegateCas: false
 backplane:
   type: SHARD
   redisUri: "redis://localhost:6379"
@@ -92,17 +102,47 @@ worker:
   dequeueMatchSettings:
     platform:
     acceptEverything: true
+    allowUnmatched: false
   cas:
+    type: FILESYSTEM
     path: "cache"
     maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
     maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
     fileDirectoriesIndexInMemory: false
     skipLoad: false
+    target:
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
   linkInputDirectories: true
-  realInputDirectories: "external"
-  defaultActionTimeout: 600
-  maximumActionTimeout: 3600
+  realInputDirectories:
+    - "external"
   execOwner:
+  hexBucketLevels: 0
+  memory:
+    operation_queue:
+      target: "localhost:8980"
+      instance_name: "memory"
+      deadline_after_seconds: 60
+    content_addressable_storage:
+      target: "localhost:8980"
+      instance_name: "memory"
+      deadline_after_seconds: 60
+    action_cache:
+      target: "localhost:8980"
+      instance_name: "memory"
+      deadline_after_seconds: 60
+    stream_stdout: true
+    stdout_cas_policy: ALWAYS_INSERT
+    stream_stderr: true
+    stderr_cas_policy: ALWAYS_INSERT
+    file_cas_policy: ALWAYS_INSERT
+    tree_page_size: 0
+    platform:
+      properties:
+        name: "key_name"
+        value: "value_string"
+    default_platform:
+      properties:
+        name: "cores"
+        value: "1"

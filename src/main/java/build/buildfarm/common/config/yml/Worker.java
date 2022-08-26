@@ -1,5 +1,8 @@
 package build.buildfarm.common.config.yml;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class Worker {
     private long port = 8981;
     private String publicName;
@@ -13,10 +16,10 @@ public class Worker {
     private long inputFetchStageWidth = 1;
     private long inputFetchDeadline = 60;
     private boolean linkInputDirectories = true;
-    private String realInputDirectories = "external";
-    private long defaultActionTimeout = 600;
-    private long maximumActionTimeout = 3600;
+    private List<String> realInputDirectories = Arrays.asList("external");
     private String execOwner;
+
+    private int hexBucketLevels = 0;
 
     public long getPort() {
         return port;
@@ -114,28 +117,12 @@ public class Worker {
         this.linkInputDirectories = linkInputDirectories;
     }
 
-    public String getRealInputDirectories() {
+    public List<String> getRealInputDirectories() {
         return realInputDirectories;
     }
 
-    public void setRealInputDirectories(String realInputDirectories) {
+    public void setRealInputDirectories(List<String> realInputDirectories) {
         this.realInputDirectories = realInputDirectories;
-    }
-
-    public long getDefaultActionTimeout() {
-        return defaultActionTimeout;
-    }
-
-    public void setDefaultActionTimeout(long defaultActionTimeout) {
-        this.defaultActionTimeout = defaultActionTimeout;
-    }
-
-    public long getMaximumActionTimeout() {
-        return maximumActionTimeout;
-    }
-
-    public void setMaximumActionTimeout(long maximumActionTimeout) {
-        this.maximumActionTimeout = maximumActionTimeout;
     }
 
     public String getExecOwner() {
@@ -144,6 +131,14 @@ public class Worker {
 
     public void setExecOwner(String execOwner) {
         this.execOwner = execOwner;
+    }
+
+    public int getHexBucketLevels() {
+        return hexBucketLevels;
+    }
+
+    public void setHexBucketLevels(int hexBucketLevels) {
+        this.hexBucketLevels = hexBucketLevels;
     }
 
     @Override
@@ -162,9 +157,8 @@ public class Worker {
                 ", inputFetchDeadline=" + inputFetchDeadline +
                 ", linkInputDirectories=" + linkInputDirectories +
                 ", realInputDirectories='" + realInputDirectories + '\'' +
-                ", defaultActionTimeout=" + defaultActionTimeout +
-                ", maximumActionTimeout=" + maximumActionTimeout +
-                ", execOwner=" + execOwner +
+                ", execOwner='" + execOwner + '\'' +
+                ", hexBucketLevels=" + hexBucketLevels +
                 '}';
     }
 }
