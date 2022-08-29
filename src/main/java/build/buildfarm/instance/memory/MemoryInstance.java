@@ -51,6 +51,7 @@ import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.queues.Worker;
@@ -61,14 +62,12 @@ import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.instance.server.OperationsMap;
 import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
-import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.FilesystemACConfig;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GrpcACConfig;
-import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.QueueEntry;
@@ -132,7 +131,8 @@ public class MemoryInstance extends AbstractServerInstance {
   public static final String TIMEOUT_OUT_OF_BOUNDS =
       "A timeout specified is out of bounds with a configured range";
 
-  private final MemoryInstanceConfig config;
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private final SetMultimap<String, WatchFuture> watchers;
   private final LoadingCache<String, ByteStringStreamSource> streams =
       CacheBuilder.newBuilder()
@@ -202,13 +202,12 @@ public class MemoryInstance extends AbstractServerInstance {
     }
   }
 
-  public MemoryInstance(String name, DigestUtil digestUtil, MemoryInstanceConfig config)
+  public MemoryInstance(String name, DigestUtil digestUtil)
       throws ConfigurationException {
     this(
         name,
         digestUtil,
-        config,
-        ContentAddressableStorages.create(config.getCasConfig()),
+        ContentAddressableStorages.create(),
         /* watchers=*/ synchronizedSetMultimap(
             MultimapBuilder.hashKeys().hashSetValues(/* expectedValuesPerKey=*/ 1).build()),
         /* watcherExecutor=*/ newCachedThreadPool(),
@@ -222,7 +221,6 @@ public class MemoryInstance extends AbstractServerInstance {
   public MemoryInstance(
       String name,
       DigestUtil digestUtil,
-      MemoryInstanceConfig config,
       ContentAddressableStorage contentAddressableStorage,
       SetMultimap<String, WatchFuture> watchers,
       Executor watcherExecutor,
@@ -234,13 +232,11 @@ public class MemoryInstance extends AbstractServerInstance {
         name,
         digestUtil,
         contentAddressableStorage,
-        MemoryInstance.createActionCache(
-            config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
+        MemoryInstance.createActionCache(contentAddressableStorage, digestUtil),
         outstandingOperations,
         MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil),
         /*activeBlobWrites=*/ new ConcurrentHashMap<>(),
         false);
-    this.config = config;
     this.watchers = watchers;
     this.outstandingOperations = outstandingOperations;
     this.watcherExecutor = watcherExecutor;
@@ -252,11 +248,9 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   private static ActionCache createActionCache(
-      ActionCacheConfig config, ContentAddressableStorage cas, DigestUtil digestUtil) {
+      ContentAddressableStorage cas, DigestUtil digestUtil) {
     switch (config.getTypeCase()) {
-      default:
-      case TYPE_NOT_SET:
-        throw new IllegalArgumentException("ActionCache config not set in config");
+      default: throw new IllegalArgumentException("ActionCache config not set in config");
       case GRPC:
         return createGrpcActionCache(config.getGrpc());
       case DELEGATE_CAS:
@@ -440,9 +434,9 @@ public class MemoryInstance extends AbstractServerInstance {
       PreconditionFailure.Builder preconditionFailure,
       RequestMetadata requestMetadata)
       throws InterruptedException, StatusException {
-    if (action.hasTimeout() && config.hasMaximumActionTimeout()) {
+    if (action.hasTimeout() && configs.getMaximumActionTimeout() > 0) {
       Duration timeout = action.getTimeout();
-      Duration maximum = config.getMaximumActionTimeout();
+      Duration maximum = Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build();
       if (timeout.getSeconds() > maximum.getSeconds()
           || (timeout.getSeconds() == maximum.getSeconds()
               && timeout.getNanos() > maximum.getNanos())) {
@@ -619,8 +613,8 @@ public class MemoryInstance extends AbstractServerInstance {
       Duration actionTimeout = null;
       if (action.hasTimeout()) {
         actionTimeout = action.getTimeout();
-      } else if (config.hasDefaultActionTimeout()) {
-        actionTimeout = config.getDefaultActionTimeout();
+      } else if (configs.getDefaultActionTimeout() > 0) {
+        actionTimeout = Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build();
       }
       if (actionTimeout != null) {
         Duration delay = config.getOperationCompletedDelay();
@@ -720,11 +714,10 @@ public class MemoryInstance extends AbstractServerInstance {
     WorkerQueue queue =
         queuedOperations.MatchEligibleQueue(createProvisions(command.getPlatform()));
 
-    DequeueMatchSettings settings = new DequeueMatchSettings();
     synchronized (queue.workers) {
       while (!dispatched && !queue.workers.isEmpty()) {
         Worker worker = queue.workers.remove(0);
-        if (!DequeueMatchEvaluator.shouldKeepOperation(settings, worker.getProvisions(), command)) {
+        if (!DequeueMatchEvaluator.shouldKeepOperation(worker.getProvisions(), command)) {
           rejectedWorkers.add(worker);
         } else {
           QueueEntry queueEntry =
@@ -809,10 +802,9 @@ public class MemoryInstance extends AbstractServerInstance {
 
       String operationName = operation.getName();
 
-      DequeueMatchSettings settings = new DequeueMatchSettings();
       if (command == null) {
         cancelOperation(operationName);
-      } else if (DequeueMatchEvaluator.shouldKeepOperation(settings, provisions, command)) {
+      } else if (DequeueMatchEvaluator.shouldKeepOperation(provisions, command)) {
         QueuedOperation queuedOperation =
             QueuedOperation.newBuilder()
                 .setAction(action)

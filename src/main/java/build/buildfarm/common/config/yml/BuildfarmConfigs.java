@@ -57,19 +57,19 @@ public class BuildfarmConfigs {
         this.digestFunction = digestFunction;
     }
 
-    public static long getDefaultActionTimeout() {
+    public long getDefaultActionTimeout() {
         return defaultActionTimeout;
     }
 
-    public static void setDefaultActionTimeout(long defaultActionTimeout) {
+    public void setDefaultActionTimeout(long defaultActionTimeout) {
         BuildfarmConfigs.defaultActionTimeout = defaultActionTimeout;
     }
 
-    public static long getMaximumActionTimeout() {
+    public long getMaximumActionTimeout() {
         return maximumActionTimeout;
     }
 
-    public static void setMaximumActionTimeout(long maximumActionTimeout) {
+    public void setMaximumActionTimeout(long maximumActionTimeout) {
         BuildfarmConfigs.maximumActionTimeout = maximumActionTimeout;
     }
 
