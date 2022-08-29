@@ -75,7 +75,6 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.DequeueMatchEvaluator;
-import build.buildfarm.worker.DequeueMatchSettings;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;

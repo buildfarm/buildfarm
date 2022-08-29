@@ -80,16 +80,18 @@ backplane:
   queues:
     - name: "cpu"
       allowUnmatched: true
-      properties:
-        - name: "min-cores"
-          value: "*"
-        - name: "max-cores"
-          value: "*"
+      platform:
+        properties:
+          - name: "min-cores"
+            value: "*"
+          - name: "max-cores"
+            value: "*"
     - name: "gpu"
       allowUnmatched: true
-      properties:
-        - name: "gpu"
-          value: "1"
+      platform:
+        properties:
+          - name: "gpu"
+            value: "1"
 worker:
   port: 8981
   publicName: "localhost:8981"
@@ -119,6 +121,18 @@ worker:
     - "external"
   execOwner:
   hexBucketLevels: 0
+  defaultMaxCores: 0
+  limitGlobalExecution: false
+  onlyMulticoreTests: false
+  allowBringYourOwnContainer: false
+  errorOperationRemainingResources: false
+  executionPolicies:
+    - name: test
+      executionWrapper:
+        path: /
+        arguments:
+          - arg1
+          - arg2
   memory:
     operation_queue:
       target: "localhost:8980"

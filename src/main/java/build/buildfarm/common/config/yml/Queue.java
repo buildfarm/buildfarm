@@ -1,11 +1,12 @@
 package build.buildfarm.common.config.yml;
 
-import java.util.Arrays;
+import build.bazel.remote.execution.v2.Platform;
 
 public class Queue {
     private String name;
     private boolean allowUnmatched;
-    private Property[] properties;
+
+    private Platform platform = Platform.getDefaultInstance();
 
     public String getName() {
         return name;
@@ -23,12 +24,12 @@ public class Queue {
         this.allowUnmatched = allowUnmatched;
     }
 
-    public Property[] getProperties() {
-        return properties;
+    public Platform getPlatform() {
+        return platform;
     }
 
-    public void setProperties(Property[] properties) {
-        this.properties = properties;
+    public void setPlatform(Platform platform) {
+        this.platform = platform;
     }
 
     @Override
@@ -36,7 +37,7 @@ public class Queue {
         return "Queue{" +
                 "name='" + name + '\'' +
                 ", allowUnmatched=" + allowUnmatched +
-                ", properties=" + Arrays.toString(properties) +
+                ", platform=" + platform +
                 '}';
     }
 }

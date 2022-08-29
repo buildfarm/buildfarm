@@ -1,5 +1,6 @@
 package build.buildfarm.common.config.yml;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -12,14 +13,19 @@ public class Worker {
     private long operationPollPeriod = 1;
     private DequeueMatchSettings dequeueMatchSettings = new DequeueMatchSettings();
     private Cas cas = new Cas();
-    private long executeStageWidth = 1;
-    private long inputFetchStageWidth = 1;
-    private long inputFetchDeadline = 60;
+    private int executeStageWidth = 1;
+    private int inputFetchStageWidth = 1;
+    private int inputFetchDeadline = 60;
     private boolean linkInputDirectories = true;
     private List<String> realInputDirectories = Arrays.asList("external");
     private String execOwner;
-
     private int hexBucketLevels = 0;
+    private int defaultMaxCores  = 0;
+    private boolean limitGlobalExecution = false;
+    private boolean onlyMulticoreTests = false;
+    private boolean allowBringYourOwnContainer = false;
+    private boolean errorOperationRemainingResources = false;
+    private List<ExecutionPolicy> executionPolicies = new ArrayList<>();
 
     public long getPort() {
         return port;
@@ -85,27 +91,27 @@ public class Worker {
         this.cas = cas;
     }
 
-    public long getExecuteStageWidth() {
+    public int getExecuteStageWidth() {
         return executeStageWidth;
     }
 
-    public void setExecuteStageWidth(long executeStageWidth) {
+    public void setExecuteStageWidth(int executeStageWidth) {
         this.executeStageWidth = executeStageWidth;
     }
 
-    public long getInputFetchStageWidth() {
+    public int getInputFetchStageWidth() {
         return inputFetchStageWidth;
     }
 
-    public void setInputFetchStageWidth(long inputFetchStageWidth) {
+    public void setInputFetchStageWidth(int inputFetchStageWidth) {
         this.inputFetchStageWidth = inputFetchStageWidth;
     }
 
-    public long getInputFetchDeadline() {
+    public int getInputFetchDeadline() {
         return inputFetchDeadline;
     }
 
-    public void setInputFetchDeadline(long inputFetchDeadline) {
+    public void setInputFetchDeadline(int inputFetchDeadline) {
         this.inputFetchDeadline = inputFetchDeadline;
     }
 
@@ -141,6 +147,54 @@ public class Worker {
         this.hexBucketLevels = hexBucketLevels;
     }
 
+    public int getDefaultMaxCores() {
+        return defaultMaxCores;
+    }
+
+    public void setDefaultMaxCores(int defaultMaxCores) {
+        this.defaultMaxCores = defaultMaxCores;
+    }
+
+    public boolean isLimitGlobalExecution() {
+        return limitGlobalExecution;
+    }
+
+    public void setLimitGlobalExecution(boolean limitGlobalExecution) {
+        this.limitGlobalExecution = limitGlobalExecution;
+    }
+
+    public boolean isOnlyMulticoreTests() {
+        return onlyMulticoreTests;
+    }
+
+    public void setOnlyMulticoreTests(boolean onlyMulticoreTests) {
+        this.onlyMulticoreTests = onlyMulticoreTests;
+    }
+
+    public boolean isAllowBringYourOwnContainer() {
+        return allowBringYourOwnContainer;
+    }
+
+    public void setAllowBringYourOwnContainer(boolean allowBringYourOwnContainer) {
+        this.allowBringYourOwnContainer = allowBringYourOwnContainer;
+    }
+
+    public boolean isErrorOperationRemainingResources() {
+        return errorOperationRemainingResources;
+    }
+
+    public void setErrorOperationRemainingResources(boolean errorOperationRemainingResources) {
+        this.errorOperationRemainingResources = errorOperationRemainingResources;
+    }
+
+    public List<ExecutionPolicy> getExecutionPolicies() {
+        return executionPolicies;
+    }
+
+    public void setExecutionPolicies(List<ExecutionPolicy> executionPolicies) {
+        this.executionPolicies = executionPolicies;
+    }
+
     @Override
     public String toString() {
         return "Worker{" +
@@ -156,9 +210,15 @@ public class Worker {
                 ", inputFetchStageWidth=" + inputFetchStageWidth +
                 ", inputFetchDeadline=" + inputFetchDeadline +
                 ", linkInputDirectories=" + linkInputDirectories +
-                ", realInputDirectories='" + realInputDirectories + '\'' +
+                ", realInputDirectories=" + realInputDirectories +
                 ", execOwner='" + execOwner + '\'' +
                 ", hexBucketLevels=" + hexBucketLevels +
+                ", defaultMaxCores=" + defaultMaxCores +
+                ", limitGlobalExecution=" + limitGlobalExecution +
+                ", onlyMulticoreTests=" + onlyMulticoreTests +
+                ", allowBringYourOwnContainer=" + allowBringYourOwnContainer +
+                ", errorOperationRemainingResources=" + errorOperationRemainingResources +
+                ", executionPolicies=" + executionPolicies +
                 '}';
     }
 }

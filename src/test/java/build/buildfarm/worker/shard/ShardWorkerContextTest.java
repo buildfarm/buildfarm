@@ -32,7 +32,6 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;

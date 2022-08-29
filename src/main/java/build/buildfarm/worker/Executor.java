@@ -14,15 +14,6 @@
 
 package build.buildfarm.worker;
 
-import static build.buildfarm.v1test.ExecutionPolicy.PolicyCase.WRAPPER;
-import static com.google.common.collect.Maps.uniqueIndex;
-import static com.google.protobuf.util.Durations.add;
-import static com.google.protobuf.util.Durations.compare;
-import static com.google.protobuf.util.Durations.fromSeconds;
-import static java.lang.String.format;
-import static java.util.concurrent.TimeUnit.DAYS;
-import static java.util.concurrent.TimeUnit.MICROSECONDS;
-
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -34,9 +25,8 @@ import build.buildfarm.common.ProcessUtils;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
+import build.buildfarm.common.config.yml.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
-import build.buildfarm.v1test.ExecutionPolicy;
-import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
@@ -53,6 +43,7 @@ import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import io.grpc.Deadline;
+
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -63,6 +54,14 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static com.google.common.collect.Maps.uniqueIndex;
+import static com.google.protobuf.util.Durations.add;
+import static com.google.protobuf.util.Durations.compare;
+import static com.google.protobuf.util.Durations.fromSeconds;
+import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
@@ -221,8 +220,8 @@ class Executor {
         workerContext.limitExecution(
             operationName, arguments, operationContext.command, workingDirectory)) {
       for (ExecutionPolicy policy : policies) {
-        if (policy.getPolicyCase() == WRAPPER) {
-          arguments.addAll(transformWrapper(policy.getWrapper()));
+        if (policy.getExecutionWrapper() != null) {
+          arguments.addAll(transformWrapper(policy.getExecutionWrapper()));
         }
       }
 
@@ -374,14 +373,14 @@ class Executor {
     }
   }
 
-  private Iterable<String> transformWrapper(ExecutionWrapper wrapper) {
+  private Iterable<String> transformWrapper(ExecutionPolicy.ExecutionWrapper wrapper) {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
     Map<String, Property> properties =
         uniqueIndex(operationContext.command.getPlatform().getPropertiesList(), Property::getName);
 
     arguments.add(wrapper.getPath());
-    for (String argument : wrapper.getArgumentsList()) {
+    for (String argument : wrapper.getArguments()) {
       // If the argument is of the form <propertyName>, substitute the value of
       // the property from the platform specification.
       if (!argument.equals("<>")

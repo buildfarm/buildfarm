@@ -99,7 +99,7 @@ public class DistributedStateCreator {
               getQueueName(queueConfig),
               queueTypeToSr(),
               getQueueHashes(client, getQueueName(queueConfig)),
-              toMultimap(Arrays.asList(queueConfig.getProperties())),
+              toMultimap(Arrays.asList(queueConfig.getPlatform().getProperties())),
               queueConfig.isAllowUnmatched());
       provisionedQueues.add(provisionedQueue);
     }

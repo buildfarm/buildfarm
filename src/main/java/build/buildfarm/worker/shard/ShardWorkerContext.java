@@ -14,13 +14,6 @@
 
 package build.buildfarm.worker.shard;
 
-import static build.buildfarm.cas.ContentAddressableStorage.UNLIMITED_ENTRY_SIZE_MAX;
-import static build.buildfarm.common.Actions.checkPreconditionFailure;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static java.lang.String.format;
-import static java.util.concurrent.TimeUnit.DAYS;
-
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -42,16 +35,16 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.ExecutionPolicy;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.worker.DequeueMatchEvaluator;
-import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
@@ -76,6 +69,7 @@ import io.grpc.Deadline;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.prometheus.client.Counter;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitResult;
@@ -92,6 +86,13 @@ import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import static build.buildfarm.cas.ContentAddressableStorage.UNLIMITED_ENTRY_SIZE_MAX;
+import static build.buildfarm.common.Actions.checkPreconditionFailure;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.DAYS;
+
 class ShardWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(ShardWorkerContext.class.getName());
 
@@ -102,9 +103,9 @@ class ShardWorkerContext implements WorkerContext {
   private static final Counter operationPollerCounter =
       Counter.build().name("operation_poller").help("Number of operations polled.").register();
 
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private final String name;
-  private final Platform platform;
-  private final DequeueMatchSettings matchSettings;
   private final SetMultimap<String, String> matchProvisions;
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
@@ -128,10 +129,9 @@ class ShardWorkerContext implements WorkerContext {
   private final CasWriter writer;
   private final boolean errorOperationRemainingResources;
 
-  static SetMultimap<String, String> getMatchProvisions(
-      Platform platform, Iterable<ExecutionPolicy> policies, int executeStageWidth) {
+  static SetMultimap<String, String> getMatchProvisions(Iterable<ExecutionPolicy> policies, int executeStageWidth) {
     ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
-    Platform matchPlatform = ExecutionPolicies.getMatchPlatform(platform, policies);
+    Platform matchPlatform = ExecutionPolicies.getMatchPlatform(configs.getBackplane().getQueues()[0].getPlatform(), policies);
     for (Platform.Property property : matchPlatform.getPropertiesList()) {
       provisions.put(property.getName(), property.getValue());
     }
@@ -141,8 +141,6 @@ class ShardWorkerContext implements WorkerContext {
 
   ShardWorkerContext(
       String name,
-      DequeueMatchSettings matchSettings,
-      Platform platform,
       Duration operationPollPeriod,
       OperationPoller operationPoller,
       int inputFetchStageWidth,
@@ -162,9 +160,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean errorOperationRemainingResources,
       CasWriter writer) {
     this.name = name;
-    this.matchSettings = matchSettings;
-    this.platform = platform;
-    this.matchProvisions = getMatchProvisions(platform, policies, executeStageWidth);
+    this.matchProvisions = getMatchProvisions(policies, executeStageWidth);
     this.operationPollPeriod = operationPollPeriod;
     this.operationPoller = operationPoller;
     this.inputFetchStageWidth = inputFetchStageWidth;
@@ -277,7 +273,7 @@ class ShardWorkerContext implements WorkerContext {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
     try {
-      queueEntry = backplane.dispatchOperation(platform.getPropertiesList());
+      queueEntry = backplane.dispatchOperation(configs.getBackplane().getQueues()[0].getPlatform().getPropertiesList());
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {
@@ -295,7 +291,7 @@ class ShardWorkerContext implements WorkerContext {
     listener.onWaitEnd();
 
     if (queueEntry == null
-        || DequeueMatchEvaluator.shouldKeepOperation(matchSettings, matchProvisions, queueEntry)) {
+        || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -692,7 +688,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Iterable<ExecutionPolicy> getExecutionPolicies(String name) {
+  public List<ExecutionPolicy> getExecutionPolicies(String name) {
     return policies.get(name);
   }
 

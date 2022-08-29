@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.ExecutionProperties;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
@@ -39,10 +40,10 @@ import org.jetbrains.annotations.NotNull;
  *     settings provided allow varying amount of leniency when evaluating the platform properties.
  */
 public class DequeueMatchEvaluator {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   /**
    * @brief Decide whether the worker should keep the operation or put it back on the queue.
    * @details Compares the platform properties of the worker to the operation's platform properties.
-   * @param matchSettings The provisions of the worker.
    * @param workerProvisions The provisions of the worker.
    * @param queueEntry An entry recently removed from the queue.
    * @return Whether or not the worker should accept or reject the queue entry.
@@ -52,16 +53,14 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   public static boolean shouldKeepOperation(
-      DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       QueueEntry queueEntry) {
-    return shouldKeepViaPlatform(matchSettings, workerProvisions, queueEntry.getPlatform());
+    return shouldKeepViaPlatform(workerProvisions, queueEntry.getPlatform());
   }
 
   /**
    * @brief Decide whether the worker should keep the operation or put it back on the queue.
    * @details Compares the platform properties of the worker to the operation's platform properties.
-   * @param matchSettings The provisions of the worker.
    * @param workerProvisions The provisions of the worker.
    * @param command A command to evaluate.
    * @return Whether or not the worker should accept or reject the queue entry.
@@ -71,10 +70,9 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   public static boolean shouldKeepOperation(
-      DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       Command command) {
-    return shouldKeepViaPlatform(matchSettings, workerProvisions, command.getPlatform());
+    return shouldKeepViaPlatform(workerProvisions, command.getPlatform());
   }
 
   /**
@@ -82,7 +80,6 @@ public class DequeueMatchEvaluator {
    *     queue.
    * @details Compares the platform properties of the worker to the platform properties of the
    *     operation.
-   * @param matchSettings The provisions of the worker.
    * @param workerProvisions The provisions of the worker.
    * @param platform The platforms of operation.
    * @return Whether or not the worker should accept or reject the operation.
@@ -91,23 +88,21 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean shouldKeepViaPlatform(
-      DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       Platform platform) {
     // attempt to execute everything the worker gets off the queue.
     // this is a recommended configuration.
-    if (matchSettings.acceptEverything) {
+    if (configs.getWorker().getDequeueMatchSettings().isAcceptEverything()) {
       return true;
     }
 
-    return satisfiesProperties(matchSettings, workerProvisions, platform);
+    return satisfiesProperties(workerProvisions, platform);
   }
 
   /**
    * @brief Decide whether the worker should keep the operation by comparing its platform properties
    *     with the queue entry.
    * @details Compares the platform properties of the worker to the platform properties.
-   * @param matchSettings The provisions of the worker.
    * @param workerProvisions The provisions of the worker.
    * @param platform The platforms of operation.
    * @return Whether or not the worker should accept or reject the queue entry.
@@ -116,11 +111,10 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean satisfiesProperties(
-      DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       Platform platform) {
     for (Platform.Property property : platform.getPropertiesList()) {
-      if (!satisfiesProperty(matchSettings, workerProvisions, property)) {
+      if (!satisfiesProperty(workerProvisions, property)) {
         return false;
       }
     }
@@ -131,7 +125,6 @@ public class DequeueMatchEvaluator {
    * @brief Decide whether the worker should keep the operation by comparing its platform properties
    *     with a queue entry property.
    * @details Checks for certain exact matches on key/values.
-   * @param matchSettings The provisions of the worker.
    * @param workerProvisions The provisions of the worker.
    * @param property A property of the queued entry.
    * @return Whether or not the worker should accept or reject the queue entry.
@@ -140,7 +133,6 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean satisfiesProperty(
-      DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       Platform.Property property) {
     // validate min cores
@@ -177,7 +169,7 @@ public class DequeueMatchEvaluator {
     }
 
     // accept other properties not specified on the worker
-    if (matchSettings.allowUnmatched) {
+    if (configs.getWorker().getDequeueMatchSettings().isAllowUnmatched()) {
       return true;
     }
 

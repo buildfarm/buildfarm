@@ -70,6 +70,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
@@ -348,7 +349,7 @@ class OperationQueueWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Iterable<ExecutionPolicy> getExecutionPolicies(String name) {
+  public List<build.buildfarm.common.config.yml.ExecutionPolicy> getExecutionPolicies(String name) {
     return policies.get(name);
   }
 

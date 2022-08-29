@@ -14,18 +14,6 @@
 
 package build.buildfarm.worker.shard;
 
-import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
-import static build.buildfarm.common.io.Utils.getUser;
-import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static java.lang.String.format;
-import static java.util.concurrent.Executors.newFixedThreadPool;
-import static java.util.concurrent.Executors.newSingleThreadExecutor;
-import static java.util.concurrent.TimeUnit.DAYS;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.INFO;
-import static java.util.logging.Level.SEVERE;
-
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
@@ -54,7 +42,6 @@ import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.ShardWorker;
-import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
@@ -87,6 +74,9 @@ import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.services.HealthStatusManager;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
+
+import javax.annotation.Nullable;
+import javax.naming.ConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -108,8 +98,18 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
-import javax.naming.ConfigurationException;
+
+import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
+import static build.buildfarm.common.io.Utils.getUser;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static java.lang.String.format;
+import static java.util.concurrent.Executors.newFixedThreadPool;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.logging.Level.INFO;
+import static java.util.logging.Level.SEVERE;
 
 public class Worker extends LoggingMain {
   private static final java.util.logging.Logger nettyLogger =
@@ -429,16 +429,10 @@ public class Worker extends LoggingMain {
       writer = new LocalCasWriter();
     }
 
-    DequeueMatchSettings matchSettings = new DequeueMatchSettings();
-    matchSettings.acceptEverything = configs.getWorker().getDequeueMatchSettings().isAcceptEverything();
-    matchSettings.allowUnmatched = configs.getWorker().getDequeueMatchSettings().isAllowUnmatched();
-
     ShardWorkerContext context =
         new ShardWorkerContext(
             configs.getWorker().getPublicName(),
-            matchSettings,
-            configs.getWorker().getDequeueMatchSettings().getPlatform(),
-            configs.getWorker().getOperationPollPeriod(),
+            Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build(),
             backplane::pollOperation,
             configs.getWorker().getInputFetchStageWidth(),
             configs.getWorker().getExecuteStageWidth(),
@@ -448,15 +442,15 @@ public class Worker extends LoggingMain {
             new EmptyInputStreamFactory(
                 new FailoverInputStreamFactory(
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
-            configs.getWorker().getExecutionPoliciesList(),
+            configs.getWorker().getExecutionPolicies(),
             instance,
-            configs.getDefaultActionTimeout(),
-            configs.getMaximumActionTimeout(),
+            Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build(),
+            Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build(),
             configs.getWorker().getDefaultMaxCores(),
-            configs.getWorker().getLimitGlobalExecution(),
-            configs.getWorker().getOnlyMulticoreTests(),
-            configs.getWorker().getAllowBringYourOwnContainer(),
-            configs.getWorker().getErrorOperationRemainingResources(),
+            configs.getWorker().isLimitGlobalExecution(),
+            configs.getWorker().isOnlyMulticoreTests(),
+            configs.getWorker().isAllowBringYourOwnContainer(),
+            configs.getWorker().isErrorOperationRemainingResources(),
             writer);
 
     pipeline = new Pipeline();

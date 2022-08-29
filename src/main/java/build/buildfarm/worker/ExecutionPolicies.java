@@ -15,8 +15,7 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Platform;
-import build.bazel.remote.execution.v2.Platform.Property;
-import build.buildfarm.v1test.ExecutionPolicy;
+import build.buildfarm.common.config.yml.ExecutionPolicy;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
@@ -46,7 +45,7 @@ public class ExecutionPolicies {
       Platform platform, ExecutionPoliciesIndex policiesIndex) {
     ImmutableList.Builder<ExecutionPolicy> policies = ImmutableList.builder();
     policies.addAll(policiesIndex.get(DEFAULT_EXECUTION_POLICY_NAME));
-    for (Property property : platform.getPropertiesList()) {
+    for (Platform.Property property : platform.getPropertiesList()) {
       if (property.getName().equals(EXECUTION_POLICY_PROPERTY_NAME)
           && !property.getValue().equals(DEFAULT_EXECUTION_POLICY_NAME)) {
         policies.addAll(policiesIndex.get(property.getValue()));
