@@ -85,6 +85,9 @@ public class WorkerIndexer {
   private static void reindexNode(
       JedisCluster cluster, Jedis node, CasIndexSettings settings, CasIndexResults results) {
 
+    Long totalKeys = 0L;
+    Long removedKeys = 0L;
+    Long removedHosts = 0L;
     Set<String> activeWorkers = cluster.hkeys("Workers");
     logger.info(
         String.format(
@@ -105,16 +108,16 @@ public class WorkerIndexer {
       if (scanResult != null) {
         List<String> casKeys = scanResult.getResult();
         for (String casKey : casKeys) {
-          results.totalKeys += casKeys.size();
+          totalKeys += casKeys.size();
           Set<String> intersectSource = cluster.smembers(casKey);
           Set<String> intersectResult =
               intersectSource.stream()
                   .distinct()
                   .filter(activeWorkers::contains)
                   .collect(Collectors.toSet());
-          results.removedHosts += (intersectSource.size() - intersectResult.size());
+          removedHosts += (intersectSource.size() - intersectResult.size());
           if (intersectResult.isEmpty()) {
-            results.removedKeys++;
+            removedKeys++;
             cluster.del(casKey);
           } else {
             cluster.sadd(casKey, intersectResult.toArray(new String[0]));
@@ -123,7 +126,10 @@ public class WorkerIndexer {
         cursor = scanResult.getCursor();
       }
     } while (!cursor.equals("0"));
-    indexerHostsRemovedGauge.labels(node.getClient().getHost()).set(results.removedHosts);
-    indexerKeysRemovedGauge.labels(node.getClient().getHost()).set(results.removedKeys);
+    results.totalKeys += totalKeys;
+    results.removedKeys += removedKeys;
+    results.removedHosts += removedHosts;
+    indexerHostsRemovedGauge.labels(node.getClient().getHost()).set(removedHosts);
+    indexerKeysRemovedGauge.labels(node.getClient().getHost()).set(removedKeys);
   }
 }
