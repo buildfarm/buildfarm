@@ -691,6 +691,41 @@ class CASFileCacheTest {
     assertThat(write.isComplete()).isTrue();
   }
 
+  class UnsupportedWrite implements Write {
+    @Override
+    public long getCommittedSize() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean isComplete() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public FeedbackOutputStream getOutput(
+        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+        throws IOException {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ListenableFuture<FeedbackOutputStream> getOutputFuture(
+        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void reset() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ListenableFuture<Long> getFuture() {
+      throw new UnsupportedOperationException();
+    }
+  }
+
   @Test
   public void expireInterruptCausesExpirySequenceHalt() throws IOException, InterruptedException {
     Blob expiringBlob;
@@ -705,18 +740,8 @@ class CASFileCacheTest {
 
     // set the delegate to throw interrupted on write output creation
     Write interruptingWrite =
-        new Write() {
+        new UnsupportedWrite() {
           boolean canReset = false;
-
-          @Override
-          public long getCommittedSize() {
-            throw new UnsupportedOperationException();
-          }
-
-          @Override
-          public boolean isComplete() {
-            throw new UnsupportedOperationException();
-          }
 
           @Override
           public FeedbackOutputStream getOutput(
@@ -727,21 +752,10 @@ class CASFileCacheTest {
           }
 
           @Override
-          public ListenableFuture<FeedbackOutputStream> getOutputFuture(
-              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
-            throw new UnsupportedOperationException();
-          }
-
-          @Override
           public void reset() {
             if (!canReset) {
               throw new UnsupportedOperationException();
             }
-          }
-
-          @Override
-          public ListenableFuture<Long> getFuture() {
-            throw new UnsupportedOperationException();
           }
         };
     when(delegate.getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class)))
@@ -760,6 +774,48 @@ class CASFileCacheTest {
     verify(delegate, times(1))
         .getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class));
     assertThat(storage).isEmpty();
+  }
+
+  @Test
+  public void delegateWriteCompleteIsNotAnError() throws IOException, InterruptedException {
+    Blob expiringBlob;
+    try (ByteString.Output out = ByteString.newOutput(1024)) {
+      for (int i = 0; i < 1024; i++) {
+        out.write(0);
+      }
+      expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
+      fileCache.put(expiringBlob);
+    }
+    Digest expiringDigest = expiringBlob.getDigest();
+
+    // set the delegate to throw on stream create, indicate write complete after
+    Write completingWrite =
+        new UnsupportedWrite() {
+          boolean completed = false;
+
+          @Override
+          public FeedbackOutputStream getOutput(
+              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+              throws IOException {
+            completed = true;
+            throw new IOException("indicates already complete");
+          }
+
+          @Override
+          public boolean isComplete() {
+            return completed;
+          }
+        };
+    when(delegate.getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class)))
+        .thenReturn(completingWrite);
+
+    Blob blob = new Blob(ByteString.copyFromUtf8("Hello, World"), DIGEST_UTIL);
+    fileCache.put(blob);
+
+    verify(delegate, times(1))
+        .getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class));
+    assertThat(completingWrite.isComplete()).isTrue();
+    assertThat(storage.keySet()).containsExactly(blob.getDigest().getHash());
   }
 
   void decrementReference(Path path) throws IOException, InterruptedException {

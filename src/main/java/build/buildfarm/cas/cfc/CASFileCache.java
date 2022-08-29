@@ -1785,6 +1785,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  // clears the interrupted status
+  private static boolean causedByInterrupted(Exception e) {
+    return Thread.interrupted()
+        || e.getCause() instanceof InterruptedException
+        || e instanceof ClosedByInterruptException;
+  }
+
   @SuppressWarnings("NonAtomicOperationOnVolatileField")
   @GuardedBy("this")
   private ListenableFuture<Entry> expireEntry(long blobSizeInBytes, ExecutorService service)
@@ -1804,10 +1811,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       try {
         expireEntryFallback(e);
       } catch (IOException ioEx) {
-        interrupted =
-            Thread.interrupted()
-                || ioEx.getCause() instanceof InterruptedException
-                || ioEx instanceof ClosedByInterruptException;
+        interrupted = causedByInterrupted(ioEx);
       }
       Entry removedEntry = storage.remove(e.key);
       // reference compare on purpose
@@ -2916,9 +2920,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         InputStream in = Files.newInputStream(getPath(e.key))) {
       ByteStreams.copy(in, out);
     } catch (IOException ioEx) {
-      write.reset();
-      logger.log(Level.SEVERE, format("error delegating expired entry %s", e.key), ioEx);
-      throw ioEx;
+      boolean interrupted = causedByInterrupted(ioEx);
+      if (interrupted || !write.isComplete()) {
+        write.reset();
+        logger.log(Level.SEVERE, format("error delegating expired entry %s", e.key), ioEx);
+        if (interrupted) {
+          Thread.currentThread().interrupt();
+        }
+        throw ioEx;
+      }
     }
   }
 }
