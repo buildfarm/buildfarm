@@ -1,5 +1,7 @@
 package build.buildfarm.common.config.yml;
 
+import com.google.common.base.Strings;
+
 import java.util.Arrays;
 
 public class Backplane {
@@ -47,7 +49,11 @@ public class Backplane {
     }
 
     public String getRedisUri() {
-        return redisUri;
+        if (!Strings.isNullOrEmpty(redisUri)) {
+            return redisUri;
+        } else {
+            return System.getenv("REDIS_URI");
+        }
     }
 
     public void setRedisUri(String redisUri) {

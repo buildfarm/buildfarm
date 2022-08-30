@@ -1,5 +1,7 @@
 package build.buildfarm.common.config.yml;
 
+import com.google.common.base.Strings;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -38,7 +40,11 @@ public class Worker {
     }
 
     public String getPublicName() {
-        return publicName;
+        if (!Strings.isNullOrEmpty(publicName)) {
+            return publicName;
+        } else {
+            return System.getenv("INSTANCE_NAME");
+        }
     }
 
     public void setPublicName(String publicName) {
@@ -96,6 +102,8 @@ public class Worker {
     public int getExecuteStageWidth() {
         if (executeStageWidth > 0) {
             return executeStageWidth;
+        } else if (!Strings.isNullOrEmpty(System.getenv("EXECUTION_STAGE_WIDTH"))) {
+            return Integer.parseInt(System.getenv("EXECUTION_STAGE_WIDTH"));
         } else {
             return Math.max(1, Runtime.getRuntime().availableProcessors() - executeStageWidthOffset);
 

@@ -1,5 +1,7 @@
 package build.buildfarm.common.config.yml;
 
+import com.google.common.base.Strings;
+
 public class Server {
     private String instanceType;
     private String name;
@@ -221,7 +223,11 @@ public class Server {
     }
 
     public String getPublicName() {
-        return publicName;
+        if (!Strings.isNullOrEmpty(publicName)) {
+            return publicName;
+        } else {
+            return System.getenv("INSTANCE_NAME");
+        }
     }
 
     public void setPublicName(String publicName) {
