@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class Worker {
-    private long port = 8981;
+    private int port = 8981;
     private String publicName;
     private Capabilities capabilities = new Capabilities();
     private String root = "/tmp/worker";
@@ -27,11 +27,11 @@ public class Worker {
     private boolean errorOperationRemainingResources = false;
     private List<ExecutionPolicy> executionPolicies = new ArrayList<>();
 
-    public long getPort() {
+    public int getPort() {
         return port;
     }
 
-    public void setPort(long port) {
+    public void setPort(int port) {
         this.port = port;
     }
 

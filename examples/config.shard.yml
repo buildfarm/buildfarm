@@ -1,0 +1,20 @@
+server:
+  instanceType: SHARD
+  name: shard
+backplane:
+  redisUri: "redis://localhost:6379"
+  queues:
+    - name: "cpu"
+      allowUnmatched: true
+      properties:
+        - name: "min-cores"
+          value: "*"
+        - name: "max-cores"
+          value: "*"
+    - name: "gpu"
+      allowUnmatched: true
+      properties:
+        - name: "gpu"
+          value: "1"
+worker:
+  publicName: "localhost:8981"

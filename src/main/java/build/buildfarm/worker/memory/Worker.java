@@ -111,7 +111,7 @@ public class Worker extends LoggingMain {
   private static HashFunction getValidHashFunction()
       throws ConfigurationException {
     try {
-      return HashFunction.forHash(configs.getDigestFunction());
+      return HashFunction.valueOf(configs.getDigestFunction());
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }

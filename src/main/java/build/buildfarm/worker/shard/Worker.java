@@ -375,7 +375,7 @@ public class Worker extends LoggingMain {
   @SuppressWarnings({"deprecation", "unchecked"})
   public Worker(String session) throws ConfigurationException {
     super("BuildFarmShardWorker");
-    ServerBuilder<?> serverBuilder = ServerBuilder.forPort(configs.getServer().getPort());
+    ServerBuilder<?> serverBuilder = ServerBuilder.forPort(configs.getWorker().getPort());
     hasCasCapability = configs.getWorker().getCapabilities().isCas();
     hasExecutionCapability = configs.getWorker().getCapabilities().isExecution();
     String identifier = "buildfarm-worker-" + configs.getWorker().getPublicName() + "-" + session;

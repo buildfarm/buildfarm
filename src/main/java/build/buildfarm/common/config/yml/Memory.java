@@ -2,22 +2,25 @@ package build.buildfarm.common.config.yml;
 
 import build.bazel.remote.execution.v2.Platform;
 
+import java.util.List;
+
 public class Memory {
-    private int listOperationsDefaultPageSize;
-    private int listOperationsMaxPageSize;
-    private int treeDefaultPageSize;
-    private int treeMaxPageSize;
-    private int operationPollTimeout;
-    private int operationCompletedDelay;
-    private boolean delegateCas;
+    private int listOperationsDefaultPageSize = 1024;
+    private int listOperationsMaxPageSize = 16384;
+    private int treeDefaultPageSize = 1024;
+    private int treeMaxPageSize = 16384;
+    private int operationPollTimeout = 30;
+    private int operationCompletedDelay = 10;
+    private boolean delegateCas = false;
     private String target;
-    private int deadlineAfterSeconds;
-    private boolean streamStdout;
-    private boolean streamStderr;
-    private String casPolicy;
-    private int treePageSize;
-    private Platform platform;
-    private Platform defaultPlatform;
+    private int deadlineAfterSeconds = 60;
+    private boolean streamStdout = true;
+    private boolean streamStderr = true;
+    private String casPolicy = "ALWAYS_INSERT";
+    private int treePageSize = 0;
+    private Platform platform = Platform.newBuilder().build();
+
+    private List<Property> properties;
 
     public int getListOperationsDefaultPageSize() {
         return listOperationsDefaultPageSize;
@@ -123,20 +126,20 @@ public class Memory {
         this.treePageSize = treePageSize;
     }
 
+    public void setProperties(List<Property> properties) {
+        this.properties = properties;
+    }
+
     public Platform getPlatform() {
-        return platform;
+        Platform.Builder platformBuilder = Platform.newBuilder();
+        for (Property property : this.properties) {
+            platformBuilder.addProperties(Platform.Property.newBuilder().setName(property.getName()).setValue(property.getValue()).build());
+        }
+        return platformBuilder.build();
     }
 
     public void setPlatform(Platform platform) {
-        this.platform = platform;
-    }
-
-    public Platform getDefaultPlatform() {
-        return defaultPlatform;
-    }
-
-    public void setDefaultPlatform(Platform defaultPlatform) {
-        this.defaultPlatform = defaultPlatform;
+        this.platform = Platform.newBuilder().build();
     }
 
     @Override
@@ -156,7 +159,6 @@ public class Memory {
                 ", casPolicy='" + casPolicy + '\'' +
                 ", treePageSize=" + treePageSize +
                 ", platform=" + platform +
-                ", defaultPlatform=" + defaultPlatform +
                 '}';
     }
 }
