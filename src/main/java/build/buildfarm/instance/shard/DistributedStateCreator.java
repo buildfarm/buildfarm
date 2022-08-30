@@ -14,8 +14,8 @@
 
 package build.buildfarm.instance.shard;
 
+import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
-import build.buildfarm.common.config.yml.Property;
 import build.buildfarm.common.config.yml.Queue;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
@@ -32,7 +32,6 @@ import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 
 public class DistributedStateCreator {
@@ -99,7 +98,7 @@ public class DistributedStateCreator {
               getQueueName(queueConfig),
               queueTypeToSr(),
               getQueueHashes(client, getQueueName(queueConfig)),
-              toMultimap(Arrays.asList(queueConfig.getPlatform().getProperties())),
+              toMultimap(queueConfig.getPlatform().getPropertiesList()),
               queueConfig.isAllowUnmatched());
       provisionedQueues.add(provisionedQueue);
     }
@@ -133,9 +132,9 @@ public class DistributedStateCreator {
                 jedis, RedisHashtags.existingHash(queueName)));
   }
 
-  private static SetMultimap<String, String> toMultimap(List<Property> provisions) {
+  private static SetMultimap<String, String> toMultimap(List<Platform.Property> provisions) {
     SetMultimap<String, String> set = LinkedHashMultimap.create();
-    for (Property property : provisions) {
+    for (Platform.Property property : provisions) {
       set.put(property.getName(), property.getValue());
     }
     return set;

@@ -24,6 +24,8 @@ public class BuildfarmConfigs {
 
     private static Worker worker;
 
+    private static Memory memory;
+
     private BuildfarmConfigs() {}
 
     public static BuildfarmConfigs getInstance() {
@@ -97,6 +99,14 @@ public class BuildfarmConfigs {
         this.worker = worker;
     }
 
+    public Memory getMemory() {
+        return memory;
+    }
+
+    public void setMemory(Memory memory) {
+        BuildfarmConfigs.memory = memory;
+    }
+
     @Override
     public String toString() {
         return "BuildfarmConfigs{" +
@@ -106,6 +116,7 @@ public class BuildfarmConfigs {
                 ", server=" + server +
                 ", worker=" + worker +
                 ", backplane=" + backplane +
+                ", memory=" + memory +
                 '}';
     }
 }

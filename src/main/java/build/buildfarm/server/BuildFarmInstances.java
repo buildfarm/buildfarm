@@ -34,7 +34,7 @@ public class BuildFarmInstances {
     switch (configs.getServer().getInstanceType()) {
       default: throw new IllegalArgumentException("Instance type not set in config");
       case "MEMORY":
-        instance = new MemoryInstance(name, digestUtil, /* TODO - REMOVE ARG */ null);
+        instance = new MemoryInstance(name, digestUtil);
         break;
       case "SHARD":
         instance =

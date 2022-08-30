@@ -14,20 +14,6 @@
 
 package build.buildfarm.instance.memory;
 
-import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.instance.Utils.putBlob;
-import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
-import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import static java.lang.String.format;
-import static java.util.Collections.synchronizedSortedMap;
-import static java.util.concurrent.Executors.newCachedThreadPool;
-import static java.util.concurrent.TimeUnit.SECONDS;
-
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -64,10 +50,8 @@ import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
-import build.buildfarm.v1test.FilesystemACConfig;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.QueueEntry;
@@ -106,6 +90,9 @@ import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+
+import javax.annotation.Nullable;
+import javax.naming.ConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Paths;
@@ -122,8 +109,20 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
-import javax.naming.ConfigurationException;
+
+import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.instance.Utils.putBlob;
+import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.lang.String.format;
+import static java.util.Collections.synchronizedSortedMap;
+import static java.util.concurrent.Executors.newCachedThreadPool;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class MemoryInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(MemoryInstance.class.getName());
@@ -249,14 +248,14 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private static ActionCache createActionCache(
       ContentAddressableStorage cas, DigestUtil digestUtil) {
-    switch (config.getTypeCase()) {
+    switch (configs.getWorker().getCas().getType()) {
       default: throw new IllegalArgumentException("ActionCache config not set in config");
-      case GRPC:
-        return createGrpcActionCache(config.getGrpc());
-      case DELEGATE_CAS:
+      case "GRPC":
+        return createGrpcActionCache();
+      case "DELEGATE_CAS":
         return createDelegateCASActionCache(cas, digestUtil);
-      case FILESYSTEM:
-        return createFilesystemActionCache(config.getFilesystem());
+      case "FILESYSTEM":
+        return createFilesystemActionCache();
     }
   }
 
@@ -266,9 +265,9 @@ public class MemoryInstance extends AbstractServerInstance {
     return builder.build();
   }
 
-  private static ActionCache createGrpcActionCache(GrpcACConfig config) {
-    Channel channel = createChannel(config.getTarget());
-    return new GrpcActionCache(config.getInstanceName(), channel);
+  private static ActionCache createGrpcActionCache() {
+    Channel channel = createChannel(configs.getMemory().getTarget());
+    return new GrpcActionCache(configs.getServer().getName(), channel);
   }
 
   private static ActionCache createDelegateCASActionCache(
@@ -289,8 +288,8 @@ public class MemoryInstance extends AbstractServerInstance {
     };
   }
 
-  private static ActionCache createFilesystemActionCache(FilesystemACConfig config) {
-    return new FilesystemActionCache(Paths.get(config.getPath()));
+  private static ActionCache createFilesystemActionCache() {
+    return new FilesystemActionCache(Paths.get(configs.getWorker().getCas().getPath()));
   }
 
   private static OperationsMap createCompletedOperationMap(
@@ -617,7 +616,7 @@ public class MemoryInstance extends AbstractServerInstance {
         actionTimeout = Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build();
       }
       if (actionTimeout != null) {
-        Duration delay = config.getOperationCompletedDelay();
+        Duration delay = Duration.newBuilder().setSeconds(configs.getMemory().getOperationCompletedDelay()).build();
         Duration timeout =
             Duration.newBuilder()
                 .setSeconds(actionTimeout.getSeconds() + delay.getSeconds())
@@ -644,7 +643,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private void onDispatched(Operation operation) {
     final String operationName = operation.getName();
-    Duration timeout = config.getOperationPollTimeout();
+    Duration timeout = Duration.newBuilder().setSeconds(configs.getMemory().getOperationPollTimeout()).build();
     Watchdog requeuer =
         new Watchdog(
             timeout,
@@ -920,22 +919,22 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected int getListOperationsDefaultPageSize() {
-    return config.getListOperationsDefaultPageSize();
+    return configs.getMemory().getListOperationsDefaultPageSize();
   }
 
   @Override
   protected int getListOperationsMaxPageSize() {
-    return config.getListOperationsMaxPageSize();
+    return configs.getMemory().getListOperationsMaxPageSize();
   }
 
   @Override
   protected int getTreeDefaultPageSize() {
-    return config.getTreeDefaultPageSize();
+    return configs.getMemory().getTreeDefaultPageSize();
   }
 
   @Override
   protected int getTreeMaxPageSize() {
-    return config.getTreeMaxPageSize();
+    return configs.getMemory().getTreeMaxPageSize();
   }
 
   @Override

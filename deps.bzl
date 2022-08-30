@@ -151,6 +151,14 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
         ],
     )
 
+    maybe(
+        http_jar,
+        "lombok",
+        urls = [
+            "https://projectlombok.org/downloads/lombok.jar",
+        ],
+    )
+
     http_file(
         name = "tini",
         urls = ["https://github.com/krallin/tini/releases/download/v0.18.0/tini"],

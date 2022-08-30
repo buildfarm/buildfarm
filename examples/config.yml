@@ -35,14 +35,6 @@ server:
     topic: test
     topicMaxConnections: 1000
     secretName: test
-  memory:
-    listOperationsDefaultPageSize: 1024
-    listOperationsMaxPageSize: 16384
-    treeDefaultPageSize: 1024
-    treeMaxPageSize: 16384
-    operationPollTimeout: 30
-    operationCompletedDelay: 10
-    delegateCas: false
 backplane:
   type: SHARD
   redisUri: "redis://localhost:6379"
@@ -80,18 +72,16 @@ backplane:
   queues:
     - name: "cpu"
       allowUnmatched: true
-      platform:
-        properties:
-          - name: "min-cores"
-            value: "*"
-          - name: "max-cores"
-            value: "*"
+      properties:
+        - name: "min-cores"
+          value: "*"
+        - name: "max-cores"
+          value: "*"
     - name: "gpu"
       allowUnmatched: true
-      platform:
-        properties:
-          - name: "gpu"
-            value: "1"
+      properties:
+        - name: "gpu"
+          value: "1"
 worker:
   port: 8981
   publicName: "localhost:8981"
@@ -133,30 +123,25 @@ worker:
         arguments:
           - arg1
           - arg2
-  memory:
-    operation_queue:
-      target: "localhost:8980"
-      instance_name: "memory"
-      deadline_after_seconds: 60
-    content_addressable_storage:
-      target: "localhost:8980"
-      instance_name: "memory"
-      deadline_after_seconds: 60
-    action_cache:
-      target: "localhost:8980"
-      instance_name: "memory"
-      deadline_after_seconds: 60
-    stream_stdout: true
-    stdout_cas_policy: ALWAYS_INSERT
-    stream_stderr: true
-    stderr_cas_policy: ALWAYS_INSERT
-    file_cas_policy: ALWAYS_INSERT
-    tree_page_size: 0
-    platform:
-      properties:
-        name: "key_name"
-        value: "value_string"
-    default_platform:
-      properties:
-        name: "cores"
-        value: "1"
+memory:
+  listOperationsDefaultPageSize: 1024
+  listOperationsMaxPageSize: 16384
+  treeDefaultPageSize: 1024
+  treeMaxPageSize: 16384
+  operationPollTimeout: 30
+  operationCompletedDelay: 10
+  delegateCas: false
+  target: "localhost:8980"
+  deadlineAfterSeconds: 60
+  streamStdout: true
+  streamStderr: true
+  casPolicy: ALWAYS_INSERT
+  treePageSize: 0
+  platform:
+    properties:
+      name: "key_name"
+      value: "value_string"
+  defaultPlatform:
+    properties:
+      name: "cores"
+      value: "1"

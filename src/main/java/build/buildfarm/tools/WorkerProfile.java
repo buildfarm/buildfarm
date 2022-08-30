@@ -37,6 +37,9 @@ import io.grpc.ManagedChannel;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+import redis.clients.jedis.JedisCluster;
+
+import javax.naming.ConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -47,8 +50,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.naming.ConfigurationException;
-import redis.clients.jedis.JedisCluster;
 
 class WorkerProfile {
   private static ManagedChannel createChannel(String target) {
@@ -140,7 +141,7 @@ class WorkerProfile {
       e.printStackTrace();
     }
 
-    RedisClient client = new RedisClient(JedisClusterFactory.create(config).get());
+    RedisClient client = new RedisClient(JedisClusterFactory.create().get());
     RedisShardBackplaneConfig finalConfig = config;
     return client.call(jedis -> fetchWorkers(jedis, finalConfig, System.currentTimeMillis()));
   }

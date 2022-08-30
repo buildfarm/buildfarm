@@ -9,7 +9,7 @@ public class Worker {
     private String publicName;
     private Capabilities capabilities = new Capabilities();
     private String root = "/tmp/worker";
-    private long inlineContentLimit = 1048567; //1024 * 1024
+    private int inlineContentLimit = 1048567; //1024 * 1024
     private long operationPollPeriod = 1;
     private DequeueMatchSettings dequeueMatchSettings = new DequeueMatchSettings();
     private Cas cas = new Cas();
@@ -59,11 +59,11 @@ public class Worker {
         this.root = root;
     }
 
-    public long getInlineContentLimit() {
+    public int getInlineContentLimit() {
         return inlineContentLimit;
     }
 
-    public void setInlineContentLimit(long inlineContentLimit) {
+    public void setInlineContentLimit(int inlineContentLimit) {
         this.inlineContentLimit = inlineContentLimit;
     }
 

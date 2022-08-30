@@ -14,16 +14,14 @@
 
 package build.buildfarm.worker.memory;
 
-import static java.util.logging.Level.SEVERE;
-
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.yml.ExecutionPolicy;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
-import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.worker.ExecutionPolicies;
@@ -31,10 +29,13 @@ import build.buildfarm.worker.RetryingMatchListener;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
+
+import javax.annotation.Nullable;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
+
+import static java.util.logging.Level.SEVERE;
 
 class OperationQueueClient {
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
