@@ -6,7 +6,7 @@ import java.util.List;
 
 public class Queue {
     private String name;
-    private boolean allowUnmatched;
+    private boolean allowUnmatched = true;
 
     private Platform platform = Platform.newBuilder().build();
 
