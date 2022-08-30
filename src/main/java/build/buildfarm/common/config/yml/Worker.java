@@ -13,8 +13,10 @@ public class Worker {
     private long operationPollPeriod = 1;
     private DequeueMatchSettings dequeueMatchSettings = new DequeueMatchSettings();
     private Cas cas = new Cas();
-    private int executeStageWidth = 1;
-    private int inputFetchStageWidth = 1;
+    private int executeStageWidth = 0;
+
+    private int executeStageWidthOffset = 0;
+    private int inputFetchStageWidth = 0;
     private int inputFetchDeadline = 60;
     private boolean linkInputDirectories = true;
     private List<String> realInputDirectories = Arrays.asList("external");
@@ -92,15 +94,32 @@ public class Worker {
     }
 
     public int getExecuteStageWidth() {
-        return executeStageWidth;
+        if (executeStageWidth > 0) {
+            return executeStageWidth;
+        } else {
+            return Math.max(1, Runtime.getRuntime().availableProcessors() - executeStageWidthOffset);
+
+        }
     }
 
     public void setExecuteStageWidth(int executeStageWidth) {
         this.executeStageWidth = executeStageWidth;
     }
 
+    public int getExecuteStageWidthOffset() {
+        return executeStageWidthOffset;
+    }
+
+    public void setExecuteStageWidthOffset(int executeStageWidthOffset) {
+        this.executeStageWidthOffset = executeStageWidthOffset;
+    }
+
     public int getInputFetchStageWidth() {
-        return inputFetchStageWidth;
+        if (inputFetchStageWidth > 0) {
+            return inputFetchStageWidth;
+        } else {
+            return Math.max(1, getExecuteStageWidth() / 5);
+        }
     }
 
     public void setInputFetchStageWidth(int inputFetchStageWidth) {
@@ -207,6 +226,7 @@ public class Worker {
                 ", dequeueMatchSettings=" + dequeueMatchSettings +
                 ", cas=" + cas +
                 ", executeStageWidth=" + executeStageWidth +
+                ", executeStageWidthOffset=" + executeStageWidthOffset +
                 ", inputFetchStageWidth=" + inputFetchStageWidth +
                 ", inputFetchDeadline=" + inputFetchDeadline +
                 ", linkInputDirectories=" + linkInputDirectories +
