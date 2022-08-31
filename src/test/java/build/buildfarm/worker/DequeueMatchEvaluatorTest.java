@@ -16,7 +16,6 @@ package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
-import build.buildfarm.common.config.yml.DequeueMatchSettings;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
@@ -26,6 +25,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -51,7 +52,8 @@ public class DequeueMatchEvaluatorTest {
 
   @Before
   public void setUp() throws IOException {
-
+    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
+    configs.loadConfigs(configPath);
   }
 
   // Function under test: shouldKeepOperation
@@ -107,6 +109,7 @@ public class DequeueMatchEvaluatorTest {
   @Test
   public void shouldKeepOperationInvalidMinCoresQueueEntry() throws Exception {
     // ARRANGE
+    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     workerProvisions.put("cores", "10");
 
@@ -162,8 +165,8 @@ public class DequeueMatchEvaluatorTest {
   @Test
   public void shouldKeepOperationUnmatchedPropertiesRejectionAcceptance() throws Exception {
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-
+    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
 
     QueueEntry entry =

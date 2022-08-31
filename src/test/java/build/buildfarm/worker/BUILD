@@ -13,9 +13,7 @@ java_test(
         ":fuse": ["FuseCASTest.java"],
         "//conditions:default": [],
     }),
-    classpath_resources = [
-        "//src/test/java/build/buildfarm:configs",
-    ],
+    data = ["//examples:example_configs"],
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",

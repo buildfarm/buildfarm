@@ -29,6 +29,7 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.queues.Worker;
 import build.buildfarm.instance.server.AbstractServerInstance;
@@ -61,6 +62,8 @@ import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 import org.mockito.stubbing.Answer;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -95,6 +98,7 @@ import static org.mockito.Mockito.when;
 
 @RunWith(JUnit4.class)
 public class MemoryInstanceTest {
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final DigestUtil DIGEST_UTIL = new DigestUtil(DigestUtil.HashFunction.SHA256);
   private final Command simpleCommand = Command.newBuilder().addArguments("true").build();
   private final Digest simpleCommandDigest = DIGEST_UTIL.compute(simpleCommand);
@@ -115,6 +119,8 @@ public class MemoryInstanceTest {
 
   @Before
   public void setUp() throws Exception {
+    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
+    configs.loadConfigs(configPath);
     outstandingOperations = new MemoryInstance.OutstandingOperations();
     watchers =
         synchronizedSetMultimap(

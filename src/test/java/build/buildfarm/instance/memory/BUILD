@@ -2,10 +2,13 @@ java_test(
     name = "tests",
     size = "small",
     srcs = glob(["*.java"]),
+
+    data = ["//examples:example_configs"],
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config/yml",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/memory",
         "//src/main/java/build/buildfarm/instance/queues",

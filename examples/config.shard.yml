@@ -10,9 +10,5 @@ backplane:
           value: "*"
         - name: "max-cores"
           value: "*"
-    - name: "gpu"
-      properties:
-        - name: "gpu"
-          value: "1"
 worker:
   publicName: "localhost:8981"

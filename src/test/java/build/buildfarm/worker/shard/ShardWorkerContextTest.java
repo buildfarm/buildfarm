@@ -22,6 +22,7 @@ import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.config.yml.ExecutionPolicy;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
@@ -42,6 +43,7 @@ import org.mockito.MockitoAnnotations;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 import static org.mockito.Mockito.any;
@@ -53,6 +55,8 @@ import static org.mockito.Mockito.when;
 @RunWith(JUnit4.class)
 public class ShardWorkerContextTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
+
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private Path root;
 
@@ -68,6 +72,9 @@ public class ShardWorkerContextTest {
 
   @Before
   public void setUp() throws Exception {
+    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
+    configs.loadConfigs(configPath);
+    configs.getWorker().setRoot(".");
     MockitoAnnotations.initMocks(this);
     when(instance.getDigestUtil()).thenReturn(DIGEST_UTIL);
     root = Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null);
