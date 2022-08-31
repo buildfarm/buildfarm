@@ -2,6 +2,7 @@ java_test(
     name = "tests",
     size = "small",
     srcs = glob(["*.java"]),
+    data = ["//examples:example_configs"],
     classpath_resources = [
         "//src/test/java/build/buildfarm:configs",
     ],

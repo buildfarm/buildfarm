@@ -49,7 +49,7 @@ public class ActionCacheServiceTest {
 
     // ARRANGE
     Instance instance = mock(Instance.class);
-    configs.getMemory().setCasPolicy("READ_ONLY");
+    configs.getServer().setActionCacheReadOnly(true);
     ActionCacheService service = new ActionCacheService(instance);
 
     // ACT
@@ -68,7 +68,7 @@ public class ActionCacheServiceTest {
 
     // ARRANGE
     Instance instance = mock(Instance.class);
-    configs.getMemory().setCasPolicy("READ_AND_WRITE");
+    configs.getServer().setActionCacheReadOnly(false);
     ActionCacheService service = new ActionCacheService(instance);
 
     // ACT

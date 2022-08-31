@@ -15,6 +15,7 @@
 package build.buildfarm.server;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -26,6 +27,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -40,9 +43,14 @@ import static org.mockito.Mockito.verify;
 public class ExecutionServiceTest {
   private Instance instance;
 
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   @Before
   public void setUp() throws Exception {
     instance = mock(Instance.class);
+    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
+    configs.loadConfigs(configPath);
+    configs.getServer().setClusterId("buildfarm-test");
   }
 
   @SuppressWarnings("unchecked")

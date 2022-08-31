@@ -252,7 +252,7 @@ public class MemoryInstance extends AbstractServerInstance {
       default: throw new IllegalArgumentException("ActionCache config not set in config");
       case "GRPC":
         return createGrpcActionCache();
-      case "DELEGATE_CAS":
+      case "MEMORY":
         return createDelegateCASActionCache(cas, digestUtil);
       case "FILESYSTEM":
         return createFilesystemActionCache();

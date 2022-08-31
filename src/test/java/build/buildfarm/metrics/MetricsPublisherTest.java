@@ -17,6 +17,7 @@ package build.buildfarm.metrics;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.metrics.aws.AwsMetricsPublisher;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.v1test.OperationRequestMetadata;
@@ -26,9 +27,14 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static com.google.common.truth.Truth.assertThat;
@@ -58,6 +64,17 @@ public class MetricsPublisherTest {
           .build();
   private final PreconditionFailure preconditionFailure =
       PreconditionFailure.getDefaultInstance().toBuilder().addViolations(defaultViolation).build();
+
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  @Before
+  public void setUp() throws IOException {
+    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
+    configs.loadConfigs(configPath);
+    configs.getServer().setCloudRegion("test");
+    configs.getServer().setClusterId("buildfarm-test");
+    configs.getServer().getMetrics().setPublisher("aws");
+  }
 
   @Test
   public void publishCompleteMetricsTest() throws InvalidProtocolBufferException {

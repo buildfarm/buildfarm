@@ -25,7 +25,7 @@ public class Server {
     private Admin admin = new Admin();
     private Metrics metrics = new Metrics();
     private int maxCpu;
-    private String clusterId;
+    private String clusterId = "";
     private String cloudRegion;
 
     private String publicName;

@@ -71,10 +71,13 @@ public class BuildFarmServer extends LoggingMain {
   private boolean stopping = false;
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  public BuildFarmServer(String session) throws InterruptedException, IOException, ConfigurationException {
-    super("BuildFarmServer");
+  public BuildFarmServer(String session)
+          throws InterruptedException, ConfigurationException, IOException {
+    this(session, ServerBuilder.forPort(configs.getServer().getPort()));
+  }
 
-    ServerBuilder<?> serverBuilder = ServerBuilder.forPort(configs.getServer().getPort());
+  public BuildFarmServer(String session, ServerBuilder<?> serverBuilder) throws InterruptedException, ConfigurationException {
+    super("BuildFarmServer");
 
     instance = BuildFarmInstances.createInstance(session, this::stop);
 

@@ -35,6 +35,7 @@ import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
@@ -65,6 +66,7 @@ import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
+import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
@@ -75,6 +77,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.UUID;
 
@@ -95,12 +99,15 @@ public class BuildFarmServerTest {
   private BuildFarmServer server;
   private ManagedChannel inProcessChannel;
 
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   @Before
   public void setUp() throws Exception {
+    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
+    configs.loadConfigs(configPath);
+    configs.getServer().setClusterId("buildfarm-test");
     String uniqueServerName = "in-process server for " + getClass();
-
-    server =
-        new BuildFarmServer("test");
+    server = new BuildFarmServer("test", InProcessServerBuilder.forName(uniqueServerName).directExecutor());
     server.start("startTime/test:0000");
     inProcessChannel = InProcessChannelBuilder.forName(uniqueServerName).directExecutor().build();
   }
@@ -434,6 +441,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void grpcMetricsOffByDefault() {
+    configs.getServer().getGrpcMetrics().setEnabled(false);
     // ARRANGE
     ServerBuilder serverBuilder = mock(ServerBuilder.class);
 
@@ -446,6 +454,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void grpcMetricsEnabled() {
+    configs.getServer().getGrpcMetrics().setEnabled(true);
     // ARRANGE
     ServerBuilder serverBuilder = mock(ServerBuilder.class);
 

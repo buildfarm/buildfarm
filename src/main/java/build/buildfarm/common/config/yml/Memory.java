@@ -11,7 +11,7 @@ public class Memory {
     private int treeMaxPageSize = 16384;
     private int operationPollTimeout = 30;
     private int operationCompletedDelay = 10;
-    private boolean delegateCas = false;
+    private boolean delegateCas = true;
     private String target;
     private int deadlineAfterSeconds = 60;
     private boolean streamStdout = true;
