@@ -14,20 +14,6 @@
 
 package build.buildfarm.server;
 
-import static build.buildfarm.common.DigestUtil.HashFunction.SHA256;
-import static build.buildfarm.server.ByteStreamService.CHUNK_SIZE;
-import static com.google.common.truth.Truth.assertThat;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.mockito.AdditionalAnswers.answerVoid;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
@@ -52,11 +38,6 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
-import java.io.IOException;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -66,6 +47,25 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.stubbing.Answer;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+import static build.buildfarm.common.DigestUtil.HashFunction.SHA256;
+import static build.buildfarm.server.ByteStreamService.CHUNK_SIZE;
+import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.AdditionalAnswers.answerVoid;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @RunWith(JUnit4.class)
 public class ByteStreamServiceTest {
@@ -83,7 +83,7 @@ public class ByteStreamServiceTest {
     // Use a mutable service registry for later registering the service impl for each test case.
     fakeServer =
         InProcessServerBuilder.forName(fakeServerName)
-            .addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, SECONDS))
+            .addService(new ByteStreamService(instance))
             .directExecutor()
             .build()
             .start();

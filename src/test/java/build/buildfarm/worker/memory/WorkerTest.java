@@ -14,21 +14,21 @@
 
 package build.buildfarm.worker.memory;
 
-import build.buildfarm.v1test.WorkerConfig;
-import javax.naming.ConfigurationException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+
+import javax.naming.ConfigurationException;
 
 @RunWith(JUnit4.class)
 public class WorkerTest {
   @Test(expected = ConfigurationException.class)
   public void missingWorkerRoot() throws ConfigurationException {
-    new Worker(WorkerConfig.newBuilder().setCasCacheDirectory("/cache").build());
+    new Worker();
   }
 
   @Test(expected = ConfigurationException.class)
   public void missingCasCacheDirectory() throws ConfigurationException {
-    new Worker(WorkerConfig.newBuilder().setRoot("/").build());
+    new Worker();
   }
 }

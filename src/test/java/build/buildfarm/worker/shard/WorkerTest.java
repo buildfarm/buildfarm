@@ -14,21 +14,21 @@
 
 package build.buildfarm.worker.shard;
 
-import build.buildfarm.v1test.ShardWorkerConfig;
-import javax.naming.ConfigurationException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+
+import javax.naming.ConfigurationException;
 
 @RunWith(JUnit4.class)
 public class WorkerTest {
   @Test(expected = ConfigurationException.class)
   public void missingWorkerRoot() throws ConfigurationException {
-    new Worker("test", ShardWorkerConfig.newBuilder().build());
+    new Worker("test");
   }
 
   @Test(expected = ConfigurationException.class)
   public void missingCasCacheDirectory() throws ConfigurationException {
-    new Worker("test", ShardWorkerConfig.newBuilder().setRoot("/").build());
+    new Worker("test");
   }
 }

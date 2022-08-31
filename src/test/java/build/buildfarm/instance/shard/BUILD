@@ -9,6 +9,7 @@ java_test(
     deps = [
         "//src/main/java/build/buildfarm/backplane",
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config/yml",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/server",
         "//src/main/java/build/buildfarm/instance/shard",

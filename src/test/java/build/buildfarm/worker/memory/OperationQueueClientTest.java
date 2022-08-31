@@ -14,25 +14,26 @@
 
 package build.buildfarm.worker.memory;
 
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.common.config.yml.ExecutionPolicy;
+import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.MatchListener;
+import build.buildfarm.v1test.QueueEntry;
+import com.google.common.collect.ImmutableList;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+import org.mockito.stubbing.Answer;
+
+import javax.annotation.Nullable;
+
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-
-import build.bazel.remote.execution.v2.Platform;
-import build.bazel.remote.execution.v2.Platform.Property;
-import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.MatchListener;
-import build.buildfarm.v1test.ExecutionPolicy;
-import build.buildfarm.v1test.QueueEntry;
-import com.google.common.collect.ImmutableList;
-import javax.annotation.Nullable;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
-import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class OperationQueueClientTest {
@@ -52,7 +53,7 @@ public class OperationQueueClientTest {
         new OperationQueueClient(
             instance,
             Platform.getDefaultInstance(),
-            ImmutableList.of(ExecutionPolicy.newBuilder().setName("foo").build()));
+            ImmutableList.of((new ExecutionPolicy("foo"))));
     MatchListener listener =
         new MatchListener() {
           @Override

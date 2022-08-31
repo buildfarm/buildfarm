@@ -14,6 +14,59 @@
 
 package build.buildfarm.instance.memory;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Watchdog;
+import build.buildfarm.common.Watcher;
+import build.buildfarm.instance.MatchListener;
+import build.buildfarm.instance.queues.Worker;
+import build.buildfarm.instance.server.AbstractServerInstance;
+import build.buildfarm.instance.server.OperationsMap;
+import build.buildfarm.instance.server.WatchFuture;
+import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.QueueEntry;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.SetMultimap;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.Durations;
+import com.google.rpc.Code;
+import com.google.rpc.PreconditionFailure;
+import com.google.rpc.PreconditionFailure.Violation;
+import com.google.rpc.Status;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+import org.mockito.ArgumentCaptor;
+import org.mockito.stubbing.Answer;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicReference;
+
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.CACHE_CHECK;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
@@ -39,61 +92,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
-
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteResponse;
-import build.bazel.remote.execution.v2.ExecutionPolicy;
-import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.Platform;
-import build.bazel.remote.execution.v2.RequestMetadata;
-import build.bazel.remote.execution.v2.ResultsCachePolicy;
-import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.Watchdog;
-import build.buildfarm.common.Watcher;
-import build.buildfarm.instance.MatchListener;
-import build.buildfarm.instance.queues.Worker;
-import build.buildfarm.instance.server.AbstractServerInstance;
-import build.buildfarm.instance.server.OperationsMap;
-import build.buildfarm.instance.server.WatchFuture;
-import build.buildfarm.v1test.ActionCacheConfig;
-import build.buildfarm.v1test.CompletedOperationMetadata;
-import build.buildfarm.v1test.DelegateCASConfig;
-import build.buildfarm.v1test.MemoryInstanceConfig;
-import build.buildfarm.v1test.QueueEntry;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.MultimapBuilder;
-import com.google.common.collect.SetMultimap;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.longrunning.Operation;
-import com.google.protobuf.Any;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.Duration;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.Durations;
-import com.google.rpc.Code;
-import com.google.rpc.PreconditionFailure;
-import com.google.rpc.PreconditionFailure.Violation;
-import com.google.rpc.Status;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicReference;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
-import org.mockito.ArgumentCaptor;
-import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class MemoryInstanceTest {
@@ -122,22 +120,6 @@ public class MemoryInstanceTest {
         synchronizedSetMultimap(
             MultimapBuilder.hashKeys().hashSetValues(/* expectedValuesPerKey=*/ 1).build());
     watcherService = newDirectExecutorService();
-    MemoryInstanceConfig memoryInstanceConfig =
-        MemoryInstanceConfig.newBuilder()
-            .setListOperationsDefaultPageSize(1024)
-            .setListOperationsMaxPageSize(16384)
-            .setTreeDefaultPageSize(1024)
-            .setTreeMaxPageSize(16384)
-            .setOperationPollTimeout(Durations.fromSeconds(10))
-            .setOperationCompletedDelay(Durations.fromSeconds(10))
-            .setDefaultActionTimeout(Durations.fromSeconds(600))
-            .setMaximumActionTimeout(MAXIMUM_ACTION_TIMEOUT)
-            .setActionCacheConfig(
-                ActionCacheConfig.newBuilder()
-                    .setDelegateCas(DelegateCASConfig.getDefaultInstance())
-                    .build())
-            .build();
-
     storage = Maps.newHashMap();
     workers = Lists.newArrayList();
     requeuers = Maps.newHashMap();
@@ -146,7 +128,6 @@ public class MemoryInstanceTest {
         new MemoryInstance(
             "memory",
             DIGEST_UTIL,
-            memoryInstanceConfig,
             casMapDecorator(storage),
             watchers,
             watcherService,

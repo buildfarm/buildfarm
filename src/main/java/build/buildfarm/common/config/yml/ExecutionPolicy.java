@@ -6,6 +6,12 @@ public class ExecutionPolicy {
     private String name;
     private ExecutionWrapper executionWrapper;
 
+    public ExecutionPolicy() { }
+
+    public ExecutionPolicy(String name) {
+        this.name = name;
+    }
+
     public class ExecutionWrapper {
         private String path;
         private List<String> arguments;

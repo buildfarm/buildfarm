@@ -14,6 +14,20 @@
 
 package build.buildfarm.server;
 
+import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.instance.Instance;
+import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.longrunning.Operation;
+import io.grpc.stub.ServerCallStreamObserver;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+import org.mockito.ArgumentCaptor;
+
+import java.util.concurrent.ScheduledExecutorService;
+
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -21,21 +35,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-
-import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.instance.Instance;
-import build.buildfarm.metrics.log.LogMetricsPublisher;
-import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
-import build.buildfarm.v1test.MetricsConfig;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.longrunning.Operation;
-import io.grpc.stub.ServerCallStreamObserver;
-import java.util.concurrent.ScheduledExecutorService;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
-import org.mockito.ArgumentCaptor;
 
 @RunWith(JUnit4.class)
 public class ExecutionServiceTest {
@@ -53,11 +52,7 @@ public class ExecutionServiceTest {
     ExecutionService service =
         new ExecutionService(
             instance,
-            /* keepaliveAfter=*/ 1,
-            /* keepaliveUnit=*/ SECONDS, // far enough in the future that we'll get scheduled and
-            keepaliveScheduler,
-            new LogMetricsPublisher(
-                MetricsConfig.getDefaultInstance())); // cancelled without executing
+            keepaliveScheduler); // cancelled without executing
     ServerCallStreamObserver<Operation> response = mock(ServerCallStreamObserver.class);
     RequestMetadata requestMetadata = RequestMetadata.newBuilder().build();
     Operation operation =

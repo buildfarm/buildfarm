@@ -19,6 +19,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config/yml",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/worker",
         "//src/main/java/build/buildfarm/worker/resources",

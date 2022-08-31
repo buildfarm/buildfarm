@@ -14,22 +14,34 @@
 
 package build.buildfarm.server;
 
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.UpdateActionResultRequest;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.instance.Instance;
+import io.grpc.stub.StreamObserver;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.UpdateActionResultRequest;
-import build.buildfarm.instance.Instance;
-import build.buildfarm.v1test.ActionCacheAccessPolicy;
-import io.grpc.stub.StreamObserver;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
-
 @RunWith(JUnit4.class)
 public class ActionCacheServiceTest {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  @Before
+  public void setUp() throws IOException {
+    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
+    configs.loadConfigs(configPath);
+  }
   @Test
   public void writeFailsWhenActionCacheIsReadOnly() throws Exception {
     // If the ActionCache is configured to be read-only,
@@ -37,8 +49,8 @@ public class ActionCacheServiceTest {
 
     // ARRANGE
     Instance instance = mock(Instance.class);
-    ActionCacheService service =
-        new ActionCacheService(instance, ActionCacheAccessPolicy.READ_ONLY);
+    configs.getMemory().setCasPolicy("READ_ONLY");
+    ActionCacheService service = new ActionCacheService(instance);
 
     // ACT
     StreamObserver<ActionResult> response = mock(StreamObserver.class);
@@ -56,8 +68,8 @@ public class ActionCacheServiceTest {
 
     // ARRANGE
     Instance instance = mock(Instance.class);
-    ActionCacheService service =
-        new ActionCacheService(instance, ActionCacheAccessPolicy.READ_AND_WRITE);
+    configs.getMemory().setCasPolicy("READ_AND_WRITE");
+    ActionCacheService service = new ActionCacheService(instance);
 
     // ACT
     StreamObserver<ActionResult> response = mock(StreamObserver.class);

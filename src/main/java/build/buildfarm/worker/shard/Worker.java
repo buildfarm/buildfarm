@@ -39,7 +39,6 @@ import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.v1test.AdminGrpc;
-import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.worker.ExecuteActionStage;
@@ -53,8 +52,6 @@ import build.buildfarm.worker.ReportResultStage;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
@@ -682,26 +679,6 @@ public class Worker extends LoggingMain {
             delegate == null ? this::onStorageExpire : (digests) -> {},
             delegate);
     }
-  }
-
-  private ContentAddressableStorage createStorages(
-      InputStreamFactory remoteInputStreamFactory,
-      ExecutorService removeDirectoryService,
-      Executor accessRecorder,
-      List<ContentAddressableStorageConfig> configs)
-      throws ConfigurationException {
-    ImmutableList.Builder<ContentAddressableStorage> storages = ImmutableList.builder();
-    // must construct delegates first
-    ContentAddressableStorage storage = null;
-    ContentAddressableStorage delegate = null;
-    for (ContentAddressableStorageConfig config : Lists.reverse(configs)) {
-      storage =
-          createStorage(
-              remoteInputStreamFactory, removeDirectoryService, accessRecorder, delegate);
-      storages.add(storage);
-      delegate = storage;
-    }
-    return storage;
   }
 
   private ExecFileSystem createCFCExecFileSystem(

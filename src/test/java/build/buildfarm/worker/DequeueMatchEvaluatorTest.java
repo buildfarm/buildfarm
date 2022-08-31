@@ -14,15 +14,22 @@
 
 package build.buildfarm.worker;
 
-import static com.google.common.truth.Truth.assertThat;
-
 import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.DequeueMatchSettings;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import static com.google.common.truth.Truth.assertThat;
 
 /**
  * @class DequeueMatchEvaluatorTest
@@ -42,19 +49,26 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class DequeueMatchEvaluatorTest {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  @Before
+  public void setUp() throws IOException {
+    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
+    configs.loadConfigs(configPath);
+  }
+
   // Function under test: shouldKeepOperation
   // Reason for testing: empty plaform queue entries should be kept
   // Failure explanation: properties are being evaluated differently now
   @Test
   public void shouldKeepOperationKeepEmptyQueueEntry() throws Exception {
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     QueueEntry entry = QueueEntry.newBuilder().setPlatform(Platform.newBuilder()).build();
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
@@ -68,8 +82,6 @@ public class DequeueMatchEvaluatorTest {
   @Test
   public void shouldKeepOperationValidMinCoresQueueEntry() throws Exception {
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     workerProvisions.put("cores", "11");
 
@@ -83,7 +95,7 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     // the worker accepts because it has more cores than the min-cores requested
@@ -98,8 +110,6 @@ public class DequeueMatchEvaluatorTest {
   @Test
   public void shouldKeepOperationInvalidMinCoresQueueEntry() throws Exception {
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     workerProvisions.put("cores", "10");
 
@@ -113,7 +123,7 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     // the worker rejects because it has less cores than the min-cores requested
@@ -126,8 +136,6 @@ public class DequeueMatchEvaluatorTest {
   @Test
   public void shouldKeepOperationMaxCoresDoNotInfluenceAcceptance() throws Exception {
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     workerProvisions.put("cores", "10");
 
@@ -143,7 +151,7 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     // the worker accepts because it has the same cores as the min-cores requested
@@ -171,25 +179,25 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isFalse();
 
     // ARRANGE
-    settings.acceptEverything = true;
+    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(true);
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
 
     // ARRANGE
-    settings.allowUnmatched = true;
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();

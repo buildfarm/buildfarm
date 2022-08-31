@@ -136,6 +136,7 @@ java_binary(
         ":worker-profiler-printer",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
+        "//src/main/java/build/buildfarm/common/config/yml",
         "//src/main/java/build/buildfarm/common/redis",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/shard",
