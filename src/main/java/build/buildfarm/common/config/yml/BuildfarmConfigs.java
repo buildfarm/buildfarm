@@ -20,13 +20,13 @@ public class BuildfarmConfigs {
     private static long defaultActionTimeout = 600;
 
     private static long maximumActionTimeout = 3600;
-    private static Server server;
+    private static Server server = new Server();
 
-    private static Backplane backplane;
+    private static Backplane backplane = new Backplane();
 
-    private static Worker worker;
+    private static Worker worker = new Worker();
 
-    private static Memory memory;
+    private static Memory memory = new Memory();
 
     private BuildfarmConfigs() {}
 
@@ -52,6 +52,13 @@ public class BuildfarmConfigs {
             logger.info(buildfarmConfigs.toString());
         }
     }
+
+    public void loadConfigsFromYamlContents(String yamlContents) throws IOException {
+        Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
+        buildfarmConfigs = yaml.load(yamlContents);
+        logger.info(buildfarmConfigs.toString());
+    }
+
 
     public BuildfarmConfigs getBuildfarmConfigs() {
         return buildfarmConfigs;

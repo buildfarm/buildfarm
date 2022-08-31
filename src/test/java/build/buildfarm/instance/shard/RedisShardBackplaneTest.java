@@ -35,8 +35,6 @@ import org.mockito.MockitoAnnotations;
 import redis.clients.jedis.JedisCluster;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -61,8 +59,6 @@ public class RedisShardBackplaneTest {
   @Before
   public void setUp() throws IOException {
     MockitoAnnotations.initMocks(this);
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
-    configs.loadConfigs(configPath);
   }
 
   @Test

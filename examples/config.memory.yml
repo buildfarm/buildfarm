@@ -5,7 +5,6 @@ worker:
   publicName: "localhost:8981"
 memory:
   target: "localhost:8980"
-  platform:
-    properties:
-      name: "cores"
+  properties:
+    - name: "cores"
       value: "1"

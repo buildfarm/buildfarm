@@ -26,8 +26,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -53,8 +51,7 @@ public class DequeueMatchEvaluatorTest {
 
   @Before
   public void setUp() throws IOException {
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
-    configs.loadConfigs(configPath);
+
   }
 
   // Function under test: shouldKeepOperation

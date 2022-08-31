@@ -121,7 +121,7 @@ public class ShardWorkerContextTest {
     WorkerContext context =
         createTestContext(
             Platform.getDefaultInstance(),
-            ImmutableList.of(ExecutionPolicy.newBuilder().setName("foo").build()));
+            ImmutableList.of(new ExecutionPolicy("foo")));
     Platform matchPlatform =
         Platform.newBuilder()
             .addProperties(
