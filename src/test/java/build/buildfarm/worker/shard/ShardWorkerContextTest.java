@@ -14,6 +14,12 @@
 
 package build.buildfarm.worker.shard;
 
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Platform;
@@ -34,23 +40,16 @@ import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import com.google.protobuf.Duration;
 import io.grpc.StatusException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
-
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @RunWith(JUnit4.class)
 public class ShardWorkerContextTest {
@@ -72,7 +71,8 @@ public class ShardWorkerContextTest {
 
   @Before
   public void setUp() throws Exception {
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
+    Path configPath =
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
     configs.loadConfigs(configPath);
     configs.getWorker().setRoot(".");
     MockitoAnnotations.initMocks(this);
@@ -127,8 +127,7 @@ public class ShardWorkerContextTest {
   public void queueEntryWithExecutionPolicyPlatformMatches() throws Exception {
     WorkerContext context =
         createTestContext(
-            Platform.getDefaultInstance(),
-            ImmutableList.of(new ExecutionPolicy("foo")));
+            Platform.getDefaultInstance(), ImmutableList.of(new ExecutionPolicy("foo")));
     Platform matchPlatform =
         Platform.newBuilder()
             .addProperties(

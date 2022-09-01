@@ -16,11 +16,10 @@ package build.buildfarm.common.redis;
 
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.v1test.QueueStatus;
-import redis.clients.jedis.JedisCluster;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import redis.clients.jedis.JedisCluster;
 
 /**
  * @class BalancedRedisQueue

@@ -14,6 +14,11 @@
 
 package build.buildfarm.server;
 
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.Futures.scheduleAsync;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+
 import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -33,18 +38,12 @@ import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
-
-import javax.annotation.Nullable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static com.google.common.util.concurrent.Futures.addCallback;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static com.google.common.util.concurrent.Futures.scheduleAsync;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import javax.annotation.Nullable;
 
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private static final Logger logger = Logger.getLogger(ExecutionService.class.getName());
@@ -56,9 +55,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  public ExecutionService(
-      Instance instance,
-      ScheduledExecutorService keepaliveScheduler) {
+  public ExecutionService(Instance instance, ScheduledExecutorService keepaliveScheduler) {
     this.instance = instance;
     this.keepaliveAfter = configs.getServer().getExecuteKeepaliveAfterSeconds();
     this.keepaliveScheduler = keepaliveScheduler;

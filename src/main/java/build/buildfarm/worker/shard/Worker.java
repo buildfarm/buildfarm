@@ -14,6 +14,18 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
+import static build.buildfarm.common.io.Utils.getUser;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static java.lang.String.format;
+import static java.util.concurrent.Executors.newFixedThreadPool;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.logging.Level.INFO;
+import static java.util.logging.Level.SEVERE;
+
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
@@ -71,9 +83,6 @@ import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.services.HealthStatusManager;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
-
-import javax.annotation.Nullable;
-import javax.naming.ConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -95,18 +104,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
-import static build.buildfarm.common.io.Utils.getUser;
-import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static java.lang.String.format;
-import static java.util.concurrent.Executors.newFixedThreadPool;
-import static java.util.concurrent.Executors.newSingleThreadExecutor;
-import static java.util.concurrent.TimeUnit.DAYS;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.INFO;
-import static java.util.logging.Level.SEVERE;
+import javax.annotation.Nullable;
+import javax.naming.ConfigurationException;
 
 public class Worker extends LoggingMain {
   private static final java.util.logging.Logger nettyLogger =
@@ -327,8 +326,7 @@ public class Worker extends LoggingMain {
     }
   }
 
-  private static void verifyRootConfiguration()
-      throws ConfigurationException {
+  private static void verifyRootConfiguration() throws ConfigurationException {
     String rootValue = configs.getWorker().getRoot();
 
     // Configuration error if no root is specified.
@@ -343,8 +341,7 @@ public class Worker extends LoggingMain {
     }
   }
 
-  private static Path getValidFilesystemCASPath(Path root)
-      throws ConfigurationException {
+  private static Path getValidFilesystemCASPath(Path root) throws ConfigurationException {
     String pathValue = configs.getWorker().getCas().getPath();
     if (Strings.isNullOrEmpty(pathValue)) {
       throw new ConfigurationException("Cas cache directory value in config missing");
@@ -352,8 +349,7 @@ public class Worker extends LoggingMain {
     return root.resolve(pathValue);
   }
 
-  private static HashFunction getValidHashFunction()
-      throws ConfigurationException {
+  private static HashFunction getValidHashFunction() throws ConfigurationException {
     try {
       return HashFunction.valueOf(configs.getDigestFunction());
     } catch (IllegalArgumentException e) {
@@ -385,17 +381,18 @@ public class Worker extends LoggingMain {
 
     String backplaneCase = configs.getBackplane().getType();
     switch (backplaneCase) {
-      default: throw new IllegalArgumentException("Shard Backplane not set in config");
+      default:
+        throw new IllegalArgumentException("Shard Backplane not set in config");
       case "SHARD":
         backplane =
-            new RedisShardBackplane(identifier,
-                this::stripOperation,
-                this::stripQueuedOperation);
+            new RedisShardBackplane(identifier, this::stripOperation, this::stripQueuedOperation);
         break;
     }
 
     workerStubs =
-        WorkerStubs.create(digestUtil, Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build());
+        WorkerStubs.create(
+            digestUtil,
+            Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build());
 
     ExecutorService removeDirectoryService =
         newFixedThreadPool(
@@ -416,7 +413,9 @@ public class Worker extends LoggingMain {
         createExecFileSystem(
             remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
 
-    instance = new ShardWorkerInstance(configs.getWorker().getPublicName(), digestUtil, backplane, storage);
+    instance =
+        new ShardWorkerInstance(
+            configs.getWorker().getPublicName(), digestUtil, backplane, storage);
 
     // Create the appropriate writer for the context
     CasWriter writer;
@@ -463,8 +462,7 @@ public class Worker extends LoggingMain {
       Pipeline pipeline,
       ShardWorkerContext context) {
     serverBuilder.addService(healthStatusManager.getHealthService());
-    serverBuilder.addService(
-        new ContentAddressableStorageService(instance));
+    serverBuilder.addService(new ContentAddressableStorageService(instance));
     serverBuilder.addService(new ByteStreamService(instance));
     serverBuilder.addService(new ShutDownWorkerGracefully(this));
 
@@ -657,10 +655,12 @@ public class Worker extends LoggingMain {
       ContentAddressableStorage delegate)
       throws ConfigurationException {
     switch (configs.getWorker().getCas().getType()) {
-      default: throw new IllegalArgumentException("Invalid cas type specified");
+      default:
+        throw new IllegalArgumentException("Invalid cas type specified");
       case "MEMORY":
       case "FUSE": // FIXME have FUSE refer to a name for storage backing, and topo
-        return new MemoryCAS(configs.getWorker().getCas().getMaxSizeBytes(), this::onStoragePut, delegate);
+        return new MemoryCAS(
+            configs.getWorker().getCas().getMaxSizeBytes(), this::onStoragePut, delegate);
       case "GRPC":
         checkState(delegate == null, "grpc cas cannot delegate");
         return createGrpcCAS();

@@ -14,6 +14,16 @@
 
 package build.buildfarm.server;
 
+import static build.buildfarm.common.UrlPath.detectResourceOperation;
+import static build.buildfarm.common.UrlPath.parseBlobDigest;
+import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
+import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static io.grpc.Status.INVALID_ARGUMENT;
+import static io.grpc.Status.NOT_FOUND;
+import static io.grpc.Status.OUT_OF_RANGE;
+import static java.lang.String.format;
+
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
@@ -40,7 +50,6 @@ import io.grpc.Status.Code;
 import io.grpc.stub.CallStreamObserver;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
@@ -48,16 +57,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static build.buildfarm.common.UrlPath.detectResourceOperation;
-import static build.buildfarm.common.UrlPath.parseBlobDigest;
-import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
-import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
-import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
-import static io.grpc.Status.INVALID_ARGUMENT;
-import static io.grpc.Status.NOT_FOUND;
-import static io.grpc.Status.OUT_OF_RANGE;
-import static java.lang.String.format;
 
 public class ByteStreamService extends ByteStreamImplBase {
   private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());

@@ -15,14 +15,13 @@
 package build.buildfarm.examples;
 
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 // Test that example config files can load properly
 @RunWith(JUnit4.class)
@@ -35,14 +34,16 @@ public class ExampleConfigsTest {
 
   @Test
   public void memoryWorkerConfig() throws IOException {
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
+    Path configPath =
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
     BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
     configs.loadConfigs(configPath);
   }
 
   @Test
   public void shardWorkerConfig() throws IOException {
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
+    Path configPath =
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
     BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
     configs.loadConfigs(configPath);
   }

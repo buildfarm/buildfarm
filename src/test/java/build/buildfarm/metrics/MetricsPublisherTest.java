@@ -14,6 +14,9 @@
 
 package build.buildfarm.metrics;
 
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static com.google.common.truth.Truth.assertThat;
+
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -27,17 +30,13 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static com.google.common.truth.Truth.assertThat;
 
 @RunWith(JUnit4.class)
 public class MetricsPublisherTest {
@@ -69,7 +68,8 @@ public class MetricsPublisherTest {
 
   @Before
   public void setUp() throws IOException {
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
+    Path configPath =
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
     configs.loadConfigs(configPath);
     configs.getServer().setCloudRegion("test");
     configs.getServer().setClusterId("buildfarm-test");
@@ -114,9 +114,7 @@ public class MetricsPublisherTest {
     Operation operation =
         defaultOperation.toBuilder().setMetadata(Any.pack(defaultExecuteOperationMetadata)).build();
 
-    assertThat(
-            new AwsMetricsPublisher()
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+    assertThat(new AwsMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 
@@ -125,9 +123,7 @@ public class MetricsPublisherTest {
     Operation operation =
         defaultOperation.toBuilder().setResponse(Any.pack(defaultExecuteResponse)).build();
 
-    assertThat(
-            new AwsMetricsPublisher()
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+    assertThat(new AwsMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 
@@ -143,9 +139,7 @@ public class MetricsPublisherTest {
             .setMetadata(Any.pack(defaultExecuteOperationMetadata))
             .build();
 
-    assertThat(
-            new AwsMetricsPublisher()
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+    assertThat(new AwsMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 
@@ -154,9 +148,7 @@ public class MetricsPublisherTest {
     Operation operation =
         defaultOperation.toBuilder().setResponse(Any.pack(defaultExecuteResponse)).build();
 
-    assertThat(
-            new LogMetricsPublisher()
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+    assertThat(new LogMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 }

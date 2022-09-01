@@ -15,6 +15,13 @@
 package build.buildfarm.instance.shard;
 
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Supplier;
+import javax.naming.ConfigurationException;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
@@ -22,14 +29,6 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
-
-import javax.naming.ConfigurationException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.function.Supplier;
 
 /**
  * @class JedisClusterFactory
@@ -49,13 +48,15 @@ public class JedisClusterFactory {
    */
   public static Supplier<JedisCluster> create() throws ConfigurationException {
     // null password is required to elicit no auth in jedis
-    String [] redisNodes = configs.getBackplane().getRedisNodes();
+    String[] redisNodes = configs.getBackplane().getRedisNodes();
     if (redisNodes != null && redisNodes.length > 0) {
       return createJedisClusterFactory(
           list2Set(redisNodes),
           configs.getBackplane().getTimeout(),
           configs.getBackplane().getMaxAttempts(),
-          configs.getBackplane().getRedisPassword().isEmpty() ? null : configs.getBackplane().getRedisPassword(),
+          configs.getBackplane().getRedisPassword().isEmpty()
+              ? null
+              : configs.getBackplane().getRedisPassword(),
           createJedisPoolConfig());
     }
     return createJedisClusterFactory(

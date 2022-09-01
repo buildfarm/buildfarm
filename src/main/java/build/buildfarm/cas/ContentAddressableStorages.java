@@ -14,6 +14,12 @@
 
 package build.buildfarm.cas;
 
+import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
+import static com.google.common.collect.Multimaps.synchronizedListMultimap;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -32,23 +38,17 @@ import io.grpc.Status;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.ServerCallStreamObserver;
-
-import javax.naming.ConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.UUID;
-
-import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
-import static com.google.common.collect.Multimaps.synchronizedListMultimap;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import javax.naming.ConfigurationException;
 
 public final class ContentAddressableStorages {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private static Channel createChannel(String target) {
     NettyChannelBuilder builder =
         NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
@@ -65,8 +65,7 @@ public final class ContentAddressableStorages {
     return new GrpcCAS(configs.getServer().getName(), channel, byteStreamUploader, onExpirations);
   }
 
-  public static ContentAddressableStorage createFilesystemCAS()
-      throws ConfigurationException {
+  public static ContentAddressableStorage createFilesystemCAS() throws ConfigurationException {
     String path = configs.getWorker().getCas().getPath();
     if (path.isEmpty()) {
       throw new ConfigurationException("filesystem cas path is empty");
@@ -74,7 +73,8 @@ public final class ContentAddressableStorages {
     long maxSizeBytes = configs.getWorker().getCas().getMaxSizeBytes();
     long maxEntrySizeBytes = configs.getWorker().getCas().getMaxEntrySizeBytes();
     int hexBucketLevels = configs.getWorker().getHexBucketLevels();
-    boolean storeFileDirsIndexInMemory = configs.getWorker().getCas().isFileDirectoriesIndexInMemory();
+    boolean storeFileDirsIndexInMemory =
+        configs.getWorker().getCas().isFileDirectoriesIndexInMemory();
     if (maxSizeBytes <= 0) {
       throw new ConfigurationException("filesystem cas max_size_bytes <= 0");
     }
@@ -110,10 +110,10 @@ public final class ContentAddressableStorages {
     return cas;
   }
 
-  public static ContentAddressableStorage create()
-      throws ConfigurationException {
+  public static ContentAddressableStorage create() throws ConfigurationException {
     switch (configs.getWorker().getCas().getType()) {
-      default: throw new IllegalArgumentException("CAS config not set in config");
+      default:
+        throw new IllegalArgumentException("CAS config not set in config");
       case "FILESYSTEM":
         return createFilesystemCAS();
       case "GRPC":

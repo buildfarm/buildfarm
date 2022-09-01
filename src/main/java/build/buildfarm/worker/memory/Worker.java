@@ -14,6 +14,17 @@
 
 package build.buildfarm.worker.memory;
 
+import static build.buildfarm.common.io.Utils.getUser;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.logging.Level.INFO;
+import static java.util.logging.Level.SEVERE;
+
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
@@ -43,9 +54,6 @@ import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-
-import javax.annotation.Nullable;
-import javax.naming.ConfigurationException;
 import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -55,17 +63,8 @@ import java.nio.file.attribute.UserPrincipal;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
-
-import static build.buildfarm.common.io.Utils.getUser;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
-import static java.util.concurrent.TimeUnit.MINUTES;
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.INFO;
-import static java.util.logging.Level.SEVERE;
+import javax.annotation.Nullable;
+import javax.naming.ConfigurationException;
 
 public class Worker extends LoggingMain {
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
@@ -90,8 +89,7 @@ public class Worker extends LoggingMain {
     return builder.build();
   }
 
-  private static Path getValidRoot(FileSystem fileSystem)
-      throws ConfigurationException {
+  private static Path getValidRoot(FileSystem fileSystem) throws ConfigurationException {
     String rootValue = configs.getWorker().getRoot();
     if (Strings.isNullOrEmpty(rootValue)) {
       throw new ConfigurationException("root value in config missing");
@@ -99,8 +97,7 @@ public class Worker extends LoggingMain {
     return fileSystem.getPath(rootValue);
   }
 
-  private static Path getValidCasCacheDirectory(Path root)
-      throws ConfigurationException {
+  private static Path getValidCasCacheDirectory(Path root) throws ConfigurationException {
     String casCacheValue = configs.getWorker().getCas().getPath();
     if (Strings.isNullOrEmpty(casCacheValue)) {
       throw new ConfigurationException("Cas cache directory value in config missing");
@@ -108,8 +105,7 @@ public class Worker extends LoggingMain {
     return root.resolve(casCacheValue);
   }
 
-  private static HashFunction getValidHashFunction()
-      throws ConfigurationException {
+  private static HashFunction getValidHashFunction() throws ConfigurationException {
     try {
       return HashFunction.valueOf(configs.getDigestFunction());
     } catch (IllegalArgumentException e) {
@@ -216,7 +212,9 @@ public class Worker extends LoggingMain {
 
     OperationQueueClient oq =
         new OperationQueueClient(
-            operationQueueInstance, configs.getMemory().getPlatform(), configs.getWorker().getExecutionPolicies());
+            operationQueueInstance,
+            configs.getMemory().getPlatform(),
+            configs.getWorker().getExecutionPolicies());
 
     Instance acInstance = newStubInstance(casInstance.getDigestUtil());
     WorkerContext context =

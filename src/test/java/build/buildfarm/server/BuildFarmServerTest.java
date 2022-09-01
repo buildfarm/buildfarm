@@ -14,6 +14,16 @@
 
 package build.buildfarm.server;
 
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
@@ -69,28 +79,17 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.UUID;
 import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.UUID;
-
-import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
-import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
-import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.fail;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 @RunWith(JUnit4.class)
 public class BuildFarmServerTest {
@@ -103,11 +102,14 @@ public class BuildFarmServerTest {
 
   @Before
   public void setUp() throws Exception {
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
+    Path configPath =
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
     configs.loadConfigs(configPath);
     configs.getServer().setClusterId("buildfarm-test");
     String uniqueServerName = "in-process server for " + getClass();
-    server = new BuildFarmServer("test", InProcessServerBuilder.forName(uniqueServerName).directExecutor());
+    server =
+        new BuildFarmServer(
+            "test", InProcessServerBuilder.forName(uniqueServerName).directExecutor());
     server.start("startTime/test:0000");
     inProcessChannel = InProcessChannelBuilder.forName(uniqueServerName).directExecutor().build();
   }

@@ -14,6 +14,12 @@
 
 package build.buildfarm.server;
 
+import static build.buildfarm.common.io.Utils.formatIOError;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.util.logging.Level.SEVERE;
+
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.config.ServerOptions;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
@@ -28,11 +34,6 @@ import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import io.prometheus.client.Counter;
-import me.dinowernli.grpc.prometheus.Configuration;
-import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-
-import javax.naming.ConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.security.Security;
@@ -43,12 +44,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static build.buildfarm.common.io.Utils.formatIOError;
-import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
-import static java.util.logging.Level.SEVERE;
+import javax.naming.ConfigurationException;
+import me.dinowernli.grpc.prometheus.Configuration;
+import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 @SuppressWarnings("deprecation")
 public class BuildFarmServer extends LoggingMain {
@@ -72,11 +71,12 @@ public class BuildFarmServer extends LoggingMain {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   public BuildFarmServer(String session)
-          throws InterruptedException, ConfigurationException, IOException {
+      throws InterruptedException, ConfigurationException, IOException {
     this(session, ServerBuilder.forPort(configs.getServer().getPort()));
   }
 
-  public BuildFarmServer(String session, ServerBuilder<?> serverBuilder) throws InterruptedException, ConfigurationException {
+  public BuildFarmServer(String session, ServerBuilder<?> serverBuilder)
+      throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
 
     instance = BuildFarmInstances.createInstance(session, this::stop);
@@ -227,7 +227,7 @@ public class BuildFarmServer extends LoggingMain {
       session += "-" + options.publicName;
       configs.getServer().setPublicName(options.publicName);
     }
-    if(options.port > 0) {
+    if (options.port > 0) {
       configs.getServer().setPort(options.port);
     }
     session += "-" + UUID.randomUUID();

@@ -2,7 +2,6 @@ java_test(
     name = "tests",
     size = "small",
     srcs = glob(["*.java"]),
-
     data = ["//examples:example_configs"],
     test_class = "build.buildfarm.AllTests",
     deps = [

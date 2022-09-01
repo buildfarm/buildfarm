@@ -14,6 +14,20 @@
 
 package build.buildfarm.instance.memory;
 
+import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.instance.Utils.putBlob;
+import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.lang.String.format;
+import static java.util.Collections.synchronizedSortedMap;
+import static java.util.concurrent.Executors.newCachedThreadPool;
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -90,9 +104,6 @@ import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-
-import javax.annotation.Nullable;
-import javax.naming.ConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Paths;
@@ -109,20 +120,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.instance.Utils.putBlob;
-import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
-import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import static java.lang.String.format;
-import static java.util.Collections.synchronizedSortedMap;
-import static java.util.concurrent.Executors.newCachedThreadPool;
-import static java.util.concurrent.TimeUnit.SECONDS;
+import javax.annotation.Nullable;
+import javax.naming.ConfigurationException;
 
 public class MemoryInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(MemoryInstance.class.getName());
@@ -201,8 +200,7 @@ public class MemoryInstance extends AbstractServerInstance {
     }
   }
 
-  public MemoryInstance(String name, DigestUtil digestUtil)
-      throws ConfigurationException {
+  public MemoryInstance(String name, DigestUtil digestUtil) throws ConfigurationException {
     this(
         name,
         digestUtil,
@@ -249,7 +247,8 @@ public class MemoryInstance extends AbstractServerInstance {
   private static ActionCache createActionCache(
       ContentAddressableStorage cas, DigestUtil digestUtil) {
     switch (configs.getWorker().getCas().getType()) {
-      default: throw new IllegalArgumentException("ActionCache config not set in config");
+      default:
+        throw new IllegalArgumentException("ActionCache config not set in config");
       case "GRPC":
         return createGrpcActionCache();
       case "MEMORY":
@@ -435,7 +434,8 @@ public class MemoryInstance extends AbstractServerInstance {
       throws InterruptedException, StatusException {
     if (action.hasTimeout() && configs.getMaximumActionTimeout() > 0) {
       Duration timeout = action.getTimeout();
-      Duration maximum = Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build();
+      Duration maximum =
+          Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build();
       if (timeout.getSeconds() > maximum.getSeconds()
           || (timeout.getSeconds() == maximum.getSeconds()
               && timeout.getNanos() > maximum.getNanos())) {
@@ -616,7 +616,10 @@ public class MemoryInstance extends AbstractServerInstance {
         actionTimeout = Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build();
       }
       if (actionTimeout != null) {
-        Duration delay = Duration.newBuilder().setSeconds(configs.getMemory().getOperationCompletedDelay()).build();
+        Duration delay =
+            Duration.newBuilder()
+                .setSeconds(configs.getMemory().getOperationCompletedDelay())
+                .build();
         Duration timeout =
             Duration.newBuilder()
                 .setSeconds(actionTimeout.getSeconds() + delay.getSeconds())
@@ -643,7 +646,8 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private void onDispatched(Operation operation) {
     final String operationName = operation.getName();
-    Duration timeout = Duration.newBuilder().setSeconds(configs.getMemory().getOperationPollTimeout()).build();
+    Duration timeout =
+        Duration.newBuilder().setSeconds(configs.getMemory().getOperationPollTimeout()).build();
     Watchdog requeuer =
         new Watchdog(
             timeout,

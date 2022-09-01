@@ -53,8 +53,7 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   public static boolean shouldKeepOperation(
-      SetMultimap<String, String> workerProvisions,
-      QueueEntry queueEntry) {
+      SetMultimap<String, String> workerProvisions, QueueEntry queueEntry) {
     return shouldKeepViaPlatform(workerProvisions, queueEntry.getPlatform());
   }
 
@@ -70,8 +69,7 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   public static boolean shouldKeepOperation(
-      SetMultimap<String, String> workerProvisions,
-      Command command) {
+      SetMultimap<String, String> workerProvisions, Command command) {
     return shouldKeepViaPlatform(workerProvisions, command.getPlatform());
   }
 
@@ -88,8 +86,7 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean shouldKeepViaPlatform(
-      SetMultimap<String, String> workerProvisions,
-      Platform platform) {
+      SetMultimap<String, String> workerProvisions, Platform platform) {
     // attempt to execute everything the worker gets off the queue.
     // this is a recommended configuration.
     if (configs.getWorker().getDequeueMatchSettings().isAcceptEverything()) {
@@ -111,8 +108,7 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean satisfiesProperties(
-      SetMultimap<String, String> workerProvisions,
-      Platform platform) {
+      SetMultimap<String, String> workerProvisions, Platform platform) {
     for (Platform.Property property : platform.getPropertiesList()) {
       if (!satisfiesProperty(workerProvisions, property)) {
         return false;
@@ -133,8 +129,7 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean satisfiesProperty(
-      SetMultimap<String, String> workerProvisions,
-      Platform.Property property) {
+      SetMultimap<String, String> workerProvisions, Platform.Property property) {
     // validate min cores
     if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
       if (!workerProvisions.containsKey(ExecutionProperties.CORES)) {

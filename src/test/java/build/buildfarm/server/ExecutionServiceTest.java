@@ -14,23 +14,6 @@
 
 package build.buildfarm.server;
 
-import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
-import build.buildfarm.instance.Instance;
-import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.longrunning.Operation;
-import io.grpc.stub.ServerCallStreamObserver;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
-import org.mockito.ArgumentCaptor;
-
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.concurrent.ScheduledExecutorService;
-
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -38,6 +21,22 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+
+import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.instance.Instance;
+import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.longrunning.Operation;
+import io.grpc.stub.ServerCallStreamObserver;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.concurrent.ScheduledExecutorService;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+import org.mockito.ArgumentCaptor;
 
 @RunWith(JUnit4.class)
 public class ExecutionServiceTest {
@@ -48,7 +47,8 @@ public class ExecutionServiceTest {
   @Before
   public void setUp() throws Exception {
     instance = mock(Instance.class);
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
+    Path configPath =
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
     configs.loadConfigs(configPath);
     configs.getServer().setClusterId("buildfarm-test");
   }
@@ -58,9 +58,7 @@ public class ExecutionServiceTest {
   public void keepaliveIsCancelledWithContext() throws Exception {
     ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
     ExecutionService service =
-        new ExecutionService(
-            instance,
-            keepaliveScheduler); // cancelled without executing
+        new ExecutionService(instance, keepaliveScheduler); // cancelled without executing
     ServerCallStreamObserver<Operation> response = mock(ServerCallStreamObserver.class);
     RequestMetadata requestMetadata = RequestMetadata.newBuilder().build();
     Operation operation =

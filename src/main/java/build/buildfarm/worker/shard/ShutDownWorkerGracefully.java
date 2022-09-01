@@ -14,16 +14,15 @@
 
 package build.buildfarm.worker.shard;
 
+import static java.util.logging.Level.WARNING;
+
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import io.grpc.stub.StreamObserver;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
-
-import static java.util.logging.Level.WARNING;
 
 public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerImplBase {
   private static final Logger logger = Logger.getLogger(ShutDownWorkerGracefully.class.getName());

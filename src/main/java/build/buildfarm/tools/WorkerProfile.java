@@ -34,17 +34,17 @@ import io.grpc.ManagedChannel;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import redis.clients.jedis.JedisCluster;
-
-import javax.naming.ConfigurationException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.naming.ConfigurationException;
+import redis.clients.jedis.JedisCluster;
 
 class WorkerProfile {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
         NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
@@ -119,10 +119,10 @@ class WorkerProfile {
     return client.call(jedis -> fetchWorkers(jedis, System.currentTimeMillis()));
   }
 
-  private static Set<String> fetchWorkers(
-      JedisCluster jedis, long now) {
+  private static Set<String> fetchWorkers(JedisCluster jedis, long now) {
     Set<String> workers = Sets.newConcurrentHashSet();
-    for (Map.Entry<String, String> entry : jedis.hgetAll(configs.getBackplane().getWorkersHashName()).entrySet()) {
+    for (Map.Entry<String, String> entry :
+        jedis.hgetAll(configs.getBackplane().getWorkersHashName()).entrySet()) {
       String json = entry.getValue();
       try {
         if (json != null) {

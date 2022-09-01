@@ -14,6 +14,13 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.cas.ContentAddressableStorage.UNLIMITED_ENTRY_SIZE_MAX;
+import static build.buildfarm.common.Actions.checkPreconditionFailure;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.DAYS;
+
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -69,7 +76,6 @@ import io.grpc.Deadline;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.prometheus.client.Counter;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitResult;
@@ -85,13 +91,6 @@ import java.util.Map;
 import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static build.buildfarm.cas.ContentAddressableStorage.UNLIMITED_ENTRY_SIZE_MAX;
-import static build.buildfarm.common.Actions.checkPreconditionFailure;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static java.lang.String.format;
-import static java.util.concurrent.TimeUnit.DAYS;
 
 class ShardWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(ShardWorkerContext.class.getName());
@@ -129,9 +128,12 @@ class ShardWorkerContext implements WorkerContext {
   private final CasWriter writer;
   private final boolean errorOperationRemainingResources;
 
-  static SetMultimap<String, String> getMatchProvisions(Iterable<ExecutionPolicy> policies, int executeStageWidth) {
+  static SetMultimap<String, String> getMatchProvisions(
+      Iterable<ExecutionPolicy> policies, int executeStageWidth) {
     ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
-    Platform matchPlatform = ExecutionPolicies.getMatchPlatform(configs.getBackplane().getQueues()[0].getPlatform(), policies);
+    Platform matchPlatform =
+        ExecutionPolicies.getMatchPlatform(
+            configs.getBackplane().getQueues()[0].getPlatform(), policies);
     for (Platform.Property property : matchPlatform.getPropertiesList()) {
       provisions.put(property.getName(), property.getValue());
     }
@@ -273,7 +275,9 @@ class ShardWorkerContext implements WorkerContext {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
     try {
-      queueEntry = backplane.dispatchOperation(configs.getBackplane().getQueues()[0].getPlatform().getPropertiesList());
+      queueEntry =
+          backplane.dispatchOperation(
+              configs.getBackplane().getQueues()[0].getPlatform().getPropertiesList());
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {

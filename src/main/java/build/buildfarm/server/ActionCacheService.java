@@ -14,6 +14,9 @@
 
 package build.buildfarm.server;
 
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
@@ -29,13 +32,9 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import io.prometheus.client.Counter;
-
-import javax.annotation.Nullable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static com.google.common.util.concurrent.Futures.addCallback;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import javax.annotation.Nullable;
 
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   public static final Logger logger = Logger.getLogger(ActionCacheService.class.getName());

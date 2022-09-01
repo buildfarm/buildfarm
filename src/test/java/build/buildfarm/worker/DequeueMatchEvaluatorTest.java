@@ -14,21 +14,20 @@
 
 package build.buildfarm.worker;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-
-import static com.google.common.truth.Truth.assertThat;
 
 /**
  * @class DequeueMatchEvaluatorTest
@@ -52,7 +51,8 @@ public class DequeueMatchEvaluatorTest {
 
   @Before
   public void setUp() throws IOException {
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
+    Path configPath =
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
     configs.loadConfigs(configPath);
   }
 
@@ -66,8 +66,7 @@ public class DequeueMatchEvaluatorTest {
     QueueEntry entry = QueueEntry.newBuilder().setPlatform(Platform.newBuilder()).build();
 
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
@@ -93,8 +92,7 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     // the worker accepts because it has more cores than the min-cores requested
@@ -122,8 +120,7 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     // the worker rejects because it has less cores than the min-cores requested
@@ -150,8 +147,7 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     // the worker accepts because it has the same cores as the min-cores requested
@@ -178,8 +174,7 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isFalse();

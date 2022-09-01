@@ -14,6 +14,32 @@
 
 package build.buildfarm.instance.memory;
 
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.CACHE_CHECK;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.UNKNOWN;
+import static build.buildfarm.cas.ContentAddressableStorages.casMapDecorator;
+import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.instance.memory.MemoryInstance.TIMEOUT_OUT_OF_BOUNDS;
+import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_ACTION;
+import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
+import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.when;
+
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -54,14 +80,6 @@ import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import com.google.rpc.Status;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
-import org.mockito.ArgumentCaptor;
-import org.mockito.stubbing.Answer;
-
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -69,32 +87,13 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static build.bazel.remote.execution.v2.ExecutionStage.Value.CACHE_CHECK;
-import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
-import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
-import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
-import static build.bazel.remote.execution.v2.ExecutionStage.Value.UNKNOWN;
-import static build.buildfarm.cas.ContentAddressableStorages.casMapDecorator;
-import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.instance.memory.MemoryInstance.TIMEOUT_OUT_OF_BOUNDS;
-import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_ACTION;
-import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
-import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
-import static org.mockito.Mockito.when;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+import org.mockito.ArgumentCaptor;
+import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class MemoryInstanceTest {
@@ -119,7 +118,8 @@ public class MemoryInstanceTest {
 
   @Before
   public void setUp() throws Exception {
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
+    Path configPath =
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
     configs.loadConfigs(configPath);
     outstandingOperations = new MemoryInstance.OutstandingOperations();
     watchers =

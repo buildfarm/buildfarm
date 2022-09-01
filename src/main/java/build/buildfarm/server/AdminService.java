@@ -42,7 +42,6 @@ import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
-
 import java.util.logging.Level;
 import java.util.logging.Logger;
 

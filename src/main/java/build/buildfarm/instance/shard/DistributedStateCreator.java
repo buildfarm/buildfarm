@@ -27,18 +27,16 @@ import build.buildfarm.common.redis.RedisNodeHashes;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
+import java.io.IOException;
+import java.util.List;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 
-import java.io.IOException;
-import java.util.List;
-
 public class DistributedStateCreator {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  public static DistributedState create(RedisClient client)
-      throws IOException {
+  public static DistributedState create(RedisClient client) throws IOException {
     DistributedState state = new DistributedState();
 
     // Create containers that make up the backplane
@@ -50,7 +48,8 @@ public class DistributedStateCreator {
     state.blockedInvocations = new RedisMap(configs.getBackplane().getInvocationBlacklistPrefix());
     state.processingOperations = new RedisMap(configs.getBackplane().getProcessingPrefix());
     state.dispatchingOperations = new RedisMap(configs.getBackplane().getDispatchingPrefix());
-    state.dispatchedOperations = new RedisHashMap(configs.getBackplane().getDispatchedOperationsHashName());
+    state.dispatchedOperations =
+        new RedisHashMap(configs.getBackplane().getDispatchedOperationsHashName());
     state.workers = new RedisHashMap(configs.getBackplane().getWorkersHashName());
 
     return state;
@@ -59,9 +58,13 @@ public class DistributedStateCreator {
   private static CasWorkerMap createCasWorkerMap() {
     if (configs.getBackplane().isCacheCas()) {
       RedissonClient redissonClient = createRedissonClient();
-      return new RedissonCasWorkerMap(redissonClient, configs.getBackplane().getCasPrefix(), configs.getBackplane().getCasExpire());
+      return new RedissonCasWorkerMap(
+          redissonClient,
+          configs.getBackplane().getCasPrefix(),
+          configs.getBackplane().getCasExpire());
     } else {
-      return new JedisCasWorkerMap(configs.getBackplane().getCasPrefix(), configs.getBackplane().getCasExpire());
+      return new JedisCasWorkerMap(
+          configs.getBackplane().getCasPrefix(), configs.getBackplane().getCasExpire());
     }
   }
 
@@ -74,8 +77,7 @@ public class DistributedStateCreator {
     return Redisson.create(redissonConfig);
   }
 
-  private static BalancedRedisQueue createPrequeue(
-      RedisClient client) throws IOException {
+  private static BalancedRedisQueue createPrequeue(RedisClient client) throws IOException {
     // Construct the prequeue so that elements are balanced across all redis nodes.
     return new BalancedRedisQueue(
         getPreQueuedOperationsListName(),
@@ -84,8 +86,7 @@ public class DistributedStateCreator {
         queueTypeToSr());
   }
 
-  private static OperationQueue createOperationQueue(
-      RedisClient client) throws IOException {
+  private static OperationQueue createOperationQueue(RedisClient client) throws IOException {
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
     // eligibility and placement of operations.

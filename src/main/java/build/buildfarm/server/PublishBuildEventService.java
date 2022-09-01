@@ -25,7 +25,6 @@ import com.google.protobuf.TextFormat;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
-
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -34,7 +33,7 @@ public class PublishBuildEventService extends PublishBuildEventImplBase {
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  public PublishBuildEventService() { }
+  public PublishBuildEventService() {}
 
   @Override
   public void publishLifecycleEvent(

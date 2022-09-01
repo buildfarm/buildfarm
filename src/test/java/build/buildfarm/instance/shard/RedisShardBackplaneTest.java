@@ -14,6 +14,15 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationChange;
+import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
@@ -25,6 +34,13 @@ import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableMap;
 import com.google.longrunning.Operation;
 import com.google.protobuf.util.JsonFormat;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.function.Supplier;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -33,23 +49,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import redis.clients.jedis.JedisCluster;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import java.util.function.Supplier;
-
-import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationChange;
-import static com.google.common.truth.Truth.assertThat;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @RunWith(JUnit4.class)
 public class RedisShardBackplaneTest {
@@ -60,7 +59,8 @@ public class RedisShardBackplaneTest {
 
   @Before
   public void setUp() throws IOException {
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
+    Path configPath =
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
     configs.loadConfigs(configPath);
     configs.getWorker().setRoot(".");
     configs.getBackplane().setOperationExpire(10);
@@ -76,16 +76,14 @@ public class RedisShardBackplaneTest {
     when(jedisCluster.hdel(configs.getBackplane().getWorkersHashName(), "foo")).thenReturn(1L);
     backplane =
         new RedisShardBackplane(
-            "invalid-protobuf-worker-removed-test",
-            (o) -> o,
-            (o) -> o,
-            mockJedisClusterFactory);
+            "invalid-protobuf-worker-removed-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
     backplane.start("startTime/test:0000");
 
     assertThat(backplane.getWorkers()).isEmpty();
     verify(jedisCluster, times(1)).hdel(configs.getBackplane().getWorkersHashName(), "foo");
     ArgumentCaptor<String> changeCaptor = ArgumentCaptor.forClass(String.class);
-    verify(jedisCluster, times(1)).publish(eq(configs.getBackplane().getWorkerChannel()), changeCaptor.capture());
+    verify(jedisCluster, times(1))
+        .publish(eq(configs.getBackplane().getWorkerChannel()), changeCaptor.capture());
     String json = changeCaptor.getValue();
     WorkerChange.Builder builder = WorkerChange.newBuilder();
     JsonFormat.parser().merge(json, builder);
@@ -123,7 +121,9 @@ public class RedisShardBackplaneTest {
             configs.getBackplane().getOperationExpire(),
             RedisShardBackplane.operationPrinter.print(op));
     verify(jedisCluster, times(1))
-        .lpush(configs.getBackplane().getPreQueuedOperationsListName(), JsonFormat.printer().print(executeEntry));
+        .lpush(
+            configs.getBackplane().getPreQueuedOperationsListName(),
+            JsonFormat.printer().print(executeEntry));
     verifyChangePublished(jedisCluster);
   }
 
@@ -153,7 +153,8 @@ public class RedisShardBackplaneTest {
     backplane.start("startTime/test:0000");
 
     final String opName = "op";
-    when(jedisCluster.hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName)).thenReturn(1L);
+    when(jedisCluster.hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName))
+        .thenReturn(1L);
 
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
@@ -162,9 +163,12 @@ public class RedisShardBackplaneTest {
     backplane.requeueDispatchedOperation(queueEntry);
 
     verify(mockJedisClusterFactory, times(1)).get();
-    verify(jedisCluster, times(1)).hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName);
     verify(jedisCluster, times(1))
-        .lpush(configs.getBackplane().getQueuedOperationsListName(), JsonFormat.printer().print(queueEntry));
+        .hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName);
+    verify(jedisCluster, times(1))
+        .lpush(
+            configs.getBackplane().getQueuedOperationsListName(),
+            JsonFormat.printer().print(queueEntry));
     verifyChangePublished(jedisCluster);
   }
 
@@ -293,7 +297,8 @@ public class RedisShardBackplaneTest {
     backplane.completeOperation(opName);
 
     verify(mockJedisClusterFactory, times(1)).get();
-    verify(jedisCluster, times(1)).hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName);
+    verify(jedisCluster, times(1))
+        .hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName);
   }
 
   @org.junit.Ignore
@@ -311,7 +316,8 @@ public class RedisShardBackplaneTest {
     backplane.deleteOperation(opName);
 
     verify(mockJedisClusterFactory, times(1)).get();
-    verify(jedisCluster, times(1)).hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName);
+    verify(jedisCluster, times(1))
+        .hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName);
     verify(jedisCluster, times(1)).del(backplane.operationKey(opName));
     verifyChangePublished(jedisCluster);
   }
@@ -320,7 +326,8 @@ public class RedisShardBackplaneTest {
   public void invocationsCanBeBlacklisted() throws IOException {
     UUID toolInvocationId = UUID.randomUUID();
     JedisCluster jedisCluster = mock(JedisCluster.class);
-    String invocationBlacklistKey = configs.getBackplane().getInvocationBlacklistPrefix() + ":" + toolInvocationId;
+    String invocationBlacklistKey =
+        configs.getBackplane().getInvocationBlacklistPrefix() + ":" + toolInvocationId;
     when(jedisCluster.exists(invocationBlacklistKey)).thenReturn(true);
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
     backplane =

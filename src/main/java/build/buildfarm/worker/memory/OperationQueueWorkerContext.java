@@ -14,6 +14,14 @@
 
 package build.buildfarm.worker.memory;
 
+import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
+import static build.buildfarm.instance.Utils.getBlob;
+import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.logging.Level.INFO;
+
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -54,8 +62,6 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
-
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -70,14 +76,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-
-import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
-import static build.buildfarm.instance.Utils.getBlob;
-import static com.google.common.util.concurrent.Futures.allAsList;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import static java.lang.String.format;
-import static java.util.concurrent.TimeUnit.DAYS;
-import static java.util.logging.Level.INFO;
+import javax.annotation.Nullable;
 
 class OperationQueueWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(WorkerContext.class.getName());
@@ -133,7 +132,9 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage) {
-    Poller poller = new Poller(Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build());
+    Poller poller =
+        new Poller(
+            Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build());
     resumePoller(poller, name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
     return poller;
   }
