@@ -380,13 +380,11 @@ public class Worker extends LoggingMain {
     digestUtil = new DigestUtil(getValidHashFunction());
 
     String backplaneCase = configs.getBackplane().getType();
-    switch (backplaneCase) {
-      default:
-        throw new IllegalArgumentException("Shard Backplane not set in config");
-      case "SHARD":
-        backplane =
-            new RedisShardBackplane(identifier, this::stripOperation, this::stripQueuedOperation);
-        break;
+    if ("SHARD".equals(backplaneCase)) {
+      backplane =
+          new RedisShardBackplane(identifier, this::stripOperation, this::stripQueuedOperation);
+    } else {
+      throw new IllegalArgumentException("Shard Backplane not set in config");
     }
 
     workerStubs =

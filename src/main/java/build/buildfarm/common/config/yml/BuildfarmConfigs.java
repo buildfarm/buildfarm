@@ -10,7 +10,7 @@ import java.util.logging.Logger;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
-public class BuildfarmConfigs {
+public final class BuildfarmConfigs {
   private static final Logger logger = Logger.getLogger(BuildfarmConfigs.class.getName());
   private static BuildfarmConfigs buildfarmConfigs;
 

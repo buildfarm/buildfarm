@@ -241,12 +241,11 @@ public class ShardInstance extends AbstractServerInstance {
   private static final Duration queueTimeout = Durations.fromSeconds(60);
 
   private static Backplane createBackplane(String identifier) throws ConfigurationException {
-    switch (configs.getBackplane().getType()) {
-      default:
-        throw new IllegalArgumentException("Shard Backplane not set in config");
-      case "SHARD":
-        return new RedisShardBackplane(
-            identifier, ShardInstance::stripOperation, ShardInstance::stripQueuedOperation);
+    if ("SHARD".equals(configs.getBackplane().getType())) {
+      return new RedisShardBackplane(
+          identifier, ShardInstance::stripOperation, ShardInstance::stripQueuedOperation);
+    } else {
+      throw new IllegalArgumentException("Shard Backplane not set in config");
     }
   }
 

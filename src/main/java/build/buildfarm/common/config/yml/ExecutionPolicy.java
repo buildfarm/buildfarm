@@ -6,8 +6,6 @@ public class ExecutionPolicy {
   private String name;
   private ExecutionWrapper executionWrapper;
 
-  public ExecutionPolicy() {}
-
   public ExecutionPolicy(String name) {
     this.name = name;
   }

@@ -33,8 +33,6 @@ public class PublishBuildEventService extends PublishBuildEventImplBase {
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  public PublishBuildEventService() {}
-
   @Override
   public void publishLifecycleEvent(
       PublishLifecycleEventRequest request, StreamObserver<Empty> responseObserver) {

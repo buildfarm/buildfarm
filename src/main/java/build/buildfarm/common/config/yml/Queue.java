@@ -7,8 +7,6 @@ public class Queue {
   private String name;
   private boolean allowUnmatched = true;
 
-  private Platform platform = Platform.newBuilder().build();
-
   private List<Property> properties;
 
   public String getName() {
@@ -41,10 +39,6 @@ public class Queue {
               .build());
     }
     return platformBuilder.build();
-  }
-
-  public void setPlatform(Platform platform) {
-    this.platform = Platform.newBuilder().build();
   }
 
   @Override
