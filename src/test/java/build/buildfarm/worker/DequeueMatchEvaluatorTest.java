@@ -21,10 +21,6 @@ import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -48,13 +44,6 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class DequeueMatchEvaluatorTest {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
-  @Before
-  public void setUp() throws IOException {
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
-    configs.loadConfigs(configPath);
-  }
 
   // Function under test: shouldKeepOperation
   // Reason for testing: empty plaform queue entries should be kept

@@ -30,6 +30,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.config.yml.ExecutionPolicy;
+import build.buildfarm.common.config.yml.Queue;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.QueueEntry;
@@ -42,7 +43,7 @@ import com.google.protobuf.Duration;
 import io.grpc.StatusException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
@@ -71,9 +72,16 @@ public class ShardWorkerContextTest {
 
   @Before
   public void setUp() throws Exception {
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
-    configs.loadConfigs(configPath);
+    configs.getServer().setInstanceType("SHARD");
+    configs.getServer().setName("shard");
+    configs.getWorker().setPublicName("localhost:8981");
+    configs.getBackplane().setRedisUri("redis://localhost:6379");
+    Queue queue = new Queue();
+    queue.setProperties(new ArrayList<>());
+    Queue[] queues = new Queue[1];
+    queues[0] = queue;
+    configs.getBackplane().setQueues(queues);
+
     MockitoAnnotations.initMocks(this);
     when(instance.getDigestUtil()).thenReturn(DIGEST_UTIL);
     root = Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null);

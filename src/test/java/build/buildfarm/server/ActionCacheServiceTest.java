@@ -24,10 +24,6 @@ import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
 import io.grpc.stub.StreamObserver;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -35,13 +31,6 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ActionCacheServiceTest {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
-  @Before
-  public void setUp() throws IOException {
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
-    configs.loadConfigs(configPath);
-  }
 
   @Test
   public void writeFailsWhenActionCacheIsReadOnly() throws Exception {

@@ -31,8 +31,6 @@ import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -68,9 +66,6 @@ public class MetricsPublisherTest {
 
   @Before
   public void setUp() throws IOException {
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
-    configs.loadConfigs(configPath);
     configs.getServer().setCloudRegion("test");
     configs.getServer().setClusterId("buildfarm-test");
     configs.getServer().getMetrics().setPublisher("aws");

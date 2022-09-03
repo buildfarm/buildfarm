@@ -80,8 +80,6 @@ import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import com.google.rpc.Status;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -118,9 +116,11 @@ public class MemoryInstanceTest {
 
   @Before
   public void setUp() throws Exception {
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
-    configs.loadConfigs(configPath);
+    configs.getServer().setInstanceType("MEMORY");
+    configs.getServer().setName("memory");
+    configs.getWorker().setPublicName("localhost:8981");
+    configs.getWorker().getCas().setType("MEMORY");
+    configs.getMemory().setTarget("localhost:8980");
     outstandingOperations = new MemoryInstance.OutstandingOperations();
     watchers =
         synchronizedSetMultimap(

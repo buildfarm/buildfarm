@@ -36,8 +36,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.longrunning.Operation;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -61,9 +59,6 @@ public class RedisShardBackplaneTest {
 
   @Before
   public void setUp() throws IOException {
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
-    configs.loadConfigs(configPath);
     configs.getBackplane().setOperationExpire(10);
     configs.getBackplane().setSubscribeToBackplane(false);
     configs.getBackplane().setRunFailsafeOperation(false);

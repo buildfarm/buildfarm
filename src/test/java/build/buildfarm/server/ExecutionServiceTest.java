@@ -29,8 +29,6 @@ import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import io.grpc.stub.ServerCallStreamObserver;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.ScheduledExecutorService;
 import org.junit.Before;
 import org.junit.Test;
@@ -47,9 +45,6 @@ public class ExecutionServiceTest {
   @Before
   public void setUp() throws Exception {
     instance = mock(Instance.class);
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
-    configs.loadConfigs(configPath);
     configs.getServer().setClusterId("buildfarm-test");
   }
 

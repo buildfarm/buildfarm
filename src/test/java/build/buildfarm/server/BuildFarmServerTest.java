@@ -80,8 +80,6 @@ import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.UUID;
 import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
@@ -102,10 +100,12 @@ public class BuildFarmServerTest {
 
   @Before
   public void setUp() throws Exception {
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
-    configs.loadConfigs(configPath);
     configs.getServer().setClusterId("buildfarm-test");
+    configs.getServer().setInstanceType("MEMORY");
+    configs.getServer().setName("memory");
+    configs.getWorker().setPublicName("localhost:8981");
+    configs.getWorker().getCas().setType("MEMORY");
+    configs.getMemory().setTarget("localhost:8980");
     String uniqueServerName = "in-process server for " + getClass();
     server =
         new BuildFarmServer(
