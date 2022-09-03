@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.Queue;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationChange;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -62,8 +64,10 @@ public class RedisShardBackplaneTest {
     Path configPath =
         Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
     configs.loadConfigs(configPath);
-    configs.getWorker().setRoot(".");
     configs.getBackplane().setOperationExpire(10);
+    configs.getBackplane().setSubscribeToBackplane(false);
+    configs.getBackplane().setRunFailsafeOperation(false);
+    configs.getBackplane().setQueues(new Queue[] {});
     MockitoAnnotations.initMocks(this);
   }
 
@@ -301,8 +305,8 @@ public class RedisShardBackplaneTest {
         .hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName);
   }
 
-  @org.junit.Ignore
   @Test
+  @Ignore
   public void deleteOperationDeletesAndPublishes() throws IOException {
     JedisCluster jedisCluster = mock(JedisCluster.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);

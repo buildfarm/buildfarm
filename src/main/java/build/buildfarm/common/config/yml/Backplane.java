@@ -31,7 +31,7 @@ public class Backplane {
   private boolean runFailsafeOperation = true;
   private int maxQueueDepth = 100000;
   private int maxPreQueueDepth = 1000000;
-  private String redisQueueType = "NORMAL";
+  private String redisQueueType = "REGULAR";
   private Queue[] queues;
   private String redisPassword;
   private int timeout = 10000;

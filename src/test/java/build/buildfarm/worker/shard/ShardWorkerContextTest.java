@@ -74,7 +74,6 @@ public class ShardWorkerContextTest {
     Path configPath =
         Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
     configs.loadConfigs(configPath);
-    configs.getWorker().setRoot(".");
     MockitoAnnotations.initMocks(this);
     when(instance.getDigestUtil()).thenReturn(DIGEST_UTIL);
     root = Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null);

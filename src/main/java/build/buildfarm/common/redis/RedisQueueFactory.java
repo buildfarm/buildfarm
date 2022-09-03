@@ -25,7 +25,6 @@ public class RedisQueueFactory {
     }
     if (queueType.equalsIgnoreCase("regular")) {
       return new RedisQueue(name);
-
     } else if (queueType.equalsIgnoreCase("priority")) {
       return new RedisPriorityQueue(name);
     }

@@ -63,7 +63,6 @@ public class DispatchedMonitorTest {
     Path configPath =
         Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
     configs.loadConfigs(configPath);
-    configs.getWorker().setRoot(".");
     MockitoAnnotations.initMocks(this);
     when(requeuer.apply(any(QueueEntry.class), any(Duration.class)))
         .thenReturn(immediateFailedFuture(new RuntimeException("unexpected requeue")));
