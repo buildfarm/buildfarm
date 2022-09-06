@@ -56,6 +56,8 @@ import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
+import build.buildfarm.v1test.WorkerCapabilities;
+import build.buildfarm.v1test.WorkerType;
 import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
@@ -937,6 +939,19 @@ public class Worker extends LoggingMain {
               }
             })
         .start();
+  }
+
+  private WorkerType determineWorkerType() {
+    boolean hasStorage = config.getCapabilities().getCas();
+    boolean hasExecute = config.getCapabilities().getExecution();
+
+    if (hasStorage && hasExecute) {
+      return WorkerType.EXECUTE_AND_STORAGE;
+    }
+    if (hasStorage) {
+      return WorkerType.STORAGE_ONLY;
+    }
+    return WorkerType.EXECUTE_ONLY;
   }
 
   @SuppressWarnings("deprecation")
