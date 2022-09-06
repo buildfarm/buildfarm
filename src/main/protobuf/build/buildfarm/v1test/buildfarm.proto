@@ -772,10 +772,20 @@ message ShardWorkerConfig {
   int32 input_fetch_deadline = 39;
 }
 
+enum WorkerType {
+  EXECUTE_ONLY = 0;
+
+  STORAGE_ONLY = 1;
+
+  EXECUTE_AND_STORAGE = 2;
+}
+
 message ShardWorker {
   string endpoint = 1;
 
   int64 expire_at = 2;
+
+  WorkerType worker_type = 3;
 }
 
 message WorkerChange {

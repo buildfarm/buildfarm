@@ -53,6 +53,7 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
+import build.buildfarm.v1test.WorkerType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ListMultimap;
@@ -588,7 +589,7 @@ public class RedisShardBackplane implements Backplane {
         jedis -> {
           // could rework with an hget to publish prior, but this seems adequate, and
           // we are the only guaranteed source
-          if (state.workers.insert(jedis, shardWorker.getEndpoint(), json)) {
+          if (addWorkerByType(jedis, shardWorker, json)) {
             jedis.publish(config.getWorkerChannel(), workerChangeJson);
             return true;
           }
@@ -596,8 +597,24 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
+  private boolean addWorkerByType(JedisCluster jedis, ShardWorker shardWorker, String json) {
+    if (shardWorker.getWorkerType() == WorkerType.EXECUTE_ONLY) {
+      return state.executeWorkers.insert(jedis, shardWorker.getEndpoint(), json);
+    } else if (shardWorker.getWorkerType() == WorkerType.STORAGE_ONLY) {
+      return state.storageWorkers.insert(jedis, shardWorker.getEndpoint(), json);
+    }
+
+    return state.executeAndStorageWorkers.insert(jedis, shardWorker.getEndpoint(), json);
+  }
+
   private boolean removeWorkerAndPublish(JedisCluster jedis, String name, String changeJson) {
-    if (state.workers.remove(jedis, name)) {
+    if (state.executeWorkers.remove(jedis, name)) {
+      jedis.publish(config.getWorkerChannel(), changeJson);
+      return true;
+    } else if (state.storageWorkers.remove(jedis, name)) {
+      jedis.publish(config.getWorkerChannel(), changeJson);
+      return true;
+    } else if (state.executeAndStorageWorkers.remove(jedis, name)) {
       jedis.publish(config.getWorkerChannel(), changeJson);
       return true;
     }
