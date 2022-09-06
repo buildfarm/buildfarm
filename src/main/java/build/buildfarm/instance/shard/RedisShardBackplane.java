@@ -724,7 +724,7 @@ public class RedisShardBackplane implements Backplane {
   private Set<String> fetchAndExpireWorkers(JedisCluster jedis, long now) {
     Set<String> returnWorkers = Sets.newConcurrentHashSet();
     ImmutableList.Builder<ShardWorker> invalidWorkers = ImmutableList.builder();
-    for (Map.Entry<String, String> entry : state.workers.asMap(jedis).entrySet()) {
+    for (Map.Entry<String, String> entry : state.executeAndStorageWorkers.asMap(jedis).entrySet()) {
       String json = entry.getValue();
       String name = entry.getKey();
       try {
@@ -1353,7 +1353,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public BackplaneStatus backplaneStatus() throws IOException {
     BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
-    builder.addAllActiveWorkers(client.call(jedis -> state.workers.keys(jedis)));
+    builder.addAllActiveWorkers(client.call(jedis -> state.executeAndStorageWorkers.keys(jedis)));
     builder.setDispatchedSize(client.call(jedis -> state.dispatchedOperations.size(jedis)));
     builder.setOperationQueue(state.operationQueue.status(client.call(jedis -> jedis)));
     builder.setPrequeue(state.prequeue.status(client.call(jedis -> jedis)));
