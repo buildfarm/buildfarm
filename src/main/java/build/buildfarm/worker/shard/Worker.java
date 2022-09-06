@@ -878,7 +878,7 @@ public class Worker extends LoggingMain {
   private void startFailsafeRegistration() {
     String endpoint = config.getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
-    worker.setWorkerType(determineWorkerType(config.getCapabilities()));
+    worker.setWorkerType(determineWorkerType());
     int registrationIntervalMillis = 10000;
     int registrationOffsetMillis = registrationIntervalMillis * 3;
     new Thread(
@@ -942,14 +942,11 @@ public class Worker extends LoggingMain {
         .start();
   }
 
-  private WorkerType determineWorkerType(WorkerCapabilities capabilities) {
-    boolean hasStorage = capabilities.getCas();
-    boolean hasExecute = capabilities.getExecution();
-
-    if (hasStorage && hasExecute) {
+  private WorkerType determineWorkerType() {
+    if (hasCasCapability && hasExecutionCapability) {
       return WorkerType.EXECUTE_AND_STORAGE;
     }
-    if (hasStorage) {
+    if (hasCasCapability) {
       return WorkerType.STORAGE;
     }
     return WorkerType.EXECUTE;
