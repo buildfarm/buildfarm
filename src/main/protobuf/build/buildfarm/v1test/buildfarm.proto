@@ -773,9 +773,9 @@ message ShardWorkerConfig {
 }
 
 enum WorkerType {
-  EXECUTE_ONLY = 0;
+  EXECUTE = 0;
 
-  STORAGE_ONLY = 1;
+  STORAGE = 1;
 
   EXECUTE_AND_STORAGE = 2;
 }

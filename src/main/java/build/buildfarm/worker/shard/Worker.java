@@ -950,9 +950,9 @@ public class Worker extends LoggingMain {
       return WorkerType.EXECUTE_AND_STORAGE;
     }
     if (hasStorage) {
-      return WorkerType.STORAGE_ONLY;
+      return WorkerType.STORAGE;
     }
-    return WorkerType.EXECUTE_ONLY;
+    return WorkerType.EXECUTE;
   }
 
   @SuppressWarnings("deprecation")
