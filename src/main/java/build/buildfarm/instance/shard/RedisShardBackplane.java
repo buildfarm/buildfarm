@@ -598,9 +598,9 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private boolean addWorkerByType(JedisCluster jedis, ShardWorker shardWorker, String json) {
-    if (shardWorker.getWorkerType() == WorkerType.EXECUTE_ONLY) {
+    if (shardWorker.getWorkerType() == WorkerType.EXECUTE) {
       return state.executeWorkers.insert(jedis, shardWorker.getEndpoint(), json);
-    } else if (shardWorker.getWorkerType() == WorkerType.STORAGE_ONLY) {
+    } else if (shardWorker.getWorkerType() == WorkerType.STORAGE) {
       return state.storageWorkers.insert(jedis, shardWorker.getEndpoint(), json);
     }
 
