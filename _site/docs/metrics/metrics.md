@@ -2,7 +2,7 @@
 layout: default
 title: Metrics
 has_children: true
-nav_order: 4
+nav_order: 7
 ---
 
 ## Prometheus Configuration
