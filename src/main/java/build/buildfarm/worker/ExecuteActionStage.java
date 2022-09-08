@@ -42,7 +42,6 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   private final Set<Thread> executors = Sets.newHashSet();
   private final AtomicInteger executorClaims = new AtomicInteger(0);
   private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
-  private volatile int size = 0;
 
   public ExecuteActionStage(
       WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -97,24 +96,25 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
           "tried to remove unknown executor thread for " + operationName);
     }
     releaseClaim(operationName, claims);
-    return executorClaims.addAndGet(-claims);
+    int slotUsage = executorClaims.addAndGet(-claims);
+    executionSlotUsage.set(slotUsage);
+    return slotUsage;
   }
 
   public void releaseExecutor(
       String operationName, int claims, long usecs, long stallUSecs, int exitCode) {
-    size = removeAndRelease(operationName, claims);
+    int slotUsage = removeAndRelease(operationName, claims);
     executionTime.observe(usecs / 1000.0);
     executionStallTime.observe(stallUSecs / 1000.0);
-    executionSlotUsage.set(size);
     logComplete(
         operationName,
         usecs,
         stallUSecs,
-        String.format("exit code: %d, %s", exitCode, getUsage(size)));
+        String.format("exit code: %d, %s", exitCode, getUsage(slotUsage)));
   }
 
   public int getSlotUsage() {
-    return size;
+    return executorClaims.get();
   }
 
   @Override
@@ -138,8 +138,9 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
 
     synchronized (this) {
       executors.add(executorThread);
-      size = executorClaims.addAndGet(limits.cpu.claimed);
-      logStart(operationContext.operation.getName(), getUsage(size));
+      int slotUsage = executorClaims.addAndGet(limits.cpu.claimed);
+      executionSlotUsage.set(slotUsage);
+      logStart(operationContext.operation.getName(), getUsage(slotUsage));
       executorThread.start();
     }
   }
