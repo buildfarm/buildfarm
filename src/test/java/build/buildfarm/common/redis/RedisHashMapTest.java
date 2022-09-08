@@ -16,6 +16,7 @@ package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -39,10 +40,12 @@ import redis.clients.jedis.JedisCluster;
  */
 @RunWith(JUnit4.class)
 public class RedisHashMapTest {
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private JedisCluster redis;
 
   @Before
   public void setUp() throws Exception {
+    configs.getBackplane().setRedisUri("redis://localhost:6379");
     redis = JedisClusterFactory.createTest();
   }
 

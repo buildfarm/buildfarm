@@ -68,6 +68,7 @@ import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
@@ -83,7 +84,6 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
-import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.Tree;
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -235,37 +235,26 @@ public class ShardInstance extends AbstractServerInstance {
   private boolean stopped = true;
   private final Thread prometheusMetricsThread;
 
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   // TODO: move to config
   private static final Duration queueTimeout = Durations.fromSeconds(60);
 
-  private static Backplane createBackplane(ShardInstanceConfig config, String identifier)
-      throws ConfigurationException {
-    ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
-    switch (backplaneCase) {
-      default:
-      case BACKPLANE_NOT_SET:
-        throw new IllegalArgumentException("Shard Backplane not set in config");
-      case REDIS_SHARD_BACKPLANE_CONFIG:
-        return new RedisShardBackplane(
-            config.getRedisShardBackplaneConfig(),
-            identifier,
-            ShardInstance::stripOperation,
-            ShardInstance::stripQueuedOperation);
+  private static Backplane createBackplane(String identifier) throws ConfigurationException {
+    if ("SHARD".equals(configs.getBackplane().getType())) {
+      return new RedisShardBackplane(
+          identifier, ShardInstance::stripOperation, ShardInstance::stripQueuedOperation);
+    } else {
+      throw new IllegalArgumentException("Shard Backplane not set in config");
     }
   }
 
-  public ShardInstance(
-      String name,
-      String identifier,
-      DigestUtil digestUtil,
-      ShardInstanceConfig config,
-      Runnable onStop)
+  public ShardInstance(String name, String identifier, DigestUtil digestUtil, Runnable onStop)
       throws InterruptedException, ConfigurationException {
     this(
         name,
         digestUtil,
-        createBackplane(config, identifier),
-        config,
+        createBackplane(identifier),
         onStop,
         /* actionCacheFetchService=*/ listeningDecorator(newFixedThreadPool(24)));
   }
@@ -274,7 +263,6 @@ public class ShardInstance extends AbstractServerInstance {
       String name,
       DigestUtil digestUtil,
       Backplane backplane,
-      ShardInstanceConfig config,
       Runnable onStop,
       ListeningExecutorService actionCacheFetchService)
       throws InterruptedException {
@@ -284,18 +272,20 @@ public class ShardInstance extends AbstractServerInstance {
         backplane,
         new ShardActionCache(
             DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE, backplane, actionCacheFetchService),
-        config.getRunDispatchedMonitor(),
-        config.getDispatchedMonitorIntervalSeconds(),
-        config.getRunOperationQueuer(),
-        config.getMaxEntrySizeBytes(),
-        config.getMaxCpu(),
-        config.getMaxRequeueAttempts(),
-        config.getMaximumActionTimeout(),
-        config.getUseDenyList(),
+        configs.getServer().isRunDispatchedMonitor(),
+        configs.getServer().getDispatchedMonitorIntervalSeconds(),
+        configs.getServer().isRunOperationQueuer(),
+        configs.getServer().getMaxEntrySizeBytes(),
+        configs.getServer().getMaxCpu(),
+        configs.getServer().getMaxRequeueAttempts(),
+        Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build(),
+        configs.getServer().isUseDenyList(),
         onStop,
-        WorkerStubs.create(digestUtil, config.getGrpcTimeout()),
+        WorkerStubs.create(
+            digestUtil,
+            Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build()),
         actionCacheFetchService,
-        config.getEnsureOutputsPresent());
+        configs.getServer().isEnsureOutputsPresent());
   }
 
   public ShardInstance(

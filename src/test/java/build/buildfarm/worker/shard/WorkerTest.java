@@ -14,21 +14,31 @@
 
 package build.buildfarm.worker.shard;
 
-import build.buildfarm.v1test.ShardWorkerConfig;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import java.io.IOException;
 import javax.naming.ConfigurationException;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class WorkerTest {
-  @Test(expected = ConfigurationException.class)
-  public void missingWorkerRoot() throws ConfigurationException {
-    new Worker("test", ShardWorkerConfig.newBuilder().build());
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  @Before
+  public void setUp() throws IOException {
+    configs.getWorker().setRoot(null);
+    configs.getWorker().getCas().setPath(null);
   }
 
-  @Test(expected = ConfigurationException.class)
+  @Test(expected = NullPointerException.class)
+  public void missingWorkerRoot() throws ConfigurationException {
+    new Worker("test");
+  }
+
+  @Test(expected = NullPointerException.class)
   public void missingCasCacheDirectory() throws ConfigurationException {
-    new Worker("test", ShardWorkerConfig.newBuilder().setRoot("/").build());
+    new Worker("test");
   }
 }

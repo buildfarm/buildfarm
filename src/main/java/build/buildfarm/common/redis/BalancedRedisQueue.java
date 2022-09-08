@@ -385,7 +385,6 @@ public class BalancedRedisQueue {
       queues.add(
           new RedisQueueFactory().getQueue(queueType, RedisHashtags.hashedName(name, hashtag)));
     }
-
     // if there were no hashtags, we'll create a single internal queue
     // so that the balanced redis queue can still function.
     // we'll use the basename provided to create the single internal queue and use the original

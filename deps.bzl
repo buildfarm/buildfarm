@@ -20,9 +20,9 @@ def archive_dependencies(third_party):
         # Kubernetes rules.  Useful for local development with tilt.
         {
             "name": "io_bazel_rules_k8s",
-            "strip_prefix": "rules_k8s-0.5",
-            "url": "https://github.com/bazelbuild/rules_k8s/archive/v0.5.tar.gz",
-            "sha256": "773aa45f2421a66c8aa651b8cecb8ea51db91799a405bd7b913d77052ac7261a",
+            "strip_prefix": "rules_k8s-0.7",
+            "url": "https://github.com/bazelbuild/rules_k8s/archive/refs/tags/v0.7.tar.gz",
+            "sha256": "ce5b9bc0926681e2e7f2147b49096f143e6cbc783e71bc1d4f36ca76b00e6f4a",
         },
 
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
@@ -148,6 +148,14 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
         sha256 = "0523287984978c091be0d22a5c61f0bce8267eeafbbae58c98abaf99c9396832",
         urls = [
             "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.11.0/opentelemetry-javaagent.jar",
+        ],
+    )
+
+    maybe(
+        http_jar,
+        "lombok",
+        urls = [
+            "https://projectlombok.org/downloads/lombok.jar",
         ],
     )
 

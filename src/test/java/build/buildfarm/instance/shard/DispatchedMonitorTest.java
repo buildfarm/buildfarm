@@ -54,7 +54,7 @@ public class DispatchedMonitorTest {
   private DispatchedMonitor dispatchedMonitor;
 
   @Before
-  public void setUp() throws InterruptedException {
+  public void setUp() throws InterruptedException, IOException {
     MockitoAnnotations.initMocks(this);
     when(requeuer.apply(any(QueueEntry.class), any(Duration.class)))
         .thenReturn(immediateFailedFuture(new RuntimeException("unexpected requeue")));

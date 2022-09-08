@@ -39,8 +39,8 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
-import build.buildfarm.common.config.ConfigAdjuster;
 import build.buildfarm.common.config.ShardWorkerOptions;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
@@ -51,13 +51,9 @@ import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.v1test.AdminGrpc;
-import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
-import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
-import build.buildfarm.v1test.WorkerType;
-import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
@@ -69,8 +65,6 @@ import build.buildfarm.worker.ReportResultStage;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
@@ -78,7 +72,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.TextFormat;
+import com.google.protobuf.Duration;
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -93,7 +87,6 @@ import io.prometheus.client.Gauge;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
@@ -139,13 +132,14 @@ public class Worker extends LoggingMain {
           .register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
+
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final boolean hasCasCapability;
   private final boolean hasExecutionCapability;
 
   private boolean inGracefulShutdown = false;
   private boolean isPaused = false;
 
-  private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
 
   @SuppressWarnings("deprecation")
@@ -243,10 +237,6 @@ public class Worker extends LoggingMain {
     }
   }
 
-  public Worker(String session, ShardWorkerConfig config) throws ConfigurationException {
-    this(session, ServerBuilder.forPort(config.getPort()), config);
-  }
-
   /**
    * The method will prepare the worker for graceful shutdown and send out grpc request to disable
    * scale in protection when the worker is ready. If unexpected errors happened, it will cancel the
@@ -273,7 +263,7 @@ public class Worker extends LoggingMain {
       logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
     } finally {
       // make a grpc call to disable scale protection
-      String clusterEndpoint = config.getAdminConfig().getClusterEndpoint();
+      String clusterEndpoint = configs.getServer().getAdmin().getClusterEndpoint();
       logger.log(
           INFO,
           String.format(
@@ -281,7 +271,7 @@ public class Worker extends LoggingMain {
               timeWaited,
               pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
       try {
-        disableScaleInProtection(clusterEndpoint, config.getPublicName());
+        disableScaleInProtection(clusterEndpoint, configs.getWorker().getPublicName());
       } catch (Exception e) {
         logger.log(
             SEVERE,
@@ -320,14 +310,14 @@ public class Worker extends LoggingMain {
     }
   }
 
-  private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
-    addMissingRoot(config);
-    verifyRootConfiguration(config);
-    return Paths.get(config.getRoot());
+  private static Path getValidRoot() throws ConfigurationException {
+    addMissingRoot();
+    verifyRootConfiguration();
+    return Paths.get(configs.getWorker().getRoot());
   }
 
-  private static void addMissingRoot(ShardWorkerConfig config) {
-    Path root = Paths.get(config.getRoot());
+  private static void addMissingRoot() {
+    Path root = Paths.get(configs.getWorker().getRoot());
     if (!Files.isDirectory(root)) {
       try {
         Files.createDirectories(root);
@@ -337,9 +327,8 @@ public class Worker extends LoggingMain {
     }
   }
 
-  private static void verifyRootConfiguration(ShardWorkerConfig config)
-      throws ConfigurationException {
-    String rootValue = config.getRoot();
+  private static void verifyRootConfiguration() throws ConfigurationException {
+    String rootValue = configs.getWorker().getRoot();
 
     // Configuration error if no root is specified.
     if (Strings.isNullOrEmpty(rootValue)) {
@@ -353,19 +342,17 @@ public class Worker extends LoggingMain {
     }
   }
 
-  private static Path getValidFilesystemCASPath(FilesystemCASConfig config, Path root)
-      throws ConfigurationException {
-    String pathValue = config.getPath();
+  private static Path getValidFilesystemCASPath(Path root) throws ConfigurationException {
+    String pathValue = configs.getWorker().getCas().getPath();
     if (Strings.isNullOrEmpty(pathValue)) {
       throw new ConfigurationException("Cas cache directory value in config missing");
     }
     return root.resolve(pathValue);
   }
 
-  private static HashFunction getValidHashFunction(ShardWorkerConfig config)
-      throws ConfigurationException {
+  private static HashFunction getValidHashFunction() throws ConfigurationException {
     try {
-      return HashFunction.get(config.getDigestFunction());
+      return HashFunction.valueOf(configs.getDigestFunction());
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }
@@ -380,37 +367,31 @@ public class Worker extends LoggingMain {
   }
 
   @SuppressWarnings({"deprecation", "unchecked"})
-  public Worker(String session, ServerBuilder<?> serverBuilder, ShardWorkerConfig config)
-      throws ConfigurationException {
+  public Worker(String session) throws ConfigurationException {
     super("BuildFarmShardWorker");
-    this.config = config;
-    hasCasCapability = config.getCapabilities().getCas();
-    hasExecutionCapability = config.getCapabilities().getExecution();
-    String identifier = "buildfarm-worker-" + config.getPublicName() + "-" + session;
-    root = getValidRoot(config);
-    if (config.getPublicName().isEmpty()) {
+    ServerBuilder<?> serverBuilder = ServerBuilder.forPort(configs.getWorker().getPort());
+    hasCasCapability = configs.getWorker().getCapabilities().isCas();
+    hasExecutionCapability = configs.getWorker().getCapabilities().isExecution();
+    String identifier = "buildfarm-worker-" + configs.getWorker().getPublicName() + "-" + session;
+    root = getValidRoot();
+    if (configs.getWorker().getPublicName().isEmpty()) {
       throw new ConfigurationException("worker's public name should not be empty");
     }
 
-    digestUtil = new DigestUtil(getValidHashFunction(config));
+    digestUtil = new DigestUtil(getValidHashFunction());
 
-    ShardWorkerConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
-    switch (backplaneCase) {
-      default:
-      case BACKPLANE_NOT_SET:
-        throw new IllegalArgumentException("Shard Backplane not set in config");
-      case REDIS_SHARD_BACKPLANE_CONFIG:
-        backplane =
-            new RedisShardBackplane(
-                config.getRedisShardBackplaneConfig(),
-                identifier,
-                this::stripOperation,
-                this::stripQueuedOperation);
-        break;
+    String backplaneCase = configs.getBackplane().getType();
+    if ("SHARD".equals(backplaneCase)) {
+      backplane =
+          new RedisShardBackplane(identifier, this::stripOperation, this::stripQueuedOperation);
+    } else {
+      throw new IllegalArgumentException("Shard Backplane not set in config");
     }
 
     workerStubs =
-        WorkerStubs.create(digestUtil, config.getShardWorkerInstanceConfig().getGrpcTimeout());
+        WorkerStubs.create(
+            digestUtil,
+            Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build());
 
     ExecutorService removeDirectoryService =
         newFixedThreadPool(
@@ -420,19 +401,20 @@ public class Worker extends LoggingMain {
 
     InputStreamFactory remoteInputStreamFactory =
         new RemoteInputStreamFactory(
-            config.getPublicName(),
+            configs.getWorker().getPublicName(),
             backplane,
             new Random(),
             workerStubs,
             (worker, t, context) -> {});
     ContentAddressableStorage storage =
-        createStorages(
-            remoteInputStreamFactory, removeDirectoryService, accessRecorder, config.getCasList());
+        createStorage(remoteInputStreamFactory, removeDirectoryService, accessRecorder, null);
     execFileSystem =
         createExecFileSystem(
             remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
 
-    instance = new ShardWorkerInstance(config.getPublicName(), digestUtil, backplane, storage);
+    instance =
+        new ShardWorkerInstance(
+            configs.getWorker().getPublicName(), digestUtil, backplane, storage);
 
     // Create the appropriate writer for the context
     CasWriter writer;
@@ -442,34 +424,28 @@ public class Worker extends LoggingMain {
       writer = new LocalCasWriter();
     }
 
-    DequeueMatchSettings matchSettings = new DequeueMatchSettings();
-    matchSettings.acceptEverything = config.getDequeueMatchSettings().getAcceptEverything();
-    matchSettings.allowUnmatched = config.getDequeueMatchSettings().getAllowUnmatched();
-
     ShardWorkerContext context =
         new ShardWorkerContext(
-            config.getPublicName(),
-            matchSettings,
-            config.getDequeueMatchSettings().getPlatform(),
-            config.getOperationPollPeriod(),
+            configs.getWorker().getPublicName(),
+            Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build(),
             backplane::pollOperation,
-            config.getInputFetchStageWidth(),
-            config.getExecuteStageWidth(),
-            config.getInputFetchDeadline(),
+            configs.getWorker().getInputFetchStageWidth(),
+            configs.getWorker().getExecuteStageWidth(),
+            configs.getWorker().getInputFetchDeadline(),
             backplane,
             execFileSystem,
             new EmptyInputStreamFactory(
                 new FailoverInputStreamFactory(
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
-            config.getExecutionPoliciesList(),
+            configs.getWorker().getExecutionPolicies(),
             instance,
-            config.getDefaultActionTimeout(),
-            config.getMaximumActionTimeout(),
-            config.getDefaultMaxCores(),
-            config.getLimitGlobalExecution(),
-            config.getOnlyMulticoreTests(),
-            config.getAllowBringYourOwnContainer(),
-            config.getErrorOperationRemainingResources(),
+            Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build(),
+            Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build(),
+            configs.getWorker().getDefaultMaxCores(),
+            configs.getWorker().isLimitGlobalExecution(),
+            configs.getWorker().isOnlyMulticoreTests(),
+            configs.getWorker().isAllowBringYourOwnContainer(),
+            configs.getWorker().isErrorOperationRemainingResources(),
             writer);
 
     pipeline = new Pipeline();
@@ -485,10 +461,9 @@ public class Worker extends LoggingMain {
       Pipeline pipeline,
       ShardWorkerContext context) {
     serverBuilder.addService(healthStatusManager.getHealthService());
-    serverBuilder.addService(
-        new ContentAddressableStorageService(instance, /* deadlineAfter=*/ 1, DAYS));
-    serverBuilder.addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, DAYS));
-    serverBuilder.addService(new ShutDownWorkerGracefully(this, config));
+    serverBuilder.addService(new ContentAddressableStorageService(instance));
+    serverBuilder.addService(new ByteStreamService(instance));
+    serverBuilder.addService(new ShutDownWorkerGracefully(this));
 
     // We will build a worker's server based on it's capabilities.
     // A worker that is capable of execution will construct an execution pipeline.
@@ -646,7 +621,7 @@ public class Worker extends LoggingMain {
 
   private @Nullable UserPrincipal getOwner(FileSystem fileSystem) throws ConfigurationException {
     try {
-      return getUser(config.getExecOwner(), fileSystem);
+      return getUser(configs.getWorker().getExecOwner(), fileSystem);
     } catch (IOException e) {
       ConfigurationException configException =
           new ConfigurationException("Could not locate exec_owner");
@@ -676,28 +651,26 @@ public class Worker extends LoggingMain {
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
       Executor accessRecorder,
-      ContentAddressableStorageConfig config,
       ContentAddressableStorage delegate)
       throws ConfigurationException {
-    switch (config.getTypeCase()) {
+    switch (configs.getWorker().getCas().getType()) {
       default:
-      case TYPE_NOT_SET:
         throw new IllegalArgumentException("Invalid cas type specified");
-      case MEMORY:
-      case FUSE: // FIXME have FUSE refer to a name for storage backing, and topo
-        return new MemoryCAS(config.getMemory().getMaxSizeBytes(), this::onStoragePut, delegate);
-      case GRPC:
+      case "MEMORY":
+      case "FUSE": // FIXME have FUSE refer to a name for storage backing, and topo
+        return new MemoryCAS(
+            configs.getWorker().getCas().getMaxSizeBytes(), this::onStoragePut, delegate);
+      case "GRPC":
         checkState(delegate == null, "grpc cas cannot delegate");
-        return createGrpcCAS(config.getGrpc());
-      case FILESYSTEM:
-        FilesystemCASConfig fsCASConfig = config.getFilesystem();
+        return createGrpcCAS();
+      case "FILESYSTEM":
         return new ShardCASFileCache(
             remoteInputStreamFactory,
-            root.resolve(getValidFilesystemCASPath(fsCASConfig, root)),
-            fsCASConfig.getMaxSizeBytes(),
-            fsCASConfig.getMaxEntrySizeBytes(),
-            fsCASConfig.getHexBucketLevels(),
-            fsCASConfig.getFileDirectoriesIndexInMemory(),
+            root.resolve(getValidFilesystemCASPath(root)),
+            configs.getWorker().getCas().getMaxSizeBytes(),
+            configs.getWorker().getCas().getMaxEntrySizeBytes(),
+            configs.getWorker().getHexBucketLevels(),
+            configs.getWorker().getCas().isFileDirectoriesIndexInMemory(),
             digestUtil,
             removeDirectoryService,
             accessRecorder,
@@ -705,26 +678,6 @@ public class Worker extends LoggingMain {
             delegate == null ? this::onStorageExpire : (digests) -> {},
             delegate);
     }
-  }
-
-  private ContentAddressableStorage createStorages(
-      InputStreamFactory remoteInputStreamFactory,
-      ExecutorService removeDirectoryService,
-      Executor accessRecorder,
-      List<ContentAddressableStorageConfig> configs)
-      throws ConfigurationException {
-    ImmutableList.Builder<ContentAddressableStorage> storages = ImmutableList.builder();
-    // must construct delegates first
-    ContentAddressableStorage storage = null;
-    ContentAddressableStorage delegate = null;
-    for (ContentAddressableStorageConfig config : Lists.reverse(configs)) {
-      storage =
-          createStorage(
-              remoteInputStreamFactory, removeDirectoryService, accessRecorder, config, delegate);
-      storages.add(storage);
-      delegate = storage;
-    }
-    return storage;
   }
 
   private ExecFileSystem createCFCExecFileSystem(
@@ -736,8 +689,8 @@ public class Worker extends LoggingMain {
         root,
         fileCache,
         owner,
-        config.getLinkInputDirectories(),
-        config.getRealInputDirectoriesList(),
+        configs.getWorker().isLinkInputDirectories(),
+        configs.getWorker().getRealInputDirectories(),
         removeDirectoryService,
         accessRecorder
         /* deadlineAfter=*/
@@ -798,7 +751,7 @@ public class Worker extends LoggingMain {
     try {
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
       if (hasCasCapability) {
-        backplane.addBlobLocation(digest, config.getPublicName());
+        backplane.addBlobLocation(digest, configs.getWorker().getPublicName());
       }
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
@@ -809,7 +762,7 @@ public class Worker extends LoggingMain {
     if (hasCasCapability) {
       try {
         // if the worker is a CAS member, it can send/modify blobs in the backplane.
-        backplane.removeBlobsLocation(digests, config.getPublicName());
+        backplane.removeBlobsLocation(digests, configs.getWorker().getPublicName());
       } catch (IOException e) {
         throw Status.fromThrowable(e).asRuntimeException();
       }
@@ -875,7 +828,7 @@ public class Worker extends LoggingMain {
   }
 
   private void startFailsafeRegistration() {
-    String endpoint = config.getPublicName();
+    String endpoint = configs.getWorker().getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
     worker.setWorkerType(determineWorkerType());
     int registrationIntervalMillis = 10000;
@@ -894,7 +847,7 @@ public class Worker extends LoggingMain {
 
               boolean isWorkerPausedFromNewWork() {
                 try {
-                  File pausedFile = new File(config.getRoot() + "/.paused");
+                  File pausedFile = new File(configs.getWorker().getRoot() + "/.paused");
                   if (pausedFile.exists() && !isPaused) {
                     isPaused = true;
                     logger.log(Level.INFO, "The current worker is paused from taking on new work!");
@@ -954,18 +907,18 @@ public class Worker extends LoggingMain {
   @SuppressWarnings("deprecation")
   public void start() throws InterruptedException {
     try {
-      backplane.start(config.getPublicName());
+      backplane.start(configs.getWorker().getPublicName());
 
-      removeWorker(config.getPublicName());
+      removeWorker(configs.getWorker().getPublicName());
 
-      boolean skipLoad = config.getCasList().get(0).getSkipLoad();
+      boolean skipLoad = configs.getWorker().getCas().isSkipLoad();
       execFileSystem.start(
-          (digests) -> addBlobsLocation(digests, config.getPublicName()), skipLoad);
+          (digests) -> addBlobsLocation(digests, configs.getWorker().getPublicName()), skipLoad);
 
       server.start();
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-      PrometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
+      PrometheusPublisher.startHttpServer(configs.getServer().getPrometheusPort());
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
@@ -981,8 +934,8 @@ public class Worker extends LoggingMain {
     }
     pipeline.start();
     healthCheckMetric.labels("start").inc();
-    executionSlotsTotal.set(config.getExecuteStageWidth());
-    inputFetchSlotsTotal.set(config.getInputFetchStageWidth());
+    executionSlotsTotal.set(configs.getWorker().getExecuteStageWidth());
+    inputFetchSlotsTotal.set(configs.getWorker().getInputFetchStageWidth());
   }
 
   @Override
@@ -991,14 +944,6 @@ public class Worker extends LoggingMain {
     PrometheusPublisher.stopHttpServer();
     stop();
     logger.log(SEVERE, "*** server shut down");
-  }
-
-  private static ShardWorkerConfig toShardWorkerConfig(Readable input, ShardWorkerOptions options)
-      throws IOException {
-    ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
-    TextFormat.merge(input, builder);
-    ConfigAdjuster.adjust(builder, options);
-    return builder.build();
   }
 
   private static void printUsage(OptionsParser parser) {
@@ -1032,16 +977,15 @@ public class Worker extends LoggingMain {
       printUsage(parser);
       throw new IllegalArgumentException("Missing CONFIG_PATH");
     }
-    Path configPath = Paths.get(residue.get(0));
-    String session = UUID.randomUUID().toString();
-    Worker worker;
-    try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      ShardWorkerConfig config =
-          toShardWorkerConfig(
-              new InputStreamReader(configInputStream),
-              parser.getOptions(ShardWorkerOptions.class));
-      worker = new Worker(session, config);
+
+    try {
+      configs.loadConfigs(residue.get(0));
+    } catch (IOException e) {
+      logger.severe("Could not parse yml configuration file." + e);
     }
+
+    String session = UUID.randomUUID().toString();
+    Worker worker = new Worker(session);
     worker.start();
     worker.blockUntilShutdown();
     System.exit(0); // bullet to the head in case anything is stuck
