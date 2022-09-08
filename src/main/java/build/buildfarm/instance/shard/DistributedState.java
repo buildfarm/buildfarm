@@ -35,7 +35,7 @@ public class DistributedState {
   public RedisHashMap executeWorkers;
 
   /**
-   * @field workers
+   * @field storageWorkers
    * @brief All of the storage-only workers register themselves to the cluster.
    * @details This is done to keep track of which machines are online and known by the rest of the
    *     cluster.
