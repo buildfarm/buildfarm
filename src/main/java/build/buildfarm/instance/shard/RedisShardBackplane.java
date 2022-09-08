@@ -608,7 +608,7 @@ public class RedisShardBackplane implements Backplane {
 
   private boolean removeWorkerAndPublish(JedisCluster jedis, String name, String changeJson) {
     if (state.executeAndStorageWorkers.remove(jedis, name)
-        || state.storageWorkers.remove(jedis, name) 
+        || state.storageWorkers.remove(jedis, name)
         || state.executeWorkers.remove(jedis, name)) {
       jedis.publish(configs.getBackplane().getWorkerChannel(), changeJson);
       return true;
