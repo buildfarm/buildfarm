@@ -14,6 +14,7 @@
 
 package build.buildfarm.common;
 
+import io.prometheus.client.Gauge;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -31,6 +32,18 @@ import redis.clients.jedis.ScanResult;
  */
 public class WorkerIndexer {
   private static final Logger logger = Logger.getLogger(WorkerIndexer.class.getName());
+  private static final Gauge indexerKeysRemovedGauge =
+      Gauge.build()
+          .name("cas_indexer_removed_keys")
+          .labelNames("node")
+          .help("Indexer results - Number of keys removed")
+          .register();
+  private static final Gauge indexerHostsRemovedGauge =
+      Gauge.build()
+          .name("cas_indexer_removed_hosts")
+          .labelNames("node")
+          .help("Indexer results - Number of hosts removed")
+          .register();
 
   /**
    * @brief Handle the reindexing the CAS entries based on a departing worker.
@@ -72,6 +85,9 @@ public class WorkerIndexer {
   private static void reindexNode(
       JedisCluster cluster, Jedis node, CasIndexSettings settings, CasIndexResults results) {
 
+    Long totalKeys = 0L;
+    Long removedKeys = 0L;
+    Long removedHosts = 0L;
     Set<String> activeWorkers = cluster.hkeys("Workers");
     logger.info(
         String.format(
@@ -92,16 +108,16 @@ public class WorkerIndexer {
       if (scanResult != null) {
         List<String> casKeys = scanResult.getResult();
         for (String casKey : casKeys) {
-          results.totalKeys += casKeys.size();
+          totalKeys += casKeys.size();
           Set<String> intersectSource = cluster.smembers(casKey);
           Set<String> intersectResult =
               intersectSource.stream()
                   .distinct()
                   .filter(activeWorkers::contains)
                   .collect(Collectors.toSet());
-          results.removedHosts += (intersectSource.size() - intersectResult.size());
+          removedHosts += (intersectSource.size() - intersectResult.size());
           if (intersectResult.isEmpty()) {
-            results.removedKeys++;
+            removedKeys++;
             cluster.del(casKey);
           } else {
             cluster.sadd(casKey, intersectResult.toArray(new String[0]));
@@ -110,9 +126,10 @@ public class WorkerIndexer {
         cursor = scanResult.getCursor();
       }
     } while (!cursor.equals("0"));
-    logger.info(
-        String.format(
-            "CAS Indexer After Node %s Results: %s",
-            node.getClient().getHost(), results.toMessage()));
+    results.totalKeys += totalKeys;
+    results.removedKeys += removedKeys;
+    results.removedHosts += removedHosts;
+    indexerHostsRemovedGauge.labels(node.getClient().getHost()).set(removedHosts);
+    indexerKeysRemovedGauge.labels(node.getClient().getHost()).set(removedKeys);
   }
 }

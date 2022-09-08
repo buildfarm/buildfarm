@@ -708,6 +708,7 @@ class CASFileCacheTest {
 
     verify(delegate, times(1))
         .getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class));
+    assertThat(storage).isEmpty();
   }
 
   void decrementReference(Path path) throws IOException, InterruptedException {
