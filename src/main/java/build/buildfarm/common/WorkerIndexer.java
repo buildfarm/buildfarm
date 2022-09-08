@@ -84,6 +84,7 @@ public class WorkerIndexer {
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static void reindexNode(
       JedisCluster cluster, Jedis node, CasIndexSettings settings, CasIndexResults results) {
+
     Long totalKeys = 0L;
     Long removedKeys = 0L;
     Long removedHosts = 0L;
