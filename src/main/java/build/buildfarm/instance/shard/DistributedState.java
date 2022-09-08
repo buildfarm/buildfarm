@@ -27,7 +27,7 @@ import build.buildfarm.common.redis.RedisMap;
  */
 public class DistributedState {
   /**
-   * @field workers
+   * @field executeWorkers
    * @brief All of the execute-only workers register themselves to the cluster.
    * @details This is done to keep track of which machines are online and known by the rest of the
    *     cluster.
