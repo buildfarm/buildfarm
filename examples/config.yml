@@ -1,0 +1,147 @@
+digestFunction: SHA256
+defaultActionTimeout: 600
+maximumActionTimeout: 3600
+server:
+  instanceType: SHARD
+  name: shard
+  actionCacheReadOnly: false
+  port: 8980
+  prometheusPort: 9090
+  grpcMetrics:
+    enabled: false
+    provideLatencyHistograms: false
+  casWriteTimeout: 3600
+  bytestreamTimeout: 3600
+  sslCertificatePath:
+  runDispatchedMonitor: true
+  dispatchedMonitorIntervalSeconds: 1
+  runOperationQueuer: true
+  ensureOutputsPresent: false
+  maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+  maxRequeueAttempts: 5
+  useDenyList: true
+  grpcTimeout: 3600
+  executeKeepaliveAfterSeconds: 60
+  recordBesEvents: false
+  clusterId: local
+  cloudRegion: us-east-1
+  admin:
+    deploymentEnvironment: aws
+    clusterEndpoint: "grpc://localhost"
+    enabledGracefulShutdown: false
+  metrics:
+    publisher: log
+    logLevel: INFO
+    topic: test
+    topicMaxConnections: 1000
+    secretName: test
+backplane:
+  type: SHARD
+  redisUri: "redis://localhost:6379"
+  redisPassword:
+  redisNodes:
+  jedisPoolMaxTotal: 4000
+  workersHashName: "Workers"
+  workerChannel: "WorkerChannel"
+  actionCachePrefix: "ActionCache"
+  actionCacheExpire: 2419200 # 4 weeks
+  actionBlacklistPrefix: "ActionBlacklist"
+  actionBlacklistExpire: 3600 # 1 hour
+  invocationBlacklistPrefix: "InvocationBlacklist"
+  operationPrefix: "Operation"
+  operationExpire: 604800 # 1 week
+  preQueuedOperationsListName: "{Arrival}:PreQueuedOperations"
+  processingListName: "{Arrival}:ProcessingOperations"
+  processingPrefix: "Processing"
+  processingTimeoutMillis: 20000
+  queuedOperationsListName: "{Execution}:QueuedOperations"
+  dispatchingPrefix: "Dispatching"
+  dispatchingTimeoutMillis: 10000
+  dispatchedOperationsHashName: "DispatchedOperations"
+  operationChannelPrefix: "OperationChannel"
+  casPrefix: "ContentAddressableStorage"
+  casExpire: 604800 # 1 week
+  subscribeToBackplane: true
+  runFailsafeOperation: true
+  maxQueueDepth: 100000
+  maxPreQueueDepth: 1000000
+  redisQueueType: NORMAL
+  timeout: 10000
+  maxAttempts: 20
+  cacheCas: false
+  queues:
+    - name: "cpu"
+      allowUnmatched: true
+      properties:
+        - name: "min-cores"
+          value: "*"
+        - name: "max-cores"
+          value: "*"
+    - name: "gpu"
+      allowUnmatched: true
+      properties:
+        - name: "gpu"
+          value: "1"
+worker:
+  port: 8981
+  publicName: "localhost:8981"
+  capabilities:
+    cas: true
+    execution: true
+  root: "/tmp/worker"
+  inlineContentLimit: 1048567 # 1024 * 1024
+  operationPollPeriod: 1
+  dequeueMatchSettings:
+    platform:
+    acceptEverything: true
+    allowUnmatched: false
+  cas:
+    type: FILESYSTEM
+    path: "cache"
+    maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+    maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+    fileDirectoriesIndexInMemory: false
+    skipLoad: false
+    target:
+  executeStageWidth: 1
+  inputFetchStageWidth: 1
+  inputFetchDeadline: 60
+  linkInputDirectories: true
+  realInputDirectories:
+    - "external"
+  execOwner:
+  hexBucketLevels: 0
+  defaultMaxCores: 0
+  limitGlobalExecution: false
+  onlyMulticoreTests: false
+  allowBringYourOwnContainer: false
+  errorOperationRemainingResources: false
+  executionPolicies:
+    - name: test
+      executionWrapper:
+        path: /
+        arguments:
+          - arg1
+          - arg2
+memory:
+  listOperationsDefaultPageSize: 1024
+  listOperationsMaxPageSize: 16384
+  treeDefaultPageSize: 1024
+  treeMaxPageSize: 16384
+  operationPollTimeout: 30
+  operationCompletedDelay: 10
+  delegateCas: false
+  target: "localhost:8980"
+  deadlineAfterSeconds: 60
+  streamStdout: true
+  streamStderr: true
+  casPolicy: ALWAYS_INSERT
+  treePageSize: 0
+  platform:
+    properties:
+      name: "key_name"
+      value: "value_string"
+  defaultPlatform:
+    properties:
+      name: "cores"
+      value: "1"

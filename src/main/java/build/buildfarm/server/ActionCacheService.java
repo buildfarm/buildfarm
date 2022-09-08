@@ -22,9 +22,9 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.v1test.ActionCacheAccessPolicy;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Status;
@@ -44,9 +44,11 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   private final Instance instance;
   private final boolean isWritable;
 
-  public ActionCacheService(Instance instance, ActionCacheAccessPolicy policy) {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  public ActionCacheService(Instance instance) {
     this.instance = instance;
-    this.isWritable = !policy.equals(ActionCacheAccessPolicy.READ_ONLY);
+    this.isWritable = !configs.getServer().isActionCacheReadOnly();
   }
 
   @Override

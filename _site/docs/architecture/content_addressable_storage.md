@@ -34,7 +34,7 @@ Since these implementations vary in complexity and storage semantics, a common i
 
 The memory CAS implementation is extremely simple in design, constituting a maximum size with LRU eviction policy. Entry eviction is a registrable event for use as a storage for the delegated ActionCache, and Writes may be completed asynchronously by concurrent independent upload completion of an entry.
 
-This is the example presentation of a CAS in the memory instance available [here](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/server.config.example#L40-L45), but for reference, specification in any `cas_config` field for server or worker will enable the creation of a unique instance.
+This is the example presentation of a CAS in the memory instance available [here](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/config.memory.yml#L40-L45), but for reference, specification in any `cas_config` field for server or worker will enable the creation of a unique instance.
 
 ```
 cas_config: {
@@ -49,7 +49,7 @@ cas_config: {
 
 This is a CAS which completely mirrors a target CAS for all requests, useful as a proxy to be embedded in a full Instance declaration.
 
-A grpc config example is available in the alternate instance specification in the memory server example [here](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/server.config.example#L91-L99). For reference:
+A grpc config example is available in the alternate instance specification in the memory server example [here](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/config.memory.yml#L91-L99). For reference:
 
 ```
 cas_config: {
@@ -77,7 +77,7 @@ And will result in a listening grpc service on port 8081 on all interfaces, rela
 
 A sharded CAS leverages multiple Worker CAS retention and proxies requests to hosts with isolated CAS shards. These shards register their participation and entry presentation on a ShardBackplane. The backplane maintains a mapping of addresses to the nodes which host them. The sharded CAS is an aggregated proxy for its members, performing each function with fallback as appropriate; FindMissingBlobs requests are cycled through the shards, reducing a list of missing entries, Writes select a target node at random, Reads attempt a request on each advertised shard for an entry with failover on NOT_FOUND or transient grpc error. Reads are optimistic, given that a blob would not be requested that was not expected to be found, the sharded CAS will failover on complete absence of a blob to a whole cluster search for an entry.
 
-A shard CAS is the default for the Shard Instance type, with its required [backplane specification](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/shard-server.config.example#L17-L239). Since functionality between Shard CAS, AC, and Execution are mixed in here, the definition is somewhat cluttered, with efforts to refine specific aspects of it underway.
+A shard CAS is the default for the Shard Instance type, with its required [backplane specification](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/config.shard.yml#L17-L239). Since functionality between Shard CAS, AC, and Execution are mixed in here, the definition is somewhat cluttered, with efforts to refine specific aspects of it underway.
 
 ## Worker CAS
 
@@ -88,7 +88,7 @@ The worker's CAS file cache uses persistent disk storage. A strongly recommended
 
 Upon worker startup, the worker's cache instance is initialized in two phases. First, the root is scanned to store file information. Second, the existing directories are traversed to compute their validating identification.  Files will be automatically deleted if their file names are invalid for the cache, or if the configured cache size has been exceeded by previous files.
 
-Each Worker type's specification of the CASFileCache is unique. The memory worker defaults to CASFileCache with no option to change it, only configure its [root directory](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/worker.config.example#L46-L47) and [configuration options](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/worker.config.example#L111-L117). The shard worker allows a more flexible specification, with delegates available of the other types to fall back on for CAS expansion, and [encapsulated CAS configs](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/shard-worker.config.example#L49-L65)
+Each Worker type's specification of the CASFileCache is unique. The memory worker defaults to CASFileCache with no option to change it, only configure its [root directory](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/config.memory.yml#L46-L47) and [configuration options](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/config.memory.yml#L111-L117). The shard worker allows a more flexible specification, with delegates available of the other types to fall back on for CAS expansion, and [encapsulated CAS configs](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/config.shard.yml#L49-L65)
 
 The CASFileCache is also available on MemoryInstance servers, where it can represent a persistent file storage for a CAS. An example configuration for this is:
 

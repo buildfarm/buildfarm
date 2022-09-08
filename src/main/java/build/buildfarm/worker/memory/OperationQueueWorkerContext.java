@@ -36,6 +36,8 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.ExecutionPolicy;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.instance.Instance;
@@ -43,10 +45,8 @@ import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
-import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.OutputDirectory;
 import build.buildfarm.worker.UploadManifest;
@@ -70,6 +70,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
@@ -80,7 +81,8 @@ import javax.annotation.Nullable;
 class OperationQueueWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(WorkerContext.class.getName());
 
-  private final WorkerConfig config;
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private final OperationQueueClient oq;
   private final Instance casInstance;
   private final Instance acInstance;
@@ -95,7 +97,6 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @SuppressWarnings("SameParameterValue")
   OperationQueueWorkerContext(
-      WorkerConfig config,
       Instance casInstance,
       Instance acInstance,
       OperationQueueClient oq,
@@ -104,7 +105,6 @@ class OperationQueueWorkerContext implements WorkerContext {
       @Nullable UserPrincipal owner,
       Path root,
       Retrier retrier) {
-    this.config = config;
     this.casInstance = casInstance;
     this.acInstance = acInstance;
     this.oq = oq;
@@ -113,7 +113,7 @@ class OperationQueueWorkerContext implements WorkerContext {
     this.owner = owner;
     this.root = root;
     this.retrier = retrier;
-    policies = ExecutionPolicies.toMultimap(config.getExecutionPoliciesList());
+    policies = ExecutionPolicies.toMultimap(configs.getWorker().getExecutionPolicies());
   }
 
   @Override
@@ -127,12 +127,14 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public boolean shouldErrorOperationOnRemainingResources() {
-    return config.getErrorOperationRemainingResources();
+    return configs.getWorker().isErrorOperationRemainingResources();
   }
 
   @Override
   public Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage) {
-    Poller poller = new Poller(config.getOperationPollPeriod());
+    Poller poller =
+        new Poller(
+            Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build());
     resumePoller(poller, name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
     return poller;
   }
@@ -178,62 +180,62 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public CASInsertionPolicy getFileCasPolicy() {
-    return config.getFileCasPolicy();
+    return CASInsertionPolicy.valueOf(configs.getMemory().getCasPolicy());
   }
 
   @Override
   public CASInsertionPolicy getStdoutCasPolicy() {
-    return config.getStdoutCasPolicy();
+    return CASInsertionPolicy.valueOf(configs.getMemory().getCasPolicy());
   }
 
   @Override
   public CASInsertionPolicy getStderrCasPolicy() {
-    return config.getStderrCasPolicy();
+    return CASInsertionPolicy.valueOf(configs.getMemory().getCasPolicy());
   }
 
   @Override
   public int getInputFetchStageWidth() {
-    return config.getInputFetchStageWidth();
+    return configs.getWorker().getInputFetchStageWidth();
   }
 
   @Override
   public int getExecuteStageWidth() {
-    return config.getExecuteStageWidth();
+    return configs.getWorker().getExecuteStageWidth();
   }
 
   @Override
   public int getInputFetchDeadline() {
-    return config.getInputFetchDeadline();
+    return configs.getWorker().getInputFetchDeadline();
   }
 
   @Override
   public boolean hasDefaultActionTimeout() {
-    return config.hasDefaultActionTimeout();
+    return configs.getDefaultActionTimeout() > 0;
   }
 
   @Override
   public boolean hasMaximumActionTimeout() {
-    return config.hasMaximumActionTimeout();
+    return configs.getMaximumActionTimeout() > 0;
   }
 
   @Override
   public boolean getStreamStdout() {
-    return config.getStreamStdout();
+    return configs.getMemory().isStreamStdout();
   }
 
   @Override
   public boolean getStreamStderr() {
-    return config.getStreamStderr();
+    return configs.getMemory().isStreamStderr();
   }
 
   @Override
   public Duration getDefaultActionTimeout() {
-    return config.getDefaultActionTimeout();
+    return Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build();
   }
 
   @Override
   public Duration getMaximumActionTimeout() {
-    return config.getMaximumActionTimeout();
+    return Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build();
   }
 
   @Override
@@ -251,9 +253,9 @@ class OperationQueueWorkerContext implements WorkerContext {
         outputFiles,
         outputDirs,
         uploader,
-        config.getInlineContentLimit(),
-        config.getStdoutCasPolicy(),
-        config.getStderrCasPolicy());
+        configs.getWorker().getInlineContentLimit(),
+        CASInsertionPolicy.valueOf(configs.getMemory().getCasPolicy()),
+        CASInsertionPolicy.valueOf(configs.getMemory().getCasPolicy()));
   }
 
   @Override
@@ -348,7 +350,7 @@ class OperationQueueWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Iterable<ExecutionPolicy> getExecutionPolicies(String name) {
+  public List<build.buildfarm.common.config.yml.ExecutionPolicy> getExecutionPolicies(String name) {
     return policies.get(name);
   }
 
@@ -556,7 +558,7 @@ class OperationQueueWorkerContext implements WorkerContext {
       OutputDirectory childOutputDirectory =
           outputDirectory != null ? outputDirectory.getChild(name) : null;
       Path dirPath = execDir.resolve(name);
-      if (childOutputDirectory != null || !config.getLinkInputDirectories()) {
+      if (childOutputDirectory != null || !configs.getWorker().isLinkInputDirectories()) {
         Files.createDirectories(dirPath);
         fetchInputs(
             dirPath, digest, directoriesIndex, childOutputDirectory, inputFiles, inputDirectories);

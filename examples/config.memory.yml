@@ -1,0 +1,12 @@
+server:
+  instanceType: MEMORY
+  name: memory
+worker:
+  publicName: "localhost:8981"
+  cas:
+    type: MEMORY
+memory:
+  target: "localhost:8980"
+  properties:
+    - name: "cores"
+      value: "1"

@@ -30,6 +30,7 @@ import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
@@ -63,8 +64,9 @@ public class ByteStreamService extends ByteStreamImplBase {
   static final int CHUNK_SIZE = 64 * 1024;
 
   private final long deadlineAfter;
-  private final TimeUnit deadlineAfterUnits;
   private final Instance instance;
+
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   static class UnexpectedEndOfStreamException extends IOException {
     private final long remaining;
@@ -85,10 +87,9 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
   }
 
-  public ByteStreamService(Instance instance, long deadlineAfter, TimeUnit deadlineAfterUnits) {
+  public ByteStreamService(Instance instance) {
     this.instance = instance;
-    this.deadlineAfter = deadlineAfter;
-    this.deadlineAfterUnits = deadlineAfterUnits;
+    this.deadlineAfter = configs.getServer().getBytestreamTimeout();
   }
 
   void readFrom(InputStream in, long limit, CallStreamObserver<ReadResponse> target) {
@@ -442,7 +443,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     return new WriteStreamObserver(
         instance,
         deadlineAfter,
-        deadlineAfterUnits,
+        TimeUnit.SECONDS,
         () -> serverCallStreamObserver.request(1),
         responseObserver);
   }

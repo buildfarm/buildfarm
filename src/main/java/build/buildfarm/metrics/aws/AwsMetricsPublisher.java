@@ -15,8 +15,8 @@
 package build.buildfarm.metrics.aws;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.metrics.AbstractMetricsPublisher;
-import build.buildfarm.v1test.MetricsConfig;
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
@@ -40,6 +40,8 @@ import java.util.logging.Logger;
 
 public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   private static final Logger logger = Logger.getLogger(AwsMetricsPublisher.class.getName());
+
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private static AmazonSNSAsync snsClient;
 
   private final String snsTopicOperations;
@@ -48,12 +50,12 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   private final String region;
   private final int snsClientMaxConnections;
 
-  public AwsMetricsPublisher(MetricsConfig metricsConfig) {
-    super(metricsConfig.getClusterId());
-    snsTopicOperations = metricsConfig.getAwsMetricsConfig().getOperationsMetricsTopic();
-    region = metricsConfig.getAwsMetricsConfig().getRegion();
-    getAwsSecret(metricsConfig.getAwsMetricsConfig().getSecretName());
-    snsClientMaxConnections = metricsConfig.getAwsMetricsConfig().getSnsClientMaxConnections();
+  public AwsMetricsPublisher() {
+    super(configs.getServer().getClusterId());
+    snsTopicOperations = configs.getServer().getMetrics().getTopic();
+    region = configs.getServer().getCloudRegion();
+    getAwsSecret(configs.getServer().getMetrics().getSecretName());
+    snsClientMaxConnections = configs.getServer().getMetrics().getTopicMaxConnections();
     if (!StringUtils.isNullOrEmpty(snsTopicOperations)
         && snsClientMaxConnections > 0
         && !StringUtils.isNullOrEmpty(accessKeyId)

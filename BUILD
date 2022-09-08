@@ -111,7 +111,7 @@ sh_binary(
 # Docker images for buildfarm components
 java_image(
     name = "buildfarm-server",
-    args = ["/app/build_buildfarm/examples/shard-server.config.example"],
+    args = ["/app/build_buildfarm/examples/config.shard.yml"],
     base = "@amazon_corretto_java_image_base//image",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
@@ -168,7 +168,7 @@ container_image(
 
 java_image(
     name = "buildfarm-shard-worker",
-    args = ["/app/build_buildfarm/examples/shard-worker.config.example"],
+    args = ["/app/build_buildfarm/examples/config.shard.yml"],
     base = ":worker_pkgs_image_wrapper",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",

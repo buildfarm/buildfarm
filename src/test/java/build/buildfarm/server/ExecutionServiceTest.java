@@ -23,10 +23,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
-import build.buildfarm.v1test.MetricsConfig;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import io.grpc.stub.ServerCallStreamObserver;
@@ -41,9 +40,12 @@ import org.mockito.ArgumentCaptor;
 public class ExecutionServiceTest {
   private Instance instance;
 
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   @Before
   public void setUp() throws Exception {
     instance = mock(Instance.class);
+    configs.getServer().setClusterId("buildfarm-test");
   }
 
   @SuppressWarnings("unchecked")
@@ -51,13 +53,7 @@ public class ExecutionServiceTest {
   public void keepaliveIsCancelledWithContext() throws Exception {
     ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
     ExecutionService service =
-        new ExecutionService(
-            instance,
-            /* keepaliveAfter=*/ 1,
-            /* keepaliveUnit=*/ SECONDS, // far enough in the future that we'll get scheduled and
-            keepaliveScheduler,
-            new LogMetricsPublisher(
-                MetricsConfig.getDefaultInstance())); // cancelled without executing
+        new ExecutionService(instance, keepaliveScheduler); // cancelled without executing
     ServerCallStreamObserver<Operation> response = mock(ServerCallStreamObserver.class);
     RequestMetadata requestMetadata = RequestMetadata.newBuilder().build();
     Operation operation =
