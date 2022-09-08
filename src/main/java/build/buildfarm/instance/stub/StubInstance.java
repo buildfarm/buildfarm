@@ -82,7 +82,6 @@ import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.ReindexAllCasRequest;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
@@ -879,16 +878,10 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public CasIndexResults reindexCas(@Nullable String hostName) {
+  public CasIndexResults reindexCas() {
     throwIfStopped();
     ReindexCasRequestResults proto =
-        adminBlockingStub.get().reindexAllCas(ReindexAllCasRequest.newBuilder().build());
-    if (hostName != null) {
-      proto =
-          adminBlockingStub
-              .get()
-              .reindexCas(ReindexCasRequest.newBuilder().setHostId(hostName).build());
-    }
+        adminBlockingStub.get().reindexCas(ReindexCasRequest.newBuilder().build());
     CasIndexResults results = new CasIndexResults();
     results.removedHosts = proto.getRemovedHosts();
     results.removedKeys = proto.getRemovedKeys();

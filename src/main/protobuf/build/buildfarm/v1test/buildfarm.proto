@@ -53,11 +53,6 @@ service Admin {
       get : "/v1test/admin:reindexCas"
     };
   }
-  rpc ReindexAllCas(ReindexAllCasRequest) returns (ReindexCasRequestResults) {
-    option (google.api.http) = {
-      get : "/v1test/admin:reindexAllCas"
-    };
-  }
 
   rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest)
       returns (ShutDownWorkerGracefullyRequestResults) {
@@ -93,14 +88,12 @@ message ReindexCasRequest {
   string host_id = 2;
 }
 
-message ReindexAllCasRequest { string instance_name = 1; }
-
 message ReindexCasRequestResults {
-  int32 removedHosts = 1;
+  int64 removedHosts = 1;
 
-  int32 removedKeys = 2;
+  int64 removedKeys = 2;
 
-  int32 totalKeys = 3;
+  int64 totalKeys = 3;
 }
 
 message TerminateHostRequest {
@@ -991,7 +984,7 @@ message QueuedOperation {
 
   build.bazel.remote.execution.v2.Command command = 2;
 
-  build.bazel.remote.execution.v2.Tree legacy_tree = 4;
+  reserved 4;
 
   Tree tree = 5;
 }

@@ -53,9 +53,9 @@ public class AdminApi {
     return adminService.getClusterDetails();
   }
 
-  @RequestMapping("/reindexallcas")
-  public void reindexAllCas() {
-    adminService.reindexAllCas();
+  @RequestMapping("/reindexcas")
+  public void reindexCas() {
+    adminService.reindexCas();
   }
 
   @RequestMapping("/restart/{instanceId}")
