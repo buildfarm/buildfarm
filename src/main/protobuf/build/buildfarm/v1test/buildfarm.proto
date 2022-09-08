@@ -262,6 +262,14 @@ enum QueueType {
   PRIORITY = 1;
 };
 
+enum WorkerType {
+  EXECUTE = 0;
+
+  STORAGE = 1;
+
+  EXECUTE_AND_STORAGE = 2;
+}
+
 message ShardWorker {
   string endpoint = 1;
 
