@@ -160,10 +160,6 @@ class CASFileCacheTest {
     if (!shutdownAndAwaitTermination(expireService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down expire service");
     }
-    // bazel appears to have a problem with us creating directories under
-    // windows that are marked as no-delete. clean up after ourselves with
-    // our utils
-    Directories.remove(root);
   }
 
   @Test
