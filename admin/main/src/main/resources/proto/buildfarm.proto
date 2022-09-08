@@ -54,12 +54,6 @@ service Admin {
     };
   }
 
-  rpc ReindexAllCas(ReindexAllCasRequest) returns (ReindexCasRequestResults) {
-    option (google.api.http) = {
-      get : "/v1test/admin:reindexAllCas"
-    };
-  }
-
   rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest)
       returns (ShutDownWorkerGracefullyRequestResults) {
     option (google.api.http) = {
@@ -93,8 +87,6 @@ message ReindexCasRequest {
   // format: ip:port
   string host_id = 2;
 }
-
-message ReindexAllCasRequest { string instance_name = 1; }
 
 message ReindexCasRequestResults {
   int32 removedHosts = 1;

@@ -14,8 +14,6 @@
 
 package build.buildfarm.server;
 
-import static java.util.logging.Level.INFO;
-
 import build.buildfarm.admin.Admin;
 import build.buildfarm.admin.aws.AwsAdmin;
 import build.buildfarm.admin.gcp.GcpAdmin;
@@ -30,7 +28,6 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetHostsRequest;
 import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
-import build.buildfarm.v1test.ReindexAllCasRequest;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ScaleClusterRequest;
@@ -144,28 +141,8 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   public void reindexCas(
       ReindexCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
     try {
-      CasIndexResults results = instance.reindexCas(request.getHostId());
-      logger.log(INFO, "Indexer results: " + results.toMessage());
-      responseObserver.onNext(
-          ReindexCasRequestResults.newBuilder()
-              .setRemovedHosts(results.removedHosts)
-              .setRemovedKeys(results.removedKeys)
-              .setTotalKeys(results.totalKeys)
-              .build());
-      responseObserver.onCompleted();
-    } catch (Exception e) {
-      logger.log(Level.SEVERE, "Could not reindex CAS.", e);
-      responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
-    }
-  }
-
-  @Override
-  public void reindexAllCas(
-      ReindexAllCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
-    try {
-      String arg = null;
-      CasIndexResults results = instance.reindexCas(arg);
-      logger.log(INFO, "Indexer results: " + results.toMessage());
+      CasIndexResults results = instance.reindexCas();
+      logger.info(String.format("CAS Indexer Results: %s", results.toMessage()));
       responseObserver.onNext(
           ReindexCasRequestResults.newBuilder()
               .setRemovedHosts(results.removedHosts)

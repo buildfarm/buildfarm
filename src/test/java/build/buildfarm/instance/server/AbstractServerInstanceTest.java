@@ -76,7 +76,6 @@ import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
 import java.util.Stack;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -195,7 +194,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public CasIndexResults reindexCas(@Nullable String hostName) {
+    public CasIndexResults reindexCas() {
       throw new UnsupportedOperationException();
     }
 

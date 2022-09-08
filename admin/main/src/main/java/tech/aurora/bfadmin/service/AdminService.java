@@ -18,7 +18,7 @@ public interface AdminService {
 
   ClusterDetails getClusterDetails();
 
-  void reindexAllCas();
+  void reindexCas();
 
   String scaleGroup(String asgName, Integer desiredInstances);
 
@@ -27,4 +27,6 @@ public interface AdminService {
   String getInstanceIdByPrivateDnsName(String dnsName);
 
   int stopDockerContainer(String instanceId, String containerType, String grpcEndpoint, int grpcPort);
+
+  boolean isPrimaryAdminHost();
 }
