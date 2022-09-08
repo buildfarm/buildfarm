@@ -53,6 +53,7 @@ import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.ShardWorker;
+import build.buildfarm.v1test.WorkerType;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
