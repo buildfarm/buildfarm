@@ -69,6 +69,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -113,7 +114,8 @@ class OperationQueueWorkerContext implements WorkerContext {
     this.owner = owner;
     this.root = root;
     this.retrier = retrier;
-    policies = ExecutionPolicies.toMultimap(configs.getWorker().getExecutionPolicies());
+    policies =
+        ExecutionPolicies.toMultimap(Arrays.asList(configs.getWorker().getExecutionPolicies()));
   }
 
   @Override

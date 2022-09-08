@@ -28,7 +28,6 @@ server:
   admin:
     deploymentEnvironment: aws
     clusterEndpoint: "grpc://localhost"
-    enabledGracefulShutdown: false
   metrics:
     publisher: log
     logLevel: INFO
@@ -92,7 +91,6 @@ worker:
   inlineContentLimit: 1048567 # 1024 * 1024
   operationPollPeriod: 1
   dequeueMatchSettings:
-    platform:
     acceptEverything: true
     allowUnmatched: false
   cas:
@@ -119,10 +117,10 @@ worker:
   executionPolicies:
     - name: test
       executionWrapper:
-        path: /
+        path: "/"
         arguments:
-          - arg1
-          - arg2
+          - "arg1"
+          - "arg2"
 memory:
   listOperationsDefaultPageSize: 1024
   listOperationsMaxPageSize: 16384
@@ -137,11 +135,6 @@ memory:
   streamStderr: true
   casPolicy: ALWAYS_INSERT
   treePageSize: 0
-  platform:
-    properties:
-      name: "key_name"
+  properties:
+    - name: "key_name"
       value: "value_string"
-  defaultPlatform:
-    properties:
-      name: "cores"
-      value: "1"

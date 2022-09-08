@@ -6,12 +6,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.logging.Logger;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
 public final class BuildfarmConfigs {
-  private static final Logger logger = Logger.getLogger(BuildfarmConfigs.class.getName());
   private static BuildfarmConfigs buildfarmConfigs;
 
   private static String digestFunction = "SHA256";
@@ -40,7 +38,6 @@ public final class BuildfarmConfigs {
     try (InputStream inputStream = new FileInputStream(new File(configLocation))) {
       Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
       buildfarmConfigs = yaml.load(inputStream);
-      logger.info(buildfarmConfigs.toString());
     }
   }
 
@@ -48,14 +45,7 @@ public final class BuildfarmConfigs {
     try (InputStream inputStream = Files.newInputStream(configLocation)) {
       Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
       buildfarmConfigs = yaml.load(inputStream);
-      logger.info(buildfarmConfigs.toString());
     }
-  }
-
-  public void loadConfigsFromYamlContents(String yamlContents) throws IOException {
-    Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
-    buildfarmConfigs = yaml.load(yamlContents);
-    logger.info(buildfarmConfigs.toString());
   }
 
   public BuildfarmConfigs getBuildfarmConfigs() {

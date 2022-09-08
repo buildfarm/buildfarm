@@ -1,7 +1,6 @@
 package build.buildfarm.common.config.yml;
 
 import com.google.common.base.Strings;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -28,7 +27,7 @@ public class Worker {
   private boolean onlyMulticoreTests = false;
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
-  private List<ExecutionPolicy> executionPolicies = new ArrayList<>();
+  private ExecutionPolicy[] executionPolicies;
 
   public int getPort() {
     return port;
@@ -212,11 +211,15 @@ public class Worker {
     this.errorOperationRemainingResources = errorOperationRemainingResources;
   }
 
-  public List<ExecutionPolicy> getExecutionPolicies() {
-    return executionPolicies;
+  public ExecutionPolicy[] getExecutionPolicies() {
+    if (executionPolicies != null) {
+      return executionPolicies;
+    } else {
+      return new ExecutionPolicy[0];
+    }
   }
 
-  public void setExecutionPolicies(List<ExecutionPolicy> executionPolicies) {
+  public void setExecutionPolicies(ExecutionPolicy[] executionPolicies) {
     this.executionPolicies = executionPolicies;
   }
 
@@ -269,7 +272,7 @@ public class Worker {
         + ", errorOperationRemainingResources="
         + errorOperationRemainingResources
         + ", executionPolicies="
-        + executionPolicies
+        + Arrays.toString(executionPolicies)
         + '}';
   }
 }

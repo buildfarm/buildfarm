@@ -60,6 +60,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
@@ -214,7 +215,7 @@ public class Worker extends LoggingMain {
         new OperationQueueClient(
             operationQueueInstance,
             configs.getMemory().getPlatform(),
-            configs.getWorker().getExecutionPolicies());
+            Arrays.asList(configs.getWorker().getExecutionPolicies()));
 
     Instance acInstance = newStubInstance(casInstance.getDigestUtil());
     WorkerContext context =
@@ -289,6 +290,7 @@ public class Worker extends LoggingMain {
     }
     try {
       configs.loadConfigs(residue.get(0));
+      logger.info(configs.toString());
     } catch (IOException e) {
       logger.severe("Could not parse yml configuration file." + e);
     }
