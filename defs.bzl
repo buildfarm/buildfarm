@@ -155,11 +155,6 @@ def buildfarm_init(name = "buildfarm"):
         actual = "@jedis//jar",
     )
 
-    native.bind(
-        name = "jar/projectlombok/lombok",
-        actual = "@lombok//jar",
-    )
-
     llvm_toolchain(
         name = "llvm_toolchain",
         llvm_version = "10.0.0",

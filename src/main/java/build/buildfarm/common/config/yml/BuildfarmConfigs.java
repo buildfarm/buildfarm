@@ -6,9 +6,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import lombok.Data;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
+@Data
 public final class BuildfarmConfigs {
   private static BuildfarmConfigs buildfarmConfigs;
 
@@ -110,26 +112,5 @@ public final class BuildfarmConfigs {
 
   public void setMemory(Memory memory) {
     BuildfarmConfigs.memory = memory;
-  }
-
-  @Override
-  public String toString() {
-    return "BuildfarmConfigs{"
-        + "digestFunction='"
-        + digestFunction
-        + '\''
-        + ", defaultActionTimeout="
-        + defaultActionTimeout
-        + ", maximumActionTimeout="
-        + maximumActionTimeout
-        + ", server="
-        + server
-        + ", worker="
-        + worker
-        + ", backplane="
-        + backplane
-        + ", memory="
-        + memory
-        + '}';
   }
 }
