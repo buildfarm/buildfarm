@@ -34,6 +34,7 @@ import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.config.yml.ExecutionPolicy;
+import build.buildfarm.common.config.yml.ExecutionWrapper;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.resources.ResourceLimits;
@@ -372,7 +373,7 @@ class Executor {
     }
   }
 
-  private Iterable<String> transformWrapper(ExecutionPolicy.ExecutionWrapper wrapper) {
+  private Iterable<String> transformWrapper(ExecutionWrapper wrapper) {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
     Map<String, Property> properties =

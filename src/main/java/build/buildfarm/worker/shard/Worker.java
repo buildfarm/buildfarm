@@ -437,7 +437,7 @@ public class Worker extends LoggingMain {
             new EmptyInputStreamFactory(
                 new FailoverInputStreamFactory(
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
-            configs.getWorker().getExecutionPolicies(),
+            Arrays.asList(configs.getWorker().getExecutionPolicies()),
             instance,
             Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build(),
             Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build(),
@@ -977,13 +977,17 @@ public class Worker extends LoggingMain {
       printUsage(parser);
       throw new IllegalArgumentException("Missing CONFIG_PATH");
     }
-
     try {
       configs.loadConfigs(residue.get(0));
     } catch (IOException e) {
       logger.severe("Could not parse yml configuration file." + e);
     }
 
+    ShardWorkerOptions options = parser.getOptions(ShardWorkerOptions.class);
+    if (!Strings.isNullOrEmpty(options.publicName)) {
+      configs.getWorker().setPublicName(options.publicName);
+    }
+    logger.info(configs.toString());
     String session = UUID.randomUUID().toString();
     Worker worker = new Worker(session);
     worker.start();

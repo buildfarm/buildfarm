@@ -1,7 +1,6 @@
 package build.buildfarm.common.config.yml;
 
 import build.bazel.remote.execution.v2.Platform;
-import java.util.List;
 
 public class Memory {
   private int listOperationsDefaultPageSize = 1024;
@@ -19,7 +18,7 @@ public class Memory {
   private int treePageSize = 0;
   private Platform platform = Platform.newBuilder().build();
 
-  private List<Property> properties;
+  private Property[] properties;
 
   public int getListOperationsDefaultPageSize() {
     return listOperationsDefaultPageSize;
@@ -125,7 +124,7 @@ public class Memory {
     this.treePageSize = treePageSize;
   }
 
-  public void setProperties(List<Property> properties) {
+  public void setProperties(Property[] properties) {
     this.properties = properties;
   }
 

@@ -230,6 +230,7 @@ public class BuildFarmServer extends LoggingMain {
     if (options.port > 0) {
       configs.getServer().setPort(options.port);
     }
+    logger.info(configs.toString());
     session += "-" + UUID.randomUUID();
     BuildFarmServer server;
     try {

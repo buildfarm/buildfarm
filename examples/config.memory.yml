@@ -2,7 +2,6 @@ server:
   instanceType: MEMORY
   name: memory
 worker:
-  publicName: "localhost:8981"
   cas:
     type: MEMORY
 memory:

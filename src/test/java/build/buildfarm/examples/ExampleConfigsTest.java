@@ -47,4 +47,12 @@ public class ExampleConfigsTest {
     BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
     configs.loadConfigs(configPath);
   }
+
+  @Test
+  public void fullConfig() throws IOException {
+    Path configPath =
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.yml");
+    BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+    configs.loadConfigs(configPath);
+  }
 }
