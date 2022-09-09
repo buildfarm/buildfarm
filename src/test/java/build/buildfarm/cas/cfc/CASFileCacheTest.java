@@ -46,7 +46,6 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
-import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.EvenMoreFiles;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.collect.ImmutableList;
@@ -154,10 +153,6 @@ class CASFileCacheTest {
 
   @After
   public void tearDown() throws IOException, InterruptedException {
-    // bazel appears to have a problem with us creating directories under
-    // windows that are marked as no-delete. clean up after ourselves with
-    // our utils
-    Directories.remove(root);
     if (!shutdownAndAwaitTermination(putService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down put service");
     }

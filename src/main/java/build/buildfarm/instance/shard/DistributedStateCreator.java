@@ -50,7 +50,11 @@ public class DistributedStateCreator {
     state.dispatchingOperations = new RedisMap(configs.getBackplane().getDispatchingPrefix());
     state.dispatchedOperations =
         new RedisHashMap(configs.getBackplane().getDispatchedOperationsHashName());
-    state.workers = new RedisHashMap(configs.getBackplane().getWorkersHashName());
+    state.executeWorkers =
+        new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_execute");
+    state.storageWorkers =
+        new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_storage");
+    state.executeAndStorageWorkers = new RedisHashMap(configs.getBackplane().getWorkersHashName());
 
     return state;
   }

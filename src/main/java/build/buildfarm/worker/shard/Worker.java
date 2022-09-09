@@ -53,6 +53,7 @@ import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.ShardWorker;
+import build.buildfarm.v1test.WorkerType;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
@@ -829,6 +830,7 @@ public class Worker extends LoggingMain {
   private void startFailsafeRegistration() {
     String endpoint = configs.getWorker().getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
+    worker.setWorkerType(determineWorkerType());
     int registrationIntervalMillis = 10000;
     int registrationOffsetMillis = registrationIntervalMillis * 3;
     new Thread(
@@ -890,6 +892,16 @@ public class Worker extends LoggingMain {
               }
             })
         .start();
+  }
+
+  private WorkerType determineWorkerType() {
+    if (hasCasCapability && hasExecutionCapability) {
+      return WorkerType.EXECUTE_AND_STORAGE;
+    }
+    if (hasCasCapability) {
+      return WorkerType.STORAGE;
+    }
+    return WorkerType.EXECUTE;
   }
 
   @SuppressWarnings("deprecation")
