@@ -10,9 +10,8 @@ nav_order: 7
 To enable emitting of Prometheus metrics, add the following configuration to your configuration file:
 
 ```
-prometheus_config: {
-  port: 9090
-}
+server:
+  prometheusPort: 9090
 ```
 
 ## Available Prometheus Metrics
@@ -191,6 +190,8 @@ The total number of entries in the worker's CAS
 
 Java interceptors can be used to monitor Grpc services using Prometheus.  To enable [these metrics](https://github.com/grpc-ecosystem/java-grpc-prometheus), add the following configuration to your server:
 ```
-grpc_metrics: {
-  enabled: True
+server:
+  grpcMetrics:
+    enabled: true
+    provideLatencyHistograms: false
 ```

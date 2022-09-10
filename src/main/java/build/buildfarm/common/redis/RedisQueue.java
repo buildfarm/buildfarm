@@ -22,7 +22,7 @@ import redis.clients.jedis.JedisCluster;
  * @class RedisQueue
  * @brief A redis queue.
  * @details A redis queue is an implementation of a queue data structure which internally uses redis
- *     to store and distribute the data. Its important to know that the lifetime of the queue
+ *     to store and distribute the data. It's important to know that the lifetime of the queue
  *     persists before and after the queue data structure is created (since it exists in redis).
  *     Therefore, two redis queues with the same name, would in fact be the same underlying redis
  *     queue.
@@ -70,7 +70,7 @@ public class RedisQueue extends QueueInterface {
    * @brief Remove element from dequeue.
    * @details Removes an element from the dequeue and specifies whether it was removed.
    * @param val The value to remove.
-   * @return Whether or not the value was removed.
+   * @return Whether the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
   public boolean removeFromDequeue(JedisCluster jedis, String val) {
@@ -81,7 +81,7 @@ public class RedisQueue extends QueueInterface {
    * @brief Remove all elements that match from queue.
    * @details Removes all matching elements from the queue and specifies whether it was removed.
    * @param val The value to remove.
-   * @return Whether or not the value was removed.
+   * @return Whether the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
   public boolean removeAll(JedisCluster jedis, String val) {

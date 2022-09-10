@@ -352,7 +352,7 @@ class OperationQueueWorkerContext implements WorkerContext {
   }
 
   @Override
-  public List<build.buildfarm.common.config.yml.ExecutionPolicy> getExecutionPolicies(String name) {
+  public List<ExecutionPolicy> getExecutionPolicies(String name) {
     return policies.get(name);
   }
 
