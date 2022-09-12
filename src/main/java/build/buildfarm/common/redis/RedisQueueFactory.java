@@ -14,18 +14,20 @@
 
 package build.buildfarm.common.redis;
 
+import build.buildfarm.common.config.yml.Queue;
+
 /**
  * @class RedisQueueFactory
  * @brief A redis queue factory.
  */
 public class RedisQueueFactory {
-  public QueueInterface getQueue(String queueType, String name) {
+  public QueueInterface getQueue(Queue.QUEUE_TYPE queueType, String name) {
     if (queueType == null) {
       return null;
     }
-    if (queueType.equalsIgnoreCase("regular")) {
+    if (queueType.equals(Queue.QUEUE_TYPE.standard)) {
       return new RedisQueue(name);
-    } else if (queueType.equalsIgnoreCase("priority")) {
+    } else if (queueType.equals(Queue.QUEUE_TYPE.priority)) {
       return new RedisPriorityQueue(name);
     }
     return null;

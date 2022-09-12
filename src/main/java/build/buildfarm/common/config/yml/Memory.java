@@ -1,6 +1,7 @@
 package build.buildfarm.common.config.yml;
 
 import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.v1test.CASInsertionPolicy;
 import lombok.Data;
 
 @Data
@@ -16,7 +17,7 @@ public class Memory {
   private int deadlineAfterSeconds = 60;
   private boolean streamStdout = true;
   private boolean streamStderr = true;
-  private String casPolicy = "ALWAYS_INSERT";
+  private CASInsertionPolicy casPolicy = CASInsertionPolicy.ALWAYS_INSERT;
   private int treePageSize = 0;
   private Platform platform = Platform.newBuilder().build();
   private Property[] properties;

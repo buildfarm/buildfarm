@@ -34,10 +34,10 @@ public class BuildFarmInstances {
     switch (configs.getServer().getInstanceType()) {
       default:
         throw new IllegalArgumentException("Instance type not set in config");
-      case "MEMORY":
+      case MEMORY:
         instance = new MemoryInstance(name, digestUtil);
         break;
-      case "SHARD":
+      case SHARD:
         instance = new ShardInstance(name, session + "-" + name, digestUtil, onStop);
         break;
     }
@@ -45,6 +45,6 @@ public class BuildFarmInstances {
   }
 
   private static HashFunction getValidHashFunction() {
-    return HashFunction.valueOf(configs.getDigestFunction());
+    return configs.getDigestFunction();
   }
 }

@@ -5,7 +5,11 @@ import lombok.Data;
 
 @Data
 public class Backplane {
-  private String type = "SHARD";
+  public enum BACKPLANE_TYPE {
+    SHARD
+  }
+
+  private BACKPLANE_TYPE type = BACKPLANE_TYPE.SHARD;
   private String redisUri;
   private int jedisPoolMaxTotal = 4000;
   private String workersHashName = "Workers";
@@ -32,7 +36,7 @@ public class Backplane {
   private boolean runFailsafeOperation = true;
   private int maxQueueDepth = 100000;
   private int maxPreQueueDepth = 1000000;
-  private String redisQueueType = "REGULAR";
+  private boolean priorityQueue = false;
   private Queue[] queues;
   private String redisPassword;
   private int timeout = 10000;

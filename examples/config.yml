@@ -26,10 +26,10 @@ server:
   clusterId: local
   cloudRegion: us-east-1
   admin:
-    deploymentEnvironment: aws
+    deploymentEnvironment: AWS
     clusterEndpoint: "grpc://localhost"
   metrics:
-    publisher: log
+    publisher: LOG
     logLevel: INFO
     topic: test
     topicMaxConnections: 1000
@@ -64,7 +64,7 @@ backplane:
   runFailsafeOperation: true
   maxQueueDepth: 100000
   maxPreQueueDepth: 1000000
-  redisQueueType: NORMAL
+  priorityQueue: false
   timeout: 10000
   maxAttempts: 20
   cacheCas: false

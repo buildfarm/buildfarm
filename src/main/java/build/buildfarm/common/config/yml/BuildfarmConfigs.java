@@ -1,5 +1,7 @@
 package build.buildfarm.common.config.yml;
 
+import build.bazel.remote.execution.v2.DigestFunction;
+import build.buildfarm.common.DigestUtil;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -14,7 +16,8 @@ import org.yaml.snakeyaml.constructor.Constructor;
 public final class BuildfarmConfigs {
   private static BuildfarmConfigs buildfarmConfigs;
 
-  private static String digestFunction = "SHA256";
+  private static DigestUtil.HashFunction digestFunction =
+      DigestUtil.HashFunction.get(DigestFunction.Value.SHA256);
 
   private static long defaultActionTimeout = 600;
 
@@ -58,12 +61,13 @@ public final class BuildfarmConfigs {
     this.buildfarmConfigs = buildfarmConfigs;
   }
 
-  public String getDigestFunction() {
+  public DigestUtil.HashFunction getDigestFunction() {
     return digestFunction;
   }
 
-  public void setDigestFunction(String digestFunction) {
+  public void setDigestFunction(DigestUtil.HashFunction digestFunction) {
     this.digestFunction = digestFunction;
+    // System.out.println("DEBUG ME: " + DigestUtil.HashFunction.valueOf(digestFunction));
   }
 
   public long getDefaultActionTimeout() {

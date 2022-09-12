@@ -21,6 +21,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.Metrics;
 import build.buildfarm.metrics.aws.AwsMetricsPublisher;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.v1test.OperationRequestMetadata;
@@ -68,7 +69,7 @@ public class MetricsPublisherTest {
   public void setUp() throws IOException {
     configs.getServer().setCloudRegion("test");
     configs.getServer().setClusterId("buildfarm-test");
-    configs.getServer().getMetrics().setPublisher("aws");
+    configs.getServer().getMetrics().setPublisher(Metrics.PUBLISHER.AWS);
   }
 
   @Test

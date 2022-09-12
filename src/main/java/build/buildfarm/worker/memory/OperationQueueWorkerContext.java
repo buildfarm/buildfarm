@@ -182,17 +182,17 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public CASInsertionPolicy getFileCasPolicy() {
-    return CASInsertionPolicy.valueOf(configs.getMemory().getCasPolicy());
+    return configs.getMemory().getCasPolicy();
   }
 
   @Override
   public CASInsertionPolicy getStdoutCasPolicy() {
-    return CASInsertionPolicy.valueOf(configs.getMemory().getCasPolicy());
+    return configs.getMemory().getCasPolicy();
   }
 
   @Override
   public CASInsertionPolicy getStderrCasPolicy() {
-    return CASInsertionPolicy.valueOf(configs.getMemory().getCasPolicy());
+    return configs.getMemory().getCasPolicy();
   }
 
   @Override
@@ -256,8 +256,8 @@ class OperationQueueWorkerContext implements WorkerContext {
         outputDirs,
         uploader,
         configs.getWorker().getInlineContentLimit(),
-        CASInsertionPolicy.valueOf(configs.getMemory().getCasPolicy()),
-        CASInsertionPolicy.valueOf(configs.getMemory().getCasPolicy()));
+        configs.getMemory().getCasPolicy(),
+        configs.getMemory().getCasPolicy());
   }
 
   @Override

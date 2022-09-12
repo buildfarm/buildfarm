@@ -14,6 +14,7 @@ java_library(
     plugins = [":lombok-java"],
     visibility = ["//visibility:public"],
     deps = [
+        "//src/main/java/build/buildfarm/common",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@maven//:com_google_guava_guava",
         "@maven//:org_projectlombok_lombok",

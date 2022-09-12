@@ -256,12 +256,6 @@ message S3BucketConfig {
   string secret_name = 4;
 }
 
-enum QueueType {
-  // the type of the redis queue
-  REGULAR = 0;
-  PRIORITY = 1;
-};
-
 enum WorkerType {
   EXECUTE = 0;
 
