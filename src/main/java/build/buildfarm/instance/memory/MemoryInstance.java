@@ -249,11 +249,11 @@ public class MemoryInstance extends AbstractServerInstance {
     switch (configs.getWorker().getCas().getType()) {
       default:
         throw new IllegalArgumentException("ActionCache config not set in config");
-      case "GRPC":
+      case GRPC:
         return createGrpcActionCache();
-      case "MEMORY":
+      case MEMORY:
         return createDelegateCASActionCache(cas, digestUtil);
-      case "FILESYSTEM":
+      case FILESYSTEM:
         return createFilesystemActionCache();
     }
   }

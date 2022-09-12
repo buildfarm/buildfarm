@@ -21,6 +21,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.config.yml.Queue;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -347,7 +348,8 @@ public class BalancedRedisQueueMockTest {
     when(redis.zcard(any(String.class))).thenReturn(0L);
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), "priority");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", ImmutableList.of(), Queue.QUEUE_TYPE.priority.name());
 
     // ACT
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);
@@ -384,7 +386,8 @@ public class BalancedRedisQueueMockTest {
     when(redis.zcard(any(String.class))).thenReturn(999L);
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), -1, "priority");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", ImmutableList.of(), -1, Queue.QUEUE_TYPE.priority.name());
 
     // ACT
     boolean canQueue = queue.canQueue(redis);
@@ -420,7 +423,8 @@ public class BalancedRedisQueueMockTest {
     when(redis.zcard(any(String.class))).thenReturn(123L);
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 123, "priority");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", ImmutableList.of(), 123, Queue.QUEUE_TYPE.priority.name());
 
     // ACT
     boolean canQueue = queue.canQueue(redis);

@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.common.config.yml.Server.INSTANCE_TYPE.SHARD;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -72,7 +73,7 @@ public class ShardWorkerContextTest {
 
   @Before
   public void setUp() throws Exception {
-    configs.getServer().setInstanceType("SHARD");
+    configs.getServer().setInstanceType(SHARD);
     configs.getServer().setName("shard");
     configs.getWorker().setPublicName("localhost:8981");
     configs.getBackplane().setRedisUri("redis://localhost:6379");

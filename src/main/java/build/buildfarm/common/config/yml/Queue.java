@@ -6,6 +6,11 @@ import lombok.Data;
 
 @Data
 public class Queue {
+  public enum QUEUE_TYPE {
+    priority,
+    standard
+  }
+
   private String name;
   private boolean allowUnmatched = true;
   private List<Property> properties;

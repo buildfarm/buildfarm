@@ -146,7 +146,9 @@ public class DistributedStateCreator {
   }
 
   private static String queueTypeToSr() {
-    return configs.getBackplane().getRedisQueueType().toLowerCase();
+    return configs.getBackplane().isPriorityQueue()
+        ? Queue.QUEUE_TYPE.priority.name()
+        : Queue.QUEUE_TYPE.standard.name();
   }
 
   private static String getQueuedOperationsListName() {
@@ -170,6 +172,6 @@ public class DistributedStateCreator {
   private static String createFullQueueName(String base, String type) {
     // To maintain forwards compatibility, we do not append the type to the regular queue
     // implementation.
-    return ((!type.equals("regular")) ? base + "_" + type : base);
+    return ((!type.equals(Queue.QUEUE_TYPE.standard.name())) ? base + "_" + type : base);
   }
 }

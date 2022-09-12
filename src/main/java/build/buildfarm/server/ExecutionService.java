@@ -209,9 +209,9 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     switch (configs.getServer().getMetrics().getPublisher()) {
       default:
         return new LogMetricsPublisher();
-      case "aws":
+      case AWS:
         return new AwsMetricsPublisher();
-      case "gcp":
+      case GCP:
         return new GcpMetricsPublisher();
     }
   }

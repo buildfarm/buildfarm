@@ -19,6 +19,7 @@ import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.common.config.yml.Backplane.BACKPLANE_TYPE.SHARD;
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.base.Preconditions.checkState;
@@ -241,7 +242,7 @@ public class ShardInstance extends AbstractServerInstance {
   private static final Duration queueTimeout = Durations.fromSeconds(60);
 
   private static Backplane createBackplane(String identifier) throws ConfigurationException {
-    if ("SHARD".equals(configs.getBackplane().getType())) {
+    if (configs.getBackplane().getType().equals(SHARD)) {
       return new RedisShardBackplane(
           identifier, ShardInstance::stripOperation, ShardInstance::stripQueuedOperation);
     } else {

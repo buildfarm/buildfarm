@@ -31,7 +31,7 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
   public LogMetricsPublisher() {
     super(configs.getServer().getClusterId());
     if (configs.getServer().getMetrics().getLogLevel() != null) {
-      logLevel = Level.parse(configs.getServer().getMetrics().getLogLevel());
+      logLevel = Level.parse(configs.getServer().getMetrics().getLogLevel().name());
     } else {
       logLevel = Level.FINEST;
     }

@@ -17,6 +17,7 @@ package build.buildfarm.server;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.config.yml.Cas.TYPE.MEMORY;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
@@ -46,6 +47,7 @@ import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.Server;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
@@ -101,10 +103,10 @@ public class BuildFarmServerTest {
   @Before
   public void setUp() throws Exception {
     configs.getServer().setClusterId("buildfarm-test");
-    configs.getServer().setInstanceType("MEMORY");
+    configs.getServer().setInstanceType(Server.INSTANCE_TYPE.MEMORY);
     configs.getServer().setName("memory");
     configs.getWorker().setPublicName("localhost:8981");
-    configs.getWorker().getCas().setType("MEMORY");
+    configs.getWorker().getCas().setType(MEMORY);
     configs.getMemory().setTarget("localhost:8980");
     String uniqueServerName = "in-process server for " + getClass();
     server =

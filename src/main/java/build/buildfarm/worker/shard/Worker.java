@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
+import static build.buildfarm.common.config.yml.Backplane.BACKPLANE_TYPE.SHARD;
 import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -353,7 +354,7 @@ public class Worker extends LoggingMain {
 
   private static HashFunction getValidHashFunction() throws ConfigurationException {
     try {
-      return HashFunction.valueOf(configs.getDigestFunction());
+      return configs.getDigestFunction();
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }
@@ -381,8 +382,7 @@ public class Worker extends LoggingMain {
 
     digestUtil = new DigestUtil(getValidHashFunction());
 
-    String backplaneCase = configs.getBackplane().getType();
-    if ("SHARD".equals(backplaneCase)) {
+    if (SHARD.equals(configs.getBackplane().getType())) {
       backplane =
           new RedisShardBackplane(identifier, this::stripOperation, this::stripQueuedOperation);
     } else {
@@ -657,14 +657,14 @@ public class Worker extends LoggingMain {
     switch (configs.getWorker().getCas().getType()) {
       default:
         throw new IllegalArgumentException("Invalid cas type specified");
-      case "MEMORY":
-      case "FUSE": // FIXME have FUSE refer to a name for storage backing, and topo
+      case MEMORY:
+      case FUSE: // FIXME have FUSE refer to a name for storage backing, and topo
         return new MemoryCAS(
             configs.getWorker().getCas().getMaxSizeBytes(), this::onStoragePut, delegate);
-      case "GRPC":
+      case GRPC:
         checkState(delegate == null, "grpc cas cannot delegate");
         return createGrpcCAS();
-      case "FILESYSTEM":
+      case FILESYSTEM:
         return new ShardCASFileCache(
             remoteInputStreamFactory,
             root.resolve(getValidFilesystemCASPath(root)),

@@ -16,6 +16,7 @@ package build.buildfarm.common.redis;
 
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.MapUtils;
+import build.buildfarm.common.config.yml.Queue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.SetMultimap;
@@ -90,7 +91,7 @@ public class ProvisionedRedisQueue {
    */
   public ProvisionedRedisQueue(
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
-    this(name, "regular", hashtags, filterProvisions, false);
+    this(name, Queue.QUEUE_TYPE.standard.name(), hashtags, filterProvisions, false);
   }
 
   /**
@@ -108,7 +109,7 @@ public class ProvisionedRedisQueue {
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions,
       boolean allowUserUnmatched) {
-    this(name, "regular", hashtags, filterProvisions, allowUserUnmatched);
+    this(name, Queue.QUEUE_TYPE.standard.name(), hashtags, filterProvisions, allowUserUnmatched);
   }
 
   /**

@@ -248,9 +248,9 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     switch (configs.getServer().getAdmin().getDeploymentEnvironment()) {
       default:
         return null;
-      case "aws":
+      case AWS:
         return new AwsAdmin(configs.getServer().getCloudRegion());
-      case "gcp":
+      case GCP:
         return new GcpAdmin();
     }
   }

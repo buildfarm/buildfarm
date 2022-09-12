@@ -18,6 +18,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.Queue;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -255,7 +256,8 @@ public class BalancedRedisQueueTest {
   public void getNameNameHasHashtagRemovedFrontPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("{hash}queue_name", hashtags, "priority");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("{hash}queue_name", hashtags, Queue.QUEUE_TYPE.priority.name());
     // ACT
     String name = queue.getName();
 
@@ -288,7 +290,8 @@ public class BalancedRedisQueueTest {
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     // similar to what has been seen in configuration files
     BalancedRedisQueue queue =
-        new BalancedRedisQueue("{Execution}:QueuedOperations", hashtags, "priority");
+        new BalancedRedisQueue(
+            "{Execution}:QueuedOperations", hashtags, Queue.QUEUE_TYPE.priority.name());
     // ACT
     String name = queue.getName();
 
@@ -385,7 +388,8 @@ public class BalancedRedisQueueTest {
   public void sizeAdjustPushPopPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, "priority");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority.name());
 
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
@@ -461,7 +465,8 @@ public class BalancedRedisQueueTest {
   public void visitCheckVisitOfEachElementPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, "priority");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority.name());
     queue.push(redis, "element 1");
     queue.push(redis, "element 2");
     queue.push(redis, "element 3");
@@ -516,7 +521,8 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedEmptyIsEvenlyDistributedPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, "priority");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority.name());
 
     // ACT
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);
@@ -553,7 +559,8 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedFourNodesFourHundredPushesIsEvenPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, "priority");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority.name());
 
     // ACT
     for (int i = 0; i < 400; ++i) {
@@ -593,7 +600,8 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedFourNodesFourHundredOnePushesIsNotEvenPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, "priority");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority.name());
 
     // ACT
     for (int i = 0; i < 401; ++i) {
@@ -642,7 +650,8 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedSingleNodeAlwaysEvenlyDistributesPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = Collections.singletonList("single_node");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, "priority");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority.name());
 
     // ACT / ASSERT
     queue.push(redis, "foo");
@@ -711,7 +720,8 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedTwoNodeExamplePriority() throws Exception {
     // ARRANGE
     List<String> hashtags = Arrays.asList("node_1", "node_2");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, "priority");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority.name());
 
     // ACT / ASSERT
     assertThat(queue.isEvenlyDistributed(redis)).isTrue();

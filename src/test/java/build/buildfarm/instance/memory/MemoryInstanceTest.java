@@ -23,6 +23,7 @@ import static build.buildfarm.cas.ContentAddressableStorages.casMapDecorator;
 import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.common.config.yml.Cas.TYPE.MEMORY;
 import static build.buildfarm.instance.memory.MemoryInstance.TIMEOUT_OUT_OF_BOUNDS;
 import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_ACTION;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
@@ -56,6 +57,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.Server;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.queues.Worker;
 import build.buildfarm.instance.server.AbstractServerInstance;
@@ -116,10 +118,10 @@ public class MemoryInstanceTest {
 
   @Before
   public void setUp() throws Exception {
-    configs.getServer().setInstanceType("MEMORY");
+    configs.getServer().setInstanceType(Server.INSTANCE_TYPE.MEMORY);
     configs.getServer().setName("memory");
     configs.getWorker().setPublicName("localhost:8981");
-    configs.getWorker().getCas().setType("MEMORY");
+    configs.getWorker().getCas().setType(MEMORY);
     configs.getMemory().setTarget("localhost:8980");
     outstandingOperations = new MemoryInstance.OutstandingOperations();
     watchers =

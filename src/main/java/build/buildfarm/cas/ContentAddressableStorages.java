@@ -114,11 +114,11 @@ public final class ContentAddressableStorages {
     switch (configs.getWorker().getCas().getType()) {
       default:
         throw new IllegalArgumentException("CAS config not set in config");
-      case "FILESYSTEM":
+      case FILESYSTEM:
         return createFilesystemCAS();
-      case "GRPC":
+      case GRPC:
         return createGrpcCAS();
-      case "MEMORY":
+      case MEMORY:
         return new MemoryCAS(configs.getWorker().getCas().getMaxSizeBytes());
     }
   }

@@ -120,7 +120,7 @@ server:
 
 | Configuration         | Accepted and _Default_ Values | Description                                                                    |
 |-----------------------|-------------------------------|--------------------------------------------------------------------------------|
-| deploymentEnvironment | String, aws, gcp              | Specify deloyment environment in the cloud                                     |
+| deploymentEnvironment | String, AWS, GCP              | Specify deloyment environment in the cloud                                     |
 | clusterEndpoint       | String, grpc://localhost      | Buildfarm cluster endpoint for Admin use (this is a full buildfarm endpoint)   |
 
 Example:
@@ -128,7 +128,7 @@ Example:
 ```
 server:
   admin:
-    deploymentEnvironment: aws
+    deploymentEnvironment: AWS
     clusterEndpoint: "grpc://localhost"
 ```
 
@@ -137,7 +137,7 @@ server:
 | Configuration       | Accepted and _Default_ Values | Description                                                                               |
 |---------------------|-------------------------------|-------------------------------------------------------------------------------------------|
 | publisher           | String, aws, gcp, _log_       | Specify publisher type for sending metadata                                               |
-| logLevel            | String, INFO, _FINE_          | Specify log level ("log" publisher only, all Java util logging levels are allowed here)   |
+| logLevel            | String, INFO, _OFF_           | Specify log level ("log" publisher only, all Java util logging levels are allowed here)   |
 | topic               | String, _test_                | Specify SNS topic name for cloud publishing ("aws" publisher only)                        |
 | topicMaxConnections | Integer, 1000                 | Specify maximum number of connections allowed for cloud publishing ("aws" publisher only) |
 | secretName          | String, _test_                | Specify secret name to pull SNS permissions from ("aws" publisher only)                   |
@@ -193,7 +193,7 @@ server:
 | runFailsafeOperation         | boolean, _true_                          | Enable an agent in the backplane client which monitors watched operations and ensures they are in a known maintained, or expirable state                             |
 | maxQueueDepth                | Integer, _100000_                        | Maximum length that the ready to run queue is allowed to reach to control an arrival flow for execution                                                              |
 | maxPreQueueDepth             | Integer, _1000000_                       | Maximum lengh that the arrival queue is allowed to reach to control load on the Redis cluster                                                                        |
-| redisQueueType               | _REGULAR_, PRIORITY                      | Priority queue type allows prioritizing operations based on Bazel's --remote_execution_priority=<an integer> flag                                                    |
+| priorityQueue                | boolean, _false_                         | Priority queue type allows prioritizing operations based on Bazel's --remote_execution_priority=<an integer> flag                                                    |
 | timeout                      | Integer, _10000_                         | Default timeout                                                                                                                                                      |
 | maxAttempts                  | Integer, _20_                            | Maximum number of execution attempts                                                                                                                                 |
 | cacheCas                     | boolean, _false_                         |                                                                                                                                                                      |
@@ -204,7 +204,7 @@ Example:
 backplane:
   type: SHARD
   redisUri: "redis://localhost:6379"
-  redisQueueType: PRIORITY
+  priorityQueue: true
 ```
 
 ### Execution Queues

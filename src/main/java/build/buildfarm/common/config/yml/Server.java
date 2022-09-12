@@ -5,7 +5,12 @@ import lombok.Data;
 
 @Data
 public class Server {
-  private String instanceType;
+  public enum INSTANCE_TYPE {
+    SHARD,
+    MEMORY
+  }
+
+  private INSTANCE_TYPE instanceType;
   private String name;
   private boolean actionCacheReadOnly = false;
   private int port = 8980;

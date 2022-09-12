@@ -15,6 +15,7 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.config.yml.Queue;
 import build.buildfarm.v1test.QueueStatus;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -101,7 +102,7 @@ public class BalancedRedisQueue {
    * @note Overloaded.
    */
   public BalancedRedisQueue(String name, List<String> hashtags) {
-    this(name, hashtags, -1, "regular");
+    this(name, hashtags, -1, Queue.QUEUE_TYPE.standard.name());
   }
 
   /**
@@ -125,7 +126,7 @@ public class BalancedRedisQueue {
    * @note Overloaded.
    */
   public BalancedRedisQueue(String name, List<String> hashtags, int maxQueueSize) {
-    this(name, hashtags, maxQueueSize, "regular");
+    this(name, hashtags, maxQueueSize, Queue.QUEUE_TYPE.standard.name());
   }
 
   /**
