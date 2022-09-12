@@ -91,7 +91,7 @@ public class ProvisionedRedisQueue {
    */
   public ProvisionedRedisQueue(
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
-    this(name, Queue.QUEUE_TYPE.standard.name(), hashtags, filterProvisions, false);
+    this(name, Queue.QUEUE_TYPE.standard, hashtags, filterProvisions, false);
   }
 
   /**
@@ -109,7 +109,7 @@ public class ProvisionedRedisQueue {
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions,
       boolean allowUserUnmatched) {
-    this(name, Queue.QUEUE_TYPE.standard.name(), hashtags, filterProvisions, allowUserUnmatched);
+    this(name, Queue.QUEUE_TYPE.standard, hashtags, filterProvisions, allowUserUnmatched);
   }
 
   /**
@@ -123,7 +123,7 @@ public class ProvisionedRedisQueue {
    */
   public ProvisionedRedisQueue(
       String name,
-      String type,
+      Queue.QUEUE_TYPE type,
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions) {
     this(name, type, hashtags, filterProvisions, false);
@@ -142,7 +142,7 @@ public class ProvisionedRedisQueue {
    */
   public ProvisionedRedisQueue(
       String name,
-      String type,
+      Queue.QUEUE_TYPE type,
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions,
       boolean allowUserUnmatched) {

@@ -49,7 +49,7 @@ public class BalancedRedisQueue {
    * @brief Type of the queue.
    * @details It's used for selecting between regular and priority queues
    */
-  private final String queueType;
+  private final Queue.QUEUE_TYPE queueType;
 
   /**
    * @field originalHashtag
@@ -102,7 +102,7 @@ public class BalancedRedisQueue {
    * @note Overloaded.
    */
   public BalancedRedisQueue(String name, List<String> hashtags) {
-    this(name, hashtags, -1, Queue.QUEUE_TYPE.standard.name());
+    this(name, hashtags, -1, Queue.QUEUE_TYPE.standard);
   }
 
   /**
@@ -113,7 +113,7 @@ public class BalancedRedisQueue {
    * @param queueType Type of the queue in use
    * @note Overloaded.
    */
-  public BalancedRedisQueue(String name, List<String> hashtags, String queueType) {
+  public BalancedRedisQueue(String name, List<String> hashtags, Queue.QUEUE_TYPE queueType) {
     this(name, hashtags, -1, queueType);
   }
 
@@ -126,7 +126,7 @@ public class BalancedRedisQueue {
    * @note Overloaded.
    */
   public BalancedRedisQueue(String name, List<String> hashtags, int maxQueueSize) {
-    this(name, hashtags, maxQueueSize, Queue.QUEUE_TYPE.standard.name());
+    this(name, hashtags, maxQueueSize, Queue.QUEUE_TYPE.standard);
   }
 
   /**
@@ -139,10 +139,10 @@ public class BalancedRedisQueue {
    * @note Overloaded.
    */
   public BalancedRedisQueue(
-      String name, List<String> hashtags, int maxQueueSize, String queueType) {
+      String name, List<String> hashtags, int maxQueueSize, Queue.QUEUE_TYPE queueType) {
     this.originalHashtag = RedisHashtags.existingHash(name);
     this.name = RedisHashtags.unhashedName(name);
-    this.queueType = queueType.toLowerCase();
+    this.queueType = queueType;
     this.maxQueueSize = maxQueueSize;
     createHashedQueues(this.name, hashtags, this.queueType);
   }
@@ -380,7 +380,7 @@ public class BalancedRedisQueue {
    * @param name The global name of the queue.
    * @param hashtags Hashtags to distribute queue data.
    */
-  private void createHashedQueues(String name, List<String> hashtags, String queueType) {
+  private void createHashedQueues(String name, List<String> hashtags, Queue.QUEUE_TYPE queueType) {
     // create an internal queue for each of the provided hashtags
     for (String hashtag : hashtags) {
       queues.add(

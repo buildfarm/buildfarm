@@ -349,7 +349,7 @@ public class BalancedRedisQueueMockTest {
 
     // ARRANGE
     BalancedRedisQueue queue =
-        new BalancedRedisQueue("test", ImmutableList.of(), Queue.QUEUE_TYPE.priority.name());
+        new BalancedRedisQueue("test", ImmutableList.of(), Queue.QUEUE_TYPE.priority);
 
     // ACT
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);
@@ -387,7 +387,7 @@ public class BalancedRedisQueueMockTest {
 
     // ARRANGE
     BalancedRedisQueue queue =
-        new BalancedRedisQueue("test", ImmutableList.of(), -1, Queue.QUEUE_TYPE.priority.name());
+        new BalancedRedisQueue("test", ImmutableList.of(), -1, Queue.QUEUE_TYPE.priority);
 
     // ACT
     boolean canQueue = queue.canQueue(redis);
@@ -424,7 +424,7 @@ public class BalancedRedisQueueMockTest {
 
     // ARRANGE
     BalancedRedisQueue queue =
-        new BalancedRedisQueue("test", ImmutableList.of(), 123, Queue.QUEUE_TYPE.priority.name());
+        new BalancedRedisQueue("test", ImmutableList.of(), 123, Queue.QUEUE_TYPE.priority);
 
     // ACT
     boolean canQueue = queue.canQueue(redis);

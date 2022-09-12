@@ -87,7 +87,7 @@ public class DistributedStateCreator {
         getPreQueuedOperationsListName(),
         getQueueHashes(client, getPreQueuedOperationsListName()),
         configs.getBackplane().getMaxPreQueueDepth(),
-        queueTypeToSr());
+        getQueueType());
   }
 
   private static OperationQueue createOperationQueue(RedisClient client) throws IOException {
@@ -101,7 +101,7 @@ public class DistributedStateCreator {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               getQueueName(queueConfig),
-              queueTypeToSr(),
+              getQueueType(),
               getQueueHashes(client, getQueueName(queueConfig)),
               toMultimap(queueConfig.getPlatform().getPropertiesList()),
               queueConfig.isAllowUnmatched());
@@ -121,7 +121,7 @@ public class DistributedStateCreator {
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
               getQueuedOperationsListName(),
-              queueTypeToSr(),
+              getQueueType(),
               getQueueHashes(client, getQueuedOperationsListName()),
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
@@ -145,33 +145,30 @@ public class DistributedStateCreator {
     return set;
   }
 
-  private static String queueTypeToSr() {
+  private static Queue.QUEUE_TYPE getQueueType() {
     return configs.getBackplane().isPriorityQueue()
-        ? Queue.QUEUE_TYPE.priority.name()
-        : Queue.QUEUE_TYPE.standard.name();
+        ? Queue.QUEUE_TYPE.priority
+        : Queue.QUEUE_TYPE.standard;
   }
 
   private static String getQueuedOperationsListName() {
     String name = configs.getBackplane().getQueuedOperationsListName();
-    String queue_type = queueTypeToSr();
-    return createFullQueueName(name, queue_type);
+    return createFullQueueName(name, getQueueType());
   }
 
   private static String getPreQueuedOperationsListName() {
     String name = configs.getBackplane().getPreQueuedOperationsListName();
-    String queue_type = queueTypeToSr();
-    return createFullQueueName(name, queue_type);
+    return createFullQueueName(name, getQueueType());
   }
 
   private static String getQueueName(Queue pconfig) {
     String name = pconfig.getName();
-    String queue_type = queueTypeToSr();
-    return createFullQueueName(name, queue_type);
+    return createFullQueueName(name, getQueueType());
   }
 
-  private static String createFullQueueName(String base, String type) {
+  private static String createFullQueueName(String base, Queue.QUEUE_TYPE type) {
     // To maintain forwards compatibility, we do not append the type to the regular queue
     // implementation.
-    return ((!type.equals(Queue.QUEUE_TYPE.standard.name())) ? base + "_" + type : base);
+    return ((!type.equals(Queue.QUEUE_TYPE.standard)) ? base + "_" + type : base);
   }
 }
