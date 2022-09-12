@@ -32,12 +32,12 @@ public class WorkerTest {
     configs.getWorker().getCas().setPath(null);
   }
 
-  @Test(expected = NullPointerException.class)
+  @Test(expected = ConfigurationException.class)
   public void missingWorkerRoot() throws ConfigurationException {
     new Worker("test");
   }
 
-  @Test(expected = NullPointerException.class)
+  @Test(expected = ConfigurationException.class)
   public void missingCasCacheDirectory() throws ConfigurationException {
     new Worker("test");
   }

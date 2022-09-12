@@ -316,14 +316,15 @@ public class Worker extends LoggingMain {
     return Paths.get(configs.getWorker().getRoot());
   }
 
-  private static void addMissingRoot() {
-    Path root = Paths.get(configs.getWorker().getRoot());
-    if (!Files.isDirectory(root)) {
-      try {
+  private static void addMissingRoot() throws ConfigurationException {
+    try {
+      Path root = Paths.get(configs.getWorker().getRoot());
+      if (!Files.isDirectory(root)) {
         Files.createDirectories(root);
-      } catch (IOException e) {
-        logger.log(Level.SEVERE, e.toString());
       }
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, e.toString());
+      throw new ConfigurationException(e.toString());
     }
   }
 
