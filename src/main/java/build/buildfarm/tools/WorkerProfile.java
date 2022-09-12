@@ -111,7 +111,7 @@ class WorkerProfile {
       throw new IllegalArgumentException("Missing Config_PATH");
     }
     try {
-      configs.loadConfigs(residue.get(0));
+      configs.loadConfigs(residue.get(3));
     } catch (IOException e) {
       System.out.println("Could not parse yml configuration file." + e);
     }
