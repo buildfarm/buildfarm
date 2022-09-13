@@ -20,7 +20,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.Write;
-import build.buildfarm.common.config.yml.ExecutionPolicy;
+import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;

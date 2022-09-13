@@ -14,7 +14,7 @@
 
 package build.buildfarm.instance.shard;
 
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashSet;

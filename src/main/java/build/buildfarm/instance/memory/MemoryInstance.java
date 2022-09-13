@@ -51,7 +51,7 @@ import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.queues.Worker;

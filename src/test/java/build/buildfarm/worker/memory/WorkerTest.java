@@ -14,7 +14,7 @@
 
 package build.buildfarm.worker.memory;
 
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import java.io.IOException;
 import javax.naming.ConfigurationException;
 import org.junit.Before;

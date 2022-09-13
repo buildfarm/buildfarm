@@ -17,7 +17,7 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.ExecutionProperties;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;

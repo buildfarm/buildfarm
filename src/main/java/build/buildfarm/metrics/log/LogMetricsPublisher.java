@@ -15,7 +15,7 @@
 package build.buildfarm.metrics.log;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.metrics.AbstractMetricsPublisher;
 import com.google.longrunning.Operation;
 import java.util.logging.Level;

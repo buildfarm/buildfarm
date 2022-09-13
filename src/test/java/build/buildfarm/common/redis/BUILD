@@ -1,7 +1,7 @@
 COMMON_DEPS = [
     "//src/main/java/build/buildfarm/instance/shard",
     "//src/main/java/build/buildfarm/common",
-    "//src/main/java/build/buildfarm/common/config/yml",
+    "//src/main/java/build/buildfarm/common/config",
     "//src/main/java/build/buildfarm/common/redis",
     "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
     "//src/test/java/build/buildfarm:test_runner",

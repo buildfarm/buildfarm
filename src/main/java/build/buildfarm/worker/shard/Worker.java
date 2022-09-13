@@ -15,7 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
-import static build.buildfarm.common.config.yml.Backplane.BACKPLANE_TYPE.SHARD;
+import static build.buildfarm.common.config.Backplane.BACKPLANE_TYPE.SHARD;
 import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -40,8 +40,8 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ShardWorkerOptions;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
