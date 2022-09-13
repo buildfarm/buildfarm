@@ -30,6 +30,7 @@ import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
@@ -65,12 +66,11 @@ public class GrpcCAS implements ContentAddressableStorage {
   private final ByteStreamUploader uploader;
   private final ListMultimap<Digest, Runnable> onExpirations;
 
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   GrpcCAS(
-      String instanceName,
-      Channel channel,
-      ByteStreamUploader uploader,
-      ListMultimap<Digest, Runnable> onExpirations) {
-    this.instanceName = instanceName;
+      Channel channel, ByteStreamUploader uploader, ListMultimap<Digest, Runnable> onExpirations) {
+    this.instanceName = configs.getServer().getName();
     this.channel = channel;
     this.uploader = uploader;
     this.onExpirations = onExpirations;

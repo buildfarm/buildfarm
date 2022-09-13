@@ -40,7 +40,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
-import com.google.protobuf.Duration;
 import io.grpc.StatusException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -93,28 +92,16 @@ public class ShardWorkerContextTest {
   }
 
   WorkerContext createTestContext(Platform platform, Iterable<ExecutionPolicy> policies) {
+    configs.getWorker().setInputFetchStageWidth(0);
+    configs.getWorker().setExecuteStageWidth(0);
+    configs.getWorker().setInputFetchDeadline(60);
+    configs.getServer().setName("test");
     return new ShardWorkerContext(
-        "test",
-        /* operationPollPeriod=*/ Duration.getDefaultInstance(),
         /* operationPoller=*/ (queueEntry, stage, requeueAt) -> false,
-        /* inlineContentLimit=*/
-        /* inputFetchStageWidth=*/ 0,
-        /* executeStageWidth=*/ 0,
-        /* inputFetchDeadline=*/ 60,
         backplane,
         execFileSystem,
         inputStreamFactory,
-        policies,
         instance,
-        /* deadlineAfter=*/
-        /* deadlineAfterUnits=*/
-        /* defaultActionTimeout=*/ Duration.getDefaultInstance(),
-        /* maximumActionTimeout=*/ Duration.getDefaultInstance(),
-        /* defaultMaxCores=*/ 0,
-        /* limitGlobalExecution=*/ false,
-        /* onlyMulticoreTests=*/ false,
-        /* allowBringYourOwnContainer=*/ false,
-        /* errorOperationRemainingResources=*/ false,
         writer);
   }
 

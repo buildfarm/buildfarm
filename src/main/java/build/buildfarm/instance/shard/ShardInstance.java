@@ -285,9 +285,7 @@ public class ShardInstance extends AbstractServerInstance {
         Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build(),
         configs.getServer().isUseDenyList(),
         onStop,
-        WorkerStubs.create(
-            digestUtil,
-            Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build()),
+        WorkerStubs.create(digestUtil),
         actionCacheFetchService,
         configs.getServer().isEnsureOutputsPresent());
   }
@@ -504,7 +502,7 @@ public class ShardInstance extends AbstractServerInstance {
   public void start(String publicName) {
     stopped = false;
     try {
-      backplane.start(publicName);
+      backplane.start();
     } catch (IOException e) {
       throw new RuntimeException(e);
     } catch (RuntimeException e) {

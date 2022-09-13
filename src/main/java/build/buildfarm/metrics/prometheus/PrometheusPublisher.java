@@ -14,6 +14,7 @@
 
 package build.buildfarm.metrics.prometheus;
 
+import build.buildfarm.common.config.BuildfarmConfigs;
 import io.prometheus.client.exporter.HTTPServer;
 import io.prometheus.client.hotspot.DefaultExports;
 import java.io.IOException;
@@ -23,7 +24,10 @@ public class PrometheusPublisher {
   private static final Logger logger = Logger.getLogger(PrometheusPublisher.class.getName());
   private static HTTPServer server;
 
-  public static void startHttpServer(int port) {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  public static void startHttpServer() {
+    int port = configs.getServer().getPrometheusPort();
     try {
       if (port > 0) {
         DefaultExports.initialize();

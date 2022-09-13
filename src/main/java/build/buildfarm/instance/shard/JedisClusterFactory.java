@@ -42,7 +42,6 @@ public class JedisClusterFactory {
    * @brief Create a jedis cluster instance.
    * @details Use proto configuration to connect to a redis cluster server and provide a jedis
    *     client.
-   * @param config Configuration for connecting to a redis cluster server.
    * @return An established jedis client used to operate on the redis cluster.
    * @note Suggested return identifier: jedis.
    */
@@ -50,21 +49,10 @@ public class JedisClusterFactory {
     // null password is required to elicit no auth in jedis
     String[] redisNodes = configs.getBackplane().getRedisNodes();
     if (redisNodes != null && redisNodes.length > 0) {
-      return createJedisClusterFactory(
-          list2Set(redisNodes),
-          configs.getBackplane().getTimeout(),
-          configs.getBackplane().getMaxAttempts(),
-          configs.getBackplane().getRedisPassword().isEmpty()
-              ? null
-              : configs.getBackplane().getRedisPassword(),
-          createJedisPoolConfig());
+      return createJedisClusterFactory(list2Set(redisNodes), createJedisPoolConfig());
     }
     return createJedisClusterFactory(
-        parseUri(configs.getBackplane().getRedisUri()),
-        configs.getBackplane().getTimeout(),
-        configs.getBackplane().getMaxAttempts(),
-        configs.getBackplane().getRedisPassword(),
-        createJedisPoolConfig());
+        parseUri(configs.getBackplane().getRedisUri()), createJedisPoolConfig());
   }
 
   /**
@@ -139,21 +127,21 @@ public class JedisClusterFactory {
    * @details Use the URI, pool and connection information to connect to a redis cluster server and
    *     provide a jedis client.
    * @param redisUri A valid uri to a redis instance.
-   * @param timeout Connection timeout
-   * @param maxAttempts Number of connection attempts
    * @param poolConfig Configuration related to redis pools.
    * @return An established jedis client used to operate on the redis cluster.
    * @note Suggested return identifier: jedis.
    */
   private static Supplier<JedisCluster> createJedisClusterFactory(
-      URI redisUri, int timeout, int maxAttempts, String password, JedisPoolConfig poolConfig) {
+      URI redisUri, JedisPoolConfig poolConfig) {
     return () ->
         new JedisCluster(
             new HostAndPort(redisUri.getHost(), redisUri.getPort()),
-            /* connectionTimeout=*/ Integer.max(2000, timeout),
-            /* soTimeout=*/ Integer.max(2000, timeout),
-            Integer.max(5, maxAttempts),
-            password,
+            /* connectionTimeout=*/ Integer.max(2000, configs.getBackplane().getTimeout()),
+            /* soTimeout=*/ Integer.max(2000, configs.getBackplane().getTimeout()),
+            Integer.max(5, configs.getBackplane().getMaxAttempts()),
+            configs.getBackplane().getRedisPassword().isEmpty()
+                ? null
+                : configs.getBackplane().getRedisPassword(),
             poolConfig);
   }
 
@@ -162,31 +150,26 @@ public class JedisClusterFactory {
    * @details Use the nodes addresses, pool and connection information to connect to a redis cluster
    *     server and provide a jedis client.
    * @param redisUrisNodes A valid uri set to a redis nodes instances.
-   * @param timeout Connection timeout
-   * @param maxAttempts Number of connection attempts
    * @param poolConfig Configuration related to redis pools.
    * @return An established jedis client used to operate on the redis cluster.
    * @note Suggested return identifier: jedis.
    */
   private static Supplier<JedisCluster> createJedisClusterFactory(
-      Set<HostAndPort> redisUrisNodes,
-      int timeout,
-      int maxAttempts,
-      String password,
-      JedisPoolConfig poolConfig) {
+      Set<HostAndPort> redisUrisNodes, JedisPoolConfig poolConfig) {
     return () ->
         new JedisCluster(
             redisUrisNodes,
-            /* connectionTimeout=*/ Integer.max(2000, timeout),
-            /* soTimeout=*/ Integer.max(2000, timeout),
-            Integer.max(5, maxAttempts),
-            password,
+            /* connectionTimeout=*/ Integer.max(2000, configs.getBackplane().getTimeout()),
+            /* soTimeout=*/ Integer.max(2000, configs.getBackplane().getTimeout()),
+            Integer.max(5, configs.getBackplane().getMaxAttempts()),
+            configs.getBackplane().getRedisPassword().isEmpty()
+                ? null
+                : configs.getBackplane().getRedisPassword(),
             poolConfig);
   }
   /**
    * @brief Create a jedis pool config.
    * @details Use configuration to build the appropriate jedis pool configuration.
-   * @param config Configuration for connecting to a redis cluster server.
    * @return A created jedis pool config.
    * @note Suggested return identifier: poolConfig.
    */

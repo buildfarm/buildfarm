@@ -51,10 +51,10 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   private final int snsClientMaxConnections;
 
   public AwsMetricsPublisher() {
-    super(configs.getServer().getClusterId());
+    super();
     snsTopicOperations = configs.getServer().getMetrics().getTopic();
     region = configs.getServer().getCloudRegion();
-    getAwsSecret(configs.getServer().getMetrics().getSecretName());
+    getAwsSecret();
     snsClientMaxConnections = configs.getServer().getMetrics().getTopicMaxConnections();
     if (!StringUtils.isNullOrEmpty(snsTopicOperations)
         && snsClientMaxConnections > 0
@@ -119,15 +119,20 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   }
 
   @SuppressWarnings("unchecked")
-  private void getAwsSecret(String secretName) {
+  private void getAwsSecret() {
     AWSSecretsManager client = AWSSecretsManagerClientBuilder.standard().withRegion(region).build();
+    String secretName = configs.getServer().getMetrics().getSecretName();
     GetSecretValueRequest getSecretValueRequest =
         new GetSecretValueRequest().withSecretId(secretName);
     GetSecretValueResult getSecretValueResult;
     try {
       getSecretValueResult = client.getSecretValue(getSecretValueRequest);
     } catch (Exception e) {
-      logger.log(Level.SEVERE, String.format("Could not get secret %s from AWS.", secretName));
+      logger.log(
+          Level.SEVERE,
+          String.format(
+              "Could not get secret %s from AWS.",
+              configs.getServer().getMetrics().getSecretName()));
       return;
     }
     String secret;

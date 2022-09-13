@@ -30,6 +30,7 @@ import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.ByteStreamServiceWriter;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
@@ -64,6 +65,8 @@ import org.junit.runners.JUnit4;
 public class GrpcCASTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private final MutableHandlerRegistry serviceRegistry = new MutableHandlerRegistry();
   private final String fakeServerName = "fake server for " + getClass();
   private Server fakeServer;
@@ -71,6 +74,7 @@ public class GrpcCASTest {
 
   @Before
   public void setUp() throws IOException {
+    configs.getServer().setName("test");
     // Use a mutable service registry for later registering the service impl for each test case.
     fakeServer =
         InProcessServerBuilder.forName(fakeServerName)
@@ -106,7 +110,6 @@ public class GrpcCASTest {
 
     GrpcCAS cas =
         new GrpcCAS(
-            instanceName,
             InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
             mock(ByteStreamUploader.class),
             onExpirations);
@@ -135,7 +138,6 @@ public class GrpcCASTest {
 
     GrpcCAS cas =
         new GrpcCAS(
-            instanceName,
             InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
             mock(ByteStreamUploader.class),
             onExpirations);
@@ -148,12 +150,11 @@ public class GrpcCASTest {
   public void putAddsExpiration() throws IOException, InterruptedException {
     ByteString uploadContent = ByteString.copyFromUtf8("uploaded");
     Digest digest = DIGEST_UTIL.compute(uploadContent);
-    String instanceName = "test";
     ListMultimap<Digest, Runnable> onExpirations =
         MultimapBuilder.hashKeys().arrayListValues().build();
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamUploader uploader = mock(ByteStreamUploader.class);
-    GrpcCAS cas = new GrpcCAS(instanceName, channel, uploader, onExpirations);
+    GrpcCAS cas = new GrpcCAS(channel, uploader, onExpirations);
     Runnable onExpiration = mock(Runnable.class);
     cas.put(new Blob(uploadContent, digest), onExpiration);
     verify(uploader, times(1))
@@ -178,7 +179,7 @@ public class GrpcCASTest {
         new ByteStreamServiceWriter(resourceName, content, (int) digest.getSizeBytes()));
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
-    GrpcCAS cas = new GrpcCAS(instanceName, channel, /* uploader=*/ null, onExpirations);
+    GrpcCAS cas = new GrpcCAS(channel, /* uploader=*/ null, onExpirations);
     RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
     Write initialWrite = cas.getWrite(digest, uuid, requestMetadata);
     try (OutputStream writeOut = initialWrite.getOutput(1, SECONDS, () -> {})) {
@@ -195,7 +196,7 @@ public class GrpcCASTest {
   public void findMissingBlobsSwallowsFilteredList() throws Exception {
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     Runnable onExpiration = mock(Runnable.class);
-    GrpcCAS cas = new GrpcCAS("test", channel, null, onExpirations);
+    GrpcCAS cas = new GrpcCAS(channel, null, onExpirations);
     ContentAddressableStorageImplBase casService = mock(ContentAddressableStorageImplBase.class);
     serviceRegistry.addService(casService);
     Digest emptyDigest = Digest.getDefaultInstance();

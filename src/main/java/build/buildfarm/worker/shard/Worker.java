@@ -73,7 +73,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Duration;
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -272,7 +271,7 @@ public class Worker extends LoggingMain {
               timeWaited,
               pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
       try {
-        disableScaleInProtection(clusterEndpoint, configs.getWorker().getPublicName());
+        disableScaleInProtection(clusterEndpoint);
       } catch (Exception e) {
         logger.log(
             SEVERE,
@@ -292,10 +291,9 @@ public class Worker extends LoggingMain {
    * instanceIp.
    *
    * @param clusterEndpoint the current Buildfarm endpoint.
-   * @param instanceIp Ip of the the instance that we want to disable scale in protection.
    */
   @SuppressWarnings("ResultOfMethodCallIgnored")
-  private void disableScaleInProtection(String clusterEndpoint, String instanceIp) {
+  private void disableScaleInProtection(String clusterEndpoint) {
     ManagedChannel channel = null;
     try {
       NettyChannelBuilder builder =
@@ -303,7 +301,9 @@ public class Worker extends LoggingMain {
       channel = builder.build();
       AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
       adminBlockingStub.disableScaleInProtection(
-          DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
+          DisableScaleInProtectionRequest.newBuilder()
+              .setInstanceName(configs.getWorker().getPublicName())
+              .build());
     } finally {
       if (channel != null) {
         channel.shutdown();
@@ -389,10 +389,7 @@ public class Worker extends LoggingMain {
       throw new IllegalArgumentException("Shard Backplane not set in config");
     }
 
-    workerStubs =
-        WorkerStubs.create(
-            digestUtil,
-            Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build());
+    workerStubs = WorkerStubs.create(digestUtil);
 
     ExecutorService removeDirectoryService =
         newFixedThreadPool(
@@ -427,26 +424,13 @@ public class Worker extends LoggingMain {
 
     ShardWorkerContext context =
         new ShardWorkerContext(
-            configs.getWorker().getPublicName(),
-            Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build(),
             backplane::pollOperation,
-            configs.getWorker().getInputFetchStageWidth(),
-            configs.getWorker().getExecuteStageWidth(),
-            configs.getWorker().getInputFetchDeadline(),
             backplane,
             execFileSystem,
             new EmptyInputStreamFactory(
                 new FailoverInputStreamFactory(
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
-            Arrays.asList(configs.getWorker().getExecutionPolicies()),
             instance,
-            Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build(),
-            Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build(),
-            configs.getWorker().getDefaultMaxCores(),
-            configs.getWorker().isLimitGlobalExecution(),
-            configs.getWorker().isOnlyMulticoreTests(),
-            configs.getWorker().isAllowBringYourOwnContainer(),
-            configs.getWorker().isErrorOperationRemainingResources(),
             writer);
 
     pipeline = new Pipeline();
@@ -659,8 +643,7 @@ public class Worker extends LoggingMain {
         throw new IllegalArgumentException("Invalid cas type specified");
       case MEMORY:
       case FUSE: // FIXME have FUSE refer to a name for storage backing, and topo
-        return new MemoryCAS(
-            configs.getWorker().getCas().getMaxSizeBytes(), this::onStoragePut, delegate);
+        return new MemoryCAS(this::onStoragePut, delegate);
       case GRPC:
         checkState(delegate == null, "grpc cas cannot delegate");
         return createGrpcCAS();
@@ -752,7 +735,7 @@ public class Worker extends LoggingMain {
     try {
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
       if (hasCasCapability) {
-        backplane.addBlobLocation(digest, configs.getWorker().getPublicName());
+        backplane.addBlobLocation(digest);
       }
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
@@ -763,7 +746,7 @@ public class Worker extends LoggingMain {
     if (hasCasCapability) {
       try {
         // if the worker is a CAS member, it can send/modify blobs in the backplane.
-        backplane.removeBlobsLocation(digests, configs.getWorker().getPublicName());
+        backplane.removeBlobsLocation(digests);
       } catch (IOException e) {
         throw Status.fromThrowable(e).asRuntimeException();
       }
@@ -798,10 +781,10 @@ public class Worker extends LoggingMain {
     }
   }
 
-  private void addBlobsLocation(List<Digest> digests, String name) {
+  private void addBlobsLocation(List<Digest> digests) {
     while (!backplane.isStopped()) {
       try {
-        backplane.addBlobsLocation(digests, name);
+        backplane.addBlobsLocation(digests);
         return;
       } catch (IOException e) {
         Status status = Status.fromThrowable(e);
@@ -908,18 +891,17 @@ public class Worker extends LoggingMain {
   @SuppressWarnings("deprecation")
   public void start() throws InterruptedException {
     try {
-      backplane.start(configs.getWorker().getPublicName());
+      backplane.start();
 
       removeWorker(configs.getWorker().getPublicName());
 
       boolean skipLoad = configs.getWorker().getCas().isSkipLoad();
-      execFileSystem.start(
-          (digests) -> addBlobsLocation(digests, configs.getWorker().getPublicName()), skipLoad);
+      execFileSystem.start((digests) -> addBlobsLocation(digests), skipLoad);
 
       server.start();
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-      PrometheusPublisher.startHttpServer(configs.getServer().getPrometheusPort());
+      PrometheusPublisher.startHttpServer();
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.

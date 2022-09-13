@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -46,6 +47,8 @@ import javax.annotation.concurrent.GuardedBy;
 public class MemoryCAS implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
 
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private final long maxSizeInBytes;
   private final Consumer<Digest> onPut;
 
@@ -61,13 +64,12 @@ public class MemoryCAS implements ContentAddressableStorage {
   private final ContentAddressableStorage delegate;
   private final Writes writes = new Writes(this);
 
-  public MemoryCAS(long maxSizeInBytes) {
-    this(maxSizeInBytes, (digest) -> {}, /* delegate=*/ null);
+  public MemoryCAS() {
+    this((digest) -> {}, /* delegate=*/ null);
   }
 
-  public MemoryCAS(
-      long maxSizeInBytes, Consumer<Digest> onPut, ContentAddressableStorage delegate) {
-    this.maxSizeInBytes = maxSizeInBytes;
+  public MemoryCAS(Consumer<Digest> onPut, ContentAddressableStorage delegate) {
+    this.maxSizeInBytes = configs.getWorker().getCas().getMaxSizeBytes();
     this.onPut = onPut;
     this.delegate = delegate;
     sizeInBytes = 0;

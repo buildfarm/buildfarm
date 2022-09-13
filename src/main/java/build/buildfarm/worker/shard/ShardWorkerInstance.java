@@ -130,7 +130,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
           void removeBlobLocation() {
             try {
-              backplane.removeBlobLocation(digest, getName());
+              backplane.removeBlobLocation(digest);
             } catch (IOException backplaneException) {
               logger.log(
                   Level.SEVERE,

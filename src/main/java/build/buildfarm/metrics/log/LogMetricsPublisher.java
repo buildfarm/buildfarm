@@ -29,7 +29,7 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
   private static Level logLevel;
 
   public LogMetricsPublisher() {
-    super(configs.getServer().getClusterId());
+    super();
     if (configs.getServer().getMetrics().getLogLevel() != null) {
       logLevel = Level.parse(configs.getServer().getMetrics().getLogLevel().name());
     } else {

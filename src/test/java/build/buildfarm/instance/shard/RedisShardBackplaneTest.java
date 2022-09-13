@@ -63,6 +63,7 @@ public class RedisShardBackplaneTest {
     configs.getBackplane().setSubscribeToBackplane(false);
     configs.getBackplane().setRunFailsafeOperation(false);
     configs.getBackplane().setQueues(new Queue[] {});
+    configs.getWorker().setPublicName("startTime/test:0000");
     MockitoAnnotations.initMocks(this);
   }
 
@@ -76,7 +77,7 @@ public class RedisShardBackplaneTest {
     backplane =
         new RedisShardBackplane(
             "invalid-protobuf-worker-removed-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
-    backplane.start("startTime/test:0000");
+    backplane.start();
 
     assertThat(backplane.getWorkers()).isEmpty();
     verify(jedisCluster, times(1)).hdel(configs.getBackplane().getWorkersHashName(), "foo");
@@ -106,7 +107,7 @@ public class RedisShardBackplaneTest {
     backplane =
         new RedisShardBackplane(
             "prequeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
-    backplane.start("startTime/test:0000");
+    backplane.start();
 
     final String opName = "op";
     ExecuteEntry executeEntry = ExecuteEntry.newBuilder().setOperationName(opName).build();
@@ -133,7 +134,7 @@ public class RedisShardBackplaneTest {
     backplane =
         new RedisShardBackplane(
             "requeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
-    backplane.start("startTime/test:0000");
+    backplane.start();
 
     final String opName = "op";
     backplane.queueing(opName);
@@ -149,7 +150,7 @@ public class RedisShardBackplaneTest {
     backplane =
         new RedisShardBackplane(
             "requeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
-    backplane.start("startTime/test:0000");
+    backplane.start();
 
     final String opName = "op";
     when(jedisCluster.hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName))
@@ -185,7 +186,7 @@ public class RedisShardBackplaneTest {
     backplane =
         new RedisShardBackplane(
             "requeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
-    backplane.start("startTime/test:0000");
+    backplane.start();
 
     // ARRANGE
     // Assume the operation queue is already populated with a first-time operation.
@@ -241,7 +242,7 @@ public class RedisShardBackplaneTest {
     backplane =
         new RedisShardBackplane(
             "requeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
-    backplane.start("startTime/test:0000");
+    backplane.start();
 
     // Assume the operation queue is already populated from a first re-queue.
     // this means the operation's requeue amount will be 1.
@@ -289,7 +290,7 @@ public class RedisShardBackplaneTest {
     backplane =
         new RedisShardBackplane(
             "complete-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
-    backplane.start("startTime/test:0000");
+    backplane.start();
 
     final String opName = "op";
 
@@ -308,7 +309,7 @@ public class RedisShardBackplaneTest {
     backplane =
         new RedisShardBackplane(
             "delete-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
-    backplane.start("startTime/test:0000");
+    backplane.start();
 
     final String opName = "op";
 
@@ -332,7 +333,7 @@ public class RedisShardBackplaneTest {
     backplane =
         new RedisShardBackplane(
             "invocation-blacklist-test", o -> o, o -> o, mockJedisClusterFactory);
-    backplane.start("startTime/test:0000");
+    backplane.start();
 
     assertThat(
             backplane.isBlacklisted(

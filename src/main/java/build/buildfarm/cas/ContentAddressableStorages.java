@@ -50,20 +50,21 @@ import javax.naming.ConfigurationException;
 public final class ContentAddressableStorages {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  private static Channel createChannel(String target) {
+  private static Channel createChannel() {
     NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
+        NettyChannelBuilder.forTarget(configs.getWorker().getCas().getTarget())
+            .negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
   public static ContentAddressableStorage createGrpcCAS() {
-    Channel channel = createChannel(configs.getWorker().getCas().getTarget());
+    Channel channel = createChannel();
     ByteStreamUploader byteStreamUploader =
         new ByteStreamUploader("", channel, null, 300, NO_RETRIES);
     ListMultimap<Digest, Runnable> onExpirations =
         synchronizedListMultimap(MultimapBuilder.hashKeys().arrayListValues().build());
 
-    return new GrpcCAS(configs.getServer().getName(), channel, byteStreamUploader, onExpirations);
+    return new GrpcCAS(channel, byteStreamUploader, onExpirations);
   }
 
   public static ContentAddressableStorage createFilesystemCAS() throws ConfigurationException {
@@ -120,7 +121,7 @@ public final class ContentAddressableStorages {
       case GRPC:
         return createGrpcCAS();
       case MEMORY:
-        return new MemoryCAS(configs.getWorker().getCas().getMaxSizeBytes());
+        return new MemoryCAS();
     }
   }
 

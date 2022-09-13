@@ -85,6 +85,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -142,44 +143,39 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   ShardWorkerContext(
-      String name,
-      Duration operationPollPeriod,
       OperationPoller operationPoller,
-      int inputFetchStageWidth,
-      int executeStageWidth,
-      int inputFetchDeadline,
       Backplane backplane,
       ExecFileSystem execFileSystem,
       InputStreamFactory inputStreamFactory,
-      Iterable<ExecutionPolicy> policies,
       Instance instance,
-      Duration defaultActionTimeout,
-      Duration maximumActionTimeout,
-      int defaultMaxCores,
-      boolean limitGlobalExecution,
-      boolean onlyMulticoreTests,
-      boolean allowBringYourOwnContainer,
-      boolean errorOperationRemainingResources,
       CasWriter writer) {
-    this.name = name;
-    this.matchProvisions = getMatchProvisions(policies, executeStageWidth);
-    this.operationPollPeriod = operationPollPeriod;
+    this.name = configs.getWorker().getPublicName();
+    this.matchProvisions =
+        getMatchProvisions(
+            Arrays.asList(configs.getWorker().getExecutionPolicies()),
+            configs.getWorker().getExecuteStageWidth());
+    this.operationPollPeriod =
+        Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build();
     this.operationPoller = operationPoller;
-    this.inputFetchStageWidth = inputFetchStageWidth;
-    this.executeStageWidth = executeStageWidth;
-    this.inputFetchDeadline = inputFetchDeadline;
+    this.inputFetchStageWidth = configs.getWorker().getInputFetchStageWidth();
+    this.executeStageWidth = configs.getWorker().getExecuteStageWidth();
+    this.inputFetchDeadline = configs.getWorker().getInputFetchDeadline();
     this.backplane = backplane;
     this.execFileSystem = execFileSystem;
     this.inputStreamFactory = inputStreamFactory;
-    this.policies = ExecutionPolicies.toMultimap(policies);
+    this.policies =
+        ExecutionPolicies.toMultimap(Arrays.asList(configs.getWorker().getExecutionPolicies()));
     this.instance = instance;
-    this.defaultActionTimeout = defaultActionTimeout;
-    this.maximumActionTimeout = maximumActionTimeout;
-    this.defaultMaxCores = defaultMaxCores;
-    this.limitGlobalExecution = limitGlobalExecution;
-    this.onlyMulticoreTests = onlyMulticoreTests;
-    this.allowBringYourOwnContainer = allowBringYourOwnContainer;
-    this.errorOperationRemainingResources = errorOperationRemainingResources;
+    this.defaultActionTimeout =
+        Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build();
+    this.maximumActionTimeout =
+        Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build();
+    this.defaultMaxCores = configs.getWorker().getDefaultMaxCores();
+    this.limitGlobalExecution = configs.getWorker().isLimitGlobalExecution();
+    this.onlyMulticoreTests = configs.getWorker().isOnlyMulticoreTests();
+    this.allowBringYourOwnContainer = configs.getWorker().isAllowBringYourOwnContainer();
+    this.errorOperationRemainingResources =
+        configs.getWorker().isErrorOperationRemainingResources();
     this.writer = writer;
   }
 

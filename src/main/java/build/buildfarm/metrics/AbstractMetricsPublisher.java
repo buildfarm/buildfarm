@@ -17,6 +17,7 @@ package build.buildfarm.metrics;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.v1test.OperationRequestMetadata;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.longrunning.Operation;
@@ -57,15 +58,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
   private static final Histogram outputUploadTime =
       Histogram.build().name("output_upload_time_ms").help("Output upload time in ms.").register();
 
-  private final String clusterId;
-
-  public AbstractMetricsPublisher(String clusterId) {
-    this.clusterId = clusterId;
-  }
-
-  public AbstractMetricsPublisher() {
-    this(/* clusterId=*/ null);
-  }
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   @Override
   public void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata) {
@@ -85,7 +78,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
               .setRequestMetadata(requestMetadata)
               .setOperationName(operation.getName())
               .setDone(operation.getDone())
-              .setClusterId(clusterId)
+              .setClusterId(configs.getServer().getClusterId())
               .build();
       if (operation.getDone() && operation.getResponse().is(ExecuteResponse.class)) {
         operationRequestMetadata =

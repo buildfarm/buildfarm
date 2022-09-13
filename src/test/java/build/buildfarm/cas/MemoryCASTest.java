@@ -21,6 +21,7 @@ import static org.mockito.Mockito.verify;
 
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import org.junit.Test;
@@ -29,9 +30,12 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MemoryCASTest {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   @Test
   public void expireShouldCallOnExpiration() throws IOException, InterruptedException {
-    ContentAddressableStorage storage = new MemoryCAS(10);
+    configs.getWorker().getCas().setMaxSizeBytes(10);
+    ContentAddressableStorage storage = new MemoryCAS();
 
     DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);
@@ -43,7 +47,8 @@ public class MemoryCASTest {
 
   @Test
   public void expireShouldOccurAtLimitExactly() throws IOException, InterruptedException {
-    ContentAddressableStorage storage = new MemoryCAS(11);
+    configs.getWorker().getCas().setMaxSizeBytes(11);
+    ContentAddressableStorage storage = new MemoryCAS();
 
     DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);
@@ -57,7 +62,8 @@ public class MemoryCASTest {
   @Test
   public void duplicateEntryRegistersMultipleOnExpiration()
       throws IOException, InterruptedException {
-    ContentAddressableStorage storage = new MemoryCAS(10);
+    configs.getWorker().getCas().setMaxSizeBytes(10);
+    ContentAddressableStorage storage = new MemoryCAS();
 
     DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);
@@ -70,7 +76,8 @@ public class MemoryCASTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void emptyPutThrowsIllegalArgumentException() throws IOException, InterruptedException {
-    ContentAddressableStorage storage = new MemoryCAS(10);
+    configs.getWorker().getCas().setMaxSizeBytes(10);
+    ContentAddressableStorage storage = new MemoryCAS();
 
     DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     storage.put(new Blob(ByteString.EMPTY, digestUtil));
@@ -78,7 +85,8 @@ public class MemoryCASTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void emptyGetThrowsIllegalArgumentException() {
-    ContentAddressableStorage storage = new MemoryCAS(10);
+    configs.getWorker().getCas().setMaxSizeBytes(10);
+    ContentAddressableStorage storage = new MemoryCAS();
 
     DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     storage.get(digestUtil.compute(ByteString.EMPTY));

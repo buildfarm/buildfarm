@@ -64,7 +64,7 @@ public interface Backplane {
   void setOnUnsubscribe(InterruptingRunnable onUnsubscribe);
 
   /** Start the backplane's operation */
-  void start(String publicClientName) throws IOException;
+  void start() throws IOException;
 
   /** Stop the backplane's operation */
   void stop() throws InterruptedException;
@@ -80,7 +80,7 @@ public interface Backplane {
    *
    * <p>Return true if the worker was removed, and false if it was not a member of the set.
    */
-  boolean removeWorker(String workerName, String reason) throws IOException;
+  boolean removeWorker(String name, String reason) throws IOException;
 
   CasIndexResults reindexCas() throws IOException;
 
@@ -131,7 +131,7 @@ public interface Backplane {
    *
    * <p>Adds the name of a worker to the set of workers that store a blob.
    */
-  void addBlobLocation(Digest blobDigest, String workerName) throws IOException;
+  void addBlobLocation(Digest blobDigest) throws IOException;
 
   /** Remove or add workers to a blob's location set as requested */
   void adjustBlobLocations(Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
@@ -143,7 +143,7 @@ public interface Backplane {
    *
    * <p>Adds the name of a worker to the set of workers that store multiple blobs.
    */
-  void addBlobsLocation(Iterable<Digest> blobDigest, String workerName) throws IOException;
+  void addBlobsLocation(Iterable<Digest> blobDigest) throws IOException;
 
   /**
    * The CAS is represented as a map where the key is the digest of the blob that is being stored
@@ -151,7 +151,7 @@ public interface Backplane {
    *
    * <p>Removes the name of a worker from the set of workers that store a blob.
    */
-  void removeBlobLocation(Digest blobDigest, String workerName) throws IOException;
+  void removeBlobLocation(Digest blobDigest) throws IOException;
 
   /**
    * The CAS is represented as a map where the key is the digest of the blob that is being stored
@@ -159,7 +159,7 @@ public interface Backplane {
    *
    * <p>Removes the name of a worker from the set of workers that store multiple blobs.
    */
-  void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException;
+  void removeBlobsLocation(Iterable<Digest> blobDigests) throws IOException;
 
   /**
    * The CAS is represented as a map where the key is the digest of the blob that is being stored

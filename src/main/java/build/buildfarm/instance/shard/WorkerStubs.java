@@ -18,6 +18,7 @@ import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
@@ -34,10 +35,12 @@ import io.grpc.netty.NettyChannelBuilder;
 import java.util.concurrent.TimeUnit;
 
 public final class WorkerStubs {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private WorkerStubs() {}
 
   @SuppressWarnings("rawtypes")
-  public static LoadingCache create(DigestUtil digestUtil, Duration timeout) {
+  public static LoadingCache create(DigestUtil digestUtil) {
     return CacheBuilder.newBuilder()
         .expireAfterAccess(10, TimeUnit.MINUTES)
         .removalListener(
@@ -48,7 +51,10 @@ public final class WorkerStubs {
               @SuppressWarnings("NullableProblems")
               @Override
               public Instance load(String worker) {
-                return newStubInstance(worker, digestUtil, timeout);
+                return newStubInstance(
+                    worker,
+                    digestUtil,
+                    Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build());
               }
             });
   }

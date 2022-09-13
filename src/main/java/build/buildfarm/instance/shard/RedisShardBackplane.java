@@ -506,7 +506,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public void start(String clientPublicName) throws IOException {
+  public void start() throws IOException {
     // Construct a single redis client to be used throughout the entire backplane.
     // We wish to avoid various synchronous and error handling issues that could occur when using
     // multiple clients.
@@ -524,7 +524,10 @@ public class RedisShardBackplane implements Backplane {
 
     // Record client start time
     client.call(
-        jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+        jedis ->
+            jedis.set(
+                "startTime/" + configs.getWorker().getPublicName(),
+                Long.toString(new Date().getTime())));
   }
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -863,24 +866,23 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public void addBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    state.casWorkerMap.add(client, blobDigest, workerName);
+  public void addBlobLocation(Digest blobDigest) throws IOException {
+    state.casWorkerMap.add(client, blobDigest, configs.getWorker().getPublicName());
   }
 
   @Override
-  public void addBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException {
-    state.casWorkerMap.addAll(client, blobDigests, workerName);
+  public void addBlobsLocation(Iterable<Digest> blobDigests) throws IOException {
+    state.casWorkerMap.addAll(client, blobDigests, configs.getWorker().getPublicName());
   }
 
   @Override
-  public void removeBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    state.casWorkerMap.remove(client, blobDigest, workerName);
+  public void removeBlobLocation(Digest blobDigest) throws IOException {
+    state.casWorkerMap.remove(client, blobDigest, configs.getWorker().getPublicName());
   }
 
   @Override
-  public void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName)
-      throws IOException {
-    state.casWorkerMap.removeAll(client, blobDigests, workerName);
+  public void removeBlobsLocation(Iterable<Digest> blobDigests) throws IOException {
+    state.casWorkerMap.removeAll(client, blobDigests, configs.getWorker().getPublicName());
   }
 
   @Override

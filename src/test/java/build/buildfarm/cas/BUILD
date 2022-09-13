@@ -9,6 +9,7 @@ java_test(
     deps = [
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/test/java/build/buildfarm:test_runner",
         "//src/test/java/build/buildfarm/common/grpc",

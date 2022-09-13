@@ -172,7 +172,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     }
 
     if (publicName != null && locationSet.remove(publicName)) {
-      backplane.removeBlobLocation(blobDigest, publicName);
+      backplane.removeBlobLocation(blobDigest);
     }
     List<String> workersList = new ArrayList<>(locationSet);
     boolean emptyWorkerList = workersList.isEmpty();

@@ -5,6 +5,7 @@ java_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//src/main/java/build/buildfarm/common/config",
         "@maven//:io_prometheus_simpleclient",
         "@maven//:io_prometheus_simpleclient_hotspot",
         "@maven//:io_prometheus_simpleclient_httpserver",
