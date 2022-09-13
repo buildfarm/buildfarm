@@ -15,7 +15,7 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Platform;
-import build.buildfarm.common.config.yml.ExecutionPolicy;
+import build.buildfarm.common.config.ExecutionPolicy;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;

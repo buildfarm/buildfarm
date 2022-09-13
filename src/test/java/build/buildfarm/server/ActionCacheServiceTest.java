@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
 import io.grpc.stub.StreamObserver;
 import org.junit.Test;

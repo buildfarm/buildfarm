@@ -15,8 +15,8 @@
 package build.buildfarm.tools;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ShardWorkerOptions;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.JedisClusterFactory;

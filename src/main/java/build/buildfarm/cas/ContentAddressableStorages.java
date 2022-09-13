@@ -26,7 +26,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;

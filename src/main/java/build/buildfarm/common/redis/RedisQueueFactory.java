@@ -14,7 +14,7 @@
 
 package build.buildfarm.common.redis;
 
-import build.buildfarm.common.config.yml.Queue;
+import build.buildfarm.common.config.Queue;
 
 /**
  * @class RedisQueueFactory

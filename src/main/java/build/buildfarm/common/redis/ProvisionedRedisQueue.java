@@ -16,7 +16,7 @@ package build.buildfarm.common.redis;
 
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.MapUtils;
-import build.buildfarm.common.config.yml.Queue;
+import build.buildfarm.common.config.Queue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.SetMultimap;

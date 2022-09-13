@@ -17,8 +17,8 @@ package build.buildfarm.common.redis;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.common.StringVisitor;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
-import build.buildfarm.common.config.yml.Queue;
+import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Queue;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;

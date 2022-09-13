@@ -15,7 +15,7 @@
 package build.buildfarm.metrics.aws;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.metrics.AbstractMetricsPublisher;
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;

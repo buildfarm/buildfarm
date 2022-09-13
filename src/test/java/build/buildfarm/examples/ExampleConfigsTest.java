@@ -14,7 +14,7 @@
 
 package build.buildfarm.examples;
 
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;

@@ -15,8 +15,8 @@
 package build.buildfarm.instance.shard;
 
 import build.bazel.remote.execution.v2.Platform;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
-import build.buildfarm.common.config.yml.Queue;
+import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Queue;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;

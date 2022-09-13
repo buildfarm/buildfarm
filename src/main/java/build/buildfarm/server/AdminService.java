@@ -18,7 +18,7 @@ import build.buildfarm.admin.Admin;
 import build.buildfarm.admin.aws.AwsAdmin;
 import build.buildfarm.admin.gcp.GcpAdmin;
 import build.buildfarm.common.CasIndexResults;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;

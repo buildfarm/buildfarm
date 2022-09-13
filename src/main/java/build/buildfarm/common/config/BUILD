@@ -3,6 +3,7 @@ java_library(
     srcs = glob([
         "*.java",
     ]),
+    plugins = [":lombok-java"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -13,5 +14,15 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:org_projectlombok_lombok",
+        "@maven//:org_yaml_snakeyaml",
     ],
+)
+
+java_plugin(
+    name = "lombok-java",
+    generates_api = True,
+    processor_class = "lombok.launch.AnnotationProcessorHider$AnnotationProcessor",
+    visibility = ["//visibility:public"],
+    deps = ["@maven//:org_projectlombok_lombok"],
 )

@@ -21,8 +21,8 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.LoggingMain;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ServerOptions;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;

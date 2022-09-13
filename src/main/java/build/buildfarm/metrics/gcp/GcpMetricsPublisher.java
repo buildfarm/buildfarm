@@ -14,7 +14,7 @@
 
 package build.buildfarm.metrics.gcp;
 
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.metrics.AbstractMetricsPublisher;
 
 public class GcpMetricsPublisher extends AbstractMetricsPublisher {

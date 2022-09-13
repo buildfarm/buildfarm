@@ -6,7 +6,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",
-        "//src/main/java/build/buildfarm/common/config/yml",
+        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/metrics",
         "//src/main/java/build/buildfarm/metrics/aws",
         "//src/main/java/build/buildfarm/metrics/log",

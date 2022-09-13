@@ -1,4 +1,4 @@
-package build.buildfarm.common.config.yml;
+package build.buildfarm.common.config;
 
 import com.google.common.base.Strings;
 import lombok.Data;

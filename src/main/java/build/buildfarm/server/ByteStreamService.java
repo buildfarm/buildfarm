@@ -30,7 +30,7 @@ import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;

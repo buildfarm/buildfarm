@@ -1,4 +1,4 @@
-package build.buildfarm.common.config.yml;
+package build.buildfarm.common.config;
 
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.v1test.CASInsertionPolicy;

@@ -16,7 +16,7 @@ package build.buildfarm.worker.shard;
 
 import static java.util.logging.Level.WARNING;
 
-import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;

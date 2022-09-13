@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.StringVisitor;
-import build.buildfarm.common.config.yml.Queue;
+import build.buildfarm.common.config.Queue;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
