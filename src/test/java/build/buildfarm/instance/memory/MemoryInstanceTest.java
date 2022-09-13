@@ -23,6 +23,7 @@ import static build.buildfarm.cas.ContentAddressableStorages.casMapDecorator;
 import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.common.config.yml.Cas.TYPE.MEMORY;
 import static build.buildfarm.instance.memory.MemoryInstance.TIMEOUT_OUT_OF_BOUNDS;
 import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_ACTION;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
@@ -55,15 +56,14 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.Server;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.queues.Worker;
 import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.instance.server.OperationsMap;
 import build.buildfarm.instance.server.WatchFuture;
-import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.CompletedOperationMetadata;
-import build.buildfarm.v1test.DelegateCASConfig;
-import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -97,6 +97,7 @@ import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class MemoryInstanceTest {
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final DigestUtil DIGEST_UTIL = new DigestUtil(DigestUtil.HashFunction.SHA256);
   private final Command simpleCommand = Command.newBuilder().addArguments("true").build();
   private final Digest simpleCommandDigest = DIGEST_UTIL.compute(simpleCommand);
@@ -117,27 +118,16 @@ public class MemoryInstanceTest {
 
   @Before
   public void setUp() throws Exception {
+    configs.getServer().setInstanceType(Server.INSTANCE_TYPE.MEMORY);
+    configs.getServer().setName("memory");
+    configs.getWorker().setPublicName("localhost:8981");
+    configs.getWorker().getCas().setType(MEMORY);
+    configs.getMemory().setTarget("localhost:8980");
     outstandingOperations = new MemoryInstance.OutstandingOperations();
     watchers =
         synchronizedSetMultimap(
             MultimapBuilder.hashKeys().hashSetValues(/* expectedValuesPerKey=*/ 1).build());
     watcherService = newDirectExecutorService();
-    MemoryInstanceConfig memoryInstanceConfig =
-        MemoryInstanceConfig.newBuilder()
-            .setListOperationsDefaultPageSize(1024)
-            .setListOperationsMaxPageSize(16384)
-            .setTreeDefaultPageSize(1024)
-            .setTreeMaxPageSize(16384)
-            .setOperationPollTimeout(Durations.fromSeconds(10))
-            .setOperationCompletedDelay(Durations.fromSeconds(10))
-            .setDefaultActionTimeout(Durations.fromSeconds(600))
-            .setMaximumActionTimeout(MAXIMUM_ACTION_TIMEOUT)
-            .setActionCacheConfig(
-                ActionCacheConfig.newBuilder()
-                    .setDelegateCas(DelegateCASConfig.getDefaultInstance())
-                    .build())
-            .build();
-
     storage = Maps.newHashMap();
     workers = Lists.newArrayList();
     requeuers = Maps.newHashMap();
@@ -146,7 +136,6 @@ public class MemoryInstanceTest {
         new MemoryInstance(
             "memory",
             DIGEST_UTIL,
-            memoryInstanceConfig,
             casMapDecorator(storage),
             watchers,
             watcherService,

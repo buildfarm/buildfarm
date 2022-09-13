@@ -9,10 +9,10 @@ BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-memory-worker
 BUILDFARM_SHARD_WORKER_TAERGET="//src/main/java/build/buildfarm:buildfarm-shard-worker"
 
 #The configs used by the targets
-BUILDFARM_SERVER_CONFIG="/buildfarm/examples/server.config.example"
-BUILDFARM_WORKER_CONFIG="/buildfarm/examples/worker.config.example"
-BUILDFARM_SHARD_SERVER_CONFIG="/buildfarm/examples/shard-server.config.example"
-BUILDFARM_SHARD_WORKER_CONFIG="/buildfarm/examples/shard-worker.config.example"
+BUILDFARM_SERVER_CONFIG="/buildfarm/examples/config.memory.yml"
+BUILDFARM_WORKER_CONFIG="/buildfarm/examples/config.memory.yml"
+BUILDFARM_SHARD_SERVER_CONFIG="/buildfarm/examples/config.shard.yml"
+BUILDFARM_SHARD_WORKER_CONFIG="/buildfarm/examples/config.shard.yml"
 
 GRPC_LOGS1="/tmp/parsed-grpc.log"
 GRPC_LOGS2="/tmp/parsed-grpc2.log"

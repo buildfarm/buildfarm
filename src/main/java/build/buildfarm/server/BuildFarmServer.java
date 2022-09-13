@@ -21,20 +21,12 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.LoggingMain;
-import build.buildfarm.common.config.ConfigAdjuster;
 import build.buildfarm.common.config.ServerOptions;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.metrics.MetricsPublisher;
-import build.buildfarm.metrics.aws.AwsMetricsPublisher;
-import build.buildfarm.metrics.gcp.GcpMetricsPublisher;
-import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
-import build.buildfarm.v1test.BuildFarmServerConfig;
-import build.buildfarm.v1test.MetricsConfig;
 import com.google.devtools.common.options.OptionsParser;
-import com.google.protobuf.TextFormat;
-import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
@@ -44,11 +36,6 @@ import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import io.prometheus.client.Counter;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.Security;
 import java.util.Collections;
 import java.util.List;
@@ -79,25 +66,25 @@ public class BuildFarmServer extends LoggingMain {
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
   private final Instance instance;
   private final HealthStatusManager healthStatusManager;
-  private final Server server;
+  private final io.grpc.Server server;
   private boolean stopping = false;
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  public BuildFarmServer(String session, BuildFarmServerConfig config)
-      throws InterruptedException, ConfigurationException {
-    this(session, ServerBuilder.forPort(config.getPort()), config);
+  public BuildFarmServer(String session)
+      throws InterruptedException, ConfigurationException, IOException {
+    this(session, ServerBuilder.forPort(configs.getServer().getPort()));
   }
 
-  public BuildFarmServer(
-      String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
+  public BuildFarmServer(String session, ServerBuilder<?> serverBuilder)
       throws InterruptedException, ConfigurationException {
     super("BuildFarmServer");
 
-    instance = BuildFarmInstances.createInstance(session, config.getInstance(), this::stop);
+    instance = BuildFarmInstances.createInstance(session, this::stop);
 
     healthStatusManager = new HealthStatusManager();
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-    if (!config.getSslCertificatePath().equals("")) {
+    if (configs.getServer().getSslCertificatePath() != null) {
       // There are different Public Key Cryptography Standards (PKCS) that users may format their
       // certificate files in.  By default, the JDK cannot parse all of them.  In particular, it
       // cannot parse PKCS #1 (RSA Cryptography Standard).  When enabling TLS for GRPC, java's
@@ -106,57 +93,41 @@ public class BuildFarmServer extends LoggingMain {
       // is a library that will parse additional formats and allow users to provide certificates in
       // an otherwise unsupported format.
       Security.addProvider(new BouncyCastleProvider());
-      File ssl_certificate_path = new File(config.getSslCertificatePath());
+      File ssl_certificate_path = new File(configs.getServer().getSslCertificatePath());
       serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }
 
     serverBuilder
         .addService(healthStatusManager.getHealthService())
-        .addService(new ActionCacheService(instance, config.getAcPolicy()))
+        .addService(new ActionCacheService(instance))
         .addService(new CapabilitiesService(instance))
-        .addService(
-            new ContentAddressableStorageService(
-                instance,
-                /* deadlineAfter=*/ config.getCasWriteTimeout().getSeconds(),
-                TimeUnit.SECONDS
-                /* requestLogLevel=*/ ))
-        .addService(
-            new ByteStreamService(
-                instance,
-                /* writeDeadlineAfter=*/ config.getBytestreamTimeout().getSeconds(),
-                TimeUnit.SECONDS))
-        .addService(
-            new ExecutionService(
-                instance,
-                config.getExecuteKeepaliveAfterSeconds(),
-                TimeUnit.SECONDS,
-                keepaliveScheduler,
-                getMetricsPublisher(config.getMetricsConfig())))
+        .addService(new ContentAddressableStorageService(instance))
+        .addService(new ByteStreamService(instance))
+        .addService(new ExecutionService(instance, keepaliveScheduler))
         .addService(new OperationQueueService(instance))
         .addService(new OperationsService(instance))
-        .addService(new AdminService(config.getAdminConfig(), instance))
+        .addService(new AdminService(instance))
         .addService(new FetchService(instance))
         .addService(ProtoReflectionService.newInstance())
-        .addService(new PublishBuildEventService(config.getBuildEventConfig()))
+        .addService(new PublishBuildEventService())
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .intercept(headersInterceptor);
-    handleGrpcMetricIntercepts(serverBuilder, config);
+    handleGrpcMetricIntercepts(serverBuilder);
     server = serverBuilder.build();
 
     logger.log(Level.INFO, String.format("%s initialized", session));
   }
 
-  public static void handleGrpcMetricIntercepts(
-      ServerBuilder<?> serverBuilder, BuildFarmServerConfig config) {
+  public static void handleGrpcMetricIntercepts(ServerBuilder<?> serverBuilder) {
     // Decide how to capture GRPC Prometheus metrics.
     // By default, we don't capture any.
-    if (config.getGrpcMetrics().getEnabled()) {
+    if (configs.getServer().getGrpcMetrics().isEnabled()) {
       // Assume core metrics.
       // Core metrics include send/receive totals tagged with return codes.  No latencies.
       Configuration grpcConfig = Configuration.cheapMetricsOnly();
 
       // Enable latency buckets.
-      if (config.getGrpcMetrics().getProvideLatencyHistograms()) {
+      if (configs.getServer().getGrpcMetrics().isProvideLatencyHistograms()) {
         grpcConfig = grpcConfig.allMetrics();
       }
 
@@ -167,32 +138,13 @@ public class BuildFarmServer extends LoggingMain {
     }
   }
 
-  private static BuildFarmServerConfig toBuildFarmServerConfig(
-      Readable input, ServerOptions options) throws IOException {
-    BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
-    TextFormat.merge(input, builder);
-    ConfigAdjuster.adjust(builder, options);
-    return builder.build();
-  }
-
-  private static MetricsPublisher getMetricsPublisher(MetricsConfig metricsConfig) {
-    switch (metricsConfig.getMetricsDestination()) {
-      default:
-        return new LogMetricsPublisher(metricsConfig);
-      case "aws":
-        return new AwsMetricsPublisher(metricsConfig);
-      case "gcp":
-        return new GcpMetricsPublisher(metricsConfig);
-    }
-  }
-
-  public synchronized void start(String publicName, int prometheusPort) throws IOException {
+  public synchronized void start(String publicName) throws IOException {
     checkState(!stopping, "must not call start after stop");
     instance.start(publicName);
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    PrometheusPublisher.startHttpServer(prometheusPort);
+    PrometheusPublisher.startHttpServer(configs.getServer().getPrometheusPort());
     healthCheckMetric.labels("start").inc();
   }
 
@@ -262,30 +214,37 @@ public class BuildFarmServer extends LoggingMain {
       return false;
     }
 
-    Path configPath = Paths.get(residue.get(0));
     ServerOptions options = parser.getOptions(ServerOptions.class);
+
+    try {
+      configs.loadConfigs(residue.get(0));
+    } catch (IOException e) {
+      logger.severe("Could not parse yml configuration file." + e);
+    }
 
     String session = "buildfarm-server";
     if (!options.publicName.isEmpty()) {
       session += "-" + options.publicName;
+      configs.getServer().setPublicName(options.publicName);
     }
+    if (options.port > 0) {
+      configs.getServer().setPort(options.port);
+    }
+    logger.info(configs.toString());
     session += "-" + UUID.randomUUID();
     BuildFarmServer server;
-    try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      BuildFarmServerConfig config =
-          toBuildFarmServerConfig(new InputStreamReader(configInputStream), options);
-      server = new BuildFarmServer(session, config);
-      configInputStream.close();
-      server.start(options.publicName, config.getPrometheusConfig().getPort());
+    try {
+      server = new BuildFarmServer(session);
+      server.start(options.publicName);
       server.blockUntilShutdown();
       server.stop();
       return true;
     } catch (IOException e) {
       System.err.println("error: " + formatIOError(e));
-    } catch (ConfigurationException e) {
-      System.err.println("error: " + e.getMessage());
     } catch (InterruptedException e) {
       System.err.println("error: interrupted");
+    } catch (ConfigurationException e) {
+      throw new RuntimeException(e);
     }
     return false;
   }

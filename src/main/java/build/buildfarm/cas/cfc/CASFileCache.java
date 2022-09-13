@@ -1800,11 +1800,23 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 + e.referenceCount
                 + " references");
       }
-      expireEntryFallback(e);
+      boolean interrupted = false;
+      try {
+        expireEntryFallback(e);
+      } catch (IOException ioEx) {
+        interrupted =
+            Thread.interrupted()
+                || ioEx.getCause() instanceof InterruptedException
+                || ioEx instanceof ClosedByInterruptException;
+      }
       Entry removedEntry = storage.remove(e.key);
       // reference compare on purpose
       if (removedEntry == e) {
-        return dischargeEntryFuture(e, service);
+        ListenableFuture<Entry> entryFuture = dischargeEntryFuture(e, service);
+        if (interrupted) {
+          Thread.currentThread().interrupt();
+        }
+        return entryFuture;
       }
       if (removedEntry == null) {
         logger.log(Level.SEVERE, format("entry %s was already removed during expiration", e.key));
@@ -1825,6 +1837,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             "removed entry %s did not match last unreferenced entry, restoring it",
             e.key);
         storage.put(e.key, removedEntry);
+      }
+      // possibly delegated, but no removal, if we're interrupted, abort loop
+      if (interrupted || Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException();
       }
     }
     return null;
@@ -2881,7 +2897,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         write);
   }
 
-  private void expireEntryFallback(Entry e) throws IOException, InterruptedException {
+  private void expireEntryFallback(Entry e) throws IOException {
     if (delegate != null) {
       FileEntryKey fileEntryKey = parseFileEntryKey(e.key, e.size);
       if (fileEntryKey == null) {
@@ -2895,14 +2911,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  private void performCopy(Write write, Entry e) throws IOException, InterruptedException {
+  private void performCopy(Write write, Entry e) throws IOException {
     try (OutputStream out = write.getOutput(1, MINUTES, () -> {});
         InputStream in = Files.newInputStream(getPath(e.key))) {
       ByteStreams.copy(in, out);
     } catch (IOException ioEx) {
       write.reset();
       logger.log(Level.SEVERE, format("error delegating expired entry %s", e.key), ioEx);
-      throw new InterruptedException();
+      throw ioEx;
     }
   }
 }

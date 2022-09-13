@@ -1,4 +1,4 @@
-FROM java:8
+FROM amazoncorretto:17
 USER root
 VOLUME /tmp
 VOLUME /var/lib

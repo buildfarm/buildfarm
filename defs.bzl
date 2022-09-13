@@ -127,6 +127,8 @@ def buildfarm_init(name = "buildfarm"):
                         "org.threeten:threetenbp:1.3.3",
                         "org.xerial:sqlite-jdbc:3.34.0",
                         "org.jetbrains:annotations:16.0.2",
+                        "org.yaml:snakeyaml:1.30",
+                        "org.projectlombok:lombok:1.18.24",
                     ],
         generate_compat_repositories = True,
         repositories = [

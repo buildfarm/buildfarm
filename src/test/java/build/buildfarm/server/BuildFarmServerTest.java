@@ -17,6 +17,7 @@ package build.buildfarm.server;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.config.yml.Cas.TYPE.MEMORY;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
@@ -35,7 +36,6 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteRequest;
@@ -46,16 +46,11 @@ import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.Server;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
-import build.buildfarm.v1test.ActionCacheConfig;
-import build.buildfarm.v1test.BuildFarmServerConfig;
-import build.buildfarm.v1test.ContentAddressableStorageConfig;
-import build.buildfarm.v1test.DelegateCASConfig;
-import build.buildfarm.v1test.GrpcPrometheusMetrics;
-import build.buildfarm.v1test.MemoryCASConfig;
-import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
@@ -75,7 +70,6 @@ import com.google.longrunning.OperationsGrpc;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
@@ -104,42 +98,21 @@ public class BuildFarmServerTest {
   private BuildFarmServer server;
   private ManagedChannel inProcessChannel;
 
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   @Before
   public void setUp() throws Exception {
+    configs.getServer().setClusterId("buildfarm-test");
+    configs.getServer().setInstanceType(Server.INSTANCE_TYPE.MEMORY);
+    configs.getServer().setName("memory");
+    configs.getWorker().setPublicName("localhost:8981");
+    configs.getWorker().getCas().setType(MEMORY);
+    configs.getMemory().setTarget("localhost:8980");
     String uniqueServerName = "in-process server for " + getClass();
-
-    MemoryInstanceConfig memoryInstanceConfig =
-        MemoryInstanceConfig.newBuilder()
-            .setListOperationsDefaultPageSize(1024)
-            .setListOperationsMaxPageSize(16384)
-            .setTreeDefaultPageSize(1024)
-            .setTreeMaxPageSize(16384)
-            .setOperationPollTimeout(Durations.fromSeconds(10))
-            .setOperationCompletedDelay(Durations.fromSeconds(10))
-            .setCasConfig(
-                ContentAddressableStorageConfig.newBuilder()
-                    .setMemory(MemoryCASConfig.newBuilder().setMaxSizeBytes(640 * 1024)))
-            .setActionCacheConfig(
-                ActionCacheConfig.newBuilder()
-                    .setDelegateCas(DelegateCASConfig.getDefaultInstance())
-                    .build())
-            .setDefaultActionTimeout(Durations.fromSeconds(600))
-            .setMaximumActionTimeout(Durations.fromSeconds(3600))
-            .build();
-
-    BuildFarmServerConfig.Builder configBuilder = BuildFarmServerConfig.newBuilder().setPort(0);
-    configBuilder
-        .getInstanceBuilder()
-        .setName(INSTANCE_NAME)
-        .setDigestFunction(DigestFunction.Value.SHA256)
-        .setMemoryInstanceConfig(memoryInstanceConfig);
-
     server =
         new BuildFarmServer(
-            "test",
-            InProcessServerBuilder.forName(uniqueServerName).directExecutor(),
-            configBuilder.build());
-    server.start("startTime/test:0000", 0);
+            "test", InProcessServerBuilder.forName(uniqueServerName).directExecutor());
+    server.start("startTime/test:0000");
     inProcessChannel = InProcessChannelBuilder.forName(uniqueServerName).directExecutor().build();
   }
 
@@ -472,12 +445,12 @@ public class BuildFarmServerTest {
 
   @Test
   public void grpcMetricsOffByDefault() {
+    configs.getServer().getGrpcMetrics().setEnabled(false);
     // ARRANGE
     ServerBuilder serverBuilder = mock(ServerBuilder.class);
-    BuildFarmServerConfig config = BuildFarmServerConfig.newBuilder().build();
 
     // ACT
-    BuildFarmServer.handleGrpcMetricIntercepts(serverBuilder, config);
+    BuildFarmServer.handleGrpcMetricIntercepts(serverBuilder);
 
     // ASSERT
     verify(serverBuilder, times(0)).intercept(any(MonitoringServerInterceptor.class));
@@ -485,15 +458,12 @@ public class BuildFarmServerTest {
 
   @Test
   public void grpcMetricsEnabled() {
+    configs.getServer().getGrpcMetrics().setEnabled(true);
     // ARRANGE
     ServerBuilder serverBuilder = mock(ServerBuilder.class);
-    GrpcPrometheusMetrics metricsConfig =
-        GrpcPrometheusMetrics.newBuilder().setEnabled(true).build();
-    BuildFarmServerConfig config =
-        BuildFarmServerConfig.newBuilder().setGrpcMetrics(metricsConfig).build();
 
     // ACT
-    BuildFarmServer.handleGrpcMetricIntercepts(serverBuilder, config);
+    BuildFarmServer.handleGrpcMetricIntercepts(serverBuilder);
 
     // ASSERT
     verify(serverBuilder, times(1)).intercept(any(MonitoringServerInterceptor.class));

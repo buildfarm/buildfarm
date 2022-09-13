@@ -36,6 +36,7 @@ import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Tree;
@@ -66,13 +67,12 @@ public class ContentAddressableStorageService
 
   private final Instance instance;
   private final long writeDeadlineAfter;
-  private final TimeUnit writeDeadlineAfterUnits;
 
-  public ContentAddressableStorageService(
-      Instance instance, long writeDeadlineAfter, TimeUnit writeDeadlineAfterUnits) {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  public ContentAddressableStorageService(Instance instance) {
     this.instance = instance;
-    this.writeDeadlineAfter = writeDeadlineAfter;
-    this.writeDeadlineAfterUnits = writeDeadlineAfterUnits;
+    this.writeDeadlineAfter = configs.getServer().getCasWriteTimeout();
   }
 
   String checkMessage(Digest digest, boolean found) {
@@ -192,7 +192,7 @@ public class ContentAddressableStorageService
                                 instance,
                                 batchRequest.getRequestsList(),
                                 writeDeadlineAfter,
-                                writeDeadlineAfterUnits)
+                                TimeUnit.SECONDS)
                             .spliterator(),
                         false)
                     .map((future) -> transform(future, response::addResponses, directExecutor()))

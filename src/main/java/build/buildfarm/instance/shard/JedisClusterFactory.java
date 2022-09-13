@@ -14,7 +14,7 @@
 
 package build.buildfarm.instance.shard;
 
-import build.buildfarm.v1test.RedisShardBackplaneConfig;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashSet;
@@ -36,6 +36,8 @@ import redis.clients.jedis.ScanResult;
  * @details A factory for creating a jedis cluster instance.
  */
 public class JedisClusterFactory {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   /**
    * @brief Create a jedis cluster instance.
    * @details Use proto configuration to connect to a redis cluster server and provide a jedis
@@ -44,24 +46,25 @@ public class JedisClusterFactory {
    * @return An established jedis client used to operate on the redis cluster.
    * @note Suggested return identifier: jedis.
    */
-  public static Supplier<JedisCluster> create(RedisShardBackplaneConfig config)
-      throws ConfigurationException {
+  public static Supplier<JedisCluster> create() throws ConfigurationException {
     // null password is required to elicit no auth in jedis
-    List<String> redisNodes = config.getRedisNodesUrisList();
-    if (redisNodes != null && !redisNodes.isEmpty()) {
+    String[] redisNodes = configs.getBackplane().getRedisNodes();
+    if (redisNodes != null && redisNodes.length > 0) {
       return createJedisClusterFactory(
           list2Set(redisNodes),
-          config.getTimeout(),
-          config.getMaxAttempts(),
-          config.getRedisPassword().isEmpty() ? null : config.getRedisPassword(),
-          createJedisPoolConfig(config));
+          configs.getBackplane().getTimeout(),
+          configs.getBackplane().getMaxAttempts(),
+          configs.getBackplane().getRedisPassword().isEmpty()
+              ? null
+              : configs.getBackplane().getRedisPassword(),
+          createJedisPoolConfig());
     }
     return createJedisClusterFactory(
-        parseUri(config.getRedisUri()),
-        config.getTimeout(),
-        config.getMaxAttempts(),
-        config.getRedisPassword().isEmpty() ? null : config.getRedisPassword(),
-        createJedisPoolConfig(config));
+        parseUri(configs.getBackplane().getRedisUri()),
+        configs.getBackplane().getTimeout(),
+        configs.getBackplane().getMaxAttempts(),
+        configs.getBackplane().getRedisPassword(),
+        createJedisPoolConfig());
   }
 
   /**
@@ -72,15 +75,7 @@ public class JedisClusterFactory {
    * @note Suggested return identifier: jedis.
    */
   public static JedisCluster createTest() throws Exception {
-    // create the a client to interact with redis.
-    // we assume you are running a local cluster of redis.
-    // configuration values (port chosen by redis create-clusters).
-    RedisShardBackplaneConfig config =
-        RedisShardBackplaneConfig.newBuilder()
-            .setRedisUri("redis://localhost:6379")
-            .setJedisPoolMaxTotal(3)
-            .build();
-    JedisCluster redis = JedisClusterFactory.create(config).get();
+    JedisCluster redis = JedisClusterFactory.create().get();
 
     // use the client to create an empty redis cluster
     // this will prevent any persistent data across test runs
@@ -195,9 +190,9 @@ public class JedisClusterFactory {
    * @return A created jedis pool config.
    * @note Suggested return identifier: poolConfig.
    */
-  private static JedisPoolConfig createJedisPoolConfig(RedisShardBackplaneConfig config) {
+  private static JedisPoolConfig createJedisPoolConfig() {
     JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
-    jedisPoolConfig.setMaxTotal(config.getJedisPoolMaxTotal());
+    jedisPoolConfig.setMaxTotal(configs.getBackplane().getJedisPoolMaxTotal());
     return jedisPoolConfig;
   }
 
@@ -224,7 +219,7 @@ public class JedisClusterFactory {
    * @param nodes The redis nodes.
    * @return A parsed and valid HostAndPort set.
    */
-  private static Set<HostAndPort> list2Set(Iterable<String> nodes) throws ConfigurationException {
+  private static Set<HostAndPort> list2Set(String[] nodes) throws ConfigurationException {
     Set<HostAndPort> jedisClusterNodes = new HashSet<>();
     try {
       for (String node : nodes) {

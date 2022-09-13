@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-import static build.buildfarm.v1test.ExecutionPolicy.PolicyCase.WRAPPER;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.protobuf.util.Durations.add;
 import static com.google.protobuf.util.Durations.compare;
@@ -34,9 +33,9 @@ import build.buildfarm.common.ProcessUtils;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
+import build.buildfarm.common.config.yml.ExecutionPolicy;
+import build.buildfarm.common.config.yml.ExecutionWrapper;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
-import build.buildfarm.v1test.ExecutionPolicy;
-import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
@@ -221,8 +220,8 @@ class Executor {
         workerContext.limitExecution(
             operationName, arguments, operationContext.command, workingDirectory)) {
       for (ExecutionPolicy policy : policies) {
-        if (policy.getPolicyCase() == WRAPPER) {
-          arguments.addAll(transformWrapper(policy.getWrapper()));
+        if (policy.getExecutionWrapper() != null) {
+          arguments.addAll(transformWrapper(policy.getExecutionWrapper()));
         }
       }
 
@@ -381,7 +380,7 @@ class Executor {
         uniqueIndex(operationContext.command.getPlatform().getPropertiesList(), Property::getName);
 
     arguments.add(wrapper.getPath());
-    for (String argument : wrapper.getArgumentsList()) {
+    for (String argument : wrapper.getArguments()) {
       // If the argument is of the form <propertyName>, substitute the value of
       // the property from the platform specification.
       if (!argument.equals("<>")

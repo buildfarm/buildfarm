@@ -16,9 +16,9 @@ package build.buildfarm.worker.shard;
 
 import static java.util.logging.Level.WARNING;
 
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
-import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.CompletableFuture;
@@ -26,12 +26,12 @@ import java.util.logging.Logger;
 
 public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerImplBase {
   private static final Logger logger = Logger.getLogger(ShutDownWorkerGracefully.class.getName());
-  private final Worker worker;
-  private final ShardWorkerConfig config;
 
-  public ShutDownWorkerGracefully(Worker worker, ShardWorkerConfig config) {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+  private final Worker worker;
+
+  public ShutDownWorkerGracefully(Worker worker) {
     this.worker = worker;
-    this.config = config;
   }
 
   /**
@@ -45,8 +45,8 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
   public void prepareWorkerForGracefulShutdown(
       PrepareWorkerForGracefulShutDownRequest request,
       StreamObserver<PrepareWorkerForGracefulShutDownRequestResults> responseObserver) {
-    String clusterId = config.getAdminConfig().getClusterId();
-    String clusterEndpoint = config.getAdminConfig().getClusterEndpoint();
+    String clusterId = configs.getServer().getClusterId();
+    String clusterEndpoint = configs.getServer().getAdmin().getClusterEndpoint();
     if (clusterId == null
         || clusterId.equals("")
         || clusterEndpoint == null
@@ -55,18 +55,18 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
           String.format(
               "Current AdminConfig doesn't have cluster_id or cluster_endpoint set, "
                   + "the worker %s won't be shut down.",
-              config.getPublicName());
+              configs.getWorker().getPublicName());
       logger.log(WARNING, errorMessage);
       responseObserver.onError(new RuntimeException(errorMessage));
       return;
     }
 
-    if (!config.getAdminConfig().getEnableGracefulShutdown()) {
+    if (!configs.getServer().getAdmin().isEnableGracefulShutdown()) {
       String errorMessage =
           String.format(
               "Current AdminConfig doesn't support shut down worker gracefully, "
                   + "the worker %s won't be shut down.",
-              config.getPublicName());
+              configs.getWorker().getPublicName());
       logger.log(WARNING, errorMessage);
       responseObserver.onError(new RuntimeException(errorMessage));
       return;

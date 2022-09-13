@@ -19,11 +19,11 @@ This example will use the buildfarm-provided executable `as-nobody`, which will 
 
 ```
 # default wrapper policy application
-execution_policies: {
-  wrapper: {
-    path: "/app/buildfarm/as-nobody"
-  }
-}
+worker:
+  executionPolicies:
+    - name: test
+      executionWrapper:
+        path: "/app/buildfarm/as-nobody"
 ```
 
 ## Action Specification

@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Admin
-nav_order: 6
+nav_order: 9
 ---
 
 ### How to make your AWS cluster visible to Buildfarm Admin

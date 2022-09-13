@@ -17,7 +17,6 @@ package build.buildfarm.server;
 import static build.buildfarm.common.DigestUtil.HashFunction.SHA256;
 import static build.buildfarm.server.ByteStreamService.CHUNK_SIZE;
 import static com.google.common.truth.Truth.assertThat;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.AdditionalAnswers.answerVoid;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
@@ -83,7 +82,7 @@ public class ByteStreamServiceTest {
     // Use a mutable service registry for later registering the service impl for each test case.
     fakeServer =
         InProcessServerBuilder.forName(fakeServerName)
-            .addService(new ByteStreamService(instance, /* writeDeadlineAfter=*/ 1, SECONDS))
+            .addService(new ByteStreamService(instance))
             .directExecutor()
             .build()
             .start();

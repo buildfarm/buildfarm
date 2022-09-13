@@ -15,6 +15,8 @@
 package build.buildfarm.instance.shard;
 
 import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.Queue;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;
@@ -22,9 +24,6 @@ import build.buildfarm.common.redis.RedisHashMap;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
-import build.buildfarm.v1test.ProvisionedQueue;
-import build.buildfarm.v1test.QueueType;
-import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
@@ -35,36 +34,46 @@ import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 
 public class DistributedStateCreator {
-  public static DistributedState create(RedisClient client, RedisShardBackplaneConfig config)
-      throws IOException {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  public static DistributedState create(RedisClient client) throws IOException {
     DistributedState state = new DistributedState();
 
     // Create containers that make up the backplane
-    state.casWorkerMap = createCasWorkerMap(config);
-    state.actionCache = createActionCache(config);
-    state.prequeue = createPrequeue(client, config);
-    state.operationQueue = createOperationQueue(client, config);
-    state.blockedActions = new RedisMap(config.getActionBlacklistPrefix());
-    state.blockedInvocations = new RedisMap(config.getInvocationBlacklistPrefix());
-    state.processingOperations = new RedisMap(config.getProcessingPrefix());
-    state.dispatchingOperations = new RedisMap(config.getDispatchingPrefix());
-    state.dispatchedOperations = new RedisHashMap(config.getDispatchedOperationsHashName());
-    state.workers = new RedisHashMap(config.getWorkersHashName());
+    state.casWorkerMap = createCasWorkerMap();
+    state.actionCache = createActionCache();
+    state.prequeue = createPrequeue(client);
+    state.operationQueue = createOperationQueue(client);
+    state.blockedActions = new RedisMap(configs.getBackplane().getActionBlacklistPrefix());
+    state.blockedInvocations = new RedisMap(configs.getBackplane().getInvocationBlacklistPrefix());
+    state.processingOperations = new RedisMap(configs.getBackplane().getProcessingPrefix());
+    state.dispatchingOperations = new RedisMap(configs.getBackplane().getDispatchingPrefix());
+    state.dispatchedOperations =
+        new RedisHashMap(configs.getBackplane().getDispatchedOperationsHashName());
+    state.executeWorkers =
+        new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_execute");
+    state.storageWorkers =
+        new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_storage");
+    state.executeAndStorageWorkers = new RedisHashMap(configs.getBackplane().getWorkersHashName());
 
     return state;
   }
 
-  private static CasWorkerMap createCasWorkerMap(RedisShardBackplaneConfig config) {
-    if (config.getCacheCas()) {
+  private static CasWorkerMap createCasWorkerMap() {
+    if (configs.getBackplane().isCacheCas()) {
       RedissonClient redissonClient = createRedissonClient();
-      return new RedissonCasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire());
+      return new RedissonCasWorkerMap(
+          redissonClient,
+          configs.getBackplane().getCasPrefix(),
+          configs.getBackplane().getCasExpire());
     } else {
-      return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
+      return new JedisCasWorkerMap(
+          configs.getBackplane().getCasPrefix(), configs.getBackplane().getCasExpire());
     }
   }
 
-  private static RedisMap createActionCache(RedisShardBackplaneConfig config) {
-    return new RedisMap(config.getActionCachePrefix());
+  private static RedisMap createActionCache() {
+    return new RedisMap(configs.getBackplane().getActionCachePrefix());
   }
 
   private static RedissonClient createRedissonClient() {
@@ -72,32 +81,30 @@ public class DistributedStateCreator {
     return Redisson.create(redissonConfig);
   }
 
-  private static BalancedRedisQueue createPrequeue(
-      RedisClient client, RedisShardBackplaneConfig config) throws IOException {
+  private static BalancedRedisQueue createPrequeue(RedisClient client) throws IOException {
     // Construct the prequeue so that elements are balanced across all redis nodes.
     return new BalancedRedisQueue(
-        getPreQueuedOperationsListName(config),
-        getQueueHashes(client, getPreQueuedOperationsListName(config)),
-        config.getMaxPreQueueDepth(),
-        queueTypeToSr(config));
+        getPreQueuedOperationsListName(),
+        getQueueHashes(client, getPreQueuedOperationsListName()),
+        configs.getBackplane().getMaxPreQueueDepth(),
+        getQueueType());
   }
 
-  private static OperationQueue createOperationQueue(
-      RedisClient client, RedisShardBackplaneConfig config) throws IOException {
+  private static OperationQueue createOperationQueue(RedisClient client) throws IOException {
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
     // eligibility and placement of operations.
     // Therefore, it is recommended to have a final provision queue with no actual platform
     // requirements.  This will ensure that all operations are eligible for the final queue.
     ImmutableList.Builder<ProvisionedRedisQueue> provisionedQueues = new ImmutableList.Builder<>();
-    for (ProvisionedQueue queueConfig : config.getProvisionedQueues().getQueuesList()) {
+    for (Queue queueConfig : configs.getBackplane().getQueues()) {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
-              getQueueName(queueConfig, config),
-              queueTypeToSr(config),
-              getQueueHashes(client, getQueueName(queueConfig, config)),
+              getQueueName(queueConfig),
+              getQueueType(),
+              getQueueHashes(client, getQueueName(queueConfig)),
               toMultimap(queueConfig.getPlatform().getPropertiesList()),
-              queueConfig.getAllowUnmatched());
+              queueConfig.isAllowUnmatched());
       provisionedQueues.add(provisionedQueue);
     }
     // If there is no configuration for provisioned queues, we might consider that an error.
@@ -107,20 +114,20 @@ public class DistributedStateCreator {
     // all operations.
     // This will ensure the expected behavior for the paradigm in which all work is put on the same
     // queue.
-    if (config.getProvisionedQueues().getQueuesList().isEmpty()) {
+    if (configs.getBackplane().getQueues().length == 0) {
       SetMultimap defaultProvisions = LinkedHashMultimap.create();
       defaultProvisions.put(
           ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
-              getQueuedOperationsListName(config),
-              queueTypeToSr(config),
-              getQueueHashes(client, getQueuedOperationsListName(config)),
+              getQueuedOperationsListName(),
+              getQueueType(),
+              getQueueHashes(client, getQueuedOperationsListName()),
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }
 
-    return new OperationQueue(provisionedQueues.build(), config.getMaxQueueDepth());
+    return new OperationQueue(provisionedQueues.build(), configs.getBackplane().getMaxQueueDepth());
   }
 
   static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
@@ -138,32 +145,30 @@ public class DistributedStateCreator {
     return set;
   }
 
-  private static String queueTypeToSr(RedisShardBackplaneConfig config) {
-    QueueType queue = config.getRedisQueueType();
-    return queue.toString().toLowerCase();
+  private static Queue.QUEUE_TYPE getQueueType() {
+    return configs.getBackplane().isPriorityQueue()
+        ? Queue.QUEUE_TYPE.priority
+        : Queue.QUEUE_TYPE.standard;
   }
 
-  private static String getQueuedOperationsListName(RedisShardBackplaneConfig config) {
-    String name = config.getQueuedOperationsListName();
-    String queue_type = queueTypeToSr(config);
-    return createFullQueueName(name, queue_type);
+  private static String getQueuedOperationsListName() {
+    String name = configs.getBackplane().getQueuedOperationsListName();
+    return createFullQueueName(name, getQueueType());
   }
 
-  private static String getPreQueuedOperationsListName(RedisShardBackplaneConfig config) {
-    String name = config.getPreQueuedOperationsListName();
-    String queue_type = queueTypeToSr(config);
-    return createFullQueueName(name, queue_type);
+  private static String getPreQueuedOperationsListName() {
+    String name = configs.getBackplane().getPreQueuedOperationsListName();
+    return createFullQueueName(name, getQueueType());
   }
 
-  private static String getQueueName(ProvisionedQueue pconfig, RedisShardBackplaneConfig rconfig) {
+  private static String getQueueName(Queue pconfig) {
     String name = pconfig.getName();
-    String queue_type = queueTypeToSr(rconfig);
-    return createFullQueueName(name, queue_type);
+    return createFullQueueName(name, getQueueType());
   }
 
-  private static String createFullQueueName(String base, String type) {
+  private static String createFullQueueName(String base, Queue.QUEUE_TYPE type) {
     // To maintain forwards compatibility, we do not append the type to the regular queue
     // implementation.
-    return ((!type.equals("regular")) ? base + "_" + type : base);
+    return ((!type.equals(Queue.QUEUE_TYPE.standard)) ? base + "_" + type : base);
   }
 }

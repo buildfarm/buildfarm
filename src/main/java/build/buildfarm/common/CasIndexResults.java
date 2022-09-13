@@ -25,21 +25,21 @@ public class CasIndexResults {
    * @brief The number of CAS entries the worker was removed from.
    * @details This indicates how much CAS data the shard new the worker had.
    */
-  public int removedHosts = 0;
+  public long removedHosts = 0;
 
   /**
    * @field removedKeys
    * @brief The number of CAS entries removed due to loss of worker.
    * @details This indicates how many CAS entries were held only by the removed worker.
    */
-  public int removedKeys = 0;
+  public long removedKeys = 0;
 
   /**
    * @field totalKeys
    * @brief The total number of keys processed.
    * @details A fraction can be made with removed keys to see the total percentage of CAS lost.
    */
-  public int totalKeys = 0;
+  public long totalKeys = 0;
 
   /**
    * @brief Get a string message from performing worker indexing on the CAS.

@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker.memory;
 
-import static build.buildfarm.common.io.Utils.formatIOError;
 import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
@@ -32,15 +31,13 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
-import build.buildfarm.common.config.ConfigAdjuster;
 import build.buildfarm.common.config.MemoryWorkerOptions;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.StubInstance;
-import build.buildfarm.v1test.InstanceEndpoint;
-import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.MatchStage;
@@ -52,21 +49,18 @@ import build.buildfarm.worker.WorkerContext;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.devtools.common.options.OptionsParser;
-import com.google.protobuf.TextFormat;
 import com.google.protobuf.util.Durations;
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.attribute.UserPrincipal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
@@ -76,10 +70,11 @@ import javax.naming.ConfigurationException;
 public class Worker extends LoggingMain {
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
 
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private final Instance casInstance;
   private final Instance operationQueueInstance;
   private final ByteStreamUploader uploader;
-  private final WorkerConfig config;
   private final Path root;
   private final CASFileCache fileCache;
   private final @Nullable UserPrincipal execOwner;
@@ -95,28 +90,25 @@ public class Worker extends LoggingMain {
     return builder.build();
   }
 
-  private static Path getValidRoot(WorkerConfig config, FileSystem fileSystem)
-      throws ConfigurationException {
-    String rootValue = config.getRoot();
+  private static Path getValidRoot(FileSystem fileSystem) throws ConfigurationException {
+    String rootValue = configs.getWorker().getRoot();
     if (Strings.isNullOrEmpty(rootValue)) {
       throw new ConfigurationException("root value in config missing");
     }
     return fileSystem.getPath(rootValue);
   }
 
-  private static Path getValidCasCacheDirectory(WorkerConfig config, Path root)
-      throws ConfigurationException {
-    String casCacheValue = config.getCasCacheDirectory();
+  private static Path getValidCasCacheDirectory(Path root) throws ConfigurationException {
+    String casCacheValue = configs.getWorker().getCas().getPath();
     if (Strings.isNullOrEmpty(casCacheValue)) {
       throw new ConfigurationException("Cas cache directory value in config missing");
     }
     return root.resolve(casCacheValue);
   }
 
-  private static HashFunction getValidHashFunction(WorkerConfig config)
-      throws ConfigurationException {
+  private static HashFunction getValidHashFunction() throws ConfigurationException {
     try {
-      return HashFunction.get(config.getDigestFunction());
+      return configs.getDigestFunction();
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }
@@ -138,13 +130,12 @@ public class Worker extends LoggingMain {
     return new ByteStreamUploader(instanceName, channel, null, 300, Worker.retrier);
   }
 
-  private static Instance newStubInstance(
-      InstanceEndpoint instanceEndpoint, DigestUtil digestUtil) {
+  private static Instance newStubInstance(DigestUtil digestUtil) {
     return newStubInstance(
-        instanceEndpoint.getInstanceName(),
-        createChannel(instanceEndpoint.getTarget()),
+        configs.getServer().getName(),
+        createChannel(configs.getMemory().getTarget()),
         digestUtil,
-        instanceEndpoint.getDeadlineAfterSeconds());
+        configs.getMemory().getDeadlineAfterSeconds());
   }
 
   private static Instance newStubInstance(
@@ -159,31 +150,29 @@ public class Worker extends LoggingMain {
         retryScheduler);
   }
 
-  public Worker(WorkerConfig config) throws ConfigurationException {
-    this(config, FileSystems.getDefault());
+  public Worker() throws ConfigurationException {
+    this(FileSystems.getDefault());
   }
 
-  public Worker(WorkerConfig config, FileSystem fileSystem) throws ConfigurationException {
+  public Worker(FileSystem fileSystem) throws ConfigurationException {
     super("BuildFarmOperationQueueWorker");
-    this.config = config;
 
     /* configuration validation */
-    root = getValidRoot(config, fileSystem);
-    Path casCacheDirectory = getValidCasCacheDirectory(config, root);
-    HashFunction hashFunction = getValidHashFunction(config);
+    root = getValidRoot(fileSystem);
+    Path casCacheDirectory = getValidCasCacheDirectory(root);
+    HashFunction hashFunction = getValidHashFunction();
 
     /* initialization */
     DigestUtil digestUtil = new DigestUtil(hashFunction);
-    InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
-    ManagedChannel casChannel = createChannel(casEndpoint.getTarget());
+    ManagedChannel casChannel = createChannel(configs.getMemory().getTarget());
     casInstance =
         newStubInstance(
-            casEndpoint.getInstanceName(),
+            configs.getServer().getName(),
             casChannel,
             digestUtil,
-            casEndpoint.getDeadlineAfterSeconds());
+            configs.getMemory().getDeadlineAfterSeconds());
     uploader = createStubUploader(casInstance.getName(), casChannel);
-    operationQueueInstance = newStubInstance(config.getOperationQueue(), digestUtil);
+    operationQueueInstance = newStubInstance(digestUtil);
     InputStreamFactory inputStreamFactory =
         (digest, offset) ->
             casInstance.newBlobInput(
@@ -192,10 +181,10 @@ public class Worker extends LoggingMain {
         new InjectedCASFileCache(
             inputStreamFactory,
             root.resolve(casCacheDirectory),
-            config.getCasCacheMaxSizeBytes(),
-            config.getCasCacheMaxEntrySizeBytes(),
-            config.getCasCacheHexBucketLevels(),
-            config.getCasCacheFileDirectoriesIndexInMemory(),
+            configs.getWorker().getCas().getMaxSizeBytes(),
+            configs.getWorker().getCas().getMaxEntrySizeBytes(),
+            configs.getWorker().getHexBucketLevels(),
+            configs.getWorker().getCas().isFileDirectoriesIndexInMemory(),
             casInstance.getDigestUtil(),
             newDirectExecutorService(),
             directExecutor());
@@ -204,7 +193,7 @@ public class Worker extends LoggingMain {
 
   private @Nullable UserPrincipal getOwner(FileSystem fileSystem) throws ConfigurationException {
     try {
-      return getUser(config.getExecOwner(), fileSystem);
+      return getUser(configs.getWorker().getExecOwner(), fileSystem);
     } catch (IOException e) {
       ConfigurationException configException =
           new ConfigurationException("Could not locate exec_owner");
@@ -224,12 +213,14 @@ public class Worker extends LoggingMain {
 
     OperationQueueClient oq =
         new OperationQueueClient(
-            operationQueueInstance, config.getPlatform(), config.getExecutionPoliciesList());
+            operationQueueInstance,
+            configs.getMemory().getPlatform(),
+            Arrays.asList(configs.getWorker().getExecutionPolicies()));
 
-    Instance acInstance = newStubInstance(config.getActionCache(), casInstance.getDigestUtil());
+    Instance acInstance = newStubInstance(casInstance.getDigestUtil());
     WorkerContext context =
         new OperationQueueWorkerContext(
-            config, casInstance, acInstance, oq, uploader, fileCache, execOwner, root, retrier);
+            casInstance, acInstance, oq, uploader, fileCache, execOwner, root, retrier);
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> oq.deactivate(operation.getName()));
@@ -281,14 +272,6 @@ public class Worker extends LoggingMain {
     }
   }
 
-  private static WorkerConfig toWorkerConfig(Readable input, MemoryWorkerOptions options)
-      throws IOException {
-    WorkerConfig.Builder builder = WorkerConfig.newBuilder();
-    TextFormat.merge(input, builder);
-    ConfigAdjuster.adjust(builder, options);
-    return builder.build();
-  }
-
   private static void printUsage(OptionsParser parser) {
     logger.log(INFO, "Usage: CONFIG_PATH");
     logger.log(
@@ -305,18 +288,16 @@ public class Worker extends LoggingMain {
       printUsage(parser);
       return false;
     }
-    Path configPath = Paths.get(residue.get(0));
-    try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      Worker worker =
-          new Worker(
-              toWorkerConfig(
-                  new InputStreamReader(configInputStream),
-                  parser.getOptions(MemoryWorkerOptions.class)));
-      configInputStream.close();
+    try {
+      configs.loadConfigs(residue.get(0));
+      logger.info(configs.toString());
+    } catch (IOException e) {
+      logger.severe("Could not parse yml configuration file." + e);
+    }
+    try {
+      Worker worker = new Worker();
       worker.start();
       return true;
-    } catch (IOException e) {
-      System.err.println("error: " + formatIOError(e));
     } catch (ConfigurationException e) {
       System.err.println("error: " + e.getMessage());
     } catch (InterruptedException e) {

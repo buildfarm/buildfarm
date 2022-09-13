@@ -20,10 +20,10 @@ import static com.google.common.truth.Truth.assertThat;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.config.yml.BuildfarmConfigs;
+import build.buildfarm.common.config.yml.Metrics;
 import build.buildfarm.metrics.aws.AwsMetricsPublisher;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
-import build.buildfarm.v1test.AwsMetricsConfig;
-import build.buildfarm.v1test.MetricsConfig;
 import build.buildfarm.v1test.OperationRequestMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -31,6 +31,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
+import java.io.IOException;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -60,12 +62,15 @@ public class MetricsPublisherTest {
           .build();
   private final PreconditionFailure preconditionFailure =
       PreconditionFailure.getDefaultInstance().toBuilder().addViolations(defaultViolation).build();
-  private final MetricsConfig metricsConfig =
-      MetricsConfig.newBuilder()
-          .setClusterId("buildfarm-test")
-          .setMetricsDestination("aws")
-          .setAwsMetricsConfig(AwsMetricsConfig.getDefaultInstance())
-          .build();
+
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  @Before
+  public void setUp() throws IOException {
+    configs.getServer().setCloudRegion("test");
+    configs.getServer().setClusterId("buildfarm-test");
+    configs.getServer().getMetrics().setPublisher(Metrics.PUBLISHER.AWS);
+  }
 
   @Test
   public void publishCompleteMetricsTest() throws InvalidProtocolBufferException {
@@ -76,7 +81,7 @@ public class MetricsPublisherTest {
             .setMetadata(Any.pack(defaultExecuteOperationMetadata))
             .build();
 
-    AwsMetricsPublisher metricsPublisher = new AwsMetricsPublisher(metricsConfig);
+    AwsMetricsPublisher metricsPublisher = new AwsMetricsPublisher();
     assertThat(
             AbstractMetricsPublisher.formatRequestMetadataToJson(
                 metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata)))
@@ -105,9 +110,7 @@ public class MetricsPublisherTest {
     Operation operation =
         defaultOperation.toBuilder().setMetadata(Any.pack(defaultExecuteOperationMetadata)).build();
 
-    assertThat(
-            new AwsMetricsPublisher(metricsConfig)
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+    assertThat(new AwsMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 
@@ -116,9 +119,7 @@ public class MetricsPublisherTest {
     Operation operation =
         defaultOperation.toBuilder().setResponse(Any.pack(defaultExecuteResponse)).build();
 
-    assertThat(
-            new AwsMetricsPublisher(metricsConfig)
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+    assertThat(new AwsMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 
@@ -134,9 +135,7 @@ public class MetricsPublisherTest {
             .setMetadata(Any.pack(defaultExecuteOperationMetadata))
             .build();
 
-    assertThat(
-            new AwsMetricsPublisher(metricsConfig)
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+    assertThat(new AwsMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 
@@ -145,9 +144,7 @@ public class MetricsPublisherTest {
     Operation operation =
         defaultOperation.toBuilder().setResponse(Any.pack(defaultExecuteResponse)).build();
 
-    assertThat(
-            new LogMetricsPublisher(MetricsConfig.getDefaultInstance())
-                .populateRequestMetadata(operation, defaultRequestMetadata))
+    assertThat(new LogMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 }

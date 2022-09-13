@@ -6,3 +6,6 @@ build:fuse --define=fuse=true
 build:linux --sandbox_tmpfs_path=/tmp
 
 test --test_tag_filters=-redis
+
+build --nojava_header_compilation
+test --nojava_header_compilation
