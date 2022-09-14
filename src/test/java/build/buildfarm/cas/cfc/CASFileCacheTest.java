@@ -158,11 +158,7 @@ class CASFileCacheTest {
     // bazel appears to have a problem with us creating directories under
     // windows that are marked as no-delete. clean up after ourselves with
     // our utils
-    try {
-      Directories.remove(root);
-    } catch (Exception e) {
-      // Directory does not exist
-    }
+    Directories.remove(root);
     if (!shutdownAndAwaitTermination(putService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down put service");
     }
@@ -634,6 +630,7 @@ class CASFileCacheTest {
     try (OutputStream secondOut = write.getOutput(1, SECONDS, () -> {})) {
       assertThat(writeClosed.get()).isTrue();
     }
+    write.reset(); // ensure that the output stream is closed
   }
 
   @Test
@@ -650,6 +647,7 @@ class CASFileCacheTest {
     firstOut.get().close();
     assertThat(secondOut.isDone()).isTrue();
     secondOut.get().close();
+    write.reset(); // ensure that the output stream is closed
   }
 
   @Test(expected = DigestMismatchException.class)
@@ -911,6 +909,7 @@ class CASFileCacheTest {
     int remaining = content.size() - 6;
     assertThat(in.read(buf, 6, remaining)).isEqualTo(remaining);
     assertThat(ByteString.copyFrom(buf)).isEqualTo(content);
+    in.close();
   }
 
   @Test
