@@ -122,6 +122,7 @@ public class Directories {
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
+            // we will *NOT* delete the file on windows if it is still open
             Files.delete(file);
             return FileVisitResult.CONTINUE;
           }
