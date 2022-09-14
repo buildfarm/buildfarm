@@ -460,7 +460,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @Override
-  public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+  public ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests) {
     throw new UnsupportedOperationException();
   }
 

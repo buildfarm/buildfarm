@@ -26,7 +26,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
-import com.google.rpc.Code;
 import com.google.rpc.Status;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
@@ -46,10 +45,6 @@ import javax.annotation.concurrent.GuardedBy;
 
 public class MemoryCAS implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
-
-  static final Status OK = Status.newBuilder().setCode(Code.OK.getNumber()).build();
-
-  static final Status NOT_FOUND = Status.newBuilder().setCode(Code.NOT_FOUND.getNumber()).build();
 
   private final long maxSizeInBytes;
   private final Consumer<Digest> onPut;
@@ -151,11 +146,11 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+  public ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests) {
     return immediateFuture(getAll(digests));
   }
 
-  synchronized Iterable<Response> getAll(Iterable<Digest> digests) {
+  synchronized List<Response> getAll(Iterable<Digest> digests) {
     return getAll(
         digests,
         (digest) -> {
@@ -167,7 +162,7 @@ public class MemoryCAS implements ContentAddressableStorage {
         });
   }
 
-  public static Iterable<Response> getAll(
+  public static List<Response> getAll(
       Iterable<Digest> digests, Function<Digest, ByteString> blobGetter) {
     ImmutableList.Builder<Response> responses = ImmutableList.builder();
     for (Digest digest : digests) {

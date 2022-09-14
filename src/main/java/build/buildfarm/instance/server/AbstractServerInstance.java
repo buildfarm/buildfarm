@@ -121,6 +121,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.NoSuchFileException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
@@ -401,7 +402,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests) {
+  public ListenableFuture<List<Response>> getAllBlobsFuture(Iterable<Digest> digests) {
     return contentAddressableStorage.getAllFuture(digests);
   }
 
