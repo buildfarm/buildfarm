@@ -579,14 +579,10 @@ public class ShardInstance extends AbstractServerInstance {
       Iterable<Digest> blobDigests, RequestMetadata requestMetadata) {
     try {
       if (inDenyList(requestMetadata)) {
-        // hacks for bazel where findMissingBlobs retry exhaustion throws RuntimeException
-        // TODO change this back to a transient when #10663 is landed
-        return immediateFuture(ImmutableList.of());
-        /*
-        return immediateFailedFuture(Status.UNAVAILABLE
-            .withDescription("The action associated with this request is forbidden")
-            .asException());
-            */
+        return immediateFailedFuture(
+            Status.UNAVAILABLE
+                .withDescription("The action associated with this request is forbidden")
+                .asException());
       }
     } catch (IOException e) {
       return immediateFailedFuture(Status.fromThrowable(e).asException());
