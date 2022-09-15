@@ -49,10 +49,9 @@ public class Directories {
 
   private static final Integer POSIX = 1;
   private static final Integer ACL = 2;
-  private volatile static Integer attributeView;
+  private static volatile Integer attributeView;
 
   private Directories() {}
-
 
   private static Integer getFileAttributeView(Path dir) throws IOException {
     if (attributeView == null) {
@@ -61,7 +60,7 @@ public class Directories {
           FileStore fileStore = Files.getFileStore(dir);
           if (fileStore.supportsFileAttributeView("posix")) {
             attributeView = POSIX;
-          } else if (fileStore.supportsFileAttributeView("acl")){
+          } else if (fileStore.supportsFileAttributeView("acl")) {
             attributeView = ACL;
           } else {
             throw new UnsupportedOperationException("no recognized attribute view");
