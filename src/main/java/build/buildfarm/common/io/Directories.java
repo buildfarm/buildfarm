@@ -47,17 +47,40 @@ public class Directories {
   private static final Set<PosixFilePermission> nonWritablePerms =
       PosixFilePermissions.fromString("r-xr-xr-x");
 
+  private static final Integer POSIX = 1;
+  private static final Integer ACL = 2;
+  private volatile static Integer attributeView;
+
   private Directories() {}
 
+
+  private static Integer getFileAttributeView(Path dir) throws IOException {
+    if (attributeView == null) {
+      synchronized (Directories.class) {
+        if (attributeView == null) {
+          FileStore fileStore = Files.getFileStore(dir);
+          if (fileStore.supportsFileAttributeView("posix")) {
+            attributeView = POSIX;
+          } else if (fileStore.supportsFileAttributeView("acl")){
+            attributeView = ACL;
+          } else {
+            throw new UnsupportedOperationException("no recognized attribute view");
+          }
+        }
+      }
+    }
+    return attributeView;
+  }
+
   private static void makeWritable(Path dir, boolean writable) throws IOException {
-    FileStore fileStore = Files.getFileStore(dir);
-    if (fileStore.supportsFileAttributeView("posix")) {
+    Integer attributeView = getFileAttributeView(dir);
+    if (attributeView.equals(POSIX)) {
       if (writable) {
         Files.setPosixFilePermissions(dir, writablePerms);
       } else {
         Files.setPosixFilePermissions(dir, nonWritablePerms);
       }
-    } else if (fileStore.supportsFileAttributeView("acl")) {
+    } else if (attributeView.equals(ACL)) {
       // windows, we hope
       UserPrincipal authenticatedUsers =
           dir.getFileSystem()
@@ -78,8 +101,6 @@ public class Directories {
       List<AclEntry> acl = view.getAcl();
       acl.add(0, entry);
       view.setAcl(acl);
-    } else {
-      throw new UnsupportedOperationException("no recognized attribute view");
     }
   }
 
