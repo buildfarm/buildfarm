@@ -9,40 +9,40 @@ public class Backplane {
     SHARD
   }
 
-  private BACKPLANE_TYPE type = BACKPLANE_TYPE.SHARD;
+  private BACKPLANE_TYPE type;
   private String redisUri;
-  private int jedisPoolMaxTotal = 4000;
-  private String workersHashName = "Workers";
-  private String workerChannel = "WorkerChannel";
-  private String actionCachePrefix = "ActionCache";
-  private int actionCacheExpire = 2419200; // 4 Weeks
-  private String actionBlacklistPrefix = "ActionBlacklist";
-  private int actionBlacklistExpire = 3600; // 1 Hour;
-  private String invocationBlacklistPrefix = "InvocationBlacklist";
-  private String operationPrefix = "Operation";
-  private int operationExpire = 604800; // 1 Week
-  private String preQueuedOperationsListName = "{Arrival}:PreQueuedOperations";
-  private String processingListName = "{Arrival}:ProcessingOperations";
-  private String processingPrefix = "Processing";
-  private int processingTimeoutMillis = 20000;
-  private String queuedOperationsListName = "{Execution}:QueuedOperations";
-  private String dispatchingPrefix = "Dispatching";
-  private int dispatchingTimeoutMillis = 10000;
-  private String dispatchedOperationsHashName = "DispatchedOperations";
-  private String operationChannelPrefix = "OperationChannel";
-  private String casPrefix = "ContentAddressableStorage";
-  private int casExpire = 604800; // 1 Week
-  private boolean subscribeToBackplane = true;
-  private boolean runFailsafeOperation = true;
-  private int maxQueueDepth = 100000;
-  private int maxPreQueueDepth = 1000000;
-  private boolean priorityQueue = false;
+  private int jedisPoolMaxTotal;
+  private String workersHashName;
+  private String workerChannel;
+  private String actionCachePrefix;
+  private int actionCacheExpire;
+  private String actionBlacklistPrefix;
+  private int actionBlacklistExpire;
+  private String invocationBlacklistPrefix;
+  private String operationPrefix;
+  private int operationExpire;
+  private String preQueuedOperationsListName;
+  private String processingListName;
+  private String processingPrefix;
+  private int processingTimeoutMillis;
+  private String queuedOperationsListName;
+  private String dispatchingPrefix;
+  private int dispatchingTimeoutMillis;
+  private String dispatchedOperationsHashName;
+  private String operationChannelPrefix;
+  private String casPrefix;
+  private int casExpire;
+  private boolean subscribeToBackplane;
+  private boolean runFailsafeOperation;
+  private int maxQueueDepth;
+  private int maxPreQueueDepth;
+  private boolean priorityQueue;
   private Queue[] queues;
   private String redisPassword;
-  private int timeout = 10000;
+  private int timeout;
   private String[] redisNodes;
-  private int maxAttempts = 20;
-  private boolean cacheCas = false;
+  private int maxAttempts;
+  private boolean cacheCas;
 
   public String getRedisUri() {
     if (!Strings.isNullOrEmpty(redisUri)) {

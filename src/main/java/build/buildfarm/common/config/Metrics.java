@@ -21,8 +21,8 @@ public class Metrics {
     ALL
   }
 
-  private PUBLISHER publisher = PUBLISHER.LOG;
-  private LOG_LEVEL logLevel = LOG_LEVEL.OFF;
+  private PUBLISHER publisher;
+  private LOG_LEVEL logLevel;
   private String topic;
   private int topicMaxConnections;
   private String secretName;

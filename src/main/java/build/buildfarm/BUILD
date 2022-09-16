@@ -5,12 +5,6 @@ package(
     default_visibility = ["//src:__subpackages__"],
 )
 
-filegroup(
-    name = "configs",
-    srcs = ["logging.properties"],
-    visibility = ["//visibility:public"],
-)
-
 genrule(
     name = "tini.binary",
     srcs = ["@tini//file"],
@@ -21,7 +15,10 @@ genrule(
 java_binary(
     name = "buildfarm-server",
     classpath_resources = [
-        ":configs",
+        "//examples:configs",
+    ],
+    data = [
+        "//examples:configs",
     ],
     jvm_flags = ensure_accurate_metadata(),
     main_class = "build.buildfarm.server.BuildFarmServer",
@@ -54,7 +51,10 @@ container_image(
 java_binary(
     name = "buildfarm-shard-worker",
     classpath_resources = [
-        ":configs",
+        "//examples:configs",
+    ],
+    data = [
+        "//examples:configs",
     ],
     jvm_flags = ensure_accurate_metadata(),
     main_class = "build.buildfarm.worker.shard.Worker",
@@ -80,6 +80,12 @@ container_image(
 
 java_binary(
     name = "buildfarm-memory-worker",
+    classpath_resources = [
+        "//examples:configs",
+    ],
+    data = [
+        "//examples:configs",
+    ],
     jvm_flags = ensure_accurate_metadata(),
     main_class = "build.buildfarm.worker.memory.Worker",
     visibility = ["//visibility:public"],

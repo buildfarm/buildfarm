@@ -1,6 +1,8 @@
-package(default_visibility = ["//visibility:public"])
-
 filegroup(
-    name = "example_configs",
-    srcs = glob(["*.yml"]),
+    name = "configs",
+    srcs = glob([
+        "*.yml",
+        "*.properties",
+    ]),
+    visibility = ["//visibility:public"],
 )
