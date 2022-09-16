@@ -4,6 +4,6 @@ import lombok.Data;
 
 @Data
 public class GrpcMetrics {
-  private boolean enabled = false;
-  private boolean provideLatencyHistograms = false;
+  private boolean enabled;
+  private boolean provideLatencyHistograms;
 }

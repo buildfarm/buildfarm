@@ -114,14 +114,13 @@ java_image(
     args = ["/app/build_buildfarm/examples/config.shard.yml"],
     base = "@amazon_corretto_java_image_base//image",
     classpath_resources = [
-        "//src/main/java/build/buildfarm:configs",
+        "//examples:configs",
     ],
     data = [
-        "//examples:example_configs",
-        "//src/main/java/build/buildfarm:configs",
+        "//examples:configs",
     ],
     jvm_flags = [
-        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+        "-Djava.util.logging.config.file=/app/build_buildfarm/examples/logging.properties",
 
         # Flags related to OpenTelemetry
         "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
@@ -171,14 +170,13 @@ java_image(
     args = ["/app/build_buildfarm/examples/config.shard.yml"],
     base = ":worker_pkgs_image_wrapper",
     classpath_resources = [
-        "//src/main/java/build/buildfarm:configs",
+        "//examples:configs",
     ],
     data = [
-        "//examples:example_configs",
-        "//src/main/java/build/buildfarm:configs",
+        "//examples:configs",
     ],
     jvm_flags = [
-        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+        "-Djava.util.logging.config.file=/app/build_buildfarm/examples/logging.properties",
 
         # Flags related to OpenTelemetry
         "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",

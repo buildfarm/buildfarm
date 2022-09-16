@@ -6,19 +6,19 @@ import lombok.Data;
 
 @Data
 public class Memory {
-  private int listOperationsDefaultPageSize = 1024;
-  private int listOperationsMaxPageSize = 16384;
-  private int treeDefaultPageSize = 1024;
-  private int treeMaxPageSize = 16384;
-  private int operationPollTimeout = 30;
-  private int operationCompletedDelay = 10;
-  private boolean delegateCas = true;
+  private int listOperationsDefaultPageSize;
+  private int listOperationsMaxPageSize;
+  private int treeDefaultPageSize;
+  private int treeMaxPageSize;
+  private int operationPollTimeout;
+  private int operationCompletedDelay;
+  private boolean delegateCas;
   private String target;
-  private int deadlineAfterSeconds = 60;
-  private boolean streamStdout = true;
-  private boolean streamStderr = true;
-  private CASInsertionPolicy casPolicy = CASInsertionPolicy.ALWAYS_INSERT;
-  private int treePageSize = 0;
+  private int deadlineAfterSeconds;
+  private boolean streamStdout;
+  private boolean streamStderr;
+  private CASInsertionPolicy casPolicy;
+  private int treePageSize;
   private Platform platform = Platform.newBuilder().build();
   private Property[] properties;
 

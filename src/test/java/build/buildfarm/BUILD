@@ -1,9 +1,3 @@
-filegroup(
-    name = "configs",
-    srcs = ["logging.properties"],
-    visibility = [":__subpackages__"],
-)
-
 java_library(
     name = "test_runner",
     srcs = [

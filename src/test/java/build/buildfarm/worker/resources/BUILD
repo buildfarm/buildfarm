@@ -3,7 +3,7 @@ java_test(
     size = "small",
     srcs = glob(["*.java"]),
     classpath_resources = [
-        "//src/test/java/build/buildfarm:configs",
+        "//examples:configs",
     ],
     test_class = "build.buildfarm.AllTests",
     deps = [

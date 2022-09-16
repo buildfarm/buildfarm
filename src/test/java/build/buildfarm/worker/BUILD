@@ -13,7 +13,7 @@ java_test(
         ":fuse": ["FuseCASTest.java"],
         "//conditions:default": [],
     }),
-    data = ["//examples:example_configs"],
+    data = ["//examples:configs"],
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",
