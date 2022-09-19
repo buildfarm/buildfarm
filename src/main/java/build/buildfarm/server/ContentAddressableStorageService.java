@@ -68,11 +68,9 @@ public class ContentAddressableStorageService
   private final Instance instance;
   private final long writeDeadlineAfter;
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   public ContentAddressableStorageService(Instance instance) {
     this.instance = instance;
-    this.writeDeadlineAfter = configs.getServer().getCasWriteTimeout();
+    this.writeDeadlineAfter = BuildfarmConfigs.getInstance().getServer().getCasWriteTimeout();
   }
 
   String checkMessage(Digest digest, boolean found) {

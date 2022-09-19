@@ -32,7 +32,7 @@ mkdir -p $app_dir
 cp {buildfarm-shard-worker_deploy.jar} $app_dir
 cp {logging.properties} $app_dir
 mkdir -p $config_dir
-cp {config.shard.yml} $config_dir/worker.config
+cp {config.yml} $config_dir/worker.config
 mkdir -p $log_dir
 mkdir -p $service_dir
 cp {buildfarm-worker.service} $service_dir/%{name}.service

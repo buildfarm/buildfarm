@@ -129,8 +129,6 @@ public class MemoryInstance extends AbstractServerInstance {
   public static final String TIMEOUT_OUT_OF_BOUNDS =
       "A timeout specified is out of bounds with a configured range";
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   private final SetMultimap<String, WatchFuture> watchers;
   private final LoadingCache<String, ByteStringStreamSource> streams =
       CacheBuilder.newBuilder()
@@ -246,7 +244,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private static ActionCache createActionCache(
       ContentAddressableStorage cas, DigestUtil digestUtil) {
-    switch (configs.getWorker().getCas().getType()) {
+    switch (BuildfarmConfigs.getInstance().getWorker().getCas().getType()) {
       default:
         throw new IllegalArgumentException("ActionCache config not set in config");
       case GRPC:
@@ -265,8 +263,8 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   private static ActionCache createGrpcActionCache() {
-    Channel channel = createChannel(configs.getMemory().getTarget());
-    return new GrpcActionCache(configs.getServer().getName(), channel);
+    Channel channel = createChannel(BuildfarmConfigs.getInstance().getMemory().getTarget());
+    return new GrpcActionCache(BuildfarmConfigs.getInstance().getServer().getName(), channel);
   }
 
   private static ActionCache createDelegateCASActionCache(
@@ -288,7 +286,8 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   private static ActionCache createFilesystemActionCache() {
-    return new FilesystemActionCache(Paths.get(configs.getWorker().getCas().getPath()));
+    return new FilesystemActionCache(
+        Paths.get(BuildfarmConfigs.getInstance().getWorker().getCas().getPath()));
   }
 
   private static OperationsMap createCompletedOperationMap(
@@ -432,10 +431,12 @@ public class MemoryInstance extends AbstractServerInstance {
       PreconditionFailure.Builder preconditionFailure,
       RequestMetadata requestMetadata)
       throws InterruptedException, StatusException {
-    if (action.hasTimeout() && configs.getMaximumActionTimeout() > 0) {
+    if (action.hasTimeout() && BuildfarmConfigs.getInstance().getMaximumActionTimeout() > 0) {
       Duration timeout = action.getTimeout();
       Duration maximum =
-          Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build();
+          Duration.newBuilder()
+              .setSeconds(BuildfarmConfigs.getInstance().getMaximumActionTimeout())
+              .build();
       if (timeout.getSeconds() > maximum.getSeconds()
           || (timeout.getSeconds() == maximum.getSeconds()
               && timeout.getNanos() > maximum.getNanos())) {
@@ -612,13 +613,16 @@ public class MemoryInstance extends AbstractServerInstance {
       Duration actionTimeout = null;
       if (action.hasTimeout()) {
         actionTimeout = action.getTimeout();
-      } else if (configs.getDefaultActionTimeout() > 0) {
-        actionTimeout = Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build();
+      } else if (BuildfarmConfigs.getInstance().getDefaultActionTimeout() > 0) {
+        actionTimeout =
+            Duration.newBuilder()
+                .setSeconds(BuildfarmConfigs.getInstance().getDefaultActionTimeout())
+                .build();
       }
       if (actionTimeout != null) {
         Duration delay =
             Duration.newBuilder()
-                .setSeconds(configs.getMemory().getOperationCompletedDelay())
+                .setSeconds(BuildfarmConfigs.getInstance().getMemory().getOperationCompletedDelay())
                 .build();
         Duration timeout =
             Duration.newBuilder()
@@ -647,7 +651,9 @@ public class MemoryInstance extends AbstractServerInstance {
   private void onDispatched(Operation operation) {
     final String operationName = operation.getName();
     Duration timeout =
-        Duration.newBuilder().setSeconds(configs.getMemory().getOperationPollTimeout()).build();
+        Duration.newBuilder()
+            .setSeconds(BuildfarmConfigs.getInstance().getMemory().getOperationPollTimeout())
+            .build();
     Watchdog requeuer =
         new Watchdog(
             timeout,
@@ -923,22 +929,22 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected int getListOperationsDefaultPageSize() {
-    return configs.getMemory().getListOperationsDefaultPageSize();
+    return BuildfarmConfigs.getInstance().getMemory().getListOperationsDefaultPageSize();
   }
 
   @Override
   protected int getListOperationsMaxPageSize() {
-    return configs.getMemory().getListOperationsMaxPageSize();
+    return BuildfarmConfigs.getInstance().getMemory().getListOperationsMaxPageSize();
   }
 
   @Override
   protected int getTreeDefaultPageSize() {
-    return configs.getMemory().getTreeDefaultPageSize();
+    return BuildfarmConfigs.getInstance().getMemory().getTreeDefaultPageSize();
   }
 
   @Override
   protected int getTreeMaxPageSize() {
-    return configs.getMemory().getTreeMaxPageSize();
+    return BuildfarmConfigs.getInstance().getMemory().getTreeMaxPageSize();
   }
 
   @Override

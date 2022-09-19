@@ -30,6 +30,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import io.grpc.stub.ServerCallStreamObserver;
 import java.util.concurrent.ScheduledExecutorService;
+import javax.naming.ConfigurationException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -40,12 +41,11 @@ import org.mockito.ArgumentCaptor;
 public class ExecutionServiceTest {
   private Instance instance;
 
-  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   @Before
-  public void setUp() throws Exception {
+  public void setUp() throws ConfigurationException {
+    BuildfarmConfigs.loadConfigs();
     instance = mock(Instance.class);
-    configs.getServer().setClusterId("buildfarm-test");
+    BuildfarmConfigs.getInstance().getServer().setClusterId("buildfarm-test");
   }
 
   @SuppressWarnings("unchecked")

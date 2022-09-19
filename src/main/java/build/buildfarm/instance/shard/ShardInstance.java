@@ -239,13 +239,11 @@ public class ShardInstance extends AbstractServerInstance {
   private boolean stopped = true;
   private final Thread prometheusMetricsThread;
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   // TODO: move to config
   private static final Duration queueTimeout = Durations.fromSeconds(60);
 
   private static Backplane createBackplane(String identifier) throws ConfigurationException {
-    if (configs.getBackplane().getType().equals(SHARD)) {
+    if (BuildfarmConfigs.getInstance().getBackplane().getType().equals(SHARD)) {
       return new RedisShardBackplane(
           identifier, ShardInstance::stripOperation, ShardInstance::stripQueuedOperation);
     } else {
@@ -276,20 +274,24 @@ public class ShardInstance extends AbstractServerInstance {
         backplane,
         new ShardActionCache(
             DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE, backplane, actionCacheFetchService),
-        configs.getServer().isRunDispatchedMonitor(),
-        configs.getServer().getDispatchedMonitorIntervalSeconds(),
-        configs.getServer().isRunOperationQueuer(),
-        configs.getServer().getMaxEntrySizeBytes(),
-        configs.getServer().getMaxCpu(),
-        configs.getServer().getMaxRequeueAttempts(),
-        Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build(),
-        configs.getServer().isUseDenyList(),
+        BuildfarmConfigs.getInstance().getServer().isRunDispatchedMonitor(),
+        BuildfarmConfigs.getInstance().getServer().getDispatchedMonitorIntervalSeconds(),
+        BuildfarmConfigs.getInstance().getServer().isRunOperationQueuer(),
+        BuildfarmConfigs.getInstance().getServer().getMaxEntrySizeBytes(),
+        BuildfarmConfigs.getInstance().getServer().getMaxCpu(),
+        BuildfarmConfigs.getInstance().getServer().getMaxRequeueAttempts(),
+        Duration.newBuilder()
+            .setSeconds(BuildfarmConfigs.getInstance().getMaximumActionTimeout())
+            .build(),
+        BuildfarmConfigs.getInstance().getServer().isUseDenyList(),
         onStop,
         WorkerStubs.create(
             digestUtil,
-            Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build()),
+            Duration.newBuilder()
+                .setSeconds(BuildfarmConfigs.getInstance().getServer().getGrpcTimeout())
+                .build()),
         actionCacheFetchService,
-        configs.getServer().isEnsureOutputsPresent());
+        BuildfarmConfigs.getInstance().getServer().isEnsureOutputsPresent());
   }
 
   public ShardInstance(

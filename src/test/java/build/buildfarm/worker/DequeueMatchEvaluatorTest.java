@@ -21,6 +21,8 @@ import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import javax.naming.ConfigurationException;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -43,7 +45,11 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class DequeueMatchEvaluatorTest {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  @Before
+  public void setUp() throws ConfigurationException {
+    BuildfarmConfigs.loadConfigs();
+  }
 
   // Function under test: shouldKeepOperation
   // Reason for testing: empty plaform queue entries should be kept
@@ -96,7 +102,7 @@ public class DequeueMatchEvaluatorTest {
   @Test
   public void shouldKeepOperationInvalidMinCoresQueueEntry() throws Exception {
     // ARRANGE
-    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
+    BuildfarmConfigs.getInstance().getWorker().getDequeueMatchSettings().setAcceptEverything(false);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     workerProvisions.put("cores", "10");
 
@@ -150,8 +156,8 @@ public class DequeueMatchEvaluatorTest {
   @Test
   public void shouldKeepOperationUnmatchedPropertiesRejectionAcceptance() throws Exception {
     // ARRANGE
-    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
-    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
+    BuildfarmConfigs.getInstance().getWorker().getDequeueMatchSettings().setAcceptEverything(false);
+    BuildfarmConfigs.getInstance().getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
 
     QueueEntry entry =
@@ -169,7 +175,7 @@ public class DequeueMatchEvaluatorTest {
     assertThat(shouldKeep).isFalse();
 
     // ARRANGE
-    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(true);
+    BuildfarmConfigs.getInstance().getWorker().getDequeueMatchSettings().setAcceptEverything(true);
 
     // ACT
     shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
@@ -178,7 +184,7 @@ public class DequeueMatchEvaluatorTest {
     assertThat(shouldKeep).isTrue();
 
     // ARRANGE
-    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
+    BuildfarmConfigs.getInstance().getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
 
     // ACT
     shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);

@@ -24,14 +24,13 @@ import java.util.logging.Logger;
 public class LogMetricsPublisher extends AbstractMetricsPublisher {
   private static final Logger logger = Logger.getLogger(LogMetricsPublisher.class.getName());
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   private static Level logLevel;
 
   public LogMetricsPublisher() {
-    super(configs.getServer().getClusterId());
-    if (configs.getServer().getMetrics().getLogLevel() != null) {
-      logLevel = Level.parse(configs.getServer().getMetrics().getLogLevel().name());
+    super(BuildfarmConfigs.getInstance().getServer().getClusterId());
+    if (BuildfarmConfigs.getInstance().getServer().getMetrics().getLogLevel() != null) {
+      logLevel =
+          Level.parse(BuildfarmConfigs.getInstance().getServer().getMetrics().getLogLevel().name());
     } else {
       logLevel = Level.FINEST;
     }

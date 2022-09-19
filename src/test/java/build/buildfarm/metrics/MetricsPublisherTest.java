@@ -31,7 +31,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
-import java.io.IOException;
+import javax.naming.ConfigurationException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -63,13 +63,12 @@ public class MetricsPublisherTest {
   private final PreconditionFailure preconditionFailure =
       PreconditionFailure.getDefaultInstance().toBuilder().addViolations(defaultViolation).build();
 
-  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   @Before
-  public void setUp() throws IOException {
-    configs.getServer().setCloudRegion("test");
-    configs.getServer().setClusterId("buildfarm-test");
-    configs.getServer().getMetrics().setPublisher(Metrics.PUBLISHER.AWS);
+  public void setUp() throws ConfigurationException {
+    BuildfarmConfigs.loadConfigs();
+    BuildfarmConfigs.getInstance().getServer().setCloudRegion("test");
+    BuildfarmConfigs.getInstance().getServer().setClusterId("buildfarm-test");
+    BuildfarmConfigs.getInstance().getServer().getMetrics().setPublisher(Metrics.PUBLISHER.AWS);
   }
 
   @Test

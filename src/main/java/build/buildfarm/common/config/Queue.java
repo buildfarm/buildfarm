@@ -11,13 +11,19 @@ public class Queue {
     standard
   }
 
+  @Data
+  public static class Property {
+    private String name;
+    private String value;
+  }
+
   private String name;
   private boolean allowUnmatched;
   private List<Property> properties;
 
   public Platform getPlatform() {
     Platform.Builder platformBuilder = Platform.newBuilder();
-    for (Property property : this.properties) {
+    for (Property property : properties) {
       platformBuilder.addProperties(
           Platform.Property.newBuilder()
               .setName(property.getName())

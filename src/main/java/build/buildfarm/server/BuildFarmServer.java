@@ -68,11 +68,10 @@ public class BuildFarmServer extends LoggingMain {
   private final HealthStatusManager healthStatusManager;
   private final io.grpc.Server server;
   private boolean stopping = false;
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   public BuildFarmServer(String session)
       throws InterruptedException, ConfigurationException, IOException {
-    this(session, ServerBuilder.forPort(configs.getServer().getPort()));
+    this(session, ServerBuilder.forPort(BuildfarmConfigs.getInstance().getServer().getPort()));
   }
 
   public BuildFarmServer(String session, ServerBuilder<?> serverBuilder)
@@ -84,7 +83,7 @@ public class BuildFarmServer extends LoggingMain {
     healthStatusManager = new HealthStatusManager();
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-    if (configs.getServer().getSslCertificatePath() != null) {
+    if (BuildfarmConfigs.getInstance().getServer().getSslCertificatePath() != null) {
       // There are different Public Key Cryptography Standards (PKCS) that users may format their
       // certificate files in.  By default, the JDK cannot parse all of them.  In particular, it
       // cannot parse PKCS #1 (RSA Cryptography Standard).  When enabling TLS for GRPC, java's
@@ -93,7 +92,8 @@ public class BuildFarmServer extends LoggingMain {
       // is a library that will parse additional formats and allow users to provide certificates in
       // an otherwise unsupported format.
       Security.addProvider(new BouncyCastleProvider());
-      File ssl_certificate_path = new File(configs.getServer().getSslCertificatePath());
+      File ssl_certificate_path =
+          new File(BuildfarmConfigs.getInstance().getServer().getSslCertificatePath());
       serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
     }
 
@@ -121,13 +121,16 @@ public class BuildFarmServer extends LoggingMain {
   public static void handleGrpcMetricIntercepts(ServerBuilder<?> serverBuilder) {
     // Decide how to capture GRPC Prometheus metrics.
     // By default, we don't capture any.
-    if (configs.getServer().getGrpcMetrics().isEnabled()) {
+    if (BuildfarmConfigs.getInstance().getServer().getGrpcMetrics().isEnabled()) {
       // Assume core metrics.
       // Core metrics include send/receive totals tagged with return codes.  No latencies.
       Configuration grpcConfig = Configuration.cheapMetricsOnly();
 
       // Enable latency buckets.
-      if (configs.getServer().getGrpcMetrics().isProvideLatencyHistograms()) {
+      if (BuildfarmConfigs.getInstance()
+          .getServer()
+          .getGrpcMetrics()
+          .isProvideLatencyHistograms()) {
         grpcConfig = grpcConfig.allMetrics();
       }
 
@@ -144,7 +147,8 @@ public class BuildFarmServer extends LoggingMain {
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    PrometheusPublisher.startHttpServer(configs.getServer().getPrometheusPort());
+    PrometheusPublisher.startHttpServer(
+        BuildfarmConfigs.getInstance().getServer().getPrometheusPort());
     healthCheckMetric.labels("start").inc();
   }
 
@@ -217,20 +221,19 @@ public class BuildFarmServer extends LoggingMain {
     ServerOptions options = parser.getOptions(ServerOptions.class);
 
     try {
-      configs.loadConfigs(residue.get(0));
-    } catch (IOException e) {
+      BuildfarmConfigs.loadConfigs(residue.get(0));
+    } catch (ConfigurationException e) {
       logger.severe("Could not parse yml configuration file." + e);
     }
 
     String session = "buildfarm-server";
     if (!options.publicName.isEmpty()) {
       session += "-" + options.publicName;
-      configs.getServer().setPublicName(options.publicName);
+      BuildfarmConfigs.getInstance().getServer().setPublicName(options.publicName);
     }
     if (options.port > 0) {
-      configs.getServer().setPort(options.port);
+      BuildfarmConfigs.getInstance().getServer().setPort(options.port);
     }
-    logger.info(configs.toString());
     session += "-" + UUID.randomUUID();
     BuildFarmServer server;
     try {

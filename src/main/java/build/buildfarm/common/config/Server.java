@@ -29,8 +29,8 @@ public class Server {
   private long grpcTimeout;
   private long executeKeepaliveAfterSeconds;
   private boolean recordBesEvents;
-  private Admin admin = new Admin();
-  private Metrics metrics = new Metrics();
+  private Admin admin;
+  private Metrics metrics;
   private int maxCpu;
   private String clusterId;
   private String cloudRegion;

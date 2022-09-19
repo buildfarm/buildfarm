@@ -31,8 +31,6 @@ import java.util.logging.Logger;
 public class PublishBuildEventService extends PublishBuildEventImplBase {
   public static final Logger logger = Logger.getLogger(PublishBuildEventService.class.getName());
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   @Override
   public void publishLifecycleEvent(
       PublishLifecycleEventRequest request, StreamObserver<Empty> responseObserver) {
@@ -69,7 +67,8 @@ public class PublishBuildEventService extends PublishBuildEventImplBase {
   }
 
   private void recordEvent(PublishBuildToolEventStreamRequest in) {
-    if (configs.getServer().isRecordBesEvents() && in.hasOrderedBuildEvent()) {
+    if (BuildfarmConfigs.getInstance().getServer().isRecordBesEvents()
+        && in.hasOrderedBuildEvent()) {
       logger.log(Level.INFO, TextFormat.shortDebugString(in.getOrderedBuildEvent()));
     }
   }

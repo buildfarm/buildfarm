@@ -27,7 +27,6 @@ import java.util.logging.Logger;
 public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerImplBase {
   private static final Logger logger = Logger.getLogger(ShutDownWorkerGracefully.class.getName());
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final Worker worker;
 
   public ShutDownWorkerGracefully(Worker worker) {
@@ -45,8 +44,9 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
   public void prepareWorkerForGracefulShutdown(
       PrepareWorkerForGracefulShutDownRequest request,
       StreamObserver<PrepareWorkerForGracefulShutDownRequestResults> responseObserver) {
-    String clusterId = configs.getServer().getClusterId();
-    String clusterEndpoint = configs.getServer().getAdmin().getClusterEndpoint();
+    String clusterId = BuildfarmConfigs.getInstance().getServer().getClusterId();
+    String clusterEndpoint =
+        BuildfarmConfigs.getInstance().getServer().getAdmin().getClusterEndpoint();
     if (clusterId == null
         || clusterId.equals("")
         || clusterEndpoint == null
@@ -55,18 +55,18 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
           String.format(
               "Current AdminConfig doesn't have cluster_id or cluster_endpoint set, "
                   + "the worker %s won't be shut down.",
-              configs.getWorker().getPublicName());
+              BuildfarmConfigs.getInstance().getWorker().getPublicName());
       logger.log(WARNING, errorMessage);
       responseObserver.onError(new RuntimeException(errorMessage));
       return;
     }
 
-    if (!configs.getServer().getAdmin().isEnableGracefulShutdown()) {
+    if (!BuildfarmConfigs.getInstance().getServer().getAdmin().isEnableGracefulShutdown()) {
       String errorMessage =
           String.format(
               "Current AdminConfig doesn't support shut down worker gracefully, "
                   + "the worker %s won't be shut down.",
-              configs.getWorker().getPublicName());
+              BuildfarmConfigs.getInstance().getWorker().getPublicName());
       logger.log(WARNING, errorMessage);
       responseObserver.onError(new RuntimeException(errorMessage));
       return;

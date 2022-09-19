@@ -84,6 +84,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
+import javax.naming.ConfigurationException;
 import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 import org.junit.After;
 import org.junit.Before;
@@ -98,16 +99,13 @@ public class BuildFarmServerTest {
   private BuildFarmServer server;
   private ManagedChannel inProcessChannel;
 
-  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   @Before
-  public void setUp() throws Exception {
-    configs.getServer().setClusterId("buildfarm-test");
-    configs.getServer().setInstanceType(Server.INSTANCE_TYPE.MEMORY);
-    configs.getServer().setName("memory");
-    configs.getWorker().setPublicName("localhost:8981");
-    configs.getWorker().getCas().setType(MEMORY);
-    configs.getMemory().setTarget("localhost:8980");
+  public void setUp() throws ConfigurationException, InterruptedException, IOException {
+    BuildfarmConfigs.loadConfigs();
+    BuildfarmConfigs.getInstance().getServer().setClusterId("buildfarm-test");
+    BuildfarmConfigs.getInstance().getServer().setInstanceType(Server.INSTANCE_TYPE.MEMORY);
+    BuildfarmConfigs.getInstance().getServer().setName("memory");
+    BuildfarmConfigs.getInstance().getWorker().getCas().setType(MEMORY);
     String uniqueServerName = "in-process server for " + getClass();
     server =
         new BuildFarmServer(
@@ -445,7 +443,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void grpcMetricsOffByDefault() {
-    configs.getServer().getGrpcMetrics().setEnabled(false);
+    BuildfarmConfigs.getInstance().getServer().getGrpcMetrics().setEnabled(false);
     // ARRANGE
     ServerBuilder serverBuilder = mock(ServerBuilder.class);
 
@@ -458,7 +456,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void grpcMetricsEnabled() {
-    configs.getServer().getGrpcMetrics().setEnabled(true);
+    BuildfarmConfigs.getInstance().getServer().getGrpcMetrics().setEnabled(true);
     // ARRANGE
     ServerBuilder serverBuilder = mock(ServerBuilder.class);
 

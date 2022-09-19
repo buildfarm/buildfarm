@@ -15,9 +15,7 @@
 package build.buildfarm.examples;
 
 import build.buildfarm.common.config.BuildfarmConfigs;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import javax.naming.ConfigurationException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -33,26 +31,8 @@ public class ExampleConfigsTest {
   }
 
   @Test
-  public void memoryWorkerConfig() throws IOException {
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
+  public void fullConfig() throws ConfigurationException {
     BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-    configs.loadConfigs(configPath);
-  }
-
-  @Test
-  public void shardWorkerConfig() throws IOException {
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
-    BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-    configs.loadConfigs(configPath);
-  }
-
-  @Test
-  public void fullConfig() throws IOException {
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.yml");
-    BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-    configs.loadConfigs(configPath);
+    configs.loadConfigs(System.getenv("TEST_SRCDIR") + "/build_buildfarm/examples/config.yml");
   }
 }

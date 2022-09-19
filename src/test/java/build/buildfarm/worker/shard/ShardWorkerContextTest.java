@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker.shard;
 
-import static build.buildfarm.common.config.Server.INSTANCE_TYPE.SHARD;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -46,6 +45,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import javax.naming.ConfigurationException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -56,8 +56,6 @@ import org.mockito.MockitoAnnotations;
 @RunWith(JUnit4.class)
 public class ShardWorkerContextTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
-
-  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private Path root;
 
@@ -72,16 +70,13 @@ public class ShardWorkerContextTest {
   @Mock private CasWriter writer;
 
   @Before
-  public void setUp() throws Exception {
-    configs.getServer().setInstanceType(SHARD);
-    configs.getServer().setName("shard");
-    configs.getWorker().setPublicName("localhost:8981");
-    configs.getBackplane().setRedisUri("redis://localhost:6379");
+  public void setUp() throws ConfigurationException {
+    BuildfarmConfigs.loadConfigs();
     Queue queue = new Queue();
     queue.setProperties(new ArrayList<>());
-    Queue[] queues = new Queue[1];
-    queues[0] = queue;
-    configs.getBackplane().setQueues(queues);
+    List queues = new ArrayList();
+    queues.add(queue);
+    BuildfarmConfigs.getInstance().getBackplane().setQueues(queues);
 
     MockitoAnnotations.initMocks(this);
     when(instance.getDigestUtil()).thenReturn(DIGEST_UTIL);

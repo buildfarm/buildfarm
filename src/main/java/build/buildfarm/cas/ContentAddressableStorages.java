@@ -48,7 +48,6 @@ import java.util.UUID;
 import javax.naming.ConfigurationException;
 
 public final class ContentAddressableStorages {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private static Channel createChannel(String target) {
     NettyChannelBuilder builder =
@@ -57,25 +56,31 @@ public final class ContentAddressableStorages {
   }
 
   public static ContentAddressableStorage createGrpcCAS() {
-    Channel channel = createChannel(configs.getWorker().getCas().getTarget());
+    Channel channel =
+        createChannel(BuildfarmConfigs.getInstance().getWorker().getCas().getTarget());
     ByteStreamUploader byteStreamUploader =
         new ByteStreamUploader("", channel, null, 300, NO_RETRIES);
     ListMultimap<Digest, Runnable> onExpirations =
         synchronizedListMultimap(MultimapBuilder.hashKeys().arrayListValues().build());
 
-    return new GrpcCAS(configs.getServer().getName(), channel, byteStreamUploader, onExpirations);
+    return new GrpcCAS(
+        BuildfarmConfigs.getInstance().getServer().getName(),
+        channel,
+        byteStreamUploader,
+        onExpirations);
   }
 
   public static ContentAddressableStorage createFilesystemCAS() throws ConfigurationException {
-    String path = configs.getWorker().getCas().getPath();
+    String path = BuildfarmConfigs.getInstance().getWorker().getCas().getPath();
     if (path.isEmpty()) {
       throw new ConfigurationException("filesystem cas path is empty");
     }
-    long maxSizeBytes = configs.getWorker().getCas().getMaxSizeBytes();
-    long maxEntrySizeBytes = configs.getWorker().getCas().getMaxEntrySizeBytes();
-    int hexBucketLevels = configs.getWorker().getHexBucketLevels();
+    long maxSizeBytes = BuildfarmConfigs.getInstance().getWorker().getCas().getMaxSizeBytes();
+    long maxEntrySizeBytes =
+        BuildfarmConfigs.getInstance().getWorker().getCas().getMaxEntrySizeBytes();
+    int hexBucketLevels = BuildfarmConfigs.getInstance().getWorker().getHexBucketLevels();
     boolean storeFileDirsIndexInMemory =
-        configs.getWorker().getCas().isFileDirectoriesIndexInMemory();
+        BuildfarmConfigs.getInstance().getWorker().getCas().isFileDirectoriesIndexInMemory();
     if (maxSizeBytes <= 0) {
       throw new ConfigurationException("filesystem cas max_size_bytes <= 0");
     }
@@ -95,7 +100,7 @@ public final class ContentAddressableStorages {
             maxEntrySizeBytes,
             hexBucketLevels,
             storeFileDirsIndexInMemory,
-            DigestUtil.forHash("SHA256"),
+            DigestUtil.forHash(BuildfarmConfigs.getInstance().getDigestFunction().name()),
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor()) {
           @Override
@@ -112,7 +117,7 @@ public final class ContentAddressableStorages {
   }
 
   public static ContentAddressableStorage create() throws ConfigurationException {
-    switch (configs.getWorker().getCas().getType()) {
+    switch (BuildfarmConfigs.getInstance().getWorker().getCas().getType()) {
       default:
         throw new IllegalArgumentException("CAS config not set in config");
       case FILESYSTEM:
@@ -120,7 +125,7 @@ public final class ContentAddressableStorages {
       case GRPC:
         return createGrpcCAS();
       case MEMORY:
-        return new MemoryCAS(configs.getWorker().getCas().getMaxSizeBytes());
+        return new MemoryCAS(BuildfarmConfigs.getInstance().getWorker().getCas().getMaxSizeBytes());
     }
   }
 

@@ -22,15 +22,10 @@ All commandline options override corresponding config settings.
 Run via
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile> [<-p|--port> PORT]
+bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile>
 ```
 
-- **`configfile`** has to be in Protocol Buffer text format, corresponding to a [BuildFarmServerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L55) definition.
-
-  For an example, see the [examples](examples) directory, which contains the working example [examples/config.memory.yml](examples/config.memory.yml).
-  For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
-
-- **`PORT`** to expose service endpoints on
+- **`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
 
 ### Bazel Buildfarm Worker
 
@@ -40,10 +35,7 @@ Run via
 bazel run //src/main/java/build/buildfarm:buildfarm-memory-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
 ```
 
-- **`configfile`** has to be in Protocol Buffer text format, corresponding to a [WorkerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L459) definition.
-
-  For an example, see the [examples](examples) directory, which contains the working example [examples/config.memory.yml](examples/config.memory.yml).
-  For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
+- **`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
 
 - **`ROOT`** base directory path for all work being performed.
 

@@ -44,11 +44,9 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   private final Instance instance;
   private final boolean isWritable;
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   public ActionCacheService(Instance instance) {
     this.instance = instance;
-    this.isWritable = !configs.getServer().isActionCacheReadOnly();
+    this.isWritable = !BuildfarmConfigs.getInstance().getServer().isActionCacheReadOnly();
   }
 
   @Override

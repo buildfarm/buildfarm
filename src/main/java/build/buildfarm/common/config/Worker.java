@@ -8,12 +8,12 @@ import lombok.Data;
 public class Worker {
   private int port;
   private String publicName;
-  private Capabilities capabilities = new Capabilities();
+  private Capabilities capabilities;
   private String root;
   private int inlineContentLimit;
   private long operationPollPeriod;
-  private DequeueMatchSettings dequeueMatchSettings = new DequeueMatchSettings();
-  private Cas cas = new Cas();
+  private DequeueMatchSettings dequeueMatchSettings;
+  private Cas cas;
   private int executeStageWidth;
   private int executeStageWidthOffset;
   private int inputFetchStageWidth;
@@ -27,7 +27,7 @@ public class Worker {
   private boolean onlyMulticoreTests;
   private boolean allowBringYourOwnContainer;
   private boolean errorOperationRemainingResources;
-  private ExecutionPolicy[] executionPolicies;
+  private List<ExecutionPolicy> executionPolicies;
 
   public String getPublicName() {
     if (!Strings.isNullOrEmpty(publicName)) {
@@ -52,14 +52,6 @@ public class Worker {
       return inputFetchStageWidth;
     } else {
       return Math.max(1, getExecuteStageWidth() / 5);
-    }
-  }
-
-  public ExecutionPolicy[] getExecutionPolicies() {
-    if (executionPolicies != null) {
-      return executionPolicies;
-    } else {
-      return new ExecutionPolicy[0];
     }
   }
 }

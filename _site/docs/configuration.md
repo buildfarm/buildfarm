@@ -4,44 +4,6 @@ title: Configuration
 nav_order: 4
 ---
 
-## Shard Implementation
-
-Minimal required:
-
-```
-server:
-  instanceType: SHARD
-  name: shard
-backplane:
-  redisUri: "redis://localhost:6379"
-  queues:
-    - name: "cpu"
-      properties:
-        - name: "min-cores"
-          value: "*"
-        - name: "max-cores"
-          value: "*"
-worker:
-  publicName: "localhost:8981"
-```
-
-## Memory Implementation
-
-Minimal required:
-
-```
-server:
-  instanceType: MEMORY
-  name: memory
-worker:
-  cas:
-    type: MEMORY
-memory:
-  target: "localhost:8980"
-  properties:
-    - name: "cores"
-      value: "1"
-```
 ## All Configurations
 
 ### Common

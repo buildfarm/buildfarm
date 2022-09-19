@@ -60,7 +60,6 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
@@ -69,8 +68,6 @@ import javax.naming.ConfigurationException;
 
 public class Worker extends LoggingMain {
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
-
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private final Instance casInstance;
   private final Instance operationQueueInstance;
@@ -91,7 +88,7 @@ public class Worker extends LoggingMain {
   }
 
   private static Path getValidRoot(FileSystem fileSystem) throws ConfigurationException {
-    String rootValue = configs.getWorker().getRoot();
+    String rootValue = BuildfarmConfigs.getInstance().getWorker().getRoot();
     if (Strings.isNullOrEmpty(rootValue)) {
       throw new ConfigurationException("root value in config missing");
     }
@@ -99,7 +96,7 @@ public class Worker extends LoggingMain {
   }
 
   private static Path getValidCasCacheDirectory(Path root) throws ConfigurationException {
-    String casCacheValue = configs.getWorker().getCas().getPath();
+    String casCacheValue = BuildfarmConfigs.getInstance().getWorker().getCas().getPath();
     if (Strings.isNullOrEmpty(casCacheValue)) {
       throw new ConfigurationException("Cas cache directory value in config missing");
     }
@@ -108,7 +105,7 @@ public class Worker extends LoggingMain {
 
   private static HashFunction getValidHashFunction() throws ConfigurationException {
     try {
-      return configs.getDigestFunction();
+      return BuildfarmConfigs.getInstance().getDigestFunction();
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }
@@ -132,10 +129,10 @@ public class Worker extends LoggingMain {
 
   private static Instance newStubInstance(DigestUtil digestUtil) {
     return newStubInstance(
-        configs.getServer().getName(),
-        createChannel(configs.getMemory().getTarget()),
+        BuildfarmConfigs.getInstance().getServer().getName(),
+        createChannel(BuildfarmConfigs.getInstance().getMemory().getTarget()),
         digestUtil,
-        configs.getMemory().getDeadlineAfterSeconds());
+        BuildfarmConfigs.getInstance().getMemory().getDeadlineAfterSeconds());
   }
 
   private static Instance newStubInstance(
@@ -164,13 +161,14 @@ public class Worker extends LoggingMain {
 
     /* initialization */
     DigestUtil digestUtil = new DigestUtil(hashFunction);
-    ManagedChannel casChannel = createChannel(configs.getMemory().getTarget());
+    ManagedChannel casChannel =
+        createChannel(BuildfarmConfigs.getInstance().getMemory().getTarget());
     casInstance =
         newStubInstance(
-            configs.getServer().getName(),
+            BuildfarmConfigs.getInstance().getServer().getName(),
             casChannel,
             digestUtil,
-            configs.getMemory().getDeadlineAfterSeconds());
+            BuildfarmConfigs.getInstance().getMemory().getDeadlineAfterSeconds());
     uploader = createStubUploader(casInstance.getName(), casChannel);
     operationQueueInstance = newStubInstance(digestUtil);
     InputStreamFactory inputStreamFactory =
@@ -181,10 +179,10 @@ public class Worker extends LoggingMain {
         new InjectedCASFileCache(
             inputStreamFactory,
             root.resolve(casCacheDirectory),
-            configs.getWorker().getCas().getMaxSizeBytes(),
-            configs.getWorker().getCas().getMaxEntrySizeBytes(),
-            configs.getWorker().getHexBucketLevels(),
-            configs.getWorker().getCas().isFileDirectoriesIndexInMemory(),
+            BuildfarmConfigs.getInstance().getWorker().getCas().getMaxSizeBytes(),
+            BuildfarmConfigs.getInstance().getWorker().getCas().getMaxEntrySizeBytes(),
+            BuildfarmConfigs.getInstance().getWorker().getHexBucketLevels(),
+            BuildfarmConfigs.getInstance().getWorker().getCas().isFileDirectoriesIndexInMemory(),
             casInstance.getDigestUtil(),
             newDirectExecutorService(),
             directExecutor());
@@ -193,7 +191,7 @@ public class Worker extends LoggingMain {
 
   private @Nullable UserPrincipal getOwner(FileSystem fileSystem) throws ConfigurationException {
     try {
-      return getUser(configs.getWorker().getExecOwner(), fileSystem);
+      return getUser(BuildfarmConfigs.getInstance().getWorker().getExecOwner(), fileSystem);
     } catch (IOException e) {
       ConfigurationException configException =
           new ConfigurationException("Could not locate exec_owner");
@@ -214,8 +212,8 @@ public class Worker extends LoggingMain {
     OperationQueueClient oq =
         new OperationQueueClient(
             operationQueueInstance,
-            configs.getMemory().getPlatform(),
-            Arrays.asList(configs.getWorker().getExecutionPolicies()));
+            BuildfarmConfigs.getInstance().getMemory().getPlatform(),
+            BuildfarmConfigs.getInstance().getWorker().getExecutionPolicies());
 
     Instance acInstance = newStubInstance(casInstance.getDigestUtil());
     WorkerContext context =
@@ -289,9 +287,8 @@ public class Worker extends LoggingMain {
       return false;
     }
     try {
-      configs.loadConfigs(residue.get(0));
-      logger.info(configs.toString());
-    } catch (IOException e) {
+      BuildfarmConfigs.loadConfigs(residue.get(0));
+    } catch (ConfigurationException e) {
       logger.severe("Could not parse yml configuration file." + e);
     }
     try {

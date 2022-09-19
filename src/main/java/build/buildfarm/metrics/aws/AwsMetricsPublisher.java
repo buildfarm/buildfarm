@@ -41,7 +41,6 @@ import java.util.logging.Logger;
 public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   private static final Logger logger = Logger.getLogger(AwsMetricsPublisher.class.getName());
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private static AmazonSNSAsync snsClient;
 
   private final String snsTopicOperations;
@@ -51,11 +50,12 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   private final int snsClientMaxConnections;
 
   public AwsMetricsPublisher() {
-    super(configs.getServer().getClusterId());
-    snsTopicOperations = configs.getServer().getMetrics().getTopic();
-    region = configs.getServer().getCloudRegion();
-    getAwsSecret(configs.getServer().getMetrics().getSecretName());
-    snsClientMaxConnections = configs.getServer().getMetrics().getTopicMaxConnections();
+    super(BuildfarmConfigs.getInstance().getServer().getClusterId());
+    snsTopicOperations = BuildfarmConfigs.getInstance().getServer().getMetrics().getTopic();
+    region = BuildfarmConfigs.getInstance().getServer().getCloudRegion();
+    getAwsSecret(BuildfarmConfigs.getInstance().getServer().getMetrics().getSecretName());
+    snsClientMaxConnections =
+        BuildfarmConfigs.getInstance().getServer().getMetrics().getTopicMaxConnections();
     if (!StringUtils.isNullOrEmpty(snsTopicOperations)
         && snsClientMaxConnections > 0
         && !StringUtils.isNullOrEmpty(accessKeyId)

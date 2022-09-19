@@ -79,7 +79,6 @@ public class S3Bucket {
   /**
    * @brief Constructor.
    * @details Construct an S3 bucket with existing bucket and s3 instance.
-   * @param config Configuration information for establishing the bucket.
    * @param s3 An established S3 instance
    * @param bucket An established bucket instance
    */

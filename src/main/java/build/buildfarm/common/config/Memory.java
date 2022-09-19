@@ -2,6 +2,7 @@ package build.buildfarm.common.config;
 
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -20,11 +21,17 @@ public class Memory {
   private CASInsertionPolicy casPolicy;
   private int treePageSize;
   private Platform platform = Platform.newBuilder().build();
-  private Property[] properties;
+  private List<Property> properties;
+
+  @Data
+  public static class Property {
+    private String name;
+    private String value;
+  }
 
   public Platform getPlatform() {
     Platform.Builder platformBuilder = Platform.newBuilder();
-    for (Property property : this.properties) {
+    for (Property property : properties) {
       platformBuilder.addProperties(
           Platform.Property.newBuilder()
               .setName(property.getName())
@@ -32,9 +39,5 @@ public class Memory {
               .build());
     }
     return platformBuilder.build();
-  }
-
-  public void setPlatform(Platform platform) {
-    this.platform = Platform.newBuilder().build();
   }
 }

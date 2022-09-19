@@ -53,11 +53,10 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private final ScheduledExecutorService keepaliveScheduler;
   private final MetricsPublisher metricsPublisher;
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   public ExecutionService(Instance instance, ScheduledExecutorService keepaliveScheduler) {
     this.instance = instance;
-    this.keepaliveAfter = configs.getServer().getExecuteKeepaliveAfterSeconds();
+    this.keepaliveAfter =
+        BuildfarmConfigs.getInstance().getServer().getExecuteKeepaliveAfterSeconds();
     this.keepaliveScheduler = keepaliveScheduler;
     this.metricsPublisher = getMetricsPublisher();
   }
@@ -206,7 +205,10 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   }
 
   private static MetricsPublisher getMetricsPublisher() {
-    switch (configs.getServer().getMetrics().getPublisher()) {
+    if (BuildfarmConfigs.getInstance().getServer().getMetrics().getPublisher() == null) {
+      return new LogMetricsPublisher();
+    }
+    switch (BuildfarmConfigs.getInstance().getServer().getMetrics().getPublisher()) {
       default:
         return new LogMetricsPublisher();
       case AWS:

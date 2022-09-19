@@ -69,7 +69,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -81,8 +80,6 @@ import javax.annotation.Nullable;
 
 class OperationQueueWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(WorkerContext.class.getName());
-
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private final OperationQueueClient oq;
   private final Instance casInstance;
@@ -115,7 +112,8 @@ class OperationQueueWorkerContext implements WorkerContext {
     this.root = root;
     this.retrier = retrier;
     policies =
-        ExecutionPolicies.toMultimap(Arrays.asList(configs.getWorker().getExecutionPolicies()));
+        ExecutionPolicies.toMultimap(
+            BuildfarmConfigs.getInstance().getWorker().getExecutionPolicies());
   }
 
   @Override
@@ -129,14 +127,16 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public boolean shouldErrorOperationOnRemainingResources() {
-    return configs.getWorker().isErrorOperationRemainingResources();
+    return BuildfarmConfigs.getInstance().getWorker().isErrorOperationRemainingResources();
   }
 
   @Override
   public Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage) {
     Poller poller =
         new Poller(
-            Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build());
+            Duration.newBuilder()
+                .setSeconds(BuildfarmConfigs.getInstance().getWorker().getOperationPollPeriod())
+                .build());
     resumePoller(poller, name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
     return poller;
   }
@@ -182,62 +182,66 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public CASInsertionPolicy getFileCasPolicy() {
-    return configs.getMemory().getCasPolicy();
+    return BuildfarmConfigs.getInstance().getMemory().getCasPolicy();
   }
 
   @Override
   public CASInsertionPolicy getStdoutCasPolicy() {
-    return configs.getMemory().getCasPolicy();
+    return BuildfarmConfigs.getInstance().getMemory().getCasPolicy();
   }
 
   @Override
   public CASInsertionPolicy getStderrCasPolicy() {
-    return configs.getMemory().getCasPolicy();
+    return BuildfarmConfigs.getInstance().getMemory().getCasPolicy();
   }
 
   @Override
   public int getInputFetchStageWidth() {
-    return configs.getWorker().getInputFetchStageWidth();
+    return BuildfarmConfigs.getInstance().getWorker().getInputFetchStageWidth();
   }
 
   @Override
   public int getExecuteStageWidth() {
-    return configs.getWorker().getExecuteStageWidth();
+    return BuildfarmConfigs.getInstance().getWorker().getExecuteStageWidth();
   }
 
   @Override
   public int getInputFetchDeadline() {
-    return configs.getWorker().getInputFetchDeadline();
+    return BuildfarmConfigs.getInstance().getWorker().getInputFetchDeadline();
   }
 
   @Override
   public boolean hasDefaultActionTimeout() {
-    return configs.getDefaultActionTimeout() > 0;
+    return BuildfarmConfigs.getInstance().getDefaultActionTimeout() > 0;
   }
 
   @Override
   public boolean hasMaximumActionTimeout() {
-    return configs.getMaximumActionTimeout() > 0;
+    return BuildfarmConfigs.getInstance().getMaximumActionTimeout() > 0;
   }
 
   @Override
   public boolean getStreamStdout() {
-    return configs.getMemory().isStreamStdout();
+    return BuildfarmConfigs.getInstance().getMemory().isStreamStdout();
   }
 
   @Override
   public boolean getStreamStderr() {
-    return configs.getMemory().isStreamStderr();
+    return BuildfarmConfigs.getInstance().getMemory().isStreamStderr();
   }
 
   @Override
   public Duration getDefaultActionTimeout() {
-    return Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build();
+    return Duration.newBuilder()
+        .setSeconds(BuildfarmConfigs.getInstance().getDefaultActionTimeout())
+        .build();
   }
 
   @Override
   public Duration getMaximumActionTimeout() {
-    return Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build();
+    return Duration.newBuilder()
+        .setSeconds(BuildfarmConfigs.getInstance().getMaximumActionTimeout())
+        .build();
   }
 
   @Override
@@ -255,9 +259,9 @@ class OperationQueueWorkerContext implements WorkerContext {
         outputFiles,
         outputDirs,
         uploader,
-        configs.getWorker().getInlineContentLimit(),
-        configs.getMemory().getCasPolicy(),
-        configs.getMemory().getCasPolicy());
+        BuildfarmConfigs.getInstance().getWorker().getInlineContentLimit(),
+        BuildfarmConfigs.getInstance().getMemory().getCasPolicy(),
+        BuildfarmConfigs.getInstance().getMemory().getCasPolicy());
   }
 
   @Override
@@ -560,7 +564,8 @@ class OperationQueueWorkerContext implements WorkerContext {
       OutputDirectory childOutputDirectory =
           outputDirectory != null ? outputDirectory.getChild(name) : null;
       Path dirPath = execDir.resolve(name);
-      if (childOutputDirectory != null || !configs.getWorker().isLinkInputDirectories()) {
+      if (childOutputDirectory != null
+          || !BuildfarmConfigs.getInstance().getWorker().isLinkInputDirectories()) {
         Files.createDirectories(dirPath);
         fetchInputs(
             dirPath, digest, directoriesIndex, childOutputDirectory, inputFiles, inputDirectories);

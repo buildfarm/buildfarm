@@ -23,15 +23,14 @@ import build.buildfarm.instance.shard.ShardInstance;
 import javax.naming.ConfigurationException;
 
 public class BuildFarmInstances {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   public static Instance createInstance(String session, Runnable onStop)
       throws InterruptedException, ConfigurationException {
-    String name = configs.getServer().getName();
+    String name = BuildfarmConfigs.getInstance().getServer().getName();
     HashFunction hashFunction = getValidHashFunction();
     DigestUtil digestUtil = new DigestUtil(hashFunction);
     Instance instance;
-    switch (configs.getServer().getInstanceType()) {
+    switch (BuildfarmConfigs.getInstance().getServer().getInstanceType()) {
       default:
         throw new IllegalArgumentException("Instance type not set in config");
       case MEMORY:
@@ -45,6 +44,6 @@ public class BuildFarmInstances {
   }
 
   private static HashFunction getValidHashFunction() {
-    return configs.getDigestFunction();
+    return BuildfarmConfigs.getInstance().getDigestFunction();
   }
 }

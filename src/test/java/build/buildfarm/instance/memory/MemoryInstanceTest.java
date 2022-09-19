@@ -97,7 +97,6 @@ import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class MemoryInstanceTest {
-  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final DigestUtil DIGEST_UTIL = new DigestUtil(DigestUtil.HashFunction.SHA256);
   private final Command simpleCommand = Command.newBuilder().addArguments("true").build();
   private final Digest simpleCommandDigest = DIGEST_UTIL.compute(simpleCommand);
@@ -118,11 +117,10 @@ public class MemoryInstanceTest {
 
   @Before
   public void setUp() throws Exception {
-    configs.getServer().setInstanceType(Server.INSTANCE_TYPE.MEMORY);
-    configs.getServer().setName("memory");
-    configs.getWorker().setPublicName("localhost:8981");
-    configs.getWorker().getCas().setType(MEMORY);
-    configs.getMemory().setTarget("localhost:8980");
+    BuildfarmConfigs.loadConfigs();
+    BuildfarmConfigs.getInstance().getServer().setInstanceType(Server.INSTANCE_TYPE.MEMORY);
+    BuildfarmConfigs.getInstance().getServer().setName("memory");
+    BuildfarmConfigs.getInstance().getWorker().getCas().setType(MEMORY);
     outstandingOperations = new MemoryInstance.OutstandingOperations();
     watchers =
         synchronizedSetMultimap(

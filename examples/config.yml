@@ -42,25 +42,11 @@ backplane:
   redisPassword:
   redisNodes:
   jedisPoolMaxTotal: 4000
-  workersHashName: "Workers"
-  workerChannel: "WorkerChannel"
-  actionCachePrefix: "ActionCache"
   actionCacheExpire: 2419200 # 4 weeks
-  actionBlacklistPrefix: "ActionBlacklist"
   actionBlacklistExpire: 3600 # 1 hour
-  invocationBlacklistPrefix: "InvocationBlacklist"
-  operationPrefix: "Operation"
   operationExpire: 604800 # 1 week
-  preQueuedOperationsListName: "{Arrival}:PreQueuedOperations"
-  processingListName: "{Arrival}:ProcessingOperations"
-  processingPrefix: "Processing"
   processingTimeoutMillis: 20000
-  queuedOperationsListName: "{Execution}:QueuedOperations"
-  dispatchingPrefix: "Dispatching"
   dispatchingTimeoutMillis: 10000
-  dispatchedOperationsHashName: "DispatchedOperations"
-  operationChannelPrefix: "OperationChannel"
-  casPrefix: "ContentAddressableStorage"
   casExpire: 604800 # 1 week
   subscribeToBackplane: true
   runFailsafeOperation: true
@@ -78,11 +64,6 @@ backplane:
           value: "*"
         - name: "max-cores"
           value: "*"
-    - name: "gpu"
-      allowUnmatched: true
-      properties:
-        - name: "gpu"
-          value: "1"
 worker:
   port: 8981
   publicName: "localhost:8981"
@@ -121,8 +102,6 @@ worker:
       executionWrapper:
         path: "/"
         arguments:
-          - "arg1"
-          - "arg2"
 memory:
   listOperationsDefaultPageSize: 1024
   listOperationsMaxPageSize: 16384
@@ -138,5 +117,5 @@ memory:
   casPolicy: ALWAYS_INSERT
   treePageSize: 0
   properties:
-    - name: "key_name"
-      value: "value_string"
+    - name: "key"
+      value: "val"

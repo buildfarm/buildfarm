@@ -24,13 +24,19 @@ import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
 import io.grpc.stub.StreamObserver;
+import javax.naming.ConfigurationException;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ActionCacheServiceTest {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
+  @Before
+  public void setUp() throws ConfigurationException {
+    BuildfarmConfigs.loadConfigs();
+  }
 
   @Test
   public void writeFailsWhenActionCacheIsReadOnly() throws Exception {
@@ -38,8 +44,8 @@ public class ActionCacheServiceTest {
     // then attempting to write to it should result in an error.
 
     // ARRANGE
+    BuildfarmConfigs.getInstance().getServer().setActionCacheReadOnly(true);
     Instance instance = mock(Instance.class);
-    configs.getServer().setActionCacheReadOnly(true);
     ActionCacheService service = new ActionCacheService(instance);
 
     // ACT
@@ -58,7 +64,7 @@ public class ActionCacheServiceTest {
 
     // ARRANGE
     Instance instance = mock(Instance.class);
-    configs.getServer().setActionCacheReadOnly(false);
+    BuildfarmConfigs.getInstance().getServer().setActionCacheReadOnly(false);
     ActionCacheService service = new ActionCacheService(instance);
 
     // ACT

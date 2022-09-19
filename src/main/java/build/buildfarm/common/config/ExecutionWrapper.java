@@ -1,9 +1,10 @@
 package build.buildfarm.common.config;
 
+import java.util.List;
 import lombok.Data;
 
 @Data
 public class ExecutionWrapper {
   private String path;
-  private String[] arguments = new String[0];
+  private List<String> arguments;
 }

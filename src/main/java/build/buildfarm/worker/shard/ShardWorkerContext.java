@@ -102,8 +102,6 @@ class ShardWorkerContext implements WorkerContext {
   private static final Counter operationPollerCounter =
       Counter.build().name("operation_poller").help("Number of operations polled.").register();
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   private final String name;
   private final SetMultimap<String, String> matchProvisions;
   private final Duration operationPollPeriod;
@@ -133,7 +131,8 @@ class ShardWorkerContext implements WorkerContext {
     ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
     Platform matchPlatform =
         ExecutionPolicies.getMatchPlatform(
-            configs.getBackplane().getQueues()[0].getPlatform(), policies);
+            BuildfarmConfigs.getInstance().getBackplane().getQueues().get(0).getPlatform(),
+            policies);
     for (Platform.Property property : matchPlatform.getPropertiesList()) {
       provisions.put(property.getName(), property.getValue());
     }
@@ -277,7 +276,12 @@ class ShardWorkerContext implements WorkerContext {
     try {
       queueEntry =
           backplane.dispatchOperation(
-              configs.getBackplane().getQueues()[0].getPlatform().getPropertiesList());
+              BuildfarmConfigs.getInstance()
+                  .getBackplane()
+                  .getQueues()
+                  .get(0)
+                  .getPlatform()
+                  .getPropertiesList());
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {

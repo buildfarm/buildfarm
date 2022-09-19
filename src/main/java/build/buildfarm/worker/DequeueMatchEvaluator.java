@@ -40,7 +40,7 @@ import org.jetbrains.annotations.NotNull;
  *     settings provided allow varying amount of leniency when evaluating the platform properties.
  */
 public class DequeueMatchEvaluator {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   /**
    * @brief Decide whether the worker should keep the operation or put it back on the queue.
    * @details Compares the platform properties of the worker to the operation's platform properties.
@@ -89,7 +89,7 @@ public class DequeueMatchEvaluator {
       SetMultimap<String, String> workerProvisions, Platform platform) {
     // attempt to execute everything the worker gets off the queue.
     // this is a recommended configuration.
-    if (configs.getWorker().getDequeueMatchSettings().isAcceptEverything()) {
+    if (BuildfarmConfigs.getInstance().getWorker().getDequeueMatchSettings().isAcceptEverything()) {
       return true;
     }
 
@@ -164,7 +164,7 @@ public class DequeueMatchEvaluator {
     }
 
     // accept other properties not specified on the worker
-    if (configs.getWorker().getDequeueMatchSettings().isAllowUnmatched()) {
+    if (BuildfarmConfigs.getInstance().getWorker().getDequeueMatchSettings().isAllowUnmatched()) {
       return true;
     }
 

@@ -134,7 +134,6 @@ public class Worker extends LoggingMain {
 
   private static final int shutdownWaitTimeInSeconds = 10;
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final boolean hasCasCapability;
   private final boolean hasExecutionCapability;
 
@@ -264,7 +263,8 @@ public class Worker extends LoggingMain {
       logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
     } finally {
       // make a grpc call to disable scale protection
-      String clusterEndpoint = configs.getServer().getAdmin().getClusterEndpoint();
+      String clusterEndpoint =
+          BuildfarmConfigs.getInstance().getServer().getAdmin().getClusterEndpoint();
       logger.log(
           INFO,
           String.format(
@@ -272,7 +272,8 @@ public class Worker extends LoggingMain {
               timeWaited,
               pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
       try {
-        disableScaleInProtection(clusterEndpoint, configs.getWorker().getPublicName());
+        disableScaleInProtection(
+            clusterEndpoint, BuildfarmConfigs.getInstance().getWorker().getPublicName());
       } catch (Exception e) {
         logger.log(
             SEVERE,
@@ -314,12 +315,12 @@ public class Worker extends LoggingMain {
   private static Path getValidRoot() throws ConfigurationException {
     addMissingRoot();
     verifyRootConfiguration();
-    return Paths.get(configs.getWorker().getRoot());
+    return Paths.get(BuildfarmConfigs.getInstance().getWorker().getRoot());
   }
 
   private static void addMissingRoot() throws ConfigurationException {
     try {
-      Path root = Paths.get(configs.getWorker().getRoot());
+      Path root = Paths.get(BuildfarmConfigs.getInstance().getWorker().getRoot());
       if (!Files.isDirectory(root)) {
         Files.createDirectories(root);
       }
@@ -330,7 +331,7 @@ public class Worker extends LoggingMain {
   }
 
   private static void verifyRootConfiguration() throws ConfigurationException {
-    String rootValue = configs.getWorker().getRoot();
+    String rootValue = BuildfarmConfigs.getInstance().getWorker().getRoot();
 
     // Configuration error if no root is specified.
     if (Strings.isNullOrEmpty(rootValue)) {
@@ -345,7 +346,7 @@ public class Worker extends LoggingMain {
   }
 
   private static Path getValidFilesystemCASPath(Path root) throws ConfigurationException {
-    String pathValue = configs.getWorker().getCas().getPath();
+    String pathValue = BuildfarmConfigs.getInstance().getWorker().getCas().getPath();
     if (Strings.isNullOrEmpty(pathValue)) {
       throw new ConfigurationException("Cas cache directory value in config missing");
     }
@@ -354,7 +355,7 @@ public class Worker extends LoggingMain {
 
   private static HashFunction getValidHashFunction() throws ConfigurationException {
     try {
-      return configs.getDigestFunction();
+      return BuildfarmConfigs.getInstance().getDigestFunction();
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }
@@ -371,18 +372,24 @@ public class Worker extends LoggingMain {
   @SuppressWarnings({"deprecation", "unchecked"})
   public Worker(String session) throws ConfigurationException {
     super("BuildFarmShardWorker");
-    ServerBuilder<?> serverBuilder = ServerBuilder.forPort(configs.getWorker().getPort());
-    hasCasCapability = configs.getWorker().getCapabilities().isCas();
-    hasExecutionCapability = configs.getWorker().getCapabilities().isExecution();
-    String identifier = "buildfarm-worker-" + configs.getWorker().getPublicName() + "-" + session;
+    ServerBuilder<?> serverBuilder =
+        ServerBuilder.forPort(BuildfarmConfigs.getInstance().getWorker().getPort());
+    hasCasCapability = BuildfarmConfigs.getInstance().getWorker().getCapabilities().isCas();
+    hasExecutionCapability =
+        BuildfarmConfigs.getInstance().getWorker().getCapabilities().isExecution();
+    String identifier =
+        "buildfarm-worker-"
+            + BuildfarmConfigs.getInstance().getWorker().getPublicName()
+            + "-"
+            + session;
     root = getValidRoot();
-    if (configs.getWorker().getPublicName().isEmpty()) {
+    if (BuildfarmConfigs.getInstance().getWorker().getPublicName().isEmpty()) {
       throw new ConfigurationException("worker's public name should not be empty");
     }
 
     digestUtil = new DigestUtil(getValidHashFunction());
 
-    if (SHARD.equals(configs.getBackplane().getType())) {
+    if (SHARD.equals(BuildfarmConfigs.getInstance().getBackplane().getType())) {
       backplane =
           new RedisShardBackplane(identifier, this::stripOperation, this::stripQueuedOperation);
     } else {
@@ -392,7 +399,9 @@ public class Worker extends LoggingMain {
     workerStubs =
         WorkerStubs.create(
             digestUtil,
-            Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build());
+            Duration.newBuilder()
+                .setSeconds(BuildfarmConfigs.getInstance().getServer().getGrpcTimeout())
+                .build());
 
     ExecutorService removeDirectoryService =
         newFixedThreadPool(
@@ -402,7 +411,7 @@ public class Worker extends LoggingMain {
 
     InputStreamFactory remoteInputStreamFactory =
         new RemoteInputStreamFactory(
-            configs.getWorker().getPublicName(),
+            BuildfarmConfigs.getInstance().getWorker().getPublicName(),
             backplane,
             new Random(),
             workerStubs,
@@ -415,7 +424,10 @@ public class Worker extends LoggingMain {
 
     instance =
         new ShardWorkerInstance(
-            configs.getWorker().getPublicName(), digestUtil, backplane, storage);
+            BuildfarmConfigs.getInstance().getWorker().getPublicName(),
+            digestUtil,
+            backplane,
+            storage);
 
     // Create the appropriate writer for the context
     CasWriter writer;
@@ -427,26 +439,32 @@ public class Worker extends LoggingMain {
 
     ShardWorkerContext context =
         new ShardWorkerContext(
-            configs.getWorker().getPublicName(),
-            Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build(),
+            BuildfarmConfigs.getInstance().getWorker().getPublicName(),
+            Duration.newBuilder()
+                .setSeconds(BuildfarmConfigs.getInstance().getWorker().getOperationPollPeriod())
+                .build(),
             backplane::pollOperation,
-            configs.getWorker().getInputFetchStageWidth(),
-            configs.getWorker().getExecuteStageWidth(),
-            configs.getWorker().getInputFetchDeadline(),
+            BuildfarmConfigs.getInstance().getWorker().getInputFetchStageWidth(),
+            BuildfarmConfigs.getInstance().getWorker().getExecuteStageWidth(),
+            BuildfarmConfigs.getInstance().getWorker().getInputFetchDeadline(),
             backplane,
             execFileSystem,
             new EmptyInputStreamFactory(
                 new FailoverInputStreamFactory(
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
-            Arrays.asList(configs.getWorker().getExecutionPolicies()),
+            BuildfarmConfigs.getInstance().getWorker().getExecutionPolicies(),
             instance,
-            Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build(),
-            Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build(),
-            configs.getWorker().getDefaultMaxCores(),
-            configs.getWorker().isLimitGlobalExecution(),
-            configs.getWorker().isOnlyMulticoreTests(),
-            configs.getWorker().isAllowBringYourOwnContainer(),
-            configs.getWorker().isErrorOperationRemainingResources(),
+            Duration.newBuilder()
+                .setSeconds(BuildfarmConfigs.getInstance().getDefaultActionTimeout())
+                .build(),
+            Duration.newBuilder()
+                .setSeconds(BuildfarmConfigs.getInstance().getMaximumActionTimeout())
+                .build(),
+            BuildfarmConfigs.getInstance().getWorker().getDefaultMaxCores(),
+            BuildfarmConfigs.getInstance().getWorker().isLimitGlobalExecution(),
+            BuildfarmConfigs.getInstance().getWorker().isOnlyMulticoreTests(),
+            BuildfarmConfigs.getInstance().getWorker().isAllowBringYourOwnContainer(),
+            BuildfarmConfigs.getInstance().getWorker().isErrorOperationRemainingResources(),
             writer);
 
     pipeline = new Pipeline();
@@ -622,7 +640,7 @@ public class Worker extends LoggingMain {
 
   private @Nullable UserPrincipal getOwner(FileSystem fileSystem) throws ConfigurationException {
     try {
-      return getUser(configs.getWorker().getExecOwner(), fileSystem);
+      return getUser(BuildfarmConfigs.getInstance().getWorker().getExecOwner(), fileSystem);
     } catch (IOException e) {
       ConfigurationException configException =
           new ConfigurationException("Could not locate exec_owner");
@@ -654,13 +672,15 @@ public class Worker extends LoggingMain {
       Executor accessRecorder,
       ContentAddressableStorage delegate)
       throws ConfigurationException {
-    switch (configs.getWorker().getCas().getType()) {
+    switch (BuildfarmConfigs.getInstance().getWorker().getCas().getType()) {
       default:
         throw new IllegalArgumentException("Invalid cas type specified");
       case MEMORY:
       case FUSE: // FIXME have FUSE refer to a name for storage backing, and topo
         return new MemoryCAS(
-            configs.getWorker().getCas().getMaxSizeBytes(), this::onStoragePut, delegate);
+            BuildfarmConfigs.getInstance().getWorker().getCas().getMaxSizeBytes(),
+            this::onStoragePut,
+            delegate);
       case GRPC:
         checkState(delegate == null, "grpc cas cannot delegate");
         return createGrpcCAS();
@@ -668,10 +688,10 @@ public class Worker extends LoggingMain {
         return new ShardCASFileCache(
             remoteInputStreamFactory,
             root.resolve(getValidFilesystemCASPath(root)),
-            configs.getWorker().getCas().getMaxSizeBytes(),
-            configs.getWorker().getCas().getMaxEntrySizeBytes(),
-            configs.getWorker().getHexBucketLevels(),
-            configs.getWorker().getCas().isFileDirectoriesIndexInMemory(),
+            BuildfarmConfigs.getInstance().getWorker().getCas().getMaxSizeBytes(),
+            BuildfarmConfigs.getInstance().getWorker().getCas().getMaxEntrySizeBytes(),
+            BuildfarmConfigs.getInstance().getWorker().getHexBucketLevels(),
+            BuildfarmConfigs.getInstance().getWorker().getCas().isFileDirectoriesIndexInMemory(),
             digestUtil,
             removeDirectoryService,
             accessRecorder,
@@ -690,8 +710,8 @@ public class Worker extends LoggingMain {
         root,
         fileCache,
         owner,
-        configs.getWorker().isLinkInputDirectories(),
-        configs.getWorker().getRealInputDirectories(),
+        BuildfarmConfigs.getInstance().getWorker().isLinkInputDirectories(),
+        BuildfarmConfigs.getInstance().getWorker().getRealInputDirectories(),
         removeDirectoryService,
         accessRecorder
         /* deadlineAfter=*/
@@ -752,7 +772,8 @@ public class Worker extends LoggingMain {
     try {
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
       if (hasCasCapability) {
-        backplane.addBlobLocation(digest, configs.getWorker().getPublicName());
+        backplane.addBlobLocation(
+            digest, BuildfarmConfigs.getInstance().getWorker().getPublicName());
       }
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
@@ -763,7 +784,8 @@ public class Worker extends LoggingMain {
     if (hasCasCapability) {
       try {
         // if the worker is a CAS member, it can send/modify blobs in the backplane.
-        backplane.removeBlobsLocation(digests, configs.getWorker().getPublicName());
+        backplane.removeBlobsLocation(
+            digests, BuildfarmConfigs.getInstance().getWorker().getPublicName());
       } catch (IOException e) {
         throw Status.fromThrowable(e).asRuntimeException();
       }
@@ -829,7 +851,7 @@ public class Worker extends LoggingMain {
   }
 
   private void startFailsafeRegistration() {
-    String endpoint = configs.getWorker().getPublicName();
+    String endpoint = BuildfarmConfigs.getInstance().getWorker().getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
     worker.setWorkerType(determineWorkerType());
     int registrationIntervalMillis = 10000;
@@ -848,7 +870,8 @@ public class Worker extends LoggingMain {
 
               boolean isWorkerPausedFromNewWork() {
                 try {
-                  File pausedFile = new File(configs.getWorker().getRoot() + "/.paused");
+                  File pausedFile =
+                      new File(BuildfarmConfigs.getInstance().getWorker().getRoot() + "/.paused");
                   if (pausedFile.exists() && !isPaused) {
                     isPaused = true;
                     logger.log(Level.INFO, "The current worker is paused from taking on new work!");
@@ -908,18 +931,21 @@ public class Worker extends LoggingMain {
   @SuppressWarnings("deprecation")
   public void start() throws InterruptedException {
     try {
-      backplane.start(configs.getWorker().getPublicName());
+      backplane.start(BuildfarmConfigs.getInstance().getWorker().getPublicName());
 
-      removeWorker(configs.getWorker().getPublicName());
+      removeWorker(BuildfarmConfigs.getInstance().getWorker().getPublicName());
 
-      boolean skipLoad = configs.getWorker().getCas().isSkipLoad();
+      boolean skipLoad = BuildfarmConfigs.getInstance().getWorker().getCas().isSkipLoad();
       execFileSystem.start(
-          (digests) -> addBlobsLocation(digests, configs.getWorker().getPublicName()), skipLoad);
+          (digests) ->
+              addBlobsLocation(digests, BuildfarmConfigs.getInstance().getWorker().getPublicName()),
+          skipLoad);
 
       server.start();
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-      PrometheusPublisher.startHttpServer(configs.getServer().getPrometheusPort());
+      PrometheusPublisher.startHttpServer(
+          BuildfarmConfigs.getInstance().getServer().getPrometheusPort());
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
@@ -935,8 +961,8 @@ public class Worker extends LoggingMain {
     }
     pipeline.start();
     healthCheckMetric.labels("start").inc();
-    executionSlotsTotal.set(configs.getWorker().getExecuteStageWidth());
-    inputFetchSlotsTotal.set(configs.getWorker().getInputFetchStageWidth());
+    executionSlotsTotal.set(BuildfarmConfigs.getInstance().getWorker().getExecuteStageWidth());
+    inputFetchSlotsTotal.set(BuildfarmConfigs.getInstance().getWorker().getInputFetchStageWidth());
   }
 
   @Override
@@ -979,16 +1005,15 @@ public class Worker extends LoggingMain {
       throw new IllegalArgumentException("Missing CONFIG_PATH");
     }
     try {
-      configs.loadConfigs(residue.get(0));
-    } catch (IOException e) {
+      BuildfarmConfigs.loadConfigs(residue.get(0));
+    } catch (ConfigurationException e) {
       logger.severe("Could not parse yml configuration file." + e);
     }
 
     ShardWorkerOptions options = parser.getOptions(ShardWorkerOptions.class);
     if (!Strings.isNullOrEmpty(options.publicName)) {
-      configs.getWorker().setPublicName(options.publicName);
+      BuildfarmConfigs.getInstance().getWorker().setPublicName(options.publicName);
     }
-    logger.info(configs.toString());
     String session = UUID.randomUUID().toString();
     Worker worker = new Worker(session);
     worker.start();

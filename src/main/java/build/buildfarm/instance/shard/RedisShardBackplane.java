@@ -101,8 +101,6 @@ import redis.clients.jedis.ScanResult;
 public class RedisShardBackplane implements Backplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   private static final JsonFormat.Parser operationParser =
       JsonFormat.parser()
           .usingTypeRegistry(
@@ -222,7 +220,8 @@ public class RedisShardBackplane implements Backplane {
           protected void visit(ExecuteEntry executeEntry, String executeEntryJson) {
             String operationName = executeEntry.getOperationName();
             String value = state.processingOperations.get(jedis, operationName);
-            long defaultTimeout_ms = configs.getBackplane().getProcessingTimeoutMillis();
+            long defaultTimeout_ms =
+                BuildfarmConfigs.getInstance().getBackplane().getProcessingTimeoutMillis();
 
             // get the operation's expiration
             Instant expiresAt = convertToMilliInstant(value, operationName);
@@ -255,7 +254,8 @@ public class RedisShardBackplane implements Backplane {
           protected void visit(QueueEntry queueEntry, String queueEntryJson) {
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             String value = state.dispatchingOperations.get(jedis, operationName);
-            long defaultTimeout_ms = configs.getBackplane().getDispatchingTimeoutMillis();
+            long defaultTimeout_ms =
+                BuildfarmConfigs.getInstance().getBackplane().getDispatchingTimeoutMillis();
 
             // get the operation's expiration
             Instant expiresAt = convertToMilliInstant(value, operationName);
@@ -462,7 +462,10 @@ public class RedisShardBackplane implements Backplane {
     subscriberService = Executors.newFixedThreadPool(32);
     subscriber =
         new RedisShardSubscriber(
-            watchers, workerSet, configs.getBackplane().getWorkerChannel(), subscriberService);
+            watchers,
+            workerSet,
+            BuildfarmConfigs.getInstance().getBackplane().getWorkerChannel(),
+            subscriberService);
 
     operationSubscription =
         new RedisShardSubscription(
@@ -515,10 +518,10 @@ public class RedisShardBackplane implements Backplane {
     // Create containers that make up the backplane
     state = DistributedStateCreator.create(client);
 
-    if (configs.getBackplane().isSubscribeToBackplane()) {
+    if (BuildfarmConfigs.getInstance().getBackplane().isSubscribeToBackplane()) {
       startSubscriptionThread();
     }
-    if (configs.getBackplane().isRunFailsafeOperation()) {
+    if (BuildfarmConfigs.getInstance().getBackplane().isRunFailsafeOperation()) {
       startFailsafeOperationThread();
     }
 
@@ -589,7 +592,8 @@ public class RedisShardBackplane implements Backplane {
           // could rework with an hget to publish prior, but this seems adequate, and
           // we are the only guaranteed source
           if (addWorkerByType(jedis, shardWorker, json)) {
-            jedis.publish(configs.getBackplane().getWorkerChannel(), workerChangeJson);
+            jedis.publish(
+                BuildfarmConfigs.getInstance().getBackplane().getWorkerChannel(), workerChangeJson);
             return true;
           }
           return false;
@@ -610,7 +614,7 @@ public class RedisShardBackplane implements Backplane {
     if (state.executeAndStorageWorkers.remove(jedis, name)
         || state.storageWorkers.remove(jedis, name)
         || state.executeWorkers.remove(jedis, name)) {
-      jedis.publish(configs.getBackplane().getWorkerChannel(), changeJson);
+      jedis.publish(BuildfarmConfigs.getInstance().getBackplane().getWorkerChannel(), changeJson);
       return true;
     }
     return false;
@@ -633,7 +637,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public CasIndexResults reindexCas() throws IOException {
     CasIndexSettings settings = new CasIndexSettings();
-    settings.casQuery = configs.getBackplane().getCasPrefix() + ":*";
+    settings.casQuery = BuildfarmConfigs.getInstance().getBackplane().getCasPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
@@ -644,7 +648,8 @@ public class RedisShardBackplane implements Backplane {
       throws IOException {
     FindOperationsSettings settings = new FindOperationsSettings();
     settings.filterPredicate = filterPredicate;
-    settings.operationQuery = configs.getBackplane().getOperationPrefix() + ":*";
+    settings.operationQuery =
+        BuildfarmConfigs.getInstance().getBackplane().getOperationPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> OperationsFinder.findOperations(jedis, instance, settings));
   }
@@ -775,7 +780,10 @@ public class RedisShardBackplane implements Backplane {
     client.run(
         jedis ->
             state.blockedActions.insert(
-                jedis, actionId, "", configs.getBackplane().getActionBlacklistExpire()));
+                jedis,
+                actionId,
+                "",
+                BuildfarmConfigs.getInstance().getBackplane().getActionBlacklistExpire()));
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -788,7 +796,7 @@ public class RedisShardBackplane implements Backplane {
                 jedis,
                 asDigestStr(actionKey),
                 json,
-                configs.getBackplane().getActionCacheExpire()));
+                BuildfarmConfigs.getInstance().getBackplane().getActionCacheExpire()));
   }
 
   private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
@@ -819,7 +827,9 @@ public class RedisShardBackplane implements Backplane {
     ImmutableList.Builder<Map.Entry<ActionKey, String>> results = new ImmutableList.Builder<>();
 
     ScanParams scanParams =
-        new ScanParams().match(configs.getBackplane().getActionCachePrefix() + ":*").count(count);
+        new ScanParams()
+            .match(BuildfarmConfigs.getInstance().getBackplane().getActionCachePrefix() + ":*")
+            .count(count);
 
     String token =
         client.call(
@@ -968,7 +978,10 @@ public class RedisShardBackplane implements Backplane {
     String name = operation.getName();
     client.run(
         jedis -> {
-          jedis.setex(operationKey(name), configs.getBackplane().getOperationExpire(), json);
+          jedis.setex(
+              operationKey(name),
+              BuildfarmConfigs.getInstance().getBackplane().getOperationExpire(),
+              json);
           if (publishOperation != null) {
             publishReset(jedis, publishOperation);
           }
@@ -1003,7 +1016,7 @@ public class RedisShardBackplane implements Backplane {
         jedis -> {
           jedis.setex(
               operationKey(operationName),
-              configs.getBackplane().getOperationExpire(),
+              BuildfarmConfigs.getInstance().getBackplane().getOperationExpire(),
               operationJson);
           queue(
               jedis,
@@ -1126,7 +1139,8 @@ public class RedisShardBackplane implements Backplane {
     publishReset(jedis, operation);
 
     long requeueAt =
-        System.currentTimeMillis() + configs.getBackplane().getDispatchingTimeoutMillis();
+        System.currentTimeMillis()
+            + BuildfarmConfigs.getInstance().getBackplane().getDispatchingTimeoutMillis();
     DispatchedOperation o =
         DispatchedOperation.newBuilder().setQueueEntry(queueEntry).setRequeueAt(requeueAt).build();
     boolean success = false;
@@ -1233,7 +1247,7 @@ public class RedisShardBackplane implements Backplane {
         jedis -> {
           jedis.setex(
               operationKey(operationName),
-              configs.getBackplane().getOperationExpire(),
+              BuildfarmConfigs.getInstance().getBackplane().getOperationExpire(),
               operationJson);
           state.prequeue.push(jedis, executeEntryJson, priority);
           publishReset(jedis, publishOperation);
@@ -1295,7 +1309,8 @@ public class RedisShardBackplane implements Backplane {
         jedis -> {
           completeOperation(jedis, operationName);
           // FIXME find a way to get rid of this thing from the queue by name
-          // jedis.lrem(configs.getBackplane().getQueuedOperationsListName(), 0, operationName);
+          // jedis.lrem(BuildfarmConfigs.getInstance().getBackplane().getQueuedOperationsListName(),
+          // 0, operationName);
           jedis.del(operationKey(operationName));
 
           publishReset(jedis, o);
@@ -1307,11 +1322,13 @@ public class RedisShardBackplane implements Backplane {
   }
 
   String operationKey(String operationName) {
-    return configs.getBackplane().getOperationPrefix() + ":" + operationName;
+    return BuildfarmConfigs.getInstance().getBackplane().getOperationPrefix() + ":" + operationName;
   }
 
   String operationChannel(String operationName) {
-    return configs.getBackplane().getOperationChannelPrefix() + ":" + operationName;
+    return BuildfarmConfigs.getInstance().getBackplane().getOperationChannelPrefix()
+        + ":"
+        + operationName;
   }
 
   public static String parseOperationChannel(String channel) {

@@ -15,7 +15,6 @@
 package build.buildfarm.worker.memory;
 
 import build.buildfarm.common.config.BuildfarmConfigs;
-import java.io.IOException;
 import javax.naming.ConfigurationException;
 import org.junit.Before;
 import org.junit.Test;
@@ -24,12 +23,12 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class WorkerTest {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   @Before
-  public void setUp() throws IOException {
-    configs.getWorker().setRoot(null);
-    configs.getWorker().getCas().setPath(null);
+  public void setUp() throws ConfigurationException {
+    BuildfarmConfigs.loadConfigs();
+    BuildfarmConfigs.getInstance().getWorker().setRoot(null);
+    BuildfarmConfigs.getInstance().getWorker().getCas().setPath(null);
   }
 
   @Test(expected = ConfigurationException.class)

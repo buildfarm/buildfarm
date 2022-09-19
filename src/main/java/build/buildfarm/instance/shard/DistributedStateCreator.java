@@ -34,7 +34,6 @@ import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 
 public class DistributedStateCreator {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   public static DistributedState create(RedisClient client) throws IOException {
     DistributedState state = new DistributedState();
@@ -44,36 +43,45 @@ public class DistributedStateCreator {
     state.actionCache = createActionCache();
     state.prequeue = createPrequeue(client);
     state.operationQueue = createOperationQueue(client);
-    state.blockedActions = new RedisMap(configs.getBackplane().getActionBlacklistPrefix());
-    state.blockedInvocations = new RedisMap(configs.getBackplane().getInvocationBlacklistPrefix());
-    state.processingOperations = new RedisMap(configs.getBackplane().getProcessingPrefix());
-    state.dispatchingOperations = new RedisMap(configs.getBackplane().getDispatchingPrefix());
+    state.blockedActions =
+        new RedisMap(BuildfarmConfigs.getInstance().getBackplane().getActionBlacklistPrefix());
+    state.blockedInvocations =
+        new RedisMap(BuildfarmConfigs.getInstance().getBackplane().getInvocationBlacklistPrefix());
+    state.processingOperations =
+        new RedisMap(BuildfarmConfigs.getInstance().getBackplane().getProcessingPrefix());
+    state.dispatchingOperations =
+        new RedisMap(BuildfarmConfigs.getInstance().getBackplane().getDispatchingPrefix());
     state.dispatchedOperations =
-        new RedisHashMap(configs.getBackplane().getDispatchedOperationsHashName());
+        new RedisHashMap(
+            BuildfarmConfigs.getInstance().getBackplane().getDispatchedOperationsHashName());
     state.executeWorkers =
-        new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_execute");
+        new RedisHashMap(
+            BuildfarmConfigs.getInstance().getBackplane().getWorkersHashName() + "_execute");
     state.storageWorkers =
-        new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_storage");
-    state.executeAndStorageWorkers = new RedisHashMap(configs.getBackplane().getWorkersHashName());
+        new RedisHashMap(
+            BuildfarmConfigs.getInstance().getBackplane().getWorkersHashName() + "_storage");
+    state.executeAndStorageWorkers =
+        new RedisHashMap(BuildfarmConfigs.getInstance().getBackplane().getWorkersHashName());
 
     return state;
   }
 
   private static CasWorkerMap createCasWorkerMap() {
-    if (configs.getBackplane().isCacheCas()) {
+    if (BuildfarmConfigs.getInstance().getBackplane().isCacheCas()) {
       RedissonClient redissonClient = createRedissonClient();
       return new RedissonCasWorkerMap(
           redissonClient,
-          configs.getBackplane().getCasPrefix(),
-          configs.getBackplane().getCasExpire());
+          BuildfarmConfigs.getInstance().getBackplane().getCasPrefix(),
+          BuildfarmConfigs.getInstance().getBackplane().getCasExpire());
     } else {
       return new JedisCasWorkerMap(
-          configs.getBackplane().getCasPrefix(), configs.getBackplane().getCasExpire());
+          BuildfarmConfigs.getInstance().getBackplane().getCasPrefix(),
+          BuildfarmConfigs.getInstance().getBackplane().getCasExpire());
     }
   }
 
   private static RedisMap createActionCache() {
-    return new RedisMap(configs.getBackplane().getActionCachePrefix());
+    return new RedisMap(BuildfarmConfigs.getInstance().getBackplane().getActionCachePrefix());
   }
 
   private static RedissonClient createRedissonClient() {
@@ -86,7 +94,7 @@ public class DistributedStateCreator {
     return new BalancedRedisQueue(
         getPreQueuedOperationsListName(),
         getQueueHashes(client, getPreQueuedOperationsListName()),
-        configs.getBackplane().getMaxPreQueueDepth(),
+        BuildfarmConfigs.getInstance().getBackplane().getMaxPreQueueDepth(),
         getQueueType());
   }
 
@@ -97,7 +105,7 @@ public class DistributedStateCreator {
     // Therefore, it is recommended to have a final provision queue with no actual platform
     // requirements.  This will ensure that all operations are eligible for the final queue.
     ImmutableList.Builder<ProvisionedRedisQueue> provisionedQueues = new ImmutableList.Builder<>();
-    for (Queue queueConfig : configs.getBackplane().getQueues()) {
+    for (Queue queueConfig : BuildfarmConfigs.getInstance().getBackplane().getQueues()) {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               getQueueName(queueConfig),
@@ -114,7 +122,7 @@ public class DistributedStateCreator {
     // all operations.
     // This will ensure the expected behavior for the paradigm in which all work is put on the same
     // queue.
-    if (configs.getBackplane().getQueues().length == 0) {
+    if (BuildfarmConfigs.getInstance().getBackplane().getQueues().size() == 0) {
       SetMultimap defaultProvisions = LinkedHashMultimap.create();
       defaultProvisions.put(
           ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
@@ -127,7 +135,9 @@ public class DistributedStateCreator {
       provisionedQueues.add(defaultQueue);
     }
 
-    return new OperationQueue(provisionedQueues.build(), configs.getBackplane().getMaxQueueDepth());
+    return new OperationQueue(
+        provisionedQueues.build(),
+        BuildfarmConfigs.getInstance().getBackplane().getMaxQueueDepth());
   }
 
   static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
@@ -146,18 +156,18 @@ public class DistributedStateCreator {
   }
 
   private static Queue.QUEUE_TYPE getQueueType() {
-    return configs.getBackplane().isPriorityQueue()
+    return BuildfarmConfigs.getInstance().getBackplane().isPriorityQueue()
         ? Queue.QUEUE_TYPE.priority
         : Queue.QUEUE_TYPE.standard;
   }
 
   private static String getQueuedOperationsListName() {
-    String name = configs.getBackplane().getQueuedOperationsListName();
+    String name = BuildfarmConfigs.getInstance().getBackplane().getQueuedOperationsListName();
     return createFullQueueName(name, getQueueType());
   }
 
   private static String getPreQueuedOperationsListName() {
-    String name = configs.getBackplane().getPreQueuedOperationsListName();
+    String name = BuildfarmConfigs.getInstance().getBackplane().getPreQueuedOperationsListName();
     return createFullQueueName(name, getQueueType());
   }
 

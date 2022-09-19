@@ -43,7 +43,6 @@ import javax.naming.ConfigurationException;
 import redis.clients.jedis.JedisCluster;
 
 class WorkerProfile {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
@@ -110,11 +109,7 @@ class WorkerProfile {
     if (residue.isEmpty()) {
       throw new IllegalArgumentException("Missing Config_PATH");
     }
-    try {
-      configs.loadConfigs(residue.get(3));
-    } catch (IOException e) {
-      System.out.println("Could not parse yml configuration file." + e);
-    }
+    BuildfarmConfigs.loadConfigs(residue.get(3));
     RedisClient client = new RedisClient(JedisClusterFactory.create().get());
     return client.call(jedis -> fetchWorkers(jedis, System.currentTimeMillis()));
   }
@@ -122,7 +117,9 @@ class WorkerProfile {
   private static Set<String> fetchWorkers(JedisCluster jedis, long now) {
     Set<String> workers = Sets.newConcurrentHashSet();
     for (Map.Entry<String, String> entry :
-        jedis.hgetAll(configs.getBackplane().getWorkersHashName()).entrySet()) {
+        jedis
+            .hgetAll(BuildfarmConfigs.getInstance().getBackplane().getWorkersHashName())
+            .entrySet()) {
       String json = entry.getValue();
       try {
         if (json != null) {
@@ -203,7 +200,7 @@ class WorkerProfile {
   }
 
   // how to run the binary: bf-workerprofile WorkerProfile shard SHA256
-  // examples/config.shard.yml
+  // examples/config.yml
   public static void main(String[] args) throws Exception {
     workerProfile(args);
   }

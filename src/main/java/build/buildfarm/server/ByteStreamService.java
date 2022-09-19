@@ -66,8 +66,6 @@ public class ByteStreamService extends ByteStreamImplBase {
   private final long deadlineAfter;
   private final Instance instance;
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   static class UnexpectedEndOfStreamException extends IOException {
     private final long remaining;
     private final long limit;
@@ -89,7 +87,7 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   public ByteStreamService(Instance instance) {
     this.instance = instance;
-    this.deadlineAfter = configs.getServer().getBytestreamTimeout();
+    this.deadlineAfter = BuildfarmConfigs.getInstance().getServer().getBytestreamTimeout();
   }
 
   void readFrom(InputStream in, long limit, CallStreamObserver<ReadResponse> target) {

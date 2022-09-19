@@ -51,8 +51,6 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   private final Admin adminController;
   private final Instance instance;
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   public AdminService(Instance instance) {
     this.adminController = getAdminController();
     this.instance = instance;
@@ -242,14 +240,14 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   }
 
   private static Admin getAdminController() {
-    if (configs.getServer().getAdmin().getDeploymentEnvironment() == null) {
+    if (BuildfarmConfigs.getInstance().getServer().getAdmin().getDeploymentEnvironment() == null) {
       return null;
     }
-    switch (configs.getServer().getAdmin().getDeploymentEnvironment()) {
+    switch (BuildfarmConfigs.getInstance().getServer().getAdmin().getDeploymentEnvironment()) {
       default:
         return null;
       case AWS:
-        return new AwsAdmin(configs.getServer().getCloudRegion());
+        return new AwsAdmin(BuildfarmConfigs.getInstance().getServer().getCloudRegion());
       case GCP:
         return new GcpAdmin();
     }
