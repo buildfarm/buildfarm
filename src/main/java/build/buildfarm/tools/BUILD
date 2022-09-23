@@ -25,7 +25,7 @@ java_binary(
     name = "bf-cache-load",
     srcs = ["CacheLoad.java"],
     classpath_resources = [
-        "//examples:configs",
+        "//src/main/java/build/buildfarm:configs",
     ],
     main_class = "build.buildfarm.tools.CacheLoad",
     visibility = ["//visibility:public"],
@@ -100,7 +100,7 @@ java_binary(
     name = "bf-cat",
     srcs = ["Cat.java"],
     classpath_resources = [
-        "//examples:configs",
+        "//src/main/java/build/buildfarm:configs",
     ],
     main_class = "build.buildfarm.tools.Cat",
     visibility = ["//visibility:public"],
@@ -128,7 +128,7 @@ java_binary(
     name = "bf-workerprofile",
     srcs = ["WorkerProfile.java"],
     classpath_resources = [
-        "//examples:configs",
+        "//src/main/java/build/buildfarm:configs",
     ],
     main_class = "build.buildfarm.tools.WorkerProfile",
     visibility = ["//visibility:public"],
@@ -160,7 +160,7 @@ java_binary(
     name = "bf-ac",
     srcs = ["Ac.java"],
     classpath_resources = [
-        "//examples:configs",
+        "//src/main/java/build/buildfarm:configs",
     ],
     main_class = "build.buildfarm.tools.Ac",
     visibility = ["//visibility:public"],

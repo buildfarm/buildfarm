@@ -12,7 +12,7 @@ public class Queue {
   }
 
   private String name;
-  private boolean allowUnmatched;
+  private boolean allowUnmatched = true;
   private List<Property> properties;
 
   public Platform getPlatform() {
