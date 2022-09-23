@@ -18,6 +18,7 @@ server:
   runOperationQueuer: true
   ensureOutputsPresent: false
   maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+  maxCpu: 0
   maxRequeueAttempts: 5
   useDenyList: true
   grpcTimeout: 3600
@@ -28,9 +29,10 @@ server:
   admin:
     deploymentEnvironment: AWS
     clusterEndpoint: "grpc://localhost"
+    enableGracefulShutdown: false
   metrics:
     publisher: LOG
-    logLevel: INFO
+    logLevel: OFF
     topic: test
     topicMaxConnections: 1000
     secretName: test
@@ -76,11 +78,6 @@ backplane:
           value: "*"
         - name: "max-cores"
           value: "*"
-    - name: "gpu"
-      allowUnmatched: true
-      properties:
-        - name: "gpu"
-          value: "1"
 worker:
   port: 8981
   publicName: "localhost:8981"
@@ -119,8 +116,6 @@ worker:
       executionWrapper:
         path: "/"
         arguments:
-          - "arg1"
-          - "arg2"
 memory:
   listOperationsDefaultPageSize: 1024
   listOperationsMaxPageSize: 16384

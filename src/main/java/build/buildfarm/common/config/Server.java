@@ -10,8 +10,8 @@ public class Server {
     MEMORY
   }
 
-  private INSTANCE_TYPE instanceType;
-  private String name;
+  private INSTANCE_TYPE instanceType = INSTANCE_TYPE.SHARD;
+  private String name = "shard";
   private boolean actionCacheReadOnly = false;
   private int port = 8980;
   private int prometheusPort = 9090;

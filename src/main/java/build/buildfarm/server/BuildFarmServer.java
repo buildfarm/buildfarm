@@ -218,6 +218,7 @@ public class BuildFarmServer extends LoggingMain {
 
     try {
       configs.loadConfigs(residue.get(0));
+      logger.info("Final configs: " + configs.toString());
     } catch (IOException e) {
       logger.severe("Could not parse yml configuration file." + e);
     }

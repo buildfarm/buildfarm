@@ -9,3 +9,4 @@ test --test_tag_filters=-redis
 
 build --nojava_header_compilation
 test --nojava_header_compilation
+test --enable_runfiles

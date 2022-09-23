@@ -1,3 +1,4 @@
+digestFunction: SHA1
 server:
   instanceType: SHARD
   name: shard

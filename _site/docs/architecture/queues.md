@@ -54,7 +54,7 @@ Otherwise, the execution request's properties must have exactly the same set of 
 
 ### Server Example
 
-In this example the scheduler declares a GPU queue and CPU queue:
+In this example the scheduler declares a GPU queue and CPU queue. All queues must be declared for the server deployment:
 ```
 backplane:
   queues:
@@ -74,7 +74,9 @@ backplane:
 
 ### Worker Example
 
-Queues are defined similarly on Workers:
+Queues are defined similarly on Workers. Only the specific worker type queue must be declared for that specific worker deployment.
+
+For example, for a CPU worker pool use:
 
 ```
 backplane:
@@ -86,15 +88,19 @@ backplane:
           value: "*"
         - name: "max-cores"
           value: "*"
+```
+
+For example, for a GPU worker pool use:
+
+```
+backplane:
+  queues:
     - name: "gpu"
       allowUnmatched: true
       properties:
         - name: "gpu"
           value: "1"
 ```
-
-Note: we specify the CPU queue last.
-Since operation queues consist of multiple provisioned queues in which the order dictates the eligibility and placement of operations, it is recommended to have a final provision queue with no actual platform requirements. This ensures that all operations are eligible for the final queue.
 
 Note: make sure that all workers can communicate with each other before trying these examples
 
