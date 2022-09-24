@@ -31,7 +31,7 @@ mkdir -p $app_dir
 cp {buildfarm-server_deploy.jar} $app_dir
 cp {logging.properties} $app_dir
 mkdir -p $config_dir
-cp {config.memory.yml} $config_dir/server.config
+cp {config.yml} $config_dir/server.config
 mkdir -p $log_dir
 mkdir -p $service_dir
 cp {buildfarm-server.service} $service_dir/%{name}.service

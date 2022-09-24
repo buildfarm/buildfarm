@@ -4,6 +4,6 @@ import lombok.Data;
 
 @Data
 public class DequeueMatchSettings {
-  private boolean acceptEverything;
-  private boolean allowUnmatched;
+  private boolean acceptEverything = true;
+  private boolean allowUnmatched = false;
 }

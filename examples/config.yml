@@ -78,11 +78,6 @@ backplane:
           value: "*"
         - name: "max-cores"
           value: "*"
-    - name: "gpu"
-      allowUnmatched: true
-      properties:
-        - name: "gpu"
-          value: "1"
 worker:
   port: 8981
   publicName: "localhost:8981"
@@ -121,8 +116,6 @@ worker:
       executionWrapper:
         path: "/"
         arguments:
-          - "arg1"
-          - "arg2"
 memory:
   listOperationsDefaultPageSize: 1024
   listOperationsMaxPageSize: 16384

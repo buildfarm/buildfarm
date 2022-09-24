@@ -40,13 +40,13 @@ one for the Buildfarm server and one for a Buildfarm worker.
 
 Your Redis cluster is now up, and you can now start your Buildfarm server talking to it:
 ```sh
-bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.shard.yml
+bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.yml
 ```
 
 And your Buildfarm worker:
 ```sh
 mkdir /tmp/worker
-bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/config.shard.yml
+bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/config.yml
 ```
 
 ### Setting up intelliJ

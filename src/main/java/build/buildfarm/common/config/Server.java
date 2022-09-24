@@ -10,29 +10,29 @@ public class Server {
     MEMORY
   }
 
-  private INSTANCE_TYPE instanceType;
-  private String name;
-  private boolean actionCacheReadOnly;
-  private int port;
-  private int prometheusPort;
+  private INSTANCE_TYPE instanceType = INSTANCE_TYPE.SHARD;
+  private String name = "shard";
+  private boolean actionCacheReadOnly = false;
+  private int port = 8980;
+  private int prometheusPort = 9090;
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
-  private int casWriteTimeout;
-  private int bytestreamTimeout;
-  private String sslCertificatePath;
-  private boolean runDispatchedMonitor;
-  private int dispatchedMonitorIntervalSeconds;
-  private boolean runOperationQueuer;
-  private boolean ensureOutputsPresent;
-  private long maxEntrySizeBytes;
-  private int maxRequeueAttempts;
-  private boolean useDenyList;
-  private long grpcTimeout;
-  private long executeKeepaliveAfterSeconds;
-  private boolean recordBesEvents;
+  private int casWriteTimeout = 3600;
+  private int bytestreamTimeout = 3600;
+  private String sslCertificatePath = null;
+  private boolean runDispatchedMonitor = true;
+  private int dispatchedMonitorIntervalSeconds = 1;
+  private boolean runOperationQueuer = true;
+  private boolean ensureOutputsPresent = false;
+  private long maxEntrySizeBytes = 2147483648L; // 2 * 1024 * 1024 * 1024
+  private int maxRequeueAttempts = 5;
+  private boolean useDenyList = true;
+  private long grpcTimeout = 3600;
+  private long executeKeepaliveAfterSeconds = 60;
+  private boolean recordBesEvents = false;
   private Admin admin = new Admin();
   private Metrics metrics = new Metrics();
   private int maxCpu;
-  private String clusterId;
+  private String clusterId = "";
   private String cloudRegion;
   private String publicName;
 

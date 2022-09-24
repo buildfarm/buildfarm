@@ -203,7 +203,7 @@ class WorkerProfile {
   }
 
   // how to run the binary: bf-workerprofile WorkerProfile shard SHA256
-  // examples/config.shard.yml
+  // examples/config.yml
   public static void main(String[] args) throws Exception {
     workerProfile(args);
   }
