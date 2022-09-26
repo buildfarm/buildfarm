@@ -1,7 +1,3 @@
-digestFunction: SHA1
-server:
-  instanceType: SHARD
-  name: shard
 backplane:
   redisUri: "redis://localhost:6379"
   queues:

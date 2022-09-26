@@ -68,7 +68,7 @@ bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/c
 
    This indicates a successful launch!
 1. To add a config file, edit your new run configuration and enter the absolute
-   path to [`examples/config.memory.yml`](examples/config.memory.yml) in
+   path to [`examples/config.minimal.yml`](examples/config.minimal.yml) in
    the "Executable flags" text box.
 
 Now, you should have something like this, and you can now run / debug Buildfarm

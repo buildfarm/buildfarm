@@ -27,7 +27,7 @@ GATING_FUNC_PERCENTAGE="40";
 DEFAULT_TEST_TARGET="//src/test/java/...:all"
 
 # Any test tags filters to apply when generating code coverage.
-DEFAULT_TEST_TAG_FILTERS="-redis"
+DEFAULT_TEST_TAG_FILTERS="-redis,-integration"
 
 # How to spawn bazel.  The CI has a bazel available.
 DEFAULT_BAZEL_WRAPPER=bazel

@@ -6,8 +6,7 @@ import lombok.Data;
 @Data
 public class Server {
   public enum INSTANCE_TYPE {
-    SHARD,
-    MEMORY
+    SHARD
   }
 
   private INSTANCE_TYPE instanceType = INSTANCE_TYPE.SHARD;

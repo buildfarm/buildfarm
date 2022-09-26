@@ -979,7 +979,7 @@ public class Worker extends LoggingMain {
       throw new IllegalArgumentException("Missing CONFIG_PATH");
     }
     try {
-      configs.loadConfigs(residue.get(0));
+      configs = BuildfarmConfigs.loadConfigs(residue.get(0));
     } catch (IOException e) {
       logger.severe("Could not parse yml configuration file." + e);
     }

@@ -33,17 +33,10 @@ public class ExampleConfigsTest {
   }
 
   @Test
-  public void memoryWorkerConfig() throws IOException {
-    Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.memory.yml");
-    BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-    configs.loadConfigs(configPath);
-  }
-
-  @Test
   public void shardWorkerConfig() throws IOException {
     Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.shard.yml");
+        Paths.get(
+            System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.minimal.yml");
     BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
     configs.loadConfigs(configPath);
   }

@@ -5,8 +5,9 @@ build:fuse --define=fuse=true
 # Workaround for https://github.com/bazelbuild/bazel/issues/3236
 build:linux --sandbox_tmpfs_path=/tmp
 
-test --test_tag_filters=-redis
-
 build --nojava_header_compilation
+
 test --nojava_header_compilation
 test --enable_runfiles
+test --test_tag_filters=-redis
+

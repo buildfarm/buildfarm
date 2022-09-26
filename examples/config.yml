@@ -116,20 +116,3 @@ worker:
       executionWrapper:
         path: "/"
         arguments:
-memory:
-  listOperationsDefaultPageSize: 1024
-  listOperationsMaxPageSize: 16384
-  treeDefaultPageSize: 1024
-  treeMaxPageSize: 16384
-  operationPollTimeout: 30
-  operationCompletedDelay: 10
-  delegateCas: false
-  target: "localhost:8980"
-  deadlineAfterSeconds: 60
-  streamStdout: true
-  streamStderr: true
-  casPolicy: ALWAYS_INSERT
-  treePageSize: 0
-  properties:
-    - name: "key_name"
-      value: "value_string"

@@ -217,8 +217,7 @@ public class BuildFarmServer extends LoggingMain {
     ServerOptions options = parser.getOptions(ServerOptions.class);
 
     try {
-      configs.loadConfigs(residue.get(0));
-      logger.info("Final configs: " + configs.toString());
+      configs = BuildfarmConfigs.loadConfigs(residue.get(0));
     } catch (IOException e) {
       logger.severe("Could not parse yml configuration file." + e);
     }
@@ -231,8 +230,8 @@ public class BuildFarmServer extends LoggingMain {
     if (options.port > 0) {
       configs.getServer().setPort(options.port);
     }
-    logger.info(configs.toString());
     session += "-" + UUID.randomUUID();
+    logger.info(configs.toString());
     BuildFarmServer server;
     try {
       server = new BuildFarmServer(session);
