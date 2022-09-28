@@ -56,9 +56,6 @@ import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
-import com.google.bytestream.ByteStreamGrpc;
-import com.google.bytestream.ByteStreamProto.WriteRequest;
-import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.hash.HashCode;
@@ -81,7 +78,6 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.protobuf.StatusProto;
-import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -397,47 +393,6 @@ public class BuildFarmServerIntegrationTest {
     } catch (StatusRuntimeException e) {
       assertThat(e.getStatus().getCode()).isEqualTo(Status.Code.NOT_FOUND);
     }
-  }
-
-  @Test
-  @Ignore
-  public void progressiveUploadCompletes() throws Exception {
-    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
-    Digest digest = digestUtil.compute(content);
-    HashCode hash = HashCode.fromString(digest.getHash());
-    UUID uuid = UUID.randomUUID();
-    String resourceName =
-        ByteStreamUploader.uploadResourceName(INSTANCE_NAME, uuid, hash, content.size());
-
-    assertThat(getBlob(digest)).isNull();
-
-    FutureWriteResponseObserver futureResponder = new FutureWriteResponseObserver();
-    StreamObserver<WriteRequest> requestObserver =
-        ByteStreamGrpc.newStub(inProcessChannel).write(futureResponder);
-    ByteString shortContent = content.substring(0, 6);
-    requestObserver.onNext(
-        WriteRequest.newBuilder()
-            .setWriteOffset(0)
-            .setResourceName(resourceName)
-            .setData(shortContent)
-            .build());
-    requestObserver.onError(Status.CANCELLED.asException());
-    assertThat(futureResponder.isDone()).isTrue(); // should be done
-
-    futureResponder = new FutureWriteResponseObserver();
-    requestObserver = ByteStreamGrpc.newStub(inProcessChannel).write(futureResponder);
-    requestObserver.onNext(
-        WriteRequest.newBuilder()
-            .setWriteOffset(6)
-            .setResourceName(resourceName)
-            .setData(content.substring(6))
-            .setFinishWrite(true)
-            .build());
-    requestObserver.onCompleted();
-    assertThat(futureResponder.get())
-        .isEqualTo(WriteResponse.newBuilder().setCommittedSize(content.size()).build());
-
-    assertThat(getBlob(digest)).isEqualTo(content);
   }
 
   @Test

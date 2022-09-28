@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server;
+package build.buildfarm.server.services;
 
 import static build.buildfarm.common.UrlPath.detectResourceOperation;
 import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
@@ -50,7 +50,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
 
-class WriteStreamObserver implements StreamObserver<WriteRequest> {
+public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Logger logger = Logger.getLogger(WriteStreamObserver.class.getName());
   private static final Histogram ioMetric =
       Histogram.build()
@@ -78,7 +78,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private long requestCount = 0;
   private long requestBytes = 0;
 
-  WriteStreamObserver(
+  public WriteStreamObserver(
       Instance instance,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
