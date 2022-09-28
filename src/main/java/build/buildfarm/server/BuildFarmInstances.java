@@ -18,7 +18,6 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.instance.shard.ShardInstance;
 import javax.naming.ConfigurationException;
 
@@ -30,18 +29,7 @@ public class BuildFarmInstances {
     String name = configs.getServer().getName();
     HashFunction hashFunction = getValidHashFunction();
     DigestUtil digestUtil = new DigestUtil(hashFunction);
-    Instance instance;
-    switch (configs.getServer().getInstanceType()) {
-      default:
-        throw new IllegalArgumentException("Instance type not set in config");
-      case MEMORY:
-        instance = new MemoryInstance(name, digestUtil);
-        break;
-      case SHARD:
-        instance = new ShardInstance(name, session + "-" + name, digestUtil, onStop);
-        break;
-    }
-    return instance;
+    return new ShardInstance(name, session + "-" + name, digestUtil, onStop);
   }
 
   private static HashFunction getValidHashFunction() {

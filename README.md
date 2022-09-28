@@ -17,29 +17,39 @@ File issues here for bugs or feature requests, and ask questions via build team 
 
 All commandline options override corresponding config settings.
 
+### Redis
+
+Run via
+
+```
+docker run -d --rm --name buildfarm-redis -p 6379:6379 redis:5.0.9
+redis-cli config set stop-writes-on-bgsave-error no
+```
+
 ### Bazel Buildfarm Server
 
 Run via
 
 ```
 bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile>
+
+Ex: bazel run //src/main/java/build/buildfarm:buildfarm-server $(pwd)/examples/config.minimal.yml
 ```
 
-- **`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
+**`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
 
 ### Bazel Buildfarm Worker
 
 Run via
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-memory-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker <configfile>
+
+Ex: bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $(pwd)/examples/config.minimal.yml
+
 ```
 
-- **`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
-
-- **`ROOT`** base directory path for all work being performed.
-
-- **`CAS_CACHE_DIRECTORY`** is (absolute or relative) directory path to cached files from CAS.
+**`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
 
 ### Bazel Client
 
@@ -60,19 +70,19 @@ You can use typical Java logging configuration to filter these results and obser
 An example `logging.properties` file has been provided at [examples/debug.logging.properties](examples/debug.logging.properties) for use as follows:
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/config.memory.yml
+bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/config.minimal.yml
 ```
 
 and
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-memory-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/config.memory.yml
+bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/config.minimal.yml
 ```
 
 To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/examples/config.memory.yml
+bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/examples/config.minimal.yml
 ```
 
 

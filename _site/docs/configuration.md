@@ -4,14 +4,9 @@ title: Configuration
 nav_order: 4
 ---
 
-## Shard Implementation
-
 Minimal required:
 
 ```
-server:
-  instanceType: SHARD
-  name: shard
 backplane:
   redisUri: "redis://localhost:6379"
   queues:
@@ -25,23 +20,6 @@ worker:
   publicName: "localhost:8981"
 ```
 
-## Memory Implementation
-
-Minimal required:
-
-```
-server:
-  instanceType: MEMORY
-  name: memory
-worker:
-  cas:
-    type: MEMORY
-memory:
-  target: "localhost:8980"
-  properties:
-    - name: "cores"
-      value: "1"
-```
 ## All Configurations
 
 ### Common
@@ -344,38 +322,4 @@ worker:
         arguments:
           - arg1
           - arg2
-```
-
-### Memory Implementation
-
-| Configuration                 | Accepted and _Default_ Values       | Description                                                                                                                                    |
-|-------------------------------|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| listOperationsDefaultPageSize | Integer, _1024_                     | Default request limit for list operations                                                                                                      |
-| listOperationsMaxPageSize     | Integer, _16384_                    | Maximum request limist for list operations                                                                                                     |
-| treeDefaultPageSize           | Integer, _1024_                     | Default request limit for get tree                                                                                                             |
-| treeMaxPageSize               | Integer, _16384_                    | Maximum request limit for get tree                                                                                                             |
-| operationPollTimeout          | Integer, _30_                       | Maximum time after dispatch of an operation until the worker must poll to indicate continued work, after which, the operation will be requeued |
-| operationCompletedDelay       | Integer, _10_                       | Delay after an action timeout before an action is automatically considered failed with no results                                              |
-| delegateCas                   | boolean, _false_                    | Retain a local map of action keys and retain actions in CAS                                                                                    |
-| target                        | String, _localhost:8980_            | Primary endpoint for memory implementation                                                                                                     |
-| deadlineAfterSeconds          | Integer, _60_                       | The dealine (in seconds) for requests (0 = unlimited)                                                                                          |
-| streamStdout                  | boolean, _true_                     | Determines if stdout of running processes should be streamed                                                                                   |
-| streamStderr                  | boolean, _true_                     | Determines if stderr of running processes should be streamed                                                                                   |
-| casPolicy                     | _ALWAYS_INSERT_, INSERT_ABOVE_LIMIT | Whether to insert stderr/stdout/outputs into CAS (or only when it exceeds the inlineContentLimit)                                              |
-| treePageSize                  | Integer, _0_                        | CAS getTree  per page directory count (0 = let the server decide)                                                                              |
-| properties                    | List of name/value pairs            | Key/value set of capabilities for this worker                                                                                                  |
-
-Example:
-
-```
-memory:
-  target: "localhost:8980"
-  deadlineAfterSeconds: 60
-  streamStdout: true
-  streamStderr: true
-  casPolicy: ALWAYS_INSERT
-  treePageSize: 0
-  properties:
-    - name: "cores"
-      value: "1"
 ```

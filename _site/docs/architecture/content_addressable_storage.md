@@ -72,7 +72,7 @@ And will result in a listening grpc service on port 8081 on all interfaces, rela
 
 A sharded CAS leverages multiple Worker CAS retention and proxies requests to hosts with isolated CAS shards. These shards register their participation and entry presentation on a ShardBackplane. The backplane maintains a mapping of addresses to the nodes which host them. The sharded CAS is an aggregated proxy for its members, performing each function with fallback as appropriate; FindMissingBlobs requests are cycled through the shards, reducing a list of missing entries, Writes select a target node at random, Reads attempt a request on each advertised shard for an entry with failover on NOT_FOUND or transient grpc error. Reads are optimistic, given that a blob would not be requested that was not expected to be found, the sharded CAS will failover on complete absence of a blob to a whole cluster search for an entry.
 
-A shard CAS is the default for the Shard Instance type, with its required [backplane specification](https://github.com/bazelbuild/bazel-buildfarm/blob/main/examples/config.shard.yml). Since functionality between Shard CAS, AC, and Execution are mixed in here, the definition is somewhat cluttered, with efforts to refine specific aspects of it underway.
+A shard CAS is the default for the Shard Instance type, with its required [backplane specification](https://github.com/bazelbuild/bazel-buildfarm/blob/main/examples/config.minimal.yml). Since functionality between Shard CAS, AC, and Execution are mixed in here, the definition is somewhat cluttered, with efforts to refine specific aspects of it underway.
 
 ## Worker CAS
 

@@ -44,7 +44,7 @@ A Buildfarm server with an instance can be used strictly as an ActionCache and C
 
 Download the buildfarm repository and change into its directory, then:
 
-run `bazel run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.memory.yml`
+run `bazel run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.minimal.yml`
 
 This will wait while the server runs, indicating that it is ready for requests.
 
@@ -73,11 +73,11 @@ Now we will use buildfarm for remote execution with a minimal configuration - a 
 First, we should restart the buildfarm server to ensure that we get remote execution (this can also be forced from the client by using `--noremote_accept_cached`). From the buildfarm server prompt and directory:
 
 interrupt a running `buildfarm-server`
-run `bazel run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.memory.yml`
+run `bazel run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.minimal.yml`
 
 From another prompt in the buildfarm repository directory:
 
-run `bazel run src/main/java/build/buildfarm:buildfarm-memory-worker $PWD/examples/config.memory.yml`
+run `bazel run src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/config.minimal.yml`
 
 From another prompt, in your client workspace:
 
