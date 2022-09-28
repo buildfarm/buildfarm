@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server;
+package build.buildfarm.server.services;
 
 import static build.buildfarm.common.DigestUtil.HashFunction.SHA256;
-import static build.buildfarm.server.ByteStreamService.CHUNK_SIZE;
+import static build.buildfarm.server.services.ByteStreamService.CHUNK_SIZE;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.AdditionalAnswers.answerVoid;
 import static org.mockito.Mockito.any;

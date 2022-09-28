@@ -13,7 +13,7 @@ java_library(
         "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/java/build/buildfarm/metrics/prometheus",
         "//src/main/java/build/buildfarm/operations",
-        "//src/main/java/build/buildfarm/server",
+        "//src/main/java/build/buildfarm/server/services",
         "//src/main/java/build/buildfarm/worker",
         "//src/main/java/build/buildfarm/worker/cgroup",
         "//src/main/java/build/buildfarm/worker/resources",

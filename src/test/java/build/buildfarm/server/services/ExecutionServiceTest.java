@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server;
+package build.buildfarm.server.services;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verify;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
+import build.buildfarm.server.services.ExecutionService.KeepaliveWatcher;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import io.grpc.stub.ServerCallStreamObserver;

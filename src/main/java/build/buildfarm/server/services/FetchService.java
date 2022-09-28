@@ -1,4 +1,4 @@
-package build.buildfarm.server;
+package build.buildfarm.server.services;
 
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -22,12 +22,12 @@ import io.grpc.stub.StreamObserver;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-class FetchService extends FetchImplBase {
+public class FetchService extends FetchImplBase {
   public static final Logger logger = Logger.getLogger(ActionCacheService.class.getName());
 
   private final Instance instance;
 
-  FetchService(Instance instance) {
+  public FetchService(Instance instance) {
     this.instance = instance;
   }
 

@@ -46,7 +46,7 @@ worker:
 
 | Configuration                    | Accepted and _Default_ Values | Description                                                                                                                 |
 |----------------------------------|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
-| instanceType                     | _SHARD_, MEMORY               | Type of implementation                                                                                                      |
+| instanceType                     | _SHARD_                       | Type of implementation (SHARD is the only one supported)                                                                    |
 | name                             | String, _null_                | Implementation name                                                                                                         |
 | actionCacheReadOnly              | boolean, _false_              | Allow/Deny writing to action cache                                                                                          |
 | port                             | Integer, _8980_               | Listening port of the GRPC server                                                                                           |

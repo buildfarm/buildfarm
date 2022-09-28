@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server;
+package build.buildfarm.server.services;
 
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;

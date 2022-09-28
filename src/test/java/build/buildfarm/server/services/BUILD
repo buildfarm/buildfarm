@@ -2,10 +2,12 @@ java_test(
     name = "tests",
     size = "small",
     srcs = [
-        "BuildFarmServerIntegrationTest.java",
+        "ActionCacheServiceTest.java",
+        "ByteStreamServiceTest.java",
+        "ExecutionServiceTest.java",
+        "FutureWriteResponseObserver.java",
     ],
     data = ["//examples:example_configs"],
-    tags = ["integration"],
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -15,6 +17,7 @@ java_test(
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/metrics/log",
         "//src/main/java/build/buildfarm/server",
+        "//src/main/java/build/buildfarm/server/services",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
