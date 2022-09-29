@@ -24,13 +24,13 @@ import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ServerOptions;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
+import build.buildfarm.common.services.ByteStreamService;
+import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.services.ActionCacheService;
 import build.buildfarm.server.services.AdminService;
-import build.buildfarm.server.services.ByteStreamService;
 import build.buildfarm.server.services.CapabilitiesService;
-import build.buildfarm.server.services.ContentAddressableStorageService;
 import build.buildfarm.server.services.ExecutionService;
 import build.buildfarm.server.services.FetchService;
 import build.buildfarm.server.services.OperationQueueService;
@@ -154,7 +154,7 @@ public class BuildFarmServer extends LoggingMain {
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    PrometheusPublisher.startHttpServer(configs.getServer().getPrometheusPort());
+    PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
     healthCheckMetric.labels("start").inc();
   }
 

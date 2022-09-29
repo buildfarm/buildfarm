@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server.services;
+package build.buildfarm.common.services;
 
 import static build.buildfarm.instance.Utils.putBlobFuture;
 import static com.google.common.util.concurrent.Futures.addCallback;

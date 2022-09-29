@@ -13,7 +13,6 @@ public class Server {
   private String name = "shard";
   private boolean actionCacheReadOnly = false;
   private int port = 8980;
-  private int prometheusPort = 9090;
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
   private int casWriteTimeout = 3600;
   private int bytestreamTimeout = 3600;
