@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server.services;
+package build.buildfarm.common.services;
 
 import static build.buildfarm.common.UrlPath.detectResourceOperation;
 import static build.buildfarm.common.UrlPath.parseBlobDigest;
@@ -61,7 +61,7 @@ import java.util.logging.Logger;
 public class ByteStreamService extends ByteStreamImplBase {
   private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());
 
-  static final int CHUNK_SIZE = 64 * 1024;
+  public static final int CHUNK_SIZE = 64 * 1024;
 
   private final long deadlineAfter;
   private final Instance instance;

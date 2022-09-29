@@ -1,12 +1,12 @@
 digestFunction: SHA256
 defaultActionTimeout: 600
 maximumActionTimeout: 3600
+prometheusPort: 9090
 server:
   instanceType: SHARD
   name: shard
   actionCacheReadOnly: false
   port: 8980
-  prometheusPort: 9090
   grpcMetrics:
     enabled: false
     provideLatencyHistograms: false

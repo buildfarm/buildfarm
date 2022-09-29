@@ -24,11 +24,12 @@ worker:
 
 ### Common
 
-| Configuration        | Accepted and _Default_ Values | Description                                   |
-|----------------------|-------------------------------|-----------------------------------------------|
-| digestFunction       | _SHA256_, SHA1                | Digest function for this implementation       |
-| defaultActionTimeout | Integer, _600_                | Default timeout value for an action (seconds) |
-| maximumActionTimeout | Integer, _3600_               | Maximum allowed action timeout (seconds)      |
+| Configuration        | Accepted and _Default_ Values | Description                                       |
+|----------------------|-------------------------------|---------------------------------------------------|
+| digestFunction       | _SHA256_, SHA1                | Digest function for this implementation           |
+| defaultActionTimeout | Integer, _600_                | Default timeout value for an action (seconds)     |
+| maximumActionTimeout | Integer, _3600_               | Maximum allowed action timeout (seconds)          |
+| prometheusPort       | Integer, _9090_               | Listening port of the Prometheus metrics endpoint |
 
 Example:
 
@@ -36,6 +37,7 @@ Example:
 digestFunction: SHA1
 defaultActionTimeout: 1800
 maximumActionTimeout: 1800
+prometheusPort: 9090
 server:
   ...
 worker:
@@ -50,7 +52,6 @@ worker:
 | name                             | String, _null_                | Implementation name                                                                                                         |
 | actionCacheReadOnly              | boolean, _false_              | Allow/Deny writing to action cache                                                                                          |
 | port                             | Integer, _8980_               | Listening port of the GRPC server                                                                                           |
-| prometheusPort                   | Integer, _9090_               | Listening port of the Prometheus metrics endpoint                                                                           |
 | casWriteTimeout                  | Integer, _3600_               | CAS write timeout (seconds)                                                                                                 |
 | bytestreamTimeout                | Integer, _3600_               | Byte Stream write timeout (seconds)                                                                                         |
 | sslCertificatePath               | String, _null_                | Absolute path of the SSL certificate (if used)                                                                              |

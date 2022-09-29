@@ -15,7 +15,7 @@
 package build.buildfarm.server.services;
 
 import static build.buildfarm.common.DigestUtil.HashFunction.SHA256;
-import static build.buildfarm.server.services.ByteStreamService.CHUNK_SIZE;
+import static build.buildfarm.common.services.ByteStreamService.CHUNK_SIZE;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.AdditionalAnswers.answerVoid;
 import static org.mockito.Mockito.any;
@@ -32,6 +32,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.bytestream.ByteStreamGrpc;

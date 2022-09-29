@@ -44,13 +44,13 @@ import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ShardWorkerOptions;
 import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.common.services.ByteStreamService;
+import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
-import build.buildfarm.server.services.ByteStreamService;
-import build.buildfarm.server.services.ContentAddressableStorageService;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.ShardWorker;
@@ -919,7 +919,7 @@ public class Worker extends LoggingMain {
       server.start();
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-      PrometheusPublisher.startHttpServer(configs.getServer().getPrometheusPort());
+      PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
