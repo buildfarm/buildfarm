@@ -915,6 +915,7 @@ class ShardWorkerContext implements WorkerContext {
     // Construct the CLI options for this binary.
     LinuxSandboxOptions options = new LinuxSandboxOptions();
     options.createNetns = limits.network.blockNetwork;
+    options.fakeHostname = limits.network.fakeHostname;
     options.workingDir = workingDirectory.toString();
 
     // Bazel encodes these directly
@@ -961,6 +962,10 @@ class ShardWorkerContext implements WorkerContext {
     // Pass flags based on the sandbox CLI options.
     if (options.createNetns) {
       arguments.add("-N");
+    }
+
+    if (options.fakeHostname) {
+      arguments.add("-H");
     }
 
     if (options.fakeUsername) {

@@ -46,6 +46,7 @@ public class ExecutionPropertiesParser {
     parser.put(ExecutionProperties.LINUX_SANDBOX, ExecutionPropertiesParser::storeLinuxSandbox);
     parser.put(ExecutionProperties.AS_NOBODY, ExecutionPropertiesParser::storeAsNobody);
     parser.put(ExecutionProperties.BLOCK_NETWORK, ExecutionPropertiesParser::storeBlockNetwork);
+    parser.put(ExecutionProperties.FAKE_HOSTNAME, ExecutionPropertiesParser::storeFakeHostname);
     parser.put(ExecutionProperties.TMPFS, ExecutionPropertiesParser::storeTmpFs);
     parser.put(ExecutionProperties.MIN_CORES, ExecutionPropertiesParser::storeMinCores);
     parser.put(ExecutionProperties.MAX_CORES, ExecutionPropertiesParser::storeMaxCores);
@@ -192,6 +193,17 @@ public class ExecutionPropertiesParser {
   private static void storeBlockNetwork(ResourceLimits limits, Property property) {
     limits.network.blockNetwork = Boolean.parseBoolean(property.getValue());
     describeChange(limits.network.description, "network blocking", property.getValue(), property);
+  }
+
+  /**
+   * @brief Store the property for fake hostname.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeFakeHostname(ResourceLimits limits, Property property) {
+    limits.network.fakeHostname = Boolean.parseBoolean(property.getValue());
+    describeChange(limits.network.description, "use fake hostname", property.getValue(), property);
   }
 
   /**
