@@ -22,10 +22,10 @@ import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.CompletableFuture;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerImplBase {
-  private static final Logger logger = Logger.getLogger(ShutDownWorkerGracefully.class.getName());
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final Worker worker;
@@ -56,7 +56,7 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
               "Current AdminConfig doesn't have cluster_id or cluster_endpoint set, "
                   + "the worker %s won't be shut down.",
               configs.getWorker().getPublicName());
-      logger.log(WARNING, errorMessage);
+      log.log(WARNING, errorMessage);
       responseObserver.onError(new RuntimeException(errorMessage));
       return;
     }
@@ -67,7 +67,7 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
               "Current AdminConfig doesn't support shut down worker gracefully, "
                   + "the worker %s won't be shut down.",
               configs.getWorker().getPublicName());
-      logger.log(WARNING, errorMessage);
+      log.log(WARNING, errorMessage);
       responseObserver.onError(new RuntimeException(errorMessage));
       return;
     }

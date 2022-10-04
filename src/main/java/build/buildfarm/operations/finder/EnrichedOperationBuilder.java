@@ -31,7 +31,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 import redis.clients.jedis.JedisCluster;
 
 /**
@@ -41,8 +41,8 @@ import redis.clients.jedis.JedisCluster;
  * @details For performance reasons, only build these enriched operations when you intend to use the
  *     extra provided metadata.
  */
+@Log
 public class EnrichedOperationBuilder {
-  private static final Logger logger = Logger.getLogger(EnrichedOperationBuilder.class.getName());
 
   /**
    * @brief Create an enriched operation based on an operation key.
@@ -112,7 +112,7 @@ public class EnrichedOperationBuilder {
             .ignoringUnknownFields();
 
     if (json == null) {
-      logger.log(Level.WARNING, "Operation Json is empty");
+      log.log(Level.WARNING, "Operation Json is empty");
       return null;
     }
     try {
@@ -120,7 +120,7 @@ public class EnrichedOperationBuilder {
       operationParser.merge(json, operationBuilder);
       return operationBuilder.build();
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+      log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
       return null;
     }
   }
@@ -154,7 +154,7 @@ public class EnrichedOperationBuilder {
       }
 
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+      log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
       metadata = null;
     }
 
@@ -177,11 +177,11 @@ public class EnrichedOperationBuilder {
         action = Action.parseFrom(blob);
         return action;
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+        log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
         return null;
       }
     } catch (Exception e) {
-      logger.log(Level.WARNING, e.getMessage());
+      log.log(Level.WARNING, e.getMessage());
       return null;
     }
   }
@@ -202,11 +202,11 @@ public class EnrichedOperationBuilder {
         command = Command.parseFrom(blob);
         return command;
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+        log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
         return null;
       }
     } catch (Exception e) {
-      logger.log(Level.WARNING, e.getMessage());
+      log.log(Level.WARNING, e.getMessage());
       return null;
     }
   }

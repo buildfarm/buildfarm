@@ -1,6 +1,7 @@
 java_library(
     name = "shard",
     srcs = glob(["*.java"]),
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/ac",
@@ -33,6 +34,7 @@ java_library(
         "@maven//:io_prometheus_simpleclient",
         "@maven//:net_javacrumbs_future_converter_future_converter_java8_guava",
         "@maven//:org_apache_commons_commons_pool2",
+        "@maven//:org_projectlombok_lombok",
         "@maven//:org_redisson_redisson",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],

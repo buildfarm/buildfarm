@@ -43,10 +43,10 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class AdminService extends AdminGrpc.AdminImplBase {
-  private static final Logger logger = Logger.getLogger(AdminService.class.getName());
 
   private final Admin adminController;
   private final Instance instance;
@@ -67,7 +67,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onNext(Status.newBuilder().setCode(Code.OK_VALUE).build());
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.log(Level.SEVERE, "Could not terminate host.", e);
+      log.log(Level.SEVERE, "Could not terminate host.", e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }
@@ -81,7 +81,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onNext(Status.newBuilder().setCode(Code.OK_VALUE).build());
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.log(Level.SEVERE, "Could not stop container.", e);
+      log.log(Level.SEVERE, "Could not stop container.", e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }
@@ -98,7 +98,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onNext(result);
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.log(Level.SEVERE, "Could not get hosts.", e);
+      log.log(Level.SEVERE, "Could not get hosts.", e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }
@@ -112,7 +112,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onNext(result);
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.log(
+      log.log(
           Level.SEVERE,
           String.format("Could not get client start time for %s.", request.getInstanceName()),
           e);
@@ -134,7 +134,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onNext(Status.newBuilder().setCode(Code.OK_VALUE).build());
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.log(Level.SEVERE, "Could not scale cluster.", e);
+      log.log(Level.SEVERE, "Could not scale cluster.", e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }
@@ -144,7 +144,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       ReindexCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
     try {
       CasIndexResults results = instance.reindexCas();
-      logger.info(String.format("CAS Indexer Results: %s", results.toMessage()));
+      log.info(String.format("CAS Indexer Results: %s", results.toMessage()));
       responseObserver.onNext(
           ReindexCasRequestResults.newBuilder()
               .setRemovedHosts(results.removedHosts)
@@ -153,7 +153,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
               .build());
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.log(Level.SEVERE, "Could not reindex CAS.", e);
+      log.log(Level.SEVERE, "Could not reindex CAS.", e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }
@@ -178,7 +178,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
           String.format(
               "Could not inform the worker %s to prepare for graceful shutdown with error %s.",
               request.getWorkerName(), e.getMessage());
-      logger.log(Level.SEVERE, errorMessage);
+      log.log(Level.SEVERE, errorMessage);
       responseObserver.onError(new Exception(errorMessage));
     }
   }

@@ -21,9 +21,10 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class InputFetchStage extends SuperscalarPipelineStage {
-  private static final Logger logger = Logger.getLogger(InputFetchStage.class.getName());
   private static final Gauge inputFetchSlotUsage =
       Gauge.build().name("input_fetch_slot_usage").help("Input fetch slot Usage.").register();
   private static final Histogram inputFetchTime =
@@ -43,7 +44,7 @@ public class InputFetchStage extends SuperscalarPipelineStage {
 
   @Override
   protected Logger getLogger() {
-    return logger;
+    return log;
   }
 
   @Override

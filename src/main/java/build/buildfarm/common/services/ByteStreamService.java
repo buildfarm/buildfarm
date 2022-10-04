@@ -56,10 +56,10 @@ import java.nio.file.NoSuchFileException;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class ByteStreamService extends ByteStreamImplBase {
-  private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());
 
   public static final int CHUNK_SIZE = 64 * 1024;
 
@@ -112,7 +112,7 @@ public class ByteStreamService extends ByteStreamImplBase {
         }
 
         if (readBytes > remaining) {
-          logger.log(Level.WARNING, format("read %d bytes, expected %d", readBytes, remaining));
+          log.log(Level.WARNING, format("read %d bytes, expected %d", readBytes, remaining));
           readBytes = (int) remaining;
         }
         remaining -= readBytes;
@@ -185,7 +185,7 @@ public class ByteStreamService extends ByteStreamImplBase {
             message +=
                 format(" after %d responses and %d bytes of content", responseCount, responseBytes);
           }
-          logger.log(level, message, t);
+          log.log(level, message, t);
         }
         delegate.onError(t);
       }
@@ -288,7 +288,7 @@ public class ByteStreamService extends ByteStreamImplBase {
             try {
               in.close();
             } catch (IOException e) {
-              logger.log(Level.SEVERE, "error closing stream", e);
+              log.log(Level.SEVERE, "error closing stream", e);
             }
           });
       readFrom(in, limit, onErrorLogReadObserver(resourceName, offset, target));
@@ -321,7 +321,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     String resourceName = request.getResourceName();
     long offset = request.getReadOffset();
     long limit = request.getReadLimit();
-    logger.log(
+    log.log(
         Level.FINER,
         format("read resource_name=%s offset=%d limit=%d", resourceName, offset, limit));
 
@@ -337,7 +337,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       QueryWriteStatusRequest request, StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
     try {
-      logger.log(Level.FINE, format("queryWriteStatus(%s)", resourceName));
+      log.log(Level.FINE, format("queryWriteStatus(%s)", resourceName));
       Write write = getWrite(resourceName);
       responseObserver.onNext(
           QueryWriteStatusResponse.newBuilder()
@@ -345,20 +345,20 @@ public class ByteStreamService extends ByteStreamImplBase {
               .setComplete(write.isComplete())
               .build());
       responseObserver.onCompleted();
-      logger.log(
+      log.log(
           Level.FINE,
           format(
               "queryWriteStatus(%s) => committed_size = %d, complete = %s",
               resourceName, write.getCommittedSize(), write.isComplete()));
     } catch (IllegalArgumentException | InvalidResourceNameException e) {
-      logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
+      log.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     } catch (EntryLimitException e) {
-      logger.log(Level.WARNING, format("queryWriteStatus(%s): %s", resourceName, e.getMessage()));
+      log.log(Level.WARNING, format("queryWriteStatus(%s): %s", resourceName, e.getMessage()));
       responseObserver.onNext(QueryWriteStatusResponse.getDefaultInstance());
       responseObserver.onCompleted();
     } catch (RuntimeException e) {
-      logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
+      log.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(Status.fromThrowable(e).asException());
     }
   }

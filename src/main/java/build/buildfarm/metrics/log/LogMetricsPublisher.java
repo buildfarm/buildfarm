@@ -19,10 +19,10 @@ import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.metrics.AbstractMetricsPublisher;
 import com.google.longrunning.Operation;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class LogMetricsPublisher extends AbstractMetricsPublisher {
-  private static final Logger logger = Logger.getLogger(LogMetricsPublisher.class.getName());
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
@@ -40,11 +40,11 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
   @Override
   public void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata) {
     try {
-      logger.log(
+      log.log(
           logLevel,
           formatRequestMetadataToJson(populateRequestMetadata(operation, requestMetadata)));
     } catch (Exception e) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format("Could not publish request metadata to LOG for %s.", operation.getName()),
           e);
@@ -53,6 +53,6 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
 
   @Override
   public void publishMetric(String metricName, Object metricValue) {
-    logger.log(Level.INFO, String.format("%s: %s", metricName, metricValue.toString()));
+    log.log(Level.INFO, String.format("%s: %s", metricName, metricValue.toString()));
   }
 }

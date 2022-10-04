@@ -105,14 +105,14 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import lombok.extern.java.Log;
 
+@Log
 public class Worker extends LoggingMain {
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
-  private static final Logger logger = Logger.getLogger(Worker.class.getName());
   private static final Counter healthCheckMetric =
       Counter.build()
           .name("health_check")
@@ -245,7 +245,7 @@ public class Worker extends LoggingMain {
    */
   public void prepareWorkerForGracefulShutdown() {
     inGracefulShutdown = true;
-    logger.log(
+    log.log(
         Level.INFO,
         "The current worker will not be registered again and should be shutdown gracefully!");
     pipeline.stopMatchingOperations();
@@ -257,15 +257,14 @@ public class Worker extends LoggingMain {
       while (!pipeline.isEmpty() && timeWaited < timeOut) {
         SECONDS.sleep(scanRate);
         timeWaited += scanRate;
-        logger.log(
-            INFO, String.format("Pipeline is still not empty after %d seconds.", timeWaited));
+        log.log(INFO, String.format("Pipeline is still not empty after %d seconds.", timeWaited));
       }
     } catch (InterruptedException e) {
-      logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
+      log.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
     } finally {
       // make a grpc call to disable scale protection
       String clusterEndpoint = configs.getServer().getAdmin().getClusterEndpoint();
-      logger.log(
+      log.log(
           INFO,
           String.format(
               "It took the worker %d seconds to %s",
@@ -274,7 +273,7 @@ public class Worker extends LoggingMain {
       try {
         disableScaleInProtection(clusterEndpoint, configs.getWorker().getPublicName());
       } catch (Exception e) {
-        logger.log(
+        log.log(
             SEVERE,
             String.format(
                 "gRPC call to AdminService to disable scale in protection failed with exception: %s and stacktrace %s",
@@ -324,7 +323,7 @@ public class Worker extends LoggingMain {
         Files.createDirectories(root);
       }
     } catch (Exception e) {
-      logger.log(Level.SEVERE, e.toString());
+      log.log(Level.SEVERE, e.toString());
       throw new ConfigurationException(e.toString());
     }
   }
@@ -452,7 +451,7 @@ public class Worker extends LoggingMain {
     pipeline = new Pipeline();
     server = createServer(serverBuilder, storage, instance, pipeline, context);
 
-    logger.log(INFO, String.format("%s initialized", identifier));
+    log.log(INFO, String.format("%s initialized", identifier));
   }
 
   private Server createServer(
@@ -519,7 +518,7 @@ public class Worker extends LoggingMain {
               } catch (IOException e) {
                 if (!write.isComplete()) {
                   write.reset();
-                  logger.log(Level.SEVERE, "unexpected error transferring file for " + digest, e);
+                  log.log(Level.SEVERE, "unexpected error transferring file for " + digest, e);
                 }
               }
             });
@@ -536,7 +535,7 @@ public class Worker extends LoggingMain {
                 }
                 long committedSize = write.getCommittedSize();
                 if (committedSize != digest.getSizeBytes()) {
-                  logger.log(
+                  log.log(
                       Level.WARNING,
                       format(
                           "committed size %d did not match expectation for digestUtil",
@@ -585,7 +584,7 @@ public class Worker extends LoggingMain {
     try {
       return workerStubs.get(worker);
     } catch (ExecutionException e) {
-      logger.log(Level.SEVERE, "error getting worker stub for " + worker, e.getCause());
+      log.log(Level.SEVERE, "error getting worker stub for " + worker, e.getCause());
       throw new IllegalStateException("stub instance creation must not fail");
     }
   }
@@ -702,7 +701,7 @@ public class Worker extends LoggingMain {
   public void stop() throws InterruptedException {
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
-      logger.log(INFO, "Closing the pipeline");
+      log.log(INFO, "Closing the pipeline");
       try {
         pipeline.close();
       } catch (InterruptedException e) {
@@ -716,18 +715,18 @@ public class Worker extends LoggingMain {
     executionSlotsTotal.set(0);
     inputFetchSlotsTotal.set(0);
     if (execFileSystem != null) {
-      logger.log(INFO, "Stopping exec filesystem");
+      log.log(INFO, "Stopping exec filesystem");
       execFileSystem.stop();
     }
     if (server != null) {
-      logger.log(INFO, "Shutting down the server");
+      log.log(INFO, "Shutting down the server");
       server.shutdown();
 
       try {
         server.awaitTermination(shutdownWaitTimeInSeconds, SECONDS);
       } catch (InterruptedException e) {
         interrupted = true;
-        logger.log(SEVERE, "interrupted while waiting for server shutdown", e);
+        log.log(SEVERE, "interrupted while waiting for server shutdown", e);
       } finally {
         server.shutdownNow();
       }
@@ -776,13 +775,13 @@ public class Worker extends LoggingMain {
       if (pipeline.hasStages() || hasExecutionCapability) {
         pipeline.join();
       } else {
-        logger.log(INFO, "No pipeline stages.  Block until interruption.");
+        log.log(INFO, "No pipeline stages.  Block until interruption.");
         server.awaitTermination();
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    logger.log(INFO, "Shutting down because pipeline finished.");
+    log.log(INFO, "Shutting down because pipeline finished.");
     stop();
   }
 
@@ -794,7 +793,7 @@ public class Worker extends LoggingMain {
       if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
         throw status.asRuntimeException();
       }
-      logger.log(INFO, "backplane was unavailable or overloaded, deferring removeWorker");
+      log.log(INFO, "backplane was unavailable or overloaded, deferring removeWorker");
     }
   }
 
@@ -851,12 +850,12 @@ public class Worker extends LoggingMain {
                   File pausedFile = new File(configs.getWorker().getRoot() + "/.paused");
                   if (pausedFile.exists() && !isPaused) {
                     isPaused = true;
-                    logger.log(Level.INFO, "The current worker is paused from taking on new work!");
+                    log.log(Level.INFO, "The current worker is paused from taking on new work!");
                     pipeline.stopMatchingOperations();
                     workerPausedMetric.inc();
                   }
                 } catch (Exception e) {
-                  logger.log(Level.WARNING, "Could not open .paused file.", e);
+                  log.log(Level.WARNING, "Could not open .paused file.", e);
                 }
                 return isPaused;
               }
@@ -886,7 +885,7 @@ public class Worker extends LoggingMain {
                   try {
                     stop();
                   } catch (InterruptedException ie) {
-                    logger.log(SEVERE, "interrupted while stopping worker", ie);
+                    log.log(SEVERE, "interrupted while stopping worker", ie);
                     // ignore
                   }
                 }
@@ -926,11 +925,11 @@ public class Worker extends LoggingMain {
       if (hasCasCapability) {
         startFailsafeRegistration();
       } else {
-        logger.log(INFO, "Skipping worker registration");
+        log.log(INFO, "Skipping worker registration");
       }
     } catch (Exception e) {
       stop();
-      logger.log(SEVERE, "error starting worker", e);
+      log.log(SEVERE, "error starting worker", e);
       return;
     }
     pipeline.start();
@@ -941,23 +940,22 @@ public class Worker extends LoggingMain {
 
   @Override
   protected void onShutdown() throws InterruptedException {
-    logger.log(SEVERE, "*** shutting down gRPC server since JVM is shutting down");
+    log.log(SEVERE, "*** shutting down gRPC server since JVM is shutting down");
     PrometheusPublisher.stopHttpServer();
     stop();
-    logger.log(SEVERE, "*** server shut down");
+    log.log(SEVERE, "*** server shut down");
   }
 
   private static void printUsage(OptionsParser parser) {
-    logger.log(INFO, "Usage: CONFIG_PATH");
-    logger.log(
-        INFO, parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+    log.log(INFO, "Usage: CONFIG_PATH");
+    log.log(INFO, parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
   public static void main(String[] args) {
     try {
       startWorker(args);
     } catch (Exception e) {
-      logger.log(SEVERE, "exception caught", e);
+      log.log(SEVERE, "exception caught", e);
       System.exit(1);
     }
   }
@@ -981,14 +979,14 @@ public class Worker extends LoggingMain {
     try {
       configs = BuildfarmConfigs.loadConfigs(residue.get(0));
     } catch (IOException e) {
-      logger.severe("Could not parse yml configuration file." + e);
+      log.severe("Could not parse yml configuration file." + e);
     }
 
     ShardWorkerOptions options = parser.getOptions(ShardWorkerOptions.class);
     if (!Strings.isNullOrEmpty(options.publicName)) {
       configs.getWorker().setPublicName(options.publicName);
     }
-    logger.info(configs.toString());
+    log.info(configs.toString());
     String session = UUID.randomUUID().toString();
     Worker worker = new Worker(session);
     worker.start();
