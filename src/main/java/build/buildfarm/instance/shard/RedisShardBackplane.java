@@ -87,19 +87,19 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import lombok.extern.java.Log;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
+@Log
 public class RedisShardBackplane implements Backplane {
-  private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
@@ -184,7 +184,7 @@ public class RedisShardBackplane implements Backplane {
         JsonFormat.parser().merge(entry, queueEntry);
         visit(queueEntry.build(), entry);
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.SEVERE, "invalid QueueEntry json: " + entry, e);
+        log.log(Level.SEVERE, "invalid QueueEntry json: " + entry, e);
       }
     }
   }
@@ -198,7 +198,7 @@ public class RedisShardBackplane implements Backplane {
         JsonFormat.parser().merge(entry, executeEntry);
         visit(executeEntry.build(), entry);
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.FINE, "invalid ExecuteEntry json: " + entry, e);
+        log.log(Level.FINE, "invalid ExecuteEntry json: " + entry, e);
       }
     }
   }
@@ -208,7 +208,7 @@ public class RedisShardBackplane implements Backplane {
       try {
         return Instant.ofEpochMilli(Long.parseLong(value));
       } catch (NumberFormatException e) {
-        logger.log(Level.SEVERE, format("invalid expiration %s for %s", value, key));
+        log.log(Level.SEVERE, format("invalid expiration %s for %s", value, key));
       }
     }
     return null;
@@ -321,11 +321,11 @@ public class RedisShardBackplane implements Backplane {
         };
 
     if (!expiringChannels.isEmpty()) {
-      logger.log(
+      log.log(
           Level.FINE,
           format("Scan %d watches, %s, expiresAt: %s", expiringChannels.size(), now, expiresAt));
 
-      logger.log(Level.FINE, "Scan prequeue");
+      log.log(Level.FINE, "Scan prequeue");
       // scan prequeue, pet watches
       scanPrequeue(jedis, resetChannel);
     }
@@ -334,7 +334,7 @@ public class RedisShardBackplane implements Backplane {
     scanProcessing(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      logger.log(Level.FINE, "Scan queue");
+      log.log(Level.FINE, "Scan queue");
       // scan queue, pet watches
       scanQueue(jedis, resetChannel);
     }
@@ -343,7 +343,7 @@ public class RedisShardBackplane implements Backplane {
     scanDispatching(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      logger.log(Level.FINE, "Scan dispatched");
+      log.log(Level.FINE, "Scan dispatched");
       // scan dispatched pet watches
       scanDispatched(jedis, resetChannel);
     }
@@ -378,7 +378,7 @@ public class RedisShardBackplane implements Backplane {
               operationChange.setEffectiveAt(toTimestamp(effectiveAt)).setSource(source).build());
       jedis.publish(channel, operationChangeJson);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.SEVERE, "error printing operation change", e);
+      log.log(Level.SEVERE, "error printing operation change", e);
       // very unlikely, printer would have to fail
     }
   }
@@ -442,7 +442,7 @@ public class RedisShardBackplane implements Backplane {
           operation = onPublish.apply(operation);
         }
         subscriber.onOperation(operationChannel(operationName), operation, nextExpiresAt(now));
-        logger.log(
+        log.log(
             Level.FINE,
             format(
                 "operation %s done due to %s",
@@ -496,7 +496,7 @@ public class RedisShardBackplane implements Backplane {
                   Thread.currentThread().interrupt();
                   break;
                 } catch (Exception e) {
-                  logger.log(Level.SEVERE, "error while updating watchers in failsafe", e);
+                  log.log(Level.SEVERE, "error while updating watchers in failsafe", e);
                 }
               }
             },
@@ -533,24 +533,24 @@ public class RedisShardBackplane implements Backplane {
     if (failsafeOperationThread != null) {
       failsafeOperationThread.interrupt();
       failsafeOperationThread.join();
-      logger.log(Level.FINE, "failsafeOperationThread has been stopped");
+      log.log(Level.FINE, "failsafeOperationThread has been stopped");
     }
     if (operationSubscription != null) {
       operationSubscription.stop();
       if (subscriptionThread != null) {
         subscriptionThread.join();
       }
-      logger.log(Level.FINE, "subscriptionThread has been stopped");
+      log.log(Level.FINE, "subscriptionThread has been stopped");
     }
     if (subscriberService != null) {
       subscriberService.shutdown();
       subscriberService.awaitTermination(10, TimeUnit.SECONDS);
-      logger.log(Level.FINE, "subscriberService has been stopped");
+      log.log(Level.FINE, "subscriberService has been stopped");
     }
     if (client != null) {
       client.close();
       client = null;
-      logger.log(Level.FINE, "client has been closed");
+      log.log(Level.FINE, "client has been closed");
     }
   }
 
@@ -710,7 +710,7 @@ public class RedisShardBackplane implements Backplane {
           String workerChangeJson = JsonFormat.printer().print(workerChange);
           removeWorkerAndPublish(jedis, name, workerChangeJson);
         } catch (InvalidProtocolBufferException e) {
-          logger.log(Level.SEVERE, "error printing workerChange", e);
+          log.log(Level.SEVERE, "error printing workerChange", e);
         }
       }
     }
@@ -922,7 +922,7 @@ public class RedisShardBackplane implements Backplane {
       operationParser.merge(operationJson, operationBuilder);
       return operationBuilder.build();
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.SEVERE, "error parsing operation from " + operationJson, e);
+      log.log(Level.SEVERE, "error parsing operation from " + operationJson, e);
       return null;
     }
   }
@@ -954,7 +954,7 @@ public class RedisShardBackplane implements Backplane {
     try {
       json = operationPrinter.print(operation);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.SEVERE, "error printing operation " + operation.getName(), e);
+      log.log(Level.SEVERE, "error printing operation " + operation.getName(), e);
       return false;
     }
 
@@ -986,7 +986,7 @@ public class RedisShardBackplane implements Backplane {
       String queueEntryJson,
       int priority) {
     if (state.dispatchedOperations.remove(jedis, operationName)) {
-      logger.log(Level.WARNING, format("removed dispatched operation %s", operationName));
+      log.log(Level.WARNING, format("removed dispatched operation %s", operationName));
     }
     state.operationQueue.push(jedis, provisions, queueEntryJson, priority);
   }
@@ -1048,7 +1048,7 @@ public class RedisShardBackplane implements Backplane {
         JsonFormat.parser().merge(entry.getValue(), dispatchedOperationBuilder);
         builder.add(dispatchedOperationBuilder.build());
       } catch (InvalidProtocolBufferException e) {
-        logger.log(
+        log.log(
             Level.SEVERE,
             "RedisShardBackplane::getDispatchedOperations: removing invalid operation "
                 + entry.getKey(),
@@ -1086,7 +1086,7 @@ public class RedisShardBackplane implements Backplane {
 
       // destroy the processing entry and ttl
       if (!state.prequeue.removeFromDequeue(jedis, executeEntryJson)) {
-        logger.log(
+        log.log(
             Level.SEVERE,
             format("could not remove %s from %s", operationName, state.prequeue.getDequeueName()));
         return null;
@@ -1094,7 +1094,7 @@ public class RedisShardBackplane implements Backplane {
       state.processingOperations.remove(jedis, operationName);
       return executeEntry;
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.SEVERE, "error parsing execute entry", e);
+      log.log(Level.SEVERE, "error parsing execute entry", e);
       return null;
     }
   }
@@ -1116,7 +1116,7 @@ public class RedisShardBackplane implements Backplane {
     try {
       JsonFormat.parser().merge(queueEntryJson, queueEntryBuilder);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.SEVERE, "error parsing queue entry", e);
+      log.log(Level.SEVERE, "error parsing queue entry", e);
       return null;
     }
     QueueEntry queueEntry = queueEntryBuilder.build();
@@ -1137,13 +1137,13 @@ public class RedisShardBackplane implements Backplane {
       success =
           state.dispatchedOperations.insertIfMissing(jedis, operationName, dispatchedOperationJson);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.SEVERE, "error printing dispatched operation", e);
+      log.log(Level.SEVERE, "error printing dispatched operation", e);
       // very unlikely, printer would have to fail
     }
 
     if (success) {
       if (!state.operationQueue.removeFromDequeue(jedis, queueEntryJson)) {
-        logger.log(
+        log.log(
             Level.WARNING,
             format(
                 "operation %s was missing in %s, may be orphaned",
@@ -1204,7 +1204,7 @@ public class RedisShardBackplane implements Backplane {
     try {
       json = printPollOperation(queueEntry, requeueAt);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.SEVERE, "error printing dispatched operation " + operationName, e);
+      log.log(Level.SEVERE, "error printing dispatched operation " + operationName, e);
       return false;
     }
     return client.call(jedis -> pollOperation(jedis, operationName, json));
@@ -1381,7 +1381,7 @@ public class RedisShardBackplane implements Backplane {
                         .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(key))))
                         .build()));
       } catch (NumberFormatException nfe) {
-        logger.warning("Could not obtain start time for " + key);
+        log.warning("Could not obtain start time for " + key);
       }
     }
     return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();

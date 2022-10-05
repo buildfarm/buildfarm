@@ -46,10 +46,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class AwsAdmin implements Admin {
-  private static final Logger logger = Logger.getLogger(Admin.class.getName());
   private final AmazonAutoScaling scale;
   private final AmazonEC2 ec2;
   private final AWSSimpleSystemsManagement ssm;
@@ -63,7 +63,7 @@ public class AwsAdmin implements Admin {
   @Override
   public void terminateHost(String hostId) {
     ec2.terminateInstances(new TerminateInstancesRequest().withInstanceIds(hostId));
-    logger.log(Level.INFO, String.format("Terminated host: %s", hostId));
+    log.log(Level.INFO, String.format("Terminated host: %s", hostId));
   }
 
   @Override
@@ -77,8 +77,7 @@ public class AwsAdmin implements Admin {
             .withDocumentName("AWS-RunShellScript")
             .withInstanceIds(hostId)
             .withParameters(parameters));
-    logger.log(
-        Level.INFO, String.format("Stopped container: %s on host: %s", containerName, hostId));
+    log.log(Level.INFO, String.format("Stopped container: %s on host: %s", containerName, hostId));
   }
 
   @Override
@@ -114,7 +113,7 @@ public class AwsAdmin implements Admin {
     }
     resultBuilder.addAllHosts(hosts);
     resultBuilder.setNumHosts(hosts.size());
-    logger.log(Level.FINE, String.format("Got %d hosts for filter: %s", hosts.size(), filter));
+    log.log(Level.FINE, String.format("Got %d hosts for filter: %s", hosts.size(), filter));
     return resultBuilder.build();
   }
 
@@ -144,7 +143,7 @@ public class AwsAdmin implements Admin {
                       .withOnDemandPercentageAboveBaseCapacity(targetReservedHostsPercent)));
     }
     scale.updateAutoScalingGroup(request);
-    logger.log(Level.INFO, String.format("Scaled: %s", scaleGroupName));
+    log.log(Level.INFO, String.format("Scaled: %s", scaleGroupName));
   }
 
   private long getHostUptimeInMinutes(Date launchTime) {
@@ -163,7 +162,7 @@ public class AwsAdmin implements Admin {
     Instance workerInstance = getInstanceId(privateDnsName);
     if (workerInstance == null) {
       String errorMessage = "Cannot find instance with private DNS name " + privateDnsName;
-      logger.log(Level.SEVERE, errorMessage);
+      log.log(Level.SEVERE, errorMessage);
       throw new RuntimeException(errorMessage);
     }
     String instanceId = workerInstance.getInstanceId();
@@ -171,7 +170,7 @@ public class AwsAdmin implements Admin {
     if (autoScalingGroup == null || autoScalingGroup.length() == 0) {
       String errorMessage =
           "Cannot find AutoScalingGroup name of worker with private DNS name " + privateDnsName;
-      logger.log(Level.SEVERE, errorMessage);
+      log.log(Level.SEVERE, errorMessage);
       throw new RuntimeException(errorMessage);
     }
 
@@ -182,7 +181,7 @@ public class AwsAdmin implements Admin {
             .withAutoScalingGroupName(autoScalingGroup)
             .withProtectedFromScaleIn(false);
     SetInstanceProtectionResult result = scale.setInstanceProtection(disableProtectionRequest);
-    logger.log(
+    log.log(
         Level.INFO,
         String.format(
             "Disable protection of host: %s in AutoScalingGroup: %s and get result: %s",

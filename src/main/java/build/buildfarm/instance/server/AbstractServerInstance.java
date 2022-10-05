@@ -136,9 +136,10 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 
+@Log
 public abstract class AbstractServerInstance implements Instance {
-  private static final Logger logger = Logger.getLogger(AbstractServerInstance.class.getName());
 
   private final String name;
   protected final ContentAddressableStorage contentAddressableStorage;
@@ -649,7 +650,7 @@ public abstract class AbstractServerInstance implements Instance {
             });
         return immediateFuture(actualDigestBuilder.build());
       } catch (Exception e) {
-        logger.log(Level.WARNING, "download attempt failed", e);
+        log.log(Level.WARNING, "download attempt failed", e);
         // ignore?
       }
     }
@@ -955,7 +956,7 @@ public abstract class AbstractServerInstance implements Instance {
         getLogger().log(Level.SEVERE, "no rpc status from exception", cause);
         status = asExecutionStatus(cause);
       } else if (Code.forNumber(status.getCode()) == Code.DEADLINE_EXCEEDED) {
-        logger.log(
+        log.log(
             Level.WARNING, "an rpc status was thrown with DEADLINE_EXCEEDED, discarding it", cause);
         status =
             com.google.rpc.Status.newBuilder()
@@ -1401,7 +1402,7 @@ public abstract class AbstractServerInstance implements Instance {
           @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
-            logger.log(
+            log.log(
                 Level.WARNING,
                 format("action cache check of %s failed", DigestUtil.toString(actionDigest)),
                 t);
@@ -1418,7 +1419,7 @@ public abstract class AbstractServerInstance implements Instance {
       try {
         return metadata.unpack(QueuedOperationMetadata.class);
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
+        log.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
       }
     }
     return null;
@@ -1430,7 +1431,7 @@ public abstract class AbstractServerInstance implements Instance {
       try {
         return metadata.unpack(ExecutingOperationMetadata.class);
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
+        log.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
       }
     }
     return null;
@@ -1442,7 +1443,7 @@ public abstract class AbstractServerInstance implements Instance {
       try {
         return metadata.unpack(CompletedOperationMetadata.class);
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.SEVERE, format("invalid completed operation metadata %s", name), e);
+        log.log(Level.SEVERE, format("invalid completed operation metadata %s", name), e);
       }
     }
     return null;
@@ -1488,7 +1489,7 @@ public abstract class AbstractServerInstance implements Instance {
     try {
       return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(
+      log.log(
           Level.SEVERE, format("invalid execute operation metadata %s", operation.getName()), e);
     }
     return null;
@@ -1506,7 +1507,7 @@ public abstract class AbstractServerInstance implements Instance {
             try {
               future.set(parser.parseFrom(blob));
             } catch (InvalidProtocolBufferException e) {
-              logger.log(
+              log.log(
                   Level.WARNING,
                   format("expect parse for %s failed", DigestUtil.toString(digest)),
                   e);
@@ -1520,7 +1521,7 @@ public abstract class AbstractServerInstance implements Instance {
             Status status = Status.fromThrowable(t);
             // NOT_FOUNDs are not notable enough to log independently
             if (status.getCode() != io.grpc.Status.Code.NOT_FOUND) {
-              logger.log(
+              log.log(
                   Level.WARNING, format("expect for %s failed", DigestUtil.toString(digest)), t);
             }
             future.setException(t);

@@ -90,10 +90,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 class ShardWorkerContext implements WorkerContext {
-  private static final Logger logger = Logger.getLogger(ShardWorkerContext.class.getName());
 
   private static final String PROVISION_CORES_NAME = "cores";
 
@@ -227,24 +227,23 @@ class ShardWorkerContext implements WorkerContext {
             success =
                 operationPoller.poll(queueEntry, stage, System.currentTimeMillis() + 30 * 1000);
           } catch (IOException e) {
-            logger.log(
+            log.log(
                 Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
           if (!success) {
-            logger.log(
+            log.log(
                 Level.INFO,
                 format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
           } else {
             operationPollerCounter.inc();
-            logger.log(
+            log.log(
                 Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
         () -> {
-          logger.log(
-              Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
+          log.log(Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);
@@ -282,10 +281,10 @@ class ShardWorkerContext implements WorkerContext {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {
         case DEADLINE_EXCEEDED:
-          logger.log(Level.WARNING, "backplane timed out for match during bookkeeping");
+          log.log(Level.WARNING, "backplane timed out for match during bookkeeping");
           break;
         case UNAVAILABLE:
-          logger.log(Level.WARNING, "backplane was unavailable for match");
+          log.log(Level.WARNING, "backplane was unavailable for match");
           break;
         default:
           throw e;
@@ -334,7 +333,7 @@ class ShardWorkerContext implements WorkerContext {
             }
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
-              logger.log(Level.WARNING, "matched duplicate operation " + operationName);
+              log.log(Level.WARNING, "matched duplicate operation " + operationName);
               return false;
             }
             matched = true;
@@ -371,7 +370,7 @@ class ShardWorkerContext implements WorkerContext {
       operationPoller.poll(queueEntry, ExecutionStage.Value.QUEUED, 0);
     } catch (IOException e) {
       // ignore, at least dispatcher will pick us up in 30s
-      logger.log(Level.SEVERE, "Failure while trying to fast requeue " + operationName, e);
+      log.log(Level.SEVERE, "Failure while trying to fast requeue " + operationName, e);
     }
   }
 
@@ -483,7 +482,7 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputPath = actionRoot.resolve(outputFile);
     if (!Files.exists(outputPath)) {
-      logger.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
+      log.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
       return;
     }
 
@@ -491,7 +490,7 @@ class ShardWorkerContext implements WorkerContext {
       String message =
           String.format(
               "ReportResultStage: %s is a directory but it should have been a file", outputPath);
-      logger.log(Level.FINE, message);
+      log.log(Level.FINE, message);
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -572,12 +571,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputDirPath = actionRoot.resolve(outputDir);
     if (!Files.exists(outputDirPath)) {
-      logger.log(Level.FINE, "ReportResultStage: " + outputDir + " does not exist...");
+      log.log(Level.FINE, "ReportResultStage: " + outputDir + " does not exist...");
       return;
     }
 
     if (!Files.isDirectory(outputDirPath)) {
-      logger.log(Level.FINE, "ReportResultStage: " + outputDir + " is not a directory...");
+      log.log(Level.FINE, "ReportResultStage: " + outputDir + " is not a directory...");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -601,7 +600,7 @@ class ShardWorkerContext implements WorkerContext {
             try {
               digest = getDigestUtil().compute(file);
             } catch (NoSuchFileException e) {
-              logger.log(
+              log.log(
                   Level.SEVERE,
                   format(
                       "error visiting file %s under output dir %s",
@@ -701,7 +700,7 @@ class ShardWorkerContext implements WorkerContext {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
       completedOperations.inc();
-      logger.log(Level.FINE, "CompletedOperation: " + operation.getName());
+      log.log(Level.FINE, "CompletedOperation: " + operation.getName());
     }
     return success;
   }

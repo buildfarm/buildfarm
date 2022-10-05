@@ -42,11 +42,11 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 
+@Log
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
-  private static final Logger logger = Logger.getLogger(ExecutionService.class.getName());
 
   private final Instance instance;
   private final long keepaliveAfter;
@@ -86,7 +86,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
           @Override
           public void onFailure(Throwable t) {
             if (!isCancelled() && !(t instanceof CancellationException)) {
-              logger.log(Level.WARNING, "error occurred during execution", t);
+              log.log(Level.WARNING, "error occurred during execution", t);
               serverCallStreamObserver.onError(Status.fromThrowable(t).asException());
             }
           }

@@ -26,10 +26,10 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class PublishBuildEventService extends PublishBuildEventImplBase {
-  public static final Logger logger = Logger.getLogger(PublishBuildEventService.class.getName());
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
@@ -70,7 +70,7 @@ public class PublishBuildEventService extends PublishBuildEventImplBase {
 
   private void recordEvent(PublishBuildToolEventStreamRequest in) {
     if (configs.getServer().isRecordBesEvents() && in.hasOrderedBuildEvent()) {
-      logger.log(Level.INFO, TextFormat.shortDebugString(in.getOrderedBuildEvent()));
+      log.log(Level.INFO, TextFormat.shortDebugString(in.getOrderedBuildEvent()));
     }
   }
 }

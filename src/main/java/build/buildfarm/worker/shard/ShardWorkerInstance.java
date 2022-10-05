@@ -60,9 +60,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class ShardWorkerInstance extends AbstractServerInstance {
-  private static final Logger logger = Logger.getLogger(ShardWorkerInstance.class.getName());
 
   private final Backplane backplane;
 
@@ -132,7 +133,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             try {
               backplane.removeBlobLocation(digest, getName());
             } catch (IOException backplaneException) {
-              logger.log(
+              log.log(
                   Level.SEVERE,
                   String.format("error removing blob location for %s", DigestUtil.toString(digest)),
                   backplaneException);
@@ -300,7 +301,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             .unpack(QueuedOperationMetadata.class)
             .getExecuteOperationMetadata();
       } catch (InvalidProtocolBufferException e) {
-        logger.log(
+        log.log(
             Level.SEVERE,
             String.format("error unpacking queued operation metadata from %s", operation.getName()),
             e);
@@ -313,7 +314,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             .unpack(ExecutingOperationMetadata.class)
             .getExecuteOperationMetadata();
       } catch (InvalidProtocolBufferException e) {
-        logger.log(
+        log.log(
             Level.SEVERE,
             String.format(
                 "error unpacking executing operation metadata from %s", operation.getName()),
@@ -327,7 +328,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             .unpack(CompletedOperationMetadata.class)
             .getExecuteOperationMetadata();
       } catch (InvalidProtocolBufferException e) {
-        logger.log(
+        log.log(
             Level.SEVERE,
             String.format(
                 "error unpacking completed operation metadata from %s", operation.getName()),
@@ -359,7 +360,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   protected Logger getLogger() {
-    return logger;
+    return log;
   }
 
   @Override

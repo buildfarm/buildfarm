@@ -33,11 +33,11 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import io.prometheus.client.Counter;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 
+@Log
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
-  public static final Logger logger = Logger.getLogger(ActionCacheService.class.getName());
   private static final Counter actionResultsMetric =
       Counter.build().name("action_results").help("Action results.").register();
 
@@ -82,7 +82,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
           @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
-            logger.log(
+            log.log(
                 Level.WARNING,
                 String.format(
                     "getActionResult(%s): %s",

@@ -1,6 +1,7 @@
 java_library(
     name = "server",
     srcs = glob(["*.java"]),
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -21,5 +22,6 @@ java_library(
         "@maven//:io_prometheus_simpleclient",
         "@maven//:me_dinowernli_java_grpc_prometheus",
         "@maven//:org_bouncycastle_bcprov_jdk15on",
+        "@maven//:org_projectlombok_lombok",
     ],
 )
