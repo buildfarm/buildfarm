@@ -20,13 +20,14 @@ import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTe
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.logging.Level.SEVERE;
 
-import build.buildfarm.common.LoggingMain;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ServerOptions;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.services.ActionCacheService;
 import build.buildfarm.server.services.AdminService;
@@ -37,6 +38,7 @@ import build.buildfarm.server.services.OperationQueueService;
 import build.buildfarm.server.services.OperationsService;
 import build.buildfarm.server.services.PublishBuildEventService;
 import com.google.devtools.common.options.OptionsParser;
+import com.google.devtools.common.options.OptionsParsingException;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
@@ -49,21 +51,22 @@ import java.io.IOException;
 import java.security.Security;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
 import me.dinowernli.grpc.prometheus.Configuration;
 import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SuppressWarnings("deprecation")
 @Log
-public class BuildFarmServer extends LoggingMain {
-  // We need to keep references to the root and netty loggers to prevent them from being garbage
-  // collected, which would cause us to loose their configuration.
+@SpringBootApplication
+public class BuildFarmServer {
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
   private static final Counter healthCheckMetric =
@@ -74,22 +77,27 @@ public class BuildFarmServer extends LoggingMain {
           .register();
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-  private final Instance instance;
-  private final HealthStatusManager healthStatusManager;
-  private final io.grpc.Server server;
+  private Instance instance;
+  private HealthStatusManager healthStatusManager;
+  private io.grpc.Server server;
   private boolean stopping = false;
+
+  private static String[] args;
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  public BuildFarmServer(String session)
-      throws InterruptedException, ConfigurationException, IOException {
-    this(session, ServerBuilder.forPort(configs.getServer().getPort()));
+  private void printUsage(OptionsParser parser) {
+    log.info("Usage: CONFIG_PATH");
+    log.info(parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
-  public BuildFarmServer(String session, ServerBuilder<?> serverBuilder)
-      throws InterruptedException, ConfigurationException {
-    super("BuildFarmServer");
-
-    instance = BuildFarmInstances.createInstance(session, this::stop);
+  public synchronized void start(ServerBuilder<?> serverBuilder, String publicName)
+      throws IOException, ConfigurationException, InterruptedException {
+    instance =
+        new ShardInstance(
+            configs.getServer().getName(),
+            configs.getServer().getSession() + "-" + configs.getServer().getName(),
+            new DigestUtil(configs.getDigestFunction()),
+            this::stop);
 
     healthStatusManager = new HealthStatusManager();
 
@@ -125,10 +133,18 @@ public class BuildFarmServer extends LoggingMain {
     handleGrpcMetricIntercepts(serverBuilder);
     server = serverBuilder.build();
 
-    log.log(Level.INFO, String.format("%s initialized", session));
+    log.info(String.format("%s initialized", configs.getServer().getSession()));
+
+    checkState(!stopping, "must not call start after stop");
+    instance.start(publicName);
+    server.start();
+    healthStatusManager.setStatus(
+        HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
+    PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
+    healthCheckMetric.labels("start").inc();
   }
 
-  public static void handleGrpcMetricIntercepts(ServerBuilder<?> serverBuilder) {
+  public void handleGrpcMetricIntercepts(ServerBuilder<?> serverBuilder) {
     // Decide how to capture GRPC Prometheus metrics.
     // By default, we don't capture any.
     if (configs.getServer().getGrpcMetrics().isEnabled()) {
@@ -148,24 +164,7 @@ public class BuildFarmServer extends LoggingMain {
     }
   }
 
-  public synchronized void start(String publicName) throws IOException {
-    checkState(!stopping, "must not call start after stop");
-    instance.start(publicName);
-    server.start();
-    healthStatusManager.setStatus(
-        HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
-    healthCheckMetric.labels("start").inc();
-  }
-
-  @Override
-  protected void onShutdown() {
-    System.err.println("*** shutting down gRPC server since JVM is shutting down");
-    stop();
-    System.err.println("*** server shut down");
-  }
-
-  @SuppressWarnings("ConstantConditions")
+  @PreDestroy
   public void stop() {
     synchronized (this) {
       if (stopping) {
@@ -173,6 +172,7 @@ public class BuildFarmServer extends LoggingMain {
       }
       stopping = true;
     }
+    System.err.println("*** shutting down gRPC server since JVM is shutting down");
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     PrometheusPublisher.stopHttpServer();
@@ -189,26 +189,13 @@ public class BuildFarmServer extends LoggingMain {
       }
     }
     if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
-      log.log(Level.WARNING, "could not shut down keepalive scheduler");
+      log.warning("could not shut down keepalive scheduler");
     }
+    System.err.println("*** server shut down");
   }
 
-  private void blockUntilShutdown() throws InterruptedException {
-    if (server != null) {
-      server.awaitTermination();
-    }
-  }
-
-  private static void printUsage(OptionsParser parser) {
-    log.log(Level.INFO, "Usage: CONFIG_PATH");
-    log.log(
-        Level.INFO,
-        parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
-  }
-
-  /** returns success or failure */
-  @SuppressWarnings("ConstantConditions")
-  static boolean serverMain(String[] args) {
+  @PostConstruct
+  public void init() throws OptionsParsingException {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //
     // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
@@ -217,11 +204,10 @@ public class BuildFarmServer extends LoggingMain {
     nettyLogger.setLevel(SEVERE);
 
     OptionsParser parser = OptionsParser.newOptionsParser(ServerOptions.class);
-    parser.parseAndExitUponError(args);
+    parser.parse(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
       printUsage(parser);
-      return false;
     }
 
     ServerOptions options = parser.getOptions(ServerOptions.class);
@@ -232,23 +218,17 @@ public class BuildFarmServer extends LoggingMain {
       log.severe("Could not parse yml configuration file." + e);
     }
 
-    String session = "buildfarm-server";
     if (!options.publicName.isEmpty()) {
       configs.getServer().setPublicName(options.publicName);
-      session += "-" + configs.getServer().getPublicName();
     }
     if (options.port > 0) {
       configs.getServer().setPort(options.port);
     }
-    session += "-" + UUID.randomUUID();
     log.info(configs.toString());
-    BuildFarmServer server;
     try {
-      server = new BuildFarmServer(session);
-      server.start(configs.getServer().getPublicName());
-      server.blockUntilShutdown();
-      server.stop();
-      return true;
+      start(
+          ServerBuilder.forPort(configs.getServer().getPort()),
+          configs.getServer().getPublicName());
     } catch (IOException e) {
       System.err.println("error: " + formatIOError(e));
     } catch (InterruptedException e) {
@@ -256,10 +236,10 @@ public class BuildFarmServer extends LoggingMain {
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }
-    return false;
   }
 
   public static void main(String[] args) {
-    System.exit(serverMain(args) ? 0 : 1);
+    BuildFarmServer.args = args;
+    SpringApplication.run(BuildFarmServer.class, args);
   }
 }

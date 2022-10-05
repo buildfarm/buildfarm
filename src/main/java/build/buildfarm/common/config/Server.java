@@ -1,6 +1,7 @@
 package build.buildfarm.common.config;
 
 import com.google.common.base.Strings;
+import java.util.UUID;
 import lombok.Data;
 
 @Data
@@ -8,6 +9,8 @@ public class Server {
   public enum INSTANCE_TYPE {
     SHARD
   }
+
+  private static UUID sessionGuid = UUID.randomUUID();
 
   private INSTANCE_TYPE instanceType = INSTANCE_TYPE.SHARD;
   private String name = "shard";
@@ -40,5 +43,9 @@ public class Server {
     } else {
       return System.getenv("INSTANCE_NAME");
     }
+  }
+
+  public String getSession() {
+    return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);
   }
 }
