@@ -117,10 +117,9 @@ public class BuildFarmServerIntegrationTest {
     configs.getWorker().getCas().setType(MEMORY);
     configs.getWorker().getCas().setTarget("localhost:8980");
     String uniqueServerName = "in-process server for " + getClass();
-    server =
-        new BuildFarmServer(
-            "test", InProcessServerBuilder.forName(uniqueServerName).directExecutor());
-    server.start("startTime/test:0000");
+    server = new BuildFarmServer();
+    server.start(
+        InProcessServerBuilder.forName(uniqueServerName).directExecutor(), "startTime/test:0000");
     inProcessChannel = InProcessChannelBuilder.forName(uniqueServerName).directExecutor().build();
   }
 
@@ -402,7 +401,7 @@ public class BuildFarmServerIntegrationTest {
     ServerBuilder serverBuilder = mock(ServerBuilder.class);
 
     // ACT
-    BuildFarmServer.handleGrpcMetricIntercepts(serverBuilder);
+    server.handleGrpcMetricIntercepts(serverBuilder);
 
     // ASSERT
     verify(serverBuilder, times(0)).intercept(any(MonitoringServerInterceptor.class));
@@ -415,7 +414,7 @@ public class BuildFarmServerIntegrationTest {
     ServerBuilder serverBuilder = mock(ServerBuilder.class);
 
     // ACT
-    BuildFarmServer.handleGrpcMetricIntercepts(serverBuilder);
+    server.handleGrpcMetricIntercepts(serverBuilder);
 
     // ASSERT
     verify(serverBuilder, times(1)).intercept(any(MonitoringServerInterceptor.class));
