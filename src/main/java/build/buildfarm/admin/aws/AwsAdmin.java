@@ -15,6 +15,9 @@
 package build.buildfarm.admin.aws;
 
 import build.buildfarm.admin.Admin;
+import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.v1test.AdminGrpc;
+import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.Host;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
@@ -37,6 +40,9 @@ import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementClientBuilder;
 import com.amazonaws.services.simplesystemsmanagement.model.SendCommandRequest;
 import com.google.protobuf.util.Timestamps;
+import io.grpc.ManagedChannel;
+import io.grpc.netty.NegotiationType;
+import io.grpc.netty.NettyChannelBuilder;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -47,17 +53,26 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
+import org.springframework.stereotype.Component;
 
 @Log
+@Component
 public class AwsAdmin implements Admin {
-  private final AmazonAutoScaling scale;
-  private final AmazonEC2 ec2;
-  private final AWSSimpleSystemsManagement ssm;
 
-  public AwsAdmin(String region) {
-    scale = AmazonAutoScalingClientBuilder.standard().withRegion(region).build();
-    ec2 = AmazonEC2ClientBuilder.standard().withRegion(region).build();
-    ssm = AWSSimpleSystemsManagementClientBuilder.standard().withRegion(region).build();
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+  private AmazonAutoScaling scale;
+  private AmazonEC2 ec2;
+  private AWSSimpleSystemsManagement ssm;
+
+  public AwsAdmin() {
+    String region = configs.getServer().getCloudRegion();
+    if (region != null) {
+      scale = AmazonAutoScalingClientBuilder.standard().withRegion(region).build();
+      ec2 = AmazonEC2ClientBuilder.standard().withRegion(region).build();
+      ssm = AWSSimpleSystemsManagementClientBuilder.standard().withRegion(region).build();
+    } else {
+      log.warning("Missing cloudRegion configuration. AWS Admin will not be enabled.");
+    }
   }
 
   @Override
@@ -186,6 +201,23 @@ public class AwsAdmin implements Admin {
         String.format(
             "Disable protection of host: %s in AutoScalingGroup: %s and get result: %s",
             instanceId, autoScalingGroup, result.toString()));
+  }
+
+  @Override
+  public void disableHostScaleInProtection(String clusterEndpoint, String instanceIp) {
+    ManagedChannel channel = null;
+    try {
+      NettyChannelBuilder builder =
+          NettyChannelBuilder.forTarget(clusterEndpoint).negotiationType(NegotiationType.PLAINTEXT);
+      channel = builder.build();
+      AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
+      adminBlockingStub.disableScaleInProtection(
+          DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
+    } finally {
+      if (channel != null) {
+        channel.shutdown();
+      }
+    }
   }
 
   private String getTagValue(List<Tag> tags) {

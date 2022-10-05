@@ -249,7 +249,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       default:
         return null;
       case AWS:
-        return new AwsAdmin(configs.getServer().getCloudRegion());
+        return new AwsAdmin();
       case GCP:
         return new GcpAdmin();
     }

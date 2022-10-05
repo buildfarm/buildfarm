@@ -1,17 +1,25 @@
 package build.buildfarm.common.config;
 
 import build.buildfarm.common.DigestUtil;
+import com.google.common.base.Strings;
+import com.google.devtools.common.options.OptionsParser;
+import com.google.devtools.common.options.OptionsParsingException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
+import javax.naming.ConfigurationException;
 import lombok.Data;
+import lombok.extern.java.Log;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
 @Data
+@Log
 public final class BuildfarmConfigs {
   private static BuildfarmConfigs buildfarmConfigs;
 
@@ -36,6 +44,7 @@ public final class BuildfarmConfigs {
     try (InputStream inputStream = new FileInputStream(new File(configLocation))) {
       Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
       buildfarmConfigs = yaml.load(inputStream);
+      log.info(buildfarmConfigs.toString());
     }
     return buildfarmConfigs;
   }
@@ -44,6 +53,64 @@ public final class BuildfarmConfigs {
     try (InputStream inputStream = Files.newInputStream(configLocation)) {
       Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
       buildfarmConfigs = yaml.load(inputStream);
+      log.info(buildfarmConfigs.toString());
     }
+  }
+
+  private static OptionsParser getOptionsParser(Class clazz, String[] args)
+      throws ConfigurationException {
+    verifyArgs(args);
+    OptionsParser parser = OptionsParser.newOptionsParser(clazz);
+    try {
+      parser.parse(args);
+    } catch (OptionsParsingException e) {
+      log.severe("Could not parse options provided." + e);
+      throw new RuntimeException(e);
+    }
+    List<String> residue = parser.getResidue();
+    if (residue.isEmpty()) {
+      log.info("Usage: CONFIG_PATH");
+      log.info(parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+    }
+    return parser;
+  }
+
+  private static void verifyArgs(String[] args) throws ConfigurationException {
+    if (args.length == 0) {
+      throw new ConfigurationException("A valid path to a configuration file must be provided.");
+    }
+  }
+
+  public static BuildfarmConfigs loadServerConfigs(String[] args) throws ConfigurationException {
+    OptionsParser parser = getOptionsParser(ServerOptions.class, args);
+    ServerOptions options = parser.getOptions(ServerOptions.class);
+    try {
+      buildfarmConfigs = BuildfarmConfigs.loadConfigs(parser.getResidue().get(0));
+    } catch (IOException e) {
+      log.severe("Could not parse yml configuration file." + e);
+      throw new RuntimeException(e);
+    }
+    if (!options.publicName.isEmpty()) {
+      buildfarmConfigs.getServer().setPublicName(options.publicName);
+    }
+    if (options.port > 0) {
+      buildfarmConfigs.getServer().setPort(options.port);
+    }
+    return buildfarmConfigs;
+  }
+
+  public static BuildfarmConfigs loadWorkerConfigs(String[] args) throws ConfigurationException {
+    OptionsParser parser = getOptionsParser(ShardWorkerOptions.class, args);
+    ShardWorkerOptions options = parser.getOptions(ShardWorkerOptions.class);
+    try {
+      buildfarmConfigs = BuildfarmConfigs.loadConfigs(parser.getResidue().get(0));
+    } catch (IOException e) {
+      log.severe("Could not parse yml configuration file." + e);
+      throw new RuntimeException(e);
+    }
+    if (!Strings.isNullOrEmpty(options.publicName)) {
+      buildfarmConfigs.getWorker().setPublicName(options.publicName);
+    }
+    return buildfarmConfigs;
   }
 }
