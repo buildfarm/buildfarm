@@ -234,8 +234,8 @@ public class BuildFarmServer extends LoggingMain {
 
     String session = "buildfarm-server";
     if (!options.publicName.isEmpty()) {
-      session += "-" + options.publicName;
       configs.getServer().setPublicName(options.publicName);
+      session += "-" + configs.getServer().getPublicName();
     }
     if (options.port > 0) {
       configs.getServer().setPort(options.port);
@@ -245,7 +245,7 @@ public class BuildFarmServer extends LoggingMain {
     BuildFarmServer server;
     try {
       server = new BuildFarmServer(session);
-      server.start(options.publicName);
+      server.start(configs.getServer().getPublicName());
       server.blockUntilShutdown();
       server.stop();
       return true;
