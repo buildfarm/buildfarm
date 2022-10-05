@@ -53,7 +53,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.naming.ConfigurationException;
@@ -87,10 +86,8 @@ public class BuildFarmServer {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private void printUsage(OptionsParser parser) {
-    log.log(Level.INFO, "Usage: CONFIG_PATH");
-    log.log(
-        Level.INFO,
-        parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+    log.info("Usage: CONFIG_PATH");
+    log.info(parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
   public synchronized void start(ServerBuilder<?> serverBuilder, String publicName)
@@ -136,7 +133,7 @@ public class BuildFarmServer {
     handleGrpcMetricIntercepts(serverBuilder);
     server = serverBuilder.build();
 
-    log.log(Level.INFO, String.format("%s initialized", configs.getServer().getSession()));
+    log.info(String.format("%s initialized", configs.getServer().getSession()));
 
     checkState(!stopping, "must not call start after stop");
     instance.start(publicName);
@@ -192,7 +189,7 @@ public class BuildFarmServer {
       }
     }
     if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
-      log.log(Level.WARNING, "could not shut down keepalive scheduler");
+      log.warning("could not shut down keepalive scheduler");
     }
     System.err.println("*** server shut down");
   }
