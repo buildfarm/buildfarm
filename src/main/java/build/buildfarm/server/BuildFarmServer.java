@@ -53,19 +53,19 @@ import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
+import lombok.extern.java.Log;
 import me.dinowernli.grpc.prometheus.Configuration;
 import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 @SuppressWarnings("deprecation")
+@Log
 public class BuildFarmServer extends LoggingMain {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
   // collected, which would cause us to loose their configuration.
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
-  private static final Logger logger = Logger.getLogger(BuildFarmServer.class.getName());
   private static final Counter healthCheckMetric =
       Counter.build()
           .name("health_check")
@@ -125,7 +125,7 @@ public class BuildFarmServer extends LoggingMain {
     handleGrpcMetricIntercepts(serverBuilder);
     server = serverBuilder.build();
 
-    logger.log(Level.INFO, String.format("%s initialized", session));
+    log.log(Level.INFO, String.format("%s initialized", session));
   }
 
   public static void handleGrpcMetricIntercepts(ServerBuilder<?> serverBuilder) {
@@ -189,7 +189,7 @@ public class BuildFarmServer extends LoggingMain {
       }
     }
     if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
-      logger.log(Level.WARNING, "could not shut down keepalive scheduler");
+      log.log(Level.WARNING, "could not shut down keepalive scheduler");
     }
   }
 
@@ -200,8 +200,8 @@ public class BuildFarmServer extends LoggingMain {
   }
 
   private static void printUsage(OptionsParser parser) {
-    logger.log(Level.INFO, "Usage: CONFIG_PATH");
-    logger.log(
+    log.log(Level.INFO, "Usage: CONFIG_PATH");
+    log.log(
         Level.INFO,
         parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
@@ -229,7 +229,7 @@ public class BuildFarmServer extends LoggingMain {
     try {
       configs = BuildfarmConfigs.loadConfigs(residue.get(0));
     } catch (IOException e) {
-      logger.severe("Could not parse yml configuration file." + e);
+      log.severe("Could not parse yml configuration file." + e);
     }
 
     String session = "buildfarm-server";
@@ -241,7 +241,7 @@ public class BuildFarmServer extends LoggingMain {
       configs.getServer().setPort(options.port);
     }
     session += "-" + UUID.randomUUID();
-    logger.info(configs.toString());
+    log.info(configs.toString());
     BuildFarmServer server;
     try {
       server = new BuildFarmServer(session);

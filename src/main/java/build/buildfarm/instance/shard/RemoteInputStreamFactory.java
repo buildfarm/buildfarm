@@ -52,11 +52,11 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 
+@Log
 public class RemoteInputStreamFactory implements InputStreamFactory {
-  private static final Logger logger = Logger.getLogger(RemoteInputStreamFactory.class.getName());
 
   public interface UnavailableConsumer {
     void accept(String worker, Throwable t, String context);
@@ -94,7 +94,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     try {
       return workerStubs.get(worker);
     } catch (ExecutionException e) {
-      logger.log(Level.SEVERE, String.format("error getting worker stub for %s", worker), e);
+      log.log(Level.SEVERE, String.format("error getting worker stub for %s", worker), e);
       throw new IllegalStateException("stub instance creation must not fail");
     }
   }

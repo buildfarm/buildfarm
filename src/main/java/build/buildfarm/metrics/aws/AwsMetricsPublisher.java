@@ -36,10 +36,10 @@ import java.io.IOException;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class AwsMetricsPublisher extends AbstractMetricsPublisher {
-  private static final Logger logger = Logger.getLogger(AwsMetricsPublisher.class.getName());
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private static AmazonSNSAsync snsClient;
@@ -76,7 +76,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
             new AsyncHandler<PublishRequest, PublishResult>() {
               @Override
               public void onError(Exception e) {
-                logger.log(Level.WARNING, "Could not publish metrics data to SNS.", e);
+                log.log(Level.WARNING, "Could not publish metrics data to SNS.", e);
               }
 
               @Override
@@ -84,7 +84,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
             });
       }
     } catch (Exception e) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format("Could not publish request metadata to SNS for %s.", operation.getName()),
           e);
@@ -92,7 +92,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   }
 
   private AmazonSNSAsync initSnsClient() {
-    logger.log(Level.INFO, "Initializing SNS Client.");
+    log.log(Level.INFO, "Initializing SNS Client.");
     return AmazonSNSAsyncClientBuilder.standard()
         .withRegion(region)
         .withClientConfiguration(
@@ -127,7 +127,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     try {
       getSecretValueResult = client.getSecretValue(getSecretValueRequest);
     } catch (Exception e) {
-      logger.log(Level.SEVERE, String.format("Could not get secret %s from AWS.", secretName));
+      log.log(Level.SEVERE, String.format("Could not get secret %s from AWS.", secretName));
       return;
     }
     String secret;
@@ -145,7 +145,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
         accessKeyId = secretMap.get("access_key");
         secretKey = secretMap.get("secret_key");
       } catch (IOException e) {
-        logger.log(Level.SEVERE, String.format("Could not parse secret %s from AWS", secretName));
+        log.log(Level.SEVERE, String.format("Could not parse secret %s from AWS", secretName));
       }
     }
   }

@@ -26,9 +26,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class ExecuteActionStage extends SuperscalarPipelineStage {
-  private static final Logger logger = Logger.getLogger(ExecuteActionStage.class.getName());
   private static final Gauge executionSlotUsage =
       Gauge.build().name("execution_slot_usage").help("Execution slot Usage.").register();
   private static final Histogram executionTime =
@@ -61,7 +62,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
         try {
           workerContext.destroyExecDir(operationContext.execDir);
         } catch (IOException e) {
-          logger.log(
+          log.log(
               Level.SEVERE, "error while destroying action root " + operationContext.execDir, e);
         } finally {
           output.put(operationContext);
@@ -72,7 +73,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
 
   @Override
   protected Logger getLogger() {
-    return logger;
+    return log;
   }
 
   @Override

@@ -40,11 +40,11 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
+import lombok.extern.java.Log;
 
+@Log
 public class MemoryCAS implements ContentAddressableStorage {
-  private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
 
   private final long maxSizeInBytes;
   private final Consumer<Digest> onPut;
@@ -190,7 +190,7 @@ public class MemoryCAS implements ContentAddressableStorage {
         response.setData(blob).setStatus(OK);
       }
     } catch (Throwable t) {
-      logger.log(Level.SEVERE, "error getting " + DigestUtil.toString(digest), t);
+      log.log(Level.SEVERE, "error getting " + DigestUtil.toString(digest), t);
       response.setStatus(statusFromThrowable(t));
     }
     return response.build();
@@ -272,7 +272,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     }
 
     if (sizeInBytes > maxSizeInBytes) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format(
               "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
@@ -303,7 +303,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   @GuardedBy("this")
   private void expireEntry(Entry e) {
     Digest digest = DigestUtil.buildDigest(e.key, e.value.size());
-    logger.log(Level.INFO, "MemoryLRUCAS: expiring " + DigestUtil.toString(digest));
+    log.log(Level.INFO, "MemoryLRUCAS: expiring " + DigestUtil.toString(digest));
     if (delegate != null) {
       try {
         Write write =
@@ -312,7 +312,7 @@ public class MemoryCAS implements ContentAddressableStorage {
           e.value.getData().writeTo(out);
         }
       } catch (IOException ioEx) {
-        logger.log(
+        log.log(
             Level.SEVERE, String.format("error delegating %s", DigestUtil.toString(digest)), ioEx);
       }
     }

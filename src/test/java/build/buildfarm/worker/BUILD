@@ -14,6 +14,7 @@ java_test(
         "//conditions:default": [],
     }),
     data = ["//examples:example_configs"],
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -36,6 +37,7 @@ java_test(
         "@maven//:io_grpc_grpc_core",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:org_mockito_mockito_core",
+        "@maven//:org_projectlombok_lombok",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )

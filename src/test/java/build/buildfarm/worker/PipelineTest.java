@@ -15,13 +15,14 @@
 package build.buildfarm.worker;
 
 import java.util.logging.Logger;
+import lombok.extern.java.Log;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
+@Log
 public class PipelineTest {
-  private static final Logger logger = Logger.getLogger(PipelineTest.class.getName());
 
   abstract static class AbstractPipelineStage extends PipelineStage {
     public AbstractPipelineStage(String name) {
@@ -30,7 +31,7 @@ public class PipelineTest {
 
     @Override
     public Logger getLogger() {
-      return logger;
+      return log;
     }
 
     @Override

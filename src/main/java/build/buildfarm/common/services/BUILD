@@ -1,6 +1,7 @@
 java_library(
     name = "services",
     srcs = glob(["*.java"]),
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/cas",
@@ -26,6 +27,7 @@ java_library(
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
+        "@maven//:org_projectlombok_lombok",
         "@remote_apis//:build_bazel_remote_asset_v1_remote_asset_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_semver_java_proto",

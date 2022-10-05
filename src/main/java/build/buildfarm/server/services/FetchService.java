@@ -20,10 +20,10 @@ import com.google.common.util.concurrent.FutureCallback;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class FetchService extends FetchImplBase {
-  public static final Logger logger = Logger.getLogger(ActionCacheService.class.getName());
 
   private final Instance instance;
 
@@ -67,7 +67,7 @@ public class FetchService extends FetchImplBase {
           new FutureCallback<Digest>() {
             @Override
             public void onSuccess(Digest actualDigest) {
-              logger.log(
+              log.log(
                   Level.INFO,
                   format(
                       "fetch blob succeeded: %s inserted into CAS",
@@ -81,7 +81,7 @@ public class FetchService extends FetchImplBase {
             @Override
             public void onFailure(Throwable t) {
               // handle NoSuchFileException
-              logger.log(Level.SEVERE, "fetch blob failed", t);
+              log.log(Level.SEVERE, "fetch blob failed", t);
               responseObserver.onError(t);
             }
           },
@@ -108,7 +108,7 @@ public class FetchService extends FetchImplBase {
   @Override
   public void fetchDirectory(
       FetchDirectoryRequest request, StreamObserver<FetchDirectoryResponse> responseObserver) {
-    logger.log(
+    log.log(
         Level.SEVERE,
         "fetchDirectory: "
             + request.toString()

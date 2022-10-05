@@ -61,11 +61,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
-  private static final Logger logger = Logger.getLogger(Executor.class.getName());
 
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
@@ -96,7 +96,7 @@ class Executor {
     try {
       metadata = operationContext.operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.SEVERE, "invalid execute operation metadata", e);
+      log.log(Level.SEVERE, "invalid execute operation metadata", e);
       return 0;
     }
     ExecuteOperationMetadata executingMetadata =
@@ -128,12 +128,12 @@ class Executor {
     try {
       operationUpdateSuccess = workerContext.putOperation(operation);
     } catch (IOException e) {
-      logger.log(
+      log.log(
           Level.SEVERE, format("error putting operation %s as EXECUTING", operation.getName()), e);
     }
 
     if (!operationUpdateSuccess) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format(
               "Executor::run(%s): could not transition to EXECUTING", operation.getName()));
@@ -199,7 +199,7 @@ class Executor {
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
-    logger.log(Level.FINE, "Executor: Operation " + operation.getName() + " Executing command");
+    log.log(Level.FINE, "Executor: Operation " + operation.getName() + " Executing command");
 
     ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
     resultBuilder
@@ -269,7 +269,7 @@ class Executor {
             .setMessage("command resources were referenced after execution completed");
       }
     } catch (IOException e) {
-      logger.log(Level.SEVERE, format("error executing operation %s", operationName), e);
+      log.log(Level.SEVERE, format("error executing operation %s", operationName), e);
       operationContext.poller.pause();
       putError();
       return 0;
@@ -290,7 +290,7 @@ class Executor {
         .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
-    logger.log(
+    log.log(
         Level.FINE,
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
@@ -309,7 +309,7 @@ class Executor {
         throw e;
       }
     } else {
-      logger.log(Level.FINE, "Executor: Operation " + operationName + " Failed to claim output");
+      log.log(Level.FINE, "Executor: Operation " + operationName + " Failed to claim output");
       boolean wasInterrupted = Thread.interrupted();
       try {
         putError();
@@ -333,23 +333,23 @@ class Executor {
       try {
         putError();
       } catch (InterruptedException errorEx) {
-        logger.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
+        log.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
       } finally {
         Thread.currentThread().interrupt();
       }
     } catch (Exception e) {
       // clear interrupt flag for error put
       boolean wasInterrupted = Thread.interrupted();
-      logger.log(Level.SEVERE, format("errored during execution of %s", operationName), e);
+      log.log(Level.SEVERE, format("errored during execution of %s", operationName), e);
       try {
         putError();
       } catch (InterruptedException errorEx) {
-        logger.log(
+        log.log(
             Level.SEVERE,
             format("interrupted while erroring %s after error", operationName),
             errorEx);
       } catch (Exception errorEx) {
-        logger.log(
+        log.log(
             Level.SEVERE, format("errored while erroring %s after error", operationName), errorEx);
       }
       if (wasInterrupted) {
@@ -453,7 +453,7 @@ class Executor {
       process = ProcessUtils.threadSafeStart(processBuilder);
       process.getOutputStream().close();
     } catch (IOException e) {
-      logger.log(Level.SEVERE, format("error starting process for %s", operationName), e);
+      log.log(Level.SEVERE, format("error starting process for %s", operationName), e);
       // again, should we do something else here??
       resultBuilder.setExitCode(INCOMPLETE_EXIT_CODE);
       // The openjdk IOException for an exec failure here includes the working
@@ -500,7 +500,7 @@ class Executor {
           exitCode = process.exitValue();
           processCompleted = true;
         } else {
-          logger.log(
+          log.log(
               Level.INFO,
               format("process timed out for %s after %ds", operationName, timeout.getSeconds()));
           statusCode = Code.DEADLINE_EXCEEDED;
@@ -511,7 +511,7 @@ class Executor {
         process.destroy();
         int waitMillis = 1000;
         while (!process.waitFor(waitMillis, TimeUnit.MILLISECONDS)) {
-          logger.log(
+          log.log(
               Level.INFO,
               format("process did not respond to termination for %s, killing it", operationName));
           process.destroyForcibly();
@@ -530,7 +530,7 @@ class Executor {
       stderr = stderrReader.getData();
 
     } catch (Exception e) {
-      logger.log(Level.SEVERE, "error extracting stdout/stderr: ", e.getMessage());
+      log.log(Level.SEVERE, "error extracting stdout/stderr: ", e.getMessage());
     }
 
     resultBuilder.setExitCode(exitCode).setStdoutRaw(stdout).setStderrRaw(stderr);

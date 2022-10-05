@@ -17,8 +17,8 @@ package build.buildfarm.common;
 import io.prometheus.client.Gauge;
 import java.util.List;
 import java.util.Set;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import lombok.extern.java.Log;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.ScanParams;
@@ -30,8 +30,8 @@ import redis.clients.jedis.ScanResult;
  * @details When workers leave the cluster, the CAS keys must be updated to inform other workers
  *     that they can no longer obtain CAS data from the missing worker.
  */
+@Log
 public class WorkerIndexer {
-  private static final Logger logger = Logger.getLogger(WorkerIndexer.class.getName());
   private static final Gauge indexerKeysRemovedGauge =
       Gauge.build()
           .name("cas_indexer_removed_keys")
@@ -89,7 +89,7 @@ public class WorkerIndexer {
     Long removedKeys = 0L;
     Long removedHosts = 0L;
     Set<String> activeWorkers = cluster.hkeys("Workers");
-    logger.info(
+    log.info(
         String.format(
             "Initializing CAS Indexer for Node %s with %d active workers.",
             node.getClient().getHost(), activeWorkers.size()));

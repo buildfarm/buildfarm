@@ -142,12 +142,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
+import lombok.extern.java.Log;
 
+@Log
 public class StubInstance implements Instance {
-  private static final Logger logger = Logger.getLogger(StubInstance.class.getName());
 
   private static final long DEFAULT_DEADLINE_DAYS = 100 * 365;
 
@@ -354,7 +354,7 @@ public class StubInstance implements Instance {
     channel.shutdownNow();
     channel.awaitTermination(0, TimeUnit.SECONDS);
     if (retryService != null && !shutdownAndAwaitTermination(retryService, 10, TimeUnit.SECONDS)) {
-      logger.log(Level.SEVERE, format("Could not shut down retry service for %s", identifier));
+      log.log(Level.SEVERE, format("Could not shut down retry service for %s", identifier));
     }
   }
 
@@ -756,7 +756,7 @@ public class StubInstance implements Instance {
     com.google.rpc.Status status = deadlined(operationQueueBlockingStub).put(operation);
     int code = status.getCode();
     if (code != Code.OK.getNumber() && code != Code.INVALID_ARGUMENT.getNumber()) {
-      logger.log(
+      log.log(
           Level.SEVERE,
           format("putOperation(%s) response was unexpected", operation.getName()),
           StatusProto.toStatusException(status));
@@ -781,7 +781,7 @@ public class StubInstance implements Instance {
                     .build());
     int code = status.getCode();
     if (code != Code.OK.getNumber() && code != Code.INVALID_ARGUMENT.getNumber()) {
-      logger.log(
+      log.log(
           Level.SEVERE,
           format("pollOperation(%s) response was unexpected", operationName),
           StatusProto.toStatusException(status));

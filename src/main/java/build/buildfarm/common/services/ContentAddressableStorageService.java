@@ -50,14 +50,13 @@ import io.grpc.stub.StreamObserver;
 import io.prometheus.client.Histogram;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+import lombok.extern.java.Log;
 
+@Log
 public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
-  private static final Logger logger =
-      Logger.getLogger(ContentAddressableStorageService.class.getName());
   private static final Histogram missingBlobs =
       Histogram.build()
           .exponentialBuckets(1, 2, 6)
@@ -108,7 +107,7 @@ public class ContentAddressableStorageService
               responseObserver.onCompleted();
               long elapsedMicros = stopwatch.elapsed(MICROSECONDS);
               missingBlobs.observe(request.getBlobDigestsList().size());
-              logger.log(
+              log.log(
                   Level.FINE,
                   "FindMissingBlobs("
                       + instance.getName()
@@ -126,7 +125,7 @@ public class ContentAddressableStorageService
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (status.getCode() != Code.CANCELLED) {
-              logger.log(
+              log.log(
                   Level.SEVERE,
                   format(
                       "findMissingBlobs(%s): %d",

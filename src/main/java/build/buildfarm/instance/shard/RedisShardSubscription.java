@@ -23,12 +23,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPubSub;
 
+@Log
 class RedisShardSubscription implements Runnable {
-  private static final Logger logger = Logger.getLogger(RedisShardSubscription.class.getName());
 
   private final JedisPubSub subscriber;
   private final InterruptingRunnable onUnsubscribe;
@@ -69,7 +69,7 @@ class RedisShardSubscription implements Runnable {
       switch (status.getCode()) {
         case DEADLINE_EXCEEDED:
         case UNAVAILABLE:
-          logger.log(Level.WARNING, "failed to subscribe", e);
+          log.log(Level.WARNING, "failed to subscribe", e);
           /* ignore */
           break;
         default:
@@ -82,7 +82,7 @@ class RedisShardSubscription implements Runnable {
     boolean first = true;
     while (!stopped.get()) {
       if (!first) {
-        logger.log(Level.SEVERE, "unexpected subscribe return, reconnecting...");
+        log.log(Level.SEVERE, "unexpected subscribe return, reconnecting...");
       }
       iterate(!first);
       first = false;
@@ -100,7 +100,7 @@ class RedisShardSubscription implements Runnable {
     try {
       mainLoop();
     } catch (Exception e) {
-      logger.log(Level.SEVERE, "RedisShardSubscription: Calling onUnsubscribe...", e);
+      log.log(Level.SEVERE, "RedisShardSubscription: Calling onUnsubscribe...", e);
       try {
         onUnsubscribe.runInterruptibly();
       } catch (InterruptedException intEx) {
