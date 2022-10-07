@@ -16,6 +16,7 @@ package build.buildfarm.operations.finder;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -171,7 +172,9 @@ public class EnrichedOperationBuilder {
    */
   private static Action actionDigestToAction(Instance instance, Digest digest) {
     try {
-      ByteString blob = Utils.getBlob(instance, digest, RequestMetadata.getDefaultInstance());
+      ByteString blob =
+          Utils.getBlob(
+              instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance());
       Action action;
       try {
         action = Action.parseFrom(blob);
@@ -196,7 +199,9 @@ public class EnrichedOperationBuilder {
    */
   private static Command commandDigestToCommand(Instance instance, Digest digest) {
     try {
-      ByteString blob = Utils.getBlob(instance, digest, RequestMetadata.getDefaultInstance());
+      ByteString blob =
+          Utils.getBlob(
+              instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance());
       Command command;
       try {
         command = Command.parseFrom(blob);

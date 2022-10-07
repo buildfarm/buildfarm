@@ -36,6 +36,7 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CapabilitiesGrpc;
 import build.bazel.remote.execution.v2.CapabilitiesGrpc.CapabilitiesBlockingStub;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
@@ -68,6 +69,10 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
+import build.buildfarm.common.resources.BlobInformation;
+import build.buildfarm.common.resources.DownloadBlobRequest;
+import build.buildfarm.common.resources.ResourceParser;
+import build.buildfarm.common.resources.UploadBlobRequest;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.AdminGrpc;
@@ -105,7 +110,6 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
@@ -492,8 +496,12 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public String getBlobName(Digest blobDigest) {
-    return format("%s/blobs/%s", getName(), DigestUtil.toString(blobDigest));
+  public String readResourceName(Compressor.Value compressor, Digest blobDigest) {
+    return ResourceParser.downloadResourceName(
+        DownloadBlobRequest.newBuilder()
+            .setInstanceName(getName())
+            .setBlob(BlobInformation.newBuilder().setCompressor(compressor).setDigest(blobDigest))
+            .build());
   }
 
   static class ReadBlobInterchange implements ClientResponseObserver<ReadRequest, ReadResponse> {
@@ -572,6 +580,7 @@ public class StubInstance implements Instance {
 
   @Override
   public void getBlob(
+      Compressor.Value compressor,
       Digest blobDigest,
       long offset,
       long limit,
@@ -583,7 +592,7 @@ public class StubInstance implements Instance {
         .withInterceptors(attachMetadataInterceptor(requestMetadata))
         .read(
             ReadRequest.newBuilder()
-                .setResourceName(getBlobName(blobDigest))
+                .setResourceName(readResourceName(compressor, blobDigest))
                 .setReadOffset(offset)
                 .setReadLimit(limit)
                 .build(),
@@ -592,13 +601,14 @@ public class StubInstance implements Instance {
 
   @Override
   public InputStream newBlobInput(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
       throws IOException {
-    return newInput(getBlobName(digest), offset, requestMetadata);
+    return newInput(readResourceName(compressor, digest), offset, requestMetadata);
   }
 
   @Override
@@ -656,10 +666,15 @@ public class StubInstance implements Instance {
    * writes
    */
   @Override
-  public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+  public Write getBlobWrite(
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
     String resourceName =
-        ByteStreamUploader.uploadResourceName(
-            getName(), uuid, HashCode.fromString(digest.getHash()), digest.getSizeBytes());
+        ResourceParser.uploadResourceName(
+            UploadBlobRequest.newBuilder()
+                .setInstanceName(getName())
+                .setBlob(BlobInformation.newBuilder().setCompressor(compressor).setDigest(digest))
+                .setUuid(uuid.toString())
+                .build());
     return getWrite(
         resourceName,
         t -> {
@@ -669,7 +684,9 @@ public class StubInstance implements Instance {
           }
           return t;
         },
-        digest.getSizeBytes(),
+        compressor == Compressor.Value.IDENTITY
+            ? digest.getSizeBytes()
+            : StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
         /* autoflush=*/ false,
         requestMetadata);
   }

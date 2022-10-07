@@ -18,6 +18,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Size;
@@ -80,7 +81,8 @@ public class RemoteCasWriter implements CasWriter {
   private Write getCasMemberWrite(Digest digest, String workerName) throws IOException {
     Instance casMember = workerStub(workerName);
 
-    return casMember.getBlobWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+    return casMember.getBlobWrite(
+        Compressor.Value.IDENTITY, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
   }
 
   public void insertBlob(Digest digest, ByteString content)

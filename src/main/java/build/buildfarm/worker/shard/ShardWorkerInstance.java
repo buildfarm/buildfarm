@@ -17,6 +17,7 @@ package build.buildfarm.worker.shard;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
@@ -107,12 +108,13 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public String getBlobName(Digest blobDigest) {
+  public String readResourceName(Compressor.Value compressor, Digest blobDigest) {
     throw new UnsupportedOperationException();
   }
 
   @Override
   public void getBlob(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long count,
@@ -120,6 +122,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       RequestMetadata requestMetadata) {
     Preconditions.checkState(count != 0);
     contentAddressableStorage.get(
+        compressor,
         digest,
         offset,
         count,

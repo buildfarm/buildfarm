@@ -15,7 +15,9 @@
 package build.buildfarm.tools;
 
 import static build.buildfarm.instance.Utils.getBlob;
+import static com.google.common.base.Preconditions.checkArgument;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
@@ -57,13 +59,16 @@ class Mount {
             new InputStreamFactory() {
               final Map<Digest, ByteString> cache = new HashMap<>();
 
-              public synchronized InputStream newInput(Digest blobDigest, long offset) {
+              public synchronized InputStream newInput(
+                  Compressor.Value compressor, Digest blobDigest, long offset) {
+                checkArgument(compressor == Compressor.Value.IDENTITY);
                 if (cache.containsKey(blobDigest)) {
                   return cache.get(blobDigest).substring((int) offset).newInput();
                 }
                 try {
                   ByteString value =
-                      getBlob(instance, blobDigest, RequestMetadata.getDefaultInstance());
+                      getBlob(
+                          instance, compressor, blobDigest, RequestMetadata.getDefaultInstance());
                   if (offset == 0) {
                     cache.put(blobDigest, value);
                   }

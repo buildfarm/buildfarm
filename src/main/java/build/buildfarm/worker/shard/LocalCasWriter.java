@@ -16,6 +16,7 @@ package build.buildfarm.worker.shard;
 
 import static java.util.concurrent.TimeUnit.DAYS;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
@@ -49,7 +50,11 @@ class LocalCasWriter implements CasWriter {
   private Write getLocalWrite(Digest digest) throws IOException {
     return execFileSystem
         .getStorage()
-        .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+        .getWrite(
+            Compressor.Value.IDENTITY,
+            digest,
+            UUID.randomUUID(),
+            RequestMetadata.getDefaultInstance());
   }
 
   private void insertStream(Digest digest, IOSupplier<InputStream> suppliedStream)

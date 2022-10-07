@@ -27,6 +27,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
@@ -152,7 +153,8 @@ public class ByteStreamServiceTest {
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     when(write.getFuture()).thenReturn(writtenFuture);
 
-    when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
+    when(instance.getBlobWrite(
+            Compressor.Value.IDENTITY, digest, uuid, RequestMetadata.getDefaultInstance()))
         .thenReturn(write);
 
     HashCode hash = HashCode.fromString(digest.getHash());
@@ -223,7 +225,8 @@ public class ByteStreamServiceTest {
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     when(write.getFuture()).thenReturn(writtenFuture);
 
-    when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
+    when(instance.getBlobWrite(
+            Compressor.Value.IDENTITY, digest, uuid, RequestMetadata.getDefaultInstance()))
         .thenReturn(write);
 
     HashCode hash = HashCode.fromString(digest.getHash());
@@ -324,6 +327,7 @@ public class ByteStreamServiceTest {
     doAnswer(answerVoid((blobDigest, offset, limit, chunkObserver, metadata) -> {}))
         .when(instance)
         .getBlob(
+            eq(Compressor.Value.IDENTITY),
             eq(digest),
             eq(request.getReadOffset()),
             eq((long) content.size()),
@@ -337,6 +341,7 @@ public class ByteStreamServiceTest {
         ArgumentCaptor.forClass(ServerCallStreamObserver.class);
     verify(instance, times(1))
         .getBlob(
+            eq(Compressor.Value.IDENTITY),
             eq(digest),
             eq(request.getReadOffset()),
             eq((long) content.size()),

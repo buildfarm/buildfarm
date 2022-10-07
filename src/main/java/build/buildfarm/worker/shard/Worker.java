@@ -18,6 +18,7 @@ import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
 import static build.buildfarm.common.config.Backplane.BACKPLANE_TYPE.SHARD;
 import static build.buildfarm.common.io.Utils.formatIOError;
 import static build.buildfarm.common.io.Utils.getUser;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -25,6 +26,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.admin.aws.AwsAdmin;
 import build.buildfarm.backplane.Backplane;
@@ -232,19 +234,28 @@ public class Worker {
   private ExecFileSystem createFuseExecFileSystem(
       InputStreamFactory remoteInputStreamFactory, ContentAddressableStorage storage) {
     InputStreamFactory storageInputStreamFactory =
-        (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
+        (compressor, digest, offset) -> {
+          checkArgument(compressor == Compressor.Value.IDENTITY);
+          return storage.get(digest).getData().substring((int) offset).newInput();
+        };
 
     InputStreamFactory localPopulatingInputStreamFactory =
-        (blobDigest, offset) -> {
+        (compressor, blobDigest, offset) -> {
           // FIXME use write
           ByteString content =
-              ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
+              ByteString.readFrom(
+                  remoteInputStreamFactory.newInput(compressor, blobDigest, offset));
 
+          // needs some treatment for compressor
           if (offset == 0) {
             // extra computations
             Blob blob = new Blob(content, digestUtil);
             // here's hoping that our digest matches...
-            storage.put(blob);
+            try {
+              storage.put(blob);
+            } catch (InterruptedException e) {
+              throw new IOException(e);
+            }
           }
 
           return content.newInput();

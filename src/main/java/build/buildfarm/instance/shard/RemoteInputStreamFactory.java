@@ -23,6 +23,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
@@ -101,6 +102,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
 
   @SuppressWarnings({"ResultOfMethodCallIgnored", "StatementWithEmptyBody"})
   private InputStream fetchBlobFromRemoteWorker(
+      Compressor.Value compressor,
       Digest blobDigest,
       Deque<String> workers,
       long offset,
@@ -114,7 +116,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
 
       InputStream input =
           instance.newBlobInput(
-              blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
+              compressor, blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
       // ensure that if the blob cannot be fetched, that we throw here
       input.available();
       if (Thread.interrupted()) {
@@ -141,19 +143,21 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
   }
 
   @Override
-  public InputStream newInput(Digest blobDigest, long offset)
-      throws IOException, InterruptedException {
-    return newInput(blobDigest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
+  public InputStream newInput(Compressor.Value compressor, Digest blobDigest, long offset)
+      throws IOException {
+    return newInput(
+        compressor, blobDigest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
   }
 
   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   public InputStream newInput(
+      Compressor.Value compressor,
       Digest blobDigest,
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
-      throws IOException, InterruptedException {
+      throws IOException {
     Set<String> remoteWorkers;
     Set<String> locationSet;
     try {
@@ -210,6 +214,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
               try {
                 inputStreamFuture.set(
                     fetchBlobFromRemoteWorker(
+                        compressor,
                         blobDigest,
                         workers,
                         offset,
@@ -266,11 +271,15 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
         directExecutor());
     try {
       return inputStreamFuture.get();
+    } catch (InterruptedException e) {
+      throw new IOException(e);
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       Throwables.throwIfUnchecked(cause);
       Throwables.throwIfInstanceOf(cause, IOException.class);
-      Throwables.throwIfInstanceOf(cause, InterruptedException.class);
+      if (cause instanceof InterruptedException) {
+        throw new IOException(cause);
+      }
       throw new UncheckedExecutionException(cause);
     }
   }

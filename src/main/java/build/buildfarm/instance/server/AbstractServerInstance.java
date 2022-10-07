@@ -40,6 +40,7 @@ import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CacheCapabilities;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -73,6 +74,9 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.resources.BlobInformation;
+import build.buildfarm.common.resources.DownloadBlobRequest;
+import build.buildfarm.common.resources.ResourceParser;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
@@ -381,25 +385,31 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public String getBlobName(Digest blobDigest) {
-    return format("%s/blobs/%s", getName(), DigestUtil.toString(blobDigest));
+  public String readResourceName(Compressor.Value compressor, Digest blobDigest) {
+    return ResourceParser.downloadResourceName(
+        DownloadBlobRequest.newBuilder()
+            .setInstanceName(getName())
+            .setBlob(BlobInformation.newBuilder().setCompressor(compressor).setDigest(blobDigest))
+            .build());
   }
 
   @Override
   public InputStream newBlobInput(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
       throws IOException {
-    return contentAddressableStorage.newInput(digest, offset);
+    return contentAddressableStorage.newInput(compressor, digest, offset);
   }
 
   @Override
-  public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+  public Write getBlobWrite(
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException {
-    return contentAddressableStorage.getWrite(digest, uuid, requestMetadata);
+    return contentAddressableStorage.getWrite(compressor, digest, uuid, requestMetadata);
   }
 
   @Override
@@ -434,14 +444,16 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
-      Digest blobDigest, RequestMetadata requestMetadata) {
-    return getBlobFuture(blobDigest, /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
+      Compressor.Value compressor, Digest blobDigest, RequestMetadata requestMetadata) {
+    return getBlobFuture(
+        compressor, blobDigest, /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
-      Digest blobDigest, long count, RequestMetadata requestMetadata) {
+      Compressor.Value compressor, Digest blobDigest, long count, RequestMetadata requestMetadata) {
     SettableFuture<ByteString> future = SettableFuture.create();
     getBlob(
+        compressor,
         blobDigest,
         /* offset=*/ 0,
         count,
@@ -499,12 +511,14 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void getBlob(
+      Compressor.Value compressor,
       Digest blobDigest,
       long offset,
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
-    contentAddressableStorage.get(blobDigest, offset, count, blobObserver, requestMetadata);
+    contentAddressableStorage.get(
+        compressor, blobDigest, offset, count, blobObserver, requestMetadata);
   }
 
   @Override
@@ -521,7 +535,8 @@ public abstract class AbstractServerInstance implements Instance {
     for (ByteString blob : blobs) {
       Digest digest = digestUtil.compute(blob);
       try {
-        blobDigestsBuilder.add(putBlob(this, digest, blob, 1, SECONDS, requestMetadata));
+        blobDigestsBuilder.add(
+            putBlob(this, Compressor.Value.IDENTITY, digest, blob, 1, SECONDS, requestMetadata));
       } catch (StatusException e) {
         if (exception == null) {
           exception = new PutAllBlobsException();
@@ -645,7 +660,8 @@ public abstract class AbstractServerInstance implements Instance {
                   && expectedDigest.getSizeBytes() != contentLength) {
                 throw new DigestMismatchException(actualDigest, expectedDigest);
               }
-              return getBlobWrite(actualDigest, UUID.randomUUID(), requestMetadata)
+              return getBlobWrite(
+                      Compressor.Value.IDENTITY, actualDigest, UUID.randomUUID(), requestMetadata)
                   .getOutput(1, DAYS, () -> {});
             });
         return immediateFuture(actualDigestBuilder.build());
@@ -1500,7 +1516,7 @@ public abstract class AbstractServerInstance implements Instance {
     // FIXME find a way to make this a transform
     SettableFuture<T> future = SettableFuture.create();
     Futures.addCallback(
-        getBlobFuture(digest, requestMetadata),
+        getBlobFuture(Compressor.Value.IDENTITY, digest, requestMetadata),
         new FutureCallback<ByteString>() {
           @Override
           public void onSuccess(ByteString blob) {
@@ -1851,6 +1867,10 @@ public abstract class AbstractServerInstance implements Instance {
             ActionCacheUpdateCapabilities.newBuilder().setUpdateEnabled(true))
         .setMaxBatchTotalSizeBytes(Size.mbToBytes(4))
         .setSymlinkAbsolutePathStrategy(SymlinkAbsolutePathStrategy.Value.DISALLOWED)
+
+        // Compression support
+        .addSupportedCompressors(Compressor.Value.IDENTITY)
+        .addSupportedCompressors(Compressor.Value.ZSTD)
         .build();
   }
 

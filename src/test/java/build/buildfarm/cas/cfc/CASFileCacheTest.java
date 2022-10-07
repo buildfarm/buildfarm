@@ -15,6 +15,7 @@
 package build.buildfarm.cas.cfc;
 
 import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -117,9 +119,13 @@ class CASFileCacheTest {
   @Before
   public void setUp() throws IOException, InterruptedException {
     MockitoAnnotations.initMocks(this);
-    when(delegate.getWrite(any(Digest.class), any(UUID.class), any(RequestMetadata.class)))
+    when(delegate.getWrite(
+            any(Compressor.Value.class),
+            any(Digest.class),
+            any(UUID.class),
+            any(RequestMetadata.class)))
         .thenReturn(new NullWrite());
-    when(delegate.newInput(any(Digest.class), any(Long.class)))
+    when(delegate.newInput(any(Compressor.Value.class), any(Digest.class), any(Long.class)))
         .thenThrow(new NoSuchFileException("null sink delegate"));
     blobs = Maps.newHashMap();
     putService = newSingleThreadExecutor();
@@ -141,11 +147,13 @@ class CASFileCacheTest {
             onExpire,
             delegate) {
           @Override
-          protected InputStream newExternalInput(Digest digest) throws IOException {
+          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+              throws IOException {
             ByteString content = blobs.get(digest);
             if (content == null) {
-              return fileCache.newTransparentInput(digest, 0);
+              return fileCache.newTransparentInput(compressor, digest, 0);
             }
+            checkArgument(compressor == Compressor.Value.IDENTITY);
             return content.substring((int) (long) 0).newInput();
           }
         };
@@ -182,7 +190,7 @@ class CASFileCacheTest {
     ByteString blob = ByteString.copyFromUtf8("");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     // supply an empty input stream if called for test clarity
-    when(mockInputStreamFactory.newInput(blobDigest, /* offset=*/ 0))
+    when(mockInputStreamFactory.newInput(Compressor.Value.IDENTITY, blobDigest, /* offset=*/ 0))
         .thenReturn(ByteString.EMPTY.newInput());
     try {
       fileCache.put(blobDigest, false);
@@ -390,7 +398,7 @@ class CASFileCacheTest {
     entry.after = entry;
     storage.put(nonexistentKey, entry);
     NoSuchFileException noSuchFileException = null;
-    try (InputStream in = fileCache.newInput(nonexistentDigest, 0)) {
+    try (InputStream in = fileCache.newInput(Compressor.Value.IDENTITY, nonexistentDigest, 0)) {
       fail("should not get here");
     } catch (NoSuchFileException e) {
       noSuchFileException = e;
@@ -491,7 +499,8 @@ class CASFileCacheTest {
   }
 
   Write getWrite(Digest digest) throws IOException {
-    return fileCache.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+    return fileCache.getWrite(
+        Compressor.Value.IDENTITY, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
   }
 
   @Test
@@ -589,7 +598,9 @@ class CASFileCacheTest {
     try (OutputStream out = Files.newOutputStream(writePath)) {
       content.substring(0, 6).writeTo(out);
     }
-    Write write = fileCache.getWrite(digest, writeId, RequestMetadata.getDefaultInstance());
+    Write write =
+        fileCache.getWrite(
+            Compressor.Value.IDENTITY, digest, writeId, RequestMetadata.getDefaultInstance());
     AtomicBoolean notified = new AtomicBoolean(false);
     write.getFuture().addListener(() -> notified.set(true), directExecutor());
     assertThat(write.getCommittedSize()).isEqualTo(6);
@@ -673,7 +684,8 @@ class CASFileCacheTest {
     // update entry with expired deadline
     storage.get(key).existsDeadline = Deadline.after(0, SECONDS);
 
-    try (InputStream in = fileCache.newInput(blob.getDigest(), /* offset=*/ 0)) {
+    try (InputStream in =
+        fileCache.newInput(Compressor.Value.IDENTITY, blob.getDigest(), /* offset=*/ 0)) {
       fail("should not get here");
     } catch (NoSuchFileException e) {
       // success
@@ -683,11 +695,7 @@ class CASFileCacheTest {
 
   @Test
   public void emptyWriteIsComplete() throws IOException {
-    Write write =
-        fileCache.getWrite(
-            DIGEST_UTIL.compute(ByteString.EMPTY),
-            UUID.randomUUID(),
-            RequestMetadata.getDefaultInstance());
+    Write write = getWrite(DIGEST_UTIL.compute(ByteString.EMPTY));
     assertThat(write.isComplete()).isTrue();
   }
 
@@ -758,7 +766,11 @@ class CASFileCacheTest {
             }
           }
         };
-    when(delegate.getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class)))
+    when(delegate.getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(expiringDigest),
+            any(UUID.class),
+            any(RequestMetadata.class)))
         .thenReturn(interruptingWrite);
 
     // FIXME we should have a guarantee that we did not iterate over another expiration
@@ -772,7 +784,11 @@ class CASFileCacheTest {
     assertThat(sequenceException).isNotNull();
 
     verify(delegate, times(1))
-        .getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class));
+        .getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(expiringDigest),
+            any(UUID.class),
+            any(RequestMetadata.class));
     assertThat(storage).isEmpty();
   }
 
@@ -806,14 +822,22 @@ class CASFileCacheTest {
             return completed;
           }
         };
-    when(delegate.getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class)))
+    when(delegate.getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(expiringDigest),
+            any(UUID.class),
+            any(RequestMetadata.class)))
         .thenReturn(completingWrite);
 
     Blob blob = new Blob(ByteString.copyFromUtf8("Hello, World"), DIGEST_UTIL);
     fileCache.put(blob);
 
     verify(delegate, times(1))
-        .getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class));
+        .getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(expiringDigest),
+            any(UUID.class),
+            any(RequestMetadata.class));
     assertThat(completingWrite.isComplete()).isTrue();
     assertThat(storage.keySet()).containsExactly(blob.getDigest().getHash());
   }
@@ -885,7 +909,10 @@ class CASFileCacheTest {
               return null;
             });
     when(delegate.getWrite(
-            eq(expiringBlob.getDigest()), any(UUID.class), any(RequestMetadata.class)))
+            eq(Compressor.Value.IDENTITY),
+            eq(expiringBlob.getDigest()),
+            any(UUID.class),
+            any(RequestMetadata.class)))
         .thenReturn(
             new NullWrite() {
               @Override
@@ -952,13 +979,14 @@ class CASFileCacheTest {
   public void readThroughSwitchesToLocalOnComplete() throws IOException, InterruptedException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Blob blob = new Blob(content, DIGEST_UTIL);
-    when(delegate.newInput(eq(blob.getDigest()), eq(0L))).thenReturn(content.newInput());
-    InputStream in = fileCache.newInput(blob.getDigest(), 0);
+    when(delegate.newInput(eq(Compressor.Value.IDENTITY), eq(blob.getDigest()), eq(0L)))
+        .thenReturn(content.newInput());
+    InputStream in = fileCache.newInput(Compressor.Value.IDENTITY, blob.getDigest(), 0L);
     byte[] buf = new byte[content.size()];
     // advance to the middle of the content
     assertThat(in.read(buf, 0, 6)).isEqualTo(6);
     assertThat(ByteString.copyFrom(buf, 0, 6)).isEqualTo(content.substring(0, 6));
-    verify(delegate, times(1)).newInput(blob.getDigest(), 0L);
+    verify(delegate, times(1)).newInput(Compressor.Value.IDENTITY, blob.getDigest(), 0L);
     // trigger the read through to complete immediately by supplying the blob
     fileCache.put(blob);
     // read the remaining content
@@ -1011,19 +1039,26 @@ class CASFileCacheTest {
             };
           }
         };
-    when(delegate.getWrite(eq(blob.getDigest()), any(UUID.class), any(RequestMetadata.class)))
+    when(delegate.getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(blob.getDigest()),
+            any(UUID.class),
+            any(RequestMetadata.class)))
         .thenReturn(write);
-    when(delegate.newInput(eq(blob.getDigest()), eq(0L))).thenReturn(content.newInput());
+    when(delegate.newInput(eq(Compressor.Value.IDENTITY), eq(blob.getDigest()), eq(0L)))
+        .thenReturn(content.newInput());
     // the switch will reset to this point
     InputStream switchedIn = content.newInput();
     switchedIn.skip(6);
-    when(delegate.newInput(eq(blob.getDigest()), eq(6L))).thenReturn(switchedIn);
-    InputStream in = fileCache.newReadThroughInput(blob.getDigest(), 0, write);
+    when(delegate.newInput(eq(Compressor.Value.IDENTITY), eq(blob.getDigest()), eq(6L)))
+        .thenReturn(switchedIn);
+    InputStream in =
+        fileCache.newReadThroughInput(Compressor.Value.IDENTITY, blob.getDigest(), 0, write);
     byte[] buf = new byte[content.size()];
     // advance to the middle of the content
     assertThat(in.read(buf, 0, 6)).isEqualTo(6);
     assertThat(ByteString.copyFrom(buf, 0, 6)).isEqualTo(content.substring(0, 6));
-    verify(delegate, times(1)).newInput(blob.getDigest(), 0L);
+    verify(delegate, times(1)).newInput(Compressor.Value.IDENTITY, blob.getDigest(), 0L);
     // read the remaining content
     int remaining = content.size() - 6;
     assertThat(in.read(buf, 6, remaining)).isEqualTo(remaining);
@@ -1057,18 +1092,21 @@ class CASFileCacheTest {
             /* onExpire=*/ digests -> {},
             /* delegate=*/ null) {
           @Override
-          protected InputStream newExternalInput(Digest digest) throws IOException {
+          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+              throws IOException {
             ByteString content = blobs.get(digest);
             if (content == null) {
-              return fileCache.newTransparentInput(digest, 0);
+              return fileCache.newTransparentInput(compressor, digest, 0);
             }
+            checkArgument(compressor == Compressor.Value.IDENTITY);
             return content.substring((int) (long) 0).newInput();
           }
         };
     ByteString blob = ByteString.copyFromUtf8("Missing Entry");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     NoSuchFileException expected = null;
-    try (InputStream in = undelegatedCAS.newInput(blobDigest, /* offset=*/ 0)) {
+    try (InputStream in =
+        undelegatedCAS.newInput(Compressor.Value.IDENTITY, blobDigest, /* offset=*/ 0)) {
       fail("should not get here");
     } catch (NoSuchFileException e) {
       expected = e;

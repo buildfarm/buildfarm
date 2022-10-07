@@ -12,6 +12,8 @@ java_library(
         "//src/main/java/build/buildfarm/actioncache",
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/resources",
+        "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/operations",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",

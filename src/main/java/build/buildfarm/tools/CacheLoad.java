@@ -17,6 +17,7 @@ package build.buildfarm.tools;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.cas.cfc.CASFileCache.StartupCacheResults;
@@ -52,7 +53,8 @@ class CacheLoad {
     }
 
     @Override
-    protected InputStream newExternalInput(Digest digest) throws IOException {
+    protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+        throws IOException {
       throw new IOException();
     }
   }

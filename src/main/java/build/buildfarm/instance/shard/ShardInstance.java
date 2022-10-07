@@ -49,6 +49,7 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -734,6 +735,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private void fetchBlobFromWorker(
+      Compressor.Value compressor,
       Digest blobDigest,
       Deque<String> workers,
       long offset,
@@ -743,6 +745,7 @@ public class ShardInstance extends AbstractServerInstance {
     String worker = workers.removeFirst();
     workerStub(worker)
         .getBlob(
+            compressor,
             blobDigest,
             offset,
             count,
@@ -792,6 +795,7 @@ public class ShardInstance extends AbstractServerInstance {
                     } else {
                       try {
                         fetchBlobFromWorker(
+                            compressor,
                             blobDigest,
                             workers,
                             offset + received,
@@ -824,7 +828,10 @@ public class ShardInstance extends AbstractServerInstance {
             digest ->
                 catching(
                     transform(
-                        getBlobFuture(digest, RequestMetadata.getDefaultInstance()),
+                        getBlobFuture(
+                            Compressor.Value.IDENTITY,
+                            digest,
+                            RequestMetadata.getDefaultInstance()),
                         blob -> {
                           Response.Builder response = Response.newBuilder().setDigest(digest);
                           if (blob == null) {
@@ -846,6 +853,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public void getBlob(
+      Compressor.Value compressor,
       Digest blobDigest,
       long offset,
       long count,
@@ -947,6 +955,7 @@ public class ShardInstance extends AbstractServerInstance {
                       ctx.run(
                           () ->
                               fetchBlobFromWorker(
+                                  compressor,
                                   blobDigest,
                                   workers,
                                   offset,
@@ -979,7 +988,13 @@ public class ShardInstance extends AbstractServerInstance {
             ctx.run(
                 () ->
                     fetchBlobFromWorker(
-                        blobDigest, workers, offset, count, chunkObserver, requestMetadata));
+                        compressor,
+                        blobDigest,
+                        workers,
+                        offset,
+                        count,
+                        chunkObserver,
+                        requestMetadata));
           }
 
           @Override
@@ -1048,22 +1063,20 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public InputStream newBlobInput(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
       throws IOException {
-    try {
-      return remoteInputStreamFactory.newInput(
-          digest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
-    } catch (InterruptedException e) {
-      throw new IOException(e);
-    }
+    return remoteInputStreamFactory.newInput(
+        compressor, digest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
   }
 
   @Override
-  public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+  public Write getBlobWrite(
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException {
     try {
       if (inDenyList(requestMetadata)) {
@@ -1076,7 +1089,7 @@ public class ShardInstance extends AbstractServerInstance {
       throw new EntryLimitException(digest.getSizeBytes(), maxEntrySizeBytes);
     }
     // FIXME small blob write to proto cache
-    return writes.get(digest, uuid, requestMetadata);
+    return writes.get(compressor, digest, uuid, requestMetadata);
   }
 
   protected int getTreeDefaultPageSize() {
@@ -1423,7 +1436,8 @@ public class ShardInstance extends AbstractServerInstance {
       throws EntryLimitException {
     checkState(digest.getSizeBytes() == content.size());
     SettableFuture<Long> writtenFuture = SettableFuture.create();
-    Write write = getBlobWrite(digest, UUID.randomUUID(), requestMetadata);
+    Write write =
+        getBlobWrite(Compressor.Value.IDENTITY, digest, UUID.randomUUID(), requestMetadata);
     addCallback(
         write.getFuture(),
         new FutureCallback<Long>() {

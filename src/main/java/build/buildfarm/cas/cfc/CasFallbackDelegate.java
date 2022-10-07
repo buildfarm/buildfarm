@@ -14,6 +14,7 @@
 
 package build.buildfarm.cas.cfc;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage;
 import com.google.common.collect.ImmutableList;
@@ -64,13 +65,14 @@ public class CasFallbackDelegate {
   public static InputStream newInput(
       @Nullable ContentAddressableStorage delegate,
       NoSuchFileException e,
+      Compressor.Value compressor,
       Digest digest,
       long offset)
       throws IOException {
     if (delegate == null) {
       throw e;
     }
-    return delegate.newInput(digest, offset);
+    return delegate.newInput(compressor, digest, offset);
   }
   /**
    * @brief Query delegate CAS to find missing blobs.
