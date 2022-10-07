@@ -207,11 +207,13 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       name = resourceName;
       try {
         write = getWrite(resourceName);
-        logger.log(
-            Level.FINER,
-            format(
-                "registering callback for %s: committed_size = %d (transient), complete = %s",
-                resourceName, write.getCommittedSize(), write.isComplete()));
+        if (logger.isLoggable(Level.FINER)) {
+          logger.log(
+              Level.FINER,
+              format(
+                  "registering callback for %s: committed_size = %d (transient), complete = %s",
+                  resourceName, write.getCommittedSize(), write.isComplete()));
+        }
         Futures.addCallback(
             write.getFuture(),
             new FutureCallback<Long>() {
