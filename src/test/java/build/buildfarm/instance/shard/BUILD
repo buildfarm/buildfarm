@@ -5,6 +5,7 @@ java_test(
     data = ["//examples:example_configs"],
     test_class = "build.buildfarm.AllTests",
     deps = [
+        "//src/main/java/build/buildfarm/actioncache",
         "//src/main/java/build/buildfarm/backplane",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",

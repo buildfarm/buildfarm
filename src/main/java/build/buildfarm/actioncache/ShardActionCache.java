@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.shard;
+package build.buildfarm.actioncache;
 
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -32,11 +32,12 @@ import io.grpc.Status;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
-class ShardActionCache implements ReadThroughActionCache {
+public class ShardActionCache implements ActionCache {
   private final Backplane backplane;
   private final AsyncLoadingCache<ActionKey, ActionResult> actionResultCache;
 
-  ShardActionCache(int maxLocalCacheSize, Backplane backplane, ListeningExecutorService service) {
+  public ShardActionCache(
+      int maxLocalCacheSize, Backplane backplane, ListeningExecutorService service) {
     this.backplane = backplane;
 
     AsyncCacheLoader<ActionKey, ActionResult> loader =

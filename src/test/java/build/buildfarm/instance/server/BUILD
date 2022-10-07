@@ -5,7 +5,7 @@ java_test(
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     test_class = "build.buildfarm.AllTests",
     deps = [
-        "//src/main/java/build/buildfarm/ac",
+        "//src/main/java/build/buildfarm/actioncache",
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance",

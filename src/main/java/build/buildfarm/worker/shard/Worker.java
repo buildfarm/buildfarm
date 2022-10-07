@@ -482,6 +482,7 @@ public class Worker {
     if (SHARD.equals(configs.getBackplane().getType())) {
       backplane =
           new RedisShardBackplane(identifier, this::stripOperation, this::stripQueuedOperation);
+      backplane.start(configs.getWorker().getPublicName());
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
     }
@@ -548,8 +549,6 @@ public class Worker {
 
     pipeline = new Pipeline();
     server = createServer(serverBuilder, storage, instance, pipeline, context);
-
-    backplane.start(configs.getWorker().getPublicName());
 
     removeWorker(configs.getWorker().getPublicName());
 
