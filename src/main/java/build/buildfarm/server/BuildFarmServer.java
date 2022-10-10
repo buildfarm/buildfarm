@@ -22,7 +22,6 @@ import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.common.config.ServerOptions;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
@@ -37,7 +36,6 @@ import build.buildfarm.server.services.FetchService;
 import build.buildfarm.server.services.OperationQueueService;
 import build.buildfarm.server.services.OperationsService;
 import build.buildfarm.server.services.PublishBuildEventService;
-import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
@@ -49,8 +47,6 @@ import io.prometheus.client.Counter;
 import java.io.File;
 import java.io.IOException;
 import java.security.Security;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.PostConstruct;
@@ -62,10 +58,12 @@ import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.ComponentScan;
 
 @SuppressWarnings("deprecation")
 @Log
 @SpringBootApplication
+@ComponentScan("build.buildfarm")
 public class BuildFarmServer {
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
@@ -81,14 +79,7 @@ public class BuildFarmServer {
   private HealthStatusManager healthStatusManager;
   private io.grpc.Server server;
   private boolean stopping = false;
-
-  private static String[] args;
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
-  private void printUsage(OptionsParser parser) {
-    log.info("Usage: CONFIG_PATH");
-    log.info(parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
-  }
 
   public synchronized void start(ServerBuilder<?> serverBuilder, String publicName)
       throws IOException, ConfigurationException, InterruptedException {
@@ -203,28 +194,6 @@ public class BuildFarmServer {
     // unknown stream 11369
     nettyLogger.setLevel(SEVERE);
 
-    OptionsParser parser = OptionsParser.newOptionsParser(ServerOptions.class);
-    parser.parse(args);
-    List<String> residue = parser.getResidue();
-    if (residue.isEmpty()) {
-      printUsage(parser);
-    }
-
-    ServerOptions options = parser.getOptions(ServerOptions.class);
-
-    try {
-      configs = BuildfarmConfigs.loadConfigs(residue.get(0));
-    } catch (IOException e) {
-      log.severe("Could not parse yml configuration file." + e);
-    }
-
-    if (!options.publicName.isEmpty()) {
-      configs.getServer().setPublicName(options.publicName);
-    }
-    if (options.port > 0) {
-      configs.getServer().setPort(options.port);
-    }
-    log.info(configs.toString());
     try {
       start(
           ServerBuilder.forPort(configs.getServer().getPort()),
@@ -238,8 +207,8 @@ public class BuildFarmServer {
     }
   }
 
-  public static void main(String[] args) {
-    BuildFarmServer.args = args;
+  public static void main(String[] args) throws ConfigurationException {
+    configs = BuildfarmConfigs.loadServerConfigs(args);
     SpringApplication.run(BuildFarmServer.class, args);
   }
 }
