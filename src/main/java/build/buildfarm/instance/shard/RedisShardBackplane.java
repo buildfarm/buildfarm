@@ -511,7 +511,6 @@ public class RedisShardBackplane implements Backplane {
     // We wish to avoid various synchronous and error handling issues that could occur when using
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
-
     // Create containers that make up the backplane
     state = DistributedStateCreator.create(client);
 

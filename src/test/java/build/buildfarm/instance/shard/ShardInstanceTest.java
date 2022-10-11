@@ -54,6 +54,8 @@ import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ToolDetails;
+import build.buildfarm.actioncache.ActionCache;
+import build.buildfarm.actioncache.ShardActionCache;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -132,8 +134,7 @@ public class ShardInstanceTest {
   public void setUp() throws InterruptedException {
     MockitoAnnotations.initMocks(this);
     blobDigests = Sets.newHashSet();
-    ReadThroughActionCache actionCache =
-        new ShardActionCache(10, mockBackplane, newDirectExecutorService());
+    ActionCache actionCache = new ShardActionCache(10, mockBackplane, newDirectExecutorService());
     instance =
         new ShardInstance(
             "shard",
