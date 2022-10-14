@@ -29,6 +29,7 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
@@ -161,6 +162,7 @@ public class ContentAddressableStorageService
       ListenableFuture<Digest> future =
           putBlobFuture(
               instance,
+              Compressor.Value.IDENTITY,
               digest,
               request.getData(),
               writeDeadlineAfter,

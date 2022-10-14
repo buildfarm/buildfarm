@@ -24,6 +24,7 @@ import static java.util.concurrent.TimeUnit.DAYS;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -255,7 +256,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private ByteString getBlob(Digest digest) throws IOException, InterruptedException {
-    try (InputStream in = inputStreamFactory.newInput(digest, 0)) {
+    try (InputStream in = inputStreamFactory.newInput(Compressor.Value.IDENTITY, digest, 0)) {
       return ByteString.readFrom(in);
     } catch (NoSuchFileException e) {
       return null;

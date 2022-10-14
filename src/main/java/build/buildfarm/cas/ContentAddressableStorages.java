@@ -15,12 +15,14 @@
 package build.buildfarm.cas;
 
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Multimaps.synchronizedListMultimap;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.cfc.CASFileCache;
@@ -99,7 +101,8 @@ public final class ContentAddressableStorages {
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor()) {
           @Override
-          protected InputStream newExternalInput(Digest digest) throws IOException {
+          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+              throws IOException {
             throw new NoSuchFileException(digest.getHash());
           }
         };
@@ -151,13 +154,16 @@ public final class ContentAddressableStorages {
       }
 
       @Override
-      public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
-        return writes.get(digest, uuid);
+      public Write getWrite(
+          Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+        return writes.get(compressor, digest, uuid);
       }
 
       @SuppressWarnings("ResultOfMethodCallIgnored")
       @Override
-      public InputStream newInput(Digest digest, long offset) throws IOException {
+      public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
+          throws IOException {
+        checkArgument(compressor == Compressor.Value.IDENTITY);
         ByteString data = getData(digest);
         if (data == null) {
           throw new NoSuchFileException(digest.getHash());
@@ -169,11 +175,13 @@ public final class ContentAddressableStorages {
 
       @Override
       public void get(
+          Compressor.Value compressor,
           Digest digest,
           long offset,
           long count,
           ServerCallStreamObserver<ByteString> responseObserver,
           RequestMetadata requestMetadata) {
+        checkArgument(compressor == Compressor.Value.IDENTITY);
         ByteString data = getData(digest);
         if (data != null) {
           responseObserver.onNext(data);

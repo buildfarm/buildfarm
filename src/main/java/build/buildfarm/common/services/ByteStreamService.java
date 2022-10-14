@@ -16,6 +16,7 @@ package build.buildfarm.common.services;
 
 import static build.buildfarm.common.UrlPath.detectResourceOperation;
 import static build.buildfarm.common.UrlPath.parseBlobDigest;
+import static build.buildfarm.common.UrlPath.parseUploadBlobCompressor;
 import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
 import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
@@ -24,6 +25,7 @@ import static io.grpc.Status.NOT_FOUND;
 import static io.grpc.Status.OUT_OF_RANGE;
 import static java.lang.String.format;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
@@ -35,6 +37,8 @@ import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.common.resources.DownloadBlobRequest;
+import build.buildfarm.common.resources.ResourceParser;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -159,7 +163,10 @@ public class ByteStreamService extends ByteStreamImplBase {
   }
 
   ServerCallStreamObserver<ReadResponse> onErrorLogReadObserver(
-      String name, long offset, ServerCallStreamObserver<ReadResponse> delegate) {
+      String name,
+      Compressor.Value compressor,
+      long offset,
+      ServerCallStreamObserver<ReadResponse> delegate) {
     return new UniformDelegateServerCallStreamObserver<ReadResponse>(delegate) {
       long responseCount = 0;
       long responseBytes = 0;
@@ -229,18 +236,22 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   void readLimitedBlob(
       Instance instance,
-      Digest digest,
+      DownloadBlobRequest downloadBlobRequest,
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
     ServerCallStreamObserver<ReadResponse> target =
         onErrorLogReadObserver(
-            format("%s(%s)", DigestUtil.toString(digest), instance.getName()),
+            format(
+                "%s(%s)",
+                DigestUtil.toString(downloadBlobRequest.getBlob().getDigest()), instance.getName()),
+            downloadBlobRequest.getBlob().getCompressor(),
             offset,
             (ServerCallStreamObserver<ReadResponse>) responseObserver);
     try {
       instance.getBlob(
-          digest,
+          downloadBlobRequest.getBlob().getCompressor(),
+          downloadBlobRequest.getBlob().getDigest(),
           offset,
           limit,
           newChunkObserver(target),
@@ -252,11 +263,11 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   void readBlob(
       Instance instance,
-      Digest digest,
+      DownloadBlobRequest downloadBlobRequest,
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
-    long available = digest.getSizeBytes() - offset;
+    long available = downloadBlobRequest.getBlob().getDigest().getSizeBytes() - offset;
     if (available == 0) {
       responseObserver.onCompleted();
     } else if (available < 0) {
@@ -267,7 +278,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       } else {
         limit = Math.min(available, limit);
       }
-      readLimitedBlob(instance, digest, offset, limit, responseObserver);
+      readLimitedBlob(instance, downloadBlobRequest, offset, limit, responseObserver);
     }
   }
 
@@ -291,7 +302,10 @@ public class ByteStreamService extends ByteStreamImplBase {
               log.log(Level.SEVERE, "error closing stream", e);
             }
           });
-      readFrom(in, limit, onErrorLogReadObserver(resourceName, offset, target));
+      readFrom(
+          in,
+          limit,
+          onErrorLogReadObserver(resourceName, Compressor.Value.IDENTITY, offset, target));
     } catch (NoSuchFileException e) {
       responseObserver.onError(NOT_FOUND.asException());
     } catch (IOException e) {
@@ -304,7 +318,9 @@ public class ByteStreamService extends ByteStreamImplBase {
       throws InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case DOWNLOAD_BLOB_REQUEST:
-        readBlob(instance, parseBlobDigest(resourceName), offset, limit, responseObserver);
+        DownloadBlobRequest downloadBlobRequest =
+            ResourceParser.parseDownloadBlobRequest(resourceName);
+        readBlob(instance, downloadBlobRequest, offset, limit, responseObserver);
         break;
       case STREAM_OPERATION_REQUEST:
         readOperationStream(instance, resourceName, offset, limit, responseObserver);
@@ -401,12 +417,14 @@ public class ByteStreamService extends ByteStreamImplBase {
     };
   }
 
-  static Write getUploadBlobWrite(Instance instance, Digest digest, UUID uuid)
+  static Write getUploadBlobWrite(
+      Instance instance, Compressor.Value compressor, Digest digest, UUID uuid)
       throws EntryLimitException {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
-    return instance.getBlobWrite(digest, uuid, TracingMetadataUtils.fromCurrentContext());
+    return instance.getBlobWrite(
+        compressor, digest, uuid, TracingMetadataUtils.fromCurrentContext());
   }
 
   static Write getOperationStreamWrite(Instance instance, String resourceName) {
@@ -419,7 +437,10 @@ public class ByteStreamService extends ByteStreamImplBase {
         return getBlobWrite(instance, parseBlobDigest(resourceName));
       case UPLOAD_BLOB_REQUEST:
         return getUploadBlobWrite(
-            instance, parseUploadBlobDigest(resourceName), parseUploadBlobUUID(resourceName));
+            instance,
+            parseUploadBlobCompressor(resourceName),
+            parseUploadBlobDigest(resourceName),
+            parseUploadBlobUUID(resourceName));
       case STREAM_OPERATION_REQUEST:
         return getOperationStreamWrite(instance, resourceName);
       default:
@@ -440,6 +461,7 @@ public class ByteStreamService extends ByteStreamImplBase {
   public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
     ServerCallStreamObserver<WriteResponse> serverCallStreamObserver =
         initializeBackPressure(responseObserver);
+
     return new WriteStreamObserver(
         instance,
         deadlineAfter,

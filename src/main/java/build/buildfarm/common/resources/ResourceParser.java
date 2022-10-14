@@ -16,6 +16,7 @@ package build.buildfarm.common.resources;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -24,9 +25,9 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.mutable.MutableInt;
 
 /**
- * @class ResourceParser
- * @brief A URI parser responsible for extracting information encoded in Bytestream's API resource
- *     names.
+ * @class Resources
+ * @brief A parser/formatter of information encoded in Bytestream's API resource names per the
+ *     Remote Exception API.
  * @details Google's bytestream API is used for REAPI clients to make resource requests against the
  *     CAS (content-addressable storage). The ByteStream API contains ReadRequest and WriteRequest
  *     types which carry an attribute known as "resource name." The "resource name" is a URI that
@@ -42,6 +43,8 @@ public class ResourceParser {
    * @details Part of REAPI's format of resource name.
    */
   private static final String RESOURCE_SEPARATOR = "/";
+
+  private static final String UNCOMPRESSED_BLOBS_KEYWORD = "blobs";
 
   /**
    * @field COMPRESSED_BLOBS_KEYWORD
@@ -85,6 +88,7 @@ public class ResourceParser {
     // Return the resource type. If no resource type was identified, return null.
     return KEYWORDS.get(type);
   }
+
   /**
    * @brief Parse the resource name into a specific type.
    * @details Assumes the URI is already in the upload blob format.
@@ -111,6 +115,74 @@ public class ResourceParser {
     }
     return builder.build();
   }
+
+  private static void addCompressorName(
+      ImmutableList.Builder<String> resource, Compressor.Value compression) {
+    if (compression == Compressor.Value.IDENTITY) {
+      resource.add(UNCOMPRESSED_BLOBS_KEYWORD);
+    } else {
+      resource.add(COMPRESSED_BLOBS_KEYWORD);
+      switch (compression) {
+        case IDENTITY:
+          break;
+        case ZSTD:
+          resource.add("zstd");
+          break;
+        case DEFLATE:
+          resource.add("deflate");
+          break;
+        default:
+          throw new IllegalArgumentException("Unknown Compressor: " + compression);
+      }
+    }
+  }
+
+  private static void addDigestResource(ImmutableList.Builder<String> resource, Digest digest) {
+    resource.add(digest.getHash());
+    resource.add(String.format("%d", digest.getSizeBytes()));
+  }
+
+  private static void addBlobResource(
+      ImmutableList.Builder<String> resource, BlobInformation blob) {
+    addCompressorName(resource, blob.getCompressor());
+    addDigestResource(resource, blob.getDigest());
+  }
+
+  /**
+   * @brief Produce the resource name for a ByteStream ReadRequest
+   * @param request The request to be encoded into a resource name.
+   * @return The resource name derived from the request.
+   * @note Suggested return identifier: resourceName.
+   */
+  public static String downloadResourceName(DownloadBlobRequest request) {
+    ImmutableList.Builder resource = ImmutableList.builder();
+    if (!request.getInstanceName().isEmpty()) {
+      resource.add(request.getInstanceName());
+    }
+    addBlobResource(resource, request.getBlob());
+    return asResourcePath(resource.build());
+  }
+
+  /**
+   * @brief Produce the resource name for a ByteStream WriteRequest
+   * @param request The request to be encoded into a resource name.
+   * @return The resource name derived from the request.
+   * @note Suggested return identifier: resourceName.
+   */
+  public static String uploadResourceName(UploadBlobRequest request) {
+    ImmutableList.Builder resource = ImmutableList.builder();
+    if (!request.getInstanceName().isEmpty()) {
+      resource.add(request.getInstanceName());
+    }
+    resource.add("uploads");
+    resource.add(request.getUuid());
+    addBlobResource(resource, request.getBlob());
+    if (!request.getMetadata().isEmpty()) {
+      resource.add(request.getMetadata());
+    }
+    return asResourcePath(resource.build());
+  }
+
   /**
    * @brief Parse the resource name into a specific type.
    * @details Assumes the URI is already in the download blob format.
@@ -131,6 +203,7 @@ public class ResourceParser {
     builder.setBlob(parseBlobInformation(segments, index));
     return builder.build();
   }
+
   /**
    * @brief A mapping of REAPI keywords to their respective resource types.
    * @details This lookup table can be used for parsing.
@@ -145,6 +218,7 @@ public class ResourceParser {
     keywords.put("operations", Resource.TypeCase.STREAM_OPERATION_REQUEST);
     return keywords;
   }
+
   /**
    * @brief Tokenize the resource name URI.
    * @details A simple split should be fine.
@@ -155,6 +229,7 @@ public class ResourceParser {
   private static String[] tokenize(String resourceName) {
     return resourceName.split(RESOURCE_SEPARATOR);
   }
+
   /**
    * @brief The index to start parsing resource name segments from.
    * @details Because the beginning and end of resource names can be multi-segment, discovering this
@@ -167,6 +242,7 @@ public class ResourceParser {
   private static MutableInt startIndex(String[] segments, Resource.TypeCase type) {
     return new MutableInt(findKeywordIndex(segments, KEYWORDS, type));
   }
+
   /**
    * @brief The index to start parsing resource name segments from.
    * @details Because the beginning and end of resource names can be multi-segment, discovering this
@@ -184,6 +260,7 @@ public class ResourceParser {
         .findFirst()
         .orElse(0);
   }
+
   /**
    * @brief Parse blob information from the URI segments.
    * @details Progrsses the parser while extracting blob information.
@@ -196,16 +273,17 @@ public class ResourceParser {
     BlobInformation.Builder builder = BlobInformation.newBuilder();
     boolean isCompressed = segments[index.getAndIncrement()].equals(COMPRESSED_BLOBS_KEYWORD);
     if (isCompressed) {
-      builder.setCompression(
+      builder.setCompressor(
           Compressor.Value.valueOf(segments[index.getAndIncrement()].toUpperCase()));
     } else {
-      builder.setCompression(Compressor.Value.IDENTITY);
+      builder.setCompressor(Compressor.Value.IDENTITY);
     }
     String hash = segments[index.getAndIncrement()];
     String size = segments[index.getAndIncrement()];
     builder.setDigest(parseDigest(hash, size));
     return builder.build();
   }
+
   /**
    * @brief Parse digest information into type.
    * @details Size interpreted as long.
@@ -217,6 +295,7 @@ public class ResourceParser {
   private static Digest parseDigest(String hash, String size) {
     return Digest.newBuilder().setHash(hash).setSizeBytes(Long.parseLong(size)).build();
   }
+
   /**
    * @brief Combine a list of path segments into the resource_name path format.
    * @details Used on a set of previously tokenized segments.
@@ -227,6 +306,7 @@ public class ResourceParser {
   private static String asResourcePath(Iterable<String> pathSegments) {
     return String.join(RESOURCE_SEPARATOR, pathSegments);
   }
+
   /**
    * @brief Collect a list of the previous segments from the given index.
    * @details Used for instance name extraction.
@@ -238,6 +318,7 @@ public class ResourceParser {
   private static List<String> previousSegments(String[] segments, MutableInt index) {
     return Arrays.asList(Arrays.copyOfRange(segments, 0, index.intValue()));
   }
+
   /**
    * @brief Collect a list of the remaining segments from the given index.
    * @details Used for metadata extraction.

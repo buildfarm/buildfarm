@@ -22,6 +22,7 @@ import static build.buildfarm.common.io.Utils.getOrIOException;
 import static build.buildfarm.common.io.Utils.listDir;
 import static build.buildfarm.common.io.Utils.listDirentSorted;
 import static build.buildfarm.common.io.Utils.stat;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.io.ByteStreams.nullOutputStream;
@@ -44,6 +45,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -56,6 +58,9 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
+import build.buildfarm.common.ZstdCompressingInputStream;
+import build.buildfarm.common.ZstdDecompressingOutputStream;
+import build.buildfarm.common.io.CountingOutputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.io.FileStatus;
@@ -463,16 +468,27 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     throw new UnsupportedOperationException();
   }
 
-  protected InputStream newTransparentInput(Digest digest, long offset) throws IOException {
+  protected InputStream newTransparentInput(Compressor.Value compressor, Digest digest, long offset)
+      throws IOException {
     try {
-      return newLocalInput(digest, offset);
+      return newLocalInput(compressor, digest, offset);
     } catch (NoSuchFileException e) {
-      return CasFallbackDelegate.newInput(delegate, e, digest, offset);
+      return CasFallbackDelegate.newInput(delegate, e, compressor, digest, offset);
     }
   }
 
+  private InputStream compressorInputStream(Compressor.Value compressor, InputStream identity)
+      throws IOException {
+    if (compressor == Compressor.Value.IDENTITY) {
+      return identity;
+    }
+    checkArgument(compressor == Compressor.Value.ZSTD);
+    return new ZstdCompressingInputStream(identity);
+  }
+
   @SuppressWarnings("ResultOfMethodCallIgnored")
-  InputStream newLocalInput(Digest digest, long offset) throws IOException {
+  InputStream newLocalInput(Compressor.Value compressor, Digest digest, long offset)
+      throws IOException {
     log.log(Level.FINE, format("getting input stream for %s", DigestUtil.toString(digest)));
     boolean isExecutable = false;
     do {
@@ -481,7 +497,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       if (e != null) {
         InputStream input;
         try {
-          input = Files.newInputStream(getPath(key));
+          input = compressorInputStream(compressor, Files.newInputStream(getPath(key)));
           input.skip(offset);
         } catch (NoSuchFileException eNoEnt) {
           boolean removed = false;
@@ -512,20 +528,21 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) throws IOException {
+  public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
+      throws IOException {
     try {
-      return newLocalInput(digest, offset);
+      return newLocalInput(compressor, digest, offset);
     } catch (NoSuchFileException e) {
       if (delegate == null) {
         throw e;
       }
     }
-    return newInputFallback(digest, offset);
+    return newInputFallback(compressor, digest, offset);
   }
 
   @Override
   public Blob get(Digest digest) {
-    try (InputStream in = newInput(digest, /* offset=*/ 0)) {
+    try (InputStream in = newInput(Compressor.Value.IDENTITY, digest, /* offset=*/ 0)) {
       return new Blob(ByteString.readFrom(in), digest);
     } catch (NoSuchFileException e) {
       return null;
@@ -538,6 +555,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @Override
   public void get(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long count,
@@ -545,11 +563,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       RequestMetadata requestMetadata) {
     InputStream in;
     try {
-      in = newInput(digest, offset);
+      in = newInput(compressor, digest, offset);
     } catch (IOException e) {
       blobObserver.onError(e);
       return;
     }
+
     blobObserver.setOnCancelHandler(
         () -> {
           try {
@@ -647,6 +666,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       log.log(Level.FINE, format("put: %s", key));
       OutputStream out =
           putImpl(
+              Compressor.Value.IDENTITY,
               key,
               UUID.randomUUID(),
               () -> completeWrite(blob.getDigest()),
@@ -675,7 +695,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @Override
-  public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+  public Write getWrite(
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
@@ -685,10 +706,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
     try {
       return writes.get(
-          BlobWriteKey.newBuilder().setDigest(digest).setIdentifier(uuid.toString()).build());
+          BlobWriteKey.newBuilder()
+              .setDigest(digest)
+              .setIdentifier(uuid.toString())
+              .setCompressor(compressor)
+              .build());
     } catch (ExecutionException e) {
+      String compression = "";
+      if (compressor == Compressor.Value.ZSTD) {
+        compression = "zstd compressed ";
+      }
       log.log(
-          Level.SEVERE, "error getting write for " + DigestUtil.toString(digest) + ":" + uuid, e);
+          Level.SEVERE,
+          "error getting " + compression + "write for " + DigestUtil.toString(digest) + ":" + uuid,
+          e);
       throw new IllegalStateException("write create must not fail", e.getCause());
     }
   }
@@ -747,7 +778,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       closed = true;
       try {
         // we ignore closes below the complete size
-        if (out.getWritten() >= size) {
+        if (out.getWrittenForClose() >= size) {
           super.close();
         }
       } finally {
@@ -870,6 +901,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             UniqueWriteOutputStream uniqueOut =
                 createUniqueWriteOutput(
                     out,
+                    key.getCompressor(),
                     key.getDigest(),
                     UUID.fromString(key.getIdentifier()),
                     cancelled -> {
@@ -911,6 +943,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   UniqueWriteOutputStream createUniqueWriteOutput(
       CancellableOutputStream out,
+      Compressor.Value compressor,
       Digest digest,
       UUID uuid,
       Consumer<Boolean> onClosed,
@@ -918,7 +951,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       boolean isReset)
       throws IOException {
     if (out == null) {
-      out = newOutput(digest, uuid, isComplete, isReset);
+      out = newOutput(compressor, digest, uuid, isComplete, isReset);
     }
     if (out == null) {
       // duplicate output stream
@@ -947,13 +980,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   CancellableOutputStream newOutput(
-      Digest digest, UUID uuid, BooleanSupplier isComplete, boolean isReset) throws IOException {
+      Compressor.Value compressor,
+      Digest digest,
+      UUID uuid,
+      BooleanSupplier isComplete,
+      boolean isReset)
+      throws IOException {
     String key = getKey(digest, false);
     final CancellableOutputStream cancellableOut;
     try {
       log.log(Level.FINE, format("getWrite: %s", key));
       cancellableOut =
           putImpl(
+              compressor,
               key,
               uuid,
               () -> completeWrite(digest),
@@ -1022,6 +1061,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             // ignore
           }
         }
+      }
+
+      @Override
+      public long getWrittenForClose() {
+        return cancellableOut.getWrittenForClose();
       }
     };
   }
@@ -2253,6 +2297,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     String key = getKey(digest, isExecutable);
     CancellableOutputStream out =
         putImpl(
+            Compressor.Value.IDENTITY, // first place to try internal compression
             key,
             UUID.randomUUID(),
             () -> completeWrite(digest),
@@ -2299,7 +2344,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private void copyExternalInput(Digest digest, CancellableOutputStream out)
       throws IOException, InterruptedException {
     log.log(Level.FINE, format("downloading %s", DigestUtil.toString(digest)));
-    try (InputStream in = newExternalInput(digest)) {
+    try (InputStream in = newExternalInput(Compressor.Value.IDENTITY, digest)) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       out.cancel();
@@ -2328,6 +2373,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     abstract void cancel() throws IOException;
+
+    long getWrittenForClose() {
+      return getWritten();
+    }
   }
 
   private static final CancellableOutputStream DUPLICATE_OUTPUT_STREAM =
@@ -2337,6 +2386,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       };
 
   private CancellableOutputStream putImpl(
+      Compressor.Value compressor,
       String key,
       UUID writeId,
       Supplier<Boolean> writeWinner,
@@ -2346,7 +2396,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       boolean isReset)
       throws IOException, InterruptedException {
     CancellableOutputStream out =
-        putOrReference(key, writeId, writeWinner, blobSizeInBytes, isExecutable, onInsert, isReset);
+        putOrReference(
+            compressor,
+            key,
+            writeId,
+            writeWinner,
+            blobSizeInBytes,
+            isExecutable,
+            onInsert,
+            isReset);
     if (out == DUPLICATE_OUTPUT_STREAM) {
       return null;
     }
@@ -2377,6 +2435,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             terminated = true;
           }
         }
+      }
+
+      @Override
+      public long getWrittenForClose() {
+        return cancellableOut.getWrittenForClose();
       }
     };
   }
@@ -2437,6 +2500,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private CancellableOutputStream putOrReference(
+      Compressor.Value compressor,
       String key,
       UUID writeId,
       Supplier<Boolean> writeWinner,
@@ -2449,6 +2513,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     try {
       CancellableOutputStream out =
           putOrReferenceGuarded(
+              compressor,
               key,
               writeId,
               writeWinner,
@@ -2541,6 +2606,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private CancellableOutputStream putOrReferenceGuarded(
+      Compressor.Value compressor,
       String key,
       UUID writeId,
       Supplier<Boolean> writeWinner,
@@ -2561,7 +2627,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     String writeKey = key + "." + writeId;
     Path writePath = getPath(key).resolveSibling(writeKey);
     final long committedSize;
-    final HashingOutputStream hashOut;
+    HashingOutputStream hashOut;
     if (!isReset && Files.exists(writePath)) {
       committedSize = Files.size(writePath);
       try (InputStream in = Files.newInputStream(writePath)) {
@@ -2579,13 +2645,41 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       committedSize = 0;
       hashOut = digestUtil.newHashingOutputStream(Files.newOutputStream(writePath, CREATE));
     }
-    return new CancellableOutputStream(hashOut) {
+    Supplier<String> hashSupplier = () -> hashOut.hash().toString();
+    CountingOutputStream countingOut = new CountingOutputStream(committedSize, hashOut);
+    OutputStream out;
+    boolean direct;
+    switch (compressor) {
+      case IDENTITY:
+        out = countingOut;
+        direct = true;
+        break;
+      case ZSTD:
+        out = new ZstdDecompressingOutputStream(countingOut);
+        direct = false;
+        break;
+      default:
+        throw new UnsupportedOperationException("Unsupported compressor " + compressor);
+    }
+    return new CancellableOutputStream(out) {
       long written = committedSize;
       final Digest expectedDigest = keyToDigest(key, blobSizeInBytes, digestUtil);
 
       @Override
       public long getWritten() {
+        // this must be the size of the ingress output
         return written;
+      }
+
+      // must report a size that can be considered closeable
+      @Override
+      public long getWrittenForClose() {
+        try {
+          out.flush();
+        } catch (IOException e) {
+          // technically no harm no foul
+        }
+        return countingOut.written();
       }
 
       @Override
@@ -2597,7 +2691,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       public void cancel() throws IOException {
         try {
           written = 0;
-          hashOut.close();
+          out.close();
           Files.delete(writePath);
         } finally {
           dischargeAndNotify(blobSizeInBytes);
@@ -2606,11 +2700,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public void write(int b) throws IOException {
-        if (written >= blobSizeInBytes) {
+        if (direct && written >= blobSizeInBytes) {
           throw new IOException(
               format("attempted overwrite at %d by 1 byte for %s", written, writeKey));
         }
-        hashOut.write(b);
+        out.write(b);
         written++;
       }
 
@@ -2621,22 +2715,23 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public void write(byte[] b, int off, int len) throws IOException {
-        if (written + len > blobSizeInBytes) {
+        if (direct && written + len > blobSizeInBytes) {
           throw new IOException(
               format("attempted overwrite at %d by %d bytes for %s", written, len, writeKey));
         }
-        hashOut.write(b, off, len);
+        out.write(b, off, len);
         written += len;
       }
 
       @Override
       public void close() throws IOException {
+        out.flush();
+        long size = countingOut.written();
         // has some trouble with multiple closes, fortunately we have something above to handle this
-        long size = getWritten();
-        hashOut.close(); // should probably discharge here as well
+        out.close(); // should probably discharge here as well
 
         if (size > blobSizeInBytes) {
-          String hash = hashOut.hash().toString();
+          String hash = hashSupplier.get().toString();
           try {
             Files.delete(writePath);
           } finally {
@@ -2654,11 +2749,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
 
       void commit() throws IOException {
-        String hash = hashOut.hash().toString();
+        String hash = hashSupplier.get().toString();
         String fileName = writePath.getFileName().toString();
         if (!fileName.startsWith(hash)) {
           dischargeAndNotify(blobSizeInBytes);
-          Digest actual = Digest.newBuilder().setHash(hash).setSizeBytes(getWritten()).build();
+          Digest actual =
+              Digest.newBuilder().setHash(hash).setSizeBytes(countingOut.written()).build();
           throw new DigestMismatchException(actual, expectedDigest);
         }
         try {
@@ -2868,26 +2964,28 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  protected abstract InputStream newExternalInput(Digest digest)
-      throws IOException, InterruptedException;
+  protected abstract InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+      throws IOException;
 
   // CAS fallback methods
 
-  private InputStream newInputFallback(Digest digest, long offset) throws IOException {
+  private InputStream newInputFallback(Compressor.Value compressor, Digest digest, long offset)
+      throws IOException {
     checkNotNull(delegate);
 
     if (digest.getSizeBytes() > maxEntrySizeInBytes) {
-      return delegate.newInput(digest, offset);
+      return delegate.newInput(compressor, digest, offset);
     }
-    Write write = getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-    return newReadThroughInput(digest, offset, write);
+    Write write =
+        getWrite(compressor, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+    return newReadThroughInput(compressor, digest, offset, write);
   }
 
-  ReadThroughInputStream newReadThroughInput(Digest digest, long offset, Write write)
-      throws IOException {
+  ReadThroughInputStream newReadThroughInput(
+      Compressor.Value compressor, Digest digest, long offset, Write write) throws IOException {
     return new ReadThroughInputStream(
-        delegate.newInput(digest, 0),
-        localOffset -> newTransparentInput(digest, localOffset),
+        delegate.newInput(compressor, digest, 0),
+        localOffset -> newTransparentInput(compressor, digest, localOffset),
         digest.getSizeBytes(),
         offset,
         write);
@@ -2901,7 +2999,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       } else {
         Write write =
             delegate.getWrite(
-                fileEntryKey.getDigest(), UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+                Compressor.Value.IDENTITY,
+                fileEntryKey.getDigest(),
+                UUID.randomUUID(),
+                RequestMetadata.getDefaultInstance());
         performCopy(write, e);
       }
     }

@@ -49,7 +49,7 @@ message StreamOperationRequest {
 // `/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}`
 // `/blobs/{hash}/{size}`
 message BlobInformation {
-  build.bazel.remote.execution.v2.Compressor.Value compression = 1;
+  build.bazel.remote.execution.v2.Compressor.Value compressor = 1;
 
   build.bazel.remote.execution.v2.Digest digest = 2;
 }

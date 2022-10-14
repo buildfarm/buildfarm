@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker.shard;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
@@ -76,7 +77,8 @@ class ShardCASFileCache extends CASFileCache {
   }
 
   @Override
-  protected InputStream newExternalInput(Digest digest) throws IOException, InterruptedException {
-    return inputStreamFactory.newInput(digest, 0);
+  protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+      throws IOException {
+    return inputStreamFactory.newInput(compressor, digest, 0);
   }
 }

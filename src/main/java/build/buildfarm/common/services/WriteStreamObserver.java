@@ -15,6 +15,7 @@
 package build.buildfarm.common.services;
 
 import static build.buildfarm.common.UrlPath.detectResourceOperation;
+import static build.buildfarm.common.UrlPath.parseUploadBlobCompressor;
 import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
 import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -23,6 +24,7 @@ import static io.grpc.Status.ABORTED;
 import static io.grpc.Status.INVALID_ARGUMENT;
 import static java.lang.String.format;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.DigestMismatchException;
@@ -77,6 +79,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private long earliestOffset = -1;
   private long requestCount = 0;
   private long requestBytes = 0;
+  private Compressor.Value compressor;
 
   public WriteStreamObserver(
       Instance instance,
@@ -112,7 +115,8 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
-  void onUncommittedNext(WriteRequest request) throws EntryLimitException {
+  void onUncommittedNext(WriteRequest request)
+      throws EntryLimitException, InvalidResourceNameException {
     if (initialized) {
       handleRequest(request);
     } else {
@@ -127,7 +131,10 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
         Digest uploadBlobDigest = parseUploadBlobDigest(resourceName);
         expectedCommittedSize = uploadBlobDigest.getSizeBytes();
         return ByteStreamService.getUploadBlobWrite(
-            instance, uploadBlobDigest, parseUploadBlobUUID(resourceName));
+            instance,
+            parseUploadBlobCompressor(resourceName),
+            uploadBlobDigest,
+            parseUploadBlobUUID(resourceName));
       case STREAM_OPERATION_REQUEST:
         return ByteStreamService.getOperationStreamWrite(instance, resourceName);
       case DOWNLOAD_BLOB_REQUEST:
@@ -153,7 +160,10 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
           format("skipped delivering committed_size to %s for cancelled context", name));
     } else {
       try {
-        if (expectedCommittedSize >= 0 && expectedCommittedSize != committedSize) {
+        if (compressor != Compressor.Value.IDENTITY) {
+          // all compressed uploads are expected to be fine with a -1 response
+          committedSize = -1;
+        } else if (expectedCommittedSize >= 0 && expectedCommittedSize != committedSize) {
           log.log(
               Level.WARNING,
               format(
@@ -198,8 +208,9 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
-  private void initialize(WriteRequest request) {
+  private void initialize(WriteRequest request) throws InvalidResourceNameException {
     String resourceName = request.getResourceName();
+    compressor = parseUploadBlobCompressor(resourceName);
     if (resourceName.isEmpty()) {
       errorResponse(INVALID_ARGUMENT.withDescription("resource_name is empty").asException());
     } else {

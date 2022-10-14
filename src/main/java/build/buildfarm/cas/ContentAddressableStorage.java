@@ -15,6 +15,7 @@
 package build.buildfarm.cas;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
@@ -26,8 +27,6 @@ import com.google.protobuf.ByteString;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 import net.jcip.annotations.ThreadSafe;
@@ -92,17 +91,17 @@ public interface ContentAddressableStorage extends InputStreamFactory {
   /** Retrieve a set of blobs from the CAS represented by a future. */
   ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests);
 
-  InputStream newInput(Digest digest, long offset) throws IOException;
-
   /** Retrieve a value from the CAS by streaming content when ready */
   void get(
+      Compressor.Value compression,
       Digest digest,
       long offset,
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata);
 
-  Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+  Write getWrite(
+      Compressor.Value compression, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException;
 
   /** Insert a blob into the CAS. */

@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -499,13 +500,14 @@ public class AbstractServerInstanceTest {
             (Answer<Void>)
                 invocation -> {
                   StreamObserver<ByteString> blobObserver =
-                      (StreamObserver) invocation.getArguments()[3];
+                      (StreamObserver) invocation.getArguments()[4];
                   blobObserver.onNext(content);
                   blobObserver.onCompleted();
                   return null;
                 })
         .when(contentAddressableStorage)
         .get(
+            eq(Compressor.Value.IDENTITY),
             eq(digest),
             /* offset=*/ eq(0L),
             eq(digest.getSizeBytes()),
@@ -575,6 +577,7 @@ public class AbstractServerInstanceTest {
         ArgumentCaptor.forClass(Iterable.class);
     verify(contentAddressableStorage, times(1))
         .get(
+            eq(Compressor.Value.IDENTITY),
             eq(treeDigest),
             /* offset=*/ eq(0L),
             eq(treeDigest.getSizeBytes()),

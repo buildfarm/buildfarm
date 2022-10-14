@@ -14,10 +14,12 @@
 
 package build.buildfarm.cas;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
@@ -105,7 +107,9 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
-  public synchronized InputStream newInput(Digest digest, long offset) throws IOException {
+  public synchronized InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
+      throws IOException {
+    checkArgument(compressor == Compressor.Value.IDENTITY);
     // implicit int bounds compare against size bytes
     if (offset < 0 || offset > digest.getSizeBytes()) {
       throw new IndexOutOfBoundsException(
@@ -115,7 +119,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     if (blob == null) {
       if (delegate != null) {
         // FIXME change this to a read-through input stream
-        return delegate.newInput(digest, offset);
+        return delegate.newInput(Compressor.Value.IDENTITY, digest, offset);
       }
       throw new NoSuchFileException(DigestUtil.toString(digest));
     }
@@ -126,16 +130,18 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @Override
   public void get(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long limit,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
+    checkArgument(compressor == Compressor.Value.IDENTITY);
     Blob blob = get(digest);
     if (blob == null) {
       if (delegate != null) {
         // FIXME change this to a read-through get
-        delegate.get(digest, offset, limit, blobObserver, requestMetadata);
+        delegate.get(compressor, digest, offset, limit, blobObserver, requestMetadata);
       } else {
         blobObserver.onError(io.grpc.Status.NOT_FOUND.asException());
       }
@@ -233,8 +239,9 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
-    return writes.get(digest, uuid);
+  public Write getWrite(
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+    return writes.get(compressor, digest, uuid);
   }
 
   @Override
@@ -307,7 +314,11 @@ public class MemoryCAS implements ContentAddressableStorage {
     if (delegate != null) {
       try {
         Write write =
-            delegate.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+            delegate.getWrite(
+                Compressor.Value.IDENTITY,
+                digest,
+                UUID.randomUUID(),
+                RequestMetadata.getDefaultInstance());
         try (OutputStream out = write.getOutput(1, MINUTES, () -> {})) {
           e.value.getData().writeTo(out);
         }

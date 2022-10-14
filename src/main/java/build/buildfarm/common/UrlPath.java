@@ -14,6 +14,7 @@
 
 package build.buildfarm.common;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.resources.Resource;
 import build.buildfarm.common.resources.ResourceParser;
@@ -69,5 +70,10 @@ public class UrlPath {
   public static Digest parseUploadBlobDigest(String resourceName)
       throws InvalidResourceNameException {
     return ResourceParser.parseUploadBlobRequest(resourceName).getBlob().getDigest();
+  }
+
+  public static Compressor.Value parseUploadBlobCompressor(String resourceName)
+      throws InvalidResourceNameException {
+    return ResourceParser.parseUploadBlobRequest(resourceName).getBlob().getCompressor();
   }
 }

@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -428,7 +429,9 @@ public class FuseCAS extends FuseStubFS {
     if (children == null) {
       try {
         Directory directory =
-            Directory.parseFrom(ByteString.readFrom(inputStreamFactory.newInput(digest, 0)));
+            Directory.parseFrom(
+                ByteString.readFrom(
+                    inputStreamFactory.newInput(Compressor.Value.IDENTITY, digest, 0)));
 
         ImmutableMap.Builder<String, Entry> builder = new ImmutableMap.Builder<>();
 
@@ -886,10 +889,13 @@ public class FuseCAS extends FuseStubFS {
       FileEntry fileEntry = (FileEntry) entry;
 
       try {
-        content = ByteString.readFrom(inputStreamFactory.newInput(fileEntry.digest, 0));
-      } catch (InterruptedException e) {
-        return -ErrorCodes.EINTR();
+        content =
+            ByteString.readFrom(
+                inputStreamFactory.newInput(Compressor.Value.IDENTITY, fileEntry.digest, 0));
       } catch (IOException e) {
+        if (e.getCause() != null && e.getCause() instanceof InterruptedException) {
+          return -ErrorCodes.EINTR();
+        }
         return -ErrorCodes.EIO();
       }
 
