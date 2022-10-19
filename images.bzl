@@ -37,5 +37,5 @@ def buildfarm_images():
         name = "amazon_corretto_java_image_base",
         registry = "index.docker.io",
         repository = "amazoncorretto",
-        tag = "18",
+        tag = "19",
     )
