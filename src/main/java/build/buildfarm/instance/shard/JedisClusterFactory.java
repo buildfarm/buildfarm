@@ -54,16 +54,14 @@ public class JedisClusterFactory {
           list2Set(redisNodes),
           configs.getBackplane().getTimeout(),
           configs.getBackplane().getMaxAttempts(),
-          configs.getBackplane().getRedisPassword().isEmpty()
-              ? null
-              : configs.getBackplane().getRedisPassword(),
+          configs.getBackplane().getRedisPassword().isEmpty() ? null : configs.getBackplane().getRedisPassword(),
           createJedisPoolConfig());
     }
     return createJedisClusterFactory(
         parseUri(configs.getBackplane().getRedisUri()),
         configs.getBackplane().getTimeout(),
         configs.getBackplane().getMaxAttempts(),
-        configs.getBackplane().getRedisPassword(),
+        configs.getBackplane().getRedisPassword().isEmpty() ? null : configs.getBackplane().getRedisPassword(),
         createJedisPoolConfig());
   }
 
