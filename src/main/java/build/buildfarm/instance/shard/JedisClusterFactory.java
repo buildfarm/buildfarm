@@ -59,6 +59,7 @@ public class JedisClusterFactory {
               : configs.getBackplane().getRedisPassword(),
           createJedisPoolConfig());
     }
+    // support "" as redis password.
     return createJedisClusterFactory(
         parseUri(configs.getBackplane().getRedisUri()),
         configs.getBackplane().getTimeout(),
