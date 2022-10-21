@@ -31,9 +31,9 @@ redis-cli config set stop-writes-on-bgsave-error no
 Run via
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server -- <logfile> <configfile>
+bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- <logfile> <configfile>
 
-Ex: bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
+Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
 **`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
 **`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
@@ -43,9 +43,9 @@ Ex: bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Dl
 Run via
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker -- <logfile> <configfile>
+bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- <logfile> <configfile>
 
-Ex: bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
+Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 
 ```
 **`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
