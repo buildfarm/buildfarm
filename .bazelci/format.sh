@@ -10,7 +10,7 @@ LOCAL_FORMATTER="java_formatter.jar"
 FORMAT_PROTO=true
 CLANG_FORMAT=@llvm_toolchain//:clang-format
 if [ -z "$BAZEL" ]; then
-  BAZEL=bazel
+  BAZEL=bazelisk
 fi
 
 FORMAT_BUILD=true
