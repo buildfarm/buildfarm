@@ -61,7 +61,6 @@ public class JedisClusterFactory {
           createJedisPoolConfig());
     }
 
-
     // support "" as redis password.
     return createJedisClusterFactory(
         parseUri(configs.getBackplane().getRedisUri()),
