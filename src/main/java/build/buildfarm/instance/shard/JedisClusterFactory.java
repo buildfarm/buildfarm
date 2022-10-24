@@ -15,6 +15,7 @@
 package build.buildfarm.instance.shard;
 
 import build.buildfarm.common.config.BuildfarmConfigs;
+import com.google.common.base.Strings;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashSet;
@@ -54,19 +55,17 @@ public class JedisClusterFactory {
           list2Set(redisNodes),
           configs.getBackplane().getTimeout(),
           configs.getBackplane().getMaxAttempts(),
-          configs.getBackplane().getRedisPassword().isEmpty()
-              ? null
-              : configs.getBackplane().getRedisPassword(),
+          Strings.isNullOrEmpty(configs.getBackplane().getRedisPassword()) ? null : configs.getBackplane().getRedisPassword(),
           createJedisPoolConfig());
     }
+
+
     // support "" as redis password.
     return createJedisClusterFactory(
         parseUri(configs.getBackplane().getRedisUri()),
         configs.getBackplane().getTimeout(),
         configs.getBackplane().getMaxAttempts(),
-        configs.getBackplane().getRedisPassword().isEmpty()
-            ? null
-            : configs.getBackplane().getRedisPassword(),
+        Strings.isNullOrEmpty(configs.getBackplane().getRedisPassword()) ? null : configs.getBackplane().getRedisPassword(),
         createJedisPoolConfig());
   }
 
