@@ -55,7 +55,9 @@ public class JedisClusterFactory {
           list2Set(redisNodes),
           configs.getBackplane().getTimeout(),
           configs.getBackplane().getMaxAttempts(),
-          Strings.isNullOrEmpty(configs.getBackplane().getRedisPassword()) ? null : configs.getBackplane().getRedisPassword(),
+          Strings.isNullOrEmpty(configs.getBackplane().getRedisPassword())
+              ? null
+              : configs.getBackplane().getRedisPassword(),
           createJedisPoolConfig());
     }
 
@@ -65,7 +67,9 @@ public class JedisClusterFactory {
         parseUri(configs.getBackplane().getRedisUri()),
         configs.getBackplane().getTimeout(),
         configs.getBackplane().getMaxAttempts(),
-        Strings.isNullOrEmpty(configs.getBackplane().getRedisPassword()) ? null : configs.getBackplane().getRedisPassword(),
+        Strings.isNullOrEmpty(configs.getBackplane().getRedisPassword())
+            ? null
+            : configs.getBackplane().getRedisPassword(),
         createJedisPoolConfig());
   }
 
