@@ -165,6 +165,9 @@ public class OutputDirectory {
     String prefix = "/";
     for (OutputDirectoryEntry entry : sortedOutputDirs) {
       String outputDir = entry.outputDirectory;
+      if (outputDir.startsWith("//")) {
+        outputDir = outputDir.substring(1);
+      }
       while (!outputDir.startsWith(prefix)) {
         currentBuilder = stack.pop();
         int upPathSeparatorIndex = prefix.lastIndexOf('/', prefix.length() - 2);
