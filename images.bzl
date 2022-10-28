@@ -28,6 +28,7 @@ def buildfarm_images():
 
     container_pull(
         name = "ubuntu-bionic",
+        digest = "sha256:4bc527c7a288da405f2041928c63d0a6479a120ad63461c2f124c944def54be2",
         registry = "index.docker.io",
         repository = "bazelbuild/buildfarm-worker-base",
         tag = "bionic-java11-gcc",
@@ -38,4 +39,5 @@ def buildfarm_images():
         registry = "index.docker.io",
         repository = "amazoncorretto",
         tag = "19",
+        digest = "sha256:81d0df4412140416b27211c999e1f3c4565ae89a5cd92889475d20af422ba507",
     )
