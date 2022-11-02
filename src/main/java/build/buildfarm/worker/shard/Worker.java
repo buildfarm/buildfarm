@@ -319,7 +319,7 @@ public class Worker {
             remoteInputStreamFactory,
             root.resolve(configs.getWorker().getCas().getValidPath(root)),
             configs.getWorker().getCas().getMaxSizeBytes(),
-            configs.getWorker().getCas().getMaxEntrySizeBytes(),
+            configs.getMaxEntrySizeBytes(),
             configs.getWorker().getHexBucketLevels(),
             configs.getWorker().getCas().isFileDirectoriesIndexInMemory(),
             digestUtil,

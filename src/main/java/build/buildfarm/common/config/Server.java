@@ -24,7 +24,6 @@ public class Server {
   private int dispatchedMonitorIntervalSeconds = 1;
   private boolean runOperationQueuer = true;
   private boolean ensureOutputsPresent = false;
-  private long maxEntrySizeBytes = 2147483648L; // 2 * 1024 * 1024 * 1024
   private int maxRequeueAttempts = 5;
   private boolean useDenyList = true;
   private long grpcTimeout = 3600;

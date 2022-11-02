@@ -29,6 +29,7 @@ worker:
 | digestFunction       | _SHA256_, SHA1                | Digest function for this implementation           |
 | defaultActionTimeout | Integer, _600_                | Default timeout value for an action (seconds)     |
 | maximumActionTimeout | Integer, _3600_               | Maximum allowed action timeout (seconds)          |
+| maxEntrySizeBytes    | Long, _2147483648_            | Maximum size of a single blob accepted (bytes)    |
 | prometheusPort       | Integer, _9090_               | Listening port of the Prometheus metrics endpoint |
 
 Example:
@@ -59,7 +60,6 @@ worker:
 | dispatchedMonitorIntervalSeconds | Integer, _1_                  | Dispatched monitor's lease expiration check interval (seconds)                                                              |
 | runOperationQueuer               | boolean, _true_               | Aquire execute request entries cooperatively from an arrival queue on the backplane                                         |
 | ensureOutputsPresent             | boolean, _false_              | Decide if all outputs are also present in the CAS. If any outputs are missing a cache miss is returned                      |
-| maxEntrySizeBytes                | Long, _2147483648_            | Maximum size of a single blob accepted (bytes)                                                                              |
 | maxCpu                           | Integer, _0_                  | Maximum number of CPU cores that any min/max-cores property may request (0 = unlimited)                                     |
 | maxRequeueAttempts               | Integer, _5_                  | Maximum number of requeue attempts for an operation                                                                         |
 | useDenyList                      | boolean, _true_               | Allow usage of a deny list when looking up actions and invocations (for cache only it is recommended to disable this check) |
@@ -280,7 +280,6 @@ worker:
 | type                         | _FILESYSTEM_, GRPC            | Type of CAS used                                                                                              |
 | path                         | String, _cache_               | Local cache location relative to the 'root', or absolute                                                      |
 | maxSizeBytes                 | Integer, _2147483648_         | Limit for contents of files retained from CAS in the cache                                                    |
-| maxEntrySizeBytes            | Integer, _2147483648_         | Limit on the content size of the files retained in CAS                                                        |
 | fileDirectoriesIndexInMemory | boolean, _false_              | Determines if the file directories bidirectional mapping should be stored in memory or in sqllite             |
 | skipLoad                     | boolean, _false_              | Determines if transient data on the worker should be loaded into CAS on worker startup (affects startup time) |
 | target                       | String, _null_                | For GRPC CAS type, target for external CAS endpoint                                                           |
