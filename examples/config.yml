@@ -32,7 +32,7 @@ server:
     enableGracefulShutdown: false
   metrics:
     publisher: LOG
-    logLevel: OFF
+    logLevel: FINEST
     topic: test
     topicMaxConnections: 1000
     secretName: test

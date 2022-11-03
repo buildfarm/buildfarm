@@ -14,9 +14,11 @@
 
 package build.buildfarm.metrics.log;
 
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.metrics.AbstractMetricsPublisher;
+import build.buildfarm.v1test.OperationRequestMetadata;
 import com.google.longrunning.Operation;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
@@ -40,12 +42,16 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
   @Override
   public void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata) {
     try {
-      log.log(
-          logLevel,
-          formatRequestMetadataToJson(populateRequestMetadata(operation, requestMetadata)));
+      OperationRequestMetadata metadata = populateRequestMetadata(operation, requestMetadata);
+      if (metadata
+          .getExecuteOperationMetadata()
+          .getStage()
+          .equals(ExecutionStage.Value.COMPLETED)) {
+        log.log(logLevel, formatRequestMetadataToJson(metadata));
+      }
     } catch (Exception e) {
       log.log(
-          Level.WARNING,
+          Level.FINE,
           String.format("Could not publish request metadata to LOG for %s.", operation.getName()),
           e);
     }
