@@ -34,7 +34,7 @@ public class Cas {
       try {
         maxSizeBytes =
             (long)
-                (new File(BuildfarmConfigs.getInstance().getWorker().getRoot()).getUsableSpace()
+                (new File(BuildfarmConfigs.getInstance().getWorker().getRoot()).getTotalSpace()
                     * 0.9);
       } catch (Exception e) {
         maxSizeBytes = DEFAULT_CAS_SIZE;
