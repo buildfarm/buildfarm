@@ -14,7 +14,6 @@
 
 package build.buildfarm.metrics.log;
 
-import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.metrics.AbstractMetricsPublisher;
@@ -43,15 +42,12 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
   public void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata) {
     try {
       OperationRequestMetadata metadata = populateRequestMetadata(operation, requestMetadata);
-      if (metadata
-          .getExecuteOperationMetadata()
-          .getStage()
-          .equals(ExecutionStage.Value.COMPLETED)) {
+      if (metadata.getDone()) {
         log.log(logLevel, formatRequestMetadataToJson(metadata));
       }
     } catch (Exception e) {
       log.log(
-          Level.FINE,
+          Level.WARNING,
           String.format("Could not publish request metadata to LOG for %s.", operation.getName()),
           e);
     }
