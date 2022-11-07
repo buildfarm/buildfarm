@@ -188,6 +188,11 @@ public class ShardInstance extends AbstractServerInstance {
           .name("requeue_failure")
           .help("Number of operations that failed to requeue.")
           .register();
+  private static final Counter queueFailureCounter =
+      Counter.build()
+          .name("queue_failure")
+          .help("Number of operations that failed to queue.")
+          .register();
   // Metrics about the dispatched operations
   private static final Gauge dispatchedOperationsSize =
       Gauge.build()
@@ -397,6 +402,7 @@ public class ShardInstance extends AbstractServerInstance {
 
                           @Override
                           public void onFailure(Throwable t) {
+                            queueFailureCounter.inc();
                             log.log(Level.SEVERE, "error queueing " + operationName, t);
                           }
                         },
@@ -411,6 +417,7 @@ public class ShardInstance extends AbstractServerInstance {
                     return queueFuture;
                   } catch (Throwable t) {
                     poller.pause();
+                    queueFailureCounter.inc();
                     log.log(Level.SEVERE, "error queueing " + operationName, t);
                     return immediateFuture(null);
                   }
@@ -1651,6 +1658,7 @@ public class ShardInstance extends AbstractServerInstance {
 
           @Override
           public void onFailure(Throwable t) {
+            requeueFailureCounter.inc();
             log.log(Level.SEVERE, "failed to requeue: " + operationName, t);
             com.google.rpc.Status status = StatusProto.fromThrowable(t);
             if (status == null) {

@@ -36,9 +36,13 @@ Gauge of a number of items in prequeue
 
 Counter for number of CAS misses from worker-worker
 
+**queue_failure**
+
+Counter for number of operations that failed to queue
+
 **requeue_failure**
 
-Counterfor number of operations that failed to requeue
+Counter for number of operations that failed to requeue
 
 **dispatched_operations_size**
 
