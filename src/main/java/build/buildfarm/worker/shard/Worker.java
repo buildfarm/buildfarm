@@ -84,6 +84,8 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
+import me.dinowernli.grpc.prometheus.Configuration;
+import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -226,8 +228,29 @@ public class Worker {
           new WorkerProfileService(
               storage, inputFetchStage, executeActionStage, context, completeStage, backplane));
     }
+    handleGrpcMetricIntercepts(serverBuilder);
 
     return serverBuilder.build();
+  }
+
+  public void handleGrpcMetricIntercepts(ServerBuilder<?> serverBuilder) {
+    // Decide how to capture GRPC Prometheus metrics.
+    // By default, we don't capture any.
+    if (configs.getWorker().getGrpcMetrics().isEnabled()) {
+      // Assume core metrics.
+      // Core metrics include send/receive totals tagged with return codes.  No latencies.
+      Configuration grpcConfig = Configuration.cheapMetricsOnly();
+
+      // Enable latency buckets.
+      if (configs.getWorker().getGrpcMetrics().isProvideLatencyHistograms()) {
+        grpcConfig = grpcConfig.allMetrics();
+      }
+
+      // Apply config to create an interceptor and apply it to the GRPC server.
+      MonitoringServerInterceptor monitoringInterceptor =
+          MonitoringServerInterceptor.create(grpcConfig);
+      serverBuilder.intercept(monitoringInterceptor);
+    }
   }
 
   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")

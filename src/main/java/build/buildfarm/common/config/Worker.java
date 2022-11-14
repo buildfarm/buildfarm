@@ -13,6 +13,7 @@ import lombok.Data;
 @Data
 public class Worker {
   private int port = 8981;
+  private GrpcMetrics grpcMetrics = new GrpcMetrics();
   private String publicName;
   private Capabilities capabilities = new Capabilities();
   private String root = "/tmp/worker";
