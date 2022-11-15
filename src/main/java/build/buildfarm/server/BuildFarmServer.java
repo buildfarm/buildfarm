@@ -22,6 +22,7 @@ import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.GrpcMetrics;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
@@ -53,8 +54,6 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
-import me.dinowernli.grpc.prometheus.Configuration;
-import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -121,7 +120,7 @@ public class BuildFarmServer {
         .addService(new PublishBuildEventService())
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .intercept(headersInterceptor);
-    handleGrpcMetricIntercepts(serverBuilder);
+    GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getServer().getGrpcMetrics());
     server = serverBuilder.build();
 
     log.info(String.format("%s initialized", configs.getServer().getSession()));
@@ -135,25 +134,6 @@ public class BuildFarmServer {
     healthCheckMetric.labels("start").inc();
   }
 
-  public void handleGrpcMetricIntercepts(ServerBuilder<?> serverBuilder) {
-    // Decide how to capture GRPC Prometheus metrics.
-    // By default, we don't capture any.
-    if (configs.getServer().getGrpcMetrics().isEnabled()) {
-      // Assume core metrics.
-      // Core metrics include send/receive totals tagged with return codes.  No latencies.
-      Configuration grpcConfig = Configuration.cheapMetricsOnly();
-
-      // Enable latency buckets.
-      if (configs.getServer().getGrpcMetrics().isProvideLatencyHistograms()) {
-        grpcConfig = grpcConfig.allMetrics();
-      }
-
-      // Apply config to create an interceptor and apply it to the GRPC server.
-      MonitoringServerInterceptor monitoringInterceptor =
-          MonitoringServerInterceptor.create(grpcConfig);
-      serverBuilder.intercept(monitoringInterceptor);
-    }
-  }
 
   @PreDestroy
   public void stop() {

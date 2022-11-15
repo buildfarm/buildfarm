@@ -37,6 +37,7 @@ import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.GrpcMetrics;
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
@@ -59,6 +60,7 @@ import com.google.devtools.common.options.OptionsParsingException;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import io.grpc.Grpc;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -228,30 +230,11 @@ public class Worker {
           new WorkerProfileService(
               storage, inputFetchStage, executeActionStage, context, completeStage, backplane));
     }
-    handleGrpcMetricIntercepts(serverBuilder);
+    GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getWorker().getGrpcMetrics());
 
     return serverBuilder.build();
   }
 
-  public void handleGrpcMetricIntercepts(ServerBuilder<?> serverBuilder) {
-    // Decide how to capture GRPC Prometheus metrics.
-    // By default, we don't capture any.
-    if (configs.getWorker().getGrpcMetrics().isEnabled()) {
-      // Assume core metrics.
-      // Core metrics include send/receive totals tagged with return codes.  No latencies.
-      Configuration grpcConfig = Configuration.cheapMetricsOnly();
-
-      // Enable latency buckets.
-      if (configs.getWorker().getGrpcMetrics().isProvideLatencyHistograms()) {
-        grpcConfig = grpcConfig.allMetrics();
-      }
-
-      // Apply config to create an interceptor and apply it to the GRPC server.
-      MonitoringServerInterceptor monitoringInterceptor =
-          MonitoringServerInterceptor.create(grpcConfig);
-      serverBuilder.intercept(monitoringInterceptor);
-    }
-  }
 
   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   private ExecFileSystem createFuseExecFileSystem(

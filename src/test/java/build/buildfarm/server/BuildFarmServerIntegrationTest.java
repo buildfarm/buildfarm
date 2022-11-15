@@ -48,6 +48,7 @@ import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.GrpcMetrics;
 import build.buildfarm.common.config.Queue;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -401,7 +402,7 @@ public class BuildFarmServerIntegrationTest {
     ServerBuilder serverBuilder = mock(ServerBuilder.class);
 
     // ACT
-    server.handleGrpcMetricIntercepts(serverBuilder);
+    GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getServer().getGrpcMetrics());
 
     // ASSERT
     verify(serverBuilder, times(0)).intercept(any(MonitoringServerInterceptor.class));
@@ -414,7 +415,7 @@ public class BuildFarmServerIntegrationTest {
     ServerBuilder serverBuilder = mock(ServerBuilder.class);
 
     // ACT
-    server.handleGrpcMetricIntercepts(serverBuilder);
+    GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getServer().getGrpcMetrics());
 
     // ASSERT
     verify(serverBuilder, times(1)).intercept(any(MonitoringServerInterceptor.class));
