@@ -10,7 +10,8 @@ public class GrpcMetrics {
   private boolean enabled = false;
   private boolean provideLatencyHistograms = false;
 
-  public static void handleGrpcMetricIntercepts(ServerBuilder<?> serverBuilder, GrpcMetrics grpcMetrics) {
+  public static void handleGrpcMetricIntercepts(
+      ServerBuilder<?> serverBuilder, GrpcMetrics grpcMetrics) {
     // Decide how to capture GRPC Prometheus metrics.
     // By default, we don't capture any.
     if (grpcMetrics.isEnabled()) {

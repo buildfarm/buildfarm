@@ -60,7 +60,6 @@ import com.google.devtools.common.options.OptionsParsingException;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import io.grpc.Grpc;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -86,8 +85,6 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
-import me.dinowernli.grpc.prometheus.Configuration;
-import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -234,7 +231,6 @@ public class Worker {
 
     return serverBuilder.build();
   }
-
 
   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   private ExecFileSystem createFuseExecFileSystem(

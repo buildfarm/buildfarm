@@ -134,7 +134,6 @@ public class BuildFarmServer {
     healthCheckMetric.labels("start").inc();
   }
 
-
   @PreDestroy
   public void stop() {
     synchronized (this) {
