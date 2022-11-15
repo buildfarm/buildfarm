@@ -22,6 +22,7 @@ import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.GrpcMetrics;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
@@ -119,7 +120,7 @@ public class BuildFarmServer {
         .addService(new PublishBuildEventService())
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .intercept(headersInterceptor);
-    BuildfarmConfigs.handleGrpcMetricIntercepts(serverBuilder, configs.getServer().getGrpcMetrics());
+    GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getServer().getGrpcMetrics());
     server = serverBuilder.build();
 
     log.info(String.format("%s initialized", configs.getServer().getSession()));
