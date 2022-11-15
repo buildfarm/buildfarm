@@ -37,7 +37,6 @@ import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.common.config.GrpcMetrics;
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
@@ -227,7 +226,7 @@ public class Worker {
           new WorkerProfileService(
               storage, inputFetchStage, executeActionStage, context, completeStage, backplane));
     }
-    GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getWorker().getGrpcMetrics());
+    BuildfarmConfigs.handleGrpcMetricIntercepts(serverBuilder, configs.getWorker().getGrpcMetrics());
 
     return serverBuilder.build();
   }
