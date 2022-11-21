@@ -2951,13 +2951,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         throw new UnsupportedOperationException("Unsupported compressor " + compressor);
     }
     return new CancellableOutputStream(out) {
-      long written = committedSize;
       final Digest expectedDigest = keyToDigest(key, blobSizeInBytes, digestUtil);
 
       @Override
       public long getWritten() {
-        // this must be the size of the ingress output
-        return written;
+        return countingOut.written();
       }
 
       // must report a size that can be considered closeable
@@ -2979,7 +2977,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       @Override
       public void cancel() throws IOException {
         try {
-          written = 0;
           out.close();
           Files.delete(writePath);
         } finally {
@@ -2989,12 +2986,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public void write(int b) throws IOException {
-        if (direct && written >= blobSizeInBytes) {
+        if (getWritten() >= blobSizeInBytes) {
           throw new IOException(
-              format("attempted overwrite at %d by 1 byte for %s", written, writeKey));
+              format("attempted overwrite at %d by 1 byte for %s", getWritten(), writeKey));
         }
         out.write(b);
-        written++;
       }
 
       @Override
@@ -3004,12 +3000,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public void write(byte[] b, int off, int len) throws IOException {
+        long written = getWritten();
         if (direct && written + len > blobSizeInBytes) {
           throw new IOException(
               format("attempted overwrite at %d by %d bytes for %s", written, len, writeKey));
         }
         out.write(b, off, len);
-        written += len;
+        if (!direct && getWritten() > blobSizeInBytes) {
+          throw new IOException(
+              format("overwrite at %d by %d bytes for %s", written, len, writeKey));
+        }
       }
 
       @Override
