@@ -12,7 +12,7 @@ def archive_dependencies(third_party):
     return [
         {
             "name": "platforms",
-            "urls":[
+            "urls": [
                 "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.6/platforms-0.0.6.tar.gz",
                 "https://github.com/bazelbuild/platforms/releases/download/0.0.6/platforms-0.0.6.tar.gz",
             ],
