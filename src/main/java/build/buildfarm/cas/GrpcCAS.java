@@ -302,7 +302,12 @@ public class GrpcCAS implements ContentAddressableStorage {
 
   @Override
   public void put(Blob blob, Runnable onExpiration) throws InterruptedException {
-    put(blob);
+    try {
+      put(blob);
+    } catch (RuntimeException e) {
+      onExpiration.run();
+      throw e;
+    }
     synchronized (onExpirations) {
       onExpirations.put(blob.getDigest(), onExpiration);
     }
