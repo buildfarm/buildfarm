@@ -11,3 +11,4 @@ test --nojava_header_compilation
 test --enable_runfiles
 test --test_tag_filters=-redis
 
+build --incompatible_disable_starlark_host_transitions

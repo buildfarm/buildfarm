@@ -5,8 +5,8 @@ buildfarm dependencies that can be imported into other WORKSPACE files
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
-RULES_JVM_EXTERNAL_TAG = "4.2"
-RULES_JVM_EXTERNAL_SHA = "cd1a77b7b02e8e008439ca76fd34f5b07aecb8c752961f9640dea15e9e5ba1ca"
+RULES_JVM_EXTERNAL_TAG = "4.5"
+RULES_JVM_EXTERNAL_SHA = "b17d7388feb9bfa7f2fa09031b32707df529f26c91ab9e5d909eb1676badd9a6"
 
 def archive_dependencies(third_party):
     return [
@@ -90,9 +90,9 @@ def archive_dependencies(third_party):
         },
         {
             "name": "io_bazel_rules_docker",
-            "sha256": "59536e6ae64359b716ba9c46c39183403b01eabfbd57578e84398b4829ca499a",
-            "strip_prefix": "rules_docker-0.22.0",
-            "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.22.0/rules_docker-v0.22.0.tar.gz"],
+            "sha256": "9cdc7ac9f19fa3ad49cf9ba9f50652f0067df5c347dafdbdfe84c6c37a8ed62b",
+            "strip_prefix": "rules_docker-48ad6d6df43d1e4b9feeec961995aef01dd72080",
+            "url": "https://github.com/bazelbuild/rules_docker/archive/48ad6d6df43d1e4b9feeec961995aef01dd72080.tar.gz",
         },
 
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
