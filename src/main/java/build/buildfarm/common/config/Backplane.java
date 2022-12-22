@@ -37,10 +37,10 @@ public class Backplane {
   private int maxQueueDepth = 100000;
   private int maxPreQueueDepth = 1000000;
   private boolean priorityQueue = false;
-  private Queue[] queues;
+  private Queue[] queues = {};
   private String redisPassword;
   private int timeout = 10000;
-  private String[] redisNodes;
+  private String[] redisNodes = {};
   private int maxAttempts = 20;
   private boolean cacheCas = false;
 
