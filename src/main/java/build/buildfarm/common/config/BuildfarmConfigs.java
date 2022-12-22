@@ -26,6 +26,7 @@ public final class BuildfarmConfigs {
   private DigestUtil.HashFunction digestFunction = DigestUtil.HashFunction.SHA256;
   private long defaultActionTimeout = 600;
   private long maximumActionTimeout = 3600;
+  private long maxEntrySizeBytes = 2147483648L; // 2 * 1024 * 1024 * 1024
   private int prometheusPort = 9090;
   private Server server = new Server();
   private Backplane backplane = new Backplane();

@@ -74,7 +74,7 @@ public final class ContentAddressableStorages {
       throw new ConfigurationException("filesystem cas path is empty");
     }
     long maxSizeBytes = configs.getWorker().getCas().getMaxSizeBytes();
-    long maxEntrySizeBytes = configs.getWorker().getCas().getMaxEntrySizeBytes();
+    long maxEntrySizeBytes = configs.getMaxEntrySizeBytes();
     int hexBucketLevels = configs.getWorker().getHexBucketLevels();
     boolean storeFileDirsIndexInMemory =
         configs.getWorker().getCas().isFileDirectoriesIndexInMemory();
