@@ -76,9 +76,11 @@ def archive_dependencies(third_party):
         # Used to format proto files
         {
             "name": "com_grail_bazel_toolchain",
-            "sha256": "98e9fe7bcd2035164efa948ba91ea01ccbc4f933fd19f0320c9cbc536cfe22b7",
-            "strip_prefix": "bazel-toolchain-f14a8a5de8f7e98a011a52163d4855572c07a1a3",
-            "url": "https://github.com/grailbio/bazel-toolchain/archive/f14a8a5de8f7e98a011a52163d4855572c07a1a3.tar.gz",
+            "sha256": "ee74a364a978fa3c85ea56d736010bfc44ea22b439691e9cefdf72284d6c9b93",
+            "strip_prefix": "bazel-toolchain-d46339675a83e3517d955f5456e525501c3e05b8",
+            "url": "https://github.com/grailbio/bazel-toolchain/archive/d46339675a83e3517d955f5456e525501c3e05b8.tar.gz",
+            "patch_args": ["-p1"],
+            "patches": ["%s:clang_toolchain.patch" % third_party],
         },
         {
             "name": "io_bazel_rules_docker",

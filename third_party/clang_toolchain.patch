@@ -1,0 +1,12 @@
+diff --git a/toolchain/BUILD.llvm_repo b/toolchain/BUILD.llvm_repo
+index 4158551..7bd9c54 100644
+--- a/toolchain/BUILD.llvm_repo
++++ b/toolchain/BUILD.llvm_repo
+@@ -70,6 +70,7 @@ filegroup(
+             "lib/lib*.dylib",
+             "lib/clang/*/lib/**/*.dylib",
+         ],
++        allow_empty = True,
+     ),
+ )
+ 
