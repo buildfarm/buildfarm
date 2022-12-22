@@ -32,7 +32,7 @@ server:
     enableGracefulShutdown: false
   metrics:
     publisher: LOG
-    logLevel: OFF
+    logLevel: FINEST
     topic: test
     topicMaxConnections: 1000
     secretName: test
@@ -81,6 +81,9 @@ backplane:
 worker:
   port: 8981
   publicName: "localhost:8981"
+  grpcMetrics:
+    enabled: false
+    provideLatencyHistograms: false
   capabilities:
     cas: true
     execution: true

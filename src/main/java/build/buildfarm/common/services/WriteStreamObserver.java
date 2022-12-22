@@ -72,7 +72,10 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private volatile boolean committed = false;
   private String name = null;
   private Write write = null;
+
+  @GuardedBy("this")
   private FeedbackOutputStream out = null;
+
   private final AtomicReference<Throwable> exception = new AtomicReference<>(null);
   private final AtomicBoolean wasReady = new AtomicBoolean(false);
   private long expectedCommittedSize = -1;
@@ -372,6 +375,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
     }
   }
 
+  @GuardedBy("this")
   private void close() {
     log.log(Level.FINER, format("closing stream due to finishWrite for %s", name));
     try {
@@ -415,6 +419,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
     }
   }
 
+  @GuardedBy("this")
   private void requestNextIfReady() {
     try {
       requestNextIfReady(getOutput());
@@ -425,19 +430,22 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
     }
   }
 
+  @GuardedBy("this")
   private FeedbackOutputStream getOutput() throws IOException {
     if (out == null) {
       out = write.getOutput(deadlineAfter, deadlineAfterUnits, this::onNewlyReadyRequestNext);
       if (out != null) {
         withCancellation.addListener(
             context -> {
-              if (out != null) {
-                try {
-                  out.close();
-                } catch (IOException e) {
-                  log.log(Level.SEVERE, format("error closing on cancellation for %s", name), e);
+              synchronized (this) {
+                if (out != null) {
+                  try {
+                    out.close();
+                  } catch (IOException e) {
+                    log.log(Level.SEVERE, format("error closing on cancellation for %s", name), e);
+                  }
+                  out = null;
                 }
-                out = null;
               }
             },
             directExecutor());

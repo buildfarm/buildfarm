@@ -116,7 +116,7 @@ server:
 | Configuration       | Accepted and _Default_ Values | Description                                                                               |
 |---------------------|-------------------------------|-------------------------------------------------------------------------------------------|
 | publisher           | String, aws, gcp, _log_       | Specify publisher type for sending metadata                                               |
-| logLevel            | String, INFO, _OFF_           | Specify log level ("log" publisher only, all Java util logging levels are allowed here)   |
+| logLevel            | String, INFO, _FINEST_        | Specify log level ("log" publisher only, all Java util logging levels are allowed here)   |
 | topic               | String, _test_                | Specify SNS topic name for cloud publishing ("aws" publisher only)                        |
 | topicMaxConnections | Integer, 1000                 | Specify maximum number of connections allowed for cloud publishing ("aws" publisher only) |
 | secretName          | String, _test_                | Specify secret name to pull SNS permissions from ("aws" publisher only)                   |
