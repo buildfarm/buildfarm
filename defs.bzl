@@ -76,7 +76,8 @@ def buildfarm_init(name = "buildfarm"):
     maven_install(
         artifacts = ["com.amazonaws:aws-java-sdk-%s:1.11.729" % module for module in COM_AWS_MODULES] +
                     [
-                        "com.fasterxml.jackson.core:jackson-databind:2.13.3",
+                        "com.fasterxml.jackson.core:jackson-databind:2.14.1",
+                        "org.yaml:snakeyaml:1.33",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
                         "com.github.docker-java:docker-java:3.2.11",
                         "com.github.jnr:jffi:1.2.16",
