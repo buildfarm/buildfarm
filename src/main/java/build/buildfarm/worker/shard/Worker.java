@@ -37,6 +37,7 @@ import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.config.GrpcMetrics;
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
@@ -55,6 +56,7 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParsingException;
 import com.google.longrunning.Operation;
@@ -300,36 +302,63 @@ public class Worker {
     }
   }
 
+  private ContentAddressableStorage createStorages(
+      InputStreamFactory remoteInputStreamFactory,
+      ExecutorService removeDirectoryService,
+      Executor accessRecorder,
+      List<Cas> storages)
+      throws ConfigurationException {
+    ContentAddressableStorage storage = null;
+    ContentAddressableStorage delegate = null;
+    boolean delegateSkipLoad = false;
+    for (Cas cas : Lists.reverse(storages)) {
+      storage =
+          createStorage(
+              remoteInputStreamFactory,
+              removeDirectoryService,
+              accessRecorder,
+              cas,
+              delegate,
+              delegateSkipLoad);
+      delegate = storage;
+      delegateSkipLoad = cas.isSkipLoad();
+    }
+    return storage;
+  }
+
   private ContentAddressableStorage createStorage(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
       Executor accessRecorder,
-      ContentAddressableStorage delegate)
+      Cas cas,
+      ContentAddressableStorage delegate,
+      boolean delegateSkipLoad)
       throws ConfigurationException {
-    switch (configs.getWorker().getCas().getType()) {
+    switch (cas.getType()) {
       default:
         throw new IllegalArgumentException("Invalid cas type specified");
       case MEMORY:
       case FUSE: // FIXME have FUSE refer to a name for storage backing, and topo
-        return new MemoryCAS(
-            configs.getWorker().getCas().getMaxSizeBytes(), this::onStoragePut, delegate);
+        return new MemoryCAS(cas.getMaxSizeBytes(), this::onStoragePut, delegate);
       case GRPC:
         checkState(delegate == null, "grpc cas cannot delegate");
-        return createGrpcCAS();
+        return createGrpcCAS(cas);
       case FILESYSTEM:
         return new ShardCASFileCache(
             remoteInputStreamFactory,
-            root.resolve(configs.getWorker().getCas().getValidPath(root)),
-            configs.getWorker().getCas().getMaxSizeBytes(),
-            configs.getMaxEntrySizeBytes(),
-            configs.getWorker().getHexBucketLevels(),
-            configs.getWorker().getCas().isFileDirectoriesIndexInMemory(),
+            root.resolve(cas.getValidPath(root)),
+            cas.getMaxSizeBytes(),
+            configs.getMaxEntrySizeBytes(), // TODO make this a configurable value for each cas
+            // delegate level
+            cas.getHexBucketLevels(),
+            cas.isFileDirectoriesIndexInMemory(),
             digestUtil,
             removeDirectoryService,
             accessRecorder,
             this::onStoragePut,
             delegate == null ? this::onStorageExpire : (digests) -> {},
-            delegate);
+            delegate,
+            delegateSkipLoad);
     }
   }
 
@@ -519,7 +548,11 @@ public class Worker {
             workerStubs,
             (worker, t, context) -> {});
     ContentAddressableStorage storage =
-        createStorage(remoteInputStreamFactory, removeDirectoryService, accessRecorder, null);
+        createStorages(
+            remoteInputStreamFactory,
+            removeDirectoryService,
+            accessRecorder,
+            configs.getWorker().getStorages());
     execFileSystem =
         createExecFileSystem(
             remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
@@ -565,7 +598,7 @@ public class Worker {
 
     removeWorker(configs.getWorker().getPublicName());
 
-    boolean skipLoad = configs.getWorker().getCas().isSkipLoad();
+    boolean skipLoad = configs.getWorker().getStorages().get(0).isSkipLoad();
     execFileSystem.start(
         (digests) -> addBlobsLocation(digests, configs.getWorker().getPublicName()), skipLoad);
 

@@ -115,8 +115,7 @@ public class BuildFarmServerIntegrationTest {
     Queue[] queues = new Queue[1];
     queues[0] = queue;
     configs.getBackplane().setQueues(queues);
-    configs.getWorker().getCas().setType(MEMORY);
-    configs.getWorker().getCas().setTarget("localhost:8980");
+    configs.getWorker().getStorages().get(0).setType(MEMORY);
     String uniqueServerName = "in-process server for " + getClass();
     server = new BuildFarmServer();
     server.start(
