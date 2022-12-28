@@ -41,9 +41,9 @@ def archive_dependencies(third_party):
         },
         {
             "name": "com_github_bazelbuild_buildtools",
-            "sha256": "a02ba93b96a8151b5d8d3466580f6c1f7e77212c4eb181cba53eb2cae7752a23",
-            "strip_prefix": "buildtools-3.5.0",
-            "urls": ["https://github.com/bazelbuild/buildtools/archive/3.5.0.tar.gz"],
+            "sha256": "be102ef1138929175f04bcbf8cefbaa9b49d18aa8b1aabff96e0ee68de0d028d",
+            "strip_prefix": "buildtools-762712d8ce3ff3aa361b36d50688eb4ab7884637",
+            "url": "https://github.com/bazelbuild/buildtools/archive/762712d8ce3ff3aa361b36d50688eb4ab7884637.zip",
         },
 
         # Needed for @grpc_java//compiler:grpc_java_plugin.
