@@ -145,7 +145,8 @@ class CASFileCacheTest {
             /* directoriesIndexDbName=*/ ":memory:",
             onPut,
             onExpire,
-            delegate) {
+            delegate,
+            /* delegateSkipLoad=*/ false) {
           @Override
           protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
               throws IOException {
@@ -1090,7 +1091,8 @@ class CASFileCacheTest {
             /* directoriesIndexDbName=*/ ":memory:",
             /* onPut=*/ digest -> {},
             /* onExpire=*/ digests -> {},
-            /* delegate=*/ null) {
+            /* delegate=*/ null,
+            /* delegateSkipLoad=*/ false) {
           @Override
           protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
               throws IOException {
