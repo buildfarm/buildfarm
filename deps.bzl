@@ -31,13 +31,25 @@ def archive_dependencies(third_party):
             "url": "https://github.com/bazelbuild/rules_k8s/archive/refs/tags/v0.7.tar.gz",
             "sha256": "ce5b9bc0926681e2e7f2147b49096f143e6cbc783e71bc1d4f36ca76b00e6f4a",
         },
+        {
+            "name": "io_bazel_rules_go",
+            "strip_prefix": "rules_go-de2074e0af1df1a34a862ca6108ed15f760520df",
+            "sha256": "ea809c38ffa3e78c626d52cabe6c3ea23d6549494696f44775ed8248db051f9e",
+            "url": "https://github.com/bazelbuild/rules_go/archive/de2074e0af1df1a34a862ca6108ed15f760520df.zip",
+        },
+        {
+            "name": "bazel_gazelle",
+            "strip_prefix": "bazel-gazelle-8adf04f8f7587ec64dc0d616b7b5243cf49b3c9d",
+            "sha256": "019772279a0688f8f7c7c5f953ea82a3d380417027d59063f0797d660b0310b7",
+            "url": "https://github.com/bazelbuild/bazel-gazelle/archive/8adf04f8f7587ec64dc0d616b7b5243cf49b3c9d.zip",
+        },
 
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
         {
             "name": "com_google_protobuf",
-            "sha256": "dd513a79c7d7e45cbaeaf7655289f78fd6b806e52dbbd7018ef4e3cf5cff697a",
-            "strip_prefix": "protobuf-3.15.8",
-            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.15.8.zip"],
+            "sha256": "6a31b662deaeb0ac35e6287bda2f3369b19836e6c9f8828d4da444346f420298",
+            "strip_prefix": "protobuf-21.12",
+            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v21.12.zip"],
         },
         {
             "name": "com_github_bazelbuild_buildtools",
