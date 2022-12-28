@@ -148,13 +148,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Consumer<Iterable<Digest>> onExpire;
   private final Executor accessRecorder;
   private final ExecutorService expireService;
-  private Thread prometheusMetricsThread;
+  private Thread prometheusMetricsThread; // TODO make this final, stop on shutdown
 
   private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newConcurrentMap();
   private final DirectoriesIndex directoriesIndex;
   private final String directoriesIndexDbName;
   private final LockMap locks = new LockMap();
   @Nullable private final ContentAddressableStorage delegate;
+  private final boolean delegateSkipLoad;
   private final LoadingCache<BlobWriteKey, Write> writes =
       CacheBuilder.newBuilder()
           .expireAfterAccess(1, HOURS)
@@ -281,7 +282,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         /* directoriesIndexDbName=*/ DEFAULT_DIRECTORIES_INDEX_NAME,
         /* onPut=*/ (digest) -> {},
         /* onExpire=*/ (digests) -> {},
-        /* delegate=*/ null);
+        /* delegate=*/ null,
+        /* delegateSkipLoad=*/ false);
   }
 
   public CASFileCache(
@@ -297,7 +299,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       String directoriesIndexDbName,
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire,
-      @Nullable ContentAddressableStorage delegate) {
+      @Nullable ContentAddressableStorage delegate,
+      boolean delegateSkipLoad) {
     this.root = root;
     this.maxSizeInBytes = maxSizeInBytes;
     this.maxEntrySizeInBytes = maxEntrySizeInBytes;
@@ -308,6 +311,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.onPut = onPut;
     this.onExpire = onExpire;
     this.delegate = delegate;
+    this.delegateSkipLoad = delegateSkipLoad;
     this.directoriesIndexDbName = directoriesIndexDbName;
 
     entryPathStrategy = new HexBucketEntryPathStrategy(root, hexBucketLevels);
@@ -1214,7 +1218,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   public StartupCacheResults start(
       Consumer<Digest> onStartPut, ExecutorService removeDirectoryService, boolean skipLoad)
       throws IOException, InterruptedException {
-    CasFallbackDelegate.start(delegate, onStartPut, removeDirectoryService, skipLoad);
+    CasFallbackDelegate.start(delegate, onStartPut, removeDirectoryService, delegateSkipLoad);
 
     log.log(Level.INFO, "Initializing cache at: " + root);
     Instant startTime = Instant.now();

@@ -93,13 +93,14 @@ worker:
   dequeueMatchSettings:
     acceptEverything: true
     allowUnmatched: false
-  cas:
-    type: FILESYSTEM
-    path: "cache"
-    maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
-    fileDirectoriesIndexInMemory: false
-    skipLoad: false
-    target:
+  storages:
+    - type: FILESYSTEM
+      path: "cache"
+      maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+      fileDirectoriesIndexInMemory: false
+      skipLoad: false
+      hexBucketLevels: 0
+      target:
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
@@ -107,7 +108,6 @@ worker:
   realInputDirectories:
     - "external"
   execOwner:
-  hexBucketLevels: 0
   defaultMaxCores: 0
   limitGlobalExecution: false
   onlyMulticoreTests: false
