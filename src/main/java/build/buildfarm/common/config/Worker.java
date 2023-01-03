@@ -33,7 +33,7 @@ public class Worker {
   private boolean onlyMulticoreTests = false;
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
-  private ExecutionPolicy[] executionPolicies;
+  private ExecutionPolicy[] executionPolicies = {};
 
   public String getPublicName() {
     if (!Strings.isNullOrEmpty(publicName)) {
