@@ -18,10 +18,15 @@ public class Cas {
   }
 
   private TYPE type = TYPE.FILESYSTEM;
+
+  // MEMORY/FILESYSTEM
   private String path = "cache";
+  private int hexBucketLevels = 0;
   private long maxSizeBytes = 0;
   private boolean fileDirectoriesIndexInMemory = false;
   private boolean skipLoad = false;
+
+  // GRPC
   private String target;
 
   /*

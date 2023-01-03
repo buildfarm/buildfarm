@@ -1,8 +1,6 @@
 # Bazel Buildfarm
 
-|Buildfarm CI|Nightly CI|Nightly Functionality Test|
-|--|--|--|
-| ![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main) |![Build status](https://badge.buildkite.com/d0c1471a98dd7d7123e6c21b57add0e8c2c0552042ea18f02c.svg)|![Build status](https://badge.buildkite.com/e0ac44ec0a8c3473d3d9490600366f1a73e8fa171d4913e9e3.svg)|
+![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main)
 
 This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
 
