@@ -43,7 +43,8 @@ class ShardCASFileCache extends CASFileCache {
       Executor accessRecorder,
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire,
-      ContentAddressableStorage delegate) {
+      ContentAddressableStorage delegate,
+      boolean delegateSkipLoad) {
     super(
         root,
         maxSizeInBytes,
@@ -57,7 +58,8 @@ class ShardCASFileCache extends CASFileCache {
         DEFAULT_DIRECTORIES_INDEX_NAME,
         onPut,
         onExpire,
-        delegate);
+        delegate,
+        delegateSkipLoad);
     this.inputStreamFactory =
         createInputStreamFactory(this::newTransparentInput, shardInputStreamFactory);
   }

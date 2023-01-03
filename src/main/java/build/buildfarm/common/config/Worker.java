@@ -20,7 +20,7 @@ public class Worker {
   private int inlineContentLimit = 1048567; // 1024 * 1024
   private long operationPollPeriod = 1;
   private DequeueMatchSettings dequeueMatchSettings = new DequeueMatchSettings();
-  private Cas cas = new Cas();
+  private List<Cas> storages = Arrays.asList(new Cas());
   private int executeStageWidth = 0;
   private int executeStageWidthOffset = 0;
   private int inputFetchStageWidth = 0;
@@ -28,7 +28,6 @@ public class Worker {
   private boolean linkInputDirectories = true;
   private List<String> realInputDirectories = Arrays.asList("external");
   private String execOwner;
-  private int hexBucketLevels = 0;
   private int defaultMaxCores = 0;
   private boolean limitGlobalExecution = false;
   private boolean onlyMulticoreTests = false;
