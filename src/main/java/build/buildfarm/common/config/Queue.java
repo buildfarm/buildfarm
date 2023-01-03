@@ -1,6 +1,7 @@
 package build.buildfarm.common.config;
 
 import build.bazel.remote.execution.v2.Platform;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.Data;
 
@@ -13,7 +14,7 @@ public class Queue {
 
   private String name;
   private boolean allowUnmatched = true;
-  private List<Property> properties;
+  private List<Property> properties = new ArrayList();
 
   public Platform getPlatform() {
     Platform.Builder platformBuilder = Platform.newBuilder();
