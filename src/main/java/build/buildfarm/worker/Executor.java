@@ -148,7 +148,7 @@ class Executor {
 
     // decide timeout and begin deadline
     Duration timeout = decideTimeout(timeoutSettings, operationContext.action);
-    Deadline pollDeadline = Time.toDeadline(timeout);
+    Deadline pollDeadline = Time.toDeadline(timeout).offset(30, TimeUnit.SECONDS);
 
     workerContext.resumePoller(
         operationContext.poller,

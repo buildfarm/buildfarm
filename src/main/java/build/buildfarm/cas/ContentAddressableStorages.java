@@ -29,6 +29,7 @@ import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Cas;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
@@ -58,8 +59,8 @@ public final class ContentAddressableStorages {
     return builder.build();
   }
 
-  public static ContentAddressableStorage createGrpcCAS() {
-    Channel channel = createChannel(configs.getWorker().getCas().getTarget());
+  public static ContentAddressableStorage createGrpcCAS(Cas cas) {
+    Channel channel = createChannel(cas.getTarget());
     ByteStreamUploader byteStreamUploader =
         new ByteStreamUploader("", channel, null, 300, NO_RETRIES);
     ListMultimap<Digest, Runnable> onExpirations =
@@ -68,16 +69,16 @@ public final class ContentAddressableStorages {
     return new GrpcCAS(configs.getServer().getName(), channel, byteStreamUploader, onExpirations);
   }
 
-  public static ContentAddressableStorage createFilesystemCAS() throws ConfigurationException {
-    String path = configs.getWorker().getCas().getPath();
+  public static ContentAddressableStorage createFilesystemCAS(Cas config)
+      throws ConfigurationException {
+    String path = config.getPath();
     if (path.isEmpty()) {
       throw new ConfigurationException("filesystem cas path is empty");
     }
-    long maxSizeBytes = configs.getWorker().getCas().getMaxSizeBytes();
+    long maxSizeBytes = config.getMaxSizeBytes();
     long maxEntrySizeBytes = configs.getMaxEntrySizeBytes();
-    int hexBucketLevels = configs.getWorker().getHexBucketLevels();
-    boolean storeFileDirsIndexInMemory =
-        configs.getWorker().getCas().isFileDirectoriesIndexInMemory();
+    int hexBucketLevels = config.getHexBucketLevels();
+    boolean storeFileDirsIndexInMemory = config.isFileDirectoriesIndexInMemory();
     if (maxSizeBytes <= 0) {
       throw new ConfigurationException("filesystem cas max_size_bytes <= 0");
     }
@@ -114,16 +115,16 @@ public final class ContentAddressableStorages {
     return cas;
   }
 
-  public static ContentAddressableStorage create() throws ConfigurationException {
-    switch (configs.getWorker().getCas().getType()) {
+  public static ContentAddressableStorage create(Cas cas) throws ConfigurationException {
+    switch (cas.getType()) {
       default:
         throw new IllegalArgumentException("CAS config not set in config");
       case FILESYSTEM:
-        return createFilesystemCAS();
+        return createFilesystemCAS(cas);
       case GRPC:
-        return createGrpcCAS();
+        return createGrpcCAS(cas);
       case MEMORY:
-        return new MemoryCAS(configs.getWorker().getCas().getMaxSizeBytes());
+        return new MemoryCAS(cas.getMaxSizeBytes());
     }
   }
 
