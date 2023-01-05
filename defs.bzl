@@ -8,12 +8,16 @@ load(
     "@io_bazel_rules_docker//repositories:repositories.bzl",
     container_repositories = "repositories",
 )
+load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 load("@io_bazel_rules_k8s//k8s:k8s.bzl", "k8s_repositories")
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
+load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
+#load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+#load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
 
 IO_NETTY_MODULES = [
     "buffer",
@@ -140,6 +144,12 @@ def buildfarm_init(name = "buildfarm"):
         ],
     )
 
+    rules_pkg_dependencies()
+
+    #grpc_deps()
+
+    #grpc_extra_deps()
+
     go_rules_dependencies()
 
     go_register_toolchains(version = "1.18.3")
@@ -152,6 +162,8 @@ def buildfarm_init(name = "buildfarm"):
     )
 
     container_repositories()
+
+    container_deps()
 
     protobuf_deps()
 

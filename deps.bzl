@@ -18,6 +18,20 @@ def archive_dependencies(third_party):
             "sha256": "5308fc1d8865406a49427ba24a9ab53087f17f5266a7aabbfc28823f3916e1ca",
         },
         {
+            "name": "rules_pkg",
+            "sha256": "eea0f59c28a9241156a47d7a8e32db9122f3d50b505fae0f33de6ce4d9b61834",
+            "url": "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.8.0/rules_pkg-0.8.0.tar.gz",
+        },
+        {
+            "name": "grpc",
+            "sha256": "20cea8585c2c9ba66ca657c75c745d0165dcc4b2b81b4b6f5bd847321d8300d1",
+            "url": "https://github.com/grpc/grpc/archive/06a9fbd3822e33e30fb62c5fc201f13886ede3f4.zip",
+            "patch_cmds": [
+                "sed -i 's/cfg = \"host\"/cfg = \"exec\"/' bazel/build_defs.bzl",
+                "sed -i 's/cfg = \"host\"/cfg = \"exec\"/' bazel/generate_cc.bzl",
+            ],
+        },
+        {
             "name": "rules_jvm_external",
             "strip_prefix": "rules_jvm_external-58b19e55a7d5cdfdd39df0e452953cbac9898768",
             "sha256": RULES_JVM_EXTERNAL_SHA,
@@ -111,11 +125,9 @@ def archive_dependencies(third_party):
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
         {
             "name": "bazel",
-            "sha256": "bca2303a43c696053317a8c7ac09a5e6d90a62fec4726e55357108bb60d7a807",
-            "strip_prefix": "bazel-3.7.2",
-            "urls": ["https://github.com/bazelbuild/bazel/archive/3.7.2.tar.gz"],
-            "patch_args": ["-p1"],
-            "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
+            "sha256": "06d3dbcba2286d45fc6479a87ccc649055821fc6da0c3c6801e73da780068397",
+            "strip_prefix": "bazel-6.0.0",
+            "urls": ["https://github.com/bazelbuild/bazel/archive/6.0.0.tar.gz"],
         },
 
         # Optional execution wrappers
@@ -126,6 +138,7 @@ def archive_dependencies(third_party):
             "strip_prefix": "TARDIS-f54fa4743e67763bb1ad77039b3d15be64e2e564",
             "url": "https://github.com/Unilang/TARDIS/archive/f54fa4743e67763bb1ad77039b3d15be64e2e564.zip",
         },
+
     ]
 
 def buildfarm_dependencies(repository_name = "build_buildfarm"):
