@@ -28,6 +28,7 @@ java_binary(
     visibility = ["//visibility:public"],
     runtime_deps = [
         "//src/main/java/build/buildfarm/server",
+        "@maven//:org_slf4j_slf4j_simple",
     ],
 )
 
@@ -61,6 +62,7 @@ java_binary(
     visibility = ["//visibility:public"],
     runtime_deps = [
         "//src/main/java/build/buildfarm/worker/shard",
+        "@maven//:org_slf4j_slf4j_simple",
     ],
 )
 
