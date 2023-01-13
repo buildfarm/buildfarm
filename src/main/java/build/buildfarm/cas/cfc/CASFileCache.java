@@ -60,6 +60,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.common.ZstdDecompressingOutputStream;
+import build.buildfarm.common.function.UUIDUtils;
 import build.buildfarm.common.io.CountingOutputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -672,7 +673,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           putImpl(
               Compressor.Value.IDENTITY,
               key,
-              UUID.randomUUID(),
+              UUIDUtils.randomUUID(),
               () -> completeWrite(blob.getDigest()),
               blob.getDigest().getSizeBytes(),
               /* isExecutable=*/ false,
@@ -2303,7 +2304,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         putImpl(
             Compressor.Value.IDENTITY, // first place to try internal compression
             key,
-            UUID.randomUUID(),
+            UUIDUtils.randomUUID(),
             () -> completeWrite(digest),
             digest.getSizeBytes(),
             isExecutable,
@@ -2981,7 +2982,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return delegate.newInput(compressor, digest, offset);
     }
     Write write =
-        getWrite(compressor, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+        getWrite(compressor, digest, UUIDUtils.randomUUID(), RequestMetadata.getDefaultInstance());
     return newReadThroughInput(compressor, digest, offset, write);
   }
 
@@ -3005,7 +3006,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             delegate.getWrite(
                 Compressor.Value.IDENTITY,
                 fileEntryKey.getDigest(),
-                UUID.randomUUID(),
+                UUIDUtils.randomUUID(),
                 RequestMetadata.getDefaultInstance());
         performCopy(write, e);
       }
