@@ -1,9 +1,11 @@
 java_library(
     name = "worker",
     srcs = glob(["*.java"]),
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/worker/resources",
@@ -35,5 +37,6 @@ java_library(
         "@maven//:io_prometheus_simpleclient",
         "@maven//:org_apache_commons_commons_compress",
         "@maven//:org_jetbrains_annotations",
+        "@maven//:org_projectlombok_lombok",
     ],
 )

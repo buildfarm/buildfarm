@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.common.config.Server.INSTANCE_TYPE.SHARD;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -28,11 +29,12 @@ import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.ExecutionPolicy;
+import build.buildfarm.common.config.Queue;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
-import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -42,6 +44,7 @@ import com.google.protobuf.Duration;
 import io.grpc.StatusException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
@@ -53,6 +56,8 @@ import org.mockito.MockitoAnnotations;
 @RunWith(JUnit4.class)
 public class ShardWorkerContextTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
+
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private Path root;
 
@@ -68,6 +73,16 @@ public class ShardWorkerContextTest {
 
   @Before
   public void setUp() throws Exception {
+    configs.getServer().setInstanceType(SHARD);
+    configs.getServer().setName("shard");
+    configs.getWorker().setPublicName("localhost:8981");
+    configs.getBackplane().setRedisUri("redis://localhost:6379");
+    Queue queue = new Queue();
+    queue.setProperties(new ArrayList<>());
+    Queue[] queues = new Queue[1];
+    queues[0] = queue;
+    configs.getBackplane().setQueues(queues);
+
     MockitoAnnotations.initMocks(this);
     when(instance.getDigestUtil()).thenReturn(DIGEST_UTIL);
     root = Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null);
@@ -78,11 +93,8 @@ public class ShardWorkerContextTest {
   }
 
   WorkerContext createTestContext(Platform platform, Iterable<ExecutionPolicy> policies) {
-    DequeueMatchSettings matchSettings = new DequeueMatchSettings();
     return new ShardWorkerContext(
         "test",
-        matchSettings,
-        platform,
         /* operationPollPeriod=*/ Duration.getDefaultInstance(),
         /* operationPoller=*/ (queueEntry, stage, requeueAt) -> false,
         /* inlineContentLimit=*/
@@ -123,8 +135,7 @@ public class ShardWorkerContextTest {
   public void queueEntryWithExecutionPolicyPlatformMatches() throws Exception {
     WorkerContext context =
         createTestContext(
-            Platform.getDefaultInstance(),
-            ImmutableList.of(ExecutionPolicy.newBuilder().setName("foo").build()));
+            Platform.getDefaultInstance(), ImmutableList.of(new ExecutionPolicy("foo")));
     Platform matchPlatform =
         Platform.newBuilder()
             .addProperties(

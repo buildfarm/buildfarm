@@ -38,6 +38,7 @@ java_library(
         ":as-nobody",
         ":delay",
         ":linux-sandbox.binary",
+        ":macos-wrapper",
         ":process-wrapper.binary",
         ":skip_sleep.binary",
         ":skip_sleep.preload",
@@ -108,10 +109,15 @@ sh_binary(
     srcs = ["delay.sh"],
 )
 
+sh_binary(
+    name = "macos-wrapper",
+    srcs = ["macos-wrapper.sh"],
+)
+
 # Docker images for buildfarm components
 java_image(
     name = "buildfarm-server",
-    args = ["/app/build_buildfarm/examples/shard-server.config.example"],
+    args = ["/app/build_buildfarm/examples/config.minimal.yml"],
     base = "@amazon_corretto_java_image_base//image",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
@@ -121,7 +127,7 @@ java_image(
         "//src/main/java/build/buildfarm:configs",
     ],
     jvm_flags = [
-        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+        "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
 
         # Flags related to OpenTelemetry
         "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
@@ -168,7 +174,7 @@ container_image(
 
 java_image(
     name = "buildfarm-shard-worker",
-    args = ["/app/build_buildfarm/examples/shard-worker.config.example"],
+    args = ["/app/build_buildfarm/examples/config.minimal.yml"],
     base = ":worker_pkgs_image_wrapper",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
@@ -178,7 +184,7 @@ java_image(
         "//src/main/java/build/buildfarm:configs",
     ],
     jvm_flags = [
-        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+        "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
 
         # Flags related to OpenTelemetry
         "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",

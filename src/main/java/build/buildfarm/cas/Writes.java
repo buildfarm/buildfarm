@@ -14,8 +14,10 @@
 
 package build.buildfarm.cas;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.Write;
@@ -41,14 +43,15 @@ public class Writes {
     this.storage = storage;
   }
 
-  Write get(Digest digest, UUID uuid) {
+  Write get(Compressor.Value compressor, Digest digest, UUID uuid) {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
-    return getNonEmpty(digest, uuid);
+    return getNonEmpty(compressor, digest, uuid);
   }
 
-  private synchronized Write getNonEmpty(Digest digest, UUID uuid) {
+  private synchronized Write getNonEmpty(Compressor.Value compressor, Digest digest, UUID uuid) {
+    checkArgument(compressor == Compressor.Value.IDENTITY);
     Blob blob = storage.get(digest);
     if (blob != null) {
       return new CompleteWrite(digest.getSizeBytes());

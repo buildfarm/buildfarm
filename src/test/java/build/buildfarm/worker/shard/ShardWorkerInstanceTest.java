@@ -22,6 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
@@ -119,8 +120,8 @@ public class ShardWorkerInstanceTest {
   }
 
   @Test(expected = UnsupportedOperationException.class)
-  public void getBlobNameIsUnsupported() {
-    instance.getBlobName(null);
+  public void readResourceNameIsUnsupported() {
+    instance.readResourceName(Compressor.Value.IDENTITY, null);
   }
 
   @Test(expected = UnsupportedOperationException.class)

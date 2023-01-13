@@ -1,18 +1,18 @@
 #!/bin/bash
+set -e
+set -o pipefail
+
 # This script is to be called within a built container reflecting the changes of a PR
 # We start the server and the worker, and test that they can complete builds for a bazel client.
 cd buildfarm;
 
 #Various targets to be tested
 BUILDFARM_SERVER_TARGET="//src/main/java/build/buildfarm:buildfarm-server"
-BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-memory-worker"
-BUILDFARM_SHARD_WORKER_TAERGET="//src/main/java/build/buildfarm:buildfarm-shard-worker"
+BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-shard-worker"
 
 #The configs used by the targets
-BUILDFARM_SERVER_CONFIG="/buildfarm/examples/server.config.example"
-BUILDFARM_WORKER_CONFIG="/buildfarm/examples/worker.config.example"
-BUILDFARM_SHARD_SERVER_CONFIG="/buildfarm/examples/shard-server.config.example"
-BUILDFARM_SHARD_WORKER_CONFIG="/buildfarm/examples/shard-worker.config.example"
+BUILDFARM_SERVER_CONFIG="/buildfarm/examples/config.minimal.yml"
+BUILDFARM_WORKER_CONFIG="/buildfarm/examples/config.minimal.yml"
 
 GRPC_LOGS1="/tmp/parsed-grpc.log"
 GRPC_LOGS2="/tmp/parsed-grpc2.log"
@@ -66,39 +66,20 @@ check_for_crashes(){
 }
 
 start_server_and_worker(){
-    if [ "${TEST_SHARD:-false}" = true ]; then
+  echo "Testing with Shard Instances."
 
-        echo "Testing with Shard Instances."
+  # Build first to create more predictable run time.
+  ./bazel build $BUILDFARM_SERVER_TARGET $BUILDFARM_WORKER_TARGET
 
-        # Build first to create more predictable run time.
-        ./bazel build $BUILDFARM_SERVER_TARGET $BUILDFARM_SHARD_WORKER_TAERGET
+  # Start the server.
+  ./bazel run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
+  SERVER_PID=$!
 
-        # Start the server.
-        ./bazel run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SHARD_SERVER_CONFIG > server.log 2>&1 &
-        SERVER_PID=$!
+  ensure_server_is_up
 
-        ensure_server_is_up
-
-        # Start the worker.
-        ./bazel run $BUILDFARM_SHARD_WORKER_TAERGET -- $BUILDFARM_SHARD_WORKER_CONFIG > worker.log 2>&1 &
-        WORKER_PID=$!
-    else
-
-        echo "Testing with Memory Instances."
-
-        # Build first to create more predictable run time.
-        ./bazel build $BUILDFARM_SERVER_TARGET $BUILDFARM_WORKER_TARGET
-
-        # Start the server.
-        ./bazel run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
-        SERVER_PID=$!
-
-        ensure_server_is_up
-
-        # Start the worker.
-        ./bazel run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
-        WORKER_PID=$!
-    fi
+  # Start the worker.
+  ./bazel run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
+  WORKER_PID=$!
 }
 
 init_grpc_parser(){

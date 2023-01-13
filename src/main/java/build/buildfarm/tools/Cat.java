@@ -23,6 +23,7 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -948,7 +949,12 @@ class Cat {
     protected void run(Instance instance, Digest digest) throws Exception {
       try (InputStream in =
           instance.newBlobInput(
-              digest, 0, 60, TimeUnit.SECONDS, RequestMetadata.getDefaultInstance())) {
+              Compressor.Value.IDENTITY,
+              digest,
+              0,
+              60,
+              TimeUnit.SECONDS,
+              RequestMetadata.getDefaultInstance())) {
         ByteStreams.copy(in, System.out);
       }
     }
@@ -957,7 +963,10 @@ class Cat {
   abstract static class BlobCommand extends DigestsCommand {
     @Override
     protected void run(Instance instance, Digest digest) throws Exception {
-      run(instance, getBlob(instance, digest, RequestMetadata.getDefaultInstance()));
+      run(
+          instance,
+          getBlob(
+              instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance()));
     }
 
     protected abstract void run(Instance instance, ByteString blob) throws Exception;

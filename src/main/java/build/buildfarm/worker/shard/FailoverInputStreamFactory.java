@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker.shard;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.InputStreamFactory;
 import java.io.IOException;
@@ -30,12 +31,12 @@ class FailoverInputStreamFactory implements InputStreamFactory {
   }
 
   @Override
-  public InputStream newInput(Digest blobDigest, long offset)
-      throws IOException, InterruptedException {
+  public InputStream newInput(Compressor.Value compressor, Digest blobDigest, long offset)
+      throws IOException {
     try {
-      return primary.newInput(blobDigest, offset);
+      return primary.newInput(compressor, blobDigest, offset);
     } catch (NoSuchFileException e) {
-      return delegate.newInput(blobDigest, offset);
+      return delegate.newInput(compressor, blobDigest, offset);
     }
   }
 }

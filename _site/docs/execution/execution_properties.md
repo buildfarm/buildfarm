@@ -42,6 +42,9 @@ Tests that exceed their memory requirements will be killed.
 ### `linux-sandbox`
 **description:** Use bazel's linux sandbox as an execution wrapper.
 
+### `fake-hostname`
+**description:** Uses `localhost` as the hostname during execution.  Assumes the usage of the linux sandbox.
+
 ### `block-network`
 **description:** Creates a new network namespace.  Assumes the usage of the linux sandbox.
 

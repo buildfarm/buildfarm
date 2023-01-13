@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -42,7 +43,7 @@ import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.Tree;
-import build.buildfarm.ac.ActionCache;
+import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
@@ -76,6 +77,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
 import java.util.Stack;
 import java.util.logging.Logger;
+import lombok.extern.java.Log;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -83,8 +85,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
+@Log
 public class AbstractServerInstanceTest {
-  private static final Logger logger = Logger.getLogger(AbstractServerInstanceTest.class.getName());
 
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
@@ -108,7 +110,7 @@ public class AbstractServerInstanceTest {
 
     @Override
     protected Logger getLogger() {
-      return logger;
+      return log;
     }
 
     @Override
@@ -498,13 +500,14 @@ public class AbstractServerInstanceTest {
             (Answer<Void>)
                 invocation -> {
                   StreamObserver<ByteString> blobObserver =
-                      (StreamObserver) invocation.getArguments()[3];
+                      (StreamObserver) invocation.getArguments()[4];
                   blobObserver.onNext(content);
                   blobObserver.onCompleted();
                   return null;
                 })
         .when(contentAddressableStorage)
         .get(
+            eq(Compressor.Value.IDENTITY),
             eq(digest),
             /* offset=*/ eq(0L),
             eq(digest.getSizeBytes()),
@@ -574,6 +577,7 @@ public class AbstractServerInstanceTest {
         ArgumentCaptor.forClass(Iterable.class);
     verify(contentAddressableStorage, times(1))
         .get(
+            eq(Compressor.Value.IDENTITY),
             eq(treeDigest),
             /* offset=*/ eq(0L),
             eq(treeDigest.getSizeBytes()),

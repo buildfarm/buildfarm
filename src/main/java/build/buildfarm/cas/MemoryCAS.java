@@ -14,10 +14,12 @@
 
 package build.buildfarm.cas;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
@@ -26,7 +28,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
-import com.google.rpc.Code;
 import com.google.rpc.Status;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
@@ -41,15 +42,11 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
+import lombok.extern.java.Log;
 
+@Log
 public class MemoryCAS implements ContentAddressableStorage {
-  private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
-
-  static final Status OK = Status.newBuilder().setCode(Code.OK.getNumber()).build();
-
-  static final Status NOT_FOUND = Status.newBuilder().setCode(Code.NOT_FOUND.getNumber()).build();
 
   private final long maxSizeInBytes;
   private final Consumer<Digest> onPut;
@@ -110,7 +107,9 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
-  public synchronized InputStream newInput(Digest digest, long offset) throws IOException {
+  public synchronized InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
+      throws IOException {
+    checkArgument(compressor == Compressor.Value.IDENTITY);
     // implicit int bounds compare against size bytes
     if (offset < 0 || offset > digest.getSizeBytes()) {
       throw new IndexOutOfBoundsException(
@@ -120,7 +119,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     if (blob == null) {
       if (delegate != null) {
         // FIXME change this to a read-through input stream
-        return delegate.newInput(digest, offset);
+        return delegate.newInput(Compressor.Value.IDENTITY, digest, offset);
       }
       throw new NoSuchFileException(DigestUtil.toString(digest));
     }
@@ -131,16 +130,18 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @Override
   public void get(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long limit,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
+    checkArgument(compressor == Compressor.Value.IDENTITY);
     Blob blob = get(digest);
     if (blob == null) {
       if (delegate != null) {
         // FIXME change this to a read-through get
-        delegate.get(digest, offset, limit, blobObserver, requestMetadata);
+        delegate.get(compressor, digest, offset, limit, blobObserver, requestMetadata);
       } else {
         blobObserver.onError(io.grpc.Status.NOT_FOUND.asException());
       }
@@ -151,11 +152,11 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+  public ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests) {
     return immediateFuture(getAll(digests));
   }
 
-  synchronized Iterable<Response> getAll(Iterable<Digest> digests) {
+  synchronized List<Response> getAll(Iterable<Digest> digests) {
     return getAll(
         digests,
         (digest) -> {
@@ -167,7 +168,7 @@ public class MemoryCAS implements ContentAddressableStorage {
         });
   }
 
-  public static Iterable<Response> getAll(
+  public static List<Response> getAll(
       Iterable<Digest> digests, Function<Digest, ByteString> blobGetter) {
     ImmutableList.Builder<Response> responses = ImmutableList.builder();
     for (Digest digest : digests) {
@@ -195,7 +196,7 @@ public class MemoryCAS implements ContentAddressableStorage {
         response.setData(blob).setStatus(OK);
       }
     } catch (Throwable t) {
-      logger.log(Level.SEVERE, "error getting " + DigestUtil.toString(digest), t);
+      log.log(Level.SEVERE, "error getting " + DigestUtil.toString(digest), t);
       response.setStatus(statusFromThrowable(t));
     }
     return response.build();
@@ -238,8 +239,9 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
-    return writes.get(digest, uuid);
+  public Write getWrite(
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+    return writes.get(compressor, digest, uuid);
   }
 
   @Override
@@ -277,7 +279,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     }
 
     if (sizeInBytes > maxSizeInBytes) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format(
               "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
@@ -308,16 +310,20 @@ public class MemoryCAS implements ContentAddressableStorage {
   @GuardedBy("this")
   private void expireEntry(Entry e) {
     Digest digest = DigestUtil.buildDigest(e.key, e.value.size());
-    logger.log(Level.INFO, "MemoryLRUCAS: expiring " + DigestUtil.toString(digest));
+    log.log(Level.INFO, "MemoryLRUCAS: expiring " + DigestUtil.toString(digest));
     if (delegate != null) {
       try {
         Write write =
-            delegate.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+            delegate.getWrite(
+                Compressor.Value.IDENTITY,
+                digest,
+                UUID.randomUUID(),
+                RequestMetadata.getDefaultInstance());
         try (OutputStream out = write.getOutput(1, MINUTES, () -> {})) {
           e.value.getData().writeTo(out);
         }
       } catch (IOException ioEx) {
-        logger.log(
+        log.log(
             Level.SEVERE, String.format("error delegating %s", DigestUtil.toString(digest)), ioEx);
       }
     }

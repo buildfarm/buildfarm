@@ -40,19 +40,19 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import jnr.constants.platform.OpenFlags;
 import jnr.ffi.LibraryLoader;
 import jnr.ffi.Pointer;
 import jnr.posix.FileStat;
 import jnr.posix.POSIX;
+import lombok.extern.java.Log;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.IOUtils;
 
+@Log
 public class Utils {
-  private static final Logger logger = Logger.getLogger(Utils.class.getName());
 
   @SuppressWarnings("Guava")
   private static final Supplier<LibC> libc =
@@ -158,7 +158,7 @@ public class Utils {
     Pointer DIR = libc.opendir(path.toString());
 
     if (DIR == null) {
-      logger.log(Level.SEVERE, "libc.opendir failed: " + path.toString());
+      log.log(Level.SEVERE, "libc.opendir failed: " + path.toString());
       return dirents;
     }
 
@@ -490,12 +490,12 @@ public class Utils {
                     Path reference = Files.readSymbolicLink(path);
                     paths.add(reference);
                   } catch (IOException e) {
-                    logger.log(Level.WARNING, "Could not derive symbolic link: ", e);
+                    log.log(Level.WARNING, "Could not derive symbolic link: ", e);
                   }
                 }
               });
     } catch (Exception e) {
-      logger.log(Level.WARNING, "Could not traverse dir: ", e);
+      log.log(Level.WARNING, "Could not traverse dir: ", e);
     }
 
     return paths;

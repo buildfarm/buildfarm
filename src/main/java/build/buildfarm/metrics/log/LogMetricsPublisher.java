@@ -15,38 +15,38 @@
 package build.buildfarm.metrics.log;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.metrics.AbstractMetricsPublisher;
-import build.buildfarm.v1test.MetricsConfig;
+import build.buildfarm.v1test.OperationRequestMetadata;
 import com.google.longrunning.Operation;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class LogMetricsPublisher extends AbstractMetricsPublisher {
-  private static final Logger logger = Logger.getLogger(LogMetricsPublisher.class.getName());
+
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private static Level logLevel;
 
-  public LogMetricsPublisher(MetricsConfig metricsConfig) {
-    super(metricsConfig.getClusterId());
-    if (!metricsConfig.getLogMetricsConfig().getLogLevel().isEmpty()) {
-      logLevel = Level.parse(metricsConfig.getLogMetricsConfig().getLogLevel());
+  public LogMetricsPublisher() {
+    super(configs.getServer().getClusterId());
+    if (configs.getServer().getMetrics().getLogLevel() != null) {
+      logLevel = Level.parse(configs.getServer().getMetrics().getLogLevel().name());
     } else {
       logLevel = Level.FINEST;
     }
   }
 
-  public LogMetricsPublisher() {
-    super();
-  }
-
   @Override
   public void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata) {
     try {
-      logger.log(
-          logLevel,
-          formatRequestMetadataToJson(populateRequestMetadata(operation, requestMetadata)));
+      OperationRequestMetadata metadata = populateRequestMetadata(operation, requestMetadata);
+      if (metadata.getDone()) {
+        log.log(logLevel, formatRequestMetadataToJson(metadata));
+      }
     } catch (Exception e) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format("Could not publish request metadata to LOG for %s.", operation.getName()),
           e);
@@ -55,6 +55,6 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
 
   @Override
   public void publishMetric(String metricName, Object metricValue) {
-    logger.log(Level.INFO, String.format("%s: %s", metricName, metricValue.toString()));
+    log.log(Level.INFO, String.format("%s: %s", metricName, metricValue.toString()));
   }
 }

@@ -1,5 +1,5 @@
 #!/bin/bash
-# This is a CI integation test for a typical "shard deployment" of buildfarm.
+# This is a CI integation test for a typical eployment of buildfarm.
 # It ensures that the buildfarm services can startup and function as expected given PR changes.
 # All of the needed buildfarm services are initialized (redis, server, worker).
 # We ensure that the system can build a set of bazel targets.
@@ -16,7 +16,6 @@ docker run \
     -v /tmp:/tmp \
     --network host  \
     --env CACHE_TEST=$CACHE_TEST \
-    --env TEST_SHARD=$TEST_SHARD \
     --env RUN_TEST=$RUN_TEST \
     --env TEST_ARG1=$TEST_ARG1 \
     --env TEST_ARG2=$TEST_ARG2 \

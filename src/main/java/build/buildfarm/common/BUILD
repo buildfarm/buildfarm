@@ -4,8 +4,8 @@ java_library(
         "*.java",
         "function/*.java",
         "io/*.java",
-        "redis/*.java",
     ]),
+    plugins = [":lombok"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common/resources",
@@ -30,7 +30,16 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_prometheus_simpleclient",
         "@maven//:org_apache_commons_commons_compress",
+        "@maven//:org_projectlombok_lombok",
         "@maven//:org_threeten_threetenbp",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
+)
+
+java_plugin(
+    name = "lombok",
+    generates_api = True,
+    processor_class = "lombok.launch.AnnotationProcessorHider$AnnotationProcessor",
+    visibility = ["//visibility:public"],
+    deps = ["@maven//:org_projectlombok_lombok"],
 )

@@ -22,17 +22,21 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
+import build.buildfarm.common.resources.BlobInformation;
+import build.buildfarm.common.resources.DownloadBlobRequest;
+import build.buildfarm.common.resources.ResourceParser;
+import build.buildfarm.common.resources.UploadBlobRequest;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import com.google.bytestream.ByteStreamGrpc;
@@ -116,10 +120,12 @@ public class GrpcCAS implements ContentAddressableStorage {
         /* retryService=*/ null);
   }
 
-  private String getBlobName(Digest digest) {
-    return String.format(
-        "%sblobs/%s",
-        instanceName.isEmpty() ? "" : (instanceName + "/"), DigestUtil.toString(digest));
+  private String readResourceName(Compressor.Value compressor, Digest digest) {
+    return ResourceParser.downloadResourceName(
+        DownloadBlobRequest.newBuilder()
+            .setInstanceName(instanceName)
+            .setBlob(BlobInformation.newBuilder().setCompressor(compressor).setDigest(digest))
+            .build());
   }
 
   @Override
@@ -169,6 +175,7 @@ public class GrpcCAS implements ContentAddressableStorage {
 
   @Override
   public void get(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long count,
@@ -176,7 +183,7 @@ public class GrpcCAS implements ContentAddressableStorage {
       RequestMetadata requestMetadata) {
     ReadRequest request =
         ReadRequest.newBuilder()
-            .setResourceName(getBlobName(digest))
+            .setResourceName(readResourceName(compressor, digest))
             .setReadOffset(offset)
             .setReadLimit(count)
             .build();
@@ -203,12 +210,13 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) throws IOException {
-    return newStreamInput(getBlobName(digest), offset);
+  public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
+      throws IOException {
+    return newStreamInput(readResourceName(compressor, digest), offset);
   }
 
   @Override
-  public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+  public ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests) {
     // FIXME limit to 4MiB total response
     return transform(
         casFutureStub
@@ -224,7 +232,8 @@ public class GrpcCAS implements ContentAddressableStorage {
 
   @Override
   public Blob get(Digest digest) {
-    try (InputStream in = newStreamInput(getBlobName(digest), /* offset=*/ 0)) {
+    try (InputStream in =
+        newStreamInput(readResourceName(Compressor.Value.IDENTITY, digest), /* offset=*/ 0)) {
       ByteString content = ByteString.readFrom(in);
       if (content.size() != digest.getSizeBytes()) {
         throw new IOException(
@@ -242,12 +251,17 @@ public class GrpcCAS implements ContentAddressableStorage {
   public static Write newWrite(
       Channel channel,
       String instanceName,
+      Compressor.Value compressor,
       Digest digest,
       UUID uuid,
       RequestMetadata requestMetadata) {
-    HashCode hash = HashCode.fromString(digest.getHash());
     String resourceName =
-        ByteStreamUploader.uploadResourceName(instanceName, uuid, hash, digest.getSizeBytes());
+        ResourceParser.uploadResourceName(
+            UploadBlobRequest.newBuilder()
+                .setInstanceName(instanceName)
+                .setUuid(uuid.toString())
+                .setBlob(BlobInformation.newBuilder().setDigest(digest).setCompressor(compressor))
+                .build());
     Supplier<ByteStreamBlockingStub> bsBlockingStub =
         Suppliers.memoize(
             () ->
@@ -268,8 +282,9 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
-    return newWrite(channel, instanceName, digest, uuid, requestMetadata);
+  public Write getWrite(
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+    return newWrite(channel, instanceName, compressor, digest, uuid, requestMetadata);
   }
 
   @Override
@@ -287,7 +302,12 @@ public class GrpcCAS implements ContentAddressableStorage {
 
   @Override
   public void put(Blob blob, Runnable onExpiration) throws InterruptedException {
-    put(blob);
+    try {
+      put(blob);
+    } catch (RuntimeException e) {
+      onExpiration.run();
+      throw e;
+    }
     synchronized (onExpirations) {
       onExpirations.put(blob.getDigest(), onExpiration);
     }

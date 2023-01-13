@@ -41,11 +41,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 
+@Log
 public class InputFetcher implements Runnable {
-  private static final Logger logger = Logger.getLogger(InputFetcher.class.getName());
 
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
@@ -162,7 +162,7 @@ public class InputFetcher implements Runnable {
 
   private long fetchPolled(Stopwatch stopwatch) throws InterruptedException {
     String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
-    logger.log(Level.FINE, format("fetching inputs: %s", operationName));
+    log.log(Level.FINE, format("fetching inputs: %s", operationName));
 
     ExecutedActionMetadata.Builder executedAction =
         operationContext
@@ -178,7 +178,7 @@ public class InputFetcher implements Runnable {
       queuedOperation = workerContext.getQueuedOperation(operationContext.queueEntry);
       List<String> constraintFailures = validateQueuedOperation(queuedOperation);
       if (!constraintFailures.isEmpty()) {
-        logger.log(
+        log.log(
             Level.SEVERE,
             format("invalid queued operation: %s", String.join(" ", constraintFailures)));
         owner.error().put(operationContext);
@@ -194,7 +194,7 @@ public class InputFetcher implements Runnable {
               queuedOperation.getAction(),
               queuedOperation.getCommand());
     } catch (IOException e) {
-      logger.log(Level.SEVERE, format("error creating exec dir for %s", operationName), e);
+      log.log(Level.SEVERE, format("error creating exec dir for %s", operationName), e);
       owner.error().put(operationContext);
       return 0;
     }
@@ -227,7 +227,7 @@ public class InputFetcher implements Runnable {
         try {
           workerContext.destroyExecDir(execDir);
         } catch (IOException e) {
-          logger.log(
+          log.log(
               Level.SEVERE,
               format("error deleting exec dir for %s after interrupt", operationName));
         }
@@ -265,8 +265,7 @@ public class InputFetcher implements Runnable {
       }
     } else {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
-      logger.log(
-          Level.FINE, "InputFetcher: Operation " + operationName + " Failed to claim output");
+      log.log(Level.FINE, "InputFetcher: Operation " + operationName + " Failed to claim output");
 
       owner.error().put(operationContext);
     }
@@ -284,16 +283,16 @@ public class InputFetcher implements Runnable {
       try {
         owner.error().put(operationContext);
       } catch (InterruptedException errorEx) {
-        logger.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
+        log.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
       } finally {
         Thread.currentThread().interrupt();
       }
     } catch (Exception e) {
-      logger.log(Level.WARNING, format("error while fetching inputs: %s", operationName), e);
+      log.log(Level.WARNING, format("error while fetching inputs: %s", operationName), e);
       try {
         owner.error().put(operationContext);
       } catch (InterruptedException errorEx) {
-        logger.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
+        log.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
       }
       throw e;
     } finally {

@@ -33,6 +33,13 @@ public class NetworkLimits {
   public boolean blockNetwork = false;
 
   /**
+   * @field fakeHostname
+   * @brief Make hostname 'localhost' during sandbox execution.
+   * @details Under the sandbox, indicate that the hostname should be 'localhost'.
+   */
+  public boolean fakeHostname = false;
+
+  /**
    * @field description
    * @brief Description explaining why settings were chosen.
    * @details This can be used to debug execution behavior.

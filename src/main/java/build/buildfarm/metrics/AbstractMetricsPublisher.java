@@ -27,10 +27,10 @@ import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public abstract class AbstractMetricsPublisher implements MetricsPublisher {
-  private static final Logger logger = Logger.getLogger(AbstractMetricsPublisher.class.getName());
 
   private static final Counter actionsCounter =
       Counter.build().name("actions").help("Number of actions.").register();
@@ -151,7 +151,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
       }
       return operationRequestMetadata;
     } catch (Exception e) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format("Could not populate request metadata for %s.", operation.getName()),
           e);
@@ -173,7 +173,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
             .usingTypeRegistry(typeRegistry)
             .omittingInsignificantWhitespace()
             .print(operationRequestMetadata);
-    logger.log(Level.FINE, "{}", formattedRequestMetadata);
+    log.log(Level.FINE, "{}", formattedRequestMetadata);
     return formattedRequestMetadata;
   }
 }

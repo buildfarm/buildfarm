@@ -23,7 +23,7 @@ analytics_settings(False)
 custom_build(
   ref='buildfarm-shard-worker-image',
   command=(
-    'bazel build --javabase=@bazel_tools//tools/jdk:remote_jdk11 //:buildfarm-shard-worker.tar && ' +
+    'bazelisk build --javabase=@bazel_tools//tools/jdk:remote_jdk11 //:buildfarm-shard-worker.tar && ' +
     'docker load < bazel-bin/buildfarm-shard-worker.tar && ' +
     'docker tag bazel:buildfarm-shard-worker $EXPECTED_REF'
 
@@ -33,7 +33,7 @@ custom_build(
 custom_build(
   ref='buildfarm-server-image',
   command=(
-    'bazel build --javabase=@bazel_tools//tools/jdk:remote_jdk11 //:buildfarm-server.tar && ' +
+    'bazelisk build --javabase=@bazel_tools//tools/jdk:remote_jdk11 //:buildfarm-server.tar && ' +
     'docker load < bazel-bin/buildfarm-server.tar && ' +
     'docker tag bazel:buildfarm-server $EXPECTED_REF'
 
@@ -41,19 +41,19 @@ custom_build(
   deps=bazel_sourcefile_deps('//:buildfarm-server.tar')
 )
 
-local_resource("unit tests",'bazel test --javabase=@bazel_tools//tools/jdk:remote_jdk11 //src/test/java/...')
+local_resource("unit tests",'bazelisk test --javabase=@bazel_tools//tools/jdk:remote_jdk11 //src/test/java/...')
 
 # Object definitions for kubernetes.
 # Tilt will automatically correlate them to any above docker images.
-k8s_yaml(local('bazel run //kubernetes/deployments:kubernetes'))
-k8s_yaml(local('bazel run //kubernetes/deployments:server'))
-k8s_yaml(local('bazel run //kubernetes/deployments:shard-worker'))
-k8s_yaml(local('bazel run //kubernetes/deployments:redis-cluster'))
-k8s_yaml(local('bazel run //kubernetes/services:grafana'))
-k8s_yaml(local('bazel run //kubernetes/services:redis-cluster'))
-k8s_yaml(local('bazel run //kubernetes/services:shard-worker'))
-k8s_yaml(local('bazel run //kubernetes/services:open-telemetry'))
-k8s_yaml(local('bazel run //kubernetes/services:jaeger'))
+k8s_yaml(local('bazelisk run //kubernetes/deployments:kubernetes'))
+k8s_yaml(local('bazelisk run //kubernetes/deployments:server'))
+k8s_yaml(local('bazelisk run //kubernetes/deployments:shard-worker'))
+k8s_yaml(local('bazelisk run //kubernetes/deployments:redis-cluster'))
+k8s_yaml(local('bazelisk run //kubernetes/services:grafana'))
+k8s_yaml(local('bazelisk run //kubernetes/services:redis-cluster'))
+k8s_yaml(local('bazelisk run //kubernetes/services:shard-worker'))
+k8s_yaml(local('bazelisk run //kubernetes/services:open-telemetry'))
+k8s_yaml(local('bazelisk run //kubernetes/services:jaeger'))
 
 # Expose endpoints outside the kubernetes cluster.
 k8s_resource('server', port_forwards=[8980,9092], labels="buildfarm-cluster")

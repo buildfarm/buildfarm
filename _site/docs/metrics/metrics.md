@@ -2,7 +2,7 @@
 layout: default
 title: Metrics
 has_children: true
-nav_order: 4
+nav_order: 7
 ---
 
 ## Prometheus Configuration
@@ -10,9 +10,8 @@ nav_order: 4
 To enable emitting of Prometheus metrics, add the following configuration to your configuration file:
 
 ```
-prometheus_config: {
-  port: 9090
-}
+server:
+  prometheusPort: 9090
 ```
 
 ## Available Prometheus Metrics
@@ -37,9 +36,13 @@ Gauge of a number of items in prequeue
 
 Counter for number of CAS misses from worker-worker
 
+**queue_failure**
+
+Counter for number of operations that failed to queue
+
 **requeue_failure**
 
-Counterfor number of operations that failed to requeue
+Counter for number of operations that failed to requeue
 
 **dispatched_operations_size**
 
@@ -191,6 +194,8 @@ The total number of entries in the worker's CAS
 
 Java interceptors can be used to monitor Grpc services using Prometheus.  To enable [these metrics](https://github.com/grpc-ecosystem/java-grpc-prometheus), add the following configuration to your server:
 ```
-grpc_metrics: {
-  enabled: True
+server:
+  grpcMetrics:
+    enabled: true
+    provideLatencyHistograms: false
 ```

@@ -32,6 +32,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -59,11 +60,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 
+@Log
 class CFCExecFileSystem implements ExecFileSystem {
-  private static final Logger logger = Logger.getLogger(Worker.class.getName());
 
   private final Path root;
   private final CASFileCache fileCache;
@@ -106,7 +107,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     try {
       dirents = readdir(root, /* followSymlinks= */ false, Files.getFileStore(root));
     } catch (IOException e) {
-      logger.log(Level.SEVERE, "error reading directory " + root.toString(), e);
+      log.log(Level.SEVERE, "error reading directory " + root.toString(), e);
     }
 
     ImmutableList.Builder<ListenableFuture<Void>> removeDirectoryFutures = ImmutableList.builder();
@@ -137,13 +138,13 @@ class CFCExecFileSystem implements ExecFileSystem {
   @Override
   public void stop() {
     if (!shutdownAndAwaitTermination(fetchService, 1, MINUTES)) {
-      logger.log(Level.SEVERE, "could not terminate fetchService");
+      log.log(Level.SEVERE, "could not terminate fetchService");
     }
     if (!shutdownAndAwaitTermination(removeDirectoryService, 1, MINUTES)) {
-      logger.log(Level.SEVERE, "could not terminate removeDirectoryService");
+      log.log(Level.SEVERE, "could not terminate removeDirectoryService");
     }
     if (!shutdownAndAwaitTermination(accessRecorder, 1, MINUTES)) {
-      logger.log(Level.SEVERE, "could not terminate accessRecorder");
+      log.log(Level.SEVERE, "could not terminate accessRecorder");
     }
   }
 
@@ -158,8 +159,9 @@ class CFCExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) throws IOException {
-    return fileCache.newInput(digest, offset);
+  public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
+      throws IOException {
+    return fileCache.newInput(compressor, digest, offset);
   }
 
   private ListenableFuture<Void> putSymlink(Path path, SymlinkNode symlinkNode) {
@@ -365,8 +367,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
-    logger.log(
-        Level.FINE, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
+    log.log(Level.FINE, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
     Iterable<ListenableFuture<Void>> fetchedFutures =
         fetchInputs(
             execDir,
@@ -418,7 +419,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     rootInputFiles.put(execDir, inputFiles.build());
     rootInputDirectories.put(execDir, inputDirectories.build());
 
-    logger.log(
+    log.log(
         Level.FINE,
         "ExecFileSystem::createExecDir(" + operationName + ") stamping output directories");
     boolean stamped = false;

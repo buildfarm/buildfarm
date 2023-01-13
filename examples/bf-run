@@ -9,13 +9,13 @@ start_buildfarm () {
 
   # Run Buildfarm Server Container
   docker run -d --name buildfarm-server -v $(pwd)/examples:/var/lib/buildfarm-server -p 8980:8980 --network host \
-  80dw/buildfarm-server:latest /var/lib/buildfarm-server/shard-server.config.example -p 8980
+  80dw/buildfarm-server:latest /var/lib/buildfarm-server/config.minimal.yml -p 8980
 
   # Run Buildfarm Shard Worker Container
   mkdir -p /tmp/worker
   docker run -d --name buildfarm-worker --privileged -v $(pwd)/examples:/var/lib/buildfarm-shard-worker \
   -v /tmp/worker:/tmp/worker -p 8981:8981 --network host \
-  80dw/buildfarm-worker:latest /var/lib/buildfarm-shard-worker/shard-worker.config.example --public_name=localhost:8981
+  80dw/buildfarm-worker:latest /var/lib/buildfarm-shard-worker/config.minimal.yml --public_name=localhost:8981
 
   echo "Buildfarm cluster started with endpoint: localhost:8980"
 }

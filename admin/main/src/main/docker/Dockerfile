@@ -1,4 +1,4 @@
-FROM amazoncorretto:17
+FROM amazoncorretto:19
 USER root
 VOLUME /tmp
 VOLUME /var/lib
