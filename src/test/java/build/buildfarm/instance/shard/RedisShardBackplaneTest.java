@@ -319,7 +319,8 @@ public class RedisShardBackplaneTest {
     backplane.deleteOperation(opName);
 
     verify(mockJedisClusterFactory, times(1)).get();
-    verify(jedisCluster, times(1)).hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName);
+    verify(jedisCluster, times(1))
+        .hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName);
     verify(jedisCluster, times(1)).del(operationName(opName));
     verifyChangePublished(jedisCluster);
   }
