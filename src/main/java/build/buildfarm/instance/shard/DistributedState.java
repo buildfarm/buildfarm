@@ -77,6 +77,14 @@ public class DistributedState {
   public OperationQueue operationQueue;
 
   /**
+   * @field operations
+   * @brief Operations involved in action execution on the system.
+   * @details We keep track of them in the distributed state to avoid them getting lost if a
+   *     particular machine goes down.
+   */
+  public RedisMap operations;
+
+  /**
    * @field processingOperations
    * @brief Operations that are being processed from the prequeue to the operation queue.
    * @details We keep track of them in the distributed state to avoid them getting lost if a
