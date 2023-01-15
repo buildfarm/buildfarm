@@ -14,9 +14,9 @@
 
 package build.buildfarm.instance.shard;
 
-import build.buildfarm.common.redis.BalancedRedisQueue;
-import build.buildfarm.common.distributed.DistributedMap;
 import build.buildfarm.common.distributed.DistributedHashMap;
+import build.buildfarm.common.distributed.DistributedMap;
+import build.buildfarm.common.redis.BalancedRedisQueue;
 
 /**
  * @class DistributedState

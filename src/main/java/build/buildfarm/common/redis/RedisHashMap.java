@@ -14,11 +14,11 @@
 
 package build.buildfarm.common.redis;
 
+import build.buildfarm.common.distributed.DistributedHashMap;
 import java.util.Map;
 import java.util.Set;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
-import build.buildfarm.common.distributed.DistributedHashMap;
 
 /**
  * @class RedisHashMap

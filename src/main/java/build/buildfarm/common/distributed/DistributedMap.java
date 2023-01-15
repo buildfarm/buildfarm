@@ -14,19 +14,16 @@
 
 package build.buildfarm.common.distributed;
 
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.StreamSupport;
 
 /**
  * @class DistributedMap
  * @brief A distributed map.
- * @details A distributed map is an implementation of a map data structure which can be shared across a distributed system.
- *     For example, implementations of this interface might choose to use redis, hazelcast, postgres, etc.
+ * @details A distributed map is an implementation of a map data structure which can be shared
+ *     across a distributed system. For example, implementations of this interface might choose to
+ *     use redis, hazelcast, postgres, etc.
  */
-public interface DistributedMap <DistributedClient> {
+public interface DistributedMap<DistributedClient> {
 
   /**
    * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
@@ -118,5 +115,4 @@ public interface DistributedMap <DistributedClient> {
    * @note Suggested return identifier: size.
    */
   public int size(DistributedClient client);
-
 }

@@ -20,10 +20,11 @@ import java.util.Set;
 /**
  * @class DistributedHashMap
  * @brief A distributed hashmap.
- * @details A distributed hashmap is an implementation of a hashmap data structure which can be shared across a distributed system.
- *     For example, implementations of this interface might choose to use redis, hazelcast, postgres, etc.
+ * @details A distributed hashmap is an implementation of a hashmap data structure which can be
+ *     shared across a distributed system. For example, implementations of this interface might
+ *     choose to use redis, hazelcast, postgres, etc.
  */
-public interface DistributedHashMap <DistributedClient> {
+public interface DistributedHashMap<DistributedClient> {
 
   /**
    * @brief Set key to hold the string value.

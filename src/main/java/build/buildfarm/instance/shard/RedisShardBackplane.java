@@ -428,7 +428,8 @@ public class RedisShardBackplane implements Backplane {
             .map(RedisShardBackplane::parseOperationChannel)
             .collect(Collectors.toList());
 
-    Iterable<Map.Entry<String, String>> entries = state.operations.get(jedis, operationChannelNames);
+    Iterable<Map.Entry<String, String>> entries =
+        state.operations.get(jedis, operationChannelNames);
     for (Map.Entry<String, String> entry : entries) {
       String json = entry.getValue();
       Operation operation = json == null ? null : RedisShardBackplane.parseOperationJson(json);
@@ -714,7 +715,8 @@ public class RedisShardBackplane implements Backplane {
   private Set<String> fetchAndExpireWorkers(JedisCluster jedis, long now) {
     Set<String> returnWorkers = Sets.newConcurrentHashSet();
     ImmutableList.Builder<ShardWorker> invalidWorkers = ImmutableList.builder();
-    Iterable<Map.Entry<String, String>> entries = state.executeAndStorageWorkers.asMap(jedis).entrySet();
+    Iterable<Map.Entry<String, String>> entries =
+        state.executeAndStorageWorkers.asMap(jedis).entrySet();
     for (Map.Entry<String, String> entry : entries) {
       String json = entry.getValue();
       String name = entry.getKey();
@@ -1013,7 +1015,6 @@ public class RedisShardBackplane implements Backplane {
     ImmutableMap.Builder<String, String> builder = new ImmutableMap.Builder<>();
     client.run(
         jedis -> {
-          
           Map<String, String> entries = state.dispatchedOperations.asMap(jedis);
           for (Map.Entry<String, String> entry : entries.entrySet()) {
             builder.put(entry.getKey(), entry.getValue());

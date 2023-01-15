@@ -15,6 +15,7 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.ScanCount;
+import build.buildfarm.common.distributed.DistributedMap;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +24,6 @@ import java.util.stream.StreamSupport;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.Response;
-import build.buildfarm.common.distributed.DistributedMap;
 
 /**
  * @class RedisMap
