@@ -23,7 +23,7 @@ import java.util.Map;
  *     across a distributed system. For example, implementations of this interface might choose to
  *     use redis, hazelcast, postgres, etc.
  */
-interface DistributedMap<DistributedClient> {
+public interface DistributedMap<DistributedClient> {
 
   /**
    * @brief Set key to hold the string value and set key to timeout after a given number of seconds.

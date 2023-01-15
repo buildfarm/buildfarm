@@ -24,7 +24,7 @@ import java.util.Set;
  *     shared across a distributed system. For example, implementations of this interface might
  *     choose to use redis, hazelcast, postgres, etc.
  */
-interface DistributedHashMap<DistributedClient> {
+public interface DistributedHashMap<DistributedClient> {
 
   /**
    * @brief Set key to hold the string value.
