@@ -24,7 +24,7 @@ import java.util.Set;
  *     shared across a distributed system. For example, implementations of this interface might
  *     choose to use redis, hazelcast, postgres, etc.
  */
-public interface DistributedHashMap<DistributedClient> {
+interface DistributedHashMap<DistributedClient> {
 
   /**
    * @brief Set key to hold the string value.
@@ -35,7 +35,7 @@ public interface DistributedHashMap<DistributedClient> {
    * @return Whether a new key was inserted. If a key is overwritten with a new value, this would be
    *     false.
    */
-  public boolean insert(DistributedClient client, String key, String value);
+  boolean insert(DistributedClient client, String key, String value);
 
   /**
    * @brief Add key/value only if key doesn't exist.
@@ -45,7 +45,7 @@ public interface DistributedHashMap<DistributedClient> {
    * @param value The value for the key.
    * @return Whether a new key was inserted. If a key already exists, this would be false.
    */
-  public boolean insertIfMissing(DistributedClient client, String key, String value);
+  boolean insertIfMissing(DistributedClient client, String key, String value);
 
   /**
    * @brief Checks whether key exists
@@ -54,7 +54,7 @@ public interface DistributedHashMap<DistributedClient> {
    * @param key The name of the key.
    * @return Whether the key exists or not in the map.
    */
-  public boolean exists(DistributedClient client, String key);
+  boolean exists(DistributedClient client, String key);
 
   /**
    * @brief Remove a key from the map.
@@ -63,7 +63,7 @@ public interface DistributedHashMap<DistributedClient> {
    * @param key The name of the key.
    * @return Whether the key was removed.
    */
-  public boolean remove(DistributedClient client, String key);
+  boolean remove(DistributedClient client, String key);
 
   /**
    * @brief Remove all given keys from the map.
@@ -71,7 +71,7 @@ public interface DistributedHashMap<DistributedClient> {
    * @param client A client used by the implementation.
    * @param key The names of the keys.
    */
-  public void remove(DistributedClient client, Iterable<String> keys);
+  void remove(DistributedClient client, Iterable<String> keys);
 
   /**
    * @brief Get the size of the map.
@@ -79,7 +79,7 @@ public interface DistributedHashMap<DistributedClient> {
    * @return The size of the map.
    * @note Suggested return identifier: size.
    */
-  public long size(DistributedClient client);
+  long size(DistributedClient client);
 
   /**
    * @brief Get all of the keys from the hashmap.
@@ -87,7 +87,7 @@ public interface DistributedHashMap<DistributedClient> {
    * @param client A client used by the implementation.
    * @return The hashmap keys represented as a set.
    */
-  public Set<String> keys(DistributedClient client);
+  Set<String> keys(DistributedClient client);
 
   /**
    * @brief Convert the redis hashmap to a java map.
@@ -95,5 +95,5 @@ public interface DistributedHashMap<DistributedClient> {
    * @param client A client used by the implementation.
    * @return The hashmap represented as a java map.
    */
-  public Map<String, String> asMap(DistributedClient client);
+  Map<String, String> asMap(DistributedClient client);
 }

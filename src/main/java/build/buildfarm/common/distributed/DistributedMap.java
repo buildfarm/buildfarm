@@ -23,7 +23,7 @@ import java.util.Map;
  *     across a distributed system. For example, implementations of this interface might choose to
  *     use redis, hazelcast, postgres, etc.
  */
-public interface DistributedMap<DistributedClient> {
+interface DistributedMap<DistributedClient> {
 
   /**
    * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
@@ -34,7 +34,7 @@ public interface DistributedMap<DistributedClient> {
    * @param timeout_s Timeout to expire the entry. (units: seconds (s))
    * @note Overloaded.
    */
-  public void insert(DistributedClient client, String key, String value, int timeout_s);
+  void insert(DistributedClient client, String key, String value, int timeout_s);
 
   /**
    * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
@@ -45,7 +45,7 @@ public interface DistributedMap<DistributedClient> {
    * @param timeout_s Timeout to expire the entry. (units: seconds (s))
    * @note Overloaded.
    */
-  public void insert(DistributedClient client, String key, String value, long timeout_s);
+  void insert(DistributedClient client, String key, String value, long timeout_s);
 
   /**
    * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
@@ -55,7 +55,7 @@ public interface DistributedMap<DistributedClient> {
    * @param value The value for the key.
    * @note Overloaded.
    */
-  public void insert(DistributedClient client, String key, String value);
+  void insert(DistributedClient client, String key, String value);
 
   /**
    * @brief Remove a key from the map.
@@ -64,7 +64,7 @@ public interface DistributedMap<DistributedClient> {
    * @param key The name of the key.
    * @note Overloaded.
    */
-  public void remove(DistributedClient client, String key);
+  void remove(DistributedClient client, String key);
 
   /**
    * @brief Remove multiple keys from the map.
@@ -73,7 +73,7 @@ public interface DistributedMap<DistributedClient> {
    * @param keys The name of the keys.
    * @note Overloaded.
    */
-  public void remove(DistributedClient client, Iterable<String> keys);
+  void remove(DistributedClient client, Iterable<String> keys);
 
   /**
    * @brief Get the value of the key.
@@ -84,7 +84,7 @@ public interface DistributedMap<DistributedClient> {
    * @note Overloaded.
    * @note Suggested return identifier: value.
    */
-  public String get(DistributedClient client, String key);
+  String get(DistributedClient client, String key);
 
   /**
    * @brief Get the values of the keys.
@@ -95,7 +95,7 @@ public interface DistributedMap<DistributedClient> {
    * @note Overloaded.
    * @note Suggested return identifier: values.
    */
-  public Iterable<Map.Entry<String, String>> get(DistributedClient client, Iterable<String> keys);
+  Iterable<Map.Entry<String, String>> get(DistributedClient client, Iterable<String> keys);
 
   /**
    * @brief whether the key exists
@@ -105,7 +105,7 @@ public interface DistributedMap<DistributedClient> {
    * @return Whether the key exists or not.
    * @note Suggested return identifier: exists.
    */
-  public boolean exists(DistributedClient client, String key);
+  boolean exists(DistributedClient client, String key);
 
   /**
    * @brief Get the size of the map.
@@ -114,5 +114,5 @@ public interface DistributedMap<DistributedClient> {
    * @return The size of the map.
    * @note Suggested return identifier: size.
    */
-  public int size(DistributedClient client);
+  int size(DistributedClient client);
 }
