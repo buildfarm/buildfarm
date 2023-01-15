@@ -7,7 +7,7 @@ User=root
 Group=root
 Restart=always
 WorkingDirectory=/usr/local/buildfarm-server
-ExecStart=/bin/sh -c 'exec /usr/bin/java -Djava.util.logging.config.file=/usr/local/buildfarm-server/logging.properties \
+ExecStart=/bin/sh -c 'exec /usr/bin/java -Dlogging.config=file:/usr/local/buildfarm-server/logging.properties \
           -jar /usr/local/buildfarm-server/buildfarm-server_deploy.jar \
           /etc/buildfarm-server/config/server.config >>/var/log/buildfarm-server/server.log 2>&1'
 Restart=on-abort

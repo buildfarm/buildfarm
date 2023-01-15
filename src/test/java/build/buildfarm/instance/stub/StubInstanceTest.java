@@ -28,6 +28,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageImplBase;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
@@ -372,7 +373,12 @@ public class StubInstanceTest {
         Digest.newBuilder().setHash("unavailable-blob-name").setSizeBytes(1).build();
     try (InputStream in =
         instance.newBlobInput(
-            unavailableDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
+            Compressor.Value.IDENTITY,
+            unavailableDigest,
+            0,
+            1,
+            SECONDS,
+            RequestMetadata.getDefaultInstance())) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       ioException = e;
@@ -410,7 +416,13 @@ public class StubInstanceTest {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     Digest delayedDigest = Digest.newBuilder().setHash("delayed-blob-name").setSizeBytes(1).build();
     try (InputStream in =
-        instance.newBlobInput(delayedDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
+        instance.newBlobInput(
+            Compressor.Value.IDENTITY,
+            delayedDigest,
+            0,
+            1,
+            SECONDS,
+            RequestMetadata.getDefaultInstance())) {
       ByteStreams.copy(in, out);
     }
     assertThat(ByteString.copyFrom(out.toByteArray())).isEqualTo(content);
@@ -432,7 +444,13 @@ public class StubInstanceTest {
     Instance instance = newStubInstance("input-stream-deadline-exceeded");
     Digest timeoutDigest = Digest.newBuilder().setHash("timeout-blob-name").setSizeBytes(1).build();
     try (InputStream in =
-        instance.newBlobInput(timeoutDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
+        instance.newBlobInput(
+            Compressor.Value.IDENTITY,
+            timeoutDigest,
+            0,
+            1,
+            SECONDS,
+            RequestMetadata.getDefaultInstance())) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       ioException = e;

@@ -47,7 +47,7 @@
 		<dependency>
 			<groupId>com.google.protobuf</groupId>
 			<artifactId>protobuf-java</artifactId>
-			<version>3.16.1</version>
+			<version>3.16.3</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.protobuf</groupId>
@@ -94,7 +94,7 @@
 		<dependency>
 			<groupId>org.json</groupId>
 			<artifactId>json</artifactId>
-			<version>20080701</version>
+			<version>20180130</version>
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>

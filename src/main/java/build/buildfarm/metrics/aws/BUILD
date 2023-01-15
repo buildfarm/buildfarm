@@ -1,8 +1,10 @@
 java_library(
     name = "aws",
     srcs = glob(["*.java"]),
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
+        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/metrics",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
@@ -14,6 +16,7 @@ java_library(
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:org_projectlombok_lombok",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )

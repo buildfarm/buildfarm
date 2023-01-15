@@ -17,6 +17,7 @@ package build.buildfarm.instance;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
@@ -49,7 +50,6 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 
 public interface Instance {
   String getName();
@@ -70,9 +70,10 @@ public interface Instance {
 
   boolean containsBlob(Digest digest, Digest.Builder result, RequestMetadata requestMetadata);
 
-  String getBlobName(Digest blobDigest);
+  String readResourceName(Compressor.Value compressor, Digest blobDigest);
 
   void getBlob(
+      Compressor.Value compressor,
       Digest blobDigest,
       long offset,
       long count,
@@ -80,6 +81,7 @@ public interface Instance {
       RequestMetadata requestMetadata);
 
   InputStream newBlobInput(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long deadlineAfter,
@@ -87,11 +89,12 @@ public interface Instance {
       RequestMetadata requestMetadata)
       throws IOException;
 
-  ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests);
+  ListenableFuture<List<Response>> getAllBlobsFuture(Iterable<Digest> digests);
 
   String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree);
 
-  Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+  Write getBlobWrite(
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException;
 
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
@@ -145,7 +148,7 @@ public interface Instance {
 
   GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request);
 
-  CasIndexResults reindexCas(@Nullable String hostName);
+  CasIndexResults reindexCas();
 
   void deregisterWorker(String workerName);
 

@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Develop
-nav_order: 7
+nav_order: 11
 ---
 
 ## Developer Information
@@ -40,13 +40,13 @@ one for the Buildfarm server and one for a Buildfarm worker.
 
 Your Redis cluster is now up, and you can now start your Buildfarm server talking to it:
 ```sh
-bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/shard-server.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.yml
 ```
 
 And your Buildfarm worker:
 ```sh
 mkdir /tmp/worker
-bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/shard-worker.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/config.yml
 ```
 
 ### Setting up intelliJ
@@ -68,7 +68,7 @@ bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/s
 
    This indicates a successful launch!
 1. To add a config file, edit your new run configuration and enter the absolute
-   path to [`examples/server.config.example`](examples/server.config.example) in
+   path to [`examples/config.minimal.yml`](examples/config.minimal.yml) in
    the "Executable flags" text box.
 
 Now, you should have something like this, and you can now run / debug Buildfarm

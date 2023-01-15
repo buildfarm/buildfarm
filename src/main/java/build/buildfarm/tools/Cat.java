@@ -23,6 +23,7 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -35,6 +36,7 @@ import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
@@ -318,8 +320,7 @@ class Cat {
       DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree)
       throws IOException, InterruptedException {
     Tree tree = reTreeToTree(digestUtil, reTree);
-    printTreeLayout(
-        DigestUtil.proxyDirectoriesIndex(tree.getDirectoriesMap()), tree.getRootDigest());
+    printTreeLayout(new ProxyDirectoriesIndex(tree.getDirectoriesMap()), tree.getRootDigest());
   }
 
   private static void printTreeLayout(Map<Digest, Directory> directoriesIndex, Digest rootDigest) {
@@ -934,7 +935,7 @@ class Cat {
     @Override
     protected void run(Instance instance, Digest digest) throws Exception {
       Tree tree = fetchTree(instance, digest);
-      printTreeLayout(DigestUtil.proxyDirectoriesIndex(tree.getDirectoriesMap()), digest);
+      printTreeLayout(new ProxyDirectoriesIndex(tree.getDirectoriesMap()), digest);
     }
   }
 
@@ -948,7 +949,12 @@ class Cat {
     protected void run(Instance instance, Digest digest) throws Exception {
       try (InputStream in =
           instance.newBlobInput(
-              digest, 0, 60, TimeUnit.SECONDS, RequestMetadata.getDefaultInstance())) {
+              Compressor.Value.IDENTITY,
+              digest,
+              0,
+              60,
+              TimeUnit.SECONDS,
+              RequestMetadata.getDefaultInstance())) {
         ByteStreams.copy(in, System.out);
       }
     }
@@ -957,7 +963,10 @@ class Cat {
   abstract static class BlobCommand extends DigestsCommand {
     @Override
     protected void run(Instance instance, Digest digest) throws Exception {
-      run(instance, getBlob(instance, digest, RequestMetadata.getDefaultInstance()));
+      run(
+          instance,
+          getBlob(
+              instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance()));
     }
 
     protected abstract void run(Instance instance, ByteString blob) throws Exception;

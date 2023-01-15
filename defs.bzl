@@ -109,6 +109,7 @@ def buildfarm_init(name = "buildfarm"):
                         "io.prometheus:simpleclient_hotspot:0.10.0",
                         "io.prometheus:simpleclient_httpserver:0.10.0",
                         "junit:junit:4.13.1",
+                        "javax.annotation:javax.annotation-api:1.3.2",
                         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
                         "org.apache.commons:commons-compress:1.21",
                         "org.apache.commons:commons-pool2:2.9.0",
@@ -121,12 +122,14 @@ def buildfarm_init(name = "buildfarm"):
                         "org.openjdk.jmh:jmh-core:1.23",
                         "org.openjdk.jmh:jmh-generator-annprocess:1.23",
                         "org.redisson:redisson:3.13.1",
-                    ] + ["org.springframework.boot:%s:2.7.0" % module for module in ORG_SPRING_BOOT_MODULES] +
-                    ["org.springframework:%s:5.3.20" % module for module in ORG_SPRING_MODULES] +
+                    ] + ["org.springframework.boot:%s:2.7.4" % module for module in ORG_SPRING_BOOT_MODULES] +
+                    ["org.springframework:%s:5.3.23" % module for module in ORG_SPRING_MODULES] +
                     [
                         "org.threeten:threetenbp:1.3.3",
                         "org.xerial:sqlite-jdbc:3.34.0",
                         "org.jetbrains:annotations:16.0.2",
+                        "org.yaml:snakeyaml:1.30",
+                        "org.projectlombok:lombok:1.18.24",
                     ],
         generate_compat_repositories = True,
         repositories = [

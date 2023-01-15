@@ -1,8 +1,6 @@
 # Bazel Buildfarm
 
-|Buildfarm CI|Nightly CI|Nightly Functionality Test|
-|--|--|--|
-| ![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main) |![Build status](https://badge.buildkite.com/d0c1471a98dd7d7123e6c21b57add0e8c2c0552042ea18f02c.svg)|![Build status](https://badge.buildkite.com/e0ac44ec0a8c3473d3d9490600366f1a73e8fa171d4913e9e3.svg)|
+![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main)
 
 This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
 
@@ -17,37 +15,39 @@ File issues here for bugs or feature requests, and ask questions via build team 
 
 All commandline options override corresponding config settings.
 
+### Redis
+
+Run via
+
+```
+docker run -d --rm --name buildfarm-redis -p 6379:6379 redis:5.0.9
+redis-cli config set stop-writes-on-bgsave-error no
+```
+
 ### Bazel Buildfarm Server
 
 Run via
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile> [<-p|--port> PORT]
+bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- <logfile> <configfile>
+
+Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
-
-- **`configfile`** has to be in Protocol Buffer text format, corresponding to a [BuildFarmServerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L55) definition.
-
-  For an example, see the [examples](examples) directory, which contains the working example [examples/server.config.example](examples/server.config.example).
-  For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
-
-- **`PORT`** to expose service endpoints on
+**`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
+**`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
 
 ### Bazel Buildfarm Worker
 
 Run via
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-memory-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- <logfile> <configfile>
+
+Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
+
 ```
-
-- **`configfile`** has to be in Protocol Buffer text format, corresponding to a [WorkerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L459) definition.
-
-  For an example, see the [examples](examples) directory, which contains the working example [examples/worker.config.example](examples/worker.config.example).
-  For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
-
-- **`ROOT`** base directory path for all work being performed.
-
-- **`CAS_CACHE_DIRECTORY`** is (absolute or relative) directory path to cached files from CAS.
+**`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
+**`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
 
 ### Bazel Client
 
@@ -65,22 +65,22 @@ Then run your build as you would normally do.
 Buildfarm uses [Java's Logging framework](https://docs.oracle.com/javase/10/core/java-logging-overview.htm) and outputs all routine behavior to the NICE [Level](https://docs.oracle.com/javase/8/docs/api/java/util/logging/Level.html).
 
 You can use typical Java logging configuration to filter these results and observe the flow of executions through your running services.
-An example `logging.properties` file has been provided at [examples/debug.logging.properties](examples/debug.logging.properties) for use as follows:
+An example `logging.properties` file has been provided at [examples/logging.properties](examples/logging.properties) for use as follows:
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/server.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
 
 and
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-memory-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/worker.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
 
 To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/examples/server.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/examples/config.minimal.yml
 ```
 
 

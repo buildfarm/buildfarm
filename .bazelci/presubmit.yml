@@ -31,19 +31,23 @@ tasks:
     - export BUILDFARM_GATE_LCOV_RESULTS=true
     - ./generate_coverage.sh
 
-  # Typical unit tests that run across a variety of operation systems.
+  # Typical unit tests that run across a variety of operating systems.
   ubuntu1604:
     name: "Unit Tests"
     build_flags:
     - "--build_tag_filters=-audit"
     build_targets:
     - "..."
+    test_flags:
+    - "--test_tag_filters=-integration,-redis"
     test_targets:
     - "..."
   ubuntu1804:
     name: "Unit Tests"
     build_targets:
     - "..."
+    test_flags:
+    - "--test_tag_filters=-integration,-redis"
     test_targets:
     - "..."
   macos:
@@ -52,6 +56,8 @@ tasks:
     - "--build_tag_filters=-container"
     build_targets:
     - "..."
+    test_flags:
+    - "--test_tag_filters=-integration,-redis"
     test_targets:
     - "..."
   windows:
@@ -60,6 +66,8 @@ tasks:
     - "--build_tag_filters=-container,-audit"
     build_targets:
     - "..."
+    test_flags:
+    - "--test_tag_filters=-integration,-redis"
     test_targets:
     - "..."
   rpm_builds:
@@ -85,35 +93,44 @@ tasks:
     shell_commands:
     - ./.bazelci/docker_unit_test.sh
 
+  # Run server integration tests.
+  # It starts the distributed storage backend and buildfarm services.
+  # It performs a realistic build on generated cc targets and gating projects.
+  integration_test_server:
+    name: "Server Integration Test"
+    platform: ubuntu1804
+    shell_commands:
+      - ./.bazelci/run_server_test.sh
+
   # Test that buildfarm can build software using the default configurations.
   # It starts the distributed storage backend and buildfarm services.
   # It performs a realistic build on generated cc targets and gating projects.
   integration_test_many:
-    name: "Integration Test (Memory)"
+    name: "Integration Test"
     platform: ubuntu1804
     shell_commands:
-    - export TEST_SHARD=false
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
-  integration_test_many_shard:
-    name: "Integration Test (Shard)"
+
+  # Test that buildfarm can work with zstd compression
+  compression_test_many_shard:
+    name: "Integration Test (Shard/Compression)"
     platform: ubuntu1804
     shell_commands:
-    - export TEST_SHARD=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - export TEST_ARG1=--experimental_remote_cache_compression
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
 
   # In the same way that clients will want to verify their cache hit rates / latencies.
   # We as service owners will want a way to verify that our cache hit rate is correct and
   # that latencies can be captured.
-  cache_check_many_shard:
+  cache_check_many:
     name: "Cache Check"
     platform: ubuntu1804
     shell_commands:
     - export CACHE_TEST=true
-    - export TEST_SHARD=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_double_test.sh
     - export TEST_ARG1=--experimental_remote_grpc_log='./grpc.log'
     - export TEST_ARG2=--experimental_remote_grpc_log='./grpc2.log'
@@ -121,25 +138,20 @@ tasks:
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/cache_test.sh
 
-  # Memory integration test is too slow.
-  # We can re-enable it if memory instance becomes faster or we build less targets.
-  # It is preserved here for offline testing.
-
-  # integration_test_abseil:
-  #   name: "Abseil Test (Memory)"
-  #   platform: ubuntu1804
-  #   shell_commands:
-  #   - export TEST_SHARD=false
-  #   - export RUN_TEST=./.bazelci/run_abseil_test.sh
-  #   - ./.bazelci/integration_test.sh
-
-  integration_test_abseil_shard:
-    name: "Abseil Test (Shard)"
+  integration_test_absei:
+    name: "Abseil Test"
     platform: ubuntu1804
     shell_commands:
-    - export TEST_SHARD=true
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
     - export EXECUTION_STAGE_WIDTH=10
+    - ./.bazelci/integration_test.sh
+  integration_test_abseil_shard_compression:
+    name: "Abseil Test (Shard/Compression)"
+    platform: ubuntu1804
+    shell_commands:
+    - export RUN_TEST=./.bazelci/run_abseil_test.sh
+    - export EXECUTION_STAGE_WIDTH=10
+    - export TEST_ARG1=--experimental_remote_cache_compression
     - ./.bazelci/integration_test.sh
 
   buildfarm_admin_test:

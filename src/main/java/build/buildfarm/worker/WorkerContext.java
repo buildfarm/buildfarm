@@ -24,9 +24,9 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.worker.resources.ResourceLimits;
@@ -37,6 +37,7 @@ import io.grpc.Deadline;
 import io.grpc.StatusException;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 public interface WorkerContext {
@@ -70,7 +71,7 @@ public interface WorkerContext {
 
   DigestUtil getDigestUtil();
 
-  Iterable<ExecutionPolicy> getExecutionPolicies(String name);
+  List<ExecutionPolicy> getExecutionPolicies(String name);
 
   int getExecuteStageWidth();
 

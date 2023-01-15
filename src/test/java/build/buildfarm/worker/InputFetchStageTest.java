@@ -30,14 +30,15 @@ import io.grpc.Deadline;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
+import lombok.extern.java.Log;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
+@Log
 public class InputFetchStageTest {
   static class PipelineSink extends PipelineStage {
-    private static final Logger logger = Logger.getLogger(PipelineSink.class.getName());
 
     private final List<OperationContext> operationContexts = Lists.newArrayList();
     private final Predicate<OperationContext> onPutShouldClose;
@@ -53,7 +54,7 @@ public class InputFetchStageTest {
 
     @Override
     public Logger getLogger() {
-      return logger;
+      return log;
     }
 
     @Override

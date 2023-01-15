@@ -15,21 +15,22 @@
 package build.buildfarm.cas;
 
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Multimaps.synchronizedListMultimap;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Cas;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.v1test.ContentAddressableStorageConfig;
-import build.buildfarm.v1test.FilesystemCASConfig;
-import build.buildfarm.v1test.GrpcCASConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
@@ -44,37 +45,40 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.naming.ConfigurationException;
 
 public final class ContentAddressableStorages {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private static Channel createChannel(String target) {
     NettyChannelBuilder builder =
         NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
-  public static ContentAddressableStorage createGrpcCAS(GrpcCASConfig config) {
-    Channel channel = createChannel(config.getTarget());
+  public static ContentAddressableStorage createGrpcCAS(Cas cas) {
+    Channel channel = createChannel(cas.getTarget());
     ByteStreamUploader byteStreamUploader =
         new ByteStreamUploader("", channel, null, 300, NO_RETRIES);
     ListMultimap<Digest, Runnable> onExpirations =
         synchronizedListMultimap(MultimapBuilder.hashKeys().arrayListValues().build());
 
-    return new GrpcCAS(config.getInstanceName(), channel, byteStreamUploader, onExpirations);
+    return new GrpcCAS(configs.getServer().getName(), channel, byteStreamUploader, onExpirations);
   }
 
-  public static ContentAddressableStorage createFilesystemCAS(FilesystemCASConfig config)
+  public static ContentAddressableStorage createFilesystemCAS(Cas config)
       throws ConfigurationException {
     String path = config.getPath();
     if (path.isEmpty()) {
       throw new ConfigurationException("filesystem cas path is empty");
     }
     long maxSizeBytes = config.getMaxSizeBytes();
-    long maxEntrySizeBytes = config.getMaxEntrySizeBytes();
+    long maxEntrySizeBytes = configs.getMaxEntrySizeBytes();
     int hexBucketLevels = config.getHexBucketLevels();
-    boolean storeFileDirsIndexInMemory = config.getFileDirectoriesIndexInMemory();
+    boolean storeFileDirsIndexInMemory = config.isFileDirectoriesIndexInMemory();
     if (maxSizeBytes <= 0) {
       throw new ConfigurationException("filesystem cas max_size_bytes <= 0");
     }
@@ -98,7 +102,8 @@ public final class ContentAddressableStorages {
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor()) {
           @Override
-          protected InputStream newExternalInput(Digest digest) throws IOException {
+          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+              throws IOException {
             throw new NoSuchFileException(digest.getHash());
           }
         };
@@ -110,18 +115,16 @@ public final class ContentAddressableStorages {
     return cas;
   }
 
-  public static ContentAddressableStorage create(ContentAddressableStorageConfig config)
-      throws ConfigurationException {
-    switch (config.getTypeCase()) {
+  public static ContentAddressableStorage create(Cas cas) throws ConfigurationException {
+    switch (cas.getType()) {
       default:
-      case FILESYSTEM:
-        return createFilesystemCAS(config.getFilesystem());
-      case TYPE_NOT_SET:
         throw new IllegalArgumentException("CAS config not set in config");
+      case FILESYSTEM:
+        return createFilesystemCAS(cas);
       case GRPC:
-        return createGrpcCAS(config.getGrpc());
+        return createGrpcCAS(cas);
       case MEMORY:
-        return new MemoryCAS(config.getMemory().getMaxSizeBytes());
+        return new MemoryCAS(cas.getMaxSizeBytes());
     }
   }
 
@@ -152,13 +155,16 @@ public final class ContentAddressableStorages {
       }
 
       @Override
-      public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
-        return writes.get(digest, uuid);
+      public Write getWrite(
+          Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+        return writes.get(compressor, digest, uuid);
       }
 
       @SuppressWarnings("ResultOfMethodCallIgnored")
       @Override
-      public InputStream newInput(Digest digest, long offset) throws IOException {
+      public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
+          throws IOException {
+        checkArgument(compressor == Compressor.Value.IDENTITY);
         ByteString data = getData(digest);
         if (data == null) {
           throw new NoSuchFileException(digest.getHash());
@@ -170,11 +176,13 @@ public final class ContentAddressableStorages {
 
       @Override
       public void get(
+          Compressor.Value compressor,
           Digest digest,
           long offset,
           long count,
           ServerCallStreamObserver<ByteString> responseObserver,
           RequestMetadata requestMetadata) {
+        checkArgument(compressor == Compressor.Value.IDENTITY);
         ByteString data = getData(digest);
         if (data != null) {
           responseObserver.onNext(data);
@@ -196,7 +204,7 @@ public final class ContentAddressableStorages {
       }
 
       @Override
-      public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+      public ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests) {
         return immediateFuture(MemoryCAS.getAll(digests, this::getData));
       }
 

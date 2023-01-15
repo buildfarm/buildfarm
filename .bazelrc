@@ -5,4 +5,12 @@ build:fuse --define=fuse=true
 # Workaround for https://github.com/bazelbuild/bazel/issues/3236
 build:linux --sandbox_tmpfs_path=/tmp
 
+build --nojava_header_compilation
+
+test --nojava_header_compilation
+test --enable_runfiles
 test --test_tag_filters=-redis
+
+# Ensure buildfarm is compatible with future versions of bazel.
+# https://buildkite.com/bazel/bazelisk-plus-incompatible-flags
+common --incompatible_disallow_empty_glob

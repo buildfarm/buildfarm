@@ -15,6 +15,7 @@
 package build.buildfarm.cas;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
@@ -23,15 +24,20 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
+import com.google.rpc.Code;
+import com.google.rpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
-import java.io.IOException;
-import java.io.InputStream;
+import java.util.List;
 import java.util.UUID;
 import net.jcip.annotations.ThreadSafe;
 
 @ThreadSafe
 public interface ContentAddressableStorage extends InputStreamFactory {
   long UNLIMITED_ENTRY_SIZE_MAX = -1;
+
+  Status OK = Status.newBuilder().setCode(Code.OK.getNumber()).build();
+
+  Status NOT_FOUND = Status.newBuilder().setCode(Code.NOT_FOUND.getNumber()).build();
 
   /**
    * Blob storage for the CAS. This class should be used at all times when interacting with complete
@@ -83,19 +89,19 @@ public interface ContentAddressableStorage extends InputStreamFactory {
   Blob get(Digest digest);
 
   /** Retrieve a set of blobs from the CAS represented by a future. */
-  ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests);
-
-  InputStream newInput(Digest digest, long offset) throws IOException;
+  ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests);
 
   /** Retrieve a value from the CAS by streaming content when ready */
   void get(
+      Compressor.Value compression,
       Digest digest,
       long offset,
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata);
 
-  Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+  Write getWrite(
+      Compressor.Value compression, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException;
 
   /** Insert a blob into the CAS. */

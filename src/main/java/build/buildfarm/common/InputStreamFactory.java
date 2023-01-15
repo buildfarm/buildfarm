@@ -14,10 +14,11 @@
 
 package build.buildfarm.common;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import java.io.IOException;
 import java.io.InputStream;
 
 public interface InputStreamFactory {
-  InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException;
+  InputStream newInput(Compressor.Value compressor, Digest digest, long offset) throws IOException;
 }
