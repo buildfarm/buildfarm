@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
+import build.buildfarm.common.distributed.DistributedHashMap;
 
 /**
  * @class RedisHashMap
@@ -27,7 +28,7 @@ import redis.clients.jedis.JedisClusterPipeline;
  *     before and after the map data structure is created (since it exists in redis). Therefore, two
  *     redis maps with the same name, would in fact be the same underlying redis map.
  */
-public class RedisHashMap {
+public class RedisHashMap implements DistributedHashMap<JedisCluster> {
   /**
    * @field name
    * @brief The unique name of the map.
@@ -55,6 +56,7 @@ public class RedisHashMap {
    * @return Whether a new key was inserted. If a key is overwritten with a new value, this would be
    *     false.
    */
+  @Override
   public boolean insert(JedisCluster jedis, String key, String value) {
     return jedis.hset(name, key, value) == 1;
   }
@@ -67,6 +69,7 @@ public class RedisHashMap {
    * @param value The value for the key.
    * @return Whether a new key was inserted. If a key already exists, this would be false.
    */
+  @Override
   public boolean insertIfMissing(JedisCluster jedis, String key, String value) {
     return jedis.hsetnx(name, key, value) == 1;
   }
@@ -78,6 +81,7 @@ public class RedisHashMap {
    * @param key The name of the key.
    * @return Whether the key exists or not in the map.
    */
+  @Override
   public boolean exists(JedisCluster jedis, String key) {
     return jedis.hexists(name, key);
   }
@@ -89,6 +93,7 @@ public class RedisHashMap {
    * @param key The name of the key.
    * @return Whether the key was removed.
    */
+  @Override
   public boolean remove(JedisCluster jedis, String key) {
     return jedis.hdel(name, key) == 1;
   }
@@ -99,6 +104,7 @@ public class RedisHashMap {
    * @param jedis Jedis cluster client.
    * @param key The names of the keys.
    */
+  @Override
   public void remove(JedisCluster jedis, Iterable<String> keys) {
     JedisClusterPipeline p = jedis.pipelined();
     for (String key : keys) {
@@ -113,6 +119,7 @@ public class RedisHashMap {
    * @return The size of the map.
    * @note Suggested return identifier: size.
    */
+  @Override
   public long size(JedisCluster jedis) {
     return jedis.hlen(name);
   }
@@ -123,6 +130,7 @@ public class RedisHashMap {
    * @param jedis Jedis cluster client.
    * @return The redis hashmap keys represented as a set.
    */
+  @Override
   public Set<String> keys(JedisCluster jedis) {
     return jedis.hkeys(name);
   }
@@ -133,6 +141,7 @@ public class RedisHashMap {
    * @param jedis Jedis cluster client.
    * @return The redis hashmap represented as a java map.
    */
+  @Override
   public Map<String, String> asMap(JedisCluster jedis) {
     return jedis.hgetAll(name);
   }

@@ -23,6 +23,7 @@ import java.util.stream.StreamSupport;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.Response;
+import build.buildfarm.common.distributed.DistributedMap;
 
 /**
  * @class RedisMap
@@ -32,7 +33,7 @@ import redis.clients.jedis.Response;
  *     before and after the map data structure is created (since it exists in redis). Therefore, two
  *     redis maps with the same name, would in fact be the same underlying redis map.
  */
-public class RedisMap {
+public class RedisMap implements DistributedMap<JedisCluster> {
   /**
    * @field name
    * @brief The unique name of the map.
@@ -77,6 +78,7 @@ public class RedisMap {
    * @param timeout_s Timeout to expire the entry. (units: seconds (s))
    * @note Overloaded.
    */
+  @Override
   public void insert(JedisCluster jedis, String key, String value, int timeout_s) {
     jedis.setex(createKeyName(key), timeout_s, value);
   }
@@ -90,6 +92,7 @@ public class RedisMap {
    * @param timeout_s Timeout to expire the entry. (units: seconds (s))
    * @note Overloaded.
    */
+  @Override
   public void insert(JedisCluster jedis, String key, String value, long timeout_s) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
@@ -104,6 +107,7 @@ public class RedisMap {
    * @param value The value for the key.
    * @note Overloaded.
    */
+  @Override
   public void insert(JedisCluster jedis, String key, String value) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
@@ -117,6 +121,7 @@ public class RedisMap {
    * @param key The name of the key.
    * @note Overloaded.
    */
+  @Override
   public void remove(JedisCluster jedis, String key) {
     jedis.del(createKeyName(key));
   }
@@ -128,6 +133,7 @@ public class RedisMap {
    * @param keys The name of the keys.
    * @note Overloaded.
    */
+  @Override
   public void remove(JedisCluster jedis, Iterable<String> keys) {
     JedisClusterPipeline p = jedis.pipelined();
     for (String key : keys) {
@@ -145,6 +151,7 @@ public class RedisMap {
    * @note Overloaded.
    * @note Suggested return identifier: value.
    */
+  @Override
   public String get(JedisCluster jedis, String key) {
     return jedis.get(createKeyName(key));
   }
@@ -158,6 +165,7 @@ public class RedisMap {
    * @note Overloaded.
    * @note Suggested return identifier: values.
    */
+  @Override
   public Iterable<Map.Entry<String, String>> get(JedisCluster jedis, Iterable<String> keys) {
     // Fetch items via pipeline
     JedisClusterPipeline p = jedis.pipelined();
@@ -181,6 +189,7 @@ public class RedisMap {
    * @return Whether the key exists or not.
    * @note Suggested return identifier: exists.
    */
+  @Override
   public boolean exists(JedisCluster jedis, String key) {
     return jedis.exists(createKeyName(key));
   }
@@ -192,6 +201,7 @@ public class RedisMap {
    * @return The size of the map.
    * @note Suggested return identifier: size.
    */
+  @Override
   public int size(JedisCluster jedis) {
     return ScanCount.get(jedis, name + ":*", 1000);
   }
