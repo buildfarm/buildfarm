@@ -36,13 +36,13 @@ public class CommandUtilsTest {
   @Test
   public void getResolvedOutputPathsCheckOutputPaths() {
     // ARRANGE
-    Command command = Command.newBuilder().addOutputPaths("foo1").addOutputPaths("foo2").build();
+    Command command = Command.newBuilder().addOutputPaths("foo0").addOutputPaths("foo1").build();
 
     // ACT
     List<Path> paths = CommandUtils.getResolvedOutputPaths(command, Paths.get("root"));
 
     // ASSERT
-    assertThat(paths.get(0).toString()).isEqualTo("root/foo1");
-    assertThat(paths.get(1).toString()).isEqualTo("root/foo2");
+    assertThat(paths.get(0)).isEqualTo(Paths.get("root/foo0"));
+    assertThat(paths.get(1)).isEqualTo(Paths.get("root/foo1"));
   }
 }
