@@ -42,7 +42,7 @@ public class CommandUtilsTest {
     List<Path> paths = CommandUtils.getResolvedOutputPaths(command, Paths.get("root"));
 
     // ASSERT
-    assertThat(paths.get(0)).isEqualTo(Paths.get("root/foo0"));
-    assertThat(paths.get(1)).isEqualTo(Paths.get("root/foo1"));
+    assertThat(paths.get(0).toString()).isEqualTo(Paths.get("root/foo0").toString());
+    assertThat(paths.get(1).toString()).isEqualTo(Paths.get("root/foo1").toString());
   }
 }
