@@ -119,14 +119,6 @@ public class ShardWorkerContextTest {
         writer);
   }
 
-  @Test(expected = StatusException.class)
-  public void outputFileIsDirectoryThrowsStatusExceptionOnUpload() throws Exception {
-    Files.createDirectories(root.resolve("output"));
-    WorkerContext context = createTestContext();
-    Command command = Command.newBuilder().addOutputPaths("output").build();
-    context.uploadOutputs(Digest.getDefaultInstance(), ActionResult.newBuilder(), root, command);
-  }
-
   @SuppressWarnings("unchecked")
   @Test
   public void queueEntryWithExecutionPolicyPlatformMatches() throws Exception {

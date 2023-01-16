@@ -679,7 +679,6 @@ class ShardWorkerContext implements WorkerContext {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
 
     List<Path> outputPaths = CommandUtils.getResolvedOutputPaths(command, actionRoot);
-
     for (Path outputPath : outputPaths) {
       if (Files.isDirectory(outputPath)) {
         uploadOutputDirectory(resultBuilder, outputPath, actionRoot, preconditionFailure);
