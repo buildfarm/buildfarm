@@ -30,7 +30,6 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 @Log
 public class SuperscalarPipelineStageTest {
-
   static class AbstractSuperscalarPipelineStage extends SuperscalarPipelineStage {
     public AbstractSuperscalarPipelineStage(String name, PipelineStage output, int width) {
       this(name, null, output, null, width);

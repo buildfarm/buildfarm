@@ -24,7 +24,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class LogMetricsPublisher extends AbstractMetricsPublisher {
-
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private static Level logLevel;

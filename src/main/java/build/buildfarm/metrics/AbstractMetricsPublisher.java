@@ -31,7 +31,6 @@ import lombok.extern.java.Log;
 
 @Log
 public abstract class AbstractMetricsPublisher implements MetricsPublisher {
-
   private static final Counter actionsCounter =
       Counter.build().name("actions").help("Number of actions.").register();
   private static final Gauge operationsInStage =

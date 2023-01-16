@@ -35,7 +35,6 @@ import lombok.extern.java.Log;
 
 @Log
 class DispatchedMonitor implements Runnable {
-
   private final Backplane backplane;
   private final BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer;
   private final int intervalSeconds;

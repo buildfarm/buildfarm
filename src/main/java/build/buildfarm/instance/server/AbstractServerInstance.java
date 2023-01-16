@@ -144,7 +144,6 @@ import lombok.extern.java.Log;
 
 @Log
 public abstract class AbstractServerInstance implements Instance {
-
   private final String name;
   protected final ContentAddressableStorage contentAddressableStorage;
   protected final ActionCache actionCache;
