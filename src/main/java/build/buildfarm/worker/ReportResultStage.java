@@ -99,8 +99,7 @@ public class ReportResultStage extends PipelineStage {
           operationContext.queueEntry.getExecuteEntry().getActionDigest(),
           resultBuilder,
           operationContext.execDir,
-          operationContext.command.getOutputFilesList(),
-          operationContext.command.getOutputDirectoriesList());
+          operationContext.command);
     } catch (StatusException e) {
       ExecuteResponse executeResponse = operationContext.executeResponse.build();
       if (executeResponse.getStatus().getCode() == Code.OK.getNumber()

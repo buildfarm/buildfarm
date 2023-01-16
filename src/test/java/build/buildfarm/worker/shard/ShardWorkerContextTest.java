@@ -22,6 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
@@ -122,12 +123,8 @@ public class ShardWorkerContextTest {
   public void outputFileIsDirectoryThrowsStatusExceptionOnUpload() throws Exception {
     Files.createDirectories(root.resolve("output"));
     WorkerContext context = createTestContext();
-    context.uploadOutputs(
-        Digest.getDefaultInstance(),
-        ActionResult.newBuilder(),
-        root,
-        ImmutableList.of("output"),
-        ImmutableList.of());
+    Command command = Command.newBuilder().addOutputPaths("output").build();
+    context.uploadOutputs(Digest.getDefaultInstance(), ActionResult.newBuilder(), root, command);
   }
 
   @SuppressWarnings("unchecked")

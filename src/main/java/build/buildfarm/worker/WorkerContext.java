@@ -101,11 +101,7 @@ public interface WorkerContext {
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;
 
   void uploadOutputs(
-      Digest actionDigest,
-      ActionResult.Builder resultBuilder,
-      Path actionRoot,
-      Iterable<String> outputFiles,
-      Iterable<String> outputDirs)
+      Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Command command)
       throws IOException, InterruptedException, StatusException;
 
   boolean putOperation(Operation operation) throws IOException, InterruptedException;
