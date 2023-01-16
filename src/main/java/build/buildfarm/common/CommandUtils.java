@@ -47,7 +47,6 @@ public class CommandUtils {
    * @note Suggested return identifier: output_paths.
    */
   public static List<Path> getResolvedOutputPaths(Command command, Path actionRoot) {
-
     // REAPI clients previously needed to specify whether the output path was a directory or file.
     // This turned out to be too restrictive-- some build tools don't know what an action produces
     // until it is done.
@@ -62,13 +61,12 @@ public class CommandUtils {
     // https://github.com/bazelbuild/remote-apis/blob/3a21deee813d0b98aaeef9737c720e509e10dc8b/build/bazel/remote/execution/v2/remote_execution.proto#L651-L653
     List<Path> resolvedPaths = new ArrayList<>();
 
-    for (String outputPath : command.getOutputPathsList()) {
-      resolvedPaths.add(actionRoot.resolve(outputPath));
-    }
-
     // If `output_paths` is used, `output_files` and
     // `output_directories` will be ignored!"
-    if (!resolvedPaths.isEmpty()) {
+    if (command.getOutputPathsCount() != 0) {
+      for (String outputPath : command.getOutputPathsList()) {
+        resolvedPaths.add(actionRoot.resolve(outputPath));
+      }
       return resolvedPaths;
     }
 

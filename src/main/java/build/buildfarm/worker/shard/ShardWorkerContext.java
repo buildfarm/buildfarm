@@ -481,7 +481,6 @@ class ShardWorkerContext implements WorkerContext {
       Path actionRoot,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
-
     String outputFile = actionRoot.relativize(outputPath).toString();
     if (!Files.exists(outputPath)) {
       log.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
