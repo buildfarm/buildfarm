@@ -29,7 +29,6 @@ import lombok.extern.java.Log;
  */
 @Log
 public class ProtoUtils {
-
   public static QueuedOperation parseQueuedOperation(
       ByteString queuedOperationBlob, QueueEntry queueEntry) {
     Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();

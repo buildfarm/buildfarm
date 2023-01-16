@@ -39,7 +39,6 @@ import org.junit.runners.JUnit4;
 @Log
 public class InputFetchStageTest {
   static class PipelineSink extends PipelineStage {
-
     private final List<OperationContext> operationContexts = Lists.newArrayList();
     private final Predicate<OperationContext> onPutShouldClose;
 

@@ -47,7 +47,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class AdminService extends AdminGrpc.AdminImplBase {
-
   private final Admin adminController;
   private final Instance instance;
 
