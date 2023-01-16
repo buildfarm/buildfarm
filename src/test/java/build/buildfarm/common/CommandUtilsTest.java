@@ -45,4 +45,20 @@ public class CommandUtilsTest {
     assertThat(paths.get(0).toString()).isEqualTo(Paths.get("root/foo0").toString());
     assertThat(paths.get(1).toString()).isEqualTo(Paths.get("root/foo1").toString());
   }
+
+  // Function under test: getResolvedOutputPaths
+  // Reason for testing: check path results when output_paths is empty
+  // Failure explanation: paths are not captured or resolved correctly
+  @Test
+  public void getResolvedOutputPathsCheckOutputFiles() {
+    // ARRANGE
+    Command command = Command.newBuilder().addOutputFiles("foo0").addOutputFiles("foo1").build();
+
+    // ACT
+    List<Path> paths = CommandUtils.getResolvedOutputPaths(command, Paths.get("root"));
+
+    // ASSERT
+    assertThat(paths.get(0).toString()).isEqualTo(Paths.get("root/foo0").toString());
+    assertThat(paths.get(1).toString()).isEqualTo(Paths.get("root/foo1").toString());
+  }
 }
