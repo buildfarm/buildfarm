@@ -65,7 +65,6 @@ import lombok.extern.java.Log;
  */
 @Log
 public class ByteStreamUploader {
-
   private final String instanceName;
   private final Channel channel;
   private final CallCredentials callCredentials;

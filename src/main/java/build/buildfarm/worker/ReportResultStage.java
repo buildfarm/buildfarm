@@ -46,7 +46,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class ReportResultStage extends PipelineStage {
-
   private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public ReportResultStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {

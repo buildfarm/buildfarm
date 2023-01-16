@@ -65,7 +65,6 @@ import lombok.extern.java.Log;
 
 @Log
 class CFCExecFileSystem implements ExecFileSystem {
-
   private final Path root;
   private final CASFileCache fileCache;
   private final @Nullable UserPrincipal owner;

@@ -23,7 +23,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class Pipeline {
-
   private final Map<PipelineStage, Thread> stageThreads;
   private final Map<PipelineStage, Integer> stageClosePriorities;
   private Thread joiningThread = null;
