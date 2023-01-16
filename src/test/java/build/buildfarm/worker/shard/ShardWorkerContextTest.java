@@ -55,8 +55,6 @@ public class ShardWorkerContextTest {
 
   private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  private Path root;
-
   @Mock private Backplane backplane;
 
   @Mock private ExecFileSystem execFileSystem;
@@ -81,7 +79,6 @@ public class ShardWorkerContextTest {
 
     MockitoAnnotations.initMocks(this);
     when(instance.getDigestUtil()).thenReturn(DIGEST_UTIL);
-    root = Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null);
   }
 
   WorkerContext createTestContext() {
