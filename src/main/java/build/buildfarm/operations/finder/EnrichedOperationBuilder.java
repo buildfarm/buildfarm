@@ -44,7 +44,6 @@ import redis.clients.jedis.JedisCluster;
  */
 @Log
 public class EnrichedOperationBuilder {
-
   /**
    * @brief Create an enriched operation based on an operation key.
    * @details This will make calls to get blobs, and resolve digests into the appropriate data

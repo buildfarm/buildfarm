@@ -58,7 +58,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class RemoteInputStreamFactory implements InputStreamFactory {
-
   public interface UnavailableConsumer {
     void accept(String worker, Throwable t, String context);
   }

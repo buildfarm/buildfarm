@@ -87,7 +87,6 @@ import org.mockito.stubbing.Answer;
 @RunWith(JUnit4.class)
 @Log
 public class AbstractServerInstanceTest {
-
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   static class DummyServerInstance extends AbstractServerInstance {

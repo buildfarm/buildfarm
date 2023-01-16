@@ -95,7 +95,6 @@ import lombok.extern.java.Log;
 
 @Log
 class ShardWorkerContext implements WorkerContext {
-
   private static final String PROVISION_CORES_NAME = "cores";
 
   private static final Counter completedOperations =

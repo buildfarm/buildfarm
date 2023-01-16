@@ -23,7 +23,6 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 @Log
 public class PipelineTest {
-
   abstract static class AbstractPipelineStage extends PipelineStage {
     public AbstractPipelineStage(String name) {
       super(name, null, null, null);

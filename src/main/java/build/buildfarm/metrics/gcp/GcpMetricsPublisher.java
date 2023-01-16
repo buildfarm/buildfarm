@@ -18,7 +18,6 @@ import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.metrics.AbstractMetricsPublisher;
 
 public class GcpMetricsPublisher extends AbstractMetricsPublisher {
-
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   public GcpMetricsPublisher() {

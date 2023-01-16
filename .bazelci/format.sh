@@ -4,6 +4,7 @@
 # Use the flag --check if you want the script to fail when formatting is not correct.
 
 FORMAT_JAVA=true
+REMOVE_NEWLINES_AFTER_START_BRACKET=true
 JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/google-java-format-1.7/google-java-format-1.7-all-deps.jar
 LOCAL_FORMATTER="java_formatter.jar"
 
@@ -53,16 +54,18 @@ run_java_formatter () {
         return
     fi
 
-    # The formatter is lax on certain whitespace decisons.
+    # The formatter is lax on certain whitespace decisions.
     # Therefore, we perform these adjustements before running the formatter.
     # This will make the formatting more consistent overall.
-    for file in $files
-    do
-	# Remove whitespace lines after starting bracket '{'
-	# Ignore any issues if this does not succeed.
-	# The CI doesn't gate on this adjustment.
-        awk -i inplace -v n=-2 'NR==n+1 && !NF{next} /\{/ {n=NR}1' $file > /dev/null 2>&1
-    done
+    if [ "${REMOVE_NEWLINES_AFTER_START_BRACKET:-false}" = true ]; then
+        for file in $files
+        do
+    	# Remove whitespace lines after starting bracket '{'
+    	# Ignore any issues if this does not succeed.
+    	# The CI doesn't gate on this adjustment.
+            awk -i inplace -v n=-2 'NR==n+1 && !NF{next} /\{/ {n=NR}1' $file > /dev/null 2>&1
+        done
+    fi;
 
     # Fixes formatting issues
     java -jar $LOCAL_FORMATTER -i $files
