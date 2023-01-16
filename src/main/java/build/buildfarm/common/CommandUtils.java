@@ -60,7 +60,7 @@ public class CommandUtils {
     // `output_directories` fields. If `output_paths` is used, `output_files` and
     // `output_directories` will be ignored!"
     // https://github.com/bazelbuild/remote-apis/blob/3a21deee813d0b98aaeef9737c720e509e10dc8b/build/bazel/remote/execution/v2/remote_execution.proto#L651-L653
-    List<Path> resolvedPaths = new ArrayList<Path>();
+    List<Path> resolvedPaths = new ArrayList<>();
 
     for (String outputPath : command.getOutputPathsList()) {
       resolvedPaths.add(actionRoot.resolve(outputPath));
