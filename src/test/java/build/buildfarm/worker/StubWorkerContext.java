@@ -156,11 +156,7 @@ class StubWorkerContext implements WorkerContext {
 
   @Override
   public void uploadOutputs(
-      Digest actionDigest,
-      ActionResult.Builder resultBuilder,
-      Path actionRoot,
-      Iterable<String> outputFiles,
-      Iterable<String> outputDirs) {
+      Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Command command) {
     throw new UnsupportedOperationException();
   }
 

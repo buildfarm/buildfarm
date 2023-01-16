@@ -33,6 +33,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -476,11 +477,11 @@ class ShardWorkerContext implements WorkerContext {
 
   private void uploadOutputFile(
       ActionResult.Builder resultBuilder,
-      String outputFile,
+      Path outputPath,
       Path actionRoot,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
-    Path outputPath = actionRoot.resolve(outputFile);
+    String outputFile = actionRoot.relativize(outputPath).toString();
     if (!Files.exists(outputPath)) {
       log.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
       return;
@@ -565,11 +566,11 @@ class ShardWorkerContext implements WorkerContext {
 
   private void uploadOutputDirectory(
       ActionResult.Builder resultBuilder,
-      String outputDir,
+      Path outputDirPath,
       Path actionRoot,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
-    Path outputDirPath = actionRoot.resolve(outputDir);
+    String outputDir = actionRoot.relativize(outputDirPath).toString();
     if (!Files.exists(outputDirPath)) {
       log.log(Level.FINE, "ReportResultStage: " + outputDir + " does not exist...");
       return;
@@ -671,18 +672,17 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public void uploadOutputs(
-      Digest actionDigest,
-      ActionResult.Builder resultBuilder,
-      Path actionRoot,
-      Iterable<String> outputFiles,
-      Iterable<String> outputDirs)
+      Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Command command)
       throws IOException, InterruptedException, StatusException {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    for (String outputFile : outputFiles) {
-      uploadOutputFile(resultBuilder, outputFile, actionRoot, preconditionFailure);
-    }
-    for (String outputDir : outputDirs) {
-      uploadOutputDirectory(resultBuilder, outputDir, actionRoot, preconditionFailure);
+
+    List<Path> outputPaths = CommandUtils.getResolvedOutputPaths(command, actionRoot);
+    for (Path outputPath : outputPaths) {
+      if (Files.isDirectory(outputPath)) {
+        uploadOutputDirectory(resultBuilder, outputPath, actionRoot, preconditionFailure);
+      } else {
+        uploadOutputFile(resultBuilder, outputPath, actionRoot, preconditionFailure);
+      }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
 
