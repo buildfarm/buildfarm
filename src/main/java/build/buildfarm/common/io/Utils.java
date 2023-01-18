@@ -53,7 +53,6 @@ import org.apache.commons.io.IOUtils;
 
 @Log
 public class Utils {
-
   @SuppressWarnings("Guava")
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));

@@ -26,7 +26,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerImplBase {
-
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final Worker worker;
 

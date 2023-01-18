@@ -46,7 +46,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class InputFetcher implements Runnable {
-
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
   private final InputFetchStage owner;

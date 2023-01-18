@@ -49,7 +49,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class StubWriteOutputStream extends FeedbackOutputStream implements Write {
-
   public static final long UNLIMITED_EXPECTED_SIZE = Long.MAX_VALUE;
 
   private static final int CHUNK_SIZE = 16 * 1024;

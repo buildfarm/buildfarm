@@ -65,7 +65,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class ShardWorkerInstance extends AbstractServerInstance {
-
   private final Backplane backplane;
 
   public ShardWorkerInstance(

@@ -27,7 +27,6 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 @Log
 public class PipelineStageTest {
-
   static class StubPipelineStage extends PipelineStage {
     public StubPipelineStage(String name) {
       this(name, null, null, null);

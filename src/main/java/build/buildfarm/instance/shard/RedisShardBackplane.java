@@ -100,7 +100,6 @@ import redis.clients.jedis.ScanResult;
 
 @Log
 public class RedisShardBackplane implements Backplane {
-
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private static final JsonFormat.Parser operationParser =

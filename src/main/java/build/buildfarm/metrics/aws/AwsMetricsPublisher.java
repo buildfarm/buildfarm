@@ -40,7 +40,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class AwsMetricsPublisher extends AbstractMetricsPublisher {
-
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private static AmazonSNSAsync snsClient;
 
