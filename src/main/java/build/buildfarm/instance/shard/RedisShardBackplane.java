@@ -231,7 +231,7 @@ public class RedisShardBackplane implements Backplane {
               expiresAt = now.plusMillis(defaultTimeout_ms);
               String keyValue = String.format("%d", expiresAt.toEpochMilli());
               long timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
-              state.processingOperations.insert(jedis, operationName, keyValue, timeout_s);
+              state.processingOperations.insert(jedis, operationName, keyValue, (int) timeout_s);
             }
 
             // handle expiration
@@ -264,7 +264,7 @@ public class RedisShardBackplane implements Backplane {
               expiresAt = now.plusMillis(defaultTimeout_ms);
               String keyValue = String.format("%d", expiresAt.toEpochMilli());
               long timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
-              state.dispatchingOperations.insert(jedis, operationName, keyValue, timeout_s);
+              state.dispatchingOperations.insert(jedis, operationName, keyValue, (int) timeout_s);
             }
 
             // handle expiration

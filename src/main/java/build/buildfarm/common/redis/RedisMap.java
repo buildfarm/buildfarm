@@ -20,6 +20,7 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.StreamSupport;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
@@ -64,9 +65,9 @@ public class RedisMap implements DistributedMap<JedisCluster> {
    * @details Construct a named redis map with an established redis cluster.
    * @param name The global name of the map.
    */
-  public RedisMap(String name, int timeout_s) {
+  public RedisMap(String name, int expiration_s) {
     this.name = name;
-    this.expiration_s = timeout_s;
+    this.expiration_s = expiration_s;
   }
 
   /**
@@ -75,12 +76,14 @@ public class RedisMap implements DistributedMap<JedisCluster> {
    * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @param value The value for the key.
-   * @param timeout_s Timeout to expire the entry. (units: seconds (s))
+   * @param expiration_s Timeout to expire the entry. (units: seconds (s))
+   * @return Whether a new key was inserted. If a key is overwritten with a new value, this would be
+   *     false.
    * @note Overloaded.
    */
   @Override
-  public void insert(JedisCluster jedis, String key, String value, int timeout_s) {
-    jedis.setex(createKeyName(key), timeout_s, value);
+  public boolean insert(JedisCluster jedis, String key, String value, int expiration_s) {
+    return jedis.setex(createKeyName(key), expiration_s, value) == "OK";
   }
 
   /**
@@ -89,29 +92,28 @@ public class RedisMap implements DistributedMap<JedisCluster> {
    * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @param value The value for the key.
-   * @param timeout_s Timeout to expire the entry. (units: seconds (s))
+   * @return Whether a new key was inserted. If a key is overwritten with a new value, this would be
+   *     false.
    * @note Overloaded.
    */
   @Override
-  public void insert(JedisCluster jedis, String key, String value, long timeout_s) {
+  public boolean insert(JedisCluster jedis, String key, String value) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
-    jedis.setex(createKeyName(key), (int) timeout_s, value);
+    return jedis.setex(createKeyName(key), expiration_s, value) == "OK";
   }
 
   /**
-   * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
-   * @details If the key already exists, then the value is replaced.
+   * @brief Add key/value only if key doesn't exist.
+   * @details If the key already exists, this operation has no effect.
    * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @param value The value for the key.
-   * @note Overloaded.
+   * @return Whether a new key was inserted. If a key already exists, this would be false.
    */
   @Override
-  public void insert(JedisCluster jedis, String key, String value) {
-    // Jedis only provides int precision.  this is fine as the units are seconds.
-    // We supply an interface for longs as a convenience to callers.
-    jedis.setex(createKeyName(key), expiration_s, value);
+  public boolean insertIfMissing(JedisCluster jedis, String key, String value) {
+    return jedis.setnx(createKeyName(key), value) == 1;
   }
 
   /**
@@ -119,11 +121,13 @@ public class RedisMap implements DistributedMap<JedisCluster> {
    * @details Deletes the key/value pair.
    * @param jedis Jedis cluster client.
    * @param key The name of the key.
+   * @return Whether the key was removed.
    * @note Overloaded.
+   * @note Suggested return identifier: success.
    */
   @Override
-  public void remove(JedisCluster jedis, String key) {
-    jedis.del(createKeyName(key));
+  public boolean remove(JedisCluster jedis, String key) {
+    return jedis.del(createKeyName(key)) == 1;
   }
 
   /**
@@ -140,6 +144,53 @@ public class RedisMap implements DistributedMap<JedisCluster> {
       p.del(createKeyName(key));
     }
     p.sync();
+  }
+
+  /**
+   * @brief whether the key exists
+   * @details True if key exists. False if key does not exist.
+   * @param jedis Jedis cluster client.
+   * @param key The name of the key.
+   * @return Whether the key exists or not.
+   * @note Suggested return identifier: exists.
+   */
+  @Override
+  public boolean exists(JedisCluster jedis, String key) {
+    return jedis.exists(createKeyName(key));
+  }
+
+  /**
+   * @brief Get the size of the map.
+   * @details May be inefficient to due scanning into memory and deduplicating.
+   * @param jedis Jedis cluster client.
+   * @return The size of the map.
+   * @note Suggested return identifier: size.
+   */
+  @Override
+  public int size(JedisCluster jedis) {
+    return ScanCount.get(jedis, name + ":*", 1000);
+  }
+
+  /**
+   * @brief Get all of the keys from the hashmap.
+   * @details No order guarantee
+   * @param jedis Jedis cluster client.
+   * @return The redis hashmap keys represented as a set.
+   */
+  @Override
+  public Set<String> keys(JedisCluster jedis) {
+    return jedis.keys(name);
+  }
+
+  /**
+   * @brief Convert the redis map to a java map.
+   * @details This would not be efficient if the map is large.
+   * @param jedis Jedis cluster client.
+   * @return The redis map represented as a java map.
+   */
+  @Override
+  public Map<String, String> asMap(JedisCluster jedis) {
+    throw new UnsupportedOperationException();
   }
 
   /**
@@ -179,31 +230,6 @@ public class RedisMap implements DistributedMap<JedisCluster> {
       resolved.add(new AbstractMap.SimpleEntry<>(val.getKey(), val.getValue().get()));
     }
     return resolved;
-  }
-
-  /**
-   * @brief whether the key exists
-   * @details True if key exists. False if key does not exist.
-   * @param jedis Jedis cluster client.
-   * @param key The name of the key.
-   * @return Whether the key exists or not.
-   * @note Suggested return identifier: exists.
-   */
-  @Override
-  public boolean exists(JedisCluster jedis, String key) {
-    return jedis.exists(createKeyName(key));
-  }
-
-  /**
-   * @brief Get the size of the map.
-   * @details May be inefficient to due scanning into memory and deduplicating.
-   * @param jedis Jedis cluster client.
-   * @return The size of the map.
-   * @note Suggested return identifier: size.
-   */
-  @Override
-  public int size(JedisCluster jedis) {
-    return ScanCount.get(jedis, name + ":*", 1000);
   }
 
   /**

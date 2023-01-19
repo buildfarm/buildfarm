@@ -14,7 +14,6 @@
 
 package build.buildfarm.instance.shard;
 
-import build.buildfarm.common.distributed.DistributedHashMap;
 import build.buildfarm.common.distributed.DistributedMap;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 
@@ -32,7 +31,7 @@ public class DistributedState {
    * @details This is done to keep track of which machines are online and known by the rest of the
    *     cluster.
    */
-  public DistributedHashMap executeWorkers;
+  public DistributedMap executeWorkers;
 
   /**
    * @field storageWorkers
@@ -40,7 +39,7 @@ public class DistributedState {
    * @details This is done to keep track of which machines are online and known by the rest of the
    *     cluster.
    */
-  public DistributedHashMap storageWorkers;
+  public DistributedMap storageWorkers;
 
   /**
    * @field executeAndStorageWorkers
@@ -48,7 +47,7 @@ public class DistributedState {
    * @details This is done to keep track of which machines are online and known by the rest of the
    *     cluster.
    */
-  public DistributedHashMap executeAndStorageWorkers;
+  public DistributedMap executeAndStorageWorkers;
 
   /**
    * @field prequeue
@@ -106,7 +105,7 @@ public class DistributedState {
    * @details We keep track of them here so they can be re-executed if the progress of the execution
    *     is lost.
    */
-  public DistributedHashMap dispatchedOperations;
+  public DistributedMap dispatchedOperations;
 
   /**
    * @field casWorkerMap
