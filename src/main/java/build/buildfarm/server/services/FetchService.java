@@ -24,7 +24,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class FetchService extends FetchImplBase {
-
   private final Instance instance;
 
   public FetchService(Instance instance) {

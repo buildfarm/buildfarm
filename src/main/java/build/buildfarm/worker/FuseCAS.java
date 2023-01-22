@@ -56,7 +56,6 @@ import ru.serce.jnrfuse.struct.Timespec;
 
 @Log
 public class FuseCAS extends FuseStubFS {
-
   private final Path mountPath;
   private final InputStreamFactory inputStreamFactory;
   private final DirectoryEntry root;

@@ -46,7 +46,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class ReportResultStage extends PipelineStage {
-
   private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public ReportResultStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -99,8 +98,7 @@ public class ReportResultStage extends PipelineStage {
           operationContext.queueEntry.getExecuteEntry().getActionDigest(),
           resultBuilder,
           operationContext.execDir,
-          operationContext.command.getOutputFilesList(),
-          operationContext.command.getOutputDirectoriesList());
+          operationContext.command);
     } catch (StatusException e) {
       ExecuteResponse executeResponse = operationContext.executeResponse.build();
       if (executeResponse.getStatus().getCode() == Code.OK.getNumber()

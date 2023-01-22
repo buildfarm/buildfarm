@@ -47,7 +47,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class MemoryCAS implements ContentAddressableStorage {
-
   private final long maxSizeInBytes;
   private final Consumer<Digest> onPut;
 

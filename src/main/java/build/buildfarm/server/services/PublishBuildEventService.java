@@ -30,7 +30,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class PublishBuildEventService extends PublishBuildEventImplBase {
-
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   @Override

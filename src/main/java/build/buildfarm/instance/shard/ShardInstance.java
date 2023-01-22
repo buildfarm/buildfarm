@@ -163,7 +163,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class ShardInstance extends AbstractServerInstance {
-
   private static final ListenableFuture<Void> IMMEDIATE_VOID_FUTURE = Futures.immediateFuture(null);
 
   private static final String TIMEOUT_OUT_OF_BOUNDS =

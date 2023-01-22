@@ -29,7 +29,6 @@ import redis.clients.jedis.JedisPubSub;
 
 @Log
 class RedisShardSubscription implements Runnable {
-
   private final JedisPubSub subscriber;
   private final InterruptingRunnable onUnsubscribe;
   private final Consumer<JedisCluster> onReset;
