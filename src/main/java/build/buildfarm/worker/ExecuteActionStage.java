@@ -46,27 +46,21 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
         output,
         createDestroyExecDirStage(workerContext, error),
         workerContext.getExecuteStageWidth());
-    
-    
-  executionSlotUsage =
-      Gauge.build()
-      .name("execution_slot_usage")
-      .help("Execution slot Usage.")
-      .register();
-  executionTime =
-      Histogram.build()
-      .name("execution_time_ms")
-      .help("Execution time in ms.")
-      .buckets(.01, .02, .03, .04)
-      .register();
-  executionStallTime =
-      Histogram.build()
-          .name("execution_stall_time_ms")
-          .help("Execution stall time in ms.")
-          .buckets(.01, .02, .03, .04)
-          .register();
-    
-    
+
+    executionSlotUsage =
+        Gauge.build().name("execution_slot_usage").help("Execution slot Usage.").register();
+    executionTime =
+        Histogram.build()
+            .name("execution_time_ms")
+            .help("Execution time in ms.")
+            .buckets(.01, .02, .03, .04)
+            .register();
+    executionStallTime =
+        Histogram.build()
+            .name("execution_stall_time_ms")
+            .help("Execution stall time in ms.")
+            .buckets(.01, .02, .03, .04)
+            .register();
   }
 
   static PipelineStage createDestroyExecDirStage(
