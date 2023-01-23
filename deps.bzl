@@ -78,6 +78,8 @@ def archive_dependencies(third_party):
             "sha256": "a7823dd867d91aa6f1dcdf93552c13c4106a52387ca7ff1c67971627998fbe24",
             "strip_prefix": "grpc-java-f5e8459748735c794932637d932070f302779d5e",
             "url": "https://github.com/grpc/grpc-java/archive/f5e8459748735c794932637d932070f302779d5e.zip",
+            "patch_args": ["-p1"],
+            "patches": ["%s:grpc.patch" % third_party],
         },
 
         # The APIs that we implement.
