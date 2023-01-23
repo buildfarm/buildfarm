@@ -24,6 +24,18 @@ def archive_dependencies(third_party):
             "sha256": RULES_JVM_EXTERNAL_SHA,
             "url": "https://github.com/bazelbuild/rules_jvm_external/archive/%s.zip" % RULES_JVM_EXTERNAL_TAG,
         },
+        {
+            "name": "io_bazel_rules_go",
+            "strip_prefix": "rules_go-de2074e0af1df1a34a862ca6108ed15f760520df",
+            "sha256": "ea809c38ffa3e78c626d52cabe6c3ea23d6549494696f44775ed8248db051f9e",
+            "url": "https://github.com/bazelbuild/rules_go/archive/de2074e0af1df1a34a862ca6108ed15f760520df.zip",
+        },
+        {
+            "name": "bazel_gazelle",
+            "strip_prefix": "bazel-gazelle-8adf04f8f7587ec64dc0d616b7b5243cf49b3c9d",
+            "sha256": "019772279a0688f8f7c7c5f953ea82a3d380417027d59063f0797d660b0310b7",
+            "url": "https://github.com/bazelbuild/bazel-gazelle/archive/8adf04f8f7587ec64dc0d616b7b5243cf49b3c9d.zip",
+        },
 
         # Kubernetes rules.  Useful for local development with tilt.
         {
