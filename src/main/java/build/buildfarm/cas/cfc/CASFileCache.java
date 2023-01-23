@@ -88,6 +88,7 @@ import io.grpc.Deadline;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
+import io.prometheus.client.Histogram;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -102,6 +103,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -134,6 +136,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Gauge.build().name("cas_size").help("CAS size.").register();
   private static final Gauge casEntryCountMetric =
       Gauge.build().name("cas_entry_count").help("Number of entries in the CAS.").register();
+
+  private static final Histogram casTtl =
+      Histogram.build()
+          .name("cas_ttl")
+          .help("The amount of time CAS entries live in L1 storage")
+          .register();
 
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
@@ -2535,6 +2543,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  private void publishExpirationMetric(Path path) {
+    long currentTime = new Date().getTime();
+    long createdTime = path.toFile().lastModified();
+    long ttl = currentTime - createdTime;
+    casTtl.observe(ttl);
+  }
+
   @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored"})
   private boolean charge(String key, long blobSizeInBytes, AtomicBoolean requiresDischarge)
       throws IOException, InterruptedException {
@@ -2559,7 +2574,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     (expiredEntry) -> {
                       String expiredKey = expiredEntry.key;
                       try {
-                        Files.delete(getPath(expiredKey));
+                        Path path = getPath(expiredKey);
+                        publishExpirationMetric(path);
+                        Files.delete(path);
                       } catch (NoSuchFileException eNoEnt) {
                         log.log(
                             Level.SEVERE,
