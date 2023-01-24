@@ -40,3 +40,8 @@ openssl pkcs8 \
 
 Provide these keys to configuration values `sslCertificatePath` and `sslPrivateKeyPath`.
 
+## Combined credentials
+You may have your certificate and private keys in a combined pem file.
+For example, if you were to run `cat selfsigned.key.pem selfsigned-x509.crt > combined.pem`
+you could provide `combined.pem` to both `sslCertificatePath` and `sslPrivateKeyPath` and get the same results.
+
