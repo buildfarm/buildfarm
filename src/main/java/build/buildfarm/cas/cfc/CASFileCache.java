@@ -60,6 +60,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.common.ZstdDecompressingOutputStream;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.io.CountingOutputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -129,6 +130,8 @@ import org.json.simple.JSONObject;
 
 @Log
 public abstract class CASFileCache implements ContentAddressableStorage {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   // Prometheus metrics
   private static final Counter expiredKeyCounter =
       Counter.build().name("expired_key").help("Number of key expirations.").register();
@@ -136,12 +139,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Gauge.build().name("cas_size").help("CAS size.").register();
   private static final Gauge casEntryCountMetric =
       Gauge.build().name("cas_entry_count").help("Number of entries in the CAS.").register();
-
-  private static final Histogram casTtl =
-      Histogram.build()
-          .name("cas_ttl")
-          .help("The amount of time CAS entries live in L1 storage")
-          .register();
+  private static Histogram casTtl;
 
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
@@ -321,6 +319,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.delegate = delegate;
     this.delegateSkipLoad = delegateSkipLoad;
     this.directoriesIndexDbName = directoriesIndexDbName;
+
+    if (configs.getWorker().getStorages().get(0).isPublishTtlMetric()) {
+      casTtl =
+          Histogram.build()
+              .name("cas_ttl")
+              .help("The amount of time CAS entries live in L1 storage")
+              .register();
+    }
 
     entryPathStrategy = new HexBucketEntryPathStrategy(root, hexBucketLevels);
 
@@ -2575,7 +2581,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                       String expiredKey = expiredEntry.key;
                       try {
                         Path path = getPath(expiredKey);
-                        publishExpirationMetric(path);
+                        if (configs.getWorker().getStorages().get(0).isPublishTtlMetric()) {
+                          publishExpirationMetric(path);
+                        }
                         Files.delete(path);
                       } catch (NoSuchFileException eNoEnt) {
                         log.log(

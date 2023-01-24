@@ -29,6 +29,9 @@ public class Cas {
   // GRPC
   private String target;
 
+  // Metrics
+  private boolean publishTtlMetric = false;
+
   /*
   Automatically set disk space to 90% of available space on the worker volume.
   User configured value in .yaml will always take presedence.
