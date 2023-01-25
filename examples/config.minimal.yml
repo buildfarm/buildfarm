@@ -1,3 +1,6 @@
+server:
+  sslCertificatePath: /tmp/sslcert/server.crt
+  sslPrivateKeyPath: /tmp/sslcert/server.pem
 backplane:
   redisUri: "redis://localhost:6379"
   queues:

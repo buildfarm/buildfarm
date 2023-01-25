@@ -5,43 +5,35 @@ parent: Configuration
 nav_order: 1
 ---
 
-This is an overview of a simple way to create a self signed TLS key pair. Particularly how to create the TLS files and convert the key file to the PKCS8 format.
+This is an overview of a simple way to create a self signed TLS key pair for client / server authentication.
+We recommend you look at the [script](https://github.com/bazelbuild/bazel/blob/master/src/test/testdata/test_tls_certificate/README.md?plain=1#L1) used by bazel for certificate generation.
 
-## Generate new key and create a self signed certificate:
+## Generated TLS self-signed certificates
+After running the above script, you will have the following files:
 ```
-openssl req \
--x509 \
--nodes \
--days 365 \
--newkey rsa:4096 \
--keyout selfsigned.key.pem \
--out selfsigned-x509.crt \
--subj "/C=US/ST=WA/L=Seattle/CN=example.com/emailAddress=someEmail@gmail.com"
+ls /tmp/sslcert
+ca.crt  ca.key  client.crt  client.csr  client.key  client.pem  server.crt  server.csr  server.key  server.pem
 ```
 
-### Output:
- - `selfsigned.key.pem` - PEM Key
- - `selfsigned-x509.crt` - x509 Certificate
-
-## Convert PEM key to PKCS8 format
+## Configuring the buildfarm server
+The certificate and private key can be referenced in buildfarm's config as followed:
 ```
-openssl pkcs8 \
--topk8 \
--inform PEM \
--outform PEM \
--in selfsigned.key.pem \
--out selfsigned-pkcs8.pem
+server:
+  sslCertificatePath: /tmp/sslcert/server.crt
+  sslPrivateKeyPath: /tmp/sslcert/server.pem
 ```
+## Configuring the buildfarm client
+When calling the bazel client, pass the certificate via `--tls_certificate`:
+```
+bazel build
+  --remote_executor=grpcs://localhost:8980 \
+  --tls_certificate=/tmp/sslcert/ca.crt \
+  <target>
 
-### Ouptut:
- - `selfsigned-pkcs8.pem` - PKCS formatted key
-
-## Buildfarm configuration
-
-Provide these keys to configuration values `sslCertificatePath` and `sslPrivateKeyPath`.
+```
+Don't forget to use `grpcs://` instead of `grpc://`.
 
 ## Combined credentials
-You may have your certificate and private keys in a combined pem file.
-For example, if you were to run `cat selfsigned.key.pem selfsigned-x509.crt > combined.pem`
+You may have certificate and private keys in a combined pem file.
+For example, if you were to run `cat  /tmp/sslcert/server.crt /tmp/sslcert/server.pem > combined.pem`
 you could provide `combined.pem` to both `sslCertificatePath` and `sslPrivateKeyPath` and get the same results.
-
