@@ -17,6 +17,8 @@ package build.buildfarm.common.redis;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Queue;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -41,10 +43,12 @@ import redis.clients.jedis.JedisCluster;
  */
 @RunWith(JUnit4.class)
 public class BalancedRedisQueueTest {
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private JedisCluster redis;
 
   @Before
   public void setUp() throws Exception {
+    configs.getBackplane().setRedisUri("redis://localhost:6379");
     redis = JedisClusterFactory.createTest();
   }
 
@@ -249,11 +253,44 @@ public class BalancedRedisQueueTest {
   // Reason for testing: the name is stored without a hashtag
   // Failure explanation: name does not match what it should
   @Test
+  public void getNameNameHasHashtagRemovedFrontPriority() throws Exception {
+    // ARRANGE
+    List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("{hash}queue_name", hashtags, Queue.QUEUE_TYPE.priority);
+    // ACT
+    String name = queue.getName();
+
+    // ASSERT
+    assertThat(name).isEqualTo("queue_name");
+  }
+
+  // Function under test: getName
+  // Reason for testing: the name is stored without a hashtag
+  // Failure explanation: name does not match what it should
+  @Test
   public void getNameNameHasHashtagColonRemovedFront() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     // similar to what has been seen in configuration files
     BalancedRedisQueue queue = new BalancedRedisQueue("{Execution}:QueuedOperations", hashtags);
+    // ACT
+    String name = queue.getName();
+
+    // ASSERT
+    assertThat(name).isEqualTo(":QueuedOperations");
+  }
+
+  // Function under test: getName
+  // Reason for testing: the name is stored without a hashtag
+  // Failure explanation: name does not match what it should
+  @Test
+  public void getNameNameHasHashtagColonRemovedFrontPriority() throws Exception {
+    // ARRANGE
+    List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
+    // similar to what has been seen in configuration files
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("{Execution}:QueuedOperations", hashtags, Queue.QUEUE_TYPE.priority);
     // ACT
     String name = queue.getName();
 
@@ -343,6 +380,43 @@ public class BalancedRedisQueueTest {
     assertThat(queue.size(redis)).isEqualTo(0);
   }
 
+  // Function under test: size
+  // Reason for testing: size adjusts with push and dequeue
+  // Failure explanation: size is incorrectly reporting the expected queue size
+  @Test
+  public void sizeAdjustPushPopPriority() throws Exception {
+    // ARRANGE
+    List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
+
+    // ACT / ASSERT
+    assertThat(queue.size(redis)).isEqualTo(0);
+    queue.push(redis, "foo");
+    assertThat(queue.size(redis)).isEqualTo(1);
+    queue.push(redis, "bar");
+    assertThat(queue.size(redis)).isEqualTo(2);
+    queue.push(redis, "baz");
+    assertThat(queue.size(redis)).isEqualTo(3);
+    queue.push(redis, "baz");
+    assertThat(queue.size(redis)).isEqualTo(4);
+    queue.push(redis, "baz");
+    assertThat(queue.size(redis)).isEqualTo(5);
+    queue.push(redis, "baz");
+    assertThat(queue.size(redis)).isEqualTo(6);
+    queue.dequeue(redis);
+    assertThat(queue.size(redis)).isEqualTo(5);
+    queue.dequeue(redis);
+    assertThat(queue.size(redis)).isEqualTo(4);
+    queue.dequeue(redis);
+    assertThat(queue.size(redis)).isEqualTo(3);
+    queue.dequeue(redis);
+    assertThat(queue.size(redis)).isEqualTo(2);
+    queue.dequeue(redis);
+    assertThat(queue.size(redis)).isEqualTo(1);
+    queue.dequeue(redis);
+    assertThat(queue.size(redis)).isEqualTo(0);
+  }
+
   // Function under test: visit
   // Reason for testing: each element in the queue can be visited
   // Failure explanation: we are unable to visit each element in the queue
@@ -351,6 +425,45 @@ public class BalancedRedisQueueTest {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    queue.push(redis, "element 1");
+    queue.push(redis, "element 2");
+    queue.push(redis, "element 3");
+    queue.push(redis, "element 4");
+    queue.push(redis, "element 5");
+    queue.push(redis, "element 6");
+    queue.push(redis, "element 7");
+    queue.push(redis, "element 8");
+
+    // ACT
+    List<String> visited = new ArrayList<>();
+    StringVisitor visitor =
+        new StringVisitor() {
+          public void visit(String entry) {
+            visited.add(entry);
+          }
+        };
+    queue.visit(redis, visitor);
+
+    // ASSERT
+    assertThat(visited.size()).isEqualTo(8);
+    assertThat(visited.contains("element 1")).isTrue();
+    assertThat(visited.contains("element 2")).isTrue();
+    assertThat(visited.contains("element 3")).isTrue();
+    assertThat(visited.contains("element 4")).isTrue();
+    assertThat(visited.contains("element 5")).isTrue();
+    assertThat(visited.contains("element 6")).isTrue();
+    assertThat(visited.contains("element 7")).isTrue();
+    assertThat(visited.contains("element 8")).isTrue();
+  }
+
+  // Function under test: visit
+  // Reason for testing: each element in the queue can be visited
+  // Failure explanation: we are unable to visit each element in the queue
+  @Test
+  public void visitCheckVisitOfEachElementPriority() throws Exception {
+    // ARRANGE
+    List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
     queue.push(redis, "element 1");
     queue.push(redis, "element 2");
     queue.push(redis, "element 3");
@@ -399,6 +512,22 @@ public class BalancedRedisQueueTest {
   }
 
   // Function under test: isEvenlyDistributed
+  // Reason for testing: an empty queue is always already evenly distributed
+  // Failure explanation: evenly distributed is not working on the empty queue
+  @Test
+  public void isEvenlyDistributedEmptyIsEvenlyDistributedPriority() throws Exception {
+    // ARRANGE
+    List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
+
+    // ACT
+    Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);
+
+    // ASSERT
+    assertThat(isEvenlyDistributed).isTrue();
+  }
+
+  // Function under test: isEvenlyDistributed
   // Reason for testing: having 4 nodes and pushing 400 elements should show that the elements are
   // evenly distributed
   // Failure explanation: queue is not evenly distributing as it should
@@ -407,6 +536,26 @@ public class BalancedRedisQueueTest {
     // ARRANGE
     List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+
+    // ACT
+    for (int i = 0; i < 400; ++i) {
+      queue.push(redis, "foo");
+    }
+    Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);
+
+    // ASSERT
+    assertThat(isEvenlyDistributed).isTrue();
+  }
+
+  // Function under test: isEvenlyDistributed
+  // Reason for testing: having 4 nodes and pushing 400 elements should show that the elements are
+  // evenly distributed
+  // Failure explanation: queue is not evenly distributing as it should
+  @Test
+  public void isEvenlyDistributedFourNodesFourHundredPushesIsEvenPriority() throws Exception {
+    // ARRANGE
+    List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
 
     // ACT
     for (int i = 0; i < 400; ++i) {
@@ -439,6 +588,26 @@ public class BalancedRedisQueueTest {
   }
 
   // Function under test: isEvenlyDistributed
+  // Reason for testing: having 4 nodes and pushing 401 elements should show that the elements are
+  // not evenly distributed
+  // Failure explanation: queue is incorrectly reporting an even distribution
+  @Test
+  public void isEvenlyDistributedFourNodesFourHundredOnePushesIsNotEvenPriority() throws Exception {
+    // ARRANGE
+    List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
+
+    // ACT
+    for (int i = 0; i < 401; ++i) {
+      queue.push(redis, "foo");
+    }
+    Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);
+
+    // ASSERT
+    assertThat(isEvenlyDistributed).isFalse();
+  }
+
+  // Function under test: isEvenlyDistributed
   // Reason for testing: having a single node means the values are always evenly distributed over
   // that node
   // Failure explanation: queue is incorrectly reporting an even distribution
@@ -447,6 +616,35 @@ public class BalancedRedisQueueTest {
     // ARRANGE
     List<String> hashtags = Collections.singletonList("single_node");
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+
+    // ACT / ASSERT
+    queue.push(redis, "foo");
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.push(redis, "foo");
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.push(redis, "foo");
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.push(redis, "foo");
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.dequeue(redis);
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.dequeue(redis);
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.dequeue(redis);
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.dequeue(redis);
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+  }
+
+  // Function under test: isEvenlyDistributed
+  // Reason for testing: having a single node means the values are always evenly distributed over
+  // that node
+  // Failure explanation: queue is incorrectly reporting an even distribution
+  @Test
+  public void isEvenlyDistributedSingleNodeAlwaysEvenlyDistributesPriority() throws Exception {
+    // ARRANGE
+    List<String> hashtags = Collections.singletonList("single_node");
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
 
     // ACT / ASSERT
     queue.push(redis, "foo");
@@ -491,6 +689,47 @@ public class BalancedRedisQueueTest {
     queue.push(redis, "foo");
     assertThat(queue.isEvenlyDistributed(redis)).isTrue();
     queue.push(redis, "foo");
+    assertThat(queue.isEvenlyDistributed(redis)).isFalse();
+    queue.dequeue(redis);
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.dequeue(redis);
+    assertThat(queue.isEvenlyDistributed(redis)).isFalse();
+    queue.dequeue(redis);
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.dequeue(redis);
+    assertThat(queue.isEvenlyDistributed(redis)).isFalse();
+    queue.dequeue(redis);
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.dequeue(redis);
+    assertThat(queue.isEvenlyDistributed(redis)).isFalse();
+    queue.dequeue(redis);
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+  }
+
+  // Function under test: isEvenlyDistributed
+  // Reason for testing: this example shows how a two internal queues affect the even distribution
+  // Failure explanation: queue is incorrectly reporting an even distribution
+  @Test
+  public void isEvenlyDistributedTwoNodeExamplePriority() throws Exception {
+    // ARRANGE
+    List<String> hashtags = Arrays.asList("node_1", "node_2");
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
+
+    // ACT / ASSERT
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.push(redis, "foo");
+    assertThat(queue.isEvenlyDistributed(redis)).isFalse();
+    queue.push(redis, "foo1");
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.push(redis, "foo2");
+    assertThat(queue.isEvenlyDistributed(redis)).isFalse();
+    queue.push(redis, "foo3");
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.push(redis, "foo4");
+    assertThat(queue.isEvenlyDistributed(redis)).isFalse();
+    queue.push(redis, "foo5");
+    assertThat(queue.isEvenlyDistributed(redis)).isTrue();
+    queue.push(redis, "foo6");
     assertThat(queue.isEvenlyDistributed(redis)).isFalse();
     queue.dequeue(redis);
     assertThat(queue.isEvenlyDistributed(redis)).isTrue();

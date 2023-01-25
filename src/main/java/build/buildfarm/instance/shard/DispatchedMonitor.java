@@ -31,11 +31,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 class DispatchedMonitor implements Runnable {
-  private static final Logger logger = Logger.getLogger(DispatchedMonitor.class.getName());
-
   private final Backplane backplane;
   private final BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer;
   private final int intervalSeconds;
@@ -60,7 +59,7 @@ class DispatchedMonitor implements Runnable {
         () -> {
           long endTime = System.nanoTime();
           float ms = (endTime - startTime) / 1000000.0f;
-          logger.log(
+          log.log(
               Level.INFO, format("DispatchedMonitor::run: requeue(%s) %gms", operationName, ms));
         },
         directExecutor());
@@ -75,7 +74,7 @@ class DispatchedMonitor implements Runnable {
         String.format(
             "DispatchedMonitor: Testing %s because %dms overdue (%d >= %d)",
             operationName, overdue_amount, now, o.getRequeueAt());
-    logger.log(Level.INFO, message);
+    log.log(Level.INFO, message);
   }
 
   private void testDispatchedOperations(
@@ -100,7 +99,7 @@ class DispatchedMonitor implements Runnable {
       }
     } catch (Exception e) {
       if (!backplane.isStopped()) {
-        logger.log(Level.SEVERE, "error during dispatch evaluation", e);
+        log.log(Level.SEVERE, "error during dispatch evaluation", e);
       }
     }
     return successfulAsList(requeuedFutures.build());
@@ -112,7 +111,7 @@ class DispatchedMonitor implements Runnable {
     } catch (ExecutionException e) {
       // unlikely, successfulAsList prevents this as the only return
       Throwable cause = e.getCause();
-      logger.log(Level.SEVERE, "unexpected exception", cause);
+      log.log(Level.SEVERE, "unexpected exception", cause);
       if (cause instanceof RuntimeException) {
         throw (RuntimeException) cause;
       }
@@ -136,13 +135,13 @@ class DispatchedMonitor implements Runnable {
 
   @Override
   public synchronized void run() {
-    logger.log(Level.INFO, "DispatchedMonitor: Running");
+    log.log(Level.INFO, "DispatchedMonitor: Running");
     try {
       runInterruptibly();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } finally {
-      logger.log(Level.INFO, "DispatchedMonitor: Exiting");
+      log.log(Level.INFO, "DispatchedMonitor: Exiting");
     }
   }
 }

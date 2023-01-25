@@ -54,18 +54,17 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
+import lombok.extern.java.Log;
 
 /**
  * A client implementing the {@code Write} method of the {@code ByteStream} gRPC service.
  *
  * <p>Users must call {@link #shutdown()} before exiting.
  */
+@Log
 public class ByteStreamUploader {
-  private static final Logger logger = Logger.getLogger(ByteStreamUploader.class.getName());
-
   private final String instanceName;
   private final Channel channel;
   private final CallCredentials callCredentials;
@@ -402,7 +401,7 @@ public class ByteStreamUploader {
                 // This exception indicates that closing the underlying input stream failed.
                 // We don't expect this to ever happen, but don't want to swallow the exception
                 // completely.
-                logger.log(Level.WARNING, "Chunker failed closing data source", e);
+                log.log(Level.WARNING, "Chunker failed closing data source", e);
               }
 
               if (status.isOk() || Code.ALREADY_EXISTS.equals(status.getCode())) {
@@ -449,7 +448,7 @@ public class ByteStreamUploader {
                     // This exception indicates that closing the underlying input stream failed.
                     // We don't expect this to ever happen, but don't want to swallow the exception
                     // completely.
-                    logger.log(Level.WARNING, format("Chunker failed closing data source: %s", e1));
+                    log.log(Level.WARNING, format("Chunker failed closing data source: %s", e1));
                   } finally {
                     call.cancel("Failed to read next chunk.", e);
                   }

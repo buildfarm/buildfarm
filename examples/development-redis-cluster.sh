@@ -16,7 +16,7 @@
 #   redis-cli cluster info
 #
 # Then, start your buildfarm server:
-#   bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/shard-server.config.example
+#   bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.yml
 set -eufo pipefail
 
 function print_usage() {

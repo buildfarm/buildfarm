@@ -24,10 +24,10 @@ GATING_LINE_PERCENTAGE="40";
 GATING_FUNC_PERCENTAGE="40";
 
 # If the user does not pass a given target, this will be used instead.
-DEFAULT_TEST_TARGET="//src/test/...:all"
+DEFAULT_TEST_TARGET="//src/test/java/...:all"
 
 # Any test tags filters to apply when generating code coverage.
-DEFAULT_TEST_TAG_FILTERS="-redis"
+DEFAULT_TEST_TAG_FILTERS="-redis,-integration"
 
 # How to spawn bazel.  The CI has a bazel available.
 DEFAULT_BAZEL_WRAPPER=bazel
@@ -55,7 +55,7 @@ print_error () {
 # Download lcov if we don't already have it.
 download_lcov() {
     if [ ! -f "$LCOV_TOOL" ] ; then
-        
+
         #download and extract tool
         wget -O $LCOV_TOOL $LCOV_TOOL_URL
         tar -xf $LCOV_TOOL
@@ -66,17 +66,17 @@ download_lcov() {
 }
 
 gate_lcov_results() {
-    
+
     # get lcov results
     download_lcov
     lcov_results=`$LCOV_TOOL --summary $traces 2>&1`
-    
+
     # extract our percentage numbers
     local line_percentage=$(echo "$lcov_results" | tr '\n' ' ' | awk '{print $8}' | sed 's/.$//')
     local function_percentage=$(echo "$lcov_results" | tr '\n' ' ' | awk '{print $14}' | sed 's/.$//')
     line_percentage=${line_percentage%.*}
     function_percentage=${function_percentage%.*}
-    
+
     # gate on configured code coverage threshold
     if [ "$line_percentage" -lt "$GATING_LINE_PERCENTAGE" ]; then
         print_error "line coverage is below gating percentage: "
@@ -85,7 +85,7 @@ gate_lcov_results() {
     else
         echo "current line coverage: " $line_percentage%
     fi
-    
+
     if [ "$function_percentage" -lt "$GATING_FUNC_PERCENTAGE" ]; then
         print_error "function coverage is below gating percentage: "
         print_error "$function_percentage < $GATING_FUNC_PERCENTAGE"
@@ -93,7 +93,7 @@ gate_lcov_results() {
     else
         echo "current function coverage: " $function_percentage%
     fi
-    
+
     exit 0
 }
 
@@ -145,7 +145,16 @@ if [ "${BUILDFARM_SKIP_COVERAGE_HOST:-false}" = false ]; then
     genhtml -f $traces
 
     command -v python >/dev/null 2>&1 || { echo >&2 'python could not be found, so the coverage report cannot be locally hosted.'; exit 1; }
-    python -m SimpleHTTPServer 8080
+
+    # Get python version
+    pythonVersion=`python -c 'import platform; major, minor, patch = platform.python_version_tuple(); print(major);'`
+
+    # Host code coverage based on python version
+    if [ $pythonVersion -eq 2 ];then
+        python -m SimpleHTTPServer 8080
+    else
+        python -m http.server 8080
+    fi
 else
     echo "Skipped coverage hosting."
 fi

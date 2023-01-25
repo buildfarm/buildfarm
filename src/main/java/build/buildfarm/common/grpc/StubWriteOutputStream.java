@@ -44,12 +44,11 @@ import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
+import lombok.extern.java.Log;
 
+@Log
 public class StubWriteOutputStream extends FeedbackOutputStream implements Write {
-  private static final Logger logger = Logger.getLogger(StubWriteOutputStream.class.getName());
-
   public static final long UNLIMITED_EXPECTED_SIZE = Long.MAX_VALUE;
 
   private static final int CHUNK_SIZE = 16 * 1024;
@@ -218,7 +217,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
                       long committedSize = response.getCommittedSize();
                       if (expectedSize != UNLIMITED_EXPECTED_SIZE
                           && committedSize != expectedSize) {
-                        logger.log(
+                        log.log(
                             WARNING,
                             format(
                                 "received WriteResponse with unexpected committedSize: %d != %d",

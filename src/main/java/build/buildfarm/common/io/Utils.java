@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystem;
+import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
@@ -39,20 +40,19 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import jnr.constants.platform.OpenFlags;
 import jnr.ffi.LibraryLoader;
 import jnr.ffi.Pointer;
 import jnr.posix.FileStat;
 import jnr.posix.POSIX;
+import lombok.extern.java.Log;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.IOUtils;
 
+@Log
 public class Utils {
-  private static final Logger logger = Logger.getLogger(Utils.class.getName());
-
   @SuppressWarnings("Guava")
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
@@ -157,7 +157,7 @@ public class Utils {
     Pointer DIR = libc.opendir(path.toString());
 
     if (DIR == null) {
-      logger.log(Level.SEVERE, "libc.opendir failed: " + path.toString());
+      log.log(Level.SEVERE, "libc.opendir failed: " + path.toString());
       return dirents;
     }
 
@@ -475,6 +475,29 @@ public class Utils {
       return null;
     }
     return fileSystem.getUserPrincipalLookupService().lookupPrincipalByName(userName);
+  }
+
+  public static List<Path> getSymbolicLinkReferences(Path dir) {
+    List<Path> paths = new ArrayList<>();
+
+    try {
+      Files.walk(dir, FileVisitOption.FOLLOW_LINKS)
+          .forEach(
+              path -> {
+                if (Files.isSymbolicLink(path)) {
+                  try {
+                    Path reference = Files.readSymbolicLink(path);
+                    paths.add(reference);
+                  } catch (IOException e) {
+                    log.log(Level.WARNING, "Could not derive symbolic link: ", e);
+                  }
+                }
+              });
+    } catch (Exception e) {
+      log.log(Level.WARNING, "Could not traverse dir: ", e);
+    }
+
+    return paths;
   }
 
   /**

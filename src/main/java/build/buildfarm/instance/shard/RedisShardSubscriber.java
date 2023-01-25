@@ -34,14 +34,13 @@ import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 import redis.clients.jedis.Client;
 import redis.clients.jedis.JedisPubSub;
 
+@Log
 class RedisShardSubscriber extends JedisPubSub {
-  private static final Logger logger = Logger.getLogger(RedisShardSubscriber.class.getName());
-
   abstract static class TimedWatchFuture extends WatchFuture {
     private final TimedWatcher watcher;
 
@@ -138,7 +137,7 @@ class RedisShardSubscriber extends JedisPubSub {
         new TimedWatchFuture(watcher) {
           @Override
           public void unwatch() {
-            logger.log(Level.FINE, format("unwatching %s", channel));
+            log.log(Level.FINE, format("unwatching %s", channel));
             RedisShardSubscriber.this.unwatch(channel, this);
           }
         };
@@ -178,7 +177,7 @@ class RedisShardSubscriber extends JedisPubSub {
         (watcher) -> {
           boolean expired = force || watcher.isExpiredAt(now);
           if (expired) {
-            logger.log(
+            log.log(
                 Level.SEVERE,
                 format(
                     "Terminating expired watcher of %s because: %s >= %s%s",
@@ -200,7 +199,7 @@ class RedisShardSubscriber extends JedisPubSub {
       @Nullable Instant expiresAt) {
     List<TimedWatchFuture> operationWatchers = watchers.get(channel);
     boolean observe = operation == null || operation.hasMetadata() || operation.getDone();
-    logger.log(Level.FINE, format("onOperation %s: %s", channel, operation));
+    log.log(Level.FINE, format("onOperation %s: %s", channel, operation));
     synchronized (watchers) {
       ImmutableList.Builder<Consumer<Operation>> observers = ImmutableList.builder();
       for (TimedWatchFuture watchFuture : operationWatchers) {
@@ -216,7 +215,7 @@ class RedisShardSubscriber extends JedisPubSub {
         executor.execute(
             () -> {
               if (observe) {
-                logger.log(Level.FINE, "observing " + operation);
+                log.log(Level.FINE, "observing " + operation);
                 observer.accept(operation);
               }
             });
@@ -237,14 +236,14 @@ class RedisShardSubscriber extends JedisPubSub {
     try {
       onWorkerChange(parseWorkerChange(message));
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.INFO, format("invalid worker change message: %s", message), e);
+      log.log(Level.INFO, format("invalid worker change message: %s", message), e);
     }
   }
 
   void onWorkerChange(WorkerChange workerChange) {
     switch (workerChange.getTypeCase()) {
       case TYPE_NOT_SET:
-        logger.log(
+        log.log(
             Level.SEVERE,
             format(
                 "WorkerChange oneof type is not set from %s at %s",
@@ -275,7 +274,7 @@ class RedisShardSubscriber extends JedisPubSub {
     try {
       onOperationChange(channel, parseOperationChange(message));
     } catch (InvalidProtocolBufferException e) {
-      logger.log(
+      log.log(
           Level.INFO, format("invalid operation change message for %s: %s", channel, message), e);
     }
   }
@@ -293,7 +292,7 @@ class RedisShardSubscriber extends JedisPubSub {
     switch (operationChange.getTypeCase()) {
       case TYPE_NOT_SET:
         // FIXME present nice timestamp
-        logger.log(
+        log.log(
             Level.SEVERE,
             format(
                 "OperationChange oneof type is not set from %s at %s",

@@ -16,9 +16,12 @@ package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.config.Queue;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -332,6 +335,27 @@ public class BalancedRedisQueueMockTest {
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);
 
     // ASSERT
+    verify(redis, times(2)).llen(any(String.class));
+    assertThat(isEvenlyDistributed).isTrue();
+  }
+
+  // Function under test: isEvenlyDistributed for priority
+  // Reason for testing: an empty queue is always already evenly distributed
+  // Failure explanation: evenly distributed is not working on the empty queue
+  @Test
+  public void isEvenlyDistributedEmptyIsEvenlyDistributedPriority() throws Exception {
+    // MOCK
+    when(redis.zcard(any(String.class))).thenReturn(0L);
+
+    // ARRANGE
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", ImmutableList.of(), Queue.QUEUE_TYPE.priority);
+
+    // ACT
+    Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);
+
+    // ASSERT
+    verify(redis, times(2)).zcard(any(String.class));
     assertThat(isEvenlyDistributed).isTrue();
   }
 
@@ -354,6 +378,25 @@ public class BalancedRedisQueueMockTest {
   }
 
   // Function under test: canQueue
+  // Reason for testing: infinite queues allow queuing for priority
+  // Failure explanation: the queue is not accepting queuing when it should
+  @Test
+  public void canQueueIfinitePriorityQueueAllowsQueuing() throws Exception {
+    // MOCK
+    when(redis.zcard(any(String.class))).thenReturn(999L);
+
+    // ARRANGE
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", ImmutableList.of(), -1, Queue.QUEUE_TYPE.priority);
+
+    // ACT
+    boolean canQueue = queue.canQueue(redis);
+
+    // ASSERT
+    assertThat(canQueue).isTrue();
+  }
+
+  // Function under test: canQueue for regular
   // Reason for testing: Full queues do not allow queuing
   // Failure explanation: the queue is still allowing queuing despite being full
   @Test
@@ -368,6 +411,26 @@ public class BalancedRedisQueueMockTest {
     boolean canQueue = queue.canQueue(redis);
 
     // ASSERT
+    assertThat(canQueue).isFalse();
+  }
+
+  // Function under test: canQueue for priority
+  // Reason for testing: Full queues do not allow queuing
+  // Failure explanation: the queue is still allowing queuing despite being full
+  @Test
+  public void canQueueFullPriorityQueueNotAllowsQueuing() throws Exception {
+    // MOCK
+    when(redis.zcard(any(String.class))).thenReturn(123L);
+
+    // ARRANGE
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", ImmutableList.of(), 123, Queue.QUEUE_TYPE.priority);
+
+    // ACT
+    boolean canQueue = queue.canQueue(redis);
+
+    // ASSERT
+    verify(redis).zcard(any(String.class));
     assertThat(canQueue).isFalse();
   }
 }

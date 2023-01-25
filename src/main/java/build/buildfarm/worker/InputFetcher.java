@@ -27,23 +27,25 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.FileNode;
-import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 
+@Log
 public class InputFetcher implements Runnable {
-  private static final Logger logger = Logger.getLogger(InputFetcher.class.getName());
-
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
   private final InputFetchStage owner;
@@ -56,20 +58,33 @@ public class InputFetcher implements Runnable {
     this.owner = owner;
   }
 
-  private boolean isQueuedOperationValid(QueuedOperation queuedOperation) {
-    Action action = queuedOperation.getAction();
+  private List<String> validateQueuedOperation(QueuedOperation queuedOperation) {
+    // Capture a list of all validation failures on the queued operation.
+    // A successful validation is a an empty list of failures.
+    List<String> constraintFailures = new ArrayList<>();
 
+    if (queuedOperation == null) {
+      constraintFailures.add("QueuedOperation is missing.");
+      return constraintFailures;
+    }
+
+    // Ensure the timeout is not too long by comparing it to the maximum allowed timeout
+    Action action = queuedOperation.getAction();
     if (action.hasTimeout() && workerContext.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
       Duration maximum = workerContext.getMaximumActionTimeout();
-      if (timeout.getSeconds() > maximum.getSeconds()
-          || (timeout.getSeconds() == maximum.getSeconds()
-              && timeout.getNanos() > maximum.getNanos())) {
-        return false;
+      if (Durations.compare(timeout, maximum) > 0) {
+        constraintFailures.add(
+            String.format(
+                "Timeout is too long (%s > %s).", timeout.getSeconds(), maximum.getSeconds()));
       }
     }
 
-    return !queuedOperation.getCommand().getArgumentsList().isEmpty();
+    if (queuedOperation.getCommand().getArgumentsList().isEmpty()) {
+      constraintFailures.add("Argument list is empty.");
+    }
+
+    return constraintFailures;
   }
 
   private long runInterruptibly(Stopwatch stopwatch) throws InterruptedException {
@@ -146,7 +161,7 @@ public class InputFetcher implements Runnable {
 
   private long fetchPolled(Stopwatch stopwatch) throws InterruptedException {
     String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
-    logger.log(Level.FINE, format("fetching inputs: %s", operationName));
+    log.log(Level.FINE, format("fetching inputs: %s", operationName));
 
     ExecutedActionMetadata.Builder executedAction =
         operationContext
@@ -160,22 +175,16 @@ public class InputFetcher implements Runnable {
     Path execDir;
     try {
       queuedOperation = workerContext.getQueuedOperation(operationContext.queueEntry);
-      if (queuedOperation == null || !isQueuedOperationValid(queuedOperation)) {
-        if (queuedOperation != null) {
-          logger.log(Level.SEVERE, format("invalid queued operation: %s", operationName));
-        }
+      List<String> constraintFailures = validateQueuedOperation(queuedOperation);
+      if (!constraintFailures.isEmpty()) {
+        log.log(
+            Level.SEVERE,
+            format("invalid queued operation: %s", String.join(" ", constraintFailures)));
         owner.error().put(operationContext);
         return 0;
       }
 
-      if (queuedOperation.hasTree()) {
-        directoriesIndex =
-            DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap());
-      } else {
-        // TODO remove legacy interpretation and field after transition
-        directoriesIndex =
-            workerContext.getDigestUtil().createDirectoriesIndex(queuedOperation.getLegacyTree());
-      }
+      directoriesIndex = new ProxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap());
 
       execDir =
           workerContext.createExecDir(
@@ -184,7 +193,7 @@ public class InputFetcher implements Runnable {
               queuedOperation.getAction(),
               queuedOperation.getCommand());
     } catch (IOException e) {
-      logger.log(Level.SEVERE, format("error creating exec dir for %s", operationName), e);
+      log.log(Level.SEVERE, format("error creating exec dir for %s", operationName), e);
       owner.error().put(operationContext);
       return 0;
     }
@@ -217,7 +226,7 @@ public class InputFetcher implements Runnable {
         try {
           workerContext.destroyExecDir(execDir);
         } catch (IOException e) {
-          logger.log(
+          log.log(
               Level.SEVERE,
               format("error deleting exec dir for %s after interrupt", operationName));
         }
@@ -255,8 +264,7 @@ public class InputFetcher implements Runnable {
       }
     } else {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
-      logger.log(
-          Level.FINE, "InputFetcher: Operation " + operationName + " Failed to claim output");
+      log.log(Level.FINE, "InputFetcher: Operation " + operationName + " Failed to claim output");
 
       owner.error().put(operationContext);
     }
@@ -274,16 +282,16 @@ public class InputFetcher implements Runnable {
       try {
         owner.error().put(operationContext);
       } catch (InterruptedException errorEx) {
-        logger.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
+        log.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
       } finally {
         Thread.currentThread().interrupt();
       }
     } catch (Exception e) {
-      logger.log(Level.WARNING, format("error while fetching inputs: %s", operationName), e);
+      log.log(Level.WARNING, format("error while fetching inputs: %s", operationName), e);
       try {
         owner.error().put(operationContext);
       } catch (InterruptedException errorEx) {
-        logger.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
+        log.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
       }
       throw e;
     } finally {

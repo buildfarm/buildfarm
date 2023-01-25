@@ -1,13 +1,17 @@
 java_library(
     name = "cas",
     srcs = glob(["**/*.java"]),
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     runtime_deps = [
         "@maven//:org_xerial_sqlite_jdbc",
     ],
     deps = [
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/common/grpc",
+        "//src/main/java/build/buildfarm/common/resources",
+        "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
@@ -25,6 +29,8 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
+        "@maven//:net_jcip_jcip_annotations",
+        "@maven//:org_projectlombok_lombok",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],

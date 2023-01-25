@@ -16,6 +16,7 @@ package build.buildfarm.operations.finder;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -31,7 +32,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 import redis.clients.jedis.JedisCluster;
 
 /**
@@ -41,9 +42,8 @@ import redis.clients.jedis.JedisCluster;
  * @details For performance reasons, only build these enriched operations when you intend to use the
  *     extra provided metadata.
  */
+@Log
 public class EnrichedOperationBuilder {
-  private static final Logger logger = Logger.getLogger(EnrichedOperationBuilder.class.getName());
-
   /**
    * @brief Create an enriched operation based on an operation key.
    * @details This will make calls to get blobs, and resolve digests into the appropriate data
@@ -112,7 +112,7 @@ public class EnrichedOperationBuilder {
             .ignoringUnknownFields();
 
     if (json == null) {
-      logger.log(Level.WARNING, "Operation Json is empty");
+      log.log(Level.WARNING, "Operation Json is empty");
       return null;
     }
     try {
@@ -120,7 +120,7 @@ public class EnrichedOperationBuilder {
       operationParser.merge(json, operationBuilder);
       return operationBuilder.build();
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+      log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
       return null;
     }
   }
@@ -154,7 +154,7 @@ public class EnrichedOperationBuilder {
       }
 
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+      log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
       metadata = null;
     }
 
@@ -171,17 +171,19 @@ public class EnrichedOperationBuilder {
    */
   private static Action actionDigestToAction(Instance instance, Digest digest) {
     try {
-      ByteString blob = Utils.getBlob(instance, digest, RequestMetadata.getDefaultInstance());
+      ByteString blob =
+          Utils.getBlob(
+              instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance());
       Action action;
       try {
         action = Action.parseFrom(blob);
         return action;
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+        log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
         return null;
       }
     } catch (Exception e) {
-      logger.log(Level.WARNING, e.getMessage());
+      log.log(Level.WARNING, e.getMessage());
       return null;
     }
   }
@@ -196,17 +198,19 @@ public class EnrichedOperationBuilder {
    */
   private static Command commandDigestToCommand(Instance instance, Digest digest) {
     try {
-      ByteString blob = Utils.getBlob(instance, digest, RequestMetadata.getDefaultInstance());
+      ByteString blob =
+          Utils.getBlob(
+              instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance());
       Command command;
       try {
         command = Command.parseFrom(blob);
         return command;
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+        log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
         return null;
       }
     } catch (Exception e) {
-      logger.log(Level.WARNING, e.getMessage());
+      log.log(Level.WARNING, e.getMessage());
       return null;
     }
   }

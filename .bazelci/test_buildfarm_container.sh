@@ -1,18 +1,21 @@
 #!/bin/bash
+set -e
+set -o pipefail
+
 # This script is to be called within a built container reflecting the changes of a PR
 # We start the server and the worker, and test that they can complete builds for a bazel client.
 cd buildfarm;
 
 #Various targets to be tested
 BUILDFARM_SERVER_TARGET="//src/main/java/build/buildfarm:buildfarm-server"
-BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-memory-worker"
-BUILDFARM_SHARD_WORKER_TAERGET="//src/main/java/build/buildfarm:buildfarm-shard-worker"
+BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-shard-worker"
 
 #The configs used by the targets
-BUILDFARM_SERVER_CONFIG="/buildfarm/examples/server.config.example"
-BUILDFARM_WORKER_CONFIG="/buildfarm/examples/worker.config.example"
-BUILDFARM_SHARD_SERVER_CONFIG="/buildfarm/examples/shard-server.config.example"
-BUILDFARM_SHARD_WORKER_CONFIG="/buildfarm/examples/shard-worker.config.example"
+BUILDFARM_SERVER_CONFIG="/buildfarm/examples/config.minimal.yml"
+BUILDFARM_WORKER_CONFIG="/buildfarm/examples/config.minimal.yml"
+
+GRPC_LOGS1="/tmp/parsed-grpc.log"
+GRPC_LOGS2="/tmp/parsed-grpc2.log"
 
 ensure_server_is_up(){
     # We cannot do a test build until the server is properly started.
@@ -63,35 +66,46 @@ check_for_crashes(){
 }
 
 start_server_and_worker(){
-    if [ "${TEST_SHARD:-false}" = true ]; then
+  echo "Testing with Shard Instances."
 
-        echo "Testing with Shard Instances."
+  # Build first to create more predictable run time.
+  ./bazel build $BUILDFARM_SERVER_TARGET $BUILDFARM_WORKER_TARGET
 
-        # Start the server.
-        ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SHARD_SERVER_CONFIG > server.log 2>&1 &
-        SERVER_PID=$!
-        
-        ensure_server_is_up
+  # Start the server.
+  ./bazel run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
+  SERVER_PID=$!
 
-        # Start the worker.
-        ./bazelw run $BUILDFARM_SHARD_WORKER_TAERGET -- $BUILDFARM_SHARD_WORKER_CONFIG > worker.log 2>&1 &
-        WORKER_PID=$!
-    else
+  ensure_server_is_up
 
-        echo "Testing with Memory Instances."
+  # Start the worker.
+  ./bazel run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
+  WORKER_PID=$!
+}
 
-        # Start the server.
-        ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
-        SERVER_PID=$!
-        
-        ensure_server_is_up
+init_grpc_parser(){
+    if [ "${CACHE_TEST:-false}" = true ]; then
+        echo "Fetch tools_remote from git"
 
-        # Start the worker.
-        ./bazelw run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
-        WORKER_PID=$!
+        git clone https://github.com/bazelbuild/tools_remote.git
+        cd tools_remote;
+        git reset --hard $SHA1_TOOLS_REMOTE
+        ../bazel build //:remote_client
+        cd /buildfarm;
+    fi
+}
+parse_grpc_logs(){
+    if [ "${CACHE_TEST:-false}" = true ]; then
+        echo "Parse grpc log"
+        ./tools_remote/bazel-bin/remote_client --grpc_log src/test/many/grpc.log printlog --format_json > $GRPC_LOGS1
+        ./tools_remote/bazel-bin/remote_client --grpc_log src/test/many/grpc2.log printlog --format_json > $GRPC_LOGS2
+        calculate_cache_statistics "$GRPC_LOGS1" "$GRPC_LOGS2"
     fi
 }
 
+calculate_cache_statistics(){
+    echo "Calculating cache statistics..."
+    ./.bazelci/ingest_grpc_logs.py $1 $2
+}
 start_server_and_worker
 
 # Show startup logs
@@ -102,5 +116,9 @@ cat server.log
 
 check_for_crashes &
 
+init_grpc_parser
+
 #Run a test against the cluster
-$RUN_TEST
+$RUN_TEST $TEST_ARG1 $TEST_ARG2
+
+parse_grpc_logs

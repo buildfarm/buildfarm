@@ -48,6 +48,7 @@ COM_AWS_MODULES = [
     "secretsmanager",
     "sns",
     "ssm",
+    "s3",
 ]
 
 ORG_SPRING_MODULES = [
@@ -71,8 +72,9 @@ def buildfarm_init(name = "buildfarm"):
     maven_install(
         artifacts = ["com.amazonaws:aws-java-sdk-%s:1.11.729" % module for module in COM_AWS_MODULES] +
                     [
-                        "com.fasterxml.jackson.core:jackson-databind:2.9.8",
+                        "com.fasterxml.jackson.core:jackson-databind:2.13.3",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
+                        "com.github.docker-java:docker-java:3.2.11",
                         "com.github.jnr:jffi:1.2.16",
                         "com.github.jnr:jffi:jar:native:1.2.16",
                         "com.github.jnr:jnr-constants:0.9.9",
@@ -80,10 +82,11 @@ def buildfarm_init(name = "buildfarm"):
                         "com.github.jnr:jnr-posix:3.0.53",
                         "com.github.pcj:google-options:1.0.0",
                         "com.github.serceman:jnr-fuse:0.5.5",
+                        "com.github.luben:zstd-jni:1.5.2-1",
                         "com.google.auth:google-auth-library-credentials:0.9.1",
                         "com.google.auth:google-auth-library-oauth2-http:0.9.1",
                         "com.google.code.findbugs:jsr305:3.0.1",
-                        "com.google.code.gson:gson:2.8.6",
+                        "com.google.code.gson:gson:2.9.0",
                         "com.google.errorprone:error_prone_annotations:2.9.0",
                         "com.google.errorprone:error_prone_core:0.92",
                         "com.google.guava:failureaccess:1.0.1",
@@ -93,32 +96,40 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.protobuf:protobuf-java-util:3.10.0",
                         "com.google.protobuf:protobuf-java:3.10.0",
                         "com.google.truth:truth:0.44",
+                        "org.slf4j:slf4j-simple:1.7.35",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
                         "io.github.lognet:grpc-spring-boot-starter:4.5.4",
-                    ] + ["io.netty:netty-%s:4.1.65.Final" % module for module in IO_NETTY_MODULES] +
+                        "org.bouncycastle:bcprov-jdk15on:1.70",
+                        "net.jcip:jcip-annotations:1.0",
+                    ] + ["io.netty:netty-%s:4.1.68.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
                     [
                         "io.prometheus:simpleclient:0.10.0",
                         "io.prometheus:simpleclient_hotspot:0.10.0",
                         "io.prometheus:simpleclient_httpserver:0.10.0",
-                        "junit:junit:4.12",
+                        "junit:junit:4.13.1",
+                        "javax.annotation:javax.annotation-api:1.3.2",
                         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
                         "org.apache.commons:commons-compress:1.21",
                         "org.apache.commons:commons-pool2:2.9.0",
+                        "org.apache.commons:commons-lang3:3.12.0",
                         "commons-io:commons-io:2.11.0",
+                        "me.dinowernli:java-grpc-prometheus:0.5.0",
                         "org.apache.tomcat:annotations-api:6.0.53",
                         "org.checkerframework:checker-qual:2.5.2",
                         "org.mockito:mockito-core:2.25.0",
                         "org.openjdk.jmh:jmh-core:1.23",
                         "org.openjdk.jmh:jmh-generator-annprocess:1.23",
                         "org.redisson:redisson:3.13.1",
-                    ] + ["org.springframework.boot:%s:2.1.3.RELEASE" % module for module in ORG_SPRING_BOOT_MODULES] +
-                    ["org.springframework:%s:4.3.14.RELEASE" % module for module in ORG_SPRING_MODULES] +
+                    ] + ["org.springframework.boot:%s:2.7.4" % module for module in ORG_SPRING_BOOT_MODULES] +
+                    ["org.springframework:%s:5.3.23" % module for module in ORG_SPRING_MODULES] +
                     [
                         "org.threeten:threetenbp:1.3.3",
                         "org.xerial:sqlite-jdbc:3.34.0",
                         "org.jetbrains:annotations:16.0.2",
+                        "org.yaml:snakeyaml:1.30",
+                        "org.projectlombok:lombok:1.18.24",
                     ],
         generate_compat_repositories = True,
         repositories = [

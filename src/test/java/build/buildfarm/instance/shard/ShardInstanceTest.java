@@ -44,6 +44,7 @@ import static org.mockito.Mockito.when;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -54,6 +55,8 @@ import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ToolDetails;
+import build.buildfarm.actioncache.ActionCache;
+import build.buildfarm.actioncache.ShardActionCache;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -132,8 +135,7 @@ public class ShardInstanceTest {
   public void setUp() throws InterruptedException {
     MockitoAnnotations.initMocks(this);
     blobDigests = Sets.newHashSet();
-    ReadThroughActionCache actionCache =
-        new ShardActionCache(10, mockBackplane, newDirectExecutorService());
+    ActionCache actionCache = new ShardActionCache(10, mockBackplane, newDirectExecutorService());
     instance =
         new ShardInstance(
             "shard",
@@ -227,7 +229,7 @@ public class ShardInstanceTest {
             (Answer<Void>)
                 invocation -> {
                   StreamObserver<ByteString> blobObserver =
-                      (StreamObserver) invocation.getArguments()[3];
+                      (StreamObserver) invocation.getArguments()[4];
                   if (provideAction) {
                     blobObserver.onNext(action.toByteString());
                     blobObserver.onCompleted();
@@ -238,6 +240,7 @@ public class ShardInstanceTest {
                 })
         .when(mockWorkerInstance)
         .getBlob(
+            eq(Compressor.Value.IDENTITY),
             eq(actionDigest),
             eq(0L),
             eq(actionDigest.getSizeBytes()),
@@ -365,7 +368,8 @@ public class ShardInstanceTest {
                 Violation.newBuilder()
                     .setType(VIOLATION_TYPE_INVALID)
                     .setSubject(INVALID_PLATFORM)
-                    .setDescription("properties are not valid for queue eligibility: []"))
+                    .setDescription(
+                        "properties are not valid for queue eligibility: [].  If you think your queue should still accept these poperties without them being specified in queue configuration, consider configuring the queue with `allow_unmatched: True`"))
             .build();
     ExecuteResponse executeResponse =
         ExecuteResponse.newBuilder()
@@ -516,7 +520,11 @@ public class ShardInstanceTest {
 
     doAnswer(answer((digest, uuid) -> new NullWrite()))
         .when(mockWorkerInstance)
-        .getBlobWrite(any(Digest.class), any(UUID.class), any(RequestMetadata.class));
+        .getBlobWrite(
+            any(Compressor.Value.class),
+            any(Digest.class),
+            any(UUID.class),
+            any(RequestMetadata.class));
 
     StatusRuntimeException queueException = Status.UNAVAILABLE.asRuntimeException();
     doAnswer(
@@ -608,7 +616,11 @@ public class ShardInstanceTest {
 
     doAnswer(answer((digest, uuid) -> new NullWrite()))
         .when(mockWorkerInstance)
-        .getBlobWrite(any(Digest.class), any(UUID.class), any(RequestMetadata.class));
+        .getBlobWrite(
+            any(Compressor.Value.class),
+            any(Digest.class),
+            any(UUID.class),
+            any(RequestMetadata.class));
 
     Poller poller = mock(Poller.class);
 
@@ -759,13 +771,14 @@ public class ShardInstanceTest {
             (Answer<Void>)
                 invocation -> {
                   StreamObserver<ByteString> blobObserver =
-                      (StreamObserver) invocation.getArguments()[3];
+                      (StreamObserver) invocation.getArguments()[4];
                   blobObserver.onNext(content);
                   blobObserver.onCompleted();
                   return null;
                 })
         .when(mockWorkerInstance)
         .getBlob(
+            eq(Compressor.Value.IDENTITY),
             eq(digest),
             eq(0L),
             eq(digest.getSizeBytes()),

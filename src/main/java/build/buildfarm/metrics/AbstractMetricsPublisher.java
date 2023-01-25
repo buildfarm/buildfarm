@@ -25,13 +25,12 @@ import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
-import io.prometheus.client.Summary;
+import io.prometheus.client.Histogram;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public abstract class AbstractMetricsPublisher implements MetricsPublisher {
-  private static final Logger logger = Logger.getLogger(AbstractMetricsPublisher.class.getName());
-
   private static final Counter actionsCounter =
       Counter.build().name("actions").help("Number of actions.").register();
   private static final Gauge operationsInStage =
@@ -52,10 +51,10 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
           .labelNames("worker_name")
           .help("Operations per worker.")
           .register();
-  private static final Summary queuedTime =
-      Summary.build().name("queued_time_ms").help("Queued time in ms.").register();
-  private static final Summary outputUploadTime =
-      Summary.build().name("output_upload_time_ms").help("Output upload time in ms.").register();
+  private static final Histogram queuedTime =
+      Histogram.build().name("queued_time_ms").help("Queued time in ms.").register();
+  private static final Histogram outputUploadTime =
+      Histogram.build().name("output_upload_time_ms").help("Output upload time in ms.").register();
 
   private final String clusterId;
 
@@ -151,7 +150,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
       }
       return operationRequestMetadata;
     } catch (Exception e) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format("Could not populate request metadata for %s.", operation.getName()),
           e);
@@ -173,7 +172,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
             .usingTypeRegistry(typeRegistry)
             .omittingInsignificantWhitespace()
             .print(operationRequestMetadata);
-    logger.log(Level.FINE, "{}", formattedRequestMetadata);
+    log.log(Level.FINE, "{}", formattedRequestMetadata);
     return formattedRequestMetadata;
   }
 }

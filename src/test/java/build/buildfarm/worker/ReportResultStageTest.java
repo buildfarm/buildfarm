@@ -37,7 +37,6 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueueEntry;
-import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.rpc.Code;
@@ -158,8 +157,7 @@ public class ReportResultStageTest {
             eq(actionDigest),
             any(ActionResult.Builder.class),
             eq(erroringContext.execDir),
-            eq(ImmutableList.of()),
-            eq(ImmutableList.of()));
+            eq(Command.getDefaultInstance()));
 
     PipelineStage reportResultStage = new ReportResultStage(context, output, /* error=*/ null);
     reportResultStage.put(erroringContext);
@@ -174,8 +172,7 @@ public class ReportResultStageTest {
             eq(DIGEST_UTIL.compute(erroringContext.action)),
             any(ActionResult.Builder.class),
             eq(erroringContext.execDir),
-            eq(ImmutableList.of()),
-            eq(ImmutableList.of()));
+            eq(Command.getDefaultInstance()));
     assertThat(erroredOperation.getResponse().unpack(ExecuteResponse.class).getStatus())
         .isEqualTo(erroredStatus);
     verify(context, never()).putActionResult(any(ActionKey.class), any(ActionResult.class));

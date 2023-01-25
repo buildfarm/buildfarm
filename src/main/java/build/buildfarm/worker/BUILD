@@ -1,9 +1,11 @@
 java_library(
     name = "worker",
     srcs = glob(["*.java"]),
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/worker/resources",
@@ -11,6 +13,9 @@ java_library(
         "@bazel//src/main/protobuf:execution_statistics_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
+        "@maven//:com_github_docker_java_docker_java",
+        "@maven//:com_github_docker_java_docker_java_api",
+        "@maven//:com_github_docker_java_docker_java_core",
         "@maven//:com_github_jnr_jffi_native",
         "@maven//:com_github_jnr_jnr_constants",
         "@maven//:com_github_jnr_jnr_ffi",
@@ -22,6 +27,7 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:commons_io_commons_io",
         "@maven//:io_grpc_grpc_api",
         "@maven//:io_grpc_grpc_context",
         "@maven//:io_grpc_grpc_core",
@@ -29,6 +35,8 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
+        "@maven//:org_apache_commons_commons_compress",
         "@maven//:org_jetbrains_annotations",
+        "@maven//:org_projectlombok_lombok",
     ],
 )

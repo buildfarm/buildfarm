@@ -16,6 +16,7 @@ package build.buildfarm.common.redis;
 
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.MapUtils;
+import build.buildfarm.common.config.Queue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.SetMultimap;
@@ -90,10 +91,7 @@ public class ProvisionedRedisQueue {
    */
   public ProvisionedRedisQueue(
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
-    this.queue = new BalancedRedisQueue(name, hashtags);
-    isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
-    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard);
-    allowUserUnmatched = false;
+    this(name, Queue.QUEUE_TYPE.standard, hashtags, filterProvisions, false);
   }
 
   /**
@@ -111,7 +109,44 @@ public class ProvisionedRedisQueue {
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions,
       boolean allowUserUnmatched) {
-    this.queue = new BalancedRedisQueue(name, hashtags);
+    this(name, Queue.QUEUE_TYPE.standard, hashtags, filterProvisions, allowUserUnmatched);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct the provision queue.
+   * @param name The global name of the queue.
+   * @param type The type of the redis queue (regular or priority).
+   * @param hashtags Hashtags to distribute queue data.
+   * @param filterProvisions The filtered provisions of the queue.
+   * @note Overloaded.
+   */
+  public ProvisionedRedisQueue(
+      String name,
+      Queue.QUEUE_TYPE type,
+      List<String> hashtags,
+      SetMultimap<String, String> filterProvisions) {
+    this(name, type, hashtags, filterProvisions, false);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct the provision queue.
+   * @param name The global name of the queue.
+   * @param type The type of the redis queue (regular or priority).
+   * @param hashtags Hashtags to distribute queue data.
+   * @param filterProvisions The filtered provisions of the queue.
+   * @param allowUserUnmatched Whether the user can provide extra platform properties and still
+   *     match the queue.
+   * @note Overloaded.
+   */
+  public ProvisionedRedisQueue(
+      String name,
+      Queue.QUEUE_TYPE type,
+      List<String> hashtags,
+      SetMultimap<String, String> filterProvisions,
+      boolean allowUserUnmatched) {
+    this.queue = new BalancedRedisQueue(name, hashtags, type);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
     provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard);
     this.allowUserUnmatched = allowUserUnmatched;

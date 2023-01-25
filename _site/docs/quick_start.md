@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Quick Start
-nav_order: 2
+nav_order: 3
 ---
 
 # Quick Start
@@ -44,7 +44,7 @@ A Buildfarm server with an instance can be used strictly as an ActionCache and C
 
 Download the buildfarm repository and change into its directory, then:
 
-run `bazel run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/server.config.example`
+run `bazelisk run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.minimal.yml`
 
 This will wait while the server runs, indicating that it is ready for requests.
 
@@ -73,11 +73,11 @@ Now we will use buildfarm for remote execution with a minimal configuration - a 
 First, we should restart the buildfarm server to ensure that we get remote execution (this can also be forced from the client by using `--noremote_accept_cached`). From the buildfarm server prompt and directory:
 
 interrupt a running `buildfarm-server`
-run `bazel run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/server.config.example`
+run `bazelisk run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.minimal.yml`
 
 From another prompt in the buildfarm repository directory:
 
-run `bazel run src/main/java/build/buildfarm:buildfarm-memory-worker $PWD/examples/worker.config.example`
+run `bazelisk run src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/config.minimal.yml`
 
 From another prompt, in your client workspace:
 
@@ -90,6 +90,20 @@ INFO: 2 processes: 2 remote.
 ```
 
 That `2 remote` indicates that your compile and link ran remotely. Congratulations, you just build something through remote execution!
+
+## Container Quick Start
+
+To bring up a minimal buildfarm cluster, you can run:
+```
+./examples/bf-run start
+```
+This will start all of the necessary containers at the latest version.
+Once the containers are up, you can build with `bazel run --remote_executor=grpc://localhost:8980 :main`.
+
+To stop the containers, run:
+```
+./examples/bf-run stop
+```
 
 ## Buildfarm Manager
 

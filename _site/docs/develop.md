@@ -1,13 +1,16 @@
 ---
 layout: default
 title: Develop
-nav_order: 7
+nav_order: 11
 ---
 
 ## Developer Information
 
 The recommended solution for deploying a complete dev environment is to use [tilt](https://tilt.dev/).
-Go to the root of the repo and run `tilt up`.
+Follow the installation instructions [here](https://docs.tilt.dev/).
+Make sure you can use a local kubernetes cluster by following [these steps](https://docs.tilt.dev/choosing_clusters.html).
+If everything is installed correctly, you can go to the root of the repo and run `tilt up`.
+Tilt will prompt you to open a web UI and see all the running services.
 
 Below is information for running services directly.
 
@@ -37,13 +40,13 @@ one for the Buildfarm server and one for a Buildfarm worker.
 
 Your Redis cluster is now up, and you can now start your Buildfarm server talking to it:
 ```sh
-bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/shard-server.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.yml
 ```
 
 And your Buildfarm worker:
 ```sh
 mkdir /tmp/worker
-bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/shard-worker.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/config.yml
 ```
 
 ### Setting up intelliJ
@@ -65,10 +68,10 @@ bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/s
 
    This indicates a successful launch!
 1. To add a config file, edit your new run configuration and enter the absolute
-   path to [`examples/server.config.example`](examples/server.config.example) in
+   path to [`examples/config.minimal.yml`](examples/config.minimal.yml) in
    the "Executable flags" text box.
 
 Now, you should have something like this, and you can now run / debug Buildfarm
 Server from inside of IntelliJ, just like any other program:
 
-![IntelliJ Buildfarm Server run configuration]]({{site.url}}{{site.baseurl}}/assets/images/intellij-server-run-config.png)  
+![IntelliJ Buildfarm Server run configuration]]({{site.url}}{{site.baseurl}}/assets/images/intellij-server-run-config.png)

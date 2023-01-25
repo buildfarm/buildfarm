@@ -16,6 +16,7 @@ package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -59,8 +60,9 @@ class FuseExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) throws IOException {
-    return storage.newInput(digest, offset);
+  public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
+      throws IOException {
+    return storage.newInput(compressor, digest, offset);
   }
 
   @Override

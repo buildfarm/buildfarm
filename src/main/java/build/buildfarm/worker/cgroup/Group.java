@@ -22,11 +22,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 
+@Log
 public final class Group {
-  private static final Logger logger = Logger.getLogger(Group.class.getName());
   private static final Group root = new Group(/* name=*/ null, /* parent=*/ null);
   private static final Path rootPath = Paths.get("/sys/fs/cgroup");
 
@@ -103,7 +103,7 @@ public final class Group {
       // TODO check arg limits, exit status, etc
       Runtime.getRuntime()
           .exec("kill -SIGKILL " + pids.stream().map(Object::toString).collect(joining(" ")));
-      logger.warning("Killed processes with PIDs: " + pids);
+      log.warning("Killed processes with PIDs: " + pids);
       return false;
     }
     return true;

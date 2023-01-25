@@ -17,6 +17,7 @@ package build.buildfarm.common.redis;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,10 +39,12 @@ import redis.clients.jedis.JedisCluster;
  */
 @RunWith(JUnit4.class)
 public class RedisQueueTest {
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private JedisCluster redis;
 
   @Before
   public void setUp() throws Exception {
+    configs.getBackplane().setRedisUri("redis://localhost:6379");
     redis = JedisClusterFactory.createTest();
   }
 
@@ -179,8 +182,7 @@ public class RedisQueueTest {
   @Test
   public void sizeAdjustPushDequeue() throws Exception {
     // ARRANGE
-    RedisQueue queue = new RedisQueue("test");
-
+    RedisQueue queue = new RedisQueue("{hash}test");
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
     queue.push(redis, "foo");
