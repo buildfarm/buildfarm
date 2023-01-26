@@ -24,19 +24,18 @@ print_error () {
 download_tool () {
     if [ ! -d "$TOOL_FOLDER" ] ; then
         
-        #download and extract tool
+        #download tool
         wget -O $LOCAL_DOWNLOAD_NAME $TOOL_URL
-        unzip $LOCAL_DOWNLOAD_NAME
         
         #delete the zip and give tool common name.
-        rm $LOCAL_DOWNLOAD_NAME
-        mv checkstyle-* $TOOL_FOLDER;
+        mkdir $TOOL_FOLDER;
+        mv checkstyle.jar $TOOL_FOLDER;
     fi
 }
 
 # The tool should return non-zero if there are violations
 run_static_analysis_checks () {
-    java -jar checkstyle/checkstyle.jar -c $STATIC_ANALYSIS_RULESET -reportfile $STATIC_ANALYSIS_REPORT_FILE -dir src
+    java -jar checkstyle/checkstyle.jar -c "$STATIC_ANALYSIS_RULESET" -dir "src" -o "$STATIC_ANALYSIS_REPORT_FILE" 
 }
 
 analyze_static_analysis_results () {
