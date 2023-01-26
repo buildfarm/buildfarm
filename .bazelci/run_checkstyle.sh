@@ -35,7 +35,7 @@ download_tool () {
 
 # The tool should return non-zero if there are violations
 run_static_analysis_checks () {
-    java -jar checkstyle/checkstyle.jar -c "$STATIC_ANALYSIS_RULESET" -dir "src" -o "$STATIC_ANALYSIS_REPORT_FILE" 
+    java -jar checkstyle/checkstyle.jar -c "$STATIC_ANALYSIS_RULESET" -o "$STATIC_ANALYSIS_REPORT_FILE" src
 }
 
 analyze_static_analysis_results () {
