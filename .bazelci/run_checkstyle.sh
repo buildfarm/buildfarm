@@ -52,10 +52,6 @@ analyze_static_analysis_results () {
     fi
 }
 
-run_code_duplication_check () {
-    pmd/bin/run.sh cpd --format $CODE_DUPLICATION_FORMAT --minimum-tokens $CODE_DUPLICATION_MIN_TOKENS --files src/main src/test/java > $CODE_DUPLICATION_REPORT_FILE
-}
-
 main () {
 
     # Get tools needed to run static analysis
