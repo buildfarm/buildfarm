@@ -30,7 +30,6 @@ import java.util.Set;
 
 /** Named in the theme of Files (nio) -> MoreFiles (guava) -> EvenMoreFiles */
 public class EvenMoreFiles {
-
   private static final Set<PosixFilePermission> readOnlyPerms =
       PosixFilePermissions.fromString("r--r--r--");
   private static final Set<PosixFilePermission> readOnlyExecPerms =

@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server
+  labels:
+    name: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: server
+  template:
+    metadata:
+      labels:
+        name: server
+    spec:
+      containers:
+      - name: server
+        image: buildfarm-server-image
+        ports:
+        - containerPort: 8980
+          name: "server-comm"
+        - containerPort: 9092
+          name: "server-metrics"
+        env:
+        - name: REDIS_URI
+          value: "redis://redis-cluster-service:6379"
+

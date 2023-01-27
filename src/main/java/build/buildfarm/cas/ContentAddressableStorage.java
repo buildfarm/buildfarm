@@ -15,22 +15,29 @@
 package build.buildfarm.cas;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
+import com.google.rpc.Code;
+import com.google.rpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
-import java.io.IOException;
-import java.io.InputStream;
+import java.util.List;
 import java.util.UUID;
+import net.jcip.annotations.ThreadSafe;
 
+@ThreadSafe
 public interface ContentAddressableStorage extends InputStreamFactory {
   long UNLIMITED_ENTRY_SIZE_MAX = -1;
+
+  Status OK = Status.newBuilder().setCode(Code.OK.getNumber()).build();
+
+  Status NOT_FOUND = Status.newBuilder().setCode(Code.NOT_FOUND.getNumber()).build();
 
   /**
    * Blob storage for the CAS. This class should be used at all times when interacting with complete
@@ -73,39 +80,32 @@ public interface ContentAddressableStorage extends InputStreamFactory {
    * <p>If supported, a size_bytes of -1 may be used to look up the size of a digest A size
    * mismatch, if partial key selection is supported, may result in correction
    */
-  @ThreadSafe
   boolean contains(Digest digest, Digest.Builder result);
 
   /** Indicates presence in the CAS for a sequence of digests. */
-  @ThreadSafe
   Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) throws InterruptedException;
 
   /** Retrieve a value from the CAS. */
-  @ThreadSafe
   Blob get(Digest digest);
 
   /** Retrieve a set of blobs from the CAS represented by a future. */
-  ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests);
-
-  @ThreadSafe
-  InputStream newInput(Digest digest, long offset) throws IOException;
+  ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests);
 
   /** Retrieve a value from the CAS by streaming content when ready */
-  @ThreadSafe
   void get(
+      Compressor.Value compression,
       Digest digest,
       long offset,
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata);
 
-  @ThreadSafe
-  Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+  Write getWrite(
+      Compressor.Value compression, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException;
 
   /** Insert a blob into the CAS. */
-  @ThreadSafe
-  void put(Blob blob) throws EntryLimitException, InterruptedException;
+  void put(Blob blob) throws InterruptedException;
 
   /**
    * Insert a value into the CAS with expiration callback.
@@ -114,9 +114,7 @@ public interface ContentAddressableStorage extends InputStreamFactory {
    * Successive calls to this method for a unique blob digest will register additional callbacks,
    * does not deduplicate by callback, and the order of which is not guaranteed for invocation.
    */
-  @ThreadSafe
   void put(Blob blob, Runnable onExpiration) throws InterruptedException;
 
-  @ThreadSafe
   long maxEntrySize();
 }

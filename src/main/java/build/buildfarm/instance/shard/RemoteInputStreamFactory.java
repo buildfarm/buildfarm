@@ -23,6 +23,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
@@ -52,12 +53,11 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 
+@Log
 public class RemoteInputStreamFactory implements InputStreamFactory {
-  private static final Logger logger = Logger.getLogger(RemoteInputStreamFactory.class.getName());
-
   public interface UnavailableConsumer {
     void accept(String worker, Throwable t, String context);
   }
@@ -76,6 +76,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     this(/* publicName=*/ null, backplane, rand, workerStubs, onUnavailable);
   }
 
+  @SuppressWarnings("NullableProblems")
   public RemoteInputStreamFactory(
       String publicName,
       Backplane backplane,
@@ -93,12 +94,14 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     try {
       return workerStubs.get(worker);
     } catch (ExecutionException e) {
-      logger.log(Level.SEVERE, String.format("error getting worker stub for %s", worker), e);
+      log.log(Level.SEVERE, String.format("error getting worker stub for %s", worker), e);
       throw new IllegalStateException("stub instance creation must not fail");
     }
   }
 
+  @SuppressWarnings({"ResultOfMethodCallIgnored", "StatementWithEmptyBody"})
   private InputStream fetchBlobFromRemoteWorker(
+      Compressor.Value compressor,
       Digest blobDigest,
       Deque<String> workers,
       long offset,
@@ -112,7 +115,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
 
       InputStream input =
           instance.newBlobInput(
-              blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
+              compressor, blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
       // ensure that if the blob cannot be fetched, that we throw here
       input.available();
       if (Thread.interrupted()) {
@@ -139,18 +142,21 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
   }
 
   @Override
-  public InputStream newInput(Digest blobDigest, long offset)
-      throws IOException, InterruptedException {
-    return newInput(blobDigest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
+  public InputStream newInput(Compressor.Value compressor, Digest blobDigest, long offset)
+      throws IOException {
+    return newInput(
+        compressor, blobDigest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
   }
 
+  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   public InputStream newInput(
+      Compressor.Value compressor,
       Digest blobDigest,
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
-      throws IOException, InterruptedException {
+      throws IOException {
     Set<String> remoteWorkers;
     Set<String> locationSet;
     try {
@@ -207,6 +213,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
               try {
                 inputStreamFuture.set(
                     fetchBlobFromRemoteWorker(
+                        compressor,
                         blobDigest,
                         workers,
                         offset,
@@ -248,6 +255,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
@@ -262,11 +270,15 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
         directExecutor());
     try {
       return inputStreamFuture.get();
+    } catch (InterruptedException e) {
+      throw new IOException(e);
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       Throwables.throwIfUnchecked(cause);
       Throwables.throwIfInstanceOf(cause, IOException.class);
-      Throwables.throwIfInstanceOf(cause, InterruptedException.class);
+      if (cause instanceof InterruptedException) {
+        throw new IOException(cause);
+      }
       throw new UncheckedExecutionException(cause);
     }
   }

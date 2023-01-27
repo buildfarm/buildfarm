@@ -19,11 +19,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class Pipeline {
-  private static final Logger logger = Logger.getLogger(Pipeline.class.getName());
-
   private final Map<PipelineStage, Thread> stageThreads;
   private final Map<PipelineStage, Integer> stageClosePriorities;
   private Thread joiningThread = null;
@@ -81,7 +80,7 @@ public class Pipeline {
       if (stage instanceof InputFetchStage) {
         int slotUsage = ((InputFetchStage) stage).getSlotUsage();
         if (slotUsage != 0) {
-          logger.log(
+          log.log(
               Level.INFO,
               String.format("InputFetchStage is not empty with slot usage: %d!", slotUsage));
           return false;
@@ -89,17 +88,21 @@ public class Pipeline {
       } else if (stage instanceof ExecuteActionStage) { // ExecuteActionStage
         int slotUsage = ((ExecuteActionStage) stage).getSlotUsage();
         if (slotUsage != 0) {
-          logger.log(Level.INFO, String.format("ExecuteActionStage slot usage: %d!", slotUsage));
+          log.log(Level.INFO, String.format("ExecuteActionStage slot usage: %d!", slotUsage));
           return false;
         }
       } else { // not SuperScalar stage
         if (stage.claimed) {
-          logger.log(Level.INFO, "NonSuperScalarPipelineStage is not empty yet!");
+          log.log(Level.INFO, "NonSuperScalarPipelineStage is not empty yet!");
           return false;
         }
       }
     }
     return true;
+  }
+
+  public boolean hasStages() {
+    return !stageThreads.isEmpty();
   }
 
   public void join() throws InterruptedException {
@@ -131,7 +134,7 @@ public class Pipeline {
             }
           }
           if (stageToClose != null && !stageToClose.isClosed()) {
-            logger.log(Level.FINE, "Closing stage at priority " + maxPriority);
+            log.log(Level.FINE, "Closing stage at priority " + maxPriority);
             stageToClose.close();
           }
         }
@@ -153,13 +156,19 @@ public class Pipeline {
           }
 
           if (!thread.isAlive()) {
-            logger.log(
-                Level.FINE, "Stage has exited at priority " + stageClosePriorities.get(stage));
+            log.log(
+                Level.FINE,
+                "Stage "
+                    + stage.name()
+                    + " has exited at priority "
+                    + stageClosePriorities.get(stage));
             inactiveStages.add(stage);
           } else if (stage.isClosed()) {
-            logger.log(
+            log.log(
                 Level.INFO,
-                "Interrupting unterminated closed thread at priority "
+                "Interrupting unterminated closed thread in stage "
+                    + stage.name()
+                    + " at priority "
                     + stageClosePriorities.get(stage));
             thread.interrupt();
           }

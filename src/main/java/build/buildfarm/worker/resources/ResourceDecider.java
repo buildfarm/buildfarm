@@ -12,21 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.resources;
 
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Platform.Property;
-import build.buildfarm.common.ExecutionProperties;
-import com.google.common.collect.Iterables;
-import java.util.Map;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
-
-/**
- * @field operation
- * @brief The main operation object which contains digests to the remaining data members.
- * @details Its digests are used to resolve other data members.
- */
+import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
+import build.buildfarm.common.CommandUtils;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * @class ResourceDecider
@@ -34,166 +25,220 @@ import org.json.simple.parser.ParseException;
  * @details Platform properties from specified exec_properties are taken into account as well as
  *     global buildfarm configuration.
  */
-public class ResourceDecider {
-
+public final class ResourceDecider {
   /**
    * @brief Decide resource limitations for the given command.
    * @details Platform properties from specified exec_properties are taken into account as well as
    *     global buildfarm configuration.
    * @param command The command to decide resource limitations for.
-   * @param onlyMulticoreTests Only allow ttests to be multicore.
+   * @param workerName The name of the worker taking on the action.
+   * @param onlyMulticoreTests Only allow tests to be multicore.
+   * @param defaultMaxCores The unspecified maximum constraint for cores.
+   * @param limitGlobalExecution Whether cpu limiting should be explicitly performed.
    * @param executeStageWidth The maximum amount of cores available for the operation.
+   * @param allowBringYourOwnContainer Whether or not the feature of "bringing your own containers"
+   *     is allowed.
    * @return Default resource limits.
    * @note Suggested return identifier: resourceLimits.
    */
   public static ResourceLimits decideResourceLimitations(
-      Command command, boolean onlyMulticoreTests, int executeStageWidth) {
-    ResourceLimits limits = new ResourceLimits();
+      Command command,
+      String workerName,
+      int defaultMaxCores,
+      boolean onlyMulticoreTests,
+      boolean limitGlobalExecution,
+      int executeStageWidth,
+      boolean allowBringYourOwnContainer) {
+    // Get all of the user suggested resource changes.
+    ResourceLimits limits = ExecutionPropertiesParser.Parse(command);
 
-    command
-        .getPlatform()
-        .getPropertiesList()
-        .forEach(
-            (property) -> {
-              evaluateProperty(limits, property);
-            });
-
-    // force limits on non-test actions
-    if (onlyMulticoreTests && !commandIsTest(command)) {
-      limits.cpu.min = 1;
-      limits.cpu.max = 1;
-    }
-
-    // claim core amount according to execute stage width
-    limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
-
-    // we choose to resolve variables after the other variable values have been decided
-    resolveEnvironmentVariables(limits);
+    // Further modify the resource limits based on user selection and buildfarm constraints.
+    adjustLimits(
+        limits,
+        command,
+        workerName,
+        defaultMaxCores,
+        onlyMulticoreTests,
+        limitGlobalExecution,
+        executeStageWidth,
+        allowBringYourOwnContainer);
 
     return limits;
   }
 
   /**
-   * @brief Evaluate a given platform property of a command and use it to adjust execution settings.
-   * @details Parses the property key/value and stores them appropriately.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
+   * @brief Modify limits based on buildfarm constraints.
+   * @details Existing limits configuration and buildfarm configuration are taken into account.
+   * @param limits Existing limits chosen by the user's exec_properties.
+   * @param command The command to decide resource limitations for.
+   * @param workerName The name of the worker taking on the action.
+   * @param defaultMaxCores The unspecified maximum constraint for cores.
+   * @param onlyMulticoreTests Only allow tests to be multicore.
+   * @param limitGlobalExecution Whether cpu limiting should be explicitly performed.
+   * @param executeStageWidth The maximum amount of cores available for the operation.
+   * @param allowBringYourOwnContainer Whether or not the feature of "bringing your own containers"
+   *     is allowed.
    */
-  private static void evaluateProperty(ResourceLimits limits, Property property) {
-    // handle cpu properties
-    if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
-      storeMinCores(limits, property);
-    } else if (property.getName().equals(ExecutionProperties.MAX_CORES)) {
-      storeMaxCores(limits, property);
+  private static void adjustLimits(
+      ResourceLimits limits,
+      Command command,
+      String workerName,
+      int defaultMaxCores,
+      boolean onlyMulticoreTests,
+      boolean limitGlobalExecution,
+      int executeStageWidth,
+      boolean allowBringYourOwnContainer) {
+    // store worker name
+    limits.workerName = workerName;
+
+    // force limits on non-test actions
+    if (onlyMulticoreTests && !CommandUtils.isTest(command)) {
+      if (limits.cpu.min > 1 || limits.cpu.max > defaultMaxCores) {
+        limits.cpu.description.add(
+            String.format(
+                "cores restricted to %d because this is enforced on non-test actions",
+                defaultMaxCores));
+      }
+      limits.cpu.min = 1;
+      limits.cpu.max = defaultMaxCores;
+    } else if (limits.cpu.max <= 0) {
+      if (defaultMaxCores > 0) {
+        limits.cpu.description.add(
+            String.format("cores restricted to %d by default", defaultMaxCores));
+      }
+      limits.cpu.max = defaultMaxCores;
     }
 
-    // handle mem properties
-    if (property.getName().equals(ExecutionProperties.MIN_MEM)) {
-      storeMinMem(limits, property);
-    } else if (property.getName().equals(ExecutionProperties.MAX_MEM)) {
-      storeMaxMem(limits, property);
+    // avoid 0 cores, just in general, since it informs our claim
+    if (limits.cpu.min <= 0) {
+      limits.cpu.min = 1;
+      limits.cpu.description.add(
+          "min cores set to 1 as it cannot be 0 with limit global execution");
     }
 
-    // handle env properties
-    else if (property.getName().equals(ExecutionProperties.ENV_VARS)) {
-      storeEnvVars(limits, property);
-    } else if (property.getName().startsWith(ExecutionProperties.ENV_VAR)) {
-      storeEnvVar(limits, property);
+    // compel a specified max to be <= executeStageWidth
+    if (limits.cpu.max > 0) {
+      if (limits.cpu.max > executeStageWidth) {
+        limits.cpu.description.add(String.format("max cores limited to %d", executeStageWidth));
+      }
+      limits.cpu.max = Math.min(limits.cpu.max, executeStageWidth);
     }
 
-    // handle debug properties
-    else if (property.getName().equals(ExecutionProperties.DEBUG_BEFORE_EXECUTION)) {
-      storeBeforeExecutionDebug(limits, property);
-    } else if (property.getName().equals(ExecutionProperties.DEBUG_AFTER_EXECUTION)) {
-      storeAfterExecutionDebug(limits, property);
+    // compel the range to be min <= max
+    if (limits.cpu.max > 0) {
+      if (limits.cpu.min > limits.cpu.max) {
+        limits.cpu.description.add(
+            String.format(
+                "min cores %d limited to specified max %d", limits.cpu.min, limits.cpu.max));
+      }
+      limits.cpu.min = Math.min(limits.cpu.max, limits.cpu.min);
+    }
+
+    // perform resource overrides based on test size
+    TestSizeResourceOverrides overrides = new TestSizeResourceOverrides();
+    if (overrides.enabled && CommandUtils.isTest(command)) {
+      TestSizeResourceOverride override = deduceSizeOverride(command, overrides);
+      limits.cpu.min = override.coreMin;
+      limits.cpu.max = override.coreMax;
+      limits.cpu.description.add(
+          String.format(
+              "cores are overridden due to test size (min=%d / max=%d",
+              override.coreMin, override.coreMax));
+    }
+
+    adjustDebugFlags(command, limits);
+
+    // Should we limit the cores of the action during execution? by default, per
+    // limitGlobalExecution.
+    // Otherwise, if the action has suggested core restrictions on itself, then yes.
+    // Claim minimal core amount with regards to execute stage width.
+    limits.cpu.limit =
+        limitGlobalExecution || (limits.cpu.max > 0 && limits.cpu.max < executeStageWidth);
+    limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
+
+    // Should we limit the memory of the action during execution? by default, no.
+    // If the action has suggested memory restrictions on itself, then yes.
+    // Claim minimal memory amount based on action's suggestion.
+    limits.mem.limit = limits.mem.max > 0;
+    limits.mem.claimed = limits.mem.min;
+
+    // Avoid using the existing execution policies when using the linux sandbox.
+    // Using these execution policies under the sandbox do not have the right permissions to work.
+    // For the time being, we want to experiment with dynamically choosing the sandbox-
+    // without affecting current configurations or relying on specific deployments.
+    // This will dynamically skip using the worker configured execution policies.
+    if (limits.useLinuxSandbox) {
+      limits.useExecutionPolicies = false;
+      limits.description.add("configured execution policies skipped because of choosing sandbox");
+    }
+
+    // Decide whether the action will run in a container
+    if (allowBringYourOwnContainer && !limits.containerSettings.containerImage.isEmpty()) {
+      // enable container execution
+      limits.containerSettings.enabled = true;
+
+      // Adjust additional flags for when a container is being used.
+      adjustContainerFlags(limits);
+    }
+
+    // we choose to resolve variables after the other variable values have been decided
+    resolveEnvironmentVariables(limits);
+  }
+
+  private static void adjustContainerFlags(ResourceLimits limits) {
+    // bazelbuild/bazel-toolchains provides container images that start with "docker://".
+    // However, docker is unable to fetch images that have this as a prefix in the URI.
+    // Our solution is to remove the prefix when we see it.
+    // https://github.com/bazelbuild/bazel-buildfarm/issues/1060
+    limits.containerSettings.containerImage =
+        StringUtils.removeStart(limits.containerSettings.containerImage, "docker://");
+
+    // Avoid using the existing execution policies when running actions under docker.
+    // The programs used in the execution policies likely won't exist in the container images.
+    limits.useExecutionPolicies = false;
+    limits.description.add("configured execution policies skipped because of choosing docker");
+
+    // avoid limiting resources as cgroups may not be available in the container.
+    // in fact, we will use docker's cgroup settings explicitly.
+    // TODO(thickey): use docker's cgroup settings given existing resource limitations.
+    limits.cpu.limit = false;
+    limits.mem.limit = false;
+    limits.description.add("resource limiting disabled because of choosing docker");
+  }
+
+  private static void adjustDebugFlags(Command command, ResourceLimits limits) {
+    if (!limits.debugTarget.isEmpty()) {
+      handleTargetDebug(command, limits);
+    } else {
+      handleTestDebug(command, limits);
     }
   }
 
-  /**
-   * @brief Store the property for min cores.
-   * @details Parses and stores the property.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeMinCores(ResourceLimits limits, Property property) {
-    limits.cpu.min = Integer.parseInt(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for max cores.
-   * @details Parses and stores the property.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeMaxCores(ResourceLimits limits, Property property) {
-    limits.cpu.max = Integer.parseInt(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for min mem.
-   * @details Parses and stores the property.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeMinMem(ResourceLimits limits, Property property) {
-    limits.mem.min = Integer.parseInt(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for max mem.
-   * @details Parses and stores the property.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeMaxMem(ResourceLimits limits, Property property) {
-    limits.mem.max = Integer.parseInt(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for env vars.
-   * @details Parses the property as json.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeEnvVars(ResourceLimits limits, Property property) {
-    try {
-      JSONParser parser = new JSONParser();
-      limits.extraEnvironmentVariables = (Map<String, String>) parser.parse(property.getValue());
-    } catch (ParseException pe) {
+  private static void handleTargetDebug(Command command, ResourceLimits limits) {
+    // When debugging particular targets, disable debugging on non-matches.
+    if (!commandMatchesDebugTarget(command, limits)) {
+      limits.debugBeforeExecution = false;
+      limits.debugAfterExecution = false;
+      limits.description.add("debugging is disabled because target is not matched");
     }
   }
 
-  /**
-   * @brief Store the property for an env var.
-   * @details Parses the property key name for the env var name.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeEnvVar(ResourceLimits limits, Property property) {
-    String keyValue[] = property.getName().split(":", 2);
-    String key = keyValue[1];
-    String value = property.getValue();
-    limits.extraEnvironmentVariables.put(key, value);
+  private static void handleTestDebug(Command command, ResourceLimits limits) {
+    // When debugging tests, disable debugging on non-tests.
+    if (limits.debugTestsOnly && !CommandUtils.isTest(command)) {
+      limits.debugBeforeExecution = false;
+      limits.debugAfterExecution = false;
+      limits.description.add("debugging is disabled because only tests are enabled for debugging");
+    }
   }
 
-  /**
-   * @brief Store the property for debugging before an execution.
-   * @details Parses and stores a boolean.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeBeforeExecutionDebug(ResourceLimits limits, Property property) {
-    limits.debugBeforeExecution = Boolean.parseBoolean(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for debugging after an execution.
-   * @details Parses and stores a boolean.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeAfterExecutionDebug(ResourceLimits limits, Property property) {
-    limits.debugAfterExecution = Boolean.parseBoolean(property.getValue());
+  private static boolean commandMatchesDebugTarget(Command command, ResourceLimits limits) {
+    for (String argument : command.getArgumentsList()) {
+      if (argument.contains(limits.debugTarget)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -214,16 +259,31 @@ public class ResourceDecider {
   }
 
   /**
-   * @brief Derive if command is a test run.
-   * @details Find a reliable way to identify whether a command is a test or not.
-   * @param command The command to identify as a test command.
-   * @return Whether the command is a test.
-   * @note Suggested return identifier: exists.
+   * @brief Get resource overrides by analyzing the test command for it's "test size".
+   * @details test size is defined as an environment variable.
+   * @param command The test command to derive the size of.
+   * @return The resource overrides corresponding to the command's test size.
+   * @note Suggested return identifier: overrides.
    */
-  private static boolean commandIsTest(Command command) {
-    // only tests are setting this currently - other mechanisms are unreliable
-    return Iterables.any(
-        command.getEnvironmentVariablesList(),
-        (envVar) -> envVar.getName().equals("XML_OUTPUT_FILE"));
+  private static TestSizeResourceOverride deduceSizeOverride(
+      Command command, TestSizeResourceOverrides overrides) {
+    for (EnvironmentVariable envVar : command.getEnvironmentVariablesList()) {
+      if (envVar.getName().equals("TEST_SIZE")) {
+        if (envVar.getValue().equals("small")) {
+          return overrides.small;
+        }
+        if (envVar.getValue().equals("medium")) {
+          return overrides.medium;
+        }
+        if (envVar.getValue().equals("large")) {
+          return overrides.large;
+        }
+        if (envVar.getValue().equals("enormous")) {
+          return overrides.enormous;
+        }
+      }
+    }
+
+    return overrides.unknown;
   }
 }

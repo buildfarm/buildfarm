@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
@@ -42,40 +43,19 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class DequeueMatchEvaluatorTest {
-
-  // Function under test: shouldKeepOperation
-  // Reason for testing: null queue entries should be kept
-  // Failure explanation: this decision has changed
-  @Test
-  public void shouldKeepOperationKeepNullQueueEntry() throws Exception {
-
-    // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-    SetMultimap<String, String> workerProvisions = HashMultimap.create();
-    QueueEntry entry = null;
-
-    // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
-
-    // ASSERT
-    assertThat(shouldKeep).isTrue();
-  }
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   // Function under test: shouldKeepOperation
   // Reason for testing: empty plaform queue entries should be kept
   // Failure explanation: properties are being evaluated differently now
   @Test
   public void shouldKeepOperationKeepEmptyQueueEntry() throws Exception {
-
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     QueueEntry entry = QueueEntry.newBuilder().setPlatform(Platform.newBuilder()).build();
 
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
@@ -88,10 +68,7 @@ public class DequeueMatchEvaluatorTest {
   // differently
   @Test
   public void shouldKeepOperationValidMinCoresQueueEntry() throws Exception {
-
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     workerProvisions.put("cores", "11");
 
@@ -104,8 +81,7 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     // the worker accepts because it has more cores than the min-cores requested
@@ -119,10 +95,8 @@ public class DequeueMatchEvaluatorTest {
   // differently
   @Test
   public void shouldKeepOperationInvalidMinCoresQueueEntry() throws Exception {
-
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-
+    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     workerProvisions.put("cores", "10");
 
@@ -135,8 +109,7 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     // the worker rejects because it has less cores than the min-cores requested
@@ -148,10 +121,7 @@ public class DequeueMatchEvaluatorTest {
   // Failure explanation: either the property names changed or max-cores is evaluated differently
   @Test
   public void shouldKeepOperationMaxCoresDoNotInfluenceAcceptance() throws Exception {
-
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     workerProvisions.put("cores", "10");
 
@@ -166,8 +136,7 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     // the worker accepts because it has the same cores as the min-cores requested
@@ -180,10 +149,9 @@ public class DequeueMatchEvaluatorTest {
   // Failure explanation: ensuring exact property matches is not behaving correctly by default
   @Test
   public void shouldKeepOperationUnmatchedPropertiesRejectionAcceptance() throws Exception {
-
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-
+    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
 
     QueueEntry entry =
@@ -195,26 +163,25 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isFalse();
 
     // ARRANGE
-    settings.acceptEverything = true;
+    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(true);
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
 
     // ARRANGE
-    settings.allowUnmatched = true;
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();

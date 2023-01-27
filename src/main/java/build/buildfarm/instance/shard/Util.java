@@ -42,10 +42,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class Util {
-  private static final Logger logger = Logger.getLogger(Util.class.getName());
   public static final Predicate<Status> SHARD_IS_RETRIABLE =
       st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.apply(st);
 
@@ -83,13 +83,7 @@ public class Util {
     synchronized (workerSet) {
       foundFuture =
           correctMissingBlobSynchronized(
-              backplane,
-              workerSet,
-              originalLocationSet,
-              workerInstanceFactory,
-              digest,
-              foundWorkers,
-              requestMetadata);
+              workerSet, workerInstanceFactory, digest, foundWorkers, requestMetadata);
     }
     return transform(
         foundFuture,
@@ -103,7 +97,7 @@ public class Util {
           try {
             backplane.adjustBlobLocations(digest, foundWorkers, newLocationSet);
           } catch (IOException e) {
-            logger.log(
+            log.log(
                 Level.SEVERE,
                 format("error adjusting blob location for %s", DigestUtil.toString(digest)),
                 e);
@@ -114,9 +108,7 @@ public class Util {
   }
 
   static ListenableFuture<Void> correctMissingBlobSynchronized(
-      Backplane backplane,
       Set<String> workerSet,
-      Set<String> originalLocationSet,
       Function<String, Instance> workerInstanceFactory,
       Digest digest,
       Set<String> foundWorkers,
@@ -142,12 +134,13 @@ public class Util {
             complete();
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             fail(Status.fromThrowable(t).asRuntimeException());
           }
         };
-    logger.log(
+    log.log(
         Level.FINE,
         format(
             "scanning through %d workers to find %s",
@@ -164,6 +157,7 @@ public class Util {
               foundCallback.onSuccess(found ? worker : null);
             }
 
+            @SuppressWarnings("NullableProblems")
             @Override
             public void onFailure(Throwable t) {
               foundCallback.onFailure(t);
@@ -189,7 +183,7 @@ public class Util {
           @Override
           public void onSuccess(Iterable<Digest> missingDigests) {
             boolean found = Iterables.isEmpty(missingDigests);
-            logger.log(
+            log.log(
                 Level.FINE,
                 format(
                     "check missing response for %s to %s was %sfound",
@@ -197,11 +191,12 @@ public class Util {
             foundCallback.onSuccess(found);
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.UNAVAILABLE) {
-              logger.log(
+              log.log(
                   Level.FINE,
                   format(
                       "check missing response for %s to %s was not found for unavailable",
@@ -211,7 +206,7 @@ public class Util {
                 || Context.current().isCancelled()
                 || status.getCode() == Code.DEADLINE_EXCEEDED
                 || !SHARD_IS_RETRIABLE.test(status)) {
-              logger.log(
+              log.log(
                   Level.SEVERE,
                   format("error checking for %s on %s", DigestUtil.toString(digest), worker),
                   t);

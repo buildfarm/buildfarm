@@ -37,11 +37,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class Directories {
-  private static final Logger logger = Logger.getLogger(Directories.class.getName());
-
   private static final Set<PosixFilePermission> writablePerms =
       PosixFilePermissions.fromString("rwxr-xr-x");
   private static final Set<PosixFilePermission> nonWritablePerms =
@@ -89,6 +88,8 @@ public class Directories {
     String tmpFilename = filename + ".tmp." + suffix;
     Path tmpPath = path.resolveSibling(tmpFilename);
     try {
+      // MacOS does not permit renames unless the directory is permissioned appropriately
+      makeWritable(path, true);
       // rename must be synchronous to call
       Files.move(path, tmpPath);
     } catch (IOException e) {
@@ -100,7 +101,7 @@ public class Directories {
               try {
                 remove(tmpPath);
               } catch (IOException e) {
-                logger.log(Level.SEVERE, "error removing directory " + tmpPath, e);
+                log.log(Level.SEVERE, "error removing directory " + tmpPath, e);
               }
             },
             null);
@@ -110,7 +111,6 @@ public class Directories {
     Files.walkFileTree(
         directory,
         new SimpleFileVisitor<Path>() {
-
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
               throws IOException {
@@ -121,6 +121,7 @@ public class Directories {
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
+            // we will *NOT* delete the file on windows if it is still open
             Files.delete(file);
             return FileVisitResult.CONTINUE;
           }

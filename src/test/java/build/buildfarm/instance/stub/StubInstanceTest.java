@@ -28,6 +28,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageImplBase;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
@@ -48,7 +49,6 @@ import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
 import com.google.protobuf.ByteString;
 import io.grpc.Server;
@@ -66,6 +66,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -270,10 +271,11 @@ public class StubInstanceTest {
             responseObserver.onNext(
                 BatchUpdateBlobsResponse.newBuilder()
                     .addAllResponses(
-                        Iterables.transform(
-                            batchRequest.getRequestsList(),
-                            request ->
-                                Response.newBuilder().setDigest(request.getDigest()).build()))
+                        batchRequest.getRequestsList().stream()
+                            .map(
+                                request ->
+                                    Response.newBuilder().setDigest(request.getDigest()).build())
+                            .collect(Collectors.toList()))
                     .build());
             responseObserver.onCompleted();
           }
@@ -292,7 +294,6 @@ public class StubInstanceTest {
   public void completedWriteBeforeCloseThrowsOnNextInteraction()
       throws IOException, InterruptedException {
     String resourceName = "early-completed-output-stream-test";
-    AtomicReference<ByteString> writtenContent = new AtomicReference<>();
     serviceRegistry.addService(
         new ByteStreamImplBase() {
           boolean completed = false;
@@ -302,7 +303,6 @@ public class StubInstanceTest {
           public StreamObserver<WriteRequest> write(
               StreamObserver<WriteResponse> responseObserver) {
             return new StreamObserver<WriteRequest>() {
-
               @Override
               public void onNext(WriteRequest request) {
                 if (!completed) {
@@ -373,7 +373,12 @@ public class StubInstanceTest {
         Digest.newBuilder().setHash("unavailable-blob-name").setSizeBytes(1).build();
     try (InputStream in =
         instance.newBlobInput(
-            unavailableDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
+            Compressor.Value.IDENTITY,
+            unavailableDigest,
+            0,
+            1,
+            SECONDS,
+            RequestMetadata.getDefaultInstance())) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       ioException = e;
@@ -411,7 +416,13 @@ public class StubInstanceTest {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     Digest delayedDigest = Digest.newBuilder().setHash("delayed-blob-name").setSizeBytes(1).build();
     try (InputStream in =
-        instance.newBlobInput(delayedDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
+        instance.newBlobInput(
+            Compressor.Value.IDENTITY,
+            delayedDigest,
+            0,
+            1,
+            SECONDS,
+            RequestMetadata.getDefaultInstance())) {
       ByteStreams.copy(in, out);
     }
     assertThat(ByteString.copyFrom(out.toByteArray())).isEqualTo(content);
@@ -433,7 +444,13 @@ public class StubInstanceTest {
     Instance instance = newStubInstance("input-stream-deadline-exceeded");
     Digest timeoutDigest = Digest.newBuilder().setHash("timeout-blob-name").setSizeBytes(1).build();
     try (InputStream in =
-        instance.newBlobInput(timeoutDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
+        instance.newBlobInput(
+            Compressor.Value.IDENTITY,
+            timeoutDigest,
+            0,
+            1,
+            SECONDS,
+            RequestMetadata.getDefaultInstance())) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       ioException = e;
@@ -445,6 +462,7 @@ public class StubInstanceTest {
     instance.stop();
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void readBlobInterchangeDoesNotRequestUntilStarted() {
     ServerCallStreamObserver<ByteString> mockBlobObserver = mock(ServerCallStreamObserver.class);

@@ -16,9 +16,9 @@ package build.buildfarm.worker.shard;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.InputStreamFactory;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,13 +34,12 @@ public class EmptyInputStreamFactoryTest {
   public void emptyDigestIsNotDelegated() throws IOException, InterruptedException {
     EmptyInputStreamFactory emptyFactory =
         new EmptyInputStreamFactory(
-            new InputStreamFactory() {
-              @Override
-              public InputStream newInput(Digest digest, long offset) throws IOException {
-                throw new IOException("invalid");
-              }
+            (compressor, digest, offset) -> {
+              throw new IOException("invalid");
             });
-    InputStream in = emptyFactory.newInput(Digest.getDefaultInstance(), /* offset=*/ 0);
+    InputStream in =
+        emptyFactory.newInput(
+            Compressor.Value.IDENTITY, Digest.getDefaultInstance(), /* offset=*/ 0);
     assertThat(in.read()).isEqualTo(-1);
   }
 
@@ -50,16 +49,14 @@ public class EmptyInputStreamFactoryTest {
     Digest contentDigest = DIGEST_UTIL.compute(content);
     EmptyInputStreamFactory emptyFactory =
         new EmptyInputStreamFactory(
-            new InputStreamFactory() {
-              @Override
-              public InputStream newInput(Digest digest, long offset) throws IOException {
-                if (digest.equals(contentDigest)) {
-                  return content.newInput();
-                }
-                throw new IOException("invalid");
+            (compressor, digest, offset) -> {
+              if (digest.equals(contentDigest)) {
+                return content.newInput();
               }
+              throw new IOException("invalid");
             });
-    InputStream in = emptyFactory.newInput(contentDigest, /* offset=*/ 0);
+    InputStream in =
+        emptyFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset=*/ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);
   }
 }

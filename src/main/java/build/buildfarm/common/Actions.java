@@ -63,16 +63,14 @@ public final class Actions {
   public static Status asExecutionStatus(Throwable t) {
     Status.Builder status = Status.newBuilder();
     io.grpc.Status grpcStatus = io.grpc.Status.fromThrowable(t);
-    switch (grpcStatus.getCode()) {
-      case DEADLINE_EXCEEDED:
-        // translate timeouts to retriable errors here, rather than
-        // indications that the execution timed out
-        status.setCode(Code.UNAVAILABLE.getNumber());
-        break;
-      default:
-        status.setCode(grpcStatus.getCode().value());
-        break;
+    if (grpcStatus.getCode() == io.grpc.Status.Code.DEADLINE_EXCEEDED) {
+      // translate timeouts to retriable errors here, rather than
+      // indications that the execution timed out
+      status.setCode(Code.UNAVAILABLE.getNumber());
+    } else {
+      status.setCode(grpcStatus.getCode().value());
     }
+
     return status.setMessage(t.getMessage()).build();
   }
 

@@ -20,27 +20,26 @@ package build.buildfarm.common;
  * @details This will remove the worker from CAS indexes, and in some cases, remove the CAS key.
  */
 public class CasIndexResults {
-
   /**
    * @field removedHosts
    * @brief The number of CAS entries the worker was removed from.
    * @details This indicates how much CAS data the shard new the worker had.
    */
-  public int removedHosts = 0;
+  public long removedHosts = 0;
 
   /**
    * @field removedKeys
    * @brief The number of CAS entries removed due to loss of worker.
    * @details This indicates how many CAS entries were held only by the removed worker.
    */
-  public int removedKeys = 0;
+  public long removedKeys = 0;
 
   /**
    * @field totalKeys
    * @brief The total number of keys processed.
    * @details A fraction can be made with removed keys to see the total percentage of CAS lost.
    */
-  public int totalKeys = 0;
+  public long totalKeys = 0;
 
   /**
    * @brief Get a string message from performing worker indexing on the CAS.
@@ -49,14 +48,10 @@ public class CasIndexResults {
    * @note Suggested return identifier: message.
    */
   public String toMessage() {
-    StringBuilder message = new StringBuilder();
-    message
-        .append(String.format("Total keys re-indexed: %d. ", totalKeys))
-        .append(String.format("Worker references removed: %d. ", removedHosts))
-        .append(String.format("CAS keys deleted: %d. ", removedKeys))
-        .append(
-            String.format(
-                "CAS lost: %.2f%%.", totalKeys == 0 ? 0 : (removedKeys / (float) totalKeys) * 100));
-    return message.toString();
+    return String.format("Total keys re-indexed: %d. ", totalKeys)
+        + String.format("Worker references removed: %d. ", removedHosts)
+        + String.format("CAS keys deleted: %d. ", removedKeys)
+        + String.format(
+            "CAS lost: %.2f%%.", totalKeys == 0 ? 0 : (removedKeys / (float) totalKeys) * 100);
   }
 }

@@ -42,13 +42,9 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
-import java.util.logging.Logger;
 
 public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
-  private static final Logger logger =
-      Logger.getLogger(ContentAddressableStorageService.class.getName());
-
   private final SimpleBlobStore simpleBlobStore;
   private final int treeDefaultPageSize;
   private final int treeMaxPageSize;
@@ -83,7 +79,6 @@ public class ContentAddressableStorageService
   public void batchUpdateBlobs(
       BatchUpdateBlobsRequest batchRequest,
       StreamObserver<BatchUpdateBlobsResponse> responseObserver) {
-    ImmutableList.Builder<ByteString> validBlobsBuilder = new ImmutableList.Builder<>();
     ImmutableList.Builder<BatchUpdateBlobsResponse.Response> responses =
         new ImmutableList.Builder<>();
     Function<com.google.rpc.Code, com.google.rpc.Status> statusForCode =
@@ -119,8 +114,7 @@ public class ContentAddressableStorageService
       Digest rootDigest,
       int pageSize,
       String pageToken,
-      ImmutableList.Builder<Directory> directories)
-      throws IOException, InterruptedException {
+      ImmutableList.Builder<Directory> directories) {
     if (pageSize == 0) {
       pageSize = treeDefaultPageSize;
     }
@@ -184,20 +178,14 @@ public class ContentAddressableStorageService
       return;
     }
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
-    try {
-      String nextPageToken =
-          getTree(request.getRootDigest(), pageSize, request.getPageToken(), directories);
+    String nextPageToken =
+        getTree(request.getRootDigest(), pageSize, request.getPageToken(), directories);
 
-      responseObserver.onNext(
-          GetTreeResponse.newBuilder()
-              .addAllDirectories(directories.build())
-              .setNextPageToken(nextPageToken)
-              .build());
-      responseObserver.onCompleted();
-    } catch (IOException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+    responseObserver.onNext(
+        GetTreeResponse.newBuilder()
+            .addAllDirectories(directories.build())
+            .setNextPageToken(nextPageToken)
+            .build());
+    responseObserver.onCompleted();
   }
 }

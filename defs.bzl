@@ -10,6 +10,8 @@ load(
 )
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
+load("@io_bazel_rules_k8s//k8s:k8s.bzl", "k8s_repositories")
 
 IO_NETTY_MODULES = [
     "buffer",
@@ -39,6 +41,27 @@ IO_GRPC_MODULES = [
     "services",
 ]
 
+COM_AWS_MODULES = [
+    "autoscaling",
+    "core",
+    "ec2",
+    "secretsmanager",
+    "sns",
+    "ssm",
+    "s3",
+]
+
+ORG_SPRING_MODULES = [
+    "spring-beans",
+    "spring-core",
+    "spring-context",
+]
+
+ORG_SPRING_BOOT_MODULES = [
+    "spring-boot-autoconfigure",
+    "spring-boot",
+]
+
 def buildfarm_init(name = "buildfarm"):
     """
     Initialize the WORKSPACE for buildfarm-related targets
@@ -47,15 +70,11 @@ def buildfarm_init(name = "buildfarm"):
       name: the name of the repository
     """
     maven_install(
-        artifacts = [
-                        "com.amazonaws:aws-java-sdk-autoscaling:1.11.729",
-                        "com.amazonaws:aws-java-sdk-core:1.11.729",
-                        "com.amazonaws:aws-java-sdk-ec2:1.11.729",
-                        "com.amazonaws:aws-java-sdk-secretsmanager:1.11.729",
-                        "com.amazonaws:aws-java-sdk-sns:1.11.729",
-                        "com.amazonaws:aws-java-sdk-ssm:1.11.729",
-                        "com.fasterxml.jackson.core:jackson-databind:2.9.8",
+        artifacts = ["com.amazonaws:aws-java-sdk-%s:1.11.729" % module for module in COM_AWS_MODULES] +
+                    [
+                        "com.fasterxml.jackson.core:jackson-databind:2.13.3",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
+                        "com.github.docker-java:docker-java:3.2.11",
                         "com.github.jnr:jffi:1.2.16",
                         "com.github.jnr:jffi:jar:native:1.2.16",
                         "com.github.jnr:jnr-constants:0.9.9",
@@ -63,38 +82,56 @@ def buildfarm_init(name = "buildfarm"):
                         "com.github.jnr:jnr-posix:3.0.53",
                         "com.github.pcj:google-options:1.0.0",
                         "com.github.serceman:jnr-fuse:0.5.5",
+                        "com.github.luben:zstd-jni:1.5.2-1",
                         "com.google.auth:google-auth-library-credentials:0.9.1",
                         "com.google.auth:google-auth-library-oauth2-http:0.9.1",
                         "com.google.code.findbugs:jsr305:3.0.1",
-                        "com.google.code.gson:gson:2.8.6",
-                        "com.google.errorprone:error_prone_annotations:2.2.0",
+                        "com.google.code.gson:gson:2.9.0",
+                        "com.google.errorprone:error_prone_annotations:2.9.0",
                         "com.google.errorprone:error_prone_core:0.92",
                         "com.google.guava:failureaccess:1.0.1",
-                        "com.google.guava:guava:28.2-jre",
+                        "com.google.guava:guava:30.1.1-jre",
                         "com.google.j2objc:j2objc-annotations:1.1",
                         "com.google.jimfs:jimfs:1.1",
                         "com.google.protobuf:protobuf-java-util:3.10.0",
                         "com.google.protobuf:protobuf-java:3.10.0",
                         "com.google.truth:truth:0.44",
+                        "org.slf4j:slf4j-simple:1.7.35",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
-                    ] + ["io.netty:netty-%s:4.1.38.Final" % module for module in IO_NETTY_MODULES] +
-                    ["io.grpc:grpc-%s:1.26.0" % module for module in IO_GRPC_MODULES] +
+                        "io.github.lognet:grpc-spring-boot-starter:4.5.4",
+                        "org.bouncycastle:bcprov-jdk15on:1.70",
+                        "net.jcip:jcip-annotations:1.0",
+                    ] + ["io.netty:netty-%s:4.1.68.Final" % module for module in IO_NETTY_MODULES] +
+                    ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
                     [
                         "io.prometheus:simpleclient:0.10.0",
                         "io.prometheus:simpleclient_hotspot:0.10.0",
                         "io.prometheus:simpleclient_httpserver:0.10.0",
-                        "junit:junit:4.12",
+                        "junit:junit:4.13.1",
+                        "javax.annotation:javax.annotation-api:1.3.2",
                         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
+                        "org.apache.commons:commons-compress:1.21",
                         "org.apache.commons:commons-pool2:2.9.0",
+                        "org.apache.commons:commons-lang3:3.12.0",
+                        "commons-io:commons-io:2.11.0",
+                        "me.dinowernli:java-grpc-prometheus:0.5.0",
+                        "org.apache.tomcat:annotations-api:6.0.53",
                         "org.checkerframework:checker-qual:2.5.2",
                         "org.mockito:mockito-core:2.25.0",
                         "org.openjdk.jmh:jmh-core:1.23",
                         "org.openjdk.jmh:jmh-generator-annprocess:1.23",
                         "org.redisson:redisson:3.13.1",
+                    ] + ["org.springframework.boot:%s:2.7.4" % module for module in ORG_SPRING_BOOT_MODULES] +
+                    ["org.springframework:%s:5.3.23" % module for module in ORG_SPRING_MODULES] +
+                    [
                         "org.threeten:threetenbp:1.3.3",
-                        "org.xerial:sqlite-jdbc:3.31.1",
+                        "org.xerial:sqlite-jdbc:3.34.0",
+                        "org.jetbrains:annotations:16.0.2",
+                        "org.yaml:snakeyaml:1.30",
+                        "org.projectlombok:lombok:1.18.24",
                     ],
+        generate_compat_repositories = True,
         repositories = [
             "https://repo.maven.apache.org/maven2",
             "https://jcenter.bintray.com",
@@ -112,9 +149,16 @@ def buildfarm_init(name = "buildfarm"):
 
     grpc_java_repositories()
 
+    k8s_repositories()
+
     native.bind(
         name = "jar/redis/clients/jedis",
         actual = "@jedis//jar",
+    )
+
+    llvm_toolchain(
+        name = "llvm_toolchain",
+        llvm_version = "10.0.0",
     )
 
 def ensure_accurate_metadata():

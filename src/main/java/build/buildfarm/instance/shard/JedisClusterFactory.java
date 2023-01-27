@@ -14,7 +14,8 @@
 
 package build.buildfarm.instance.shard;
 
-import build.buildfarm.v1test.RedisShardBackplaneConfig;
+import build.buildfarm.common.config.BuildfarmConfigs;
+import com.google.common.base.Strings;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashSet;
@@ -36,6 +37,7 @@ import redis.clients.jedis.ScanResult;
  * @details A factory for creating a jedis cluster instance.
  */
 public class JedisClusterFactory {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   /**
    * @brief Create a jedis cluster instance.
@@ -45,15 +47,29 @@ public class JedisClusterFactory {
    * @return An established jedis client used to operate on the redis cluster.
    * @note Suggested return identifier: jedis.
    */
-  public static Supplier<JedisCluster> create(RedisShardBackplaneConfig config)
-      throws ConfigurationException {
+  public static Supplier<JedisCluster> create() throws ConfigurationException {
     // null password is required to elicit no auth in jedis
+    String[] redisNodes = configs.getBackplane().getRedisNodes();
+    if (redisNodes != null && redisNodes.length > 0) {
+      return createJedisClusterFactory(
+          list2Set(redisNodes),
+          configs.getBackplane().getTimeout(),
+          configs.getBackplane().getMaxAttempts(),
+          Strings.isNullOrEmpty(configs.getBackplane().getRedisPassword())
+              ? null
+              : configs.getBackplane().getRedisPassword(),
+          createJedisPoolConfig());
+    }
+
+    // support "" as redis password.
     return createJedisClusterFactory(
-        parseUri(config.getRedisUri()),
-        config.getTimeout(),
-        config.getMaxAttempts(),
-        config.getRedisPassword().isEmpty() ? null : config.getRedisPassword(),
-        createJedisPoolConfig(config));
+        parseUri(configs.getBackplane().getRedisUri()),
+        configs.getBackplane().getTimeout(),
+        configs.getBackplane().getMaxAttempts(),
+        Strings.isNullOrEmpty(configs.getBackplane().getRedisPassword())
+            ? null
+            : configs.getBackplane().getRedisPassword(),
+        createJedisPoolConfig());
   }
 
   /**
@@ -64,15 +80,7 @@ public class JedisClusterFactory {
    * @note Suggested return identifier: jedis.
    */
   public static JedisCluster createTest() throws Exception {
-    // create the a client to interact with redis.
-    // we assume you are running a local cluster of redis.
-    // configuration values (port chosen by redis create-clusters).
-    RedisShardBackplaneConfig config =
-        RedisShardBackplaneConfig.newBuilder()
-            .setRedisUri("redis://localhost:30001")
-            .setJedisPoolMaxTotal(3)
-            .build();
-    JedisCluster redis = JedisClusterFactory.create(config).get();
+    JedisCluster redis = JedisClusterFactory.create().get();
 
     // use the client to create an empty redis cluster
     // this will prevent any persistent data across test runs
@@ -102,7 +110,8 @@ public class JedisClusterFactory {
    * @param node An established jedis client to operate on a redis node.
    * @note Overloaded.
    */
-  private static void deleteExistingKeys(Jedis node) throws Exception {
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static void deleteExistingKeys(Jedis node) {
     String nextCursor = "0";
     Set<String> matchingKeys = new HashSet<>();
     ScanParams params = new ScanParams();
@@ -118,14 +127,14 @@ public class JedisClusterFactory {
 
     } while (!nextCursor.equals("0"));
 
-    if (matchingKeys.size() == 0) {
+    if (matchingKeys.isEmpty()) {
       return;
     }
 
     // we cannot pass all of the keys to del because of the following error:
     // "CROSSSLOT Keys in request don't hash to the same slot"
     // so iterate over and delete them individually.
-    for (String key : matchingKeys.toArray(new String[matchingKeys.size()])) {
+    for (String key : matchingKeys.toArray(new String[0])) {
       node.del(key);
     }
   }
@@ -154,15 +163,41 @@ public class JedisClusterFactory {
   }
 
   /**
+   * @brief Create a jedis cluster instance with connection settings.
+   * @details Use the nodes addresses, pool and connection information to connect to a redis cluster
+   *     server and provide a jedis client.
+   * @param redisUrisNodes A valid uri set to a redis nodes instances.
+   * @param timeout Connection timeout
+   * @param maxAttempts Number of connection attempts
+   * @param poolConfig Configuration related to redis pools.
+   * @return An established jedis client used to operate on the redis cluster.
+   * @note Suggested return identifier: jedis.
+   */
+  private static Supplier<JedisCluster> createJedisClusterFactory(
+      Set<HostAndPort> redisUrisNodes,
+      int timeout,
+      int maxAttempts,
+      String password,
+      JedisPoolConfig poolConfig) {
+    return () ->
+        new JedisCluster(
+            redisUrisNodes,
+            /* connectionTimeout=*/ Integer.max(2000, timeout),
+            /* soTimeout=*/ Integer.max(2000, timeout),
+            Integer.max(5, maxAttempts),
+            password,
+            poolConfig);
+  }
+  /**
    * @brief Create a jedis pool config.
    * @details Use configuration to build the appropriate jedis pool configuration.
    * @param config Configuration for connecting to a redis cluster server.
    * @return A created jedis pool config.
    * @note Suggested return identifier: poolConfig.
    */
-  private static JedisPoolConfig createJedisPoolConfig(RedisShardBackplaneConfig config) {
+  private static JedisPoolConfig createJedisPoolConfig() {
     JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
-    jedisPoolConfig.setMaxTotal(config.getJedisPoolMaxTotal());
+    jedisPoolConfig.setMaxTotal(configs.getBackplane().getJedisPoolMaxTotal());
     return jedisPoolConfig;
   }
 
@@ -177,6 +212,26 @@ public class JedisClusterFactory {
   private static URI parseUri(String uri) throws ConfigurationException {
     try {
       return new URI(uri);
+    } catch (URISyntaxException e) {
+      throw new ConfigurationException(e.getMessage());
+    }
+  }
+
+  /**
+   * @brief Convert protobuff list to set
+   * @details Convert the string list representation of the nodes URIs into a set of HostAndPort
+   *     objects. If the URI object is invalid a configuration exception will be thrown.
+   * @param nodes The redis nodes.
+   * @return A parsed and valid HostAndPort set.
+   */
+  private static Set<HostAndPort> list2Set(String[] nodes) throws ConfigurationException {
+    Set<HostAndPort> jedisClusterNodes = new HashSet<>();
+    try {
+      for (String node : nodes) {
+        URI redisUri = new URI(node);
+        jedisClusterNodes.add(new HostAndPort(redisUri.getHost(), redisUri.getPort()));
+      }
+      return jedisClusterNodes;
     } catch (URISyntaxException e) {
       throw new ConfigurationException(e.getMessage());
     }

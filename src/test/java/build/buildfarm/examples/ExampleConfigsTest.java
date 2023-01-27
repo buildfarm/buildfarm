@@ -14,14 +14,8 @@
 
 package build.buildfarm.examples;
 
-import build.buildfarm.v1test.BuildFarmServerConfig;
-import build.buildfarm.v1test.ShardWorkerConfig;
-import build.buildfarm.v1test.WorkerConfig;
-import com.google.protobuf.TextFormat;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.junit.Before;
@@ -33,71 +27,25 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 @SuppressWarnings({"ProtoBuilderReturnValueIgnored", "ReturnValueIgnored"})
 public class ExampleConfigsTest {
-
   @Before
   public void skipWindows() {
     org.junit.Assume.assumeFalse(System.getProperty("os.name").contains("Win"));
   }
 
   @Test
-  public void workerConfig() throws IOException {
-
-    // parse text into protobuf
-    Path configPath =
-        Paths.get(
-            System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "worker.config.example");
-    try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      WorkerConfig.Builder builder = WorkerConfig.newBuilder();
-      TextFormat.merge(new InputStreamReader(configInputStream), builder);
-      builder.build();
-    }
-  }
-
-  @Test
-  public void serverConfig() throws IOException {
-
-    // parse text into protobuf
-    Path configPath =
-        Paths.get(
-            System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "server.config.example");
-    try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
-      TextFormat.merge(new InputStreamReader(configInputStream), builder);
-      builder.build();
-    }
-  }
-
-  @Test
   public void shardWorkerConfig() throws IOException {
-
-    // parse text into protobuf
     Path configPath =
         Paths.get(
-            System.getenv("TEST_SRCDIR"),
-            "build_buildfarm",
-            "examples",
-            "shard-worker.config.example");
-    try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
-      TextFormat.merge(new InputStreamReader(configInputStream), builder);
-      builder.build();
-    }
+            System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.minimal.yml");
+    BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+    configs.loadConfigs(configPath);
   }
 
   @Test
-  public void shardServerConfig() throws IOException {
-
-    // parse text into protobuf
+  public void fullConfig() throws IOException {
     Path configPath =
-        Paths.get(
-            System.getenv("TEST_SRCDIR"),
-            "build_buildfarm",
-            "examples",
-            "shard-server.config.example");
-    try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
-      TextFormat.merge(new InputStreamReader(configInputStream), builder);
-      builder.build();
-    }
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.yml");
+    BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+    configs.loadConfigs(configPath);
   }
 }

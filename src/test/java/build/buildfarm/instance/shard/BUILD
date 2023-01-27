@@ -2,13 +2,13 @@ java_test(
     name = "tests",
     size = "small",
     srcs = glob(["*.java"]),
-    classpath_resources = [
-        "//src/test/java/build/buildfarm:configs",
-    ],
+    data = ["//examples:example_configs"],
     test_class = "build.buildfarm.AllTests",
     deps = [
+        "//src/main/java/build/buildfarm/actioncache",
         "//src/main/java/build/buildfarm/backplane",
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/server",
         "//src/main/java/build/buildfarm/instance/shard",

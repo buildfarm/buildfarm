@@ -23,6 +23,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageImplBase;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -62,7 +63,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class GrpcCASTest {
-
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   private final MutableHandlerRegistry serviceRegistry = new MutableHandlerRegistry();
@@ -181,11 +181,11 @@ public class GrpcCASTest {
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     GrpcCAS cas = new GrpcCAS(instanceName, channel, /* uploader=*/ null, onExpirations);
     RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
-    Write initialWrite = cas.getWrite(digest, uuid, requestMetadata);
+    Write initialWrite = cas.getWrite(Compressor.Value.IDENTITY, digest, uuid, requestMetadata);
     try (OutputStream writeOut = initialWrite.getOutput(1, SECONDS, () -> {})) {
       writeContent.substring(0, 4).writeTo(writeOut);
     }
-    Write finalWrite = cas.getWrite(digest, uuid, requestMetadata);
+    Write finalWrite = cas.getWrite(Compressor.Value.IDENTITY, digest, uuid, requestMetadata);
     try (OutputStream writeOut = finalWrite.getOutput(1, SECONDS, () -> {})) {
       writeContent.substring(4).writeTo(writeOut);
     }

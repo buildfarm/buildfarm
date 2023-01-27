@@ -16,9 +16,9 @@ package build.buildfarm.worker.shard;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.InputStreamFactory;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,22 +37,17 @@ public class FailoverInputStreamFactoryTest {
     Digest contentDigest = DIGEST_UTIL.compute(content);
     FailoverInputStreamFactory failoverFactory =
         new FailoverInputStreamFactory(
-            /* primary=*/ new InputStreamFactory() {
-              @Override
-              public InputStream newInput(Digest digest, long offset) throws IOException {
-                if (digest.equals(contentDigest)) {
-                  return content.newInput();
-                }
-                throw new NoSuchFileException(DigestUtil.toString(digest));
+            /* primary=*/ (compressor, digest, offset) -> {
+              if (digest.equals(contentDigest)) {
+                return content.newInput();
               }
+              throw new NoSuchFileException(DigestUtil.toString(digest));
             },
-            /* failover=*/ new InputStreamFactory() {
-              @Override
-              public InputStream newInput(Digest digest, long offset) throws IOException {
-                throw new IOException("invalid");
-              }
+            /* failover=*/ (compressor, digest, offset) -> {
+              throw new IOException("invalid");
             });
-    InputStream in = failoverFactory.newInput(contentDigest, /* offset=*/ 0);
+    InputStream in =
+        failoverFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset=*/ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);
   }
 
@@ -62,22 +57,17 @@ public class FailoverInputStreamFactoryTest {
     Digest contentDigest = DIGEST_UTIL.compute(content);
     FailoverInputStreamFactory failoverFactory =
         new FailoverInputStreamFactory(
-            /* primary=*/ new InputStreamFactory() {
-              @Override
-              public InputStream newInput(Digest digest, long offset) throws IOException {
-                throw new NoSuchFileException(DigestUtil.toString(digest));
-              }
+            /* primary=*/ (compressor, digest, offset) -> {
+              throw new NoSuchFileException(DigestUtil.toString(digest));
             },
-            /* failover=*/ new InputStreamFactory() {
-              @Override
-              public InputStream newInput(Digest digest, long offset) throws IOException {
-                if (digest.equals(contentDigest)) {
-                  return content.newInput();
-                }
-                throw new IOException("invalid");
+            /* failover=*/ (compressor, digest, offset) -> {
+              if (digest.equals(contentDigest)) {
+                return content.newInput();
               }
+              throw new IOException("invalid");
             });
-    InputStream in = failoverFactory.newInput(contentDigest, /* offset=*/ 0);
+    InputStream in =
+        failoverFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset=*/ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);
   }
 }

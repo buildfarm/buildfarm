@@ -112,6 +112,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
   private final URI uri;
   private final int timeoutMillis;
   private final boolean useTls;
+  private final boolean readOnly;
 
   private final Object closeLock = new Object();
 
@@ -146,7 +147,6 @@ public final class HttpBlobStore implements SimpleBlobStore {
       int remoteMaxConnections,
       @Nullable final Credentials creds)
       throws ConfigurationException, URISyntaxException, SSLException {
-
     if (KQueue.isAvailable()) {
       return new HttpBlobStore(
           KQueueEventLoopGroup::new,
@@ -176,6 +176,27 @@ public final class HttpBlobStore implements SimpleBlobStore {
       URI uri,
       int timeoutMillis,
       int remoteMaxConnections,
+      @Nullable final Credentials creds,
+      @Nullable SocketAddress socketAddress)
+      throws URISyntaxException, SSLException {
+    this(
+        newEventLoopGroup,
+        channelClass,
+        uri,
+        timeoutMillis,
+        remoteMaxConnections,
+        false,
+        creds,
+        socketAddress);
+  }
+
+  private HttpBlobStore(
+      Function<Integer, EventLoopGroup> newEventLoopGroup,
+      Class<? extends Channel> channelClass,
+      URI uri,
+      int timeoutMillis,
+      int remoteMaxConnections,
+      boolean readOnly,
       @Nullable final Credentials creds,
       @Nullable SocketAddress socketAddress)
       throws URISyntaxException, SSLException {
@@ -241,6 +262,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
     }
     this.creds = creds;
     this.timeoutMillis = timeoutMillis;
+    this.readOnly = readOnly;
   }
 
   @SuppressWarnings("FutureReturnValueIgnored")
@@ -519,60 +541,64 @@ public final class HttpBlobStore implements SimpleBlobStore {
     put(key, length, in, true);
   }
 
-  @SuppressWarnings("FutureReturnValueIgnored")
+  @SuppressWarnings({"FutureReturnValueIgnored", "ConstantConditions"})
   private void put(String key, long length, InputStream in, boolean casUpload)
       throws IOException, InterruptedException {
-    InputStream wrappedIn =
-        new FilterInputStream(in) {
-          @Override
-          public void close() {
-            // Ensure that the InputStream can't be closed somewhere in the Netty
-            // pipeline, so that we can support retries. The InputStream is closed in
-            // the finally block below.
+    if (!this.readOnly) {
+      InputStream wrappedIn =
+          new FilterInputStream(in) {
+            @Override
+            public void close() {
+              // Ensure that the InputStream can't be closed somewhere in the Netty
+              // pipeline, so that we can support retries. The InputStream is closed in
+              // the finally block below.
+            }
+          };
+      UploadCommand upload = new UploadCommand(uri, casUpload, key, wrappedIn, length);
+      Channel ch = null;
+      try {
+        ch = acquireUploadChannel();
+        ChannelFuture uploadFuture = ch.writeAndFlush(upload);
+        uploadFuture.sync();
+      } catch (Exception e) {
+        // e can be of type HttpException, because Netty uses Unsafe.throwException to re-throw a
+        // checked exception that hasn't been declared in the method signature.
+        if (e instanceof HttpException) {
+          HttpResponse response = ((HttpException) e).response();
+          if (authTokenExpired(response)) {
+            refreshCredentials();
+            // The error is due to an auth token having expired. Let's try again.
+            if (!reset(in)) {
+              // The InputStream can't be reset and thus we can't retry as most likely
+              // bytes have already been read from the InputStream.
+              throw e;
+            }
+            putAfterCredentialRefresh(upload);
+            return;
           }
-        };
-    UploadCommand upload = new UploadCommand(uri, casUpload, key, wrappedIn, length);
-    Channel ch = null;
-    try {
-      ch = acquireUploadChannel();
-      ChannelFuture uploadFuture = ch.writeAndFlush(upload);
-      uploadFuture.sync();
-    } catch (Exception e) {
-      // e can be of type HttpException, because Netty uses Unsafe.throwException to re-throw a
-      // checked exception that hasn't been declared in the method signature.
-      if (e instanceof HttpException) {
-        HttpResponse response = ((HttpException) e).response();
-        if (authTokenExpired(response)) {
-          refreshCredentials();
-          // The error is due to an auth token having expired. Let's try again.
-          if (!reset(in)) {
-            // The InputStream can't be reset and thus we can't retry as most likely
-            // bytes have already been read from the InputStream.
-            throw e;
-          }
-          putAfterCredentialRefresh(upload);
-          return;
         }
-      }
-      throw e;
-    } finally {
-      in.close();
-      if (ch != null) {
-        releaseUploadChannel(ch);
+        throw e;
+      } finally {
+        in.close();
+        if (ch != null) {
+          releaseUploadChannel(ch);
+        }
       }
     }
   }
 
-  @SuppressWarnings("FutureReturnValueIgnored")
+  @SuppressWarnings({"FutureReturnValueIgnored", "ConstantConditions"})
   private void putAfterCredentialRefresh(UploadCommand cmd) throws InterruptedException {
-    Channel ch = null;
-    try {
-      ch = acquireUploadChannel();
-      ChannelFuture uploadFuture = ch.writeAndFlush(cmd);
-      uploadFuture.sync();
-    } finally {
-      if (ch != null) {
-        releaseUploadChannel(ch);
+    if (!this.readOnly) {
+      Channel ch = null;
+      try {
+        ch = acquireUploadChannel();
+        ChannelFuture uploadFuture = ch.writeAndFlush(cmd);
+        uploadFuture.sync();
+      } finally {
+        if (ch != null) {
+          releaseUploadChannel(ch);
+        }
       }
     }
   }
@@ -623,6 +649,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
   }
 
   /** See https://tools.ietf.org/html/rfc6750#section-3.1 */
+  @SuppressWarnings("ConstantConditions")
   private boolean authTokenExpired(HttpResponse response) {
     synchronized (credentialsLock) {
       if (creds == null) {

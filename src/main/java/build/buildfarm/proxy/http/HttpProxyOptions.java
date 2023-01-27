@@ -19,7 +19,6 @@ import com.google.devtools.common.options.OptionsBase;
 
 /** Command-line options definition for example server. */
 public class HttpProxyOptions extends OptionsBase {
-
   @Option(name = "help", abbrev = 'h', help = "Prints usage info.", defaultValue = "true")
   public boolean help;
 
@@ -43,6 +42,13 @@ public class HttpProxyOptions extends OptionsBase {
               + "GET. BLOBs are stored under the path /cas/<hash>. Results are "
               + "stored under the path /ac/<actionKey>.")
   public String httpCache;
+
+  @Option(
+      name = "readonly",
+      abbrev = 'r',
+      defaultValue = "true",
+      help = "Whether or not the http_cache is read-only. Defaults to true.")
+  public boolean readOnly;
 
   @Option(
       name = "tree_default_page_size",

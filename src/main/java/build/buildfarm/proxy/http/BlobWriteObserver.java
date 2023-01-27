@@ -24,10 +24,10 @@ import com.google.common.base.Throwables;
 import com.google.protobuf.ByteString;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 class BlobWriteObserver implements WriteObserver {
-  private static final Logger logger = Logger.getLogger(BlobWriteObserver.class.getName());
   private static final int BLOB_BUFFER_SIZE = 64 * 1024;
 
   private final String resourceName;
@@ -71,7 +71,7 @@ class BlobWriteObserver implements WriteObserver {
     checkError();
     String requestResourceName = request.getResourceName();
     if (!requestResourceName.isEmpty() && !resourceName.equals(requestResourceName)) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: resource name %s does not match first request",
@@ -82,16 +82,16 @@ class BlobWriteObserver implements WriteObserver {
               resourceName, requestResourceName));
     }
     if (complete) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: write received after finish_write specified",
               resourceName));
-      throw new IllegalArgumentException(String.format("request sent after finish_write request"));
+      throw new IllegalArgumentException("request sent after finish_write request");
     }
     long committedSize = getCommittedSize();
     if (request.getWriteOffset() != committedSize) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: offset %d != committed_size %d",
@@ -100,7 +100,7 @@ class BlobWriteObserver implements WriteObserver {
     }
     long sizeAfterWrite = committedSize + request.getData().size();
     if (request.getFinishWrite() && sizeAfterWrite != size) {
-      logger.log(
+      log.log(
           Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: finish_write request of size %d for write size %d != expected %d",

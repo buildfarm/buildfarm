@@ -17,6 +17,7 @@ package build.buildfarm.instance;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
@@ -31,6 +32,7 @@ import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.Tree;
@@ -68,9 +70,10 @@ public interface Instance {
 
   boolean containsBlob(Digest digest, Digest.Builder result, RequestMetadata requestMetadata);
 
-  String getBlobName(Digest blobDigest);
+  String readResourceName(Compressor.Value compressor, Digest blobDigest);
 
   void getBlob(
+      Compressor.Value compressor,
       Digest blobDigest,
       long offset,
       long count,
@@ -78,6 +81,7 @@ public interface Instance {
       RequestMetadata requestMetadata);
 
   InputStream newBlobInput(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long deadlineAfter,
@@ -85,28 +89,23 @@ public interface Instance {
       RequestMetadata requestMetadata)
       throws IOException;
 
-  ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests);
+  ListenableFuture<List<Response>> getAllBlobsFuture(Iterable<Digest> digests);
 
-  String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree)
-      throws IOException, InterruptedException;
+  String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree);
 
-  Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+  Write getBlobWrite(
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException;
 
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
-      throws EntryLimitException, IOException, IllegalArgumentException, InterruptedException;
+      throws IOException, IllegalArgumentException, InterruptedException;
 
   ListenableFuture<Digest> fetchBlob(
       Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata);
 
   Write getOperationStreamWrite(String name);
 
-  InputStream newOperationStreamInput(
-      String name,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata)
+  InputStream newOperationStreamInput(String name, long offset, RequestMetadata requestMetadata)
       throws IOException;
 
   ListenableFuture<Void> execute(
@@ -145,11 +144,11 @@ public interface Instance {
 
   WorkerListMessage getWorkerList();
 
-  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker);
+  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully();
 
-  GetClientStartTimeResult getClientStartTime(String clientKey);
+  GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request);
 
-  CasIndexResults reindexCas(String hostName);
+  CasIndexResults reindexCas();
 
   void deregisterWorker(String workerName);
 

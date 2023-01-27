@@ -16,6 +16,7 @@ package build.buildfarm.operations.finder;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -30,6 +31,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
+import java.util.logging.Level;
+import lombok.extern.java.Log;
 import redis.clients.jedis.JedisCluster;
 
 /**
@@ -39,8 +42,8 @@ import redis.clients.jedis.JedisCluster;
  * @details For performance reasons, only build these enriched operations when you intend to use the
  *     extra provided metadata.
  */
+@Log
 public class EnrichedOperationBuilder {
-
   /**
    * @brief Create an enriched operation based on an operation key.
    * @details This will make calls to get blobs, and resolve digests into the appropriate data
@@ -55,8 +58,20 @@ public class EnrichedOperationBuilder {
       JedisCluster cluster, Instance instance, String operationKey) {
     EnrichedOperation operationWithMetadata = new EnrichedOperation();
     operationWithMetadata.operation = operationKeyToOperation(cluster, operationKey);
+
+    // the operation could not be fetched so there is nothing further to derive
+    if (operationWithMetadata.operation == null) {
+      return operationWithMetadata;
+    }
+
     operationWithMetadata.action =
         actionDigestToAction(instance, operationToActionDigest(operationWithMetadata.operation));
+
+    // the action could not be fetched so there is nothing further to derive
+    if (operationWithMetadata.action == null) {
+      return operationWithMetadata;
+    }
+
     operationWithMetadata.command =
         commandDigestToCommand(instance, operationWithMetadata.action.getCommandDigest());
     return operationWithMetadata;
@@ -72,8 +87,7 @@ public class EnrichedOperationBuilder {
    */
   private static Operation operationKeyToOperation(JedisCluster cluster, String operationKey) {
     String json = cluster.get(operationKey);
-    Operation operation = jsonToOperation(json);
-    return operation;
+    return jsonToOperation(json);
   }
 
   /**
@@ -98,6 +112,7 @@ public class EnrichedOperationBuilder {
             .ignoringUnknownFields();
 
     if (json == null) {
+      log.log(Level.WARNING, "Operation Json is empty");
       return null;
     }
     try {
@@ -105,6 +120,7 @@ public class EnrichedOperationBuilder {
       operationParser.merge(json, operationBuilder);
       return operationBuilder.build();
     } catch (InvalidProtocolBufferException e) {
+      log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
       return null;
     }
   }
@@ -116,32 +132,29 @@ public class EnrichedOperationBuilder {
    * @return The extracted digest.
    * @note Suggested return identifier: digest.
    */
+  @SuppressWarnings("ConstantConditions")
   private static Digest operationToActionDigest(Operation operation) {
     ExecuteOperationMetadata metadata;
-    RequestMetadata requestMetadata;
 
     try {
       if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
         QueuedOperationMetadata queuedOperationMetadata =
             operation.getMetadata().unpack(QueuedOperationMetadata.class);
         metadata = queuedOperationMetadata.getExecuteOperationMetadata();
-        requestMetadata = queuedOperationMetadata.getRequestMetadata();
       } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
         ExecutingOperationMetadata executingMetadata =
             operation.getMetadata().unpack(ExecutingOperationMetadata.class);
         metadata = executingMetadata.getExecuteOperationMetadata();
-        requestMetadata = executingMetadata.getRequestMetadata();
       } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
         CompletedOperationMetadata completedMetadata =
             operation.getMetadata().unpack(CompletedOperationMetadata.class);
         metadata = completedMetadata.getExecuteOperationMetadata();
-        requestMetadata = completedMetadata.getRequestMetadata();
       } else {
         metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-        requestMetadata = null;
       }
 
     } catch (InvalidProtocolBufferException e) {
+      log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
       metadata = null;
     }
 
@@ -158,15 +171,19 @@ public class EnrichedOperationBuilder {
    */
   private static Action actionDigestToAction(Instance instance, Digest digest) {
     try {
-      ByteString blob = Utils.getBlob(instance, digest, RequestMetadata.getDefaultInstance());
+      ByteString blob =
+          Utils.getBlob(
+              instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance());
       Action action;
       try {
         action = Action.parseFrom(blob);
         return action;
       } catch (InvalidProtocolBufferException e) {
+        log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
         return null;
       }
     } catch (Exception e) {
+      log.log(Level.WARNING, e.getMessage());
       return null;
     }
   }
@@ -181,15 +198,19 @@ public class EnrichedOperationBuilder {
    */
   private static Command commandDigestToCommand(Instance instance, Digest digest) {
     try {
-      ByteString blob = Utils.getBlob(instance, digest, RequestMetadata.getDefaultInstance());
+      ByteString blob =
+          Utils.getBlob(
+              instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance());
       Command command;
       try {
         command = Command.parseFrom(blob);
         return command;
       } catch (InvalidProtocolBufferException e) {
+        log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
         return null;
       }
     } catch (Exception e) {
+      log.log(Level.WARNING, e.getMessage());
       return null;
     }
   }

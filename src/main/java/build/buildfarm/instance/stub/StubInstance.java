@@ -29,12 +29,14 @@ import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheFutureStub;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CapabilitiesGrpc;
 import build.bazel.remote.execution.v2.CapabilitiesGrpc.CapabilitiesBlockingStub;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
@@ -45,6 +47,7 @@ import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.GetCapabilitiesRequest;
 import build.bazel.remote.execution.v2.GetTreeRequest;
@@ -66,12 +69,17 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
+import build.buildfarm.common.resources.BlobInformation;
+import build.buildfarm.common.resources.DownloadBlobRequest;
+import build.buildfarm.common.resources.ResourceParser;
+import build.buildfarm.common.resources.UploadBlobRequest;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BackplaneStatusRequest;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -82,7 +90,6 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import build.buildfarm.v1test.ShutDownWorkerGrpc.ShutDownWorkerBlockingStub;
 import build.buildfarm.v1test.TakeOperationRequest;
@@ -103,7 +110,6 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
@@ -124,6 +130,7 @@ import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.AbstractStub;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
@@ -132,19 +139,19 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
+import lombok.extern.java.Log;
 
+@Log
 public class StubInstance implements Instance {
-  private static final Logger logger = Logger.getLogger(StubInstance.class.getName());
-
   private static final long DEFAULT_DEADLINE_DAYS = 100 * 365;
 
   private final String name;
@@ -175,6 +182,7 @@ public class StubInstance implements Instance {
     this(name, identifier, digestUtil, channel, grpcTimeout, NO_RETRIES, /* retryService=*/ null);
   }
 
+  @SuppressWarnings("NullableProblems")
   public StubInstance(
       String name,
       String identifier,
@@ -201,6 +209,7 @@ public class StubInstance implements Instance {
     return ExecutionGrpc.newStub(channel);
   }
 
+  @SuppressWarnings("Guava")
   private final Supplier<ActionCacheBlockingStub> actionCacheBlockingStub =
       Suppliers.memoize(
           new Supplier<ActionCacheBlockingStub>() {
@@ -210,6 +219,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ActionCacheFutureStub> actionCacheFutureStub =
       Suppliers.memoize(
           new Supplier<ActionCacheFutureStub>() {
@@ -219,6 +229,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<CapabilitiesBlockingStub> capsBlockingStub =
       Suppliers.memoize(
           new Supplier<CapabilitiesBlockingStub>() {
@@ -228,6 +239,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<AdminBlockingStub> adminBlockingStub =
       Suppliers.memoize(
           new Supplier<AdminBlockingStub>() {
@@ -237,6 +249,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ContentAddressableStorageFutureStub> casFutureStub =
       Suppliers.memoize(
           new Supplier<ContentAddressableStorageFutureStub>() {
@@ -246,6 +259,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ContentAddressableStorageBlockingStub> casBlockingStub =
       Suppliers.memoize(
           new Supplier<ContentAddressableStorageBlockingStub>() {
@@ -255,6 +269,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ByteStreamStub> bsStub =
       Suppliers.memoize(
           new Supplier<ByteStreamStub>() {
@@ -264,6 +279,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub =
       Suppliers.memoize(
           new Supplier<ByteStreamBlockingStub>() {
@@ -273,6 +289,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<OperationsBlockingStub> operationsBlockingStub =
       Suppliers.memoize(
           new Supplier<OperationsBlockingStub>() {
@@ -282,6 +299,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<OperationQueueBlockingStub> operationQueueBlockingStub =
       Suppliers.memoize(
           new Supplier<OperationQueueBlockingStub>() {
@@ -291,6 +309,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<WorkerProfileBlockingStub> workerProfileBlockingStub =
       Suppliers.memoize(
           new Supplier<WorkerProfileBlockingStub>() {
@@ -300,6 +319,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings("Guava")
   private final Supplier<ShutDownWorkerBlockingStub> shutDownWorkerBlockingStub =
       Suppliers.memoize(
           new Supplier<ShutDownWorkerBlockingStub>() {
@@ -309,6 +329,7 @@ public class StubInstance implements Instance {
             }
           });
 
+  @SuppressWarnings({"Guava", "ConstantConditions"})
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
     if (grpcTimeout.getSeconds() > 0 || grpcTimeout.getNanos() > 0) {
@@ -336,7 +357,7 @@ public class StubInstance implements Instance {
     channel.shutdownNow();
     channel.awaitTermination(0, TimeUnit.SECONDS);
     if (retryService != null && !shutdownAndAwaitTermination(retryService, 10, TimeUnit.SECONDS)) {
-      logger.log(Level.SEVERE, format("Could not shut down retry service for %s", identifier));
+      log.log(Level.SEVERE, format("Could not shut down retry service for %s", identifier));
     }
   }
 
@@ -368,6 +389,7 @@ public class StubInstance implements Instance {
         directExecutor());
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
     throwIfStopped();
@@ -400,7 +422,7 @@ public class StubInstance implements Instance {
         deadlined(casFutureStub)
             .withInterceptors(attachMetadataInterceptor(requestMetadata))
             .findMissingBlobs(request),
-        (response) -> response.getMissingBlobDigestsList(),
+        FindMissingBlobsResponse::getMissingBlobDigestsList,
         directExecutor());
   }
 
@@ -436,7 +458,7 @@ public class StubInstance implements Instance {
       throw exception;
     }
     return Iterables.transform(
-        batchResponse.getResponsesList(), (response) -> response.getDigest());
+        batchResponse.getResponsesList(), BatchUpdateBlobsResponse.Response::getDigest);
   }
 
   @Override
@@ -457,21 +479,11 @@ public class StubInstance implements Instance {
 
   @Override
   public InputStream newOperationStreamInput(
-      String resourceName,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata)
-      throws IOException {
-    return newInput(resourceName, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
+      String resourceName, long offset, RequestMetadata requestMetadata) throws IOException {
+    return newInput(resourceName, offset, requestMetadata);
   }
 
-  InputStream newInput(
-      String resourceName,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata)
+  InputStream newInput(String resourceName, long offset, RequestMetadata requestMetadata)
       throws IOException {
     return ByteStreamHelper.newInput(
         resourceName,
@@ -483,8 +495,12 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public String getBlobName(Digest blobDigest) {
-    return format("%s/blobs/%s", getName(), DigestUtil.toString(blobDigest));
+  public String readResourceName(Compressor.Value compressor, Digest blobDigest) {
+    return ResourceParser.downloadResourceName(
+        DownloadBlobRequest.newBuilder()
+            .setInstanceName(getName())
+            .setBlob(BlobInformation.newBuilder().setCompressor(compressor).setDigest(blobDigest))
+            .build());
   }
 
   static class ReadBlobInterchange implements ClientResponseObserver<ReadRequest, ReadResponse> {
@@ -502,7 +518,7 @@ public class StubInstance implements Instance {
     @GuardedBy("this")
     private boolean wasStarted = false;
     // Indicator for request completion, so that callbacks throw or are ignored
-    AtomicBoolean wasCompleted = new AtomicBoolean(false);
+    final AtomicBoolean wasCompleted = new AtomicBoolean(false);
 
     ReadBlobInterchange(ServerCallStreamObserver<ByteString> blobObserver) {
       this.blobObserver = blobObserver;
@@ -563,6 +579,7 @@ public class StubInstance implements Instance {
 
   @Override
   public void getBlob(
+      Compressor.Value compressor,
       Digest blobDigest,
       long offset,
       long limit,
@@ -574,7 +591,7 @@ public class StubInstance implements Instance {
         .withInterceptors(attachMetadataInterceptor(requestMetadata))
         .read(
             ReadRequest.newBuilder()
-                .setResourceName(getBlobName(blobDigest))
+                .setResourceName(readResourceName(compressor, blobDigest))
                 .setReadOffset(offset)
                 .setReadLimit(limit)
                 .build(),
@@ -583,18 +600,18 @@ public class StubInstance implements Instance {
 
   @Override
   public InputStream newBlobInput(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata)
       throws IOException {
-    return newInput(
-        getBlobName(digest), offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
+    return newInput(readResourceName(compressor, digest), offset, requestMetadata);
   }
 
   @Override
-  public ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests) {
+  public ListenableFuture<List<Response>> getAllBlobsFuture(Iterable<Digest> digests) {
     return transform(
         deadlined(casFutureStub)
             .batchReadBlobs(
@@ -602,7 +619,7 @@ public class StubInstance implements Instance {
                     .setInstanceName(getName())
                     .addAllDigests(digests)
                     .build()),
-        (response) -> response.getResponsesList(),
+        BatchReadBlobsResponse::getResponsesList,
         directExecutor());
   }
 
@@ -648,10 +665,15 @@ public class StubInstance implements Instance {
    * writes
    */
   @Override
-  public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+  public Write getBlobWrite(
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
     String resourceName =
-        ByteStreamUploader.uploadResourceName(
-            getName(), uuid, HashCode.fromString(digest.getHash()), digest.getSizeBytes());
+        ResourceParser.uploadResourceName(
+            UploadBlobRequest.newBuilder()
+                .setInstanceName(getName())
+                .setBlob(BlobInformation.newBuilder().setCompressor(compressor).setDigest(digest))
+                .setUuid(uuid.toString())
+                .build());
     return getWrite(
         resourceName,
         t -> {
@@ -661,7 +683,9 @@ public class StubInstance implements Instance {
           }
           return t;
         },
-        digest.getSizeBytes(),
+        compressor == Compressor.Value.IDENTITY
+            ? digest.getSizeBytes()
+            : StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
         /* autoflush=*/ false,
         requestMetadata);
   }
@@ -745,7 +769,15 @@ public class StubInstance implements Instance {
   @Override
   public boolean putOperation(Operation operation) {
     throwIfStopped();
-    return deadlined(operationQueueBlockingStub).put(operation).getCode() == Code.OK.getNumber();
+    com.google.rpc.Status status = deadlined(operationQueueBlockingStub).put(operation);
+    int code = status.getCode();
+    if (code != Code.OK.getNumber() && code != Code.INVALID_ARGUMENT.getNumber()) {
+      log.log(
+          Level.SEVERE,
+          format("putOperation(%s) response was unexpected", operation.getName()),
+          StatusProto.toStatusException(status));
+    }
+    return code == Code.OK.getNumber();
   }
 
   @Override
@@ -756,14 +788,21 @@ public class StubInstance implements Instance {
   @Override
   public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
     throwIfStopped();
-    return deadlined(operationQueueBlockingStub)
+    com.google.rpc.Status status =
+        deadlined(operationQueueBlockingStub)
             .poll(
                 PollOperationRequest.newBuilder()
                     .setOperationName(operationName)
                     .setStage(stage)
-                    .build())
-            .getCode()
-        == Code.OK.getNumber();
+                    .build());
+    int code = status.getCode();
+    if (code != Code.OK.getNumber() && code != Code.INVALID_ARGUMENT.getNumber()) {
+      log.log(
+          Level.SEVERE,
+          format("pollOperation(%s) response was unexpected", operationName),
+          StatusProto.toStatusException(status));
+    }
+    return code == Code.OK.getNumber();
   }
 
   @Override
@@ -816,6 +855,7 @@ public class StubInstance implements Instance {
         .getOperation(GetOperationRequest.newBuilder().setName(operationName).build());
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void deleteOperation(String operationName) {
     throwIfStopped();
@@ -823,6 +863,7 @@ public class StubInstance implements Instance {
         .deleteOperation(DeleteOperationRequest.newBuilder().setName(operationName).build());
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void cancelOperation(String operationName) {
     throwIfStopped();
@@ -849,17 +890,15 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public CasIndexResults reindexCas(String hostName) {
+  public CasIndexResults reindexCas() {
     throwIfStopped();
     ReindexCasRequestResults proto =
-        adminBlockingStub
-            .get()
-            .reindexCas(ReindexCasRequest.newBuilder().setHostId(hostName).build());
+        adminBlockingStub.get().reindexCas(ReindexCasRequest.newBuilder().build());
     CasIndexResults results = new CasIndexResults();
     results.removedHosts = proto.getRemovedHosts();
     results.removedKeys = proto.getRemovedKeys();
@@ -867,18 +906,18 @@ public class StubInstance implements Instance {
     return results;
   }
 
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Override
   public void deregisterWorker(String workerName) {
     throwIfStopped();
-    ShutDownWorkerGracefullyRequestResults proto =
-        adminBlockingStub
-            .get()
-            .shutDownWorkerGracefully(
-                ShutDownWorkerGracefullyRequest.newBuilder().setWorkerName(workerName).build());
+    adminBlockingStub
+        .get()
+        .shutDownWorkerGracefully(
+            ShutDownWorkerGracefullyRequest.newBuilder().setWorkerName(workerName).build());
   }
 
   @Override
-  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
+  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
     throwIfStopped();
     return shutDownWorkerBlockingStub
         .get()

@@ -25,7 +25,6 @@ import org.junit.runners.model.RunnerBuilder;
  * annotated class. To be used in combination with {@link TestSuiteBuilder}.
  */
 public final class CustomSuite extends Suite {
-
   /** Only called reflectively. Do not use programmatically. */
   public CustomSuite(Class<?> klass, RunnerBuilder builder) throws Throwable {
     super(builder, klass, getClasses(klass));
@@ -33,7 +32,7 @@ public final class CustomSuite extends Suite {
 
   private static Class<?>[] getClasses(Class<?> klass) {
     Set<Class<?>> result = evalSuite(klass);
-    return result.toArray(new Class<?>[result.size()]);
+    return result.toArray(new Class<?>[0]);
   }
 
   @SuppressWarnings("unchecked") // unchecked cast to a generic type

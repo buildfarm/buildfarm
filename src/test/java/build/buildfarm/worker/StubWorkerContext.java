@@ -24,16 +24,18 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 class StubWorkerContext implements WorkerContext {
@@ -84,7 +86,7 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Iterable<ExecutionPolicy> getExecutionPolicies(String name) {
+  public List<ExecutionPolicy> getExecutionPolicies(String name) {
     throw new UnsupportedOperationException();
   }
 
@@ -95,6 +97,11 @@ class StubWorkerContext implements WorkerContext {
 
   @Override
   public int getExecuteStageWidth() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int getInputFetchDeadline() {
     throw new UnsupportedOperationException();
   }
 
@@ -149,16 +156,12 @@ class StubWorkerContext implements WorkerContext {
 
   @Override
   public void uploadOutputs(
-      Digest actionDigest,
-      ActionResult.Builder resultBuilder,
-      Path actionRoot,
-      Iterable<String> outputFiles,
-      Iterable<String> outputDirs) {
+      Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Command command) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action) {
+  public boolean putOperation(Operation operation) {
     throw new UnsupportedOperationException();
   }
 
@@ -199,7 +202,10 @@ class StubWorkerContext implements WorkerContext {
 
   @Override
   public IOResource limitExecution(
-      String operationName, ImmutableList.Builder<String> arguments, Command command) {
+      String operationName,
+      ImmutableList.Builder<String> arguments,
+      Command command,
+      Path workingDirectory) {
     throw new UnsupportedOperationException();
   }
 

@@ -1,16 +1,17 @@
 java_test(
     name = "tests",
     size = "small",
-    srcs = glob(["*.java"]),
-    classpath_resources = [
-        "//src/test/java/build/buildfarm:configs",
+    srcs = [
+        "BuildFarmServerIntegrationTest.java",
     ],
+    data = ["//examples:example_configs"],
+    tags = ["integration"],
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/instance",
-        "//src/main/java/build/buildfarm/instance/server",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/metrics/log",
         "//src/main/java/build/buildfarm/server",
@@ -33,6 +34,7 @@ java_test(
         "@maven//:io_grpc_grpc_netty",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
+        "@maven//:me_dinowernli_java_grpc_prometheus",
         "@maven//:org_mockito_mockito_core",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",

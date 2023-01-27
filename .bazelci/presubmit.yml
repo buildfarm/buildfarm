@@ -1,11 +1,23 @@
 ---
-buildifier: latest
+buildifier: 4.2.5
 tasks:
+
+  # Linting jobs
   format_check:
     name: "Code Format"
     platform: ubuntu1804
     shell_commands:
     - ./.bazelci/format.sh --check
+  package_layout:
+    name: "Package Layout"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/package_name_check.sh
+  java_unused_deps_check:
+    name: "Java Unused Dependencies"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/unused_deps.sh --check
   static_analysis_check:
     name: "Static Analysis"
     platform: ubuntu1804
@@ -16,23 +28,34 @@ tasks:
     platform: ubuntu1804
     shell_commands:
     - export BUILDFARM_SKIP_COVERAGE_HOST=true
+    - export BUILDFARM_GATE_LCOV_RESULTS=true
     - ./generate_coverage.sh
+
+  # Typical unit tests that run across a variety of operating systems.
   ubuntu1604:
     name: "Unit Tests"
     build_targets:
     - "..."
+    test_flags:
+    - "--test_tag_filters=-integration,-redis"
     test_targets:
     - "..."
   ubuntu1804:
     name: "Unit Tests"
     build_targets:
     - "..."
+    test_flags:
+    - "--test_tag_filters=-integration,-redis"
     test_targets:
     - "..."
   macos:
     name: "Unit Tests"
+    build_flags:
+    - "--build_tag_filters=-container"
     build_targets:
     - "..."
+    test_flags:
+    - "--test_tag_filters=-integration,-redis"
     test_targets:
     - "..."
   windows:
@@ -41,10 +64,96 @@ tasks:
     - "--build_tag_filters=-container"
     build_targets:
     - "..."
+    test_flags:
+    - "--test_tag_filters=-integration,-redis"
     test_targets:
     - "..."
-  integration_test:
+  rpm_builds:
+    name: "Rpm Builds"
+    platform: centos7
+    shell_commands:
+    - bazel build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
+
+  # This will run unit tests that integrate with redis.
+  # Outside of this step, similar functionality may be tested with mocks.
+  redis_unit_tests:
+    name: "Redis Unit Tests"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/redis_unit_tests.sh
+
+  # We want to run the unit tests again inside of a docker container.
+  # This is because test cases may behave different while in docker due to user permissions.
+  # This is more of a sanity check between a defined docker file and running tests directly on the host.
+  docker_unit_tests:
+    name: "Docker Unit Tests"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/docker_unit_test.sh
+
+  # Run server integration tests.
+  # It starts the distributed storage backend and buildfarm services.
+  # It performs a realistic build on generated cc targets and gating projects.
+  integration_test_server:
+    name: "Server Integration Test"
+    platform: ubuntu1804
+    shell_commands:
+      - ./.bazelci/run_server_test.sh
+
+  # Test that buildfarm can build software using the default configurations.
+  # It starts the distributed storage backend and buildfarm services.
+  # It performs a realistic build on generated cc targets and gating projects.
+  integration_test_many:
     name: "Integration Test"
     platform: ubuntu1804
     shell_commands:
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
+
+  # Test that buildfarm can work with zstd compression
+  compression_test_many_shard:
+    name: "Integration Test (Shard/Compression)"
+    platform: ubuntu1804
+    shell_commands:
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - export TEST_ARG1=--experimental_remote_cache_compression
+    - export EXECUTION_STAGE_WIDTH=5
+    - ./.bazelci/integration_test.sh
+
+  # In the same way that clients will want to verify their cache hit rates / latencies.
+  # We as service owners will want a way to verify that our cache hit rate is correct and
+  # that latencies can be captured.
+  cache_check_many:
+    name: "Cache Check"
+    platform: ubuntu1804
+    shell_commands:
+    - export CACHE_TEST=true
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_double_test.sh
+    - export TEST_ARG1=--experimental_remote_grpc_log='./grpc.log'
+    - export TEST_ARG2=--experimental_remote_grpc_log='./grpc2.log'
+    - export SHA1_TOOLS_REMOTE=9969ed6911aea04f7e896cd3958ea933547f933c
+    - export EXECUTION_STAGE_WIDTH=5
+    - ./.bazelci/cache_test.sh
+
+  integration_test_absei:
+    name: "Abseil Test"
+    platform: ubuntu1804
+    shell_commands:
+    - export RUN_TEST=./.bazelci/run_abseil_test.sh
+    - export EXECUTION_STAGE_WIDTH=10
+    - ./.bazelci/integration_test.sh
+  integration_test_abseil_shard_compression:
+    name: "Abseil Test (Shard/Compression)"
+    platform: ubuntu1804
+    shell_commands:
+    - export RUN_TEST=./.bazelci/run_abseil_test.sh
+    - export EXECUTION_STAGE_WIDTH=10
+    - export TEST_ARG1=--experimental_remote_cache_compression
+    - ./.bazelci/integration_test.sh
+
+  buildfarm_admin_test:
+    name: "BF Admin Test"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/test_bfadmin.sh

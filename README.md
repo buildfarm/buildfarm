@@ -1,6 +1,6 @@
-[![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=master)](https://buildkite.com/bazel/buildfarm-postsubmit)
-
 # Bazel Buildfarm
+
+![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main)
 
 This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
 
@@ -9,43 +9,45 @@ found in the [bazel documentation](https://docs.bazel.build/versions/master/remo
 
 File issues here for bugs or feature requests, and ask questions via build team [slack](https://join.slack.com/t/buildteamworld/shared_invite/zt-4zy8f5j5-KwiJuBoAAUorB_mdQHwF7Q) in the #buildfarm channel.
 
-[Buildfarm Wiki](https://github.com/bazelbuild/bazel-buildfarm/wiki)
+[Buildfarm Docs](https://bazelbuild.github.io/bazel-buildfarm/)
 
 ## Usage
 
 All commandline options override corresponding config settings.
+
+### Redis
+
+Run via
+
+```
+docker run -d --rm --name buildfarm-redis -p 6379:6379 redis:5.0.9
+redis-cli config set stop-writes-on-bgsave-error no
+```
 
 ### Bazel Buildfarm Server
 
 Run via
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile> [<-p|--port> PORT]
+bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- <logfile> <configfile>
+
+Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
-
-- **`configfile`** has to be in Protocol Buffer text format, corresponding to a [BuildFarmServerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L55) definition.
-
-  For an example, see the [examples](examples) directory, which contains the working example [examples/server.config.example](examples/server.config.example).
-  For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
-
-- **`PORT`** to expose service endpoints on
+**`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
+**`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
 
 ### Bazel Buildfarm Worker
 
 Run via
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- <logfile> <configfile>
+
+Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
+
 ```
-
-- **`configfile`** has to be in Protocol Buffer text format, corresponding to a [WorkerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L459) definition.
-
-  For an example, see the [examples](examples) directory, which contains the working example [examples/worker.config.example](examples/worker.config.example).
-  For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
-
-- **`ROOT`** base directory path for all work being performed.
-
-- **`CAS_CACHE_DIRECTORY`** is (absolute or relative) directory path to cached files from CAS.
+**`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
+**`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
 
 ### Bazel Client
 
@@ -63,88 +65,23 @@ Then run your build as you would normally do.
 Buildfarm uses [Java's Logging framework](https://docs.oracle.com/javase/10/core/java-logging-overview.htm) and outputs all routine behavior to the NICE [Level](https://docs.oracle.com/javase/8/docs/api/java/util/logging/Level.html).
 
 You can use typical Java logging configuration to filter these results and observe the flow of executions through your running services.
-An example `logging.properties` file has been provided at [examples/debug.logging.properties](examples/debug.logging.properties) for use as follows:
+An example `logging.properties` file has been provided at [examples/logging.properties](examples/logging.properties) for use as follows:
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/server.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
 
 and
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/worker.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
 
 To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/examples/server.config.example
+bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/examples/config.minimal.yml
 ```
-
-## Developer Information
-
-### Setting up Redis for local testing
-
-This is done using [`examples/development-redis-cluster.sh`](examples/development-redis-cluster.sh).
-
-Tested with Redis `6.0.10`, other versions probably work fine as well.
-
-First of all you need Redis installed:
-* macOS: `brew install redis`
-* Debian / Ubuntu: `sudo apt-get update && sudo apt-get install redis-server redis-tools`
-
-Then you need eight terminal panes for this. Six for [a minimal Redis
-cluster](https://redis.io/topics/cluster-tutorial#creating-and-using-a-redis-cluster),
-one for the Buildfarm server and one for a Buildfarm worker.
-
-* `./examples/development-redis-cluster.sh 0`
-* `./examples/development-redis-cluster.sh 1`
-* `./examples/development-redis-cluster.sh 2`
-* `./examples/development-redis-cluster.sh 3`
-* `./examples/development-redis-cluster.sh 4`
-* `./examples/development-redis-cluster.sh 5`
-* ```sh
-  redis-cli --cluster create 127.0.0.1:6379 127.0.0.1:6380 127.0.0.1:6381 127.0.0.1:6382 127.0.0.1:6383 127.0.0.1:6384 --cluster-replicas 1
-  ```
-
-Your Redis cluster is now up, and you can now start your Buildfarm server talking to it:
-```sh
-bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/shard-server.config.example
-```
-
-And your Buildfarm worker:
-```sh
-mkdir /tmp/worker
-bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/shard-worker.config.example
-```
-
-### Setting up intelliJ
-
-1. Check [which IntelliJ versions are supported by the Bazel
-   plugin](https://plugins.jetbrains.com/plugin/8609-bazel/versions)
-1. Make sure you have a supported IntelliJ version, otherwise [download one
-   here](https://www.jetbrains.com/idea/download/other.html)
-1. Follow [the Bazel plugin
-   instructions](https://ij.bazel.build/docs/import-project.html) and import
-   [`ij.bazelproject`](ij.bazelproject)
-1. Once IntelliJ is done loading your project, open
-   [`BuildFarmServer.java`](src/main/java/build/buildfarm/server/BuildFarmServer.java)
-   and find the `main()` method at the bottom
-1. Press the green play button symbol in the gutter next to `main()` to create a
-   Bazel build configuration for starting a server. Launching this configuration
-   should get you a help text from Buildfarm Server indicating missing a config
-   file.
-
-   This indicates a successful launch!
-1. To add a config file, edit your new run configuration and enter the absolute
-   path to [`examples/server.config.example`](examples/server.config.example) in
-   the "Executable flags" text box.
-
-Now, you should have something like this, and you can now run / debug Buildfarm
-Server from inside of IntelliJ, just like any other program:
-
-![IntelliJ Buildfarm Server run
-configuration](examples/intellij-server-run-config.png)
 
 
 ### Third-party Dependencies
@@ -182,6 +119,10 @@ buildfarm_dependencies()
 load("@build_buildfarm//:defs.bzl", "buildfarm_init")
 
 buildfarm_init()
+
+load("@maven//:compat.bzl", "compat_repositories")
+
+compat_repositories()
 ```
 
 Optionally, if you want to use the buildfarm docker container image targets, you can add this:
@@ -190,8 +131,4 @@ Optionally, if you want to use the buildfarm docker container image targets, you
 load("@build_buildfarm//:images.bzl", "buildfarm_images")
 
 buildfarm_images()
-
-load("@build_buildfarm//:pip.bzl", "buildfarm_pip")
-
-buildfarm_pip()
 ```

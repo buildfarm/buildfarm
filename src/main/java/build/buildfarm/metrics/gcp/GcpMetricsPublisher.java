@@ -14,15 +14,14 @@
 
 package build.buildfarm.metrics.gcp;
 
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.metrics.AbstractMetricsPublisher;
-import build.buildfarm.v1test.MetricsConfig;
-import java.util.logging.Logger;
 
 public class GcpMetricsPublisher extends AbstractMetricsPublisher {
-  private static final Logger logger = Logger.getLogger(GcpMetricsPublisher.class.getName());
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  public GcpMetricsPublisher(MetricsConfig metricsConfig) {
-    super(metricsConfig.getClusterId());
+  public GcpMetricsPublisher() {
+    super(configs.getServer().getClusterId());
   }
 
   @Override

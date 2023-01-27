@@ -24,23 +24,24 @@ import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 class DispatchedMonitor implements Runnable {
-  private static final Logger logger = Logger.getLogger(DispatchedMonitor.class.getName());
-
   private final Backplane backplane;
-  private final Function<QueueEntry, ListenableFuture<Void>> requeuer;
+  private final BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer;
   private final int intervalSeconds;
 
   DispatchedMonitor(
       Backplane backplane,
-      Function<QueueEntry, ListenableFuture<Void>> requeuer,
+      BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer,
       int intervalSeconds) {
     this.backplane = backplane;
     this.requeuer = requeuer;
@@ -52,13 +53,13 @@ class DispatchedMonitor implements Runnable {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
 
     logOverdueOperation(o, now);
-    ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry);
+    ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry, Durations.fromSeconds(60));
     long startTime = System.nanoTime();
     requeuedFuture.addListener(
         () -> {
           long endTime = System.nanoTime();
           float ms = (endTime - startTime) / 1000000.0f;
-          logger.log(
+          log.log(
               Level.INFO, format("DispatchedMonitor::run: requeue(%s) %gms", operationName, ms));
         },
         directExecutor());
@@ -66,23 +67,20 @@ class DispatchedMonitor implements Runnable {
   }
 
   private void logOverdueOperation(DispatchedOperation o, long now) {
-
     // log that the dispatched operation is overdue in order to indicate that it should be requeued.
     String operationName = o.getQueueEntry().getExecuteEntry().getOperationName();
     long overdue_amount = now - o.getRequeueAt();
-    StringBuilder message = new StringBuilder();
-    message.append(
+    String message =
         String.format(
             "DispatchedMonitor: Testing %s because %dms overdue (%d >= %d)",
-            operationName, overdue_amount, now, o.getRequeueAt()));
-    logger.log(Level.INFO, message.toString());
+            operationName, overdue_amount, now, o.getRequeueAt());
+    log.log(Level.INFO, message);
   }
 
   private void testDispatchedOperations(
       long now,
       Iterable<DispatchedOperation> dispatchedOperations,
       ImmutableList.Builder<ListenableFuture<Void>> requeuedFutures) {
-
     // requeue all operations that are over their dispatched duration time
     for (DispatchedOperation o : dispatchedOperations) {
       if (now >= o.getRequeueAt()) {
@@ -101,7 +99,7 @@ class DispatchedMonitor implements Runnable {
       }
     } catch (Exception e) {
       if (!backplane.isStopped()) {
-        logger.log(Level.SEVERE, "error during dispatch evaluation", e);
+        log.log(Level.SEVERE, "error during dispatch evaluation", e);
       }
     }
     return successfulAsList(requeuedFutures.build());
@@ -113,7 +111,7 @@ class DispatchedMonitor implements Runnable {
     } catch (ExecutionException e) {
       // unlikely, successfulAsList prevents this as the only return
       Throwable cause = e.getCause();
-      logger.log(Level.SEVERE, "unexpected exception", cause);
+      log.log(Level.SEVERE, "unexpected exception", cause);
       if (cause instanceof RuntimeException) {
         throw (RuntimeException) cause;
       }
@@ -137,13 +135,13 @@ class DispatchedMonitor implements Runnable {
 
   @Override
   public synchronized void run() {
-    logger.log(Level.INFO, "DispatchedMonitor: Running");
+    log.log(Level.INFO, "DispatchedMonitor: Running");
     try {
       runInterruptibly();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } finally {
-      logger.log(Level.INFO, "DispatchedMonitor: Exiting");
+      log.log(Level.INFO, "DispatchedMonitor: Exiting");
     }
   }
 }

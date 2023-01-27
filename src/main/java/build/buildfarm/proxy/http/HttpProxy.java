@@ -31,14 +31,14 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLException;
+import lombok.extern.java.Log;
 
+@Log
 public class HttpProxy extends LoggingMain {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
   // collected, which would cause us to loose their configuration.
   private static final Logger nettyLogger = Logger.getLogger("io.grpc.netty");
-  public static final Logger logger = Logger.getLogger(HttpProxy.class.getName());
 
-  private final HttpProxyOptions options;
   private final Server server;
 
   public HttpProxy(HttpProxyOptions options, @Nullable Credentials creds)
@@ -50,7 +50,6 @@ public class HttpProxy extends LoggingMain {
       ServerBuilder<?> serverBuilder, @Nullable Credentials creds, HttpProxyOptions options)
       throws URISyntaxException, SSLException {
     super("HttpProxy");
-    this.options = options;
     SimpleBlobStore simpleBlobStore =
         HttpBlobStore.create(
             URI.create(options.httpCache),
@@ -97,6 +96,7 @@ public class HttpProxy extends LoggingMain {
         parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
+  @SuppressWarnings("ConstantConditions")
   public static void main(String[] args) throws Exception {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //

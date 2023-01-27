@@ -20,14 +20,6 @@ package build.buildfarm.common;
  * @details These are used for reindexing when a worker is leaving the cluster.
  */
 public class CasIndexSettings {
-
-  /**
-   * @field hostName
-   * @brief The name of the worker.
-   * @details This correlates the the worker that needs removed from CAS entries.
-   */
-  public String hostName;
-
   /**
    * @field scanAmount
    * @brief The number of redis entries to scan at a time.

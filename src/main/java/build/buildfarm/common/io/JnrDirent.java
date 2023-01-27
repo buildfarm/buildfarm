@@ -20,13 +20,13 @@ import java.util.Objects;
 import javax.annotation.Nullable;
 import jnr.posix.FileStat;
 
-/** Directory entry representation returned by {@link Path#readdir}. */
+/** Directory entry representation returned by . */
 public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
-
   private final String name;
   @Nullable private final FileStat stat;
 
   /** Creates a new jnr dirent with the given name */
+  @SuppressWarnings("NullableProblems")
   public JnrDirent(String name, FileStat stat) {
     this.name = Preconditions.checkNotNull(name);
     this.stat = stat;

@@ -22,38 +22,46 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 
-public class Group {
-  private static final Logger logger = Logger.getLogger(Group.class.getName());
+@Log
+public final class Group {
   private static final Group root = new Group(/* name=*/ null, /* parent=*/ null);
   private static final Path rootPath = Paths.get("/sys/fs/cgroup");
 
-  private @Nullable String name;
-  private @Nullable Group parent;
-  private Cpu cpu;
+  private @Nullable final String name;
+  private @Nullable final Group parent;
+  private final Cpu cpu;
+  private final Mem mem;
 
   public static Group getRoot() {
     return root;
   }
 
+  @SuppressWarnings("NullableProblems")
   private Group(String name, Group parent) {
     this.name = name;
     this.parent = parent;
     cpu = new Cpu(this);
+    mem = new Mem(this);
   }
 
   public Group getChild(String name) {
     return new Group(name, this);
   }
 
+  @SuppressWarnings("NullableProblems")
   public String getName() {
     return name;
   }
 
   public Cpu getCpu() {
     return cpu;
+  }
+
+  public Mem getMem() {
+    return mem;
   }
 
   public String getHierarchy() {
@@ -94,8 +102,8 @@ public class Group {
     if (!pids.isEmpty()) {
       // TODO check arg limits, exit status, etc
       Runtime.getRuntime()
-          .exec("kill -SIGKILL " + pids.stream().map(pid -> pid.toString()).collect(joining(" ")));
-      logger.warning("Killed processes with PIDs: " + pids);
+          .exec("kill -SIGKILL " + pids.stream().map(Object::toString).collect(joining(" ")));
+      log.warning("Killed processes with PIDs: " + pids);
       return false;
     }
     return true;
@@ -106,7 +114,7 @@ public class Group {
     Path procs = path.resolve("cgroup.procs");
     try {
       return Files.readAllLines(procs).stream()
-          .map(line -> Integer.parseInt(line))
+          .map(Integer::parseInt)
           .collect(ImmutableList.toImmutableList());
     } catch (IOException e) {
       if (Files.exists(path)) {
@@ -117,6 +125,7 @@ public class Group {
     }
   }
 
+  @SuppressWarnings("StatementWithEmptyBody")
   public void killUntilEmpty(String controllerName) throws IOException {
     while (!killAllProcs(controllerName)) ;
   }

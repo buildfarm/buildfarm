@@ -20,6 +20,7 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.EntryLimitException;
@@ -40,10 +41,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 class Writes {
-  private final Supplier<Instance> instanceSupplier;
   private final LoadingCache<BlobWriteKey, Instance> blobWriteInstances;
 
-  private class InvalidatingWrite implements Write {
+  private static class InvalidatingWrite implements Write {
     private final Write delegate;
     private final Runnable onInvalidation;
 
@@ -117,16 +117,16 @@ class Writes {
   }
 
   Writes(Supplier<Instance> instanceSupplier) {
-    this(instanceSupplier, /* writeExpiresAfter=*/ 1, /* writeExpiresUnit=*/ TimeUnit.HOURS);
+    this(instanceSupplier, /* writeExpiresAfter=*/ 1);
   }
 
-  Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter, TimeUnit writeExpiresUnit) {
-    this.instanceSupplier = instanceSupplier;
+  Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter) {
     blobWriteInstances =
         CacheBuilder.newBuilder()
-            .expireAfterWrite(writeExpiresAfter, writeExpiresUnit)
+            .expireAfterWrite(writeExpiresAfter, TimeUnit.HOURS)
             .build(
                 new CacheLoader<BlobWriteKey, Instance>() {
+                  @SuppressWarnings("NullableProblems")
                   @Override
                   public Instance load(BlobWriteKey key) {
                     return instanceSupplier.get();
@@ -134,16 +134,21 @@ class Writes {
                 });
   }
 
-  public Write get(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+  public Write get(
+      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
     BlobWriteKey key =
-        BlobWriteKey.newBuilder().setDigest(digest).setIdentifier(uuid.toString()).build();
+        BlobWriteKey.newBuilder()
+            .setCompressor(compressor)
+            .setDigest(digest)
+            .setIdentifier(uuid.toString())
+            .build();
     try {
       return new InvalidatingWrite(
-          blobWriteInstances.get(key).getBlobWrite(digest, uuid, requestMetadata),
+          blobWriteInstances.get(key).getBlobWrite(compressor, digest, uuid, requestMetadata),
           () -> blobWriteInstances.invalidate(key));
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();

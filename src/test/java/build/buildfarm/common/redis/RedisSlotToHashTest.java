@@ -35,16 +35,13 @@ import redis.clients.jedis.util.JedisClusterCRC16;
  */
 @RunWith(JUnit4.class)
 public class RedisSlotToHashTest {
-
   // Function under test: correlate
   // Reason for testing: correlating every slot number to a string hashes back to the correct slot
   // Failure explanation: either the underlying lookup table is wrong or the algorithm that converts
   // slot numbers to strings is incorrect
   @Test
   public void correlateCorrectForEverySlot() throws Exception {
-
     for (int i = 0; i < HASHSLOTS; ++i) {
-
       // convert to hashtag
       String hashtag = RedisSlotToHash.correlate(i);
 
@@ -61,8 +58,7 @@ public class RedisSlotToHashTest {
   // Failure explanation: the object cannot be constructed
   @Test
   public void correlateEnsureConstruction() throws Exception {
-
-    RedisSlotToHash slotToHash = new RedisSlotToHash();
+    new RedisSlotToHash();
   }
 
   // Function under test: correlateRange
@@ -70,7 +66,6 @@ public class RedisSlotToHashTest {
   // Failure explanation: the hashtag does not correlate back to the slot number
   @Test
   public void correlateRangeCorrectHashtagFoundForSlotRange() throws Exception {
-
     // convert to hashtag
     String hashtag = RedisSlotToHash.correlateRange(100, 200);
 
@@ -86,7 +81,6 @@ public class RedisSlotToHashTest {
   // Failure explanation: the hashtag does not correlate back to the slot number
   @Test
   public void correlateRangeWithPrefixCorrectHashtagFoundForSlotRange() throws Exception {
-
     // convert to hashtag
     String hashtag = RedisSlotToHash.correlateRangeWithPrefix(100, 200, "Execution");
 

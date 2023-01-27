@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-cluster
+  labels:
+    name: redis-cluster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: redis-cluster
+  template:
+    metadata:
+      labels:
+        name: redis-cluster
+    spec:
+      #subdomain: primary
+      containers:
+      - name: redis-cluster
+        image: redis:5.0.4
+        ports:
+        - containerPort: 6379

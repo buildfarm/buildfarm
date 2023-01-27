@@ -14,16 +14,10 @@
 
 package build.buildfarm.cas.cfc;
 
-import static com.google.common.io.MoreFiles.asCharSink;
-
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,13 +29,11 @@ import javax.annotation.concurrent.GuardedBy;
  * using sqlite, this should reduce worker startup time a lot, but will also cause high memory
  * usage.
  */
-class MemoryFileDirectoriesIndex extends DirectoriesIndex {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
-
+class MemoryFileDirectoriesIndex extends FileDirectoriesIndex {
   private final ConcurrentHashMap<String, Set<String>> data;
 
-  public MemoryFileDirectoriesIndex(Path root) {
-    super(root);
+  public MemoryFileDirectoriesIndex(EntryPathStrategy entryPathStrategy) {
+    super(entryPathStrategy);
     data = new ConcurrentHashMap<>();
   }
 
@@ -62,20 +54,13 @@ class MemoryFileDirectoriesIndex extends DirectoriesIndex {
   @Override
   public synchronized Set<Digest> removeEntry(String entry) throws IOException {
     Set<Digest> directories = removeEntryDirectories(entry);
-
-    for (Digest directory : directories) {
-      try {
-        Files.delete(path(directory));
-      } catch (NoSuchFileException e) {
-        // ignore
-      }
-    }
+    super.removeDirectories(directories);
     return directories;
   }
 
   @Override
   public void put(Digest directory, Iterable<String> entries) throws IOException {
-    asCharSink(path(directory), UTF_8).writeLines(entries);
+    super.put(directory, entries);
     String digest = DigestUtil.toString(directory);
     data.put(digest, Sets.newConcurrentHashSet(entries));
     for (String entry : entries) {
@@ -86,11 +71,7 @@ class MemoryFileDirectoriesIndex extends DirectoriesIndex {
 
   @Override
   public synchronized void remove(Digest directory) throws IOException {
-    try {
-      Files.delete(path(directory));
-    } catch (NoSuchFileException e) {
-      // ignore
-    }
+    super.remove(directory);
 
     String digest = DigestUtil.toString(directory);
     Set<String> entries = data.remove(digest);

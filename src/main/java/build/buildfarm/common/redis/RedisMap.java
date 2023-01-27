@@ -15,8 +15,14 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.ScanCount;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.StreamSupport;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
+import redis.clients.jedis.Response;
 
 /**
  * @class RedisMap
@@ -27,7 +33,6 @@ import redis.clients.jedis.JedisClusterPipeline;
  *     redis maps with the same name, would in fact be the same underlying redis map.
  */
 public class RedisMap {
-
   /**
    * @field name
    * @brief The unique name of the map.
@@ -37,12 +42,30 @@ public class RedisMap {
   private final String name;
 
   /**
+   * @field expiration_s
+   * @brief The expiration time to use on inserts when none is given.
+   * @details The map can be initialized with a default expiration. In doing so, expirations can be
+   *     omitted from calls to insert.
+   */
+  private final int expiration_s;
+
+  /**
    * @brief Constructor.
    * @details Construct a named redis map with an established redis cluster.
    * @param name The global name of the map.
    */
   public RedisMap(String name) {
+    this(name, 86400);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct a named redis map with an established redis cluster.
+   * @param name The global name of the map.
+   */
+  public RedisMap(String name, int timeout_s) {
     this.name = name;
+    this.expiration_s = timeout_s;
   }
 
   /**
@@ -52,9 +75,39 @@ public class RedisMap {
    * @param key The name of the key.
    * @param value The value for the key.
    * @param timeout_s Timeout to expire the entry. (units: seconds (s))
+   * @note Overloaded.
    */
   public void insert(JedisCluster jedis, String key, String value, int timeout_s) {
     jedis.setex(createKeyName(key), timeout_s, value);
+  }
+
+  /**
+   * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
+   * @details If the key already exists, then the value is replaced.
+   * @param jedis Jedis cluster client.
+   * @param key The name of the key.
+   * @param value The value for the key.
+   * @param timeout_s Timeout to expire the entry. (units: seconds (s))
+   * @note Overloaded.
+   */
+  public void insert(JedisCluster jedis, String key, String value, long timeout_s) {
+    // Jedis only provides int precision.  this is fine as the units are seconds.
+    // We supply an interface for longs as a convenience to callers.
+    jedis.setex(createKeyName(key), (int) timeout_s, value);
+  }
+
+  /**
+   * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
+   * @details If the key already exists, then the value is replaced.
+   * @param jedis Jedis cluster client.
+   * @param key The name of the key.
+   * @param value The value for the key.
+   * @note Overloaded.
+   */
+  public void insert(JedisCluster jedis, String key, String value) {
+    // Jedis only provides int precision.  this is fine as the units are seconds.
+    // We supply an interface for longs as a convenience to callers.
+    jedis.setex(createKeyName(key), expiration_s, value);
   }
 
   /**
@@ -89,10 +142,35 @@ public class RedisMap {
    * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @return The value of the key. null if key does not exist.
+   * @note Overloaded.
    * @note Suggested return identifier: value.
    */
   public String get(JedisCluster jedis, String key) {
     return jedis.get(createKeyName(key));
+  }
+
+  /**
+   * @brief Get the values of the keys.
+   * @details If the key does not exist, null is returned.
+   * @param jedis Jedis cluster client.
+   * @param keys The name of the keys.
+   * @return The values of the keys. null if key does not exist.
+   * @note Overloaded.
+   * @note Suggested return identifier: values.
+   */
+  public Iterable<Map.Entry<String, String>> get(JedisCluster jedis, Iterable<String> keys) {
+    // Fetch items via pipeline
+    JedisClusterPipeline p = jedis.pipelined();
+    List<Map.Entry<String, Response<String>>> values = new ArrayList<>();
+    StreamSupport.stream(keys.spliterator(), false)
+        .forEach(key -> values.add(new AbstractMap.SimpleEntry<>(key, p.get(createKeyName(key)))));
+    p.sync();
+
+    List<Map.Entry<String, String>> resolved = new ArrayList<>();
+    for (Map.Entry<String, Response<String>> val : values) {
+      resolved.add(new AbstractMap.SimpleEntry<>(val.getKey(), val.getValue().get()));
+    }
+    return resolved;
   }
 
   /**

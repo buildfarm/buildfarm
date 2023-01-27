@@ -14,16 +14,10 @@
 
 package build.buildfarm.cas.cfc;
 
-import static com.google.common.io.MoreFiles.asCharSink;
-
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -39,16 +33,13 @@ import javax.annotation.concurrent.GuardedBy;
  *
  * <p>Sqlite db should be removed prior to using this index
  */
-class SqliteFileDirectoriesIndex extends DirectoriesIndex {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
-
+class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
   private final String dbUrl;
-
   private boolean opened = false;
   private Connection conn;
 
-  SqliteFileDirectoriesIndex(String dbUrl, Path root) {
-    super(root);
+  SqliteFileDirectoriesIndex(String dbUrl, EntryPathStrategy entryPathStrategy) {
+    super(entryPathStrategy);
     this.dbUrl = dbUrl;
   }
 
@@ -140,20 +131,10 @@ class SqliteFileDirectoriesIndex extends DirectoriesIndex {
     return directories;
   }
 
-  Path path(Digest digest) {
-    return root.resolve(digest.getHash() + "_dir_inputs");
-  }
-
   @Override
   public synchronized Set<Digest> removeEntry(String entry) throws IOException {
     Set<Digest> directories = removeEntryDirectories(entry);
-    for (Digest directory : directories) {
-      try {
-        Files.delete(path(directory));
-      } catch (NoSuchFileException e) {
-        // ignore
-      }
-    }
+    super.removeDirectories(directories);
     return directories;
   }
 
@@ -178,7 +159,7 @@ class SqliteFileDirectoriesIndex extends DirectoriesIndex {
 
   @Override
   public void put(Digest directory, Iterable<String> entries) throws IOException {
-    asCharSink(path(directory), UTF_8).writeLines(entries);
+    super.put(directory, entries);
     addEntriesDirectory(ImmutableSet.copyOf(entries), directory);
   }
 
@@ -198,11 +179,7 @@ class SqliteFileDirectoriesIndex extends DirectoriesIndex {
 
   @Override
   public synchronized void remove(Digest directory) throws IOException {
-    try {
-      Files.delete(path(directory));
-    } catch (NoSuchFileException e) {
-      // ignore
-    }
+    super.remove(directory);
     removeEntriesDirectory(directory);
   }
 }

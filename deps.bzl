@@ -5,11 +5,19 @@ buildfarm dependencies that can be imported into other WORKSPACE files
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
-RULES_JVM_EXTERNAL_TAG = "3.3"
-RULES_JVM_EXTERNAL_SHA = "d85951a92c0908c80bd8551002d66cb23c3434409c814179c0ff026b53544dab"
+RULES_JVM_EXTERNAL_TAG = "4.2"
+RULES_JVM_EXTERNAL_SHA = "cd1a77b7b02e8e008439ca76fd34f5b07aecb8c752961f9640dea15e9e5ba1ca"
 
 def archive_dependencies(third_party):
     return [
+        {
+            "name": "platforms",
+            "urls": [
+                "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.6/platforms-0.0.6.tar.gz",
+                "https://github.com/bazelbuild/platforms/releases/download/0.0.6/platforms-0.0.6.tar.gz",
+            ],
+            "sha256": "5308fc1d8865406a49427ba24a9ab53087f17f5266a7aabbfc28823f3916e1ca",
+        },
         {
             "name": "rules_jvm_external",
             "strip_prefix": "rules_jvm_external-%s" % RULES_JVM_EXTERNAL_TAG,
@@ -17,12 +25,20 @@ def archive_dependencies(third_party):
             "url": "https://github.com/bazelbuild/rules_jvm_external/archive/%s.zip" % RULES_JVM_EXTERNAL_TAG,
         },
 
+        # Kubernetes rules.  Useful for local development with tilt.
+        {
+            "name": "io_bazel_rules_k8s",
+            "strip_prefix": "rules_k8s-0.7",
+            "url": "https://github.com/bazelbuild/rules_k8s/archive/refs/tags/v0.7.tar.gz",
+            "sha256": "ce5b9bc0926681e2e7f2147b49096f143e6cbc783e71bc1d4f36ca76b00e6f4a",
+        },
+
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
         {
             "name": "com_google_protobuf",
-            "sha256": "1c744a6a1f2c901e68c5521bc275e22bdc66256eeb605c2781923365b7087e5f",
-            "strip_prefix": "protobuf-3.13.0",
-            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.13.0.zip"],
+            "sha256": "dd513a79c7d7e45cbaeaf7655289f78fd6b806e52dbbd7018ef4e3cf5cff697a",
+            "strip_prefix": "protobuf-3.15.8",
+            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.15.8.zip"],
         },
         {
             "name": "com_github_bazelbuild_buildtools",
@@ -34,41 +50,51 @@ def archive_dependencies(third_party):
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "patch_args": ["-p1"],
-            "sha256": "2705d274ce79b324f3520414202481a09640b4b14e58d3124841b3318d9b6e19",
-            "strip_prefix": "grpc-java-1.32.1",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.32.1.zip"],
+            "sha256": "101b21af120901e9bf342384988f57af3332b59d997f64d5f41a1e24ffb96f19",
+            "strip_prefix": "grpc-java-1.42.0",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.42.0.zip"],
         },
 
         # The APIs that we implement.
         {
             "name": "googleapis",
             "build_file": "%s:BUILD.googleapis" % third_party,
-            "sha256": "7b6ea252f0b8fb5cd722f45feb83e115b689909bbb6a393a873b6cbad4ceae1d",
-            "strip_prefix": "googleapis-143084a2624b6591ee1f9d23e7f5241856642f4d",
-            "url": "https://github.com/googleapis/googleapis/archive/143084a2624b6591ee1f9d23e7f5241856642f4d.zip",
+            "patch_cmds": ["find google -name 'BUILD.bazel' -type f -delete"],
+            "patch_cmds_win": ["Remove-Item google -Recurse -Include *.bazel"],
+            "sha256": "745cb3c2e538e33a07e2e467a15228ccbecadc1337239f6740d57a74d9cdef81",
+            "strip_prefix": "googleapis-6598bb829c9e9a534be674649ffd1b4671a821f9",
+            "url": "https://github.com/googleapis/googleapis/archive/6598bb829c9e9a534be674649ffd1b4671a821f9.zip",
         },
         {
             "name": "remote_apis",
             "build_file": "%s:BUILD.remote_apis" % third_party,
             "patch_args": ["-p1"],
             "patches": ["%s/remote-apis:remote-apis.patch" % third_party],
-            "sha256": "03433a21ed97517f0fbda03c759854850336775a22dc737bab918949ceeddac9",
-            "strip_prefix": "remote-apis-f54876595da9f2c2d66c98c318d00b60fd64900b",
-            "url": "https://github.com/bazelbuild/remote-apis/archive/f54876595da9f2c2d66c98c318d00b60fd64900b.zip",
+            "sha256": "743d2d5b5504029f3f825beb869ce0ec2330b647b3ee465a4f39ca82df83f8bf",
+            "strip_prefix": "remote-apis-636121a32fa7b9114311374e4786597d8e7a69f3",
+            "url": "https://github.com/bazelbuild/remote-apis/archive/636121a32fa7b9114311374e4786597d8e7a69f3.zip",
+        },
+        {
+            "name": "rules_cc",
+            "sha256": "34b2ebd4f4289ebbc27c7a0d854dcd510160109bb0194c0ba331c9656ffcb556",
+            "strip_prefix": "rules_cc-daf6ace7cfeacd6a83e9ff2ed659f416537b6c74",
+            "url": "https://github.com/bazelbuild/rules_cc/archive/daf6ace7cfeacd6a83e9ff2ed659f416537b6c74.tar.gz",
         },
 
-        # Ideally we would use the 0.14.4 release of rules_docker,
-        # but that version introduced new pypi and pkg dependncies on tar-related targets making the upgrade difficult.
-        # Those dependencies were then removed afterward.  We pick a stable commit after 0.14.4 instead of cherry-picking in the different changes.
-        # https://github.com/bazelbuild/rules_docker/issues/1622
-        # When a new version after 0.14.4 is released, we can go back to a pinned version.
+        # Used to format proto files
+        {
+            "name": "com_grail_bazel_toolchain",
+            "sha256": "ee74a364a978fa3c85ea56d736010bfc44ea22b439691e9cefdf72284d6c9b93",
+            "strip_prefix": "bazel-toolchain-d46339675a83e3517d955f5456e525501c3e05b8",
+            "url": "https://github.com/grailbio/bazel-toolchain/archive/d46339675a83e3517d955f5456e525501c3e05b8.tar.gz",
+            "patch_args": ["-p1"],
+            "patches": ["%s:clang_toolchain.patch" % third_party],
+        },
         {
             "name": "io_bazel_rules_docker",
-            "patch_args": ["-p1"],
-            "sha256": "d5609b7858246fa11e76237aa9b3e681615bdc8acf2ed29058426cf7c4cea099",
-            "strip_prefix": "rules_docker-f4822f3921f0c343dd9e5ae65c760d0fb70be1b3",
-            "urls": ["https://github.com/bazelbuild/rules_docker/archive/f4822f3921f0c343dd9e5ae65c760d0fb70be1b3.tar.gz"],
+            "sha256": "59536e6ae64359b716ba9c46c39183403b01eabfbd57578e84398b4829ca499a",
+            "strip_prefix": "rules_docker-0.22.0",
+            "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.22.0/rules_docker-v0.22.0.tar.gz"],
         },
 
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
@@ -79,6 +105,15 @@ def archive_dependencies(third_party):
             "urls": ["https://github.com/bazelbuild/bazel/archive/3.7.2.tar.gz"],
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
+        },
+
+        # Optional execution wrappers
+        {
+            "name": "skip_sleep",
+            "build_file": "%s:BUILD.skip_sleep" % third_party,
+            "sha256": "03980702e8e9b757df68aa26493ca4e8573770f15dd8a6684de728b9cb8549f1",
+            "strip_prefix": "TARDIS-f54fa4743e67763bb1ad77039b3d15be64e2e564",
+            "url": "https://github.com/Unilang/TARDIS/archive/f54fa4743e67763bb1ad77039b3d15be64e2e564.zip",
         },
     ]
 
@@ -107,17 +142,27 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
     #   endpoint as a cluster of 1 node.
     # Other changes are redis version-forward treatment of spop and visibility
     # into errors in cluster unreachable and cluster retry exhaustion.
-    # Details at https://github.com/werkt/jedis/releases/tag/3.2.0-e82e68e2f7
+    # Details at https://github.com/werkt/jedis/releases/tag/3.2.0-594c20da20
     maybe(
         http_jar,
         "jedis",
-        sha256 = "294ff5e4e6ae3fda5ff00f0a3c398fa50c1ffa3bc9313800b32e34a75fbb93f3",
+        sha256 = "72c749c02b775c0371cfc8ebcf713032910b7c6f365d958c3c000838f43f6a65",
         urls = [
-            "https://github.com/werkt/jedis/releases/download/3.2.0-e82e68e2f7/jedis-3.2.0-e82e68e2f7.jar",
+            "https://github.com/werkt/jedis/releases/download/3.2.0-594c20da20/jedis-3.2.0-594c20da20.jar",
+        ],
+    )
+
+    maybe(
+        http_jar,
+        "opentelemetry",
+        sha256 = "0523287984978c091be0d22a5c61f0bce8267eeafbbae58c98abaf99c9396832",
+        urls = [
+            "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.11.0/opentelemetry-javaagent.jar",
         ],
     )
 
     http_file(
         name = "tini",
+        sha256 = "12d20136605531b09a2c2dac02ccee85e1b874eb322ef6baf7561cd93f93c855",
         urls = ["https://github.com/krallin/tini/releases/download/v0.18.0/tini"],
     )

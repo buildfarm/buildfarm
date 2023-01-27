@@ -15,6 +15,8 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.ExecutionProperties;
+import build.buildfarm.common.MapUtils;
+import build.buildfarm.common.config.Queue;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.SetMultimap;
@@ -22,7 +24,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * @class ProvisionedRedisQueue
@@ -42,7 +43,6 @@ import java.util.stream.Collectors;
  *     queues.
  */
 public class ProvisionedRedisQueue {
-
   /**
    * @field WILDCARD_VALUE
    * @brief Wildcard value.
@@ -91,10 +91,7 @@ public class ProvisionedRedisQueue {
    */
   public ProvisionedRedisQueue(
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
-    this.queue = new BalancedRedisQueue(name, hashtags);
-    isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
-    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
-    allowUserUnmatched = false;
+    this(name, Queue.QUEUE_TYPE.standard, hashtags, filterProvisions, false);
   }
 
   /**
@@ -112,9 +109,46 @@ public class ProvisionedRedisQueue {
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions,
       boolean allowUserUnmatched) {
-    this.queue = new BalancedRedisQueue(name, hashtags);
+    this(name, Queue.QUEUE_TYPE.standard, hashtags, filterProvisions, allowUserUnmatched);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct the provision queue.
+   * @param name The global name of the queue.
+   * @param type The type of the redis queue (regular or priority).
+   * @param hashtags Hashtags to distribute queue data.
+   * @param filterProvisions The filtered provisions of the queue.
+   * @note Overloaded.
+   */
+  public ProvisionedRedisQueue(
+      String name,
+      Queue.QUEUE_TYPE type,
+      List<String> hashtags,
+      SetMultimap<String, String> filterProvisions) {
+    this(name, type, hashtags, filterProvisions, false);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct the provision queue.
+   * @param name The global name of the queue.
+   * @param type The type of the redis queue (regular or priority).
+   * @param hashtags Hashtags to distribute queue data.
+   * @param filterProvisions The filtered provisions of the queue.
+   * @param allowUserUnmatched Whether the user can provide extra platform properties and still
+   *     match the queue.
+   * @note Overloaded.
+   */
+  public ProvisionedRedisQueue(
+      String name,
+      Queue.QUEUE_TYPE type,
+      List<String> hashtags,
+      SetMultimap<String, String> filterProvisions,
+      boolean allowUserUnmatched) {
+    this.queue = new BalancedRedisQueue(name, hashtags, type);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
-    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
+    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard);
     this.allowUserUnmatched = allowUserUnmatched;
   }
 
@@ -142,10 +176,10 @@ public class ProvisionedRedisQueue {
     Set<Map.Entry<String, String>> requirements = new HashSet<>(provisions.required);
     for (Map.Entry<String, String> property : properties.entries()) {
       // for each of the properties specified, we must match requirements
-      if (!provisions.wildcard.contains(property.getKey()) && !requirements.remove(property)) {
-        if (!allowUserUnmatched) {
-          return false;
-        }
+      if (!provisions.wildcard.contains(property.getKey())
+          && !requirements.remove(property)
+          && !allowUserUnmatched) {
+        return false;
       }
     }
     return requirements.isEmpty();
@@ -179,19 +213,18 @@ public class ProvisionedRedisQueue {
    * @details This will organize the incoming provisions into separate sets.
    * @param filterProvisions The filtered provisions of the queue.
    * @param isFullyWildcard If the queue will deem any set of properties eligible.
-   * @param wildcardValue Symbol for identifying wildcard in both key/value of provisions.
    * @return Provisions filtered by wildcard.
    * @note Suggested return identifier: filteredProvisions.
    */
   private static FilteredProvisions filterProvisionsByWildcard(
-      SetMultimap<String, String> filterProvisions, boolean isFullyWildcard, String wildcardValue) {
+      SetMultimap<String, String> filterProvisions, boolean isFullyWildcard) {
     FilteredProvisions provisions = new FilteredProvisions();
     provisions.wildcard =
         isFullyWildcard
             ? ImmutableSet.of()
             : filterProvisions.asMap().entrySet().stream()
-                .filter(e -> e.getValue().contains(wildcardValue))
-                .map(e -> e.getKey())
+                .filter(e -> e.getValue().contains(ProvisionedRedisQueue.WILDCARD_VALUE))
+                .map(Map.Entry::getKey)
                 .collect(ImmutableSet.toImmutableSet());
     provisions.required =
         isFullyWildcard
@@ -246,27 +279,10 @@ public class ProvisionedRedisQueue {
   }
 
   /**
-   * @brief Convert map to printable string.
-   * @details Uses streams.
-   * @param map Map to convert to string.
-   * @return String representation of map.
-   * @note Overloaded.
-   * @note Suggested return identifier: str.
-   */
-  private static String toString(Map<String, ?> map) {
-    String mapAsString =
-        map.keySet().stream()
-            .map(key -> key + "=" + map.get(key))
-            .collect(Collectors.joining(", ", "{", "}"));
-    return mapAsString;
-  }
-
-  /**
    * @brief Convert eligibility result to printable string.
    * @details Used for visibility / debugging.
    * @param result Detailed results on the evaluation of an eligibility check.
    * @return An explanation on the eligibility of the provided properties.
-   * @note Overloaded.
    * @note Suggested return identifier: explanation.
    */
   private static String toString(EligibilityResult result) {
@@ -287,9 +303,9 @@ public class ProvisionedRedisQueue {
       return explanation;
     }
 
-    explanation += "matched: " + toString(result.matched.asMap()) + "\n";
-    explanation += "unmatched: " + toString(result.unmatched.asMap()) + "\n";
-    explanation += "still required: " + toString(result.stillRequired.asMap()) + "\n";
+    explanation += "matched: " + MapUtils.toString(result.matched.asMap()) + "\n";
+    explanation += "unmatched: " + MapUtils.toString(result.unmatched.asMap()) + "\n";
+    explanation += "still required: " + MapUtils.toString(result.stillRequired.asMap()) + "\n";
     return explanation;
   }
 }

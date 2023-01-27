@@ -44,12 +44,11 @@ import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
+import lombok.extern.java.Log;
 
+@Log
 public class StubWriteOutputStream extends FeedbackOutputStream implements Write {
-  private static final Logger logger = Logger.getLogger(StubWriteOutputStream.class.getName());
-
   public static final long UNLIMITED_EXPECTED_SIZE = Long.MAX_VALUE;
 
   private static final int CHUNK_SIZE = 16 * 1024;
@@ -57,8 +56,12 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private static final QueryWriteStatusResponse resetResponse =
       QueryWriteStatusResponse.newBuilder().setCommittedSize(0).setComplete(false).build();
 
+  @SuppressWarnings("Guava")
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub;
+
+  @SuppressWarnings("Guava")
   private final Supplier<ByteStreamStub> bsStub;
+
   private final String resourceName;
   private final Function<Throwable, Throwable> exceptionTranslator;
   private final long expectedSize;
@@ -66,6 +69,8 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private final byte[] buf;
   private final SettableFuture<Long> writeFuture = SettableFuture.create();
   private boolean wasReset = false;
+
+  @SuppressWarnings({"unchecked", "rawtypes", "Guava"})
   private final Supplier<QueryWriteStatusResponse> writeStatus =
       Suppliers.memoize(
           new Supplier() {
@@ -95,6 +100,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
               }
             }
           });
+
   private boolean sentResourceName = false;
   private int offset = 0;
   private long writtenBytes = 0;
@@ -108,6 +114,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   static class WriteCompleteException extends IOException {}
 
+  @SuppressWarnings("Guava")
   public StubWriteOutputStream(
       Supplier<ByteStreamBlockingStub> bsBlockingStub,
       Supplier<ByteStreamStub> bsStub,
@@ -165,11 +172,9 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public void flush() throws IOException {
-    if (!checkComplete()) {
-      if (offset != 0) {
-        initiateWrite();
-        flushSome(getCommittedSize() + offset == expectedSize);
-      }
+    if (!checkComplete() && offset != 0) {
+      initiateWrite();
+      flushSome(getCommittedSize() + offset == expectedSize);
     }
   }
 
@@ -212,7 +217,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
                       long committedSize = response.getCommittedSize();
                       if (expectedSize != UNLIMITED_EXPECTED_SIZE
                           && committedSize != expectedSize) {
-                        logger.log(
+                        log.log(
                             WARNING,
                             format(
                                 "received WriteResponse with unexpected committedSize: %d != %d",

@@ -40,7 +40,6 @@ import java.util.function.Supplier;
  * manually.
  */
 public final class Chunker {
-
   private static int defaultChunkSize = 1024 * 16;
 
   /** This method must only be called in tests! */
@@ -55,7 +54,6 @@ public final class Chunker {
 
   /** A piece of a byte[] blob. */
   public static final class Chunk {
-
     private final long offset;
     private final ByteString data;
 
@@ -138,6 +136,7 @@ public final class Chunker {
    *
    * <p>Closes any open resources (file handles, ...).
    */
+  @SuppressWarnings("ResultOfMethodCallIgnored")
   public void seek(long toOffset) throws IOException {
     if (toOffset < offset) {
       reset();
@@ -155,7 +154,7 @@ public final class Chunker {
    * Returns {@code true} if a subsequent call to {@link #next()} returns a {@link Chunk} object;
    */
   public boolean hasNext() {
-    return data != null || !initialized;
+    return data == null && initialized;
   }
 
   /**
@@ -167,23 +166,23 @@ public final class Chunker {
    * on the first call to {@link #next()}, a {@link Chunk} with an empty {@link ByteString} is
    * returned.
    */
+  @SuppressWarnings("JavaDoc")
   public Chunk next() throws IOException {
-    if (!hasNext()) {
+    if (hasNext()) {
       throw new NoSuchElementException();
     }
 
     maybeInitialize();
 
     if (size == 0) {
-      data = null;
+      reset();
       return emptyChunk;
     }
 
     // The cast to int is safe, because the return value is capped at chunkSize.
     int bytesToRead = (int) Math.min(bytesLeft(), chunkSize);
     if (bytesToRead == 0) {
-      chunkCache = null;
-      data = null;
+      reset();
       throw new NoSuchElementException();
     }
 

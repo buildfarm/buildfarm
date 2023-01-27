@@ -17,6 +17,7 @@ package build.buildfarm.worker.shard;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
@@ -40,10 +41,10 @@ import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
-import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -58,26 +59,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.naming.ConfigurationException;
+import lombok.extern.java.Log;
 
+@Log
 public class ShardWorkerInstance extends AbstractServerInstance {
-  private static final Logger logger = Logger.getLogger(ShardWorkerInstance.class.getName());
-
-  private final ShardWorkerInstanceConfig config;
   private final Backplane backplane;
 
   public ShardWorkerInstance(
       String name,
       DigestUtil digestUtil,
       Backplane backplane,
-      ContentAddressableStorage contentAddressableStorage,
-      ShardWorkerInstanceConfig config)
-      throws ConfigurationException {
-    super(name, digestUtil, contentAddressableStorage, null, null, null, null);
-    this.config = config;
+      ContentAddressableStorage contentAddressableStorage) {
+    super(name, digestUtil, contentAddressableStorage, null, null, null, null, false);
     this.backplane = backplane;
   }
 
@@ -112,12 +107,13 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public String getBlobName(Digest blobDigest) {
+  public String readResourceName(Compressor.Value compressor, Digest blobDigest) {
     throw new UnsupportedOperationException();
   }
 
   @Override
   public void getBlob(
+      Compressor.Value compressor,
       Digest digest,
       long offset,
       long count,
@@ -125,6 +121,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       RequestMetadata requestMetadata) {
     Preconditions.checkState(count != 0);
     contentAddressableStorage.get(
+        compressor,
         digest,
         offset,
         count,
@@ -138,7 +135,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             try {
               backplane.removeBlobLocation(digest, getName());
             } catch (IOException backplaneException) {
-              logger.log(
+              log.log(
                   Level.SEVERE,
                   String.format("error removing blob location for %s", DigestUtil.toString(digest)),
                   backplaneException);
@@ -175,11 +172,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   public InputStream newOperationStreamInput(
-      String name,
-      long offset,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) {
+      String name, long offset, RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 
@@ -217,7 +210,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, MatchListener listener) throws InterruptedException {
+  public void match(Platform platform, MatchListener listener) {
     throw new UnsupportedOperationException();
   }
 
@@ -226,6 +219,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
+  @SuppressWarnings("ConstantConditions")
   @Override
   public boolean putOperation(Operation operation) {
     try {
@@ -252,7 +246,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected Object operationLock(String operationName) {
+  protected Object operationLock() {
     throw new UnsupportedOperationException();
   }
 
@@ -309,7 +303,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             .unpack(QueuedOperationMetadata.class)
             .getExecuteOperationMetadata();
       } catch (InvalidProtocolBufferException e) {
-        logger.log(
+        log.log(
             Level.SEVERE,
             String.format("error unpacking queued operation metadata from %s", operation.getName()),
             e);
@@ -322,7 +316,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             .unpack(ExecutingOperationMetadata.class)
             .getExecuteOperationMetadata();
       } catch (InvalidProtocolBufferException e) {
-        logger.log(
+        log.log(
             Level.SEVERE,
             String.format(
                 "error unpacking executing operation metadata from %s", operation.getName()),
@@ -336,7 +330,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             .unpack(CompletedOperationMetadata.class)
             .getExecuteOperationMetadata();
       } catch (InvalidProtocolBufferException e) {
-        logger.log(
+        log.log(
             Level.SEVERE,
             String.format(
                 "error unpacking completed operation metadata from %s", operation.getName()),
@@ -368,22 +362,22 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   protected Logger getLogger() {
-    return logger;
+    return log;
   }
 
   @Override
-  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+  public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
     try {
-      return backplane.getClientStartTime(clientKey);
+      return backplane.getClientStartTime(request);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
   }
 
   @Override
-  public CasIndexResults reindexCas(String hostName) {
+  public CasIndexResults reindexCas() {
     try {
-      return backplane.reindexCas(hostName);
+      return backplane.reindexCas();
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

@@ -39,7 +39,6 @@ import java.io.OutputStream;
 
 /** ChannelHandler for downloads. */
 final class HttpDownloadHandler extends AbstractHttpHandler<HttpObject> {
-
   private OutputStream out;
   private boolean keepAlive = HttpVersion.HTTP_1_1.isKeepAliveDefault();
   private boolean downloadSucceeded;
@@ -69,14 +68,14 @@ final class HttpDownloadHandler extends AbstractHttpHandler<HttpObject> {
       if (!response.protocolVersion().equals(HttpVersion.HTTP_1_1)) {
         HttpException error =
             new HttpException(
-                response, "HTTP version 1.1 is required, was: " + response.protocolVersion(), null);
+                response, "HTTP version 1.1 is required, was: " + response.protocolVersion());
         failAndClose(error, ctx);
         return;
       }
       if (!HttpUtil.isContentLengthSet(response) && !HttpUtil.isTransferEncodingChunked(response)) {
         HttpException error =
             new HttpException(
-                response, "Missing 'Content-Length' or 'Transfer-Encoding: chunked' header", null);
+                response, "Missing 'Content-Length' or 'Transfer-Encoding: chunked' header");
         failAndClose(error, ctx);
         return;
       }
@@ -101,7 +100,7 @@ final class HttpDownloadHandler extends AbstractHttpHandler<HttpObject> {
               new String(
                   ((ByteArrayOutputStream) out).toByteArray(), HttpUtil.getCharset(response));
           out.close();
-          HttpException error = new HttpException(response, errorMsg, null);
+          HttpException error = new HttpException(response, errorMsg);
           failAndReset(error, ctx);
         }
       }

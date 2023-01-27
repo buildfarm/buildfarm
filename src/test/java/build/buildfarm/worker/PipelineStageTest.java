@@ -19,14 +19,14 @@ import static com.google.common.truth.Truth.assertThat;
 import com.google.longrunning.Operation;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
+import lombok.extern.java.Log;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
+@Log
 public class PipelineStageTest {
-  private static final Logger logger = Logger.getLogger(PipelineStageTest.class.getName());
-
   static class StubPipelineStage extends PipelineStage {
     public StubPipelineStage(String name) {
       this(name, null, null, null);
@@ -39,7 +39,7 @@ public class PipelineStageTest {
 
     @Override
     public Logger getLogger() {
-      return logger;
+      return log;
     }
 
     @Override
@@ -75,7 +75,7 @@ public class PipelineStageTest {
     AtomicInteger count = new AtomicInteger();
     PipelineStage stage =
         new StubPipelineStage("waiter", new StubWorkerContext(), output, error) {
-          Object lock = new Object();
+          final Object lock = new Object();
 
           @Override
           public OperationContext tick(OperationContext operationContext)

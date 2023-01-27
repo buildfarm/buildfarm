@@ -22,6 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
@@ -31,7 +32,6 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import build.buildfarm.v1test.Tree;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -42,7 +42,6 @@ import java.io.IOException;
 import java.net.SocketException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -63,15 +62,10 @@ public class ShardWorkerInstanceTest {
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    instance =
-        new ShardWorkerInstance(
-            "test",
-            DIGEST_UTIL,
-            backplane,
-            storage,
-            ShardWorkerInstanceConfig.getDefaultInstance());
+    instance = new ShardWorkerInstance("test", DIGEST_UTIL, backplane, storage);
   }
 
+  @SuppressWarnings("unchecked")
   @Test(expected = SocketException.class)
   public void dispatchOperationThrowsOnSocketException() throws IOException, InterruptedException {
     when(backplane.dispatchOperation(any(List.class))).thenThrow(SocketException.class);
@@ -79,6 +73,7 @@ public class ShardWorkerInstanceTest {
     instance.dispatchOperation(listener);
   }
 
+  @SuppressWarnings("unchecked")
   @Test
   public void dispatchOperationIgnoresNull() throws IOException, InterruptedException {
     QueueEntry queueEntry =
@@ -125,8 +120,8 @@ public class ShardWorkerInstanceTest {
   }
 
   @Test(expected = UnsupportedOperationException.class)
-  public void getBlobNameIsUnsupported() {
-    instance.getBlobName(null);
+  public void readResourceNameIsUnsupported() {
+    instance.readResourceName(Compressor.Value.IDENTITY, null);
   }
 
   @Test(expected = UnsupportedOperationException.class)
@@ -148,9 +143,8 @@ public class ShardWorkerInstanceTest {
     instance.newOperationStreamInput(
         /* name=*/ null,
         /* offset=*/ 0,
-        /* deadlineAfter=*/ 0,
-        /* deadlineAfterUnits=*/ TimeUnit.SECONDS,
-        RequestMetadata.getDefaultInstance());
+        /* deadlineAfter=*/
+        /* deadlineAfterUnits=*/ RequestMetadata.getDefaultInstance());
   }
 
   @Test(expected = UnsupportedOperationException.class)

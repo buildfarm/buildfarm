@@ -33,12 +33,12 @@ public class RedisClient implements Closeable {
   private static final String MISCONF_RESPONSE = "MISCONF";
 
   @FunctionalInterface
-  public static interface JedisContext<T> {
+  public interface JedisContext<T> {
     T run(JedisCluster jedis) throws JedisException;
   }
 
   @FunctionalInterface
-  public static interface JedisInterruptibleContext<T> {
+  public interface JedisInterruptibleContext<T> {
     T run(JedisCluster jedis) throws InterruptedException, JedisException;
   }
 
@@ -82,13 +82,11 @@ public class RedisClient implements Closeable {
 
   public void run(Consumer<JedisCluster> withJedis) throws IOException {
     call(
-        new JedisContext<Void>() {
-          @Override
-          public Void run(JedisCluster jedis) throws JedisException {
-            withJedis.accept(jedis);
-            return null;
-          }
-        });
+        (JedisContext<Void>)
+            jedis -> {
+              withJedis.accept(jedis);
+              return null;
+            });
   }
 
   public <T> T blockingCall(JedisInterruptibleContext<T> withJedis)
@@ -111,6 +109,7 @@ public class RedisClient implements Closeable {
     return result;
   }
 
+  @SuppressWarnings("ConstantConditions")
   public <T> T call(JedisContext<T> withJedis) throws IOException {
     throwIfClosed();
     try {
@@ -122,7 +121,8 @@ public class RedisClient implements Closeable {
         }
         throw e;
       }
-    } catch (JedisMisconfigurationException e) {
+    } catch (JedisMisconfigurationException | JedisNoReachableClusterNodeException e) {
+      // In regards to a Jedis misconfiguration,
       // the backplane is configured not to accept writes currently
       // as a result of an error. The error is meant to indicate
       // that substantial resources were unavailable.
@@ -130,8 +130,6 @@ public class RedisClient implements Closeable {
       // this looks simply to me like a good opportunity to use UNAVAILABLE
       // we are technically not at RESOURCE_EXHAUSTED, this is a
       // persistent state which can exist long past the error
-      throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
-    } catch (JedisNoReachableClusterNodeException e) {
       throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
     } catch (JedisConnectionException e) {
       if ((e.getMessage() != null && e.getMessage().equals("Unexpected end of stream."))

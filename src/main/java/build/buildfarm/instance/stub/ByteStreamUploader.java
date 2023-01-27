@@ -26,6 +26,7 @@ import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.ProgressiveBackoff;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamFutureStub;
+import com.google.bytestream.ByteStreamProto;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
@@ -53,19 +54,17 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
+import lombok.extern.java.Log;
 
 /**
  * A client implementing the {@code Write} method of the {@code ByteStream} gRPC service.
  *
  * <p>Users must call {@link #shutdown()} before exiting.
  */
+@Log
 public class ByteStreamUploader {
-
-  private static final Logger logger = Logger.getLogger(ByteStreamUploader.class.getName());
-
   private final String instanceName;
   private final Channel channel;
   private final CallCredentials callCredentials;
@@ -152,6 +151,7 @@ public class ByteStreamUploader {
       }
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
+      //noinspection deprecation
       propagateIfInstanceOf(cause, IOException.class);
       throwIfUnchecked(cause);
       throw new RuntimeException(cause);
@@ -240,7 +240,6 @@ public class ByteStreamUploader {
   }
 
   private static class AsyncUpload {
-
     private final Channel channel;
     private final CallCredentials callCredentials;
     private final long callTimeoutSecs;
@@ -300,6 +299,7 @@ public class ByteStreamUploader {
           MoreExecutors.directExecutor());
     }
 
+    @SuppressWarnings("ConstantConditions")
     private ListenableFuture<Void> guardQueryWithSuppression(
         Exception e, AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
       // we are destined to return this, avoid recreating it
@@ -327,6 +327,7 @@ public class ByteStreamUploader {
           suppressedQueryFuture, (result) -> exceptionFuture, MoreExecutors.directExecutor());
     }
 
+    @SuppressWarnings("ConstantConditions")
     private ListenableFuture<Void> query(
         AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
       ListenableFuture<Long> committedSizeFuture =
@@ -334,7 +335,7 @@ public class ByteStreamUploader {
               bsFutureStub()
                   .queryWriteStatus(
                       QueryWriteStatusRequest.newBuilder().setResourceName(resourceName).build()),
-              (response) -> response.getCommittedSize(),
+              ByteStreamProto.QueryWriteStatusResponse::getCommittedSize,
               MoreExecutors.directExecutor());
       return Futures.transformAsync(
           committedSizeFuture,
@@ -369,7 +370,6 @@ public class ByteStreamUploader {
       SettableFuture<Void> uploadResult = SettableFuture.create();
       ClientCall.Listener<WriteResponse> callListener =
           new ClientCall.Listener<WriteResponse>() {
-
             private final WriteRequest.Builder requestBuilder = WriteRequest.newBuilder();
             private volatile boolean callHalfClosed = false;
 
@@ -393,6 +393,17 @@ public class ByteStreamUploader {
 
             @Override
             public void onClose(Status status, Metadata trailers) {
+              try {
+                // If upload was completed by someone else or already present, then chunker does
+                // does not close the Filehandle. Do it here to be sure it's always closed.
+                chunker.reset();
+              } catch (IOException e) {
+                // This exception indicates that closing the underlying input stream failed.
+                // We don't expect this to ever happen, but don't want to swallow the exception
+                // completely.
+                log.log(Level.WARNING, "Chunker failed closing data source", e);
+              }
+
               if (status.isOk() || Code.ALREADY_EXISTS.equals(status.getCode())) {
                 uploadResult.set(null);
               } else {
@@ -403,7 +414,7 @@ public class ByteStreamUploader {
             @Override
             public void onReady() {
               while (call.isReady()) {
-                if (!chunker.hasNext()) {
+                if (chunker.hasNext()) {
                   halfClose();
                   return;
                 }
@@ -421,7 +432,7 @@ public class ByteStreamUploader {
                     requestBuilder.setResourceName(resourceName);
                   }
 
-                  boolean isLastChunk = !chunker.hasNext();
+                  boolean isLastChunk = chunker.hasNext();
                   WriteRequest request =
                       requestBuilder
                           .setData(chunk.getData())
@@ -437,7 +448,7 @@ public class ByteStreamUploader {
                     // This exception indicates that closing the underlying input stream failed.
                     // We don't expect this to ever happen, but don't want to swallow the exception
                     // completely.
-                    logger.log(Level.WARNING, format("Chunker failed closing data source: %s", e1));
+                    log.log(Level.WARNING, format("Chunker failed closing data source: %s", e1));
                   } finally {
                     call.cancel("Failed to read next chunk.", e);
                   }

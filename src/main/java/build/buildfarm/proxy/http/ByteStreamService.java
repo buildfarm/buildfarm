@@ -23,7 +23,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
-import build.buildfarm.common.UrlPath.ResourceOperation;
+import build.buildfarm.common.resources.Resource;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
@@ -40,10 +40,8 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
-import java.util.logging.Logger;
 
 public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
-  private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());
   private static final int DEFAULT_CHUNK_SIZE = 1024 * 16;
 
   private final Map<String, WriteObserver> writeObservers = Maps.newConcurrentMap();
@@ -70,7 +68,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   }
 
   private void readBlob(ReadRequest request, StreamObserver<ReadResponse> responseObserver)
-      throws IOException, InterruptedException, InvalidResourceNameException {
+      throws InvalidResourceNameException {
     String resourceName = request.getResourceName();
 
     Digest digest = parseBlobDigest(resourceName);
@@ -78,9 +76,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     OutputStream responseOut =
         new ChunkOutputStream(DEFAULT_CHUNK_SIZE) {
           @Override
-          public void onChunk(byte[] b, int off, int len) {
+          public void onChunk(byte[] b, int len) {
             responseObserver.onNext(
-                ReadResponse.newBuilder().setData(ByteString.copyFrom(b, off, len)).build());
+                ReadResponse.newBuilder().setData(ByteString.copyFrom(b, 0, len)).build());
           }
         };
 
@@ -105,6 +103,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             }
           }
 
+          @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
             try {
@@ -130,21 +129,15 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
 
     try {
-      ResourceOperation resourceOperation = detectResourceOperation(resourceName);
-      switch (resourceOperation) {
-        case Blob:
-          readBlob(request, responseObserver);
-          break;
-        default:
-          throw new InvalidResourceNameException(resourceName, "Unsupported service");
+      Resource.TypeCase resourceOperation = detectResourceOperation(resourceName);
+      if (resourceOperation == Resource.TypeCase.DOWNLOAD_BLOB_REQUEST) {
+        readBlob(request, responseObserver);
+      } else {
+        throw new InvalidResourceNameException(resourceName, "Unsupported service");
       }
     } catch (IllegalArgumentException | InvalidResourceNameException e) {
       String description = e.getLocalizedMessage();
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
-    } catch (IOException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
     }
   }
 
@@ -156,7 +149,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
 
     return new CompleteWrite() {
-      long committedSize = digest.getSizeBytes();
+      final long committedSize = digest.getSizeBytes();
 
       @Override
       public long getCommittedSize() {
@@ -172,11 +165,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       return write;
     }
 
-    ResourceOperation resourceOperation = detectResourceOperation(resourceName);
+    Resource.TypeCase resourceOperation = detectResourceOperation(resourceName);
     switch (resourceOperation) {
-      case UploadBlob:
+      case UPLOAD_BLOB_REQUEST:
         return findBlobWrite(resourceName);
-      case OperationStream:
+      case STREAM_OPERATION_REQUEST:
       default:
         throw Status.INVALID_ARGUMENT.asRuntimeException();
     }
@@ -216,11 +209,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
   private WriteObserver createWriteObserver(String resourceName)
       throws InvalidResourceNameException {
-    ResourceOperation resourceOperation = detectResourceOperation(resourceName);
+    Resource.TypeCase resourceOperation = detectResourceOperation(resourceName);
     switch (resourceOperation) {
-      case UploadBlob:
+      case UPLOAD_BLOB_REQUEST:
         return new BlobWriteObserver(resourceName, simpleBlobStore);
-      case OperationStream:
+      case STREAM_OPERATION_REQUEST:
       default:
         throw Status.INVALID_ARGUMENT.asRuntimeException();
     }
@@ -247,8 +240,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           }
 
           @Override
-          public WriteObserver remove(String resourceName) {
-            return writeObservers.remove(resourceName);
+          public void remove(String resourceName) {
+            writeObservers.remove(resourceName);
           }
         });
   }
