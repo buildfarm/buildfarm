@@ -5,7 +5,7 @@ java_test(
         "BuildFarmServerIntegrationTest.java",
     ],
     data = ["//examples:example_configs"],
-    tags = ["integration"],
+    tags = ["redis"],
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",
