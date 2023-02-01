@@ -10,11 +10,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
+// Utility for concurrent move/copy/link of files
 public class FileAccessUtils {
 
   private static final Logger logger = Logger.getLogger(FileAccessUtils.class.getName());
 
-  private static final ConcurrentHashMap<Path, EasyMonitor> chm = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<Path, EasyMonitor> fileLocks = new ConcurrentHashMap<>();
 
   // Used here for locking "files"
   private static class EasyMonitor {
@@ -23,8 +24,8 @@ public class FileAccessUtils {
 
   /**
    * Copies a file, creating necessary directories, replacing existing files. The resulting file is
-   * set to be writeable, and we throw if we cannot set that. Thread-safe against writes to the same
-   * path.
+   * set to be writeable, and we throw if we cannot set that. Thread-safe (within a process)
+   * against writes to the same path.
    *
    * @param from
    * @param to
@@ -135,7 +136,7 @@ public class FileAccessUtils {
       try {
         Files.deleteIfExists(absTo);
       } finally {
-        chm.remove(absTo);
+        fileLocks.remove(absTo);
       }
     }
   }
@@ -158,12 +159,13 @@ public class FileAccessUtils {
         return e;
       } finally {
         // Clean up to prevent too many locks.
-        chm.remove(absTo);
+        fileLocks.remove(absTo);
       }
     }
   }
 
+  // "Logical" file lock
   private static EasyMonitor fileLock(Path writeTo) {
-    return chm.computeIfAbsent(writeTo, k -> new EasyMonitor());
+    return fileLocks.computeIfAbsent(writeTo, k -> new EasyMonitor());
   }
 }

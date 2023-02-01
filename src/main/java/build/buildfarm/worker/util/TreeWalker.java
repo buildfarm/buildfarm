@@ -36,8 +36,8 @@ public class TreeWalker {
   public ImmutableMap<Path, Input> getAllInputs(Path opRoot) {
     if (absPathInputs == null) {
       ImmutableMap<Path, FileNode> relFiles = getAllFiles();
-
       ImmutableMap.Builder<Path, Input> inputs = ImmutableMap.builder();
+      
       for (Map.Entry<Path, FileNode> pf : relFiles.entrySet()) {
         Path absPath = opRoot.resolve(pf.getKey());
         inputs.put(absPath, inputFromFile(absPath, pf.getValue()));

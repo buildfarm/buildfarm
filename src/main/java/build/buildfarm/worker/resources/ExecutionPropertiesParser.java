@@ -67,7 +67,6 @@ public class ExecutionPropertiesParser {
     parser.put(
         ExecutionProperties.DEBUG_TESTS_ONLY, ExecutionPropertiesParser::storeDebugTestsOnly);
     parser.put(ExecutionProperties.DEBUG_TARGET, ExecutionPropertiesParser::storeDebugTarget);
-
     parser.put(
         ExecutionProperties.PERSISTENT_WORKER_KEY,
         ExecutionPropertiesParser::storePersistentWorkerKey);

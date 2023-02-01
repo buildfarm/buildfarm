@@ -38,10 +38,12 @@ public class PersistentExecutor {
   private static final ProtoCoordinator coordinator =
       ProtoCoordinator.ofCommonsPool(getMaxWorkersPerKey());
 
+  // TODO load from config (i.e. {worker_root}/persistent)
   static final Path workRootsDir = Paths.get("/tmp/worker/persistent/");
 
   static final String PERSISTENT_WORKER_FLAG = "--persistent_worker";
 
+  // TODO Revisit hardcoded actions
   static final String JAVABUILDER_JAR =
       "external/remote_java_tools/java_tools/JavaBuilder_deploy.jar";
 
@@ -60,9 +62,12 @@ public class PersistentExecutor {
   }
 
   /**
-   * 1) Parses action inputs into tool inputs and request inputs 2) Makes the WorkerKey 3) Loads the
-   * tool inputs if needed into the WorkerKey tool inputs dir 4) Runs the work request on its
-   * Coordinator, passing it the required context 5) Passes output to the resultBuilder
+   * 1) Parses action inputs into tool inputs and request inputs
+   * 2) Makes the WorkerKey
+   * 3) Loads the tool inputs, if needed, into the WorkerKey tool inputs dir
+   * 4) Runs the work request on its
+   * Coordinator, passing it the required context
+   * 5) Passes output to the resultBuilder
    */
   public static Code runOnPersistentWorker(
       String persistentWorkerInitCmd,
@@ -83,7 +88,7 @@ public class PersistentExecutor {
 
     String executionName = getExecutionName(argsList);
     if (executionName.isEmpty()) {
-      logger.log(Level.SEVERE, "Invalid Argument?!: " + argsList);
+      logger.log(Level.SEVERE, "Invalid Argument: " + argsList);
       return Code.INVALID_ARGUMENT;
     }
 
@@ -106,7 +111,7 @@ public class PersistentExecutor {
 
     Path binary = Paths.get(workerExecCmd.get(0));
     if (!workerFiles.containsTool(binary) && !binary.isAbsolute()) {
-      throw new IllegalArgumentException("Binary isn't a tool?! " + binary);
+      throw new IllegalArgumentException("Binary wasn't a tool input nor an absolute path: " + binary);
     }
 
     WorkerKey key =
@@ -185,18 +190,19 @@ public class PersistentExecutor {
     if (exitCode == 0) {
       return Code.OK;
     }
-
-    if (executionName.equals("SomeOtherExec")) {
-      System.out.println(
-          "SomeOtherExec inputs: "
-              + ImmutableList.copyOf(
-                  reqInputs.stream().map(Input::getPath).collect(Collectors.toList())));
-    }
+    
     logger.severe(
         "PersistentExecutor.runOnPersistentWorker Failed with code: "
             + exitCode
             + "\n"
-            + responseOut);
+            + responseOut
+            + "\n"
+            + executionName
+            + " inputs:\n"
+            + ImmutableList.copyOf(
+                  reqInputs.stream().map(Input::getPath).collect(Collectors.toList())
+              )
+    );
     return Code.FAILED_PRECONDITION;
   }
 
@@ -215,6 +221,7 @@ public class PersistentExecutor {
     String cmd =
         cmdStr.strip().substring(0, (cmdStr.length() - PERSISTENT_WORKER_FLAG.length()) - 1);
 
+    // Parse init command into list of space-separated words, without the persistent worker flag
     ImmutableList.Builder<String> initCmdBuilder = ImmutableList.builder();
     for (String s : argsList) {
       if (cmd.length() == 0) {
@@ -224,6 +231,7 @@ public class PersistentExecutor {
       initCmdBuilder.add(s);
     }
     ImmutableList<String> initCmd = initCmdBuilder.build();
+    // Check that the persistent worker init command matches the action command
     if (!initCmd.equals(argsList.subList(0, initCmd.size()))) {
       throw new IllegalArgumentException("parseInitCmd?![" + initCmd + "]" + "\n" + argsList);
     }

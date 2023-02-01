@@ -38,17 +38,13 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
   private static final Timer timeoutScheduler = new Timer("persistent-worker-timeout", true);
 
   // Synchronize writes to the tool input directory per WorkerKey
-  // TODO: We only need a Set of WorkerKeys to synchronize on
-  private static final ConcurrentHashMap<WorkerKey, EasyMonitor> toolInputSyncs =
+  // TODO: We only need a Set of WorkerKeys to synchronize on, but no ConcurrentHashSet
+  private static final ConcurrentHashMap<WorkerKey, WorkerKey> toolInputSyncs =
       new ConcurrentHashMap<>();
 
   // Enforces locking on the same object given the same WorkerKey
-  private static EasyMonitor keyLock(WorkerKey key) {
-    return toolInputSyncs.computeIfAbsent(key, k -> new EasyMonitor());
-  }
-
-  private static class EasyMonitor {
-    public EasyMonitor() {}
+  private static WorkerKey keyLock(WorkerKey key) {
+    return toolInputSyncs.computeIfAbsent(key, k -> k);
   }
 
   public ProtoCoordinator(CommonsWorkerPool workerPool) {
@@ -96,7 +92,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
 
   public void copyToolInputsIntoWorkerToolRoot(WorkerKey key, WorkerInputs workerFiles)
       throws IOException {
-    EasyMonitor lock = keyLock(key);
+    WorkerKey lock = keyLock(key);
     synchronized (lock) {
       try {
         // Move tool inputs as needed
@@ -121,7 +117,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     return uuid;
   }
 
-  // moveToolInputsIntoWorkerToolRoot() should have been called before this.
+  // copyToolInputsIntoWorkerToolRoot() should have been called before this.
   private static void copyToolsIntoWorkerExecRoot(WorkerKey key, Path workerExecRoot)
       throws IOException {
     logger.log(Level.FINE, "loadToolsIntoWorkerRoot() into: " + workerExecRoot);
@@ -135,29 +131,30 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     }
   }
 
-  // For now, we assume that each operation corresponds to a unique worker
   @Override
   public WorkRequest preWorkInit(WorkerKey key, RequestCtx request, PersistentWorker worker)
       throws IOException {
 
     PersistentWorker pendingWorker = pendingReqs.putIfAbsent(request, worker);
+    // null means that this request was not in pendingReqs (the expected case)
     if (pendingWorker != null) {
       if (pendingWorker != worker) {
         throw new IllegalArgumentException(
             "Already have a persistent worker on the job: " + request.request);
       } else {
         throw new IllegalArgumentException(
-            "Got the same request for the same worker while it's running?!: " + request.request);
+            "Got the same request for the same worker while it's running: " + request.request);
       }
     }
     startTimeoutTimer(request);
 
+    // Symlinking should hypothetically be faster+leaner than copying inputs, but it's buggy.
     copyNontoolInputs(request.workerInputs, worker.getExecRoot());
 
     return request.request;
   }
 
-  // After the worker has finished, we need to copy output files back to the operation directory
+  // After the worker has finished, output files need to be visible in the operation directory
   @Override
   public ResponseCtx postWorkCleanup(
       WorkResponse response, PersistentWorker worker, RequestCtx request) throws IOException {
@@ -185,7 +182,6 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     WorkFilesContext context = request.filesContext;
 
     StringBuilder sb = new StringBuilder();
-    // Why is paths empty when files are not?
     sb.append(
         "Output files failure debug for request with args<"
             + request.request.getArgumentsList()
@@ -199,20 +195,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     logger.severe(sb.toString());
 
     e.printStackTrace();
-    return new IOException("Response was OK but failed on exposeOutputFiles", e);
-  }
-
-  // This should replace any existing symlinks
-  // TODO: This should hypothetically be faster+leaner than copying inputs.
-  //  However, it's buggy.
-  private void linkNontoolInputs(WorkerInputs workerInputs, Path workerExecRoot)
-      throws IOException {
-    for (Path opPath : workerInputs.allInputs.keySet()) {
-      if (!workerInputs.allToolInputs.contains(opPath)) {
-        Path execPath = workerInputs.relativizeInput(workerExecRoot, opPath);
-        workerInputs.linkInputFile(opPath, execPath);
-      }
-    }
+    return new IOException("Response was OK but failed on postWorkCleanup", e);
   }
 
   private void copyNontoolInputs(WorkerInputs workerInputs, Path workerExecRoot)
