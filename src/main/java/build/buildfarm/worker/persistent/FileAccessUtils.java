@@ -11,14 +11,18 @@ import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 // Utility for concurrent move/copy/link of files
-public class FileAccessUtils {
+public final class FileAccessUtils {
+  // singleton class with only static methods
+  private FileAccessUtils() {}
+
   private static final Logger logger = Logger.getLogger(FileAccessUtils.class.getName());
 
-  private static final ConcurrentHashMap<Path, EasyMonitor> fileLocks = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<Path, PathLock> fileLocks = new ConcurrentHashMap<>();
 
   // Used here for locking "files"
-  private static class EasyMonitor {
-    public EasyMonitor() {}
+  private static class PathLock {
+    // Not used elsewhere
+    private PathLock() {}
   }
 
   /**
@@ -130,7 +134,7 @@ public class FileAccessUtils {
    */
   public static void deleteFileIfExists(Path toDelete) throws IOException {
     Path absTo = toDelete.toAbsolutePath();
-    EasyMonitor toLock = fileLock(absTo);
+    PathLock toLock = fileLock(absTo);
     synchronized (toLock) {
       try {
         Files.deleteIfExists(absTo);
@@ -147,14 +151,17 @@ public class FileAccessUtils {
    *
    * <p>It is up to the write operation to specify whether or not to overwrite existing files.
    */
+  @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
   private static IOException writeFileSafe(Path absTo, Supplier<IOException> writeOp) {
-    EasyMonitor toLock = fileLock(absTo);
+    PathLock toLock = fileLock(absTo);
     synchronized (toLock) {
       try {
         // If 'absTo' is a symlink, checks if its target file exists
         Files.createDirectories(absTo.getParent());
         return writeOp.get();
       } catch (IOException e) {
+        // PMD will complain about UnnecessaryLocalBeforeReturn
+        // In this case, it is necessary to catch the exception
         return e;
       } finally {
         // Clean up to prevent too many locks.
@@ -164,7 +171,7 @@ public class FileAccessUtils {
   }
 
   // "Logical" file lock
-  private static EasyMonitor fileLock(Path writeTo) {
-    return fileLocks.computeIfAbsent(writeTo, k -> new EasyMonitor());
+  private static PathLock fileLock(Path writeTo) {
+    return fileLocks.computeIfAbsent(writeTo, k -> new PathLock());
   }
 }

@@ -6,11 +6,8 @@ import com.google.devtools.build.lib.worker.WorkerProtocol.Input;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
-import persistent.common.util.Args;
 
 public class WorkerInputs {
   private static final Logger logger = Logger.getLogger(WorkerInputs.class.getName());
@@ -113,18 +110,5 @@ public class WorkerInputs {
     logger.fine(inputsDebugMsg);
 
     return new WorkerInputs(workFilesContext.opRoot, absToolInputs, toolInputs, pathInputs);
-  }
-
-  private static List<Path> argsFiles(Path opRoot, List<String> reqArgs) {
-    List<Path> files = new ArrayList<>();
-    for (String a : reqArgs) {
-      if (Args.isArgsFile(a)) {
-        try {
-          files.add(opRoot.resolve(Paths.get(a.substring(1))));
-        } catch (Exception ignored) {
-        }
-      }
-    }
-    return files;
   }
 }

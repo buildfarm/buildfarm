@@ -73,11 +73,11 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
               StringBuilder initArgs = new StringBuilder();
               for (String s : workerKey.getCmd()) {
                 initArgs.append(s);
-                initArgs.append("\n");
+                initArgs.append('\n');
               }
               for (String s : workerKey.getArgs()) {
                 initArgs.append(s);
-                initArgs.append("\n");
+                initArgs.append('\n');
               }
 
               Files.write(initArgsLogFile, initArgs.toString().getBytes());
@@ -178,17 +178,16 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
   private IOException logBadCleanup(RequestCtx request, IOException e) {
     WorkFilesContext context = request.filesContext;
 
-    StringBuilder sb = new StringBuilder();
-    sb.append(
-        "Output files failure debug for request with args<"
-            + request.request.getArgumentsList()
-            + ">:\n");
-    sb.append("getOutputPathsList:\n");
-    sb.append(context.outputPaths);
-    sb.append("getOutputFilesList:\n");
-    sb.append(context.outputFiles);
-    sb.append("getOutputDirectoriesList:\n");
-    sb.append(context.outputDirectories);
+    StringBuilder sb = new StringBuilder(122);
+    sb.append("Output files failure debug for request with args<")
+        .append(request.request.getArgumentsList())
+        .append(">:\ngetOutputPathsList:\n")
+        .append(context.outputPaths)
+        .append("getOutputFilesList:\n")
+        .append(context.outputFiles)
+        .append("getOutputDirectoriesList:\n")
+        .append(context.outputDirectories);
+
     logger.severe(sb.toString());
 
     e.printStackTrace();
