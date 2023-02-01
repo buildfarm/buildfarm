@@ -9,7 +9,6 @@ import java.nio.file.Path;
 
 /** POJO/data class grouping all the input/output file requirements for persistent workers */
 public class WorkFilesContext {
-
   public final Path opRoot;
 
   public final Tree execTree;

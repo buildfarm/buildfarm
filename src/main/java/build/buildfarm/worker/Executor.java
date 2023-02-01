@@ -70,7 +70,6 @@ import lombok.extern.java.Log;
 
 @Log
 class Executor {
-
   private static final Logger logger = Logger.getLogger(Executor.class.getName());
 
   private static final int INCOMPLETE_EXIT_CODE = -1;

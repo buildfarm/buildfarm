@@ -13,7 +13,6 @@ import java.util.logging.Logger;
 import persistent.common.util.Args;
 
 public class WorkerInputs {
-
   private static final Logger logger = Logger.getLogger(WorkerInputs.class.getName());
 
   public final Path opRoot;
@@ -92,7 +91,6 @@ public class WorkerInputs {
   }
 
   public static WorkerInputs from(WorkFilesContext workFilesContext, List<String> reqArgs) {
-
     ImmutableMap<Path, Input> pathInputs = workFilesContext.getPathInputs();
 
     ImmutableSet<Path> toolsAbsPaths = workFilesContext.getToolInputs().keySet();

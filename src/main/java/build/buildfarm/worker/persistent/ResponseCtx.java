@@ -4,7 +4,6 @@ import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
 import persistent.common.CtxAround;
 
 public class ResponseCtx implements CtxAround<WorkResponse> {
-
   public final WorkResponse response;
 
   public final String errorString;

@@ -12,7 +12,6 @@ import java.util.logging.Logger;
 
 // Utility for concurrent move/copy/link of files
 public class FileAccessUtils {
-
   private static final Logger logger = Logger.getLogger(FileAccessUtils.class.getName());
 
   private static final ConcurrentHashMap<Path, EasyMonitor> fileLocks = new ConcurrentHashMap<>();
@@ -24,8 +23,8 @@ public class FileAccessUtils {
 
   /**
    * Copies a file, creating necessary directories, replacing existing files. The resulting file is
-   * set to be writeable, and we throw if we cannot set that. Thread-safe (within a process)
-   * against writes to the same path.
+   * set to be writeable, and we throw if we cannot set that. Thread-safe (within a process) against
+   * writes to the same path.
    *
    * @param from
    * @param to

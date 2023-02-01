@@ -27,7 +27,6 @@ import persistent.bazel.client.WorkerKey;
  * workers.
  */
 public class PersistentExecutor {
-
   private static final Logger logger = Logger.getLogger(PersistentExecutor.class.getName());
 
   // How many workers can exist at once for a given WorkerKey
@@ -62,12 +61,9 @@ public class PersistentExecutor {
   }
 
   /**
-   * 1) Parses action inputs into tool inputs and request inputs
-   * 2) Makes the WorkerKey
-   * 3) Loads the tool inputs, if needed, into the WorkerKey tool inputs dir
-   * 4) Runs the work request on its
-   * Coordinator, passing it the required context
-   * 5) Passes output to the resultBuilder
+   * 1) Parses action inputs into tool inputs and request inputs 2) Makes the WorkerKey 3) Loads the
+   * tool inputs, if needed, into the WorkerKey tool inputs dir 4) Runs the work request on its
+   * Coordinator, passing it the required context 5) Passes output to the resultBuilder
    */
   public static Code runOnPersistentWorker(
       String persistentWorkerInitCmd,
@@ -79,7 +75,6 @@ public class PersistentExecutor {
       Duration timeout,
       ActionResult.Builder resultBuilder)
       throws IOException {
-
     //// Pull out persistent worker start command from the overall action request
 
     logger.log(Level.FINE, "executeCommandOnPersistentWorker[" + operationName + "]");
@@ -111,7 +106,8 @@ public class PersistentExecutor {
 
     Path binary = Paths.get(workerExecCmd.get(0));
     if (!workerFiles.containsTool(binary) && !binary.isAbsolute()) {
-      throw new IllegalArgumentException("Binary wasn't a tool input nor an absolute path: " + binary);
+      throw new IllegalArgumentException(
+          "Binary wasn't a tool input nor an absolute path: " + binary);
     }
 
     WorkerKey key =
@@ -157,7 +153,6 @@ public class PersistentExecutor {
       response = fullResponse.response;
       stdErr = fullResponse.errorString;
     } catch (Exception e) {
-
       String debug =
           "\n\tRequest.initCmd: "
               + workerExecCmd
@@ -190,7 +185,7 @@ public class PersistentExecutor {
     if (exitCode == 0) {
       return Code.OK;
     }
-    
+
     logger.severe(
         "PersistentExecutor.runOnPersistentWorker Failed with code: "
             + exitCode
@@ -200,9 +195,7 @@ public class PersistentExecutor {
             + executionName
             + " inputs:\n"
             + ImmutableList.copyOf(
-                  reqInputs.stream().map(Input::getPath).collect(Collectors.toList())
-              )
-    );
+                reqInputs.stream().map(Input::getPath).collect(Collectors.toList())));
     return Code.FAILED_PRECONDITION;
   }
 

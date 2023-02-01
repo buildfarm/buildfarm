@@ -14,7 +14,6 @@ import persistent.bazel.client.PersistentWorker;
 import persistent.bazel.client.WorkerKey;
 
 public class Keymaker {
-
   // Constructs a key with its worker tool input files being relative paths
   public static WorkerKey make(
       Path opRoot,
@@ -63,7 +62,6 @@ public class Keymaker {
 
   private static ImmutableSortedMap<Path, HashCode> workerFilesWithHashes(
       WorkerInputs workerFiles) {
-
     ImmutableSortedMap.Builder<Path, HashCode> workerFileHashBuilder =
         ImmutableSortedMap.naturalOrder();
 

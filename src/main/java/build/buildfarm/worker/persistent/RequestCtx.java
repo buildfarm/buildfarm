@@ -5,7 +5,6 @@ import com.google.protobuf.Duration;
 import persistent.common.CtxAround;
 
 public class RequestCtx implements CtxAround<WorkRequest> {
-
   public final WorkRequest request;
 
   public final WorkFilesContext filesContext;

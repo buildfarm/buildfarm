@@ -17,7 +17,6 @@ import java.util.Map;
  * JavaBuilder, Scalac, etc.)
  */
 public class TreeWalker {
-
   // See: https://github.com/bazelbuild/bazel/issues/10091
   public static final String BAZEL_TOOL_INPUT_MARKER = "bazel_tool_input";
 
@@ -37,7 +36,7 @@ public class TreeWalker {
     if (absPathInputs == null) {
       ImmutableMap<Path, FileNode> relFiles = getAllFiles();
       ImmutableMap.Builder<Path, Input> inputs = ImmutableMap.builder();
-      
+
       for (Map.Entry<Path, FileNode> pf : relFiles.entrySet()) {
         Path absPath = opRoot.resolve(pf.getKey());
         inputs.put(absPath, inputFromFile(absPath, pf.getValue()));

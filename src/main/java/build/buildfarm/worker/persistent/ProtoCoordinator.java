@@ -27,7 +27,6 @@ import persistent.bazel.client.WorkerSupervisor;
  * files in the right place
  */
 public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, CommonsWorkerPool> {
-
   private static final Logger logger = Logger.getLogger(ProtoCoordinator.class.getName());
 
   private static final String WORKER_INIT_LOG_SUFFIX = ".initargs.log";
@@ -134,7 +133,6 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
   @Override
   public WorkRequest preWorkInit(WorkerKey key, RequestCtx request, PersistentWorker worker)
       throws IOException {
-
     PersistentWorker pendingWorker = pendingReqs.putIfAbsent(request, worker);
     // null means that this request was not in pendingReqs (the expected case)
     if (pendingWorker != null) {
@@ -158,7 +156,6 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
   @Override
   public ResponseCtx postWorkCleanup(
       WorkResponse response, PersistentWorker worker, RequestCtx request) throws IOException {
-
     pendingReqs.remove(request);
 
     if (response == null) {
@@ -246,7 +243,6 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
   }
 
   private class RequestTimeoutHandler extends TimerTask {
-
     private final RequestCtx request;
 
     private RequestTimeoutHandler(RequestCtx request) {
