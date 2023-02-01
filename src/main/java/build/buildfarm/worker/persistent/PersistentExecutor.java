@@ -212,7 +212,7 @@ public class PersistentExecutor {
     }
 
     String cmd =
-        cmdStr.strip().substring(0, (cmdStr.length() - PERSISTENT_WORKER_FLAG.length()) - 1);
+        cmdStr.trim().substring(0, (cmdStr.length() - PERSISTENT_WORKER_FLAG.length()) - 1);
 
     // Parse init command into list of space-separated words, without the persistent worker flag
     ImmutableList.Builder<String> initCmdBuilder = ImmutableList.builder();
@@ -220,7 +220,7 @@ public class PersistentExecutor {
       if (cmd.length() == 0) {
         break;
       }
-      cmd = cmd.substring(s.length()).strip();
+      cmd = cmd.substring(s.length()).trim();
       initCmdBuilder.add(s);
     }
     ImmutableList<String> initCmd = initCmdBuilder.build();
