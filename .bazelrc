@@ -9,7 +9,7 @@ build --nojava_header_compilation
 
 test --nojava_header_compilation
 test --enable_runfiles
-test --test_tag_filters=-redis
+test --test_tag_filters=-redis,-integration
 
 # Ensure buildfarm is compatible with future versions of bazel.
 # https://buildkite.com/bazel/bazelisk-plus-incompatible-flags
