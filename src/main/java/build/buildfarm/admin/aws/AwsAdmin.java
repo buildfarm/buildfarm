@@ -58,7 +58,6 @@ import org.springframework.stereotype.Component;
 @Log
 @Component
 public class AwsAdmin implements Admin {
-
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private AmazonAutoScaling scale;
   private AmazonEC2 ec2;

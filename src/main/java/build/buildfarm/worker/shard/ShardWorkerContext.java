@@ -33,10 +33,10 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
-import build.buildfarm.common.ExecutionWrappers;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LinuxSandboxOptions;
 import build.buildfarm.common.Poller;
@@ -95,7 +95,6 @@ import lombok.extern.java.Log;
 
 @Log
 class ShardWorkerContext implements WorkerContext {
-
   private static final String PROVISION_CORES_NAME = "cores";
 
   private static final Counter completedOperations =
@@ -477,11 +476,11 @@ class ShardWorkerContext implements WorkerContext {
 
   private void uploadOutputFile(
       ActionResult.Builder resultBuilder,
-      String outputFile,
+      Path outputPath,
       Path actionRoot,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
-    Path outputPath = actionRoot.resolve(outputFile);
+    String outputFile = actionRoot.relativize(outputPath).toString();
     if (!Files.exists(outputPath)) {
       log.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
       return;
@@ -566,11 +565,11 @@ class ShardWorkerContext implements WorkerContext {
 
   private void uploadOutputDirectory(
       ActionResult.Builder resultBuilder,
-      String outputDir,
+      Path outputDirPath,
       Path actionRoot,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
-    Path outputDirPath = actionRoot.resolve(outputDir);
+    String outputDir = actionRoot.relativize(outputDirPath).toString();
     if (!Files.exists(outputDirPath)) {
       log.log(Level.FINE, "ReportResultStage: " + outputDir + " does not exist...");
       return;
@@ -672,18 +671,17 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public void uploadOutputs(
-      Digest actionDigest,
-      ActionResult.Builder resultBuilder,
-      Path actionRoot,
-      Iterable<String> outputFiles,
-      Iterable<String> outputDirs)
+      Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Command command)
       throws IOException, InterruptedException, StatusException {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    for (String outputFile : outputFiles) {
-      uploadOutputFile(resultBuilder, outputFile, actionRoot, preconditionFailure);
-    }
-    for (String outputDir : outputDirs) {
-      uploadOutputDirectory(resultBuilder, outputDir, actionRoot, preconditionFailure);
+
+    List<Path> outputPaths = CommandUtils.getResolvedOutputPaths(command, actionRoot);
+    for (Path outputPath : outputPaths) {
+      if (Files.isDirectory(outputPath)) {
+        uploadOutputDirectory(resultBuilder, outputPath, actionRoot, preconditionFailure);
+      } else {
+        uploadOutputFile(resultBuilder, outputPath, actionRoot, preconditionFailure);
+      }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
 
@@ -870,7 +868,7 @@ class ShardWorkerContext implements WorkerContext {
     // Decide the CLI for running under cgroups
     if (!usedGroups.isEmpty()) {
       arguments.add(
-          ExecutionWrappers.CGROUPS,
+          configs.getExecutionWrappers().getCgroups(),
           "-g",
           String.join(",", usedGroups) + ":" + group.getHierarchy());
     }
@@ -879,7 +877,7 @@ class ShardWorkerContext implements WorkerContext {
     // This is not the ideal implementation of block-network.
     // For now, without the linux-sandbox, we will unshare the network namespace.
     if (limits.network.blockNetwork && !limits.useLinuxSandbox) {
-      arguments.add(ExecutionWrappers.UNSHARE, "-n", "-r");
+      arguments.add(configs.getExecutionWrappers().getUnshare(), "-n", "-r");
     }
 
     // Decide the CLI for running the sandbox
@@ -891,15 +889,15 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     if (limits.time.skipSleep) {
-      arguments.add(ExecutionWrappers.SKIP_SLEEP);
+      arguments.add(configs.getExecutionWrappers().getSkipSleep());
 
       // we set these values very high because we want sleep calls to return immediately.
       arguments.add("90000000"); // delay factor
       arguments.add("90000000"); // time factor
-      arguments.add(ExecutionWrappers.SKIP_SLEEP_PRELOAD);
+      arguments.add(configs.getExecutionWrappers().getSkipSleepPreload());
 
       if (limits.time.timeShift != 0) {
-        arguments.add(ExecutionWrappers.DELAY);
+        arguments.add(configs.getExecutionWrappers().getDelay());
         arguments.add(String.valueOf(limits.time.timeShift));
       }
     }
@@ -954,10 +952,10 @@ class ShardWorkerContext implements WorkerContext {
 
   private void addLinuxSandboxCli(
       ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
-    arguments.add(ExecutionWrappers.AS_NOBODY);
+    arguments.add(configs.getExecutionWrappers().getAsNobody());
 
     // Choose the sandbox which is built and deployed with the worker image.
-    arguments.add(ExecutionWrappers.LINUX_SANDBOX);
+    arguments.add(configs.getExecutionWrappers().getLinuxSandbox());
 
     // Pass flags based on the sandbox CLI options.
     if (options.createNetns) {

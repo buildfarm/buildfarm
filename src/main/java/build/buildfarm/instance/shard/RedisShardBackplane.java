@@ -15,7 +15,6 @@
 package build.buildfarm.instance.shard;
 
 import static java.lang.String.format;
-import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
@@ -72,7 +71,6 @@ import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -93,14 +91,9 @@ import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisClusterPipeline;
-import redis.clients.jedis.Response;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
 
 @Log
 public class RedisShardBackplane implements Backplane {
-
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private static final JsonFormat.Parser operationParser =
@@ -802,51 +795,6 @@ public class RedisShardBackplane implements Backplane {
     actionKeys.forEach(key -> keyNames.add(asDigestStr(key)));
 
     client.run(jedis -> state.actionCache.remove(jedis, keyNames));
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  @Override
-  public ActionCacheScanResult scanActionCache(String scanToken, int count) throws IOException {
-    final String jedisScanToken = scanToken == null ? SCAN_POINTER_START : scanToken;
-
-    ImmutableList.Builder<Map.Entry<ActionKey, String>> results = new ImmutableList.Builder<>();
-
-    ScanParams scanParams =
-        new ScanParams().match(configs.getBackplane().getActionCachePrefix() + ":*").count(count);
-
-    String token =
-        client.call(
-            jedis -> {
-              ScanResult<String> scanResult = jedis.scan(jedisScanToken, scanParams);
-              List<String> keyResults = scanResult.getResult();
-
-              List<Response<String>> actionResults = new ArrayList<>(keyResults.size());
-              JedisClusterPipeline p = jedis.pipelined();
-              for (String key : keyResults) {
-                actionResults.add(p.get(key));
-              }
-              p.sync();
-              for (int i = 0; i < keyResults.size(); i++) {
-                String json = actionResults.get(i).get();
-                if (json == null) {
-                  continue;
-                }
-                String key = keyResults.get(i);
-                results.add(
-                    new AbstractMap.SimpleEntry<>(
-                        DigestUtil.asActionKey(DigestUtil.parseDigest(key.split(":")[1])), json));
-              }
-              String cursor = scanResult.getCursor();
-              return cursor.equals(SCAN_POINTER_START) ? null : cursor;
-            });
-    return new ActionCacheScanResult(
-        token,
-        results.build().stream()
-            .map(
-                (entry) ->
-                    new AbstractMap.SimpleEntry<>(
-                        entry.getKey(), parseActionResult(entry.getValue())))
-            .collect(Collectors.toList()));
   }
 
   @Override

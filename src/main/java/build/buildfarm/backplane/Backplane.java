@@ -249,9 +249,6 @@ public interface Backplane {
 
   void queue(QueueEntry queueEntry, Operation operation) throws IOException;
 
-  /** Page through action cache */
-  ActionCacheScanResult scanActionCache(String scanToken, int count) throws IOException;
-
   /** Test for whether a request is blacklisted */
   boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException;
 

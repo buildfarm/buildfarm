@@ -152,7 +152,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class StubInstance implements Instance {
-
   private static final long DEFAULT_DEADLINE_DAYS = 100 * 365;
 
   private final String name;

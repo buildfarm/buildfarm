@@ -2,6 +2,7 @@
 layout: default
 title: Configuration
 nav_order: 4
+has_children: true
 ---
 
 Minimal required:
@@ -55,7 +56,8 @@ worker:
 | port                             | Integer, _8980_               | Listening port of the GRPC server                                                                                           |
 | casWriteTimeout                  | Integer, _3600_               | CAS write timeout (seconds)                                                                                                 |
 | bytestreamTimeout                | Integer, _3600_               | Byte Stream write timeout (seconds)                                                                                         |
-| sslCertificatePath               | String, _null_                | Absolute path of the SSL certificate (if used)                                                                              |
+| sslCertificatePath               | String, _null_                | Absolute path of the SSL certificate (if TLS used)                                                                          |
+| sslPrivateKeyPath                | String, _null_                | Absolute path of the SSL private key (if TLS used)                                                                          |
 | runDispatchedMonitor             | boolean, _true_               | Enable an agent to monitor the operation store to ensure that dispatched operations with expired worker leases are requeued |
 | dispatchedMonitorIntervalSeconds | Integer, _1_                  | Dispatched monitor's lease expiration check interval (seconds)                                                              |
 | runOperationQueuer               | boolean, _true_               | Aquire execute request entries cooperatively from an arrival queue on the backplane                                         |

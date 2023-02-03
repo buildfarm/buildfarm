@@ -64,7 +64,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class ByteStreamService extends ByteStreamImplBase {
-
   public static final int CHUNK_SIZE = 64 * 1024;
 
   private final long deadlineAfter;

@@ -91,6 +91,20 @@ INFO: 2 processes: 2 remote.
 
 That `2 remote` indicates that your compile and link ran remotely. Congratulations, you just build something through remote execution!
 
+## Container Quick Start
+
+To bring up a minimal buildfarm cluster, you can run:
+```
+./examples/bf-run start
+```
+This will start all of the necessary containers at the latest version.
+Once the containers are up, you can build with `bazel run --remote_executor=grpc://localhost:8980 :main`.
+
+To stop the containers, run:
+```
+./examples/bf-run stop
+```
+
 ## Buildfarm Manager
 
 You can now easily launch a new Buildfarm cluster locally or in AWS using an open sourced <a href="https://github.com/80degreeswest/bfmgr">Buildfarm Manager</a>.

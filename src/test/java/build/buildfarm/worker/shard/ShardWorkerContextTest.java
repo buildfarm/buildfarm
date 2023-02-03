@@ -21,8 +21,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.backplane.Backplane;
@@ -37,13 +35,7 @@ import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import com.google.common.jimfs.Configuration;
-import com.google.common.jimfs.Jimfs;
 import com.google.protobuf.Duration;
-import io.grpc.StatusException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Before;
@@ -58,8 +50,6 @@ public class ShardWorkerContextTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
-  private Path root;
 
   @Mock private Backplane backplane;
 
@@ -85,7 +75,6 @@ public class ShardWorkerContextTest {
 
     MockitoAnnotations.initMocks(this);
     when(instance.getDigestUtil()).thenReturn(DIGEST_UTIL);
-    root = Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null);
   }
 
   WorkerContext createTestContext() {
@@ -116,18 +105,6 @@ public class ShardWorkerContextTest {
         /* allowBringYourOwnContainer=*/ false,
         /* errorOperationRemainingResources=*/ false,
         writer);
-  }
-
-  @Test(expected = StatusException.class)
-  public void outputFileIsDirectoryThrowsStatusExceptionOnUpload() throws Exception {
-    Files.createDirectories(root.resolve("output"));
-    WorkerContext context = createTestContext();
-    context.uploadOutputs(
-        Digest.getDefaultInstance(),
-        ActionResult.newBuilder(),
-        root,
-        ImmutableList.of("output"),
-        ImmutableList.of());
   }
 
   @SuppressWarnings("unchecked")

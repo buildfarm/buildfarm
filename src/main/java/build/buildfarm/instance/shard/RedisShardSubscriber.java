@@ -41,7 +41,6 @@ import redis.clients.jedis.JedisPubSub;
 
 @Log
 class RedisShardSubscriber extends JedisPubSub {
-
   abstract static class TimedWatchFuture extends WatchFuture {
     private final TimedWatcher watcher;
 
