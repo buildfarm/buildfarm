@@ -48,10 +48,6 @@ import lombok.extern.java.Log;
  */
 @Log
 public class S3Bucket {
-  /**
-   * @field logger
-   * @brief Used for printing error information.
-   */
 
   /**
    * @field s3
