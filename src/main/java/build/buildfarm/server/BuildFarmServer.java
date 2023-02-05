@@ -92,7 +92,8 @@ public class BuildFarmServer {
     healthStatusManager = new HealthStatusManager();
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-    if (configs.getServer().getSslCertificatePath() != null) {
+    if (configs.getServer().getSslCertificatePath() != null
+        && configs.getServer().getSslPrivateKeyPath() != null) {
       // There are different Public Key Cryptography Standards (PKCS) that users may format their
       // certificate files in.  By default, the JDK cannot parse all of them.  In particular, it
       // cannot parse PKCS #1 (RSA Cryptography Standard).  When enabling TLS for GRPC, java's
@@ -101,8 +102,9 @@ public class BuildFarmServer {
       // is a library that will parse additional formats and allow users to provide certificates in
       // an otherwise unsupported format.
       Security.addProvider(new BouncyCastleProvider());
-      File ssl_certificate_path = new File(configs.getServer().getSslCertificatePath());
-      serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
+      File ssl_certificate = new File(configs.getServer().getSslCertificatePath());
+      File ssl_private_key = new File(configs.getServer().getSslPrivateKeyPath());
+      serverBuilder.useTransportSecurity(ssl_certificate, ssl_private_key);
     }
 
     serverBuilder

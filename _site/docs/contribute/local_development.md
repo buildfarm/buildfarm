@@ -1,7 +1,8 @@
 ---
 layout: default
-title: Develop
-nav_order: 11
+title: Local Development
+parent: Contribute
+nav_order: 1
 ---
 
 ## Developer Information

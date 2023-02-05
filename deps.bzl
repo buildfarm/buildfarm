@@ -62,9 +62,9 @@ def archive_dependencies(third_party):
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "sha256": "101b21af120901e9bf342384988f57af3332b59d997f64d5f41a1e24ffb96f19",
-            "strip_prefix": "grpc-java-1.42.0",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.42.0.zip"],
+            "sha256": "2484054e9ac47d3b4d4a797b9a0caaf4f50f23e13efb5b23ce3703b363f13023",
+            "strip_prefix": "grpc-java-1.52.1",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.52.1.zip"],
         },
 
         # The APIs that we implement.
@@ -126,6 +126,12 @@ def archive_dependencies(third_party):
             "sha256": "03980702e8e9b757df68aa26493ca4e8573770f15dd8a6684de728b9cb8549f1",
             "strip_prefix": "TARDIS-f54fa4743e67763bb1ad77039b3d15be64e2e564",
             "url": "https://github.com/Unilang/TARDIS/archive/f54fa4743e67763bb1ad77039b3d15be64e2e564.zip",
+        },
+        {
+            "name": "rules_oss_audit",
+            "sha256": "02962810bcf82d0c66f929ccc163423f53773b8b154574ca956345523243e70d",
+            "strip_prefix": "rules_oss_audit-1b2690cefd5a960c181e0d89bf3c076294a0e6f4",
+            "url": "https://github.com/vmware/rules_oss_audit/archive/1b2690cefd5a960c181e0d89bf3c076294a0e6f4.zip",
         },
     ]
 
