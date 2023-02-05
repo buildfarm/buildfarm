@@ -447,8 +447,8 @@ public class Worker {
     String endpoint = configs.getWorker().getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
     worker.setWorkerType(configs.getWorker().getWorkerType());
-    int registrationIntervalMillis = 10000;
-    int registrationOffsetMillis = registrationIntervalMillis * 3;
+    int registrationIntervalMillis = 10000; //10s
+    int registrationOffsetMillis = registrationIntervalMillis * 3; //30s
     new Thread(
             new Runnable() {
               long workerRegistrationExpiresAt = 0;
