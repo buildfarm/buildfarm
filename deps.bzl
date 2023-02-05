@@ -104,9 +104,9 @@ def archive_dependencies(third_party):
         },
         {
             "name": "io_bazel_rules_docker",
-            "sha256": "59536e6ae64359b716ba9c46c39183403b01eabfbd57578e84398b4829ca499a",
-            "strip_prefix": "rules_docker-0.22.0",
-            "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.22.0/rules_docker-v0.22.0.tar.gz"],
+            "sha256": "c7f9e97bb9f498f6bbbc842a0bcfaed1016b4355e9a7317f7ba0f413bc59ad71",
+            "strip_prefix": "rules_docker-fc729d85f284225cfc0b8c6d1d838f4b3e037749",
+            "urls": ["https://github.com/bazelbuild/rules_docker/archive/fc729d85f284225cfc0b8c6d1d838f4b3e037749.tar.gz"],
         },
 
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
