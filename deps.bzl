@@ -5,8 +5,8 @@ buildfarm dependencies that can be imported into other WORKSPACE files
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
-RULES_JVM_EXTERNAL_TAG = "4.5"
-RULES_JVM_EXTERNAL_SHA = "b17d7388feb9bfa7f2fa09031b32707df529f26c91ab9e5d909eb1676badd9a6"
+RULES_JVM_EXTERNAL_COMMIT = "560d150c19a22d0b7d76d476a477c3e4cb1694dc"
+RULES_JVM_EXTERNAL_SHA = "4d4709ec5c5c31b1e8ab40bf1d49575d563008533f9967f4d0a3f5ca37a89e96"
 
 def archive_dependencies(third_party):
     return [
@@ -20,9 +20,9 @@ def archive_dependencies(third_party):
         },
         {
             "name": "rules_jvm_external",
-            "strip_prefix": "rules_jvm_external-%s" % RULES_JVM_EXTERNAL_TAG,
+            "strip_prefix": "rules_jvm_external-%s" % RULES_JVM_EXTERNAL_COMMIT,
             "sha256": RULES_JVM_EXTERNAL_SHA,
-            "url": "https://github.com/bazelbuild/rules_jvm_external/archive/%s.zip" % RULES_JVM_EXTERNAL_TAG,
+            "url": "https://github.com/bazelbuild/rules_jvm_external/archive/%s.tar.gz" % RULES_JVM_EXTERNAL_COMMIT,
         },
         {
             "name": "io_bazel_rules_go",
