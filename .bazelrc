@@ -14,7 +14,6 @@ test --test_tag_filters=-redis,-integration
 # Ensure buildfarm is compatible with future versions of bazel.
 # https://buildkite.com/bazel/bazelisk-plus-incompatible-flags
 common --incompatible_disallow_empty_glob
-common --incompatible_strict_conflict_checks
 common --incompatible_disallow_java_import_empty_jars
 common --incompatible_config_setting_private_default_visibility
 common --incompatible_enable_cc_toolchain_resolution
