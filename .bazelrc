@@ -18,4 +18,4 @@ common --incompatible_strict_conflict_checks
 common --incompatible_disallow_java_import_empty_jars
 common --incompatible_config_setting_private_default_visibility
 common --incompatible_enable_cc_toolchain_resolution
-#common --incompatible_disable_starlark_host_transitions
+common --incompatible_disable_starlark_host_transitions
