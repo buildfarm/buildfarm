@@ -20,6 +20,7 @@ public class Server {
   private int casWriteTimeout = 3600;
   private int bytestreamTimeout = 3600;
   private String sslCertificatePath = null;
+  private String sslPrivateKeyPath = null;
   private boolean runDispatchedMonitor = true;
   private int dispatchedMonitorIntervalSeconds = 1;
   private boolean runOperationQueuer = true;
