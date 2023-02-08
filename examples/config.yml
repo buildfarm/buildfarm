@@ -101,6 +101,7 @@ worker:
       skipLoad: false
       hexBucketLevels: 0
       target:
+      publishTtlMetric: false
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60

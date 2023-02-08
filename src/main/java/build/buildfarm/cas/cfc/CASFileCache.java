@@ -323,8 +323,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     if (configs.getWorker().getStorages().get(0).isPublishTtlMetric()) {
       casTtl =
           Histogram.build()
-              .name("cas_ttl")
-              .help("The amount of time CAS entries live in L1 storage")
+              .name("cas_ttl_ms")
+              .help(
+                  "The amount of time CAS entries live on L1 storage before expiration (milliseconds)")
               .register();
     }
 
@@ -2549,6 +2550,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  private void deleteExpiredKey(String expiredKey) throws IOException {
+    Path path = getPath(expiredKey);
+    if (configs.getWorker().getStorages().get(0).isPublishTtlMetric()) {
+      publishExpirationMetric(path);
+    }
+    Files.delete(path);
+  }
+
   private void publishExpirationMetric(Path path) {
     long currentTime = new Date().getTime();
     long createdTime = path.toFile().lastModified();
@@ -2580,11 +2589,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     (expiredEntry) -> {
                       String expiredKey = expiredEntry.key;
                       try {
-                        Path path = getPath(expiredKey);
-                        if (configs.getWorker().getStorages().get(0).isPublishTtlMetric()) {
-                          publishExpirationMetric(path);
-                        }
-                        Files.delete(path);
+                        deleteExpiredKey(expiredKey);
                       } catch (NoSuchFileException eNoEnt) {
                         log.log(
                             Level.SEVERE,
