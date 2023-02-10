@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.naming.ConfigurationException;
 import redis.clients.jedis.JedisCluster;
+import java.nio.file.Paths;
 
 class WorkerProfile {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
@@ -111,7 +112,7 @@ class WorkerProfile {
       throw new IllegalArgumentException("Missing Config_PATH");
     }
     try {
-      configs.loadConfigs(residue.get(3));
+      configs.loadConfigs(Paths.get(residue.get(3)));
     } catch (IOException e) {
       System.out.println("Could not parse yml configuration file." + e);
     }

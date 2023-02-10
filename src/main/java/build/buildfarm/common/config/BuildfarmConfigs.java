@@ -17,6 +17,7 @@ import lombok.Data;
 import lombok.extern.java.Log;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
+import java.nio.file.Paths;
 
 @Data
 @Log
@@ -42,23 +43,50 @@ public final class BuildfarmConfigs {
     return buildfarmConfigs;
   }
 
-  public static BuildfarmConfigs loadConfigs(String configLocation) throws IOException {
-    try (InputStream inputStream = new FileInputStream(new File(configLocation))) {
-      Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
-      buildfarmConfigs = yaml.load(inputStream);
-      log.info(buildfarmConfigs.toString());
-    }
-    return buildfarmConfigs;
-  }
-
-  public void loadConfigs(Path configLocation) throws IOException {
+  public static BuildfarmConfigs loadConfigs(Path configLocation) throws IOException {
     try (InputStream inputStream = Files.newInputStream(configLocation)) {
       Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
       buildfarmConfigs = yaml.load(inputStream);
       log.info(buildfarmConfigs.toString());
+      return buildfarmConfigs;
     }
   }
 
+  public static BuildfarmConfigs loadServerConfigs(String[] args) throws ConfigurationException {
+    OptionsParser parser = getOptionsParser(ServerOptions.class, args);
+    ServerOptions options = parser.getOptions(ServerOptions.class);
+    try {
+      buildfarmConfigs = BuildfarmConfigs.loadConfigs(Paths.get(parser.getResidue().get(0)));
+    } catch (IOException e) {
+      log.severe("Could not parse yml configuration file." + e);
+      throw new RuntimeException(e);
+    }
+    if (!options.publicName.isEmpty()) {
+      buildfarmConfigs.getServer().setPublicName(options.publicName);
+    }
+    if (options.port > 0) {
+      buildfarmConfigs.getServer().setPort(options.port);
+    }
+    return buildfarmConfigs;
+  }
+
+  public static BuildfarmConfigs loadWorkerConfigs(String[] args) throws ConfigurationException {
+    OptionsParser parser = getOptionsParser(ShardWorkerOptions.class, args);
+    ShardWorkerOptions options = parser.getOptions(ShardWorkerOptions.class);
+    try {
+      buildfarmConfigs = BuildfarmConfigs.loadConfigs(Paths.get(parser.getResidue().get(0)));
+    } catch (IOException e) {
+      log.severe("Could not parse yml configuration file." + e);
+      throw new RuntimeException(e);
+    }
+    if (!Strings.isNullOrEmpty(options.publicName)) {
+      buildfarmConfigs.getWorker().setPublicName(options.publicName);
+    }
+    return buildfarmConfigs;
+  }
+  
+  
+  
   private static OptionsParser getOptionsParser(Class clazz, String[] args)
       throws ConfigurationException {
     verifyArgs(args);
@@ -82,37 +110,5 @@ public final class BuildfarmConfigs {
       throw new ConfigurationException("A valid path to a configuration file must be provided.");
     }
   }
-
-  public static BuildfarmConfigs loadServerConfigs(String[] args) throws ConfigurationException {
-    OptionsParser parser = getOptionsParser(ServerOptions.class, args);
-    ServerOptions options = parser.getOptions(ServerOptions.class);
-    try {
-      buildfarmConfigs = BuildfarmConfigs.loadConfigs(parser.getResidue().get(0));
-    } catch (IOException e) {
-      log.severe("Could not parse yml configuration file." + e);
-      throw new RuntimeException(e);
-    }
-    if (!options.publicName.isEmpty()) {
-      buildfarmConfigs.getServer().setPublicName(options.publicName);
-    }
-    if (options.port > 0) {
-      buildfarmConfigs.getServer().setPort(options.port);
-    }
-    return buildfarmConfigs;
-  }
-
-  public static BuildfarmConfigs loadWorkerConfigs(String[] args) throws ConfigurationException {
-    OptionsParser parser = getOptionsParser(ShardWorkerOptions.class, args);
-    ShardWorkerOptions options = parser.getOptions(ShardWorkerOptions.class);
-    try {
-      buildfarmConfigs = BuildfarmConfigs.loadConfigs(parser.getResidue().get(0));
-    } catch (IOException e) {
-      log.severe("Could not parse yml configuration file." + e);
-      throw new RuntimeException(e);
-    }
-    if (!Strings.isNullOrEmpty(options.publicName)) {
-      buildfarmConfigs.getWorker().setPublicName(options.publicName);
-    }
-    return buildfarmConfigs;
-  }
+  
 }
