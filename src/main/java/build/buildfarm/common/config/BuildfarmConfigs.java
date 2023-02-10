@@ -96,7 +96,7 @@ public final class BuildfarmConfigs {
     return parser;
   }
 
-  private static Path getConfigurationPath(OptionsParser parser) {
+  private static Path getConfigurationPath(OptionsParser parser) throws ConfigurationException {
     // source config from env variable
     if (!Strings.isNullOrEmpty(System.getenv("CONFIG_PATH"))) {
       return Paths.get(System.getenv("CONFIG_PATH"));
