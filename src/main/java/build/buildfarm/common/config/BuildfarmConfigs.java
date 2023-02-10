@@ -85,7 +85,6 @@ public final class BuildfarmConfigs {
 
   private static OptionsParser getOptionsParser(Class clazz, String[] args)
       throws ConfigurationException {
-    verifyArgs(args);
     OptionsParser parser = OptionsParser.newOptionsParser(clazz);
     try {
       parser.parse(args);
