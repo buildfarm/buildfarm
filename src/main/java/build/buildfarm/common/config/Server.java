@@ -53,7 +53,7 @@ public class Server {
 
     // derive a value
     try {
-      return InetAddress.getLocalHost().getHostAddress();
+      return InetAddress.getLocalHost().getHostAddress() + ":" + port;
     } catch (Exception e) {
       log.severe("publicName could not be derived:" + e);
       return publicName;
