@@ -2,6 +2,7 @@ package build.buildfarm.common.config;
 
 import build.buildfarm.v1test.WorkerType;
 import com.google.common.base.Strings;
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -9,8 +10,10 @@ import java.util.Arrays;
 import java.util.List;
 import javax.naming.ConfigurationException;
 import lombok.Data;
+import lombok.extern.java.Log;
 
 @Data
+@Log
 public class Worker {
   private int port = 8981;
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
@@ -36,10 +39,22 @@ public class Worker {
   private ExecutionPolicy[] executionPolicies = {};
 
   public String getPublicName() {
+    // use environment override (useful for containerized deployment)
+    if (!Strings.isNullOrEmpty(System.getenv("INSTANCE_NAME"))) {
+      return System.getenv("INSTANCE_NAME");
+    }
+
+    // use configured value
     if (!Strings.isNullOrEmpty(publicName)) {
       return publicName;
-    } else {
-      return System.getenv("INSTANCE_NAME");
+    }
+
+    // derive a value
+    try {
+      return InetAddress.getLocalHost().getHostAddress();
+    } catch (Exception e) {
+      log.severe("publicName could not be derived:" + e);
+      return publicName;
     }
   }
 
