@@ -4,12 +4,11 @@ import build.buildfarm.common.DigestUtil;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import javax.naming.ConfigurationException;
@@ -17,7 +16,6 @@ import lombok.Data;
 import lombok.extern.java.Log;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
-import java.nio.file.Paths;
 
 @Data
 @Log
@@ -56,7 +54,7 @@ public final class BuildfarmConfigs {
     OptionsParser parser = getOptionsParser(ServerOptions.class, args);
     ServerOptions options = parser.getOptions(ServerOptions.class);
     try {
-      buildfarmConfigs = BuildfarmConfigs.loadConfigs(Paths.get(parser.getResidue().get(0)));
+      buildfarmConfigs = BuildfarmConfigs.loadConfigs(getConfigurationPath(parser));
     } catch (IOException e) {
       log.severe("Could not parse yml configuration file." + e);
       throw new RuntimeException(e);
@@ -74,7 +72,7 @@ public final class BuildfarmConfigs {
     OptionsParser parser = getOptionsParser(ShardWorkerOptions.class, args);
     ShardWorkerOptions options = parser.getOptions(ShardWorkerOptions.class);
     try {
-      buildfarmConfigs = BuildfarmConfigs.loadConfigs(Paths.get(parser.getResidue().get(0)));
+      buildfarmConfigs = BuildfarmConfigs.loadConfigs(getConfigurationPath(parser));
     } catch (IOException e) {
       log.severe("Could not parse yml configuration file." + e);
       throw new RuntimeException(e);
@@ -84,9 +82,7 @@ public final class BuildfarmConfigs {
     }
     return buildfarmConfigs;
   }
-  
-  
-  
+
   private static OptionsParser getOptionsParser(Class clazz, String[] args)
       throws ConfigurationException {
     verifyArgs(args);
@@ -97,18 +93,24 @@ public final class BuildfarmConfigs {
       log.severe("Could not parse options provided." + e);
       throw new RuntimeException(e);
     }
+
+    return parser;
+  }
+
+  private static Path getConfigurationPath(OptionsParser parser) {
+    // source config from env variable
+    if (!Strings.isNullOrEmpty(System.getenv("CONFIG_PATH"))) {
+      return Paths.get(System.getenv("CONFIG_PATH"));
+    }
+
+    // source config from cli
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
       log.info("Usage: CONFIG_PATH");
       log.info(parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
-    }
-    return parser;
-  }
-
-  private static void verifyArgs(String[] args) throws ConfigurationException {
-    if (args.length == 0) {
       throw new ConfigurationException("A valid path to a configuration file must be provided.");
     }
+
+    return Paths.get(residue.get(0));
   }
-  
 }

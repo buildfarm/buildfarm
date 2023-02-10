@@ -35,13 +35,13 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.naming.ConfigurationException;
 import redis.clients.jedis.JedisCluster;
-import java.nio.file.Paths;
 
 class WorkerProfile {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
