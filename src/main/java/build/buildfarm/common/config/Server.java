@@ -1,10 +1,13 @@
 package build.buildfarm.common.config;
 
 import com.google.common.base.Strings;
+import java.net.InetAddress;
 import java.util.UUID;
 import lombok.Data;
+import lombok.extern.java.Log;
 
 @Data
+@Log
 public class Server {
   public enum INSTANCE_TYPE {
     SHARD
@@ -38,10 +41,22 @@ public class Server {
   private String publicName;
 
   public String getPublicName() {
+    // use environment override (useful for containerized deployment)
+    if (!Strings.isNullOrEmpty(System.getenv("INSTANCE_NAME"))) {
+      return System.getenv("INSTANCE_NAME");
+    }
+
+    // use configured value
     if (!Strings.isNullOrEmpty(publicName)) {
       return publicName;
-    } else {
-      return System.getenv("INSTANCE_NAME");
+    }
+
+    // derive a value
+    try {
+      return InetAddress.getLocalHost().getHostAddress() + ":" + port;
+    } catch (Exception e) {
+      log.severe("publicName could not be derived:" + e);
+      return publicName;
     }
   }
 

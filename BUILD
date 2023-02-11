@@ -115,6 +115,26 @@ sh_binary(
     srcs = ["macos-wrapper.sh"],
 )
 
+SERVER_TELEMETRY_JVM_FLAGS = [
+    "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
+    "-Dotel.resource.attributes=service.name=server",
+    "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
+    "-Dotel.instrumentation.http.capture-headers.client.request",
+    "-Dotel.instrumentation.http.capture-headers.client.response",
+    "-Dotel.instrumentation.http.capture-headers.server.request",
+    "-Dotel.instrumentation.http.capture-headers.server.response",
+]
+
+WORKER_TELEMETRY_JVM_FLAGS = [
+    "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
+    "-Dotel.resource.attributes=service.name=worker",
+    "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
+    "-Dotel.instrumentation.http.capture-headers.client.request",
+    "-Dotel.instrumentation.http.capture-headers.client.response",
+    "-Dotel.instrumentation.http.capture-headers.server.request",
+    "-Dotel.instrumentation.http.capture-headers.server.response",
+]
+
 # Docker images for buildfarm components
 java_image(
     name = "buildfarm-server",
@@ -129,16 +149,10 @@ java_image(
     ],
     jvm_flags = [
         "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-
-        # Flags related to OpenTelemetry
-        "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-        "-Dotel.resource.attributes=service.name=server",
-        "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-        "-Dotel.instrumentation.http.capture-headers.client.request",
-        "-Dotel.instrumentation.http.capture-headers.client.response",
-        "-Dotel.instrumentation.http.capture-headers.server.request",
-        "-Dotel.instrumentation.http.capture-headers.server.response",
-    ],
+    ] + select({
+        "//config:open_telemetry": SERVER_TELEMETRY_JVM_FLAGS,
+        "//conditions:default": [],
+    }),
     main_class = "build.buildfarm.server.BuildFarmServer",
     tags = ["container"],
     runtime_deps = [
@@ -192,16 +206,10 @@ java_image(
     ],
     jvm_flags = [
         "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-
-        # Flags related to OpenTelemetry
-        "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-        "-Dotel.resource.attributes=service.name=worker",
-        "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-        "-Dotel.instrumentation.http.capture-headers.client.request",
-        "-Dotel.instrumentation.http.capture-headers.client.response",
-        "-Dotel.instrumentation.http.capture-headers.server.request",
-        "-Dotel.instrumentation.http.capture-headers.server.response",
-    ],
+    ] + select({
+        "//config:open_telemetry": WORKER_TELEMETRY_JVM_FLAGS,
+        "//conditions:default": [],
+    }),
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
     runtime_deps = [
