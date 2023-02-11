@@ -48,7 +48,6 @@ import lombok.extern.java.Log;
  */
 @Log
 public class S3Bucket {
-
   /**
    * @field s3
    * @brief The S3 client used for interacting with S3 buckets
