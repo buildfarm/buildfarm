@@ -59,13 +59,18 @@ public class Worker {
   }
 
   public int getExecuteStageWidth() {
+    // use environment override (useful for containerized deployment)
+    if (!Strings.isNullOrEmpty(System.getenv("EXECUTION_STAGE_WIDTH"))) {
+      return Integer.parseInt(System.getenv("EXECUTION_STAGE_WIDTH"));
+    }
+
+    // use configured value
     if (executeStageWidth > 0) {
       return executeStageWidth;
-    } else if (!Strings.isNullOrEmpty(System.getenv("EXECUTION_STAGE_WIDTH"))) {
-      return Integer.parseInt(System.getenv("EXECUTION_STAGE_WIDTH"));
-    } else {
-      return Math.max(1, Runtime.getRuntime().availableProcessors() - executeStageWidthOffset);
     }
+
+    // derive a value
+    return Math.max(1, Runtime.getRuntime().availableProcessors() - executeStageWidthOffset);
   }
 
   public int getInputFetchStageWidth() {
