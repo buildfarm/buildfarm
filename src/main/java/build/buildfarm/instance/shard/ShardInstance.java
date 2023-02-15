@@ -2116,18 +2116,14 @@ public class ShardInstance extends AbstractServerInstance {
             getName(), operation.getName(), actionDigest.getHash()));
 
     // Fetch an action from the CAS and invalidate it from the AC if requested.
-    ListenableFuture<Action> actionFuture =
-        FluentFuture.from(expectAction(actionDigest, requestMetadata))
-            .transformAsync(
-                action ->
-                    transformActionViaActionCache(action, requestMetadata, metadata, operation),
-                operationTransformService)
-            .catchingAsync(
-                StatusException.class,
-                e -> describeFailedActionFetch(e, actionDigest),
-                operationTransformService);
-
-    return actionFuture;
+    return FluentFuture.from(expectAction(actionDigest, requestMetadata))
+        .transformAsync(
+            action -> transformActionViaActionCache(action, requestMetadata, metadata, operation),
+            operationTransformService)
+        .catchingAsync(
+            StatusException.class,
+            e -> describeFailedActionFetch(e, actionDigest),
+            operationTransformService);
   }
 
   private ListenableFuture<Action> transformActionViaActionCache(
