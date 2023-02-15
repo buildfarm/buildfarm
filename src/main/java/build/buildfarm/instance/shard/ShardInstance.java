@@ -2118,7 +2118,7 @@ public class ShardInstance extends AbstractServerInstance {
     // Fetch an action from the CAS and invalidate it from the AC if requested.
     return FluentFuture.from(expectAction(actionDigest, requestMetadata))
         .transformAsync(
-            action -> transformActionViaActionCache(action, requestMetadata, metadata, operation),
+            action -> transformActionViaActionCache(action, metadata, operation),
             operationTransformService)
         .catchingAsync(
             StatusException.class,
@@ -2127,10 +2127,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<Action> transformActionViaActionCache(
-      Action action,
-      RequestMetadata requestMetadata,
-      ExecuteOperationMetadata metadata,
-      Operation operation)
+      Action action, ExecuteOperationMetadata metadata, Operation operation)
       throws IOException, StatusException {
     if (action == null) {
       throw Status.NOT_FOUND.asException();
