@@ -2124,20 +2124,7 @@ public class ShardInstance extends AbstractServerInstance {
                 operationTransformService)
             .catchingAsync(
                 StatusException.class,
-                e -> {
-                  Status st = Status.fromThrowable(e);
-                  if (st.getCode() == Code.NOT_FOUND) {
-                    PreconditionFailure.Builder preconditionFailure =
-                        PreconditionFailure.newBuilder();
-                    preconditionFailure
-                        .addViolationsBuilder()
-                        .setType(VIOLATION_TYPE_MISSING)
-                        .setSubject("blobs/" + DigestUtil.toString(actionDigest))
-                        .setDescription(MISSING_ACTION);
-                    checkPreconditionFailure(actionDigest, preconditionFailure.build());
-                  }
-                  throw st.asRuntimeException();
-                },
+                e -> describeFailedActionFetch(e, actionDigest),
                 operationTransformService);
 
     return actionFuture;
@@ -2162,8 +2149,21 @@ public class ShardInstance extends AbstractServerInstance {
 
     return immediateFuture(action);
   }
-  
-  void
+
+  private ListenableFuture<Action> describeFailedActionFetch(Throwable e, Digest actionDigest)
+      throws StatusException {
+    Status st = Status.fromThrowable(e);
+    if (st.getCode() == Code.NOT_FOUND) {
+      PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+      preconditionFailure
+          .addViolationsBuilder()
+          .setType(VIOLATION_TYPE_MISSING)
+          .setSubject("blobs/" + DigestUtil.toString(actionDigest))
+          .setDescription(MISSING_ACTION);
+      checkPreconditionFailure(actionDigest, preconditionFailure.build());
+    }
+    throw st.asRuntimeException();
+  }
 
   private ListenableFuture<Void> transformAndQueue(
       ExecuteEntry executeEntry,
