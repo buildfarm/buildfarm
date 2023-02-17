@@ -18,6 +18,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.config.SandboxSettings;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -55,7 +56,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(7);
@@ -88,7 +90,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ true,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(1);
@@ -120,7 +123,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.cpu.claimed).isGreaterThan(0);
@@ -151,7 +155,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ true,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.cpu.limit).isTrue();
@@ -182,7 +187,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.cpu.limit).isFalse();
@@ -213,7 +219,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.cpu.claimed).isEqualTo(3);
@@ -243,7 +250,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.mem.min).isEqualTo(5);
@@ -268,7 +276,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -297,7 +306,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -329,7 +339,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -363,7 +374,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -399,7 +411,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(0);
@@ -435,7 +448,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -469,7 +483,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -504,7 +519,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -539,7 +555,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -575,7 +592,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isTrue();
@@ -609,7 +627,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.debugAfterExecution).isTrue();
@@ -643,7 +662,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isFalse();
@@ -666,7 +686,8 @@ public class ResourceDeciderTest {
             /* onlyMulticoreTests=*/ false,
             /* limitGlobalExecution=*/ false,
             /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false);
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
 
     // ASSERT
     assertThat(limits.workerName).isEqualTo("foo");
