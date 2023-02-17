@@ -45,6 +45,7 @@ public class Backplane {
   private boolean cacheCas = false;
 
   public String getRedisUri() {
+
     // use environment override (useful for containerized deployment)
     if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
       return System.getenv("REDIS_URI");
