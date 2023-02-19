@@ -24,6 +24,7 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -91,6 +92,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.stubbing.Answer;
 
 class CASFileCacheTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
@@ -127,6 +129,13 @@ class CASFileCacheTest {
         .thenReturn(new NullWrite());
     when(delegate.newInput(any(Compressor.Value.class), any(Digest.class), any(Long.class)))
         .thenThrow(new NoSuchFileException("null sink delegate"));
+    doAnswer(
+            (Answer<Iterable<Digest>>)
+                invocation -> {
+                  return (Iterable<Digest>) invocation.getArguments()[0];
+                })
+        .when(delegate)
+        .findMissingBlobs(any(Iterable.class));
     blobs = Maps.newHashMap();
     putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
@@ -1073,6 +1082,21 @@ class CASFileCacheTest {
   public void findMissingBlobsFiltersEmptyBlobs() throws Exception {
     Digest emptyDigest = Digest.getDefaultInstance();
     assertThat(fileCache.findMissingBlobs(ImmutableList.of(emptyDigest))).isEmpty();
+  }
+
+  @Test
+  public void findMissingBlobsPopulatesUnknownSize() throws Exception {
+    Blob blob = new Blob(ByteString.copyFromUtf8("content"), DIGEST_UTIL);
+    Digest queryDigest = blob.getDigest().toBuilder().setSizeBytes(-1).build();
+    Iterable<Digest> digests = ImmutableList.of(queryDigest);
+    Digest responseDigest = Iterables.getOnlyElement(fileCache.findMissingBlobs(digests));
+    assertThat(responseDigest).isEqualTo(queryDigest);
+
+    // populate the digest
+    fileCache.put(blob);
+
+    responseDigest = Iterables.getOnlyElement(fileCache.findMissingBlobs(digests));
+    assertThat(responseDigest).isEqualTo(blob.getDigest());
   }
 
   @Test

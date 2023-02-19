@@ -33,13 +33,18 @@ public class FetchService extends FetchImplBase {
   @Override
   public void fetchBlob(
       FetchBlobRequest request, StreamObserver<FetchBlobResponse> responseObserver) {
-    fetchBlob(instance, request, responseObserver);
+    try {
+      fetchBlob(instance, request, responseObserver);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private void fetchBlob(
       Instance instance,
       FetchBlobRequest request,
-      StreamObserver<FetchBlobResponse> responseObserver) {
+      StreamObserver<FetchBlobResponse> responseObserver)
+      throws InterruptedException {
     Digest expectedDigest = null;
     RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
     if (request.getQualifiersCount() == 0) {
