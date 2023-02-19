@@ -2042,6 +2042,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           log.log(Level.FINE, format("directory %s has been unlocked", path.getFileName()));
         },
         service);
+
     return putFuture;
   }
 
@@ -2089,7 +2090,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     private final List<Throwable> exceptions;
 
     PutDirectoryException(Path path, Digest digest, List<Throwable> exceptions) {
-      super(String.format("%s: %d exceptions", path, exceptions.size()));
+      // When printing the exception, show the captured sub-exceptions.
+      super(String.format("%s: %d exceptions: %s", path, exceptions.size(), exceptions));
       this.path = path;
       this.digest = digest;
       this.exceptions = exceptions;

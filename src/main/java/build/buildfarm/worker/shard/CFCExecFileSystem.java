@@ -295,7 +295,8 @@ class CFCExecFileSystem implements ExecFileSystem {
     private final List<Throwable> exceptions;
 
     ExecDirException(Path path, List<Throwable> exceptions) {
-      super(String.format("%s: %d exceptions", path, exceptions.size()));
+      // When printing the exception, show the captured sub-exceptions.
+      super(String.format("%s: %d exceptions: %s", path, exceptions.size(), exceptions));
       this.path = path;
       this.exceptions = exceptions;
       for (Throwable exception : exceptions) {

@@ -27,10 +27,12 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.FileNode;
+import build.buildfarm.common.FailedOperationGetter;
 import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
+import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
@@ -194,7 +196,7 @@ public class InputFetcher implements Runnable {
               queuedOperation.getCommand());
     } catch (IOException e) {
       log.log(Level.SEVERE, format("error creating exec dir for %s", operationName), e);
-      owner.error().put(operationContext);
+      failOperation("Error creating exec dir", e.toString());
       return 0;
     }
     success = true;
@@ -305,6 +307,23 @@ public class InputFetcher implements Runnable {
           Thread.currentThread().interrupt();
         }
       }
+    }
+  }
+
+  private void failOperation(String failureMessage, String failureDetails)
+      throws InterruptedException {
+    Operation failedOperation =
+        FailedOperationGetter.get(
+            operationContext.operation,
+            operationContext.queueEntry.getExecuteEntry(),
+            failureMessage,
+            failureDetails);
+
+    try {
+      workerContext.putOperation(failedOperation);
+    } catch (Exception e) {
+      String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
+      log.log(Level.SEVERE, format("Cannot report failed operation %s", operationName), e);
     }
   }
 }
