@@ -387,8 +387,12 @@ public class ByteStreamService extends ByteStreamImplBase {
 
       @Override
       public boolean isComplete() {
-        return instance.containsBlob(
-            digest, Digest.newBuilder(), TracingMetadataUtils.fromCurrentContext());
+        try {
+          return instance.containsBlob(
+              digest, Digest.newBuilder(), TracingMetadataUtils.fromCurrentContext());
+        } catch (InterruptedException e) {
+          throw new RuntimeException("interrupted checking for completion", e);
+        }
       }
 
       @Override
