@@ -25,6 +25,7 @@ import static build.buildfarm.common.config.Backplane.BACKPLANE_TYPE.SHARD;
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Throwables.throwIfUnchecked;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catching;
@@ -97,7 +98,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
-import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -584,6 +584,27 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
+  public boolean containsBlob(Digest digest, Digest.Builder result, RequestMetadata requestMetadata)
+      throws InterruptedException {
+    Iterable<Digest> missingOrPopulated;
+    try {
+      missingOrPopulated = findMissingBlobs(ImmutableList.of(digest), requestMetadata).get();
+    } catch (ExecutionException e) {
+      throwIfUnchecked(e.getCause());
+      throw new RuntimeException(e.getCause());
+    }
+    if (digest.getSizeBytes() == -1) {
+      Digest responseDigest = Iterables.getOnlyElement(missingOrPopulated);
+      if (responseDigest.getSizeBytes() == -1) {
+        return false;
+      }
+      result.mergeFrom(responseDigest);
+      return true;
+    }
+    return Iterables.isEmpty(missingOrPopulated);
+  }
+
+  @Override
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
       Iterable<Digest> blobDigests, RequestMetadata requestMetadata) {
     try {
@@ -598,7 +619,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     Iterable<Digest> nonEmptyDigests =
-        Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() > 0);
+        Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() != 0);
     if (Iterables.isEmpty(nonEmptyDigests)) {
       return immediateFuture(ImmutableList.of());
     }
@@ -1128,7 +1149,7 @@ public class ShardInstance extends AbstractServerInstance {
                 .get();
           } catch (ExecutionException e) {
             Throwable cause = e.getCause();
-            Throwables.throwIfUnchecked(cause);
+            throwIfUnchecked(cause);
             throw new UncheckedExecutionException(cause);
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

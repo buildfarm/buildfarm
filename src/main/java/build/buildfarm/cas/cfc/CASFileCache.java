@@ -450,9 +450,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) throws InterruptedException {
     ImmutableList.Builder<Digest> builder = ImmutableList.builder();
     ImmutableList.Builder<String> found = ImmutableList.builder();
+    Digest.Builder result = Digest.newBuilder();
     for (Digest digest : digests) {
-      if (digest.getSizeBytes() != 0 && !containsLocal(digest, null, found::add)) {
+      if (digest.getSizeBytes() != 0 && !containsLocal(digest, result, found::add)) {
         builder.add(digest);
+      } else if (digest.getSizeBytes() == -1) {
+        // may misbehave with delegate
+        builder.add(result.build());
       }
     }
     List<String> foundDigests = found.build();
