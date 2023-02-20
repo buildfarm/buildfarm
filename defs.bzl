@@ -73,6 +73,7 @@ def buildfarm_init(name = "buildfarm"):
         artifacts = ["com.amazonaws:aws-java-sdk-%s:1.11.729" % module for module in COM_AWS_MODULES] +
                     [
                         "com.fasterxml.jackson.core:jackson-databind:2.13.3",
+                        "com.fasterxml.uuid:java-uuid-generator:4.0.1",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
                         "com.github.docker-java:docker-java:3.2.11",
                         "com.github.jnr:jffi:1.2.16",
