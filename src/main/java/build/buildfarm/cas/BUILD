@@ -30,6 +30,7 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
         "@maven//:net_jcip_jcip_annotations",
+        "@maven//:org_apache_commons_commons_lang3",
         "@maven//:org_projectlombok_lombok",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",

@@ -105,6 +105,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
@@ -123,6 +124,8 @@ import java.util.logging.Level;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.json.simple.JSONObject;
 
 @Log
@@ -1974,13 +1977,41 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private void fetchDirectory(
-      Path path,
+      Path rootPath,
       Digest digest,
       Map<Digest, Directory> directoriesIndex,
       ImmutableList.Builder<String> inputsBuilder,
       ImmutableList.Builder<ListenableFuture<Path>> putFutures,
       ExecutorService service)
       throws IOException, InterruptedException {
+    Stack<Pair<Path, Directory>> stack = new Stack<>();
+    stack.push(
+        new ImmutablePair<>(rootPath, getDirectoryFromDigest(directoriesIndex, rootPath, digest)));
+    while (!stack.isEmpty()) {
+      Pair<Path, Directory> pathDirectoryPair = stack.pop();
+      Path path = pathDirectoryPair.getLeft();
+      Directory directory = pathDirectoryPair.getRight();
+
+      removeFilePath(path);
+      Files.createDirectory(path);
+      putDirectoryFiles(
+          directory.getFilesList(),
+          directory.getSymlinksList(),
+          path,
+          inputsBuilder,
+          putFutures,
+          service);
+      for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
+        Path subPath = path.resolve(directoryNode.getName());
+        stack.push(
+            new ImmutablePair<>(
+                subPath,
+                getDirectoryFromDigest(directoriesIndex, subPath, directoryNode.getDigest())));
+      }
+    }
+  }
+
+  private void removeFilePath(Path path) throws IOException {
     if (Files.exists(path)) {
       if (Files.isDirectory(path)) {
         log.log(Level.FINE, "removing existing directory " + path + " for fetch");
@@ -1989,6 +2020,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Files.delete(path);
       }
     }
+  }
+
+  private Directory getDirectoryFromDigest(
+      Map<Digest, Directory> directoriesIndex, Path path, Digest digest) throws IOException {
     Directory directory;
     if (digest.getSizeBytes() == 0) {
       directory = Directory.getDefaultInstance();
@@ -1999,23 +2034,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throw new IOException(
           format("directory not found for %s(%s)", path, DigestUtil.toString(digest)));
     }
-    Files.createDirectory(path);
-    putDirectoryFiles(
-        directory.getFilesList(),
-        directory.getSymlinksList(),
-        path,
-        inputsBuilder,
-        putFutures,
-        service);
-    for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
-      fetchDirectory(
-          path.resolve(directoryNode.getName()),
-          directoryNode.getDigest(),
-          directoriesIndex,
-          inputsBuilder,
-          putFutures,
-          service);
-    }
+    return directory;
   }
 
   public ListenableFuture<Path> putDirectory(
