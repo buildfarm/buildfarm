@@ -35,6 +35,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -111,7 +112,7 @@ class WorkerProfile {
       throw new IllegalArgumentException("Missing Config_PATH");
     }
     try {
-      configs.loadConfigs(residue.get(3));
+      configs.loadConfigs(Paths.get(residue.get(3)));
     } catch (IOException e) {
       System.out.println("Could not parse yml configuration file." + e);
     }

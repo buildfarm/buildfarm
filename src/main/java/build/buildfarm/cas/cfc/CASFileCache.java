@@ -1908,19 +1908,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return Directories.remove(getDirectoryPath(digest), service);
   }
 
-  // FIXME look into whether this is needed at all
-  public Iterable<ListenableFuture<Path>> putFiles(
-      Iterable<FileNode> files,
-      Iterable<SymlinkNode> symlinks,
-      Path path,
-      ImmutableList.Builder<String> inputsBuilder,
-      ExecutorService service)
-      throws IOException, InterruptedException {
-    ImmutableList.Builder<ListenableFuture<Path>> putFutures = ImmutableList.builder();
-    putDirectoryFiles(files, symlinks, path, inputsBuilder, putFutures, service);
-    return putFutures.build();
-  }
-
   @SuppressWarnings("ConstantConditions")
   private void putDirectoryFiles(
       Iterable<FileNode> files,

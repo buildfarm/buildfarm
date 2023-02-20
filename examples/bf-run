@@ -2,24 +2,31 @@
 
 set -e
 
-REDIS_IMAGE="buildfarm-redis"
+REDIS_NAME="buildfarm-redis"
+REDIS_IMAGE="redis:5.0.9"
+
+SERVER_NAME="buildfarm-server"
 SERVER_IMAGE="bazelbuild/buildfarm-server:latest"
-WORKER_IMAGE="bazelbuild/buildfarm-server:latest"
+
+WORKER_NAME="buildfarm-worker"
+WORKER_IMAGE="bazelbuild/buildfarm-worker:latest"
+
+CONFIG="config.minimal.yml"
 
 # Start Buildfarm Cluster
 start_buildfarm () {
   # Run Redis Container
-  docker run -d --name $REDIS_IMAGE -p 6379:6379 redis:5.0.9
+  docker run -d --name $REDIS_NAME -p 6379:6379 $REDIS_IMAGE
 
   # Run Buildfarm Server Container
-  docker run -d --name buildfarm-server -v $(pwd)/examples:/var/lib/buildfarm-server -p 8980:8980 --network host \
-  $SERVER_IMAGE /var/lib/buildfarm-server/config.minimal.yml -p 8980
+  docker run -d --name $SERVER_NAME -v $(pwd)/examples:/var/lib/buildfarm-server -p 8980:8980 --network host \
+  $SERVER_IMAGE /var/lib/buildfarm-server/$CONFIG -p 8980
 
   # Run Buildfarm Shard Worker Container
   mkdir -p /tmp/worker
-  docker run -d --name buildfarm-worker --privileged -v $(pwd)/examples:/var/lib/buildfarm-shard-worker \
+  docker run -d --name $WORKER_NAME --privileged -v $(pwd)/examples:/var/lib/buildfarm-shard-worker \
   -v /tmp/worker:/tmp/worker -p 8981:8981 --network host \
-  $WORKER_IMAGE /var/lib/buildfarm-shard-worker/config.minimal.yml --public_name=localhost:8981
+  $WORKER_IMAGE /var/lib/buildfarm-shard-worker/$CONFIG --public_name=localhost:8981
 
   echo "Buildfarm cluster started with endpoint: localhost:8980"
 }
@@ -30,6 +37,11 @@ stop_buildfarm () {
   docker stop buildfarm-redis && docker rm buildfarm-redis
 }
 
+restart_buildfarm () {
+  stop_buildfarm
+  start_buildfarm
+}
+
 init () {
   case "$1" in
   start)
@@ -38,8 +50,11 @@ init () {
   stop)
     stop_buildfarm
     ;;
+  restart)
+    restart_buildfarm
+    ;;
   *)
-    echo $"Usage: $0 {start|stop}"
+    echo $"Usage: $0 {start|stop|restart}"
     exit 1
 esac
 }

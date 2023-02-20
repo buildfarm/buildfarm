@@ -3,6 +3,7 @@ load("@io_bazel_rules_docker//java:image.bzl", "java_image")
 load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "download_pkgs")
 load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+load("@rules_oss_audit//oss_audit:java/oss_audit.bzl", "oss_audit")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -114,6 +115,26 @@ sh_binary(
     srcs = ["macos-wrapper.sh"],
 )
 
+SERVER_TELEMETRY_JVM_FLAGS = [
+    "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
+    "-Dotel.resource.attributes=service.name=server",
+    "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
+    "-Dotel.instrumentation.http.capture-headers.client.request",
+    "-Dotel.instrumentation.http.capture-headers.client.response",
+    "-Dotel.instrumentation.http.capture-headers.server.request",
+    "-Dotel.instrumentation.http.capture-headers.server.response",
+]
+
+WORKER_TELEMETRY_JVM_FLAGS = [
+    "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
+    "-Dotel.resource.attributes=service.name=worker",
+    "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
+    "-Dotel.instrumentation.http.capture-headers.client.request",
+    "-Dotel.instrumentation.http.capture-headers.client.response",
+    "-Dotel.instrumentation.http.capture-headers.server.request",
+    "-Dotel.instrumentation.http.capture-headers.server.response",
+]
+
 # Docker images for buildfarm components
 java_image(
     name = "buildfarm-server",
@@ -128,22 +149,22 @@ java_image(
     ],
     jvm_flags = [
         "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-
-        # Flags related to OpenTelemetry
-        "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-        "-Dotel.resource.attributes=service.name=server",
-        "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-        "-Dotel.instrumentation.http.capture-headers.client.request",
-        "-Dotel.instrumentation.http.capture-headers.client.response",
-        "-Dotel.instrumentation.http.capture-headers.server.request",
-        "-Dotel.instrumentation.http.capture-headers.server.response",
-    ],
+    ] + select({
+        "//config:open_telemetry": SERVER_TELEMETRY_JVM_FLAGS,
+        "//conditions:default": [],
+    }),
     main_class = "build.buildfarm.server.BuildFarmServer",
     tags = ["container"],
     runtime_deps = [
         ":telemetry_tools",
         "//src/main/java/build/buildfarm/server",
     ],
+)
+
+oss_audit(
+    name = "buildfarm-server-audit",
+    src = "//src/main/java/build/buildfarm:buildfarm-server",
+    tags = ["audit"],
 )
 
 # A worker image may need additional packages installed that are not in the base image.
@@ -185,16 +206,10 @@ java_image(
     ],
     jvm_flags = [
         "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-
-        # Flags related to OpenTelemetry
-        "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-        "-Dotel.resource.attributes=service.name=worker",
-        "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-        "-Dotel.instrumentation.http.capture-headers.client.request",
-        "-Dotel.instrumentation.http.capture-headers.client.response",
-        "-Dotel.instrumentation.http.capture-headers.server.request",
-        "-Dotel.instrumentation.http.capture-headers.server.response",
-    ],
+    ] + select({
+        "//config:open_telemetry": WORKER_TELEMETRY_JVM_FLAGS,
+        "//conditions:default": [],
+    }),
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
     runtime_deps = [
@@ -202,4 +217,10 @@ java_image(
         ":telemetry_tools",
         "//src/main/java/build/buildfarm/worker/shard",
     ],
+)
+
+oss_audit(
+    name = "buildfarm-shard-worker-audit",
+    src = "//src/main/java/build/buildfarm:buildfarm-shard-worker",
+    tags = ["audit"],
 )

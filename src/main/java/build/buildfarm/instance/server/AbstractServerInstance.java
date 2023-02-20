@@ -725,24 +725,27 @@ public abstract class AbstractServerInstance implements Instance {
       Map<Digest, Directory> directoriesIndex,
       Consumer<String> onInputFile,
       Consumer<String> onInputDirectory) {
-    for (FileNode fileNode : directory.getFilesList()) {
-      String fileName = fileNode.getName();
-      String filePath = directoryPath.isEmpty() ? fileName : (directoryPath + "/" + fileName);
-      onInputFile.accept(filePath);
-    }
-    for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
-      String directoryName = directoryNode.getName();
+    Stack<DirectoryNode> directoriesStack = new Stack<>();
+    directoriesStack.addAll(directory.getDirectoriesList());
 
+    while (!directoriesStack.isEmpty()) {
+      DirectoryNode directoryNode = directoriesStack.pop();
+      String directoryName = directoryNode.getName();
       Digest directoryDigest = directoryNode.getDigest();
       String subDirectoryPath =
           directoryPath.isEmpty() ? directoryName : (directoryPath + "/" + directoryName);
       onInputDirectory.accept(subDirectoryPath);
-      enumerateActionInputDirectory(
-          subDirectoryPath,
-          directoriesIndex.get(directoryDigest),
-          directoriesIndex,
-          onInputFile,
-          onInputDirectory);
+
+      for (FileNode fileNode : directoriesIndex.get(directoryDigest).getFilesList()) {
+        String fileName = fileNode.getName();
+        String filePath = subDirectoryPath + "/" + fileName;
+        onInputFile.accept(filePath);
+      }
+
+      for (DirectoryNode subDirectoryNode :
+          directoriesIndex.get(directoryDigest).getDirectoriesList()) {
+        directoriesStack.push(subDirectoryNode);
+      }
     }
   }
 

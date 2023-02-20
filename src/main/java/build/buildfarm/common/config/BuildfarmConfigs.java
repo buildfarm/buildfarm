@@ -4,12 +4,11 @@ import build.buildfarm.common.DigestUtil;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import javax.naming.ConfigurationException;
@@ -31,6 +30,7 @@ public final class BuildfarmConfigs {
   private Server server = new Server();
   private Backplane backplane = new Backplane();
   private Worker worker = new Worker();
+  private ExecutionWrappers executionWrappers = new ExecutionWrappers();
 
   private BuildfarmConfigs() {}
 
@@ -41,44 +41,12 @@ public final class BuildfarmConfigs {
     return buildfarmConfigs;
   }
 
-  public static BuildfarmConfigs loadConfigs(String configLocation) throws IOException {
-    try (InputStream inputStream = new FileInputStream(new File(configLocation))) {
-      Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
-      buildfarmConfigs = yaml.load(inputStream);
-      log.info(buildfarmConfigs.toString());
-    }
-    return buildfarmConfigs;
-  }
-
-  public void loadConfigs(Path configLocation) throws IOException {
+  public static BuildfarmConfigs loadConfigs(Path configLocation) throws IOException {
     try (InputStream inputStream = Files.newInputStream(configLocation)) {
       Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
       buildfarmConfigs = yaml.load(inputStream);
       log.info(buildfarmConfigs.toString());
-    }
-  }
-
-  private static OptionsParser getOptionsParser(Class clazz, String[] args)
-      throws ConfigurationException {
-    verifyArgs(args);
-    OptionsParser parser = OptionsParser.newOptionsParser(clazz);
-    try {
-      parser.parse(args);
-    } catch (OptionsParsingException e) {
-      log.severe("Could not parse options provided." + e);
-      throw new RuntimeException(e);
-    }
-    List<String> residue = parser.getResidue();
-    if (residue.isEmpty()) {
-      log.info("Usage: CONFIG_PATH");
-      log.info(parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
-    }
-    return parser;
-  }
-
-  private static void verifyArgs(String[] args) throws ConfigurationException {
-    if (args.length == 0) {
-      throw new ConfigurationException("A valid path to a configuration file must be provided.");
+      return buildfarmConfigs;
     }
   }
 
@@ -86,7 +54,7 @@ public final class BuildfarmConfigs {
     OptionsParser parser = getOptionsParser(ServerOptions.class, args);
     ServerOptions options = parser.getOptions(ServerOptions.class);
     try {
-      buildfarmConfigs = BuildfarmConfigs.loadConfigs(parser.getResidue().get(0));
+      buildfarmConfigs = BuildfarmConfigs.loadConfigs(getConfigurationPath(parser));
     } catch (IOException e) {
       log.severe("Could not parse yml configuration file." + e);
       throw new RuntimeException(e);
@@ -104,7 +72,7 @@ public final class BuildfarmConfigs {
     OptionsParser parser = getOptionsParser(ShardWorkerOptions.class, args);
     ShardWorkerOptions options = parser.getOptions(ShardWorkerOptions.class);
     try {
-      buildfarmConfigs = BuildfarmConfigs.loadConfigs(parser.getResidue().get(0));
+      buildfarmConfigs = BuildfarmConfigs.loadConfigs(getConfigurationPath(parser));
     } catch (IOException e) {
       log.severe("Could not parse yml configuration file." + e);
       throw new RuntimeException(e);
@@ -113,5 +81,35 @@ public final class BuildfarmConfigs {
       buildfarmConfigs.getWorker().setPublicName(options.publicName);
     }
     return buildfarmConfigs;
+  }
+
+  private static OptionsParser getOptionsParser(Class clazz, String[] args)
+      throws ConfigurationException {
+    OptionsParser parser = OptionsParser.newOptionsParser(clazz);
+    try {
+      parser.parse(args);
+    } catch (OptionsParsingException e) {
+      log.severe("Could not parse options provided." + e);
+      throw new RuntimeException(e);
+    }
+
+    return parser;
+  }
+
+  private static Path getConfigurationPath(OptionsParser parser) throws ConfigurationException {
+    // source config from env variable
+    if (!Strings.isNullOrEmpty(System.getenv("CONFIG_PATH"))) {
+      return Paths.get(System.getenv("CONFIG_PATH"));
+    }
+
+    // source config from cli
+    List<String> residue = parser.getResidue();
+    if (residue.isEmpty()) {
+      log.info("Usage: CONFIG_PATH");
+      log.info(parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+      throw new ConfigurationException("A valid path to a configuration file must be provided.");
+    }
+
+    return Paths.get(residue.get(0));
   }
 }
