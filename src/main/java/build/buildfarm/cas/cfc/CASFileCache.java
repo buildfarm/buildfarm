@@ -60,6 +60,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.common.ZstdDecompressingOutputStream;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.io.CountingOutputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -99,6 +100,7 @@ import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -138,6 +140,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
+  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final Path root;
   private final EntryPathStrategy entryPathStrategy;
   private final long maxSizeInBytes;
@@ -1938,8 +1941,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             transformAsync(
                 put(fileNode.getDigest(), fileNode.getIsExecutable(), service),
                 (cacheFilePath) -> {
-                  // FIXME this can die with 'too many links'... needs some cascading fallout
-                  Files.createLink(filePath, cacheFilePath);
+                  linkCachedFile(filePath, cacheFilePath);
                   // we saw null entries in the built immutable list without synchronization
                   synchronized (inputsBuilder) {
                     inputsBuilder.add(key);
@@ -1970,6 +1972,26 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     Files.createSymbolicLink(symlinkPath, relativeTargetPath);
                     return symlinkPath;
                   }));
+    }
+  }
+
+  private void linkCachedFile(Path filePath, Path cacheFilePath) throws IOException {
+    // Creating a hardlink is fast and saves space within the CAS.
+    // However, some filesystems such as ext4 have a total hardlink limit of 65k for individual
+    // files. A recommended filesystem to back the CAS is XFS, due to its high link counts limits
+    // per inode. If you are using a filesystem with low hardlink limits, this call will likely fail
+    // with 'Too many links...`. A fallback to copying the file can still be permitted to ensure
+    // action correctness.
+    try {
+      Files.createLink(filePath, cacheFilePath);
+    } catch (IOException e) {
+      // propagate the exception if we do not intend a fallback strategy.
+      if (!configs.getWorker().getStorages().get(0).isExecRootCopyFallback()) {
+        throw e;
+      }
+
+      // Instead of hardlinking, copy the file into the exec root.
+      Files.copy(cacheFilePath, filePath, StandardCopyOption.REPLACE_EXISTING);
     }
   }
 
