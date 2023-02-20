@@ -23,6 +23,11 @@ tasks:
     platform: ubuntu1804
     shell_commands:
     - ./.bazelci/static_analyze.sh
+  checkstyle:
+    name: "Check Style"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/run_checkstyle.sh
   code_coverage:
     name: "Code Coverage"
     platform: ubuntu1804
