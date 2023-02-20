@@ -101,6 +101,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.AbstractMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -124,8 +125,6 @@ import java.util.logging.Level;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.json.simple.JSONObject;
 
 @Log
@@ -1984,13 +1983,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ImmutableList.Builder<ListenableFuture<Path>> putFutures,
       ExecutorService service)
       throws IOException, InterruptedException {
-    Stack<Pair<Path, Directory>> stack = new Stack<>();
+    Stack<Map.Entry<Path, Directory>> stack = new Stack<>();
     stack.push(
-        new ImmutablePair<>(rootPath, getDirectoryFromDigest(directoriesIndex, rootPath, digest)));
+        new AbstractMap.SimpleEntry<>(
+            rootPath, getDirectoryFromDigest(directoriesIndex, rootPath, digest)));
     while (!stack.isEmpty()) {
-      Pair<Path, Directory> pathDirectoryPair = stack.pop();
-      Path path = pathDirectoryPair.getLeft();
-      Directory directory = pathDirectoryPair.getRight();
+      Map.Entry<Path, Directory> pathDirectoryPair = stack.pop();
+      Path path = pathDirectoryPair.getKey();
+      Directory directory = pathDirectoryPair.getValue();
 
       removeFilePath(path);
       Files.createDirectory(path);
@@ -2004,7 +2004,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
         Path subPath = path.resolve(directoryNode.getName());
         stack.push(
-            new ImmutablePair<>(
+            new AbstractMap.SimpleEntry<>(
                 subPath,
                 getDirectoryFromDigest(directoriesIndex, subPath, directoryNode.getDigest())));
       }
