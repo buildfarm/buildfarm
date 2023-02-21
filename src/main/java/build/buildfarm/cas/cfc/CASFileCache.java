@@ -139,6 +139,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private static final Gauge casEntryCountMetric =
       Gauge.build().name("cas_entry_count").help("Number of entries in the CAS.").register();
 
+  private static final Gauge casCopyFallbackMetric =
+      Gauge.build()
+          .name("cas_copy_fallback")
+          .help("Number of times the CAS performed a file copy because hardlinking failed")
+          .register();
+
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
@@ -1969,22 +1975,34 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private void linkCachedFile(Path filePath, Path cacheFilePath) throws IOException {
-    // Creating a hardlink is fast and saves space within the CAS.
+    // = Hardlink Limitations =
+    // Creating hardlinks is fast and saves space within the CAS.
     // However, some filesystems such as ext4 have a total hardlink limit of 65k for individual
-    // files. A recommended filesystem to back the CAS is XFS, due to its high link counts limits
+    // files. Hitting this limit is easier than you think because the hardlinking occurs across
+    // actions.  A recommended filesystem to back the CAS is XFS, due to its high link counts limits
     // per inode. If you are using a filesystem with low hardlink limits, this call will likely fail
-    // with 'Too many links...`. A fallback to copying the file can still be permitted to ensure
-    // action correctness.
+    // with 'Too many links...`.
+
     try {
       Files.createLink(filePath, cacheFilePath);
     } catch (IOException e) {
-      // propagate the exception if we do not intend a fallback strategy.
+      // propagate the exception if we do not want to perform the fallback strategy.
+      // The client should expect a failed action with an explanation of 'Too many links...`.
       if (!configs.getWorker().getStorages().get(0).isExecRootCopyFallback()) {
         throw e;
       }
 
-      // Instead of hardlinking, copy the file into the exec root.
+      // = Fallback Strategy =
+      // Buildfarm provides a configuration fallback that copies files in the event
+      // that hardlinking fails.  If you are copying files more often than hardlinking,
+      // you're performance may degrade significantly.  Therefore we provide a metric
+      // signal to allow detection of this fallback.
       Files.copy(cacheFilePath, filePath, StandardCopyOption.REPLACE_EXISTING);
+      casCopyFallbackMetric.inc();
+
+      // TODO: A more optimal strategy would be to provide additional inodes
+      // (i.e. one backing file for a 65k or smaller link count) as a strategy,
+      // with pools of the same hash getting replicated.
     }
   }
 
