@@ -7,11 +7,11 @@ java_test(
     ],
     test_class = "build.buildfarm.AllTests",
     deps = [
+        "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
-        "//src/main/java/build/buildfarm/common",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_jimfs_jimfs",
         "@maven//:com_google_protobuf_protobuf_java",
