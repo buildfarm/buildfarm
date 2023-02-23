@@ -39,6 +39,8 @@ public class Server {
   private String clusterId = "";
   private String cloudRegion;
   private String publicName;
+  int maxInboundMessageSizeBytes = 0;
+  int maxInboundMetadataSize = 0;
 
   public String getPublicName() {
     // use environment override (useful for containerized deployment)
