@@ -521,8 +521,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public boolean containsBlob(
-      Digest digest, Digest.Builder result, RequestMetadata requestMetadata) {
+  public boolean containsBlob(Digest digest, Digest.Builder result, RequestMetadata requestMetadata)
+      throws InterruptedException {
     return contentAddressableStorage.contains(digest, result);
   }
 

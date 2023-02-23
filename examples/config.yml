@@ -101,6 +101,7 @@ worker:
       fileDirectoriesIndexInMemory: false
       skipLoad: false
       hexBucketLevels: 0
+      execRootCopyFallback: false
       target:
   executeStageWidth: 1
   inputFetchStageWidth: 1
