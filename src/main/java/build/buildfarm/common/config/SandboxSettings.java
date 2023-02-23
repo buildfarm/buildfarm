@@ -30,7 +30,7 @@ public class SandboxSettings {
    * @brief Whether or not to always use the sandbox when running actions.
    * @details It may be preferred to enforce sandbox usage than rely on client selection.
    */
-  boolean alwaysUse = false;
+  public boolean alwaysUse = false;
 
   /**
    * @field selectForBlockNetwork
@@ -38,7 +38,7 @@ public class SandboxSettings {
    * @details Otherwise, there may be no alternative solution and the "block network" request will
    *     be ignored / implemented differently.
    */
-  boolean selectForBlockNetwork = false;
+  public boolean selectForBlockNetwork = false;
 
   /**
    * @field selectForTmpFs
@@ -46,5 +46,5 @@ public class SandboxSettings {
    * @details Otherwise, there may be no alternative solution and the "tmpfs" request will be
    *     ignored / implemented differently.
    */
-  boolean selectForTmpFs = false;
+  public boolean selectForTmpFs = false;
 }

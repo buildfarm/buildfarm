@@ -19,6 +19,7 @@ import static com.google.common.truth.Truth.assertThat;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.config.SandboxSettings;
+import build.buildfarm.common.ExecutionProperties;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -691,5 +692,119 @@ public class ResourceDeciderTest {
 
     // ASSERT
     assertThat(limits.workerName).isEqualTo("foo");
+  }
+  
+  // Function under test: decideResourceLimitations
+  // Reason for testing: Sandbox is not selected based on sandbox settings.
+  // Failure explanation: The sandbox should be off by default.
+  @Test
+  public void decideResourceLimitationsSanboxOffDefault() throws Exception {
+    // ARRANGE
+    Command command = Command.newBuilder().build();
+
+    // ACT
+    ResourceLimits limits =
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "foo",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false,
+            new SandboxSettings());
+
+    // ASSERT
+    assertThat(limits.useLinuxSandbox).isFalse();
+  }
+  
+  // Function under test: decideResourceLimitations
+  // Reason for testing: Sandbox is selected based on sandbox settings.
+  // Failure explanation: The sandbox should have been selected.
+  @Test
+  public void decideResourceLimitationsAlwaysUseSandbox() throws Exception {
+    // ARRANGE
+    Command command = Command.newBuilder().build();
+    SandboxSettings sandboxSettings = new SandboxSettings();
+    sandboxSettings.alwaysUse = true;
+
+    // ACT
+    ResourceLimits limits =
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "foo",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false,
+            sandboxSettings);
+
+    // ASSERT
+    assertThat(limits.useLinuxSandbox).isTrue();
+  }
+  
+  // Function under test: decideResourceLimitations
+  // Reason for testing: Sandbox is selected based on sandbox settings.
+  // Failure explanation: The sandbox should have been selected.
+  @Test
+  public void decideResourceLimitationsSandboxChosenViaBlockNetwork() throws Exception {
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName(ExecutionProperties.BLOCK_NETWORK).setValue("true")))
+            .build();
+    SandboxSettings sandboxSettings = new SandboxSettings();
+    sandboxSettings.selectForBlockNetwork = true;
+
+    // ACT
+    ResourceLimits limits =
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "foo",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false,
+            sandboxSettings);
+
+    // ASSERT
+    assertThat(limits.useLinuxSandbox).isTrue();
+  }
+  
+  // Function under test: decideResourceLimitations
+  // Reason for testing: Sandbox is selected based on sandbox settings.
+  // Failure explanation: The sandbox should have been selected.
+  @Test
+  public void decideResourceLimitationsSandboxChosenViaTmpFs() throws Exception {
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName(ExecutionProperties.TMPFS).setValue("true")))
+            .build();
+    SandboxSettings sandboxSettings = new SandboxSettings();
+    sandboxSettings.selectForTmpFs = true;
+
+    // ACT
+    ResourceLimits limits =
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "foo",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false,
+            sandboxSettings);
+
+    // ASSERT
+    assertThat(limits.useLinuxSandbox).isTrue();
   }
 }
