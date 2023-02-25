@@ -2,7 +2,6 @@ package build.buildfarm.common.config;
 
 import build.buildfarm.v1test.WorkerType;
 import com.google.common.base.Strings;
-import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -37,26 +36,6 @@ public class Worker {
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
   private ExecutionPolicy[] executionPolicies = {};
-
-  public String getPublicName() {
-    // use environment override (useful for containerized deployment)
-    if (!Strings.isNullOrEmpty(System.getenv("INSTANCE_NAME"))) {
-      return System.getenv("INSTANCE_NAME");
-    }
-
-    // use configured value
-    if (!Strings.isNullOrEmpty(publicName)) {
-      return publicName;
-    }
-
-    // derive a value
-    try {
-      return InetAddress.getLocalHost().getHostAddress() + ":" + port;
-    } catch (Exception e) {
-      log.severe("publicName could not be derived:" + e);
-      return publicName;
-    }
-  }
 
   public int getExecuteStageWidth() {
     // use environment override (useful for containerized deployment)
