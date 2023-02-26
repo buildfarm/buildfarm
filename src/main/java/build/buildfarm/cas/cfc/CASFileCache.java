@@ -897,7 +897,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             }
             return transformAsync(
                 closedFuture,
-                result -> getOutputFuture(deadlineAfter, deadlineAfterUnits, onReadyHandler),
+                result -> getOutputFuture(deadlineAfter, deadlineAfterUnits, onReadyHandler), // NOPMD
                 directExecutor());
           }
 
@@ -1557,7 +1557,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         // directory
         if (isDirectory) {
           List<NamedFileKey> childDirent = listDirentSorted(entryPath, fileStore);
-          Directory dir = computeDirectory(entryPath, childDirent, fileKeys, inputsBuilder);
+          Directory dir = computeDirectory(entryPath, childDirent, fileKeys, inputsBuilder); // NOPMD
           b.addDirectoriesBuilder().setName(name).setDigest(digestUtil.compute(dir));
         } else if (isEmptyFile) {
           // empty file
@@ -2110,7 +2110,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       // additional stat check to ensure that the cache entry exists for hard link inode match?
     }
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
-      if (!directoryExists(
+      if (!directoryExists( // NOPMD
           path.resolve(directoryNode.getName()),
           directoriesIndex.get(directoryNode.getDigest()),
           directoriesIndex)) {

@@ -237,4 +237,38 @@
     <exclude name="InsecureCryptoIv"/>
 </rule>
 
+
+<!-- Custom rules -->
+<rule name="PossibleRecursion"
+      language="java"
+      message="A method appears to be calling itself.  This might be recursive and you should consider refactoring."
+      class="net.sourceforge.pmd.lang.rule.XPathRule">
+   <description>
+
+   </description>
+   <priority>3</priority>
+   <properties>
+      <property name="version" value="2.0"/>
+      <property name="xpath">
+         <value>
+<![CDATA[
+(: Find every function call. :)
+(: We know "Name" is a function call by spotting the adjacent "Arguments". :)
+//Name[(../../PrimarySuffix[@Arguments])
+
+(: Filter down to functions calls that are within a method of the same name. :)
+(: This a key indicator for identifying recursion. :)
+and(@Image=ancestor::MethodDeclaration[1]/@Name)
+
+(: Filter down to functions with the same number of arguments. :)
+(: This will avoid flagging overloaded calls as recursion. :)
+and (../../PrimarySuffix[@ArgumentCount = ancestor::MethodDeclaration[1]/@Arity])]
+
+]]>
+         </value>
+      </property>
+   </properties>
+</rule>
+
+
 </ruleset>

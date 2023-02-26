@@ -248,7 +248,7 @@ class CFCExecFileSystem implements ExecFileSystem {
         downloads =
             concat(
                 downloads,
-                fetchInputs(
+                fetchInputs( // NOPMD
                     dirPath,
                     digest,
                     directoriesIndex,

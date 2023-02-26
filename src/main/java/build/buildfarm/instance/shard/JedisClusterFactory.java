@@ -99,7 +99,7 @@ public class JedisClusterFactory {
   private static void deleteExistingKeys(JedisCluster cluster) throws Exception {
     for (JedisPool pool : cluster.getClusterNodes().values()) {
       Jedis node = pool.getResource();
-      deleteExistingKeys(node);
+      deleteExistingKeysOnNode(node);
     }
   }
 
@@ -111,7 +111,7 @@ public class JedisClusterFactory {
    * @note Overloaded.
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
-  private static void deleteExistingKeys(Jedis node) {
+  private static void deleteExistingKeysOnNode(Jedis node) {
     String nextCursor = "0";
     Set<String> matchingKeys = new HashSet<>();
     ScanParams params = new ScanParams();

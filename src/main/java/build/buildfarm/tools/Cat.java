@@ -277,7 +277,7 @@ class Cat {
           weight += directoryWeights.get(dirNode.getDigest());
         } else {
           weight +=
-              computeDirectoryWeights(dirNode.getDigest(), directoriesIndex, directoryWeights);
+              computeDirectoryWeights(dirNode.getDigest(), directoriesIndex, directoryWeights); // NOPMD
         }
       }
       // filenodes are already computed
@@ -301,7 +301,7 @@ class Cat {
       if (subDirectory == null) {
         indentOut(indentLevel + 1, "DIRECTORY MISSING FROM CAS");
       } else {
-        printTreeAt(indentLevel + 1, subDirectory, directoriesIndex, totalWeight, directoryWeights);
+        printTreeAt(indentLevel + 1, subDirectory, directoriesIndex, totalWeight, directoryWeights); // NOPMD
       }
     }
     for (FileNode fileNode : directory.getFilesList()) {
@@ -839,7 +839,7 @@ class Cat {
     @Override
     public void run(Instance instance, Iterable<String> args) throws Exception {
       for (String operationName : args) {
-        run(instance, operationName);
+        run(instance, operationName); // NOPMD
       }
     }
 
@@ -882,7 +882,7 @@ class Cat {
           StreamSupport.stream(args.spliterator(), false)
               .map(DigestUtil::parseDigest)
               .collect(Collectors.toList())) {
-        run(instance, digest);
+        run(instance, digest); // NOPMD
       }
     }
 
@@ -963,7 +963,7 @@ class Cat {
   abstract static class BlobCommand extends DigestsCommand {
     @Override
     protected void run(Instance instance, Digest digest) throws Exception {
-      run(
+      run( // NOPMD
           instance,
           getBlob(
               instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance()));

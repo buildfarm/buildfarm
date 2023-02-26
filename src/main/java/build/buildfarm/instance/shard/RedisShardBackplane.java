@@ -1118,7 +1118,7 @@ public class RedisShardBackplane implements Backplane {
     client.run(
         jedis -> {
           if (isBlacklisted(jedis, queueEntry.getExecuteEntry().getRequestMetadata())) {
-            pollOperation(
+            updateExistingOperation(
                 jedis, operationName, dispatchedEntryJson); // complete our lease to error operation
           } else {
             Operation operation = parseOperationJson(getOperation(jedis, operationName));
@@ -1145,10 +1145,10 @@ public class RedisShardBackplane implements Backplane {
       log.log(Level.SEVERE, "error printing dispatched operation " + operationName, e);
       return false;
     }
-    return client.call(jedis -> pollOperation(jedis, operationName, json));
+    return client.call(jedis -> updateExistingOperation(jedis, operationName, json));
   }
 
-  boolean pollOperation(JedisCluster jedis, String operationName, String dispatchedOperationJson) {
+  private boolean updateExistingOperation(JedisCluster jedis, String operationName, String dispatchedOperationJson) {
     if (state.dispatchedOperations.exists(jedis, operationName)) {
       if (!state.dispatchedOperations.insert(jedis, operationName, dispatchedOperationJson)) {
         return true;

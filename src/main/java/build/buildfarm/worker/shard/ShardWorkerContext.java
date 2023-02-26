@@ -339,7 +339,7 @@ class ShardWorkerContext implements WorkerContext {
             matched = true;
             boolean success = listener.onEntry(queueEntry);
             if (!success) {
-              requeue(operationName);
+              expireOperationToRequeue(operationName);
             }
             return success;
           }
@@ -364,7 +364,7 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
-  private void requeue(String operationName) {
+  private void expireOperationToRequeue(String operationName) {
     QueueEntry queueEntry = activeOperations.remove(operationName);
     try {
       operationPoller.poll(queueEntry, ExecutionStage.Value.QUEUED, 0);
@@ -375,7 +375,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   void requeue(Operation operation) {
-    requeue(operation.getName());
+    expireOperationToRequeue(operation.getName());
   }
 
   void deactivate(String operationName) {

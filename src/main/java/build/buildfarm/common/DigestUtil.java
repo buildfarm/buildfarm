@@ -195,7 +195,7 @@ public class DigestUtil {
   }
 
   public Digest build(byte[] hash, long size) {
-    return build(HashCode.fromBytes(hash).toString(), size);
+    return build(HashCode.fromBytes(hash).toString(), size); //NOPMD
   }
 
   /**
@@ -204,7 +204,7 @@ public class DigestUtil {
    * between different platforms and languages. TODO(olaola): upgrade to a better implementation!
    */
   public Digest compute(Message message) {
-    return compute(message.toByteString());
+    return compute(message.toByteString()); //NOPMD
   }
 
   public ActionKey computeActionKey(Action action) {

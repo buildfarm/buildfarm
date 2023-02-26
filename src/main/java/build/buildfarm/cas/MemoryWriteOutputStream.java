@@ -148,7 +148,7 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
     }
     return transformAsync(
         closedFuture,
-        result -> getOutputFuture(deadlineAfter, deadlineAfterUnits, onReadyHandler),
+        result -> getOutputFuture(deadlineAfter, deadlineAfterUnits, onReadyHandler), // NOPMD
         directExecutor());
   }
 

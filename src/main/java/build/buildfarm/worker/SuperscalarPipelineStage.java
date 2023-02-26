@@ -159,7 +159,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
 
   @Override
   public boolean claim(OperationContext operationContext) throws InterruptedException {
-    return claim(claimsRequired(operationContext));
+    return claim(claimsRequired(operationContext)); // NOPMD
   }
 
   @Override

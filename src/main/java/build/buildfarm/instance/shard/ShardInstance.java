@@ -1499,7 +1499,7 @@ public class ShardInstance extends AbstractServerInstance {
           if (action == null) {
             return immediateFuture(QueuedOperation.getDefaultInstance());
           }
-          return buildQueuedOperation(operationName, action, service, requestMetadata);
+          return buildQueuedOperation(operationName, action, service, requestMetadata); // NOPMD
         },
         service);
   }

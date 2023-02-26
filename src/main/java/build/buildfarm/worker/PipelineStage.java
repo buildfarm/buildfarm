@@ -149,7 +149,7 @@ public abstract class PipelineStage implements Runnable {
   }
 
   protected void logComplete(String operationName, long usecs, long stallUSecs, boolean success) {
-    logComplete(operationName, usecs, stallUSecs, success ? "Success" : "Failed");
+    logComplete(operationName, usecs, stallUSecs, success ? "Success" : "Failed"); // NOPMD
   }
 
   protected void logComplete(String operationName, long usecs, long stallUSecs, String status) {

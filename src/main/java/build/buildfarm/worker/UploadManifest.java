@@ -193,7 +193,7 @@ public class UploadManifest {
       String name = dirent.getName();
       Path child = path.resolve(name);
       if (dirent.getType() == Dirent.Type.DIRECTORY) {
-        Directory dir = computeDirectory(child, tree);
+        Directory dir = computeDirectory(child, tree); // NOPMD
         b.addDirectoriesBuilder().setName(name).setDigest(digestUtil.compute(dir));
         tree.addChildren(dir);
       } else if (dirent.getType() == Dirent.Type.FILE
