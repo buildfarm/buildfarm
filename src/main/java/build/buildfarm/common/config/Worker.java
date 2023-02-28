@@ -37,29 +37,6 @@ public class Worker {
   private boolean errorOperationRemainingResources = false;
   private ExecutionPolicy[] executionPolicies = {};
 
-  public int getExecuteStageWidth() {
-    // use environment override (useful for containerized deployment)
-    if (!Strings.isNullOrEmpty(System.getenv("EXECUTION_STAGE_WIDTH"))) {
-      return Integer.parseInt(System.getenv("EXECUTION_STAGE_WIDTH"));
-    }
-
-    // use configured value
-    if (executeStageWidth > 0) {
-      return executeStageWidth;
-    }
-
-    // derive a value
-    return Math.max(1, Runtime.getRuntime().availableProcessors() - executeStageWidthOffset);
-  }
-
-  public int getInputFetchStageWidth() {
-    if (inputFetchStageWidth > 0) {
-      return inputFetchStageWidth;
-    } else {
-      return Math.max(1, getExecuteStageWidth() / 5);
-    }
-  }
-
   public ExecutionPolicy[] getExecutionPolicies() {
     if (executionPolicies != null) {
       return executionPolicies;

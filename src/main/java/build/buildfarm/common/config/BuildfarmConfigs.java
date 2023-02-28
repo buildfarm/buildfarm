@@ -133,6 +133,46 @@ public final class BuildfarmConfigs {
     for (Cas storage : configs.getWorker().getStorages()) {
       deriveCasStorage(storage);
     }
+
+    adjustExecuteStageWidth(configs);
+    adjustInputFetchStageWidth(configs);
+  }
+
+  private static void adjustExecuteStageWidth(BuildfarmConfigs configs) {
+    if (!Strings.isNullOrEmpty(System.getenv("EXECUTION_STAGE_WIDTH"))) {
+      configs
+          .getWorker()
+          .setExecuteStageWidth(Integer.parseInt(System.getenv("EXECUTION_STAGE_WIDTH")));
+      log.info(
+          String.format(
+              "executeStageWidth overwritten to %d", configs.getWorker().getExecuteStageWidth()));
+      return;
+    }
+
+    if (configs.getWorker().getExecuteStageWidth() == 0) {
+      configs
+          .getWorker()
+          .setExecuteStageWidth(
+              Math.max(
+                  1,
+                  Runtime.getRuntime().availableProcessors()
+                      - configs.getWorker().getExecuteStageWidthOffset()));
+      log.info(
+          String.format(
+              "executeStageWidth modified to %d", configs.getWorker().getExecuteStageWidth()));
+    }
+  }
+
+  private static void adjustInputFetchStageWidth(BuildfarmConfigs configs) {
+    if (configs.getWorker().getInputFetchStageWidth() == 0) {
+      configs
+          .getWorker()
+          .setInputFetchStageWidth(Math.max(1, configs.getWorker().getExecuteStageWidth() / 5));
+      log.info(
+          String.format(
+              "executeInputFetchWidth modified to %d",
+              configs.getWorker().getInputFetchStageWidth()));
+    }
   }
 
   private static void adjustPublicName(String publicName, int port) {
