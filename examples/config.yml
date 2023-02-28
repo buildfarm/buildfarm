@@ -101,6 +101,7 @@ worker:
       fileDirectoriesIndexInMemory: false
       skipLoad: false
       hexBucketLevels: 0
+      execRootCopyFallback: false
       target:
       publishTtlMetric: false
   executeStageWidth: 1

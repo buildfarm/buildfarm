@@ -26,6 +26,9 @@ public class Cas {
   private boolean fileDirectoriesIndexInMemory = false;
   private boolean skipLoad = false;
 
+  // if creating a hardlink fails, copy the file instead
+  private boolean execRootCopyFallback = false;
+
   // GRPC
   private String target;
 
