@@ -4,7 +4,6 @@ import build.buildfarm.common.DigestUtil;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -212,7 +211,7 @@ public final class BuildfarmConfigs {
       try {
         storage.setMaxSizeBytes(
             (long)
-                (new File(BuildfarmConfigs.getInstance().getWorker().getRoot()).getTotalSpace()
+                (BuildfarmConfigs.getInstance().getWorker().getValidRoot().toFile().getTotalSpace()
                     * 0.9));
       } catch (Exception e) {
         storage.setMaxSizeBytes(DEFAULT_CAS_SIZE);
