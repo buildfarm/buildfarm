@@ -1,6 +1,8 @@
 package build.buildfarm.common.config;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.ExecutionProperties;
+import build.buildfarm.common.ExecutionWrapperProperties;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
@@ -10,6 +12,8 @@ import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import javax.naming.ConfigurationException;
@@ -135,6 +139,8 @@ public final class BuildfarmConfigs {
 
     adjustExecuteStageWidth(configs);
     adjustInputFetchStageWidth(configs);
+
+    checkExecutionWrapperAvailability(configs);
   }
 
   private static void adjustExecuteStageWidth(BuildfarmConfigs configs) {
@@ -218,5 +224,66 @@ public final class BuildfarmConfigs {
       }
       log.info(String.format("CAS size changed to %d", storage.getMaxSizeBytes()));
     }
+  }
+
+  private static ExecutionWrapperProperties createExecutionWrapperProperties(
+      BuildfarmConfigs configs) {
+    // Create a mapping from the execution wrappers to the features they enable.
+    ExecutionWrapperProperties wrapperProperties = new ExecutionWrapperProperties();
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getCgroups())),
+        new ArrayList<String>(
+            Arrays.asList(
+                "limit_execution",
+                ExecutionProperties.CORES,
+                ExecutionProperties.MIN_CORES,
+                ExecutionProperties.MAX_CORES,
+                ExecutionProperties.MIN_MEM,
+                ExecutionProperties.MAX_MEM)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getLinuxSandbox())),
+        new ArrayList<String>(
+            Arrays.asList(
+                ExecutionProperties.LINUX_SANDBOX,
+                ExecutionProperties.BLOCK_NETWORK,
+                ExecutionProperties.TMPFS)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getAsNobody())),
+        new ArrayList<String>(Arrays.asList(ExecutionProperties.AS_NOBODY)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getProcessWrapper())),
+        new ArrayList<String>(Arrays.asList(ExecutionProperties.PROCESS_WRAPPER)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(
+            Arrays.asList(
+                configs.getExecutionWrappers().getSkipSleep(),
+                configs.getExecutionWrappers().getSkipSleepPreload(),
+                configs.getExecutionWrappers().getDelay())),
+        new ArrayList<String>(
+            Arrays.asList(ExecutionProperties.SKIP_SLEEP, ExecutionProperties.TIME_SHIFT)));
+
+    return wrapperProperties;
+  }
+
+  private static void checkExecutionWrapperAvailability(BuildfarmConfigs configs) {
+    ExecutionWrapperProperties wrapperProperties = createExecutionWrapperProperties(configs);
+
+    // Find missing tools, and warn the user that missing tools mean missing features.
+    wrapperProperties.mapping.forEach(
+        (tools, features) ->
+            tools.forEach(
+                (tool) -> {
+                  if (Files.notExists(Paths.get(tool))) {
+                    String message =
+                        String.format(
+                            "the execution wrapper %s is missing and therefore the following features will not be available: %s",
+                            tool, String.join(", ", features));
+                    log.warning(message);
+                  }
+                }));
   }
 }
