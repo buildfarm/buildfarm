@@ -24,6 +24,7 @@ import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import redis.clients.jedis.JedisCluster;
 
 /**
@@ -270,6 +271,40 @@ public class OperationQueue {
       }
     }
 
+    throwNoEligibleQueueException(provisions);
+    return null;
+  }
+
+  /**
+   * @brief Choose an eligible queues based on given properties.
+   * @details We use the platform execution properties of a queue entry to determine the appropriate
+   *     queues. If there no eligible queues, an exception is thrown.
+   * @param provisions Provisions to check that requirements are met.
+   * @return The chosen queues.
+   * @note Suggested return identifier: queues.
+   */
+  private List<BalancedRedisQueue> chooseEligibleQueues(List<Platform.Property> provisions) {
+    List<BalancedRedisQueue> eligibleQueues =
+        queues.stream()
+            .filter(provisionedQueue -> provisionedQueue.isEligible(toMultimap(provisions)))
+            .map(provisionedQueue -> provisionedQueue.queue())
+            .collect(Collectors.toList());
+
+    if (!eligibleQueues.isEmpty()) {
+      return eligibleQueues;
+    }
+
+    throwNoEligibleQueueException(provisions);
+    return null;
+  }
+
+  /**
+   * @brief Throw an exception that explains why there are no eligible queues.
+   * @details This function should only be called, when there were no matched queues.
+   * @param provisions Provisions to check that requirements are met.
+   * @return no return.
+   */
+  private void throwNoEligibleQueueException(List<Platform.Property> provisions) {
     // At this point, we were unable to match an action to an eligible queue.
     // We will build an error explaining why the matching failed. This will help user's properly
     // configure their queue or adjust the execution_properties of their actions.
