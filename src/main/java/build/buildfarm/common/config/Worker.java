@@ -37,6 +37,7 @@ public class Worker {
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
   private ExecutionPolicy[] executionPolicies = {};
+  private List<LimitedResource> resources;
 
   public String getPublicName() {
     // use environment override (useful for containerized deployment)

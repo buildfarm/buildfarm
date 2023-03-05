@@ -1,6 +1,7 @@
 package build.buildfarm.common.config;
 
 import com.google.common.base.Strings;
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -43,9 +44,9 @@ public class Backplane {
   private String[] redisNodes = {};
   private int maxAttempts = 20;
   private boolean cacheCas = false;
+  private List<LimitedResource> resources;
 
   public String getRedisUri() {
-
     // use environment override (useful for containerized deployment)
     if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
       return System.getenv("REDIS_URI");
