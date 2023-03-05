@@ -274,9 +274,8 @@ class ShardWorkerContext implements WorkerContext {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
     try {
-      queueEntry =
-          backplane.dispatchOperation(
-              configs.getBackplane().getQueues()[0].getPlatform().getPropertiesList());
+      List<Platform.Property> provisions = new ArrayList<>();
+      queueEntry = backplane.dispatchOperation(provisions);
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {

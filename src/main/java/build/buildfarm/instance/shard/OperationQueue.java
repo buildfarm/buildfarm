@@ -50,6 +50,14 @@ public class OperationQueue {
   private final List<ProvisionedRedisQueue> queues;
 
   /**
+   * @field currentDequeueIndex
+   * @brief The current queue index to dequeue from.
+   * @details Used in a round-robin fashion to ensure an even distribution of dequeues across
+   *     matched queues.
+   */
+  private int currentDequeueIndex = 0;
+
+  /**
    * @brief Constructor.
    * @details Construct the operation queue with various provisioned redis queues.
    * @param queues Provisioned queues.
@@ -187,8 +195,18 @@ public class OperationQueue {
    */
   public String dequeue(JedisCluster jedis, List<Platform.Property> provisions)
       throws InterruptedException {
-    BalancedRedisQueue queue = chooseEligibleQueue(provisions);
-    return queue.dequeue(jedis);
+    // Select all matched queues, and attempt dequeuing via round-robin.
+    List<BalancedRedisQueue> queues = chooseEligibleQueues(provisions);
+    int index = roundRobinPopIndex(queues);
+    String value = queues.get(index).nonBlockingDequeue(jedis);
+
+    // Keep iterating over matched queues until we find one that is non-empty and provides a
+    // dequeued value.
+    while (value == null) {
+      index = roundRobinPopIndex(queues);
+      value = queues.get(index).nonBlockingDequeue(jedis);
+    }
+    return value;
   }
 
   /**
@@ -319,6 +337,34 @@ public class OperationQueue {
             + " One solution to is to configure a provision queue with no requirements which would be eligible to all operations."
             + " See https://github.com/bazelbuild/bazel-buildfarm/wiki/Shard-Platform-Operation-Queue for details. "
             + eligibilityResults);
+  }
+
+  /**
+   * @brief Get the current queue index for round-robin dequeues.
+   * @details Adjusts the round-robin index for next call.
+   * @param matchedQueues The queues to round robin.
+   * @return The current round-robin index.
+   * @note Suggested return identifier: queueIndex.
+   */
+  private int roundRobinPopIndex(List<BalancedRedisQueue> matchedQueues) {
+    int currentIndex = currentDequeueIndex;
+    currentDequeueIndex = nextQueueInRoundRobin(currentDequeueIndex, matchedQueues);
+    return currentIndex;
+  }
+
+  /**
+   * @brief Get the next queue in the round robin.
+   * @details If we are currently on the last queue it becomes the first queue.
+   * @param index Current queue index.
+   * @param matchedQueues The queues to round robin.
+   * @return And adjusted val based on the current queue index.
+   * @note Suggested return identifier: adjustedCurrentQueue.
+   */
+  private int nextQueueInRoundRobin(int index, List<BalancedRedisQueue> matchedQueues) {
+    if (index >= matchedQueues.size() - 1) {
+      return 0;
+    }
+    return index + 1;
   }
 
   /**
