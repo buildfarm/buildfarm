@@ -37,10 +37,12 @@ import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.LimitedResource;
 import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.config.GrpcMetrics;
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
@@ -91,6 +93,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
+import java.util.concurrent.Semaphore;
 
 @Log
 @SpringBootApplication
@@ -591,6 +594,7 @@ public class Worker {
             configs.getWorker().isOnlyMulticoreTests(),
             configs.getWorker().isAllowBringYourOwnContainer(),
             configs.getWorker().isErrorOperationRemainingResources(),
+            createLocalResourceSet(configs.getWorker().getResources()),
             writer);
 
     pipeline = new Pipeline();
@@ -621,6 +625,14 @@ public class Worker {
     inputFetchSlotsTotal.set(configs.getWorker().getInputFetchStageWidth());
 
     log.log(INFO, String.format("%s initialized", identifier));
+  }
+  
+  private LocalResourceSet createLocalResourceSet(List<LimitedResource> resources){
+    LocalResourceSet resourceSet = new LocalResourceSet();
+    for (LimitedResource resource: resources){
+      resourceSet.resources.put(resource.getName(), new Semaphore(resource.getAmount()));
+    }
+    return resourceSet;
   }
 
   @PreDestroy

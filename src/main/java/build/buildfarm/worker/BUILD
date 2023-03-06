@@ -38,5 +38,6 @@ java_library(
         "@maven//:org_apache_commons_commons_compress",
         "@maven//:org_jetbrains_annotations",
         "@maven//:org_projectlombok_lombok",
+        "@maven//:org_apache_commons_commons_lang3",
     ],
 )

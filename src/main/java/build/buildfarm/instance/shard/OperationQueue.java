@@ -308,12 +308,11 @@ public class OperationQueue {
             .map(provisionedQueue -> provisionedQueue.queue())
             .collect(Collectors.toList());
 
-    if (!eligibleQueues.isEmpty()) {
-      return eligibleQueues;
+    if (eligibleQueues.isEmpty()) {
+      throwNoEligibleQueueException(provisions);
     }
 
-    throwNoEligibleQueueException(provisions);
-    return null;
+    return eligibleQueues;
   }
 
   /**

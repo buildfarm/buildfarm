@@ -44,6 +44,7 @@ import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.LimitedResource;
 import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
@@ -127,6 +128,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Group operationsGroup = executionsGroup.getChild("operations");
   private final CasWriter writer;
   private final boolean errorOperationRemainingResources;
+  private final LocalResourceSet resourceSet;
 
   static SetMultimap<String, String> getMatchProvisions(
       Iterable<ExecutionPolicy> policies, int executeStageWidth) {
@@ -160,6 +162,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean onlyMulticoreTests,
       boolean allowBringYourOwnContainer,
       boolean errorOperationRemainingResources,
+      LocalResourceSet resourceSet,
       CasWriter writer) {
     this.name = name;
     this.matchProvisions = getMatchProvisions(policies, executeStageWidth);
@@ -180,6 +183,7 @@ class ShardWorkerContext implements WorkerContext {
     this.onlyMulticoreTests = onlyMulticoreTests;
     this.allowBringYourOwnContainer = allowBringYourOwnContainer;
     this.errorOperationRemainingResources = errorOperationRemainingResources;
+    this.resourceSet = resourceSet;
     this.writer = writer;
   }
 
@@ -271,6 +275,12 @@ class ShardWorkerContext implements WorkerContext {
 
   @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
+    
+    QueueEntry queueEntry = takeEntryOffOperationQueue(listener);
+    decideWhetherToKeepOperation(queueEntry,listener);
+  }
+  
+  private QueueEntry takeEntryOffOperationQueue(MatchListener listener) {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
     try {
@@ -291,9 +301,11 @@ class ShardWorkerContext implements WorkerContext {
       // transient backplane errors will propagate a null queueEntry
     }
     listener.onWaitEnd();
-
+  }
+  
+  private void decideWhetherToKeepOperation(QueueEntry queueEntry, MatchListener listener) {
     if (queueEntry == null
-        || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, queueEntry)) {
+        || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, resourceSet, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);

@@ -104,6 +104,7 @@ public class ShardWorkerContextTest {
         /* onlyMulticoreTests=*/ false,
         /* allowBringYourOwnContainer=*/ false,
         /* errorOperationRemainingResources=*/ false,
+        /* resourceSet=*/ new LocalResourceSet(),
         writer);
   }
 
