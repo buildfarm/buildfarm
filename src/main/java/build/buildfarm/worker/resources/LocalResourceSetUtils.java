@@ -15,6 +15,7 @@
 package build.buildfarm.worker.resources;
 
 import build.bazel.remote.execution.v2.Platform;
+import io.prometheus.client.Gauge;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,13 @@ import org.apache.commons.lang3.StringUtils;
  * @details The methods help with allocation / de-allocation of claims, as well as metrics printing.
  */
 public class LocalResourceSetUtils {
+  private static final Gauge resourceUsage =
+      Gauge.build()
+          .name("local_resource_usage")
+          .labelNames("resource_name")
+          .help("The number of claims for each resource currently being used for execution")
+          .register();
+
   public static boolean claimResources(Platform platform, LocalResourceSet resourceSet) {
     List<Map.Entry<String, Integer>> claimed = new ArrayList<>();
 
@@ -42,7 +50,7 @@ public class LocalResourceSetUtils {
 
       // Attempt to claim.  If claiming fails, we must return all other claims.
       int requestAmount = getResourceRequestAmount(property);
-      boolean wasAcquired = resource.tryAcquire(requestAmount);
+      boolean wasAcquired = semaphoreAquire(resource, resourceName, requestAmount);
       if (wasAcquired) {
         claimed.add(new AbstractMap.SimpleEntry<>(resourceName, requestAmount));
       } else {
@@ -54,7 +62,8 @@ public class LocalResourceSetUtils {
     // cleanup remaining resources if they were not all claimed.
     if (!allClaimed) {
       for (Map.Entry<String, Integer> claim : claimed) {
-        resourceSet.resources.get(claim.getKey()).release(claim.getValue());
+        semaphoreRelease(
+            resourceSet.resources.get(claim.getKey()), claim.getKey(), claim.getValue());
       }
     }
 
@@ -69,8 +78,21 @@ public class LocalResourceSetUtils {
         continue;
       }
       int requestAmount = getResourceRequestAmount(property);
-      resource.release(requestAmount);
+      semaphoreRelease(resource, resourceName, requestAmount);
     }
+  }
+
+  private static boolean semaphoreAquire(Semaphore resource, String resourceName, int amount) {
+    boolean wasAcquired = resource.tryAcquire(amount);
+    if (wasAcquired) {
+      resourceUsage.labels(resourceName).inc(amount);
+    }
+    return wasAcquired;
+  }
+
+  private static void semaphoreRelease(Semaphore resource, String resourceName, int amount) {
+    resource.release(amount);
+    resourceUsage.labels(resourceName).dec(amount);
   }
 
   private static int getResourceRequestAmount(Platform.Property property) {
