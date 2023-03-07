@@ -100,9 +100,9 @@ def archive_dependencies(third_party):
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
         {
             "name": "bazel",
-            "sha256": "bca2303a43c696053317a8c7ac09a5e6d90a62fec4726e55357108bb60d7a807",
-            "strip_prefix": "bazel-3.7.2",
-            "urls": ["https://github.com/bazelbuild/bazel/archive/3.7.2.tar.gz"],
+            "sha256": "06d3dbcba2286d45fc6479a87ccc649055821fc6da0c3c6801e73da780068397",
+            "strip_prefix": "bazel-6.0.0",
+            "urls": ["https://github.com/bazelbuild/bazel/archive/refs/tags/6.0.0.tar.gz"],
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
         },

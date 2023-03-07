@@ -1,12 +1,7 @@
 java_test(
     name = "tests",
     size = "small",
-    srcs = [
-        "ActionCacheServiceTest.java",
-        "ByteStreamServiceTest.java",
-        "ExecutionServiceTest.java",
-        "FutureWriteResponseObserver.java",
-    ],
+    srcs = glob(["*.java"]),
     data = ["//examples:example_configs"],
     test_class = "build.buildfarm.AllTests",
     deps = [
@@ -40,6 +35,8 @@ java_test(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:me_dinowernli_java_grpc_prometheus",
         "@maven//:org_mockito_mockito_core",
+        "@remote_apis//:build_bazel_remote_asset_v1_remote_asset_java_grpc",
+        "@remote_apis//:build_bazel_remote_asset_v1_remote_asset_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
