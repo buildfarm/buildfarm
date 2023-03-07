@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import java.util.ArrayList;
 import javax.naming.ConfigurationException;
 import lombok.Data;
 import lombok.extern.java.Log;
@@ -37,7 +38,7 @@ public class Worker {
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
   private ExecutionPolicy[] executionPolicies = {};
-  private List<LimitedResource> resources;
+  private List<LimitedResource> resources = new ArrayList<>();
 
   public String getPublicName() {
     // use environment override (useful for containerized deployment)
