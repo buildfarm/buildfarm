@@ -131,5 +131,5 @@ public interface WorkerContext {
 
   ResourceLimits commandExecutionSettings(Command command);
 
-  public void returnLocalResources(QueueEntry queueEntry);
+  void returnLocalResources(QueueEntry queueEntry);
 }
