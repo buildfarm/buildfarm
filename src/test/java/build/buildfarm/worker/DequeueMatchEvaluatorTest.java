@@ -19,8 +19,10 @@ import static com.google.common.truth.Truth.assertThat;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import java.util.concurrent.Semaphore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -52,10 +54,12 @@ public class DequeueMatchEvaluatorTest {
   public void shouldKeepOperationKeepEmptyQueueEntry() throws Exception {
     // ARRANGE
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
     QueueEntry entry = QueueEntry.newBuilder().setPlatform(Platform.newBuilder()).build();
 
     // ACT
-    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    boolean shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
@@ -70,6 +74,7 @@ public class DequeueMatchEvaluatorTest {
   public void shouldKeepOperationValidMinCoresQueueEntry() throws Exception {
     // ARRANGE
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
     workerProvisions.put("cores", "11");
 
     QueueEntry entry =
@@ -81,7 +86,8 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    boolean shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
 
     // ASSERT
     // the worker accepts because it has more cores than the min-cores requested
@@ -98,6 +104,7 @@ public class DequeueMatchEvaluatorTest {
     // ARRANGE
     configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
     workerProvisions.put("cores", "10");
 
     QueueEntry entry =
@@ -109,7 +116,8 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    boolean shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
 
     // ASSERT
     // the worker rejects because it has less cores than the min-cores requested
@@ -123,6 +131,7 @@ public class DequeueMatchEvaluatorTest {
   public void shouldKeepOperationMaxCoresDoNotInfluenceAcceptance() throws Exception {
     // ARRANGE
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
     workerProvisions.put("cores", "10");
 
     QueueEntry entry =
@@ -136,7 +145,8 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    boolean shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
 
     // ASSERT
     // the worker accepts because it has the same cores as the min-cores requested
@@ -153,6 +163,7 @@ public class DequeueMatchEvaluatorTest {
     configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
 
     QueueEntry entry =
         QueueEntry.newBuilder()
@@ -163,7 +174,8 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // ACT
-    boolean shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    boolean shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
 
     // ASSERT
     assertThat(shouldKeep).isFalse();
@@ -172,7 +184,7 @@ public class DequeueMatchEvaluatorTest {
     configs.getWorker().getDequeueMatchSettings().setAcceptEverything(true);
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
@@ -181,9 +193,151 @@ public class DequeueMatchEvaluatorTest {
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, entry);
+    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
+  }
+
+  // Function under test: shouldKeepOperation
+  // Reason for testing: the local resource should be claimed
+  // Failure explanation: semaphore claim did not work as expected.
+  @Test
+  public void shouldKeepOperationClaimsResource() throws Exception {
+    // ARRANGE
+    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(true);
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
+    SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
+    resourceSet.resources.put("FOO", new Semaphore(1));
+
+    QueueEntry entry =
+        QueueEntry.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("resource:FOO").setValue("1")))
+            .build();
+
+    // PRE-ASSERT
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(1);
+
+    // ACT
+    boolean shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+
+    // ASSERT
+    // the worker accepts because the resource is available.
+    assertThat(shouldKeep).isTrue();
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
+
+    // ACT
+    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+
+    // ASSERT
+    // the worker rejects because there are no resources left.
+    assertThat(shouldKeep).isFalse();
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
+  }
+
+  // Function under test: shouldKeepOperation
+  // Reason for testing: the local resources should be claimed
+  // Failure explanation: semaphore claim did not work as expected.
+  @Test
+  public void shouldKeepOperationClaimsMultipleResource() throws Exception {
+    // ARRANGE
+    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(true);
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
+    SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
+    resourceSet.resources.put("FOO", new Semaphore(2));
+    resourceSet.resources.put("BAR", new Semaphore(4));
+
+    QueueEntry entry =
+        QueueEntry.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("resource:FOO").setValue("1"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("resource:BAR").setValue("2")))
+            .build();
+
+    // PRE-ASSERT
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(2);
+    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(4);
+
+    // ACT
+    boolean shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+
+    // ASSERT
+    // the worker accepts because the resource is available.
+    assertThat(shouldKeep).isTrue();
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(1);
+    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(2);
+
+    // ACT
+    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+
+    // ASSERT
+    // the worker accepts because the resource is available.
+    assertThat(shouldKeep).isTrue();
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
+    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(0);
+
+    // ACT
+    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+
+    // ASSERT
+    // the worker rejects because there are no resources left.
+    assertThat(shouldKeep).isFalse();
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
+    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(0);
+  }
+
+  // Function under test: shouldKeepOperation
+  // Reason for testing: the local resources should fail to claim, and the existing amount should be
+  // the same.
+  // Failure explanation: semaphore claim did not work as expected.
+  @Test
+  public void shouldKeepOperationFailsToClaimSameAmountRemains() throws Exception {
+    // ARRANGE
+    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(true);
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
+    SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
+    resourceSet.resources.put("FOO", new Semaphore(50));
+    resourceSet.resources.put("BAR", new Semaphore(100));
+    resourceSet.resources.put("BAZ", new Semaphore(200));
+
+    QueueEntry entry =
+        QueueEntry.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("resource:FOO").setValue("20"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("resource:BAR").setValue("101"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("resource:BAZ").setValue("20")))
+            .build();
+
+    // PRE-ASSERT
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(50);
+    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(100);
+    assertThat(resourceSet.resources.get("BAZ").availablePermits()).isEqualTo(200);
+
+    // ACT
+    boolean shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+
+    // ASSERT
+    // the worker rejects because there are no resources left.
+    // The same amount are returned.
+    assertThat(shouldKeep).isFalse();
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(50);
+    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(100);
+    assertThat(resourceSet.resources.get("BAZ").availablePermits()).isEqualTo(200);
   }
 }

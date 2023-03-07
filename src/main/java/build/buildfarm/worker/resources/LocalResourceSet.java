@@ -14,9 +14,9 @@
 
 package build.buildfarm.worker.resources;
 
-import java.util.concurrent.Semaphore;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Semaphore;
 
 /**
  * @class Local Resource Set
@@ -24,16 +24,14 @@ import java.util.HashMap;
  * @details We define limited resources as a counting semaphores whose configuration contains a name
  *     and a count representing a physical or logical group of units obtained by executors as a
  *     precondition to fulfill a long running operation. These units are released upon the
- *     operation's completion. The resource is requested by the action's platform properties.  These resources are specific to the individual worker.
+ *     operation's completion. The resource is requested by the action's platform properties. These
+ *     resources are specific to the individual worker.
  */
 public class LocalResourceSet {
-
   /**
    * @field resources
    * @brief A set containing resource semaphores organized by name.
    * @details Key is name, and value is current usage amount.
    */
-  public Map<String,Semaphore> resources = new HashMap<>();
-  
-  
+  public Map<String, Semaphore> resources = new HashMap<>();
 }

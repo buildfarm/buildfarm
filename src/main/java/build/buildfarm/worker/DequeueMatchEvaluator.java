@@ -14,21 +14,20 @@
 
 package build.buildfarm.worker;
 
-import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
-import org.jetbrains.annotations.NotNull;
+import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Semaphore;
-import java.util.AbstractMap;
 import org.apache.commons.lang3.StringUtils;
-import java.util.ArrayList;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @class DequeueMatchEvaluator
@@ -61,25 +60,10 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   public static boolean shouldKeepOperation(
-      SetMultimap<String, String> workerProvisions, LocalResourceSet resourceSet, QueueEntry queueEntry) {
+      SetMultimap<String, String> workerProvisions,
+      LocalResourceSet resourceSet,
+      QueueEntry queueEntry) {
     return shouldKeepViaPlatform(workerProvisions, resourceSet, queueEntry.getPlatform());
-  }
-
-  /**
-   * @brief Decide whether the worker should keep the operation or put it back on the queue.
-   * @details Compares the platform properties of the worker to the operation's platform properties.
-   * @param workerProvisions The provisions of the worker.
-   * @param resourceSet The limited resources that the worker has available.
-   * @param command A command to evaluate.
-   * @return Whether or not the worker should accept or reject the queue entry.
-   * @note Overloaded.
-   * @note Suggested return identifier: shouldKeepOperation.
-   */
-  @SuppressWarnings("NullableProblems")
-  @NotNull
-  public static boolean shouldKeepOperation(
-      SetMultimap<String, String> workerProvisions, LocalResourceSet resourceSet, Command command) {
-    return shouldKeepViaPlatform(workerProvisions, resourceSet, command.getPlatform());
   }
 
   /**
@@ -96,11 +80,13 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean shouldKeepViaPlatform(
-      SetMultimap<String, String> workerProvisions, LocalResourceSet resourceSet, Platform platform) {
+      SetMultimap<String, String> workerProvisions,
+      LocalResourceSet resourceSet,
+      Platform platform) {
     // attempt to execute everything the worker gets off the queue,
     // provided there is enough resources to do so.
     // this is a recommended configuration.
-    if (!allResourcesClaimed(platform,resourceSet)){
+    if (!allResourcesClaimed(platform, resourceSet)) {
       return false;
     }
     if (configs.getWorker().getDequeueMatchSettings().isAcceptEverything()) {
@@ -109,47 +95,43 @@ public class DequeueMatchEvaluator {
 
     return satisfiesProperties(workerProvisions, platform);
   }
-  
+
   private static boolean allResourcesClaimed(Platform platform, LocalResourceSet resourceSet) {
-    List<Map.Entry<String,Integer>> claimed = new ArrayList<>();
-    
+    List<Map.Entry<String, Integer>> claimed = new ArrayList<>();
+
     boolean allClaimed = true;
     for (Platform.Property property : platform.getPropertiesList()) {
-      
       // Skip properties that are not requesting a limited resource.
       String resourceName = getResourceName(property);
       Semaphore resource = resourceSet.resources.get(resourceName);
-      if (resource == null){
+      if (resource == null) {
         continue;
       }
-      
+
       // Attempt to claim.  If claiming fails, we must return all other claims.
       int requestAmount = getResourceRequestAmount(property);
       boolean wasAcquired = resource.tryAcquire(requestAmount);
-      if (wasAcquired){
-        claimed.add(new AbstractMap.SimpleEntry<>(resourceName,requestAmount));
-      }
-      else {
+      if (wasAcquired) {
+        claimed.add(new AbstractMap.SimpleEntry<>(resourceName, requestAmount));
+      } else {
         allClaimed = false;
         break;
       }
     }
-    
-    
+
     // cleanup remaining resources if they were not all claimed.
-    if (!allClaimed){
-      for (Map.Entry<String,Integer> claim: claimed){
+    if (!allClaimed) {
+      for (Map.Entry<String, Integer> claim : claimed) {
         resourceSet.resources.get(claim.getKey()).release(claim.getValue());
       }
     }
-    
+
     return allClaimed;
-    
   }
-  
+
   private static int getResourceRequestAmount(Platform.Property property) {
-    
-    // We support resource values that are not numbers and interpret them as a request for 1 resource.
+    // We support resource values that are not numbers and interpret them as a request for 1
+    // resource.
     // For example "gpu:RTX-4090" is equivalent to resource:gpu:1".
     try {
       return Integer.parseInt(property.getValue());
@@ -157,12 +139,12 @@ public class DequeueMatchEvaluator {
       return 1;
     }
   }
-  
+
   private static String getResourceName(Platform.Property property) {
     // We match to keys whether they are prefixed "resource:" or not.
     // "resource:gpu:1" requests the gpu resource in the same way that "gpu:1" does.
     // The prefix originates from bazel's syntax for the --extra_resources flag.
-    return StringUtils.removeStart(property.getName(),"resource:");
+    return StringUtils.removeStart(property.getName(), "resource:");
   }
 
   /**

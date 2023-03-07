@@ -44,7 +44,6 @@ import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.common.config.LimitedResource;
 import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
@@ -60,6 +59,7 @@ import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.ResourceDecider;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.annotations.VisibleForTesting;
@@ -275,12 +275,12 @@ class ShardWorkerContext implements WorkerContext {
 
   @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
-    
     QueueEntry queueEntry = takeEntryOffOperationQueue(listener);
-    decideWhetherToKeepOperation(queueEntry,listener);
+    decideWhetherToKeepOperation(queueEntry, listener);
   }
-  
-  private QueueEntry takeEntryOffOperationQueue(MatchListener listener) {
+
+  private QueueEntry takeEntryOffOperationQueue(MatchListener listener)
+      throws IOException, InterruptedException {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
     try {
@@ -301,9 +301,11 @@ class ShardWorkerContext implements WorkerContext {
       // transient backplane errors will propagate a null queueEntry
     }
     listener.onWaitEnd();
+    return queueEntry;
   }
-  
-  private void decideWhetherToKeepOperation(QueueEntry queueEntry, MatchListener listener) {
+
+  private void decideWhetherToKeepOperation(QueueEntry queueEntry, MatchListener listener)
+      throws IOException, InterruptedException {
     if (queueEntry == null
         || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, resourceSet, queueEntry)) {
       listener.onEntry(queueEntry);
