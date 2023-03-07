@@ -4,6 +4,7 @@ java_library(
         "*.java",
         "function/*.java",
         "io/*.java",
+        "net/*.java",
     ]),
     plugins = [":lombok"],
     visibility = ["//visibility:public"],
