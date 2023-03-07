@@ -70,6 +70,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.rpc.PreconditionFailure;
@@ -602,12 +603,15 @@ public class AbstractServerInstanceTest {
     ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
     AbstractServerInstance instance = new DummyServerInstance(contentAddressableStorage, null);
     RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
+    SettableFuture<Long> future = SettableFuture.create();
     Write write = mock(Write.class);
+    when(write.getFuture()).thenReturn(future);
 
     FeedbackOutputStream writeCompleteOutputStream =
         new FeedbackOutputStream() {
           @Override
           public void write(int n) throws WriteCompleteException {
+            future.set(contentDigest.getSizeBytes());
             throw new WriteCompleteException();
           }
 

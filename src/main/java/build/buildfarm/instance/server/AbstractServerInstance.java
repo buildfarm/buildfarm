@@ -135,6 +135,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -664,29 +665,51 @@ public abstract class AbstractServerInstance implements Instance {
     return fetchBlobUrls(urls.build(), expectedDigest, requestMetadata);
   }
 
+  private interface DigestWriteSupplier {
+    Write get(Digest digest) throws IOException;
+  }
+
+  private static class WriteFutureOutputStreamFactory implements ContentOutputStreamFactory {
+    private final Digest expectedDigest;
+    private final DigestWriteSupplier digestWriteSupplier;
+    private ListenableFuture<Digest> future = null;
+
+    WriteFutureOutputStreamFactory(Digest expectedDigest, DigestWriteSupplier digestWriteSupplier) {
+      this.expectedDigest = expectedDigest;
+      this.digestWriteSupplier = digestWriteSupplier;
+    }
+
+    @Override
+    public OutputStream create(long contentLength) throws IOException {
+      Digest actualDigest = expectedDigest.toBuilder().setSizeBytes(contentLength).build();
+      if (expectedDigest.getSizeBytes() >= 0
+          && expectedDigest.getSizeBytes() != contentLength) {
+        throw new DigestMismatchException(actualDigest, expectedDigest);
+      }
+      Write write = digestWriteSupplier.get(actualDigest);
+      future = transform(write.getFuture(), size -> actualDigest, directExecutor());
+      return write.getOutput(1, DAYS, () -> {});
+    }
+
+    ListenableFuture<Digest> getFuture() {
+      return checkNotNull(future);
+    }
+  }
+
   @VisibleForTesting
   ListenableFuture<Digest> fetchBlobUrls(
       Iterable<URL> urls, Digest expectedDigest, RequestMetadata requestMetadata) {
     for (URL url : urls) {
-      Digest.Builder actualDigestBuilder = expectedDigest.toBuilder();
+      WriteFutureOutputStreamFactory outputStreamFactory = new WriteFutureOutputStreamFactory(
+          expectedDigest,
+          digest -> getBlobWrite(Compressor.Value.IDENTITY, digest, UUID.randomUUID(), requestMetadata));
       try {
         // some minor abuse here, we want the download to set our built digest size as side effect
-        downloadUrl(
-            url,
-            contentLength -> {
-              Digest actualDigest = actualDigestBuilder.setSizeBytes(contentLength).build();
-              if (expectedDigest.getSizeBytes() >= 0
-                  && expectedDigest.getSizeBytes() != contentLength) {
-                throw new DigestMismatchException(actualDigest, expectedDigest);
-              }
-              return getBlobWrite(
-                      Compressor.Value.IDENTITY, actualDigest, UUID.randomUUID(), requestMetadata)
-                  .getOutput(1, DAYS, () -> {});
-            });
-        return immediateFuture(actualDigestBuilder.build());
+        downloadUrl(url, outputStreamFactory);
+        return outputStreamFactory.getFuture();
       } catch (Write.WriteCompleteException e) {
         log.log(Level.FINE, "write complete signaled", e);
-        return immediateFuture(actualDigestBuilder.build());
+        return outputStreamFactory.getFuture();
       } catch (Exception e) {
         log.log(Level.WARNING, "download attempt failed", e);
         // ignore?
