@@ -618,28 +618,35 @@ public abstract class AbstractServerInstance implements Instance {
   private static void downloadUrl(URL url, ContentOutputStreamFactory getContentOutputStream)
       throws IOException {
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-    // connect timeout?
-    // proxy?
-    // authenticator?
-    connection.setInstanceFollowRedirects(true);
-    // request timeout?
-    long contentLength = connection.getContentLengthLong();
-    int status = connection.getResponseCode();
+    try {
+      // connect timeout?
+      // proxy?
+      // authenticator?
+      connection.setInstanceFollowRedirects(true);
+      // request timeout?
+      long contentLength = connection.getContentLengthLong();
+      int status = connection.getResponseCode();
 
-    if (status != HttpURLConnection.HTTP_OK) {
-      String message = connection.getResponseMessage();
-      // per docs, returns null if no valid string can be discerned
-      // from the responses, i.e. invalid HTTP
-      if (message == null) {
-        message = "Invalid HTTP Response";
+      if (status != HttpURLConnection.HTTP_OK) {
+        String message = connection.getResponseMessage();
+        // per docs, returns null if no valid string can be discerned
+        // from the responses, i.e. invalid HTTP
+        if (message == null) {
+          message = "Invalid HTTP Response";
+        }
+        message = "Download Failed: " + message + " from " + url;
+        throw new IOException(message);
       }
-      message = "Download Failed: " + message + " from " + url;
-      throw new IOException(message);
-    }
 
-    try (InputStream in = connection.getInputStream();
-        OutputStream out = getContentOutputStream.create(contentLength)) {
-      ByteStreams.copy(in, out);
+      try (InputStream in = connection.getInputStream();
+          OutputStream out = getContentOutputStream.create(contentLength)) {
+        long len = ByteStreams.copy(in, out);
+        if (len != contentLength) {
+          throw new IOException(format("http download was truncated: %d != expected %d", len, contentLength));
+        }
+      }
+    } finally {
+      connection.disconnect();
     }
   }
 
@@ -678,6 +685,7 @@ public abstract class AbstractServerInstance implements Instance {
             });
         return immediateFuture(actualDigestBuilder.build());
       } catch (Write.WriteCompleteException e) {
+        log.log(Level.FINE, "write complete signaled", e);
         return immediateFuture(actualDigestBuilder.build());
       } catch (Exception e) {
         log.log(Level.WARNING, "download attempt failed", e);
