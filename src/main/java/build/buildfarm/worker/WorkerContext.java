@@ -130,4 +130,6 @@ public interface WorkerContext {
   int commandExecutionClaims(Command command);
 
   ResourceLimits commandExecutionSettings(Command command);
+
+  public void returnLocalResources(QueueEntry queueEntry);
 }

@@ -19,14 +19,9 @@ import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.resources.LocalResourceSet;
+import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Semaphore;
-import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -86,7 +81,7 @@ public class DequeueMatchEvaluator {
     // attempt to execute everything the worker gets off the queue,
     // provided there is enough resources to do so.
     // this is a recommended configuration.
-    if (!allResourcesClaimed(platform, resourceSet)) {
+    if (!LocalResourceSetUtils.claimResources(platform, resourceSet)) {
       return false;
     }
     if (configs.getWorker().getDequeueMatchSettings().isAcceptEverything()) {
@@ -94,57 +89,6 @@ public class DequeueMatchEvaluator {
     }
 
     return satisfiesProperties(workerProvisions, platform);
-  }
-
-  private static boolean allResourcesClaimed(Platform platform, LocalResourceSet resourceSet) {
-    List<Map.Entry<String, Integer>> claimed = new ArrayList<>();
-
-    boolean allClaimed = true;
-    for (Platform.Property property : platform.getPropertiesList()) {
-      // Skip properties that are not requesting a limited resource.
-      String resourceName = getResourceName(property);
-      Semaphore resource = resourceSet.resources.get(resourceName);
-      if (resource == null) {
-        continue;
-      }
-
-      // Attempt to claim.  If claiming fails, we must return all other claims.
-      int requestAmount = getResourceRequestAmount(property);
-      boolean wasAcquired = resource.tryAcquire(requestAmount);
-      if (wasAcquired) {
-        claimed.add(new AbstractMap.SimpleEntry<>(resourceName, requestAmount));
-      } else {
-        allClaimed = false;
-        break;
-      }
-    }
-
-    // cleanup remaining resources if they were not all claimed.
-    if (!allClaimed) {
-      for (Map.Entry<String, Integer> claim : claimed) {
-        resourceSet.resources.get(claim.getKey()).release(claim.getValue());
-      }
-    }
-
-    return allClaimed;
-  }
-
-  private static int getResourceRequestAmount(Platform.Property property) {
-    // We support resource values that are not numbers and interpret them as a request for 1
-    // resource.
-    // For example "gpu:RTX-4090" is equivalent to resource:gpu:1".
-    try {
-      return Integer.parseInt(property.getValue());
-    } catch (NumberFormatException e) {
-      return 1;
-    }
-  }
-
-  private static String getResourceName(Platform.Property property) {
-    // We match to keys whether they are prefixed "resource:" or not.
-    // "resource:gpu:1" requests the gpu resource in the same way that "gpu:1" does.
-    // The prefix originates from bazel's syntax for the --extra_resources flag.
-    return StringUtils.removeStart(property.getName(), "resource:");
   }
 
   /**

@@ -60,6 +60,7 @@ import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
 import build.buildfarm.worker.resources.LocalResourceSet;
+import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import build.buildfarm.worker.resources.ResourceDecider;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.annotations.VisibleForTesting;
@@ -315,6 +316,11 @@ class ShardWorkerContext implements WorkerContext {
     if (Thread.interrupted()) {
       throw new InterruptedException();
     }
+  }
+
+  @Override
+  public void returnLocalResources(QueueEntry queueEntry) {
+    LocalResourceSetUtils.releaseClaims(queueEntry.getPlatform(), resourceSet);
   }
 
   @Override
