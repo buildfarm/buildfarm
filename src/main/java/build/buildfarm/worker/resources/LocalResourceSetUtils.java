@@ -15,7 +15,7 @@
 package build.buildfarm.worker.resources;
 
 import build.bazel.remote.execution.v2.Platform;
-import io.prometheus.client.Gauge;
+import build.buildfarm.common.config.LimitedResource;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,19 +29,16 @@ import org.apache.commons.lang3.StringUtils;
  * @details The methods help with allocation / de-allocation of claims, as well as metrics printing.
  */
 public class LocalResourceSetUtils {
-  private static final Gauge resourceUsageMetric =
-      Gauge.build()
-          .name("local_resource_usage")
-          .labelNames("resource_name")
-          .help("The number of claims for each resource currently being used for execution")
-          .register();
+  private static final LocalResourceSetMetrics metrics = new LocalResourceSetMetrics();
 
-  private static final Gauge requestersMetric =
-      Gauge.build()
-          .name("local_resource_requesters")
-          .help(
-              "Tracks how many actions have requested local resources.  This can help determine if resources are being hogged by some actions.")
-          .register();
+  public LocalResourceSet create(List<LimitedResource> resources) {
+    LocalResourceSet resourceSet = new LocalResourceSet();
+    for (LimitedResource resource : resources) {
+      resourceSet.resources.put(resource.getName(), new Semaphore(resource.getAmount()));
+      metrics.resourceTotalMetric.labels(resource.getName()).set(resource.getAmount());
+    }
+    return resourceSet;
+  }
 
   public static boolean claimResources(Platform platform, LocalResourceSet resourceSet) {
     List<Map.Entry<String, Integer>> claimed = new ArrayList<>();
@@ -92,22 +89,21 @@ public class LocalResourceSetUtils {
   private static boolean semaphoreAquire(Semaphore resource, String resourceName, int amount) {
     boolean wasAcquired = resource.tryAcquire(amount);
     if (wasAcquired) {
-      resourceUsageMetric.labels(resourceName).inc(amount);
+      metrics.resourceUsageMetric.labels(resourceName).inc(amount);
     }
-    requestersMetric.inc();
+    metrics.requestersMetric.labels(resourceName).inc();
     return wasAcquired;
   }
 
   private static void semaphoreRelease(Semaphore resource, String resourceName, int amount) {
     resource.release(amount);
-    resourceUsageMetric.labels(resourceName).dec(amount);
-    requestersMetric.dec();
+    metrics.resourceUsageMetric.labels(resourceName).dec(amount);
+    metrics.requestersMetric.labels(resourceName).dec();
   }
 
   private static int getResourceRequestAmount(Platform.Property property) {
     // We support resource values that are not numbers and interpret them as a request for 1
-    // resource.
-    // For example "gpu:RTX-4090" is equivalent to resource:gpu:1".
+    // resource.  For example "gpu:RTX-4090" is equivalent to resource:gpu:1".
     try {
       return Integer.parseInt(property.getValue());
     } catch (NumberFormatException e) {
