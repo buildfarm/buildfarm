@@ -57,6 +57,7 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.resources.LocalResourceSet;
+import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -594,7 +595,7 @@ public class Worker {
             configs.getWorker().isOnlyMulticoreTests(),
             configs.getWorker().isAllowBringYourOwnContainer(),
             configs.getWorker().isErrorOperationRemainingResources(),
-            createLocalResourceSet(configs.getWorker().getResources()),
+            LocalResourceSetUtils.create(configs.getWorker().getResources()),
             writer);
 
     pipeline = new Pipeline();

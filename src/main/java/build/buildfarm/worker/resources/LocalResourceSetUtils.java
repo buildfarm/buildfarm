@@ -31,7 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 public class LocalResourceSetUtils {
   private static final LocalResourceSetMetrics metrics = new LocalResourceSetMetrics();
 
-  public LocalResourceSet create(List<LimitedResource> resources) {
+  public static LocalResourceSet create(List<LimitedResource> resources) {
     LocalResourceSet resourceSet = new LocalResourceSet();
     for (LimitedResource resource : resources) {
       resourceSet.resources.put(resource.getName(), new Semaphore(resource.getAmount()));
