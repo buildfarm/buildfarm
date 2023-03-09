@@ -616,27 +616,42 @@ public abstract class AbstractServerInstance implements Instance {
     OutputStream create(long contentLength) throws IOException;
   }
 
+  private static void validateDownloadConnection(HttpURLConnection connection, URL url) throws IOException {
+    // connect timeout?
+    // proxy?
+    // authenticator?
+    connection.setInstanceFollowRedirects(true);
+    // request timeout?
+
+    int status = connection.getResponseCode();
+
+    if (status != HttpURLConnection.HTTP_OK) {
+      String message = connection.getResponseMessage();
+      // per docs, returns null if no valid string can be discerned
+      // from the responses, i.e. invalid HTTP
+      if (message == null) {
+        message = "Invalid HTTP Response";
+      }
+      message = "Download Failed: " + message + " from " + url;
+      throw new IOException(message);
+    }
+  }
+
   private static void downloadUrl(URL url, ContentOutputStreamFactory getContentOutputStream)
       throws IOException {
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
     try {
-      // connect timeout?
-      // proxy?
-      // authenticator?
-      connection.setInstanceFollowRedirects(true);
-      // request timeout?
-      long contentLength = connection.getContentLengthLong();
-      int status = connection.getResponseCode();
+      validateDownloadConnection(connection, url);
 
-      if (status != HttpURLConnection.HTTP_OK) {
-        String message = connection.getResponseMessage();
-        // per docs, returns null if no valid string can be discerned
-        // from the responses, i.e. invalid HTTP
-        if (message == null) {
-          message = "Invalid HTTP Response";
+      // exhaust input stream to determine size for non-content-length-reporting server
+      long contentLength = connection.getContentLengthLong();
+      if (contentLength == -1) {
+        try (InputStream in = connection.getInputStream()) {
+          contentLength = ByteStreams.exhaust(in);
         }
-        message = "Download Failed: " + message + " from " + url;
-        throw new IOException(message);
+        connection.disconnect();
+        connection = (HttpURLConnection) url.openConnection();
+        validateDownloadConnection(connection, url);
       }
 
       try (InputStream in = connection.getInputStream();
