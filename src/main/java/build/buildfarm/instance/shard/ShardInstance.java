@@ -100,6 +100,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.io.BaseEncoding;
@@ -641,6 +642,7 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFuture(nonEmptyDigests);
     }
 
+    // needs a container/context object for all of the progressive state
     SettableFuture<Iterable<Digest>> missingDigestsFuture = SettableFuture.create();
     findMissingBlobsOnWorker(
         UUID.randomUUID().toString(),
@@ -650,6 +652,7 @@ public class ShardInstance extends AbstractServerInstance {
         Iterables.size(nonEmptyDigests),
         Context.current().fixedContextExecutor(directExecutor()),
         missingDigestsFuture,
+        ImmutableList.builder(),
         requestMetadata);
     return missingDigestsFuture;
   }
@@ -669,6 +672,21 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
+  private static Iterable<Digest> filterPopulated(Iterable<Digest> missingOrPopulated, Set<String> hashes, ImmutableList.Builder<Digest> populated) {
+    if (hashes.isEmpty()) {
+      return missingOrPopulated;
+    }
+    ImmutableList.Builder<Digest> missing = ImmutableList.builder();
+    for (Digest digest : missingOrPopulated) {
+      if (hashes.contains(digest.getHash())) {
+        populated.add(digest);
+      } else {
+        missing.add(digest);
+      }
+    }
+    return missing.build();
+  }
+
   private void findMissingBlobsOnWorker(
       String requestId,
       Iterable<Digest> blobDigests,
@@ -677,19 +695,25 @@ public class ShardInstance extends AbstractServerInstance {
       int originalSize,
       Executor executor,
       SettableFuture<Iterable<Digest>> missingDigestsFuture,
+      ImmutableList.Builder<Digest> populatedDigests,
       RequestMetadata requestMetadata) {
     String worker = workers.removeFirst();
     ListenableFuture<Iterable<Digest>> workerMissingBlobsFuture =
         workerStub(worker).findMissingBlobs(blobDigests, requestMetadata);
+    Set<String> unknownSize = ImmutableSet.copyOf(
+        Iterables.transform(
+            Iterables.filter(blobDigests, digest -> digest.getSizeBytes() == -1),
+            digest -> digest.getHash()));
 
     Stopwatch stopwatch = Stopwatch.createStarted();
     addCallback(
         workerMissingBlobsFuture,
         new FutureCallback<Iterable<Digest>>() {
           @Override
-          public void onSuccess(Iterable<Digest> missingDigests) {
+          public void onSuccess(Iterable<Digest> missingOrPopulated) {
+            Iterable<Digest> missingDigests = filterPopulated(missingOrPopulated, unknownSize, populatedDigests);
             if (Iterables.isEmpty(missingDigests) || workers.isEmpty()) {
-              missingDigestsFuture.set(missingDigests);
+              missingDigestsFuture.set(Iterables.concat(missingDigests, populatedDigests.build()));
             } else {
               responses.add(
                   new FindMissingResponseEntry(
@@ -705,6 +729,7 @@ public class ShardInstance extends AbstractServerInstance {
                   originalSize,
                   executor,
                   missingDigestsFuture,
+                  populatedDigests,
                   requestMetadata);
             }
           }
@@ -753,6 +778,7 @@ public class ShardInstance extends AbstractServerInstance {
                     originalSize,
                     executor,
                     missingDigestsFuture,
+                    populatedDigests,
                     requestMetadata);
               }
             }
