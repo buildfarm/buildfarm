@@ -39,7 +39,6 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.config.GrpcMetrics;
-import build.buildfarm.common.config.LimitedResource;
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
@@ -56,7 +55,6 @@ import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
-import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
@@ -84,7 +82,6 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
@@ -626,14 +623,6 @@ public class Worker {
     inputFetchSlotsTotal.set(configs.getWorker().getInputFetchStageWidth());
 
     log.log(INFO, String.format("%s initialized", identifier));
-  }
-
-  private LocalResourceSet createLocalResourceSet(List<LimitedResource> resources) {
-    LocalResourceSet resourceSet = new LocalResourceSet();
-    for (LimitedResource resource : resources) {
-      resourceSet.resources.put(resource.getName(), new Semaphore(resource.getAmount()));
-    }
-    return resourceSet;
   }
 
   @PreDestroy
