@@ -38,6 +38,8 @@ public class Worker {
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
   private ExecutionPolicy[] executionPolicies = {};
+  
+  // These limited resources are specific to the individual worker.
   private List<LimitedResource> resources = new ArrayList<>();
 
   public String getPublicName() {

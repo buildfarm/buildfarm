@@ -45,6 +45,8 @@ public class Backplane {
   private String[] redisNodes = {};
   private int maxAttempts = 20;
   private boolean cacheCas = false;
+  
+  // These limited resources are shared across all workers.
   private List<LimitedResource> resources = new ArrayList<>();
 
   public String getRedisUri() {
