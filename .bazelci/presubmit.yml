@@ -150,7 +150,6 @@ tasks:
     shell_commands:
     - export CACHE_TEST=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_double_test.sh
-    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
     - export TEST_ARG1=--experimental_remote_grpc_log='./grpc.log'
     - export TEST_ARG2=--experimental_remote_grpc_log='./grpc2.log'
     - export SHA1_TOOLS_REMOTE=9969ed6911aea04f7e896cd3958ea933547f933c
