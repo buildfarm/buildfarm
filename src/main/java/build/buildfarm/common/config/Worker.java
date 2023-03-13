@@ -39,6 +39,7 @@ public class Worker {
   private ExecutionPolicy[] executionPolicies = {};
   // These limited resources are specific to the individual worker.
   private List<LimitedResource> resources = new ArrayList<>();
+  private SandboxSettings sandboxSettings = new SandboxSettings();
 
   public ExecutionPolicy[] getExecutionPolicies() {
     if (executionPolicies != null) {

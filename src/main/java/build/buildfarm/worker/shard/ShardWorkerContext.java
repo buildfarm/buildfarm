@@ -840,7 +840,8 @@ class ShardWorkerContext implements WorkerContext {
         onlyMulticoreTests,
         limitGlobalExecution,
         getExecuteStageWidth(),
-        allowBringYourOwnContainer);
+        allowBringYourOwnContainer,
+        configs.getWorker().getSandboxSettings());
   }
 
   @Override
