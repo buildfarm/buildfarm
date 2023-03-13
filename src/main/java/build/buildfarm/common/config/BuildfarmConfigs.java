@@ -1,14 +1,19 @@
 package build.buildfarm.common.config;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.ExecutionProperties;
+import build.buildfarm.common.ExecutionWrapperProperties;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import javax.naming.ConfigurationException;
@@ -21,6 +26,8 @@ import org.yaml.snakeyaml.constructor.Constructor;
 @Log
 public final class BuildfarmConfigs {
   private static BuildfarmConfigs buildfarmConfigs;
+
+  private static final long DEFAULT_CAS_SIZE = 2147483648L; // 2 * 1024 * 1024 * 1024
 
   private DigestUtil.HashFunction digestFunction = DigestUtil.HashFunction.SHA256;
   private long defaultActionTimeout = 600;
@@ -54,7 +61,8 @@ public final class BuildfarmConfigs {
     OptionsParser parser = getOptionsParser(ServerOptions.class, args);
     ServerOptions options = parser.getOptions(ServerOptions.class);
     try {
-      buildfarmConfigs = BuildfarmConfigs.loadConfigs(getConfigurationPath(parser));
+      buildfarmConfigs = loadConfigs(getConfigurationPath(parser));
+      adjustServerConfigs(buildfarmConfigs);
     } catch (IOException e) {
       log.severe("Could not parse yml configuration file." + e);
       throw new RuntimeException(e);
@@ -72,7 +80,8 @@ public final class BuildfarmConfigs {
     OptionsParser parser = getOptionsParser(ShardWorkerOptions.class, args);
     ShardWorkerOptions options = parser.getOptions(ShardWorkerOptions.class);
     try {
-      buildfarmConfigs = BuildfarmConfigs.loadConfigs(getConfigurationPath(parser));
+      buildfarmConfigs = loadConfigs(getConfigurationPath(parser));
+      adjustWorkerConfigs(buildfarmConfigs);
     } catch (IOException e) {
       log.severe("Could not parse yml configuration file." + e);
       throw new RuntimeException(e);
@@ -111,5 +120,170 @@ public final class BuildfarmConfigs {
     }
 
     return Paths.get(residue.get(0));
+  }
+
+  private static void adjustServerConfigs(BuildfarmConfigs configs) {
+    adjustPublicName(configs.getServer().getPublicName(), configs.getServer().getPort());
+    adjustRedisUri(configs);
+  }
+
+  private static void adjustWorkerConfigs(BuildfarmConfigs configs) {
+    adjustPublicName(configs.getWorker().getPublicName(), configs.getWorker().getPort());
+    adjustRedisUri(configs);
+
+    // Automatically set disk space to 90% of available space on the worker volume.
+    // User configured value in .yaml will always take presedence.
+    for (Cas storage : configs.getWorker().getStorages()) {
+      deriveCasStorage(storage);
+    }
+
+    adjustExecuteStageWidth(configs);
+    adjustInputFetchStageWidth(configs);
+
+    checkExecutionWrapperAvailability(configs);
+  }
+
+  private static void adjustExecuteStageWidth(BuildfarmConfigs configs) {
+    if (!Strings.isNullOrEmpty(System.getenv("EXECUTION_STAGE_WIDTH"))) {
+      configs
+          .getWorker()
+          .setExecuteStageWidth(Integer.parseInt(System.getenv("EXECUTION_STAGE_WIDTH")));
+      log.info(
+          String.format(
+              "executeStageWidth overwritten to %d", configs.getWorker().getExecuteStageWidth()));
+      return;
+    }
+
+    if (configs.getWorker().getExecuteStageWidth() == 0) {
+      configs
+          .getWorker()
+          .setExecuteStageWidth(
+              Math.max(
+                  1,
+                  Runtime.getRuntime().availableProcessors()
+                      - configs.getWorker().getExecuteStageWidthOffset()));
+      log.info(
+          String.format(
+              "executeStageWidth modified to %d", configs.getWorker().getExecuteStageWidth()));
+    }
+  }
+
+  private static void adjustInputFetchStageWidth(BuildfarmConfigs configs) {
+    if (configs.getWorker().getInputFetchStageWidth() == 0) {
+      configs
+          .getWorker()
+          .setInputFetchStageWidth(Math.max(1, configs.getWorker().getExecuteStageWidth() / 5));
+      log.info(
+          String.format(
+              "executeInputFetchWidth modified to %d",
+              configs.getWorker().getInputFetchStageWidth()));
+    }
+  }
+
+  private static void adjustPublicName(String publicName, int port) {
+    // use configured value
+    if (!Strings.isNullOrEmpty(publicName)) {
+      return;
+    }
+
+    // use environment override (useful for containerized deployment)
+    if (!Strings.isNullOrEmpty(System.getenv("INSTANCE_NAME"))) {
+      publicName = System.getenv("INSTANCE_NAME");
+      log.info(String.format("publicName overwritten to %s", publicName));
+      return;
+    }
+
+    // derive a value
+    if (Strings.isNullOrEmpty(publicName)) {
+      try {
+        publicName = InetAddress.getLocalHost().getHostAddress() + ":" + port;
+        log.info(String.format("publicName derived to %s", publicName));
+      } catch (Exception e) {
+        log.severe("publicName could not be derived:" + e);
+      }
+    }
+  }
+
+  private static void adjustRedisUri(BuildfarmConfigs configs) {
+    // use environment override (useful for containerized deployment)
+    if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
+      configs.getBackplane().setRedisUri(System.getenv("REDIS_URI"));
+      log.info(String.format("RedisUri modified to %s", configs.getBackplane().getRedisUri()));
+    }
+  }
+
+  private static void deriveCasStorage(Cas storage) {
+    if (storage.getMaxSizeBytes() == 0) {
+      try {
+        storage.setMaxSizeBytes(
+            (long)
+                (BuildfarmConfigs.getInstance().getWorker().getValidRoot().toFile().getTotalSpace()
+                    * 0.9));
+      } catch (Exception e) {
+        storage.setMaxSizeBytes(DEFAULT_CAS_SIZE);
+      }
+      log.info(String.format("CAS size changed to %d", storage.getMaxSizeBytes()));
+    }
+  }
+
+  private static ExecutionWrapperProperties createExecutionWrapperProperties(
+      BuildfarmConfigs configs) {
+    // Create a mapping from the execution wrappers to the features they enable.
+    ExecutionWrapperProperties wrapperProperties = new ExecutionWrapperProperties();
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getCgroups())),
+        new ArrayList<String>(
+            Arrays.asList(
+                "limit_execution",
+                ExecutionProperties.CORES,
+                ExecutionProperties.MIN_CORES,
+                ExecutionProperties.MAX_CORES,
+                ExecutionProperties.MIN_MEM,
+                ExecutionProperties.MAX_MEM)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getLinuxSandbox())),
+        new ArrayList<String>(
+            Arrays.asList(
+                ExecutionProperties.LINUX_SANDBOX,
+                ExecutionProperties.BLOCK_NETWORK,
+                ExecutionProperties.TMPFS)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getAsNobody())),
+        new ArrayList<String>(Arrays.asList(ExecutionProperties.AS_NOBODY)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getProcessWrapper())),
+        new ArrayList<String>(Arrays.asList(ExecutionProperties.PROCESS_WRAPPER)));
+
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(
+            Arrays.asList(
+                configs.getExecutionWrappers().getSkipSleep(),
+                configs.getExecutionWrappers().getSkipSleepPreload(),
+                configs.getExecutionWrappers().getDelay())),
+        new ArrayList<String>(
+            Arrays.asList(ExecutionProperties.SKIP_SLEEP, ExecutionProperties.TIME_SHIFT)));
+
+    return wrapperProperties;
+  }
+
+  private static void checkExecutionWrapperAvailability(BuildfarmConfigs configs) {
+    ExecutionWrapperProperties wrapperProperties = createExecutionWrapperProperties(configs);
+
+    // Find missing tools, and warn the user that missing tools mean missing features.
+    wrapperProperties.mapping.forEach(
+        (tools, features) ->
+            tools.forEach(
+                (tool) -> {
+                  if (Files.notExists(Paths.get(tool))) {
+                    String message =
+                        String.format(
+                            "the execution wrapper %s is missing and therefore the following features will not be available: %s",
+                            tool, String.join(", ", features));
+                    log.warning(message);
+                  }
+                }));
   }
 }
