@@ -24,6 +24,7 @@ import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import redis.clients.jedis.JedisCluster;
 
 /**
@@ -47,6 +48,14 @@ public class OperationQueue {
    * @details The appropriate queues are chosen based on given properties.
    */
   private final List<ProvisionedRedisQueue> queues;
+
+  /**
+   * @field currentDequeueIndex
+   * @brief The current queue index to dequeue from.
+   * @details Used in a round-robin fashion to ensure an even distribution of dequeues across
+   *     matched queues.
+   */
+  private int currentDequeueIndex = 0;
 
   /**
    * @brief Constructor.
@@ -186,8 +195,18 @@ public class OperationQueue {
    */
   public String dequeue(JedisCluster jedis, List<Platform.Property> provisions)
       throws InterruptedException {
-    BalancedRedisQueue queue = chooseEligibleQueue(provisions);
-    return queue.dequeue(jedis);
+    // Select all matched queues, and attempt dequeuing via round-robin.
+    List<BalancedRedisQueue> queues = chooseEligibleQueues(provisions);
+    int index = roundRobinPopIndex(queues);
+    String value = queues.get(index).nonBlockingDequeue(jedis);
+
+    // Keep iterating over matched queues until we find one that is non-empty and provides a
+    // dequeued value.
+    while (value == null) {
+      index = roundRobinPopIndex(queues);
+      value = queues.get(index).nonBlockingDequeue(jedis);
+    }
+    return value;
   }
 
   /**
@@ -270,6 +289,39 @@ public class OperationQueue {
       }
     }
 
+    throwNoEligibleQueueException(provisions);
+    return null;
+  }
+
+  /**
+   * @brief Choose an eligible queues based on given properties.
+   * @details We use the platform execution properties of a queue entry to determine the appropriate
+   *     queues. If there no eligible queues, an exception is thrown.
+   * @param provisions Provisions to check that requirements are met.
+   * @return The chosen queues.
+   * @note Suggested return identifier: queues.
+   */
+  private List<BalancedRedisQueue> chooseEligibleQueues(List<Platform.Property> provisions) {
+    List<BalancedRedisQueue> eligibleQueues =
+        queues.stream()
+            .filter(provisionedQueue -> provisionedQueue.isEligible(toMultimap(provisions)))
+            .map(provisionedQueue -> provisionedQueue.queue())
+            .collect(Collectors.toList());
+
+    if (eligibleQueues.isEmpty()) {
+      throwNoEligibleQueueException(provisions);
+    }
+
+    return eligibleQueues;
+  }
+
+  /**
+   * @brief Throw an exception that explains why there are no eligible queues.
+   * @details This function should only be called, when there were no matched queues.
+   * @param provisions Provisions to check that requirements are met.
+   * @return no return.
+   */
+  private void throwNoEligibleQueueException(List<Platform.Property> provisions) {
     // At this point, we were unable to match an action to an eligible queue.
     // We will build an error explaining why the matching failed. This will help user's properly
     // configure their queue or adjust the execution_properties of their actions.
@@ -284,6 +336,34 @@ public class OperationQueue {
             + " One solution to is to configure a provision queue with no requirements which would be eligible to all operations."
             + " See https://github.com/bazelbuild/bazel-buildfarm/wiki/Shard-Platform-Operation-Queue for details. "
             + eligibilityResults);
+  }
+
+  /**
+   * @brief Get the current queue index for round-robin dequeues.
+   * @details Adjusts the round-robin index for next call.
+   * @param matchedQueues The queues to round robin.
+   * @return The current round-robin index.
+   * @note Suggested return identifier: queueIndex.
+   */
+  private int roundRobinPopIndex(List<BalancedRedisQueue> matchedQueues) {
+    int currentIndex = currentDequeueIndex;
+    currentDequeueIndex = nextQueueInRoundRobin(currentDequeueIndex, matchedQueues);
+    return currentIndex;
+  }
+
+  /**
+   * @brief Get the next queue in the round robin.
+   * @details If we are currently on the last queue it becomes the first queue.
+   * @param index Current queue index.
+   * @param matchedQueues The queues to round robin.
+   * @return And adjusted val based on the current queue index.
+   * @note Suggested return identifier: adjustedCurrentQueue.
+   */
+  private int nextQueueInRoundRobin(int index, List<BalancedRedisQueue> matchedQueues) {
+    if (index >= matchedQueues.size() - 1) {
+      return 0;
+    }
+    return index + 1;
   }
 
   /**

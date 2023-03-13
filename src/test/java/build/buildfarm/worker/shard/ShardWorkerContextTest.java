@@ -34,6 +34,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Duration;
 import java.util.ArrayList;
@@ -104,6 +105,7 @@ public class ShardWorkerContextTest {
         /* onlyMulticoreTests=*/ false,
         /* allowBringYourOwnContainer=*/ false,
         /* errorOperationRemainingResources=*/ false,
+        /* resourceSet=*/ new LocalResourceSet(),
         writer);
   }
 

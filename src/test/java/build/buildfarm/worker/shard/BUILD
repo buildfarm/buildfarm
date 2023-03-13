@@ -11,6 +11,7 @@ java_test(
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/worker",
+        "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/java/build/buildfarm/worker/shard",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",

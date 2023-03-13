@@ -6,6 +6,7 @@ import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import javax.naming.ConfigurationException;
@@ -37,6 +38,8 @@ public class Worker {
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
   private ExecutionPolicy[] executionPolicies = {};
+  // These limited resources are specific to the individual worker.
+  private List<LimitedResource> resources = new ArrayList<>();
 
   public String getPublicName() {
     // use environment override (useful for containerized deployment)

@@ -1,6 +1,8 @@
 package build.buildfarm.common.config;
 
 import com.google.common.base.Strings;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -44,8 +46,10 @@ public class Backplane {
   private int maxAttempts = 20;
   private boolean cacheCas = false;
 
-  public String getRedisUri() {
+  // These limited resources are shared across all workers.
+  private List<LimitedResource> resources = new ArrayList<>();
 
+  public String getRedisUri() {
     // use environment override (useful for containerized deployment)
     if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
       return System.getenv("REDIS_URI");
