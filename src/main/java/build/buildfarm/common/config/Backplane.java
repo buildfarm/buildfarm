@@ -1,6 +1,5 @@
 package build.buildfarm.common.config;
 
-import com.google.common.base.Strings;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Data;
@@ -48,5 +47,4 @@ public class Backplane {
 
   // These limited resources are shared across all workers.
   private List<LimitedResource> resources = new ArrayList<>();
-
 }
