@@ -37,6 +37,8 @@ public class Server {
   private String clusterId = "";
   private String cloudRegion;
   private String publicName;
+  private int maxInboundMessageSizeBytes = 0;
+  private int maxInboundMetadataSize = 0;
 
   public String getSession() {
     return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);

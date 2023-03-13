@@ -123,6 +123,13 @@ public class BuildFarmServer {
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .intercept(headersInterceptor);
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getServer().getGrpcMetrics());
+
+    if (configs.getServer().getMaxInboundMessageSizeBytes() != 0) {
+      serverBuilder.maxInboundMessageSize(configs.getServer().getMaxInboundMessageSizeBytes());
+    }
+    if (configs.getServer().getMaxInboundMetadataSize() != 0) {
+      serverBuilder.maxInboundMetadataSize(configs.getServer().getMaxInboundMetadataSize());
+    }
     server = serverBuilder.build();
 
     log.info(String.format("%s initialized", configs.getServer().getSession()));
