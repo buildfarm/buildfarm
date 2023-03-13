@@ -188,6 +188,10 @@ Counter showing service restarts
 
 Total size of the worker's CAS in bytes
 
+**cas_ttl**
+
+Histogram for amount of time CAS entries live on L1 storage before expiration (milliseconds)
+
 **cas_entry_count**
 
 The total number of entries in the worker's CAS

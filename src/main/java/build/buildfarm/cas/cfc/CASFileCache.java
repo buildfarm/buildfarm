@@ -60,7 +60,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.common.ZstdDecompressingOutputStream;
-import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.io.CountingOutputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -89,6 +89,7 @@ import io.grpc.Deadline;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
+import io.prometheus.client.Histogram;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -105,6 +106,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -138,6 +140,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Gauge.build().name("cas_size").help("CAS size.").register();
   private static final Gauge casEntryCountMetric =
       Gauge.build().name("cas_entry_count").help("Number of entries in the CAS.").register();
+  private static Histogram casTtl;
 
   private static final Gauge casCopyFallbackMetric =
       Gauge.build()
@@ -148,11 +151,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
-  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final Path root;
   private final EntryPathStrategy entryPathStrategy;
   private final long maxSizeInBytes;
   private final long maxEntrySizeInBytes;
+  private final boolean publishTtlMetric;
+  private final boolean execRootFallback;
   private final DigestUtil digestUtil;
   private final ConcurrentMap<String, Entry> storage;
   private final Consumer<Digest> onPut;
@@ -273,19 +277,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   public CASFileCache(
       Path root,
-      long maxSizeInBytes,
+      Cas config,
       long maxEntrySizeInBytes,
-      int hexBucketLevels,
-      boolean storeFileDirsIndexInMemory,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder) {
     this(
         root,
-        maxSizeInBytes,
+        config.getMaxSizeBytes(),
         maxEntrySizeInBytes,
-        hexBucketLevels,
-        storeFileDirsIndexInMemory,
+        config.getHexBucketLevels(),
+        config.isFileDirectoriesIndexInMemory(),
+        config.isPublishTtlMetric(),
+        config.isExecRootCopyFallback(),
         digestUtil,
         expireService,
         accessRecorder,
@@ -303,6 +307,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       long maxEntrySizeInBytes,
       int hexBucketLevels,
       boolean storeFileDirsIndexInMemory,
+      boolean publishTtlMetric,
+      boolean execRootFallback,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder,
@@ -315,6 +321,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.root = root;
     this.maxSizeInBytes = maxSizeInBytes;
     this.maxEntrySizeInBytes = maxEntrySizeInBytes;
+    this.publishTtlMetric = publishTtlMetric;
+    this.execRootFallback = execRootFallback;
     this.digestUtil = digestUtil;
     this.expireService = expireService;
     this.accessRecorder = accessRecorder;
@@ -324,6 +332,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.delegate = delegate;
     this.delegateSkipLoad = delegateSkipLoad;
     this.directoriesIndexDbName = directoriesIndexDbName;
+
+    if (publishTtlMetric) {
+      casTtl =
+          Histogram.build()
+              .name("cas_ttl_ms")
+              .help(
+                  "The amount of time CAS entries live on L1 storage before expiration (milliseconds)")
+              .register();
+    }
 
     entryPathStrategy = new HexBucketEntryPathStrategy(root, hexBucketLevels);
 
@@ -1988,7 +2005,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     } catch (IOException e) {
       // propagate the exception if we do not want to perform the fallback strategy.
       // The client should expect a failed action with an explanation of 'Too many links...`.
-      if (!configs.getWorker().getStorages().get(0).isExecRootCopyFallback()) {
+      if (!execRootFallback) {
         throw e;
       }
 
@@ -2585,6 +2602,21 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  private void deleteExpiredKey(String expiredKey) throws IOException {
+    Path path = getPath(expiredKey);
+    Files.delete(path);
+    if (publishTtlMetric) {
+      publishExpirationMetric(path);
+    }
+  }
+
+  private void publishExpirationMetric(Path path) {
+    long currentTime = new Date().getTime();
+    long createdTime = path.toFile().lastModified();
+    long ttl = currentTime - createdTime;
+    casTtl.observe(ttl);
+  }
+
   @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored"})
   private boolean charge(String key, long blobSizeInBytes, AtomicBoolean requiresDischarge)
       throws IOException, InterruptedException {
@@ -2609,7 +2641,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     (expiredEntry) -> {
                       String expiredKey = expiredEntry.key;
                       try {
-                        Files.delete(getPath(expiredKey));
+                        deleteExpiredKey(expiredKey);
                       } catch (NoSuchFileException eNoEnt) {
                         log.log(
                             Level.SEVERE,

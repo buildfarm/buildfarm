@@ -353,6 +353,8 @@ public class Worker {
             // delegate level
             cas.getHexBucketLevels(),
             cas.isFileDirectoriesIndexInMemory(),
+            cas.isPublishTtlMetric(),
+            cas.isExecRootCopyFallback(),
             digestUtil,
             removeDirectoryService,
             accessRecorder,
