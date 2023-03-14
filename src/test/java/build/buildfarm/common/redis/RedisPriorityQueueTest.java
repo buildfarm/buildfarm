@@ -258,7 +258,7 @@ public class RedisPriorityQueueTest {
   // Reason for testing: The queue supports negative priorities.
   // Failure explanation: negative prioritizes are not handled in the correct order.
   @Test
-  public void checkPriorityOnDequeue() throws Exception {
+  public void checkNegativesInPriority() throws Exception {
     // ARRANGE
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
     String val;
