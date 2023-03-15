@@ -123,12 +123,18 @@ public final class BuildfarmConfigs {
   }
 
   private static void adjustServerConfigs(BuildfarmConfigs configs) {
-    adjustPublicName(configs.getServer().getPublicName(), configs.getServer().getPort());
+    configs
+        .getServer()
+        .setPublicName(
+            adjustPublicName(configs.getServer().getPublicName(), configs.getServer().getPort()));
     adjustRedisUri(configs);
   }
 
   private static void adjustWorkerConfigs(BuildfarmConfigs configs) {
-    adjustPublicName(configs.getWorker().getPublicName(), configs.getWorker().getPort());
+    configs
+        .getWorker()
+        .setPublicName(
+            adjustPublicName(configs.getWorker().getPublicName(), configs.getWorker().getPort()));
     adjustRedisUri(configs);
 
     // Automatically set disk space to 90% of available space on the worker volume.
@@ -180,17 +186,17 @@ public final class BuildfarmConfigs {
     }
   }
 
-  private static void adjustPublicName(String publicName, int port) {
+  private static String adjustPublicName(String publicName, int port) {
     // use configured value
     if (!Strings.isNullOrEmpty(publicName)) {
-      return;
+      return publicName;
     }
 
     // use environment override (useful for containerized deployment)
     if (!Strings.isNullOrEmpty(System.getenv("INSTANCE_NAME"))) {
       publicName = System.getenv("INSTANCE_NAME");
       log.info(String.format("publicName overwritten to %s", publicName));
-      return;
+      return publicName;
     }
 
     // derive a value
@@ -198,10 +204,13 @@ public final class BuildfarmConfigs {
       try {
         publicName = InetAddress.getLocalHost().getHostAddress() + ":" + port;
         log.info(String.format("publicName derived to %s", publicName));
+        return publicName;
       } catch (Exception e) {
         log.severe("publicName could not be derived:" + e);
       }
     }
+
+    return publicName;
   }
 
   private static void adjustRedisUri(BuildfarmConfigs configs) {
