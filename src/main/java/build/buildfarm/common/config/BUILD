@@ -18,5 +18,6 @@ java_library(
         "@maven//:me_dinowernli_java_grpc_prometheus",
         "@maven//:org_projectlombok_lombok",
         "@maven//:org_yaml_snakeyaml",
+        "@maven//:com_github_oshi_oshi_core",
     ],
 )
