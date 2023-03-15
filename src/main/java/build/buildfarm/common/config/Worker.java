@@ -16,7 +16,7 @@ import lombok.extern.java.Log;
 public class Worker {
   private int port = 8981;
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
-  private String publicName = new String();
+  private String publicName;
   private Capabilities capabilities = new Capabilities();
   private String root = "/tmp/worker";
   private int inlineContentLimit = 1048567; // 1024 * 1024
