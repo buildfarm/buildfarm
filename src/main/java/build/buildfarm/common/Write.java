@@ -40,6 +40,8 @@ public interface Write {
 
   ListenableFuture<Long> getFuture();
 
+  class WriteCompleteException extends IOException {}
+
   class CompleteWrite implements Write {
     private final long committedSize;
 

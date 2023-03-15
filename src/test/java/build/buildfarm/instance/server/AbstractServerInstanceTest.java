@@ -53,6 +53,9 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.WriteCompleteException;
+import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.common.net.URL;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
@@ -75,7 +78,10 @@ import io.grpc.StatusException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.util.Stack;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import lombok.extern.java.Log;
 import org.junit.Test;
@@ -585,5 +591,52 @@ public class AbstractServerInstanceTest {
     verify(contentAddressableStorage, times(1)).findMissingBlobs(findMissingBlobsCaptor.capture());
     assertThat(findMissingBlobsCaptor.getValue())
         .containsAtLeast(fileDigest, childFileDigest, otherFileDigest);
+  }
+
+  @Test
+  public void fetchBlobWriteCompleteIsSuccess() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
+    Digest contentDigest = DIGEST_UTIL.compute(content);
+    Digest expectedDigest = contentDigest.toBuilder().setSizeBytes(-1).build();
+
+    ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
+    AbstractServerInstance instance = new DummyServerInstance(contentAddressableStorage, null);
+    RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
+    Write write = mock(Write.class);
+
+    FeedbackOutputStream writeCompleteOutputStream =
+        new FeedbackOutputStream() {
+          @Override
+          public void write(int n) throws WriteCompleteException {
+            throw new WriteCompleteException();
+          }
+
+          @Override
+          public boolean isReady() {
+            return true;
+          }
+        };
+    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+        .thenReturn(writeCompleteOutputStream);
+    when(contentAddressableStorage.getWrite(
+            eq(Compressor.Value.IDENTITY), eq(contentDigest), any(UUID.class), eq(requestMetadata)))
+        .thenReturn(write);
+
+    HttpURLConnection httpURLConnection = mock(HttpURLConnection.class);
+    when(httpURLConnection.getContentLengthLong()).thenReturn(contentDigest.getSizeBytes());
+    when(httpURLConnection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
+    when(httpURLConnection.getInputStream()).thenReturn(content.newInput());
+    URL url = mock(URL.class);
+    when(url.openConnection()).thenReturn(httpURLConnection);
+
+    assertThat(instance.fetchBlobUrls(ImmutableList.of(url), expectedDigest, requestMetadata).get())
+        .isEqualTo(contentDigest);
+    verify(contentAddressableStorage, times(1))
+        .getWrite(
+            eq(Compressor.Value.IDENTITY), eq(contentDigest), any(UUID.class), eq(requestMetadata));
+    verify(write, times(1)).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
+    verify(httpURLConnection, times(1)).getContentLengthLong();
+    verify(httpURLConnection, times(1)).getResponseCode();
+    verify(url, times(1)).openConnection();
   }
 }
