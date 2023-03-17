@@ -22,10 +22,10 @@ package build.buildfarm.common;
  *     due to containerization and virtualization. For example, if you are using k8s with containerd
  *     you might see this method give back 1 based on your particular deployment. There are other
  *     implementations such as OSHI that use JNA to acquire the native operating system and hardware
- *     information which is often be more suitable for buildfarm. For consistency in buildfarm
- *     deriving configuration values, and allocating its own thread pools, it's best to source the
- *     processor count from the same place. This abstracts implementation on how to derive processor
- *     count based on config and environment.
+ *     information which is often more suitable for buildfarm. In order to provide consistency in
+ *     deriving configuration values, and allocating thread pools, it's best to source the processor
+ *     count from the same place. This abstracts implementation on how we derive processor count
+ *     based on config and environment.
  */
 public class SystemProcessors {
   /**
@@ -34,6 +34,6 @@ public class SystemProcessors {
    * @return Number of logical processors on the system.
    */
   public static long get() {
-    return Runtime.getRuntime().availableProcessors()
+    return Runtime.getRuntime().availableProcessors();
   }
 }
