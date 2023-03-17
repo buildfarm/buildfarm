@@ -24,6 +24,8 @@ java_library(
         "@googleapis//:google_devtools_build_v1_publish_build_event_java_proto",
         "@googleapis//:google_longrunning_operations_java_grpc",
         "@googleapis//:google_rpc_code_java_proto",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",

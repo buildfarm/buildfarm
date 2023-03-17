@@ -16,16 +16,28 @@ package build.buildfarm.common.net;
 
 import java.io.IOException;
 import java.net.URLConnection;
+import java.util.Optional;
 
-// solely exists so that we can mock this
 public class URL {
   private final java.net.URL url;
+  private final Optional<String> authHeader;
 
+  public URL(java.net.URL url, String authHeader) {
+    this.url = url;
+    this.authHeader = Optional.of(authHeader);
+  }
   public URL(java.net.URL url) {
     this.url = url;
+    this.authHeader = Optional.empty();
   }
 
   public URLConnection openConnection() throws IOException {
-    return url.openConnection();
+    if (authHeader.isPresent()) {
+      URLConnection connection = url.openConnection();
+      connection.setRequestProperty("Authorization", authHeader.get());
+      return connection;
+    } else {
+      return  url.openConnection();
+    }
   }
 }

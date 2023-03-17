@@ -9,17 +9,24 @@ import build.bazel.remote.asset.v1.FetchBlobResponse;
 import build.bazel.remote.asset.v1.FetchDirectoryRequest;
 import build.bazel.remote.asset.v1.FetchDirectoryResponse;
 import build.bazel.remote.asset.v1.FetchGrpc.FetchImplBase;
-import build.bazel.remote.asset.v1.Qualifier;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FutureCallback;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+
+import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
+
 import lombok.extern.java.Log;
 
 @Log
@@ -50,33 +57,31 @@ public class FetchService extends FetchImplBase {
     if (request.getQualifiersCount() == 0) {
       throw Status.INVALID_ARGUMENT.withDescription("Empty qualifier list").asRuntimeException();
     }
-    for (Qualifier qualifier : request.getQualifiersList()) {
-      String name = qualifier.getName();
-      if (name.equals("checksum.sri")) {
-        expectedDigest = parseChecksumSRI(qualifier.getValue());
-        Digest.Builder result = Digest.newBuilder();
-        if (instance.containsBlob(expectedDigest, result, requestMetadata)) {
-          responseObserver.onNext(
-              FetchBlobResponse.newBuilder().setBlobDigest(result.build()).build());
-          responseObserver.onCompleted();
-          return;
-        }
-      } else {
-        responseObserver.onError(
-            Status.INVALID_ARGUMENT
-                .withDescription(format("Invalid qualifier '%s'", name))
-                .asException());
-        return;
-      }
+
+    Map<String,String> qualifiers = request.getQualifiersList().stream().collect(Collectors.toMap(q -> q.getName(), q -> q.getValue()));
+    if ( ! qualifiers.containsKey("checksum.sri")) {
+      throw Status.INVALID_ARGUMENT.withDescription("Missing checksum.sri qualifier").asRuntimeException();
     }
-    if (expectedDigest == null) {
-      responseObserver.onError(
-          Status.INVALID_ARGUMENT
-              .withDescription(format("Missing qualifier 'checksum.sri'"))
-              .asException());
-    } else if (request.getUrisCount() != 0) {
+
+    Map<String, String> authHeaders = new HashMap<>();
+    if (qualifiers.containsKey("bazel.auth_headers") ) {
+      String checkAuthHeaders = qualifiers.get("bazel.auth_headers");
+      authHeaders = parseAuthHeaders(checkAuthHeaders);
+    }
+
+    String checksumSri = qualifiers.get("checksum.sri");
+    expectedDigest = parseChecksumSRI(checksumSri);
+    Digest.Builder result = Digest.newBuilder();
+    if (instance.containsBlob(expectedDigest, result, requestMetadata)) {
+      responseObserver.onNext(
+              FetchBlobResponse.newBuilder().setBlobDigest(result.build()).build());
+      responseObserver.onCompleted();
+      return;
+    }
+
+    if (request.getUrisCount() != 0) {
       addCallback(
-          instance.fetchBlob(request.getUrisList(), expectedDigest, requestMetadata),
+          instance.fetchBlob(request.getUrisList(), authHeaders, expectedDigest, requestMetadata),
           new FutureCallback<Digest>() {
             @Override
             public void onSuccess(Digest actualDigest) {
@@ -103,6 +108,23 @@ public class FetchService extends FetchImplBase {
       responseObserver.onError(
           Status.INVALID_ARGUMENT.withDescription("Empty uris list").asRuntimeException());
     }
+  }
+
+  private Map<String, String> parseAuthHeaders(String rawJson) {
+    Map<String, String> authHeaders = new HashMap<>();
+    ObjectMapper jsonMapper = new ObjectMapper();
+    TypeReference<Map<String, Map<String, String>>> typeRef =
+            new TypeReference<Map<String, Map<String, String>>>() {};
+    try {
+      jsonMapper.readValue(rawJson, typeRef).forEach((key, value) -> {
+        if (value.containsKey("Authorization")) {
+          authHeaders.put(key, value.get("Authorization"));
+        }
+      });
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+    return authHeaders;
   }
 
   private Digest parseChecksumSRI(String checksum) {

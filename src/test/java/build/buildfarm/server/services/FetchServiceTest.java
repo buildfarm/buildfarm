@@ -38,6 +38,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.stubbing.Answer;
 
+import java.util.Map;
+
 @RunWith(JUnit4.class)
 public class FetchServiceTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
@@ -72,7 +74,7 @@ public class FetchServiceTest {
     StreamObserver<FetchBlobResponse> response = mock(StreamObserver.class);
     service.fetchBlob(request, response);
     verify(instance, never())
-        .fetchBlob(any(Iterable.class), any(Digest.class), any(RequestMetadata.class));
+        .fetchBlob(any(Iterable.class), any(Map.class), any(Digest.class), any(RequestMetadata.class));
     verify(response, times(1)).onCompleted();
     verify(response, times(1))
         .onNext(FetchBlobResponse.newBuilder().setBlobDigest(contentDigest).build());

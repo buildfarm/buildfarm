@@ -135,7 +135,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -668,11 +667,15 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public ListenableFuture<Digest> fetchBlob(
-      Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata) {
+      Iterable<String> uris,Map<String,String> authHeaders, Digest expectedDigest, RequestMetadata requestMetadata) {
     ImmutableList.Builder<URL> urls = ImmutableList.builder();
     for (String uri : uris) {
       try {
-        urls.add(new URL(new java.net.URL(uri)));
+        if (authHeaders.containsKey(uri)){
+          urls.add(new URL(new java.net.URL(uri), authHeaders.get(uri)));
+        } else {
+          urls.add(new URL(new java.net.URL(uri)));
+        }
       } catch (Exception e) {
         return immediateFailedFuture(e);
       }
