@@ -22,6 +22,7 @@ worker:
 ```
 
 The configuration can be provided to the server and worker as a CLI argument or through the env variable `CONFIG_PATH`
+For an example config containing all of the configuration values, see `examples/config.yml`.
 
 ## All Configurations
 
