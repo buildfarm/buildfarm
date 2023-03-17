@@ -39,6 +39,7 @@ public class Server {
   private String publicName;
   private int maxInboundMessageSizeBytes = 0;
   private int maxInboundMetadataSize = 0;
+  private ServerCacheConfigs caches = new ServerCacheConfigs();
 
   public String getSession() {
     return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);
