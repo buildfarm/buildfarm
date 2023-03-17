@@ -4,6 +4,7 @@ load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "downl
 load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 load("@rules_oss_audit//oss_audit:java/oss_audit.bzl", "oss_audit")
+load("//:defs.bzl", "ensure_accurate_metadata")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -147,7 +148,7 @@ java_image(
         "//examples:example_configs",
         "//src/main/java/build/buildfarm:configs",
     ],
-    jvm_flags = [
+    jvm_flags = ensure_accurate_metadata() + [
         "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
     ] + select({
         "//config:open_telemetry": SERVER_TELEMETRY_JVM_FLAGS,
@@ -204,7 +205,7 @@ java_image(
         "//examples:example_configs",
         "//src/main/java/build/buildfarm:configs",
     ],
-    jvm_flags = [
+    jvm_flags = ensure_accurate_metadata() + [
         "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
     ] + select({
         "//config:open_telemetry": WORKER_TELEMETRY_JVM_FLAGS,

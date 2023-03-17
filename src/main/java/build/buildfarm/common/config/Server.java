@@ -40,6 +40,8 @@ public class Server {
   private String cloudRegion;
   private String publicName;
 
+  private ServerCacheConfigs caches = new ServerCacheConfigs();
+
   public String getPublicName() {
     // use environment override (useful for containerized deployment)
     if (!Strings.isNullOrEmpty(System.getenv("INSTANCE_NAME"))) {
