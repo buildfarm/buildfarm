@@ -14,6 +14,10 @@
 
 package build.buildfarm.common;
 
+import oshi.SystemInfo;
+import oshi.hardware.CentralProcessor;
+import oshi.hardware.HardwareAbstractionLayer;
+
 /**
  * @class SystemProcessors
  * @brief Abstraction for getting information about the system processors.
@@ -29,11 +33,49 @@ package build.buildfarm.common;
  */
 public class SystemProcessors {
   /**
+   * @field PROCESSOR_DERIVE
+   * @brief Strategies for getting total processor counts.
+   * @details Can be chosen in user configuration.
+   */
+  public enum PROCESSOR_DERIVE {
+    JAVA_RUNTIME,
+    OSHI
+  }
+
+  /**
    * @brief Get the number of logical processors on the system.
    * @details Implementation decided by configuration.
    * @return Number of logical processors on the system.
    */
-  public static long get() {
+  public static long get(PROCESSOR_DERIVE strategy) {
+    switch (strategy) {
+      case JAVA_RUNTIME:
+        return getViaJavaRuntime();
+      case OSHI:
+        return getViaOSHI();
+      default:
+        return getViaJavaRuntime();
+    }
+  }
+
+  /**
+   * @brief Get the number of logical processors on the system through java runtime.
+   * @details specific implementation.
+   * @return Number of logical processors on the system.
+   */
+  public static long getViaJavaRuntime() {
     return Runtime.getRuntime().availableProcessors();
+  }
+
+  /**
+   * @brief Get the number of logical processors on the system through OSHI.
+   * @details specific implementation.
+   * @return Number of logical processors on the system.
+   */
+  public static long getViaOSHI() {
+    SystemInfo systemInfo = new SystemInfo();
+    HardwareAbstractionLayer hardwareAbstractionLayer = systemInfo.getHardware();
+    CentralProcessor centralProcessor = hardwareAbstractionLayer.getProcessor();
+    return centralProcessor.getLogicalProcessorCount();
   }
 }

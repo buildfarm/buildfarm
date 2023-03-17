@@ -1,6 +1,7 @@
 package build.buildfarm.common.config;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.SystemProcessors;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
@@ -31,6 +32,8 @@ public final class BuildfarmConfigs {
   private Backplane backplane = new Backplane();
   private Worker worker = new Worker();
   private ExecutionWrappers executionWrappers = new ExecutionWrappers();
+  private SystemProcessors.PROCESSOR_DERIVE processorDerive =
+      SystemProcessors.PROCESSOR_DERIVE.OSHI;
 
   private BuildfarmConfigs() {}
 
