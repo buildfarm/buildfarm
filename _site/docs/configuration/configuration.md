@@ -22,6 +22,7 @@ worker:
 ```
 
 The configuration can be provided to the server and worker as a CLI argument or through the env variable `CONFIG_PATH`
+For an example config containing all of the configuration values, see `examples/config.yml`.
 
 ## All Configurations
 
@@ -98,6 +99,26 @@ server:
   grpcMetrics:
     enabled: false
     provideLatencyHistograms: false
+```
+
+### Server Caches
+
+| Configuration            | Accepted and _Default_ Values | Description                                            |
+|--------------------------|-------------------------------|--------------------------------------------------------|
+| directoryCacheMaxEntries                  | Long, _64 * 1024_              | The max number of entries that the directory cache will hold.    |
+| commandCacheMaxEntries                  | Long, _64 * 1024_              | The max number of entries that the command cache will hold.    |
+| digestToActionCacheMaxEntries                  | Long, _64 * 1024_              | The max number of entries that the digest-to-action cache will hold.    |
+| recentServedExecutionsCacheMaxEntries                  | Long, _64 * 1024_              | The max number of entries that the executions cache will hold.    |
+
+Example:
+
+```
+server:
+  caches:
+    directoryCacheMaxEntries: 10000
+    commandCacheMaxEntries: 10000
+    digestToActionCacheMaxEntries: 10000
+    recentServedExecutionsCacheMaxEntries: 10000
 ```
 
 ### Admin
