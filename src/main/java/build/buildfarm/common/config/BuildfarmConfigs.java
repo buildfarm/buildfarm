@@ -32,7 +32,7 @@ public final class BuildfarmConfigs {
   private Backplane backplane = new Backplane();
   private Worker worker = new Worker();
   private ExecutionWrappers executionWrappers = new ExecutionWrappers();
-  private SystemProcessors.PROCESSOR_DERIVE processorDerive =
+  private SystemProcessors.PROCESSOR_DERIVE processorsDerive =
       SystemProcessors.PROCESSOR_DERIVE.OSHI;
 
   private BuildfarmConfigs() {}

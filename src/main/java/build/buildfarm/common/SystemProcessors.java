@@ -47,7 +47,7 @@ public class SystemProcessors {
    * @details Implementation decided by configuration.
    * @return Number of logical processors on the system.
    */
-  public static long get(PROCESSOR_DERIVE strategy) {
+  public static int get(PROCESSOR_DERIVE strategy) {
     switch (strategy) {
       case JAVA_RUNTIME:
         return getViaJavaRuntime();
@@ -63,7 +63,7 @@ public class SystemProcessors {
    * @details specific implementation.
    * @return Number of logical processors on the system.
    */
-  public static long getViaJavaRuntime() {
+  public static int getViaJavaRuntime() {
     return Runtime.getRuntime().availableProcessors();
   }
 
@@ -72,7 +72,7 @@ public class SystemProcessors {
    * @details specific implementation.
    * @return Number of logical processors on the system.
    */
-  public static long getViaOSHI() {
+  public static int getViaOSHI() {
     SystemInfo systemInfo = new SystemInfo();
     HardwareAbstractionLayer hardwareAbstractionLayer = systemInfo.getHardware();
     CentralProcessor centralProcessor = hardwareAbstractionLayer.getProcessor();

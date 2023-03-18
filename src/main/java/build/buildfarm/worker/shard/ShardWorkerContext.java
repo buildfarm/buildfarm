@@ -42,6 +42,7 @@ import build.buildfarm.common.LinuxSandboxOptions;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
+import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ExecutionPolicy;
@@ -763,7 +764,7 @@ class ShardWorkerContext implements WorkerContext {
 
   void createOperationExecutionLimits() {
     try {
-      int availableProcessors = Runtime.getRuntime().availableProcessors();
+      int availableProcessors = SystemProcessors.get(configs.getProcessorsDerive());
       Preconditions.checkState(availableProcessors >= executeStageWidth);
       int executionsShares =
           Group.getRoot().getCpu().getShares() * executeStageWidth / availableProcessors;

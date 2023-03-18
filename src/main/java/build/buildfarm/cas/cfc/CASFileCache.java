@@ -56,6 +56,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
@@ -1341,7 +1342,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private CacheScanResults scanRoot(Consumer<Digest> onStartPut)
       throws IOException, InterruptedException {
     // create thread pool
-    int nThreads = Runtime.getRuntime().availableProcessors();
+    int nThreads = SystemProcessors.get(configs.getProcessorsDerive());
     String threadNameFormat = "scan-cache-pool-%d";
     ExecutorService pool =
         Executors.newFixedThreadPool(
@@ -1465,7 +1466,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private List<Path> computeDirectories(CacheScanResults cacheScanResults)
       throws InterruptedException {
     // create thread pool
-    int nThreads = Runtime.getRuntime().availableProcessors();
+    int nThreads = SystemProcessors.get(configs.getProcessorsDerive());
     String threadNameFormat = "compute-cache-pool-%d";
     ExecutorService pool =
         Executors.newFixedThreadPool(
