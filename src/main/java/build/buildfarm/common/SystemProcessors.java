@@ -23,7 +23,7 @@ import oshi.hardware.HardwareAbstractionLayer;
  * @brief Abstraction for getting information about the system processors.
  * @details We've found that using java's Runtime.getRuntime().availableProcessors() utility does
  *     not always accurately reflect the amount of processors available. In some cases it returns 1
- *     due to containerization and virtualization. For example, if you are using k8s with containerd
+ *     due to containerization or virtualization. For example, if you are using k8s with containerd
  *     you might see this method give back 1 based on your particular deployment. There are other
  *     implementations such as OSHI that use JNA to acquire the native operating system and hardware
  *     information which is often more suitable for buildfarm. In order to provide consistency in
