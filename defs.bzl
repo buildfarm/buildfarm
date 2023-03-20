@@ -83,6 +83,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.github.pcj:google-options:1.0.0",
                         "com.github.serceman:jnr-fuse:0.5.5",
                         "com.github.luben:zstd-jni:1.5.2-1",
+                        "com.github.oshi:oshi-core:6.4.0",
                         "com.google.auth:google-auth-library-credentials:0.9.1",
                         "com.google.auth:google-auth-library-oauth2-http:0.9.1",
                         "com.google.code.findbugs:jsr305:3.0.1",
