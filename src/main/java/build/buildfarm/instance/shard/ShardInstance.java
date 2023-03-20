@@ -192,6 +192,13 @@ public class ShardInstance extends AbstractServerInstance {
           .name("queue_failure")
           .help("Number of operations that failed to queue.")
           .register();
+  private static final Counter queueSuccessCounter =
+      Counter.build()
+          .name("queue_success")
+          .help("Number of operations that succeed in being queued.")
+          .register();
+  private static final Counter queueIterationCounter =
+      Counter.build().name("queue_iteration").help("Tracks queue iterations").register();
   // Metrics about the dispatched operations
   private static final Gauge dispatchedOperationsSize =
       Gauge.build()
@@ -417,7 +424,7 @@ public class ShardInstance extends AbstractServerInstance {
                           @Override
                           public void onSuccess(Void result) {
                             log.log(Level.FINE, "successfully queued " + operationName);
-                            // nothing
+                            queueSuccessCounter.inc();
                           }
 
                           @Override
@@ -451,6 +458,7 @@ public class ShardInstance extends AbstractServerInstance {
                       transformTokensQueue.put(new Object());
                       stopwatch.start();
                       try {
+                        queueIterationCounter.inc();
                         iterate()
                             .addListener(
                                 () -> {

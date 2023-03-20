@@ -18,6 +18,7 @@ java_library(
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@maven//:com_github_jnr_jnr_ffi",
+        "@maven//:com_github_oshi_oshi_core",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
@@ -33,6 +34,5 @@ java_library(
         "@maven//:org_projectlombok_lombok",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
-        "@maven//:com_github_oshi_oshi_core",
     ],
 )

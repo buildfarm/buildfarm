@@ -22,8 +22,8 @@ import lombok.extern.java.Log;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 import oshi.SystemInfo;
-import oshi.hardware.HardwareAbstractionLayer;
 import oshi.hardware.CentralProcessor;
+import oshi.hardware.HardwareAbstractionLayer;
 
 @Data
 @Log
@@ -167,19 +167,16 @@ public final class BuildfarmConfigs {
       configs
           .getWorker()
           .setExecuteStageWidth(
-              Math.max(
-                  1,
-                  deriveCoreCount()
-                      - configs.getWorker().getExecuteStageWidthOffset()));
+              Math.max(1, deriveCoreCount() - configs.getWorker().getExecuteStageWidthOffset()));
       log.info(
           String.format(
               "executeStageWidth modified to %d", configs.getWorker().getExecuteStageWidth()));
     }
   }
-  
-  private static int deriveCoreCount(){
-    //return Runtime.getRuntime().availableProcessors();
-    
+
+  private static int deriveCoreCount() {
+    // return Runtime.getRuntime().availableProcessors();
+
     SystemInfo systemInfo = new SystemInfo();
     HardwareAbstractionLayer hardwareAbstractionLayer = systemInfo.getHardware();
     CentralProcessor centralProcessor = hardwareAbstractionLayer.getProcessor();
