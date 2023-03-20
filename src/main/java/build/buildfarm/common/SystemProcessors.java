@@ -44,6 +44,16 @@ public class SystemProcessors {
 
   /**
    * @brief Get the number of logical processors on the system.
+   * @details Buildfarm will choose the best implementation.
+   * @return Number of logical processors on the system.
+   */
+  public static int get() {
+    // Have buildfarm choose the best value.
+    return Math.max(get(PROCESSOR_DERIVE.JAVA_RUNTIME), get(PROCESSOR_DERIVE.OSHI));
+  }
+
+  /**
+   * @brief Get the number of logical processors on the system.
    * @details Implementation decided by configuration.
    * @return Number of logical processors on the system.
    */
@@ -63,7 +73,7 @@ public class SystemProcessors {
    * @details specific implementation.
    * @return Number of logical processors on the system.
    */
-  public static int getViaJavaRuntime() {
+  private static int getViaJavaRuntime() {
     return Runtime.getRuntime().availableProcessors();
   }
 
@@ -72,7 +82,7 @@ public class SystemProcessors {
    * @details specific implementation.
    * @return Number of logical processors on the system.
    */
-  public static int getViaOSHI() {
+  private static int getViaOSHI() {
     SystemInfo systemInfo = new SystemInfo();
     HardwareAbstractionLayer hardwareAbstractionLayer = systemInfo.getHardware();
     CentralProcessor centralProcessor = hardwareAbstractionLayer.getProcessor();

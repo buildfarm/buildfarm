@@ -1342,7 +1342,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private CacheScanResults scanRoot(Consumer<Digest> onStartPut)
       throws IOException, InterruptedException {
     // create thread pool
-    int nThreads = SystemProcessors.get(configs.getProcessorsDerive());
+    int nThreads = SystemProcessors.get();
     String threadNameFormat = "scan-cache-pool-%d";
     ExecutorService pool =
         Executors.newFixedThreadPool(
@@ -1466,7 +1466,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private List<Path> computeDirectories(CacheScanResults cacheScanResults)
       throws InterruptedException {
     // create thread pool
-    int nThreads = SystemProcessors.get(configs.getProcessorsDerive());
+    int nThreads = SystemProcessors.get();
     String threadNameFormat = "compute-cache-pool-%d";
     ExecutorService pool =
         Executors.newFixedThreadPool(

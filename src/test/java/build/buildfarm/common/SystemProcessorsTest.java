@@ -30,10 +30,22 @@ public class SystemProcessorsTest {
   // Reason for testing: functions do not throw and return nonzero results.
   // Failure explanation: The implementation can not correctly derive.
   @Test
-  public void getResolvedOutputPathsCheckOutputPaths() {
+  public void getCheckImplValuesAreNotZero() {
     // ASSERT
     assertThat(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.JAVA_RUNTIME))
         .isGreaterThan(0);
     assertThat(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.OSHI)).isGreaterThan(0);
+  }
+
+  // Function under test: get
+  // Reason for testing: functions chooses highest value.
+  // Failure explanation: The implementation does not choose highest value.
+  @Test
+  public void getCheckBestValueIsChosen() {
+    // ASSERT
+    assertThat(SystemProcessors.get())
+        .isAtLeast(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.JAVA_RUNTIME));
+    assertThat(SystemProcessors.get())
+        .isAtLeast(SystemProcessors.get(SystemProcessors.PROCESSOR_DERIVE.OSHI));
   }
 }

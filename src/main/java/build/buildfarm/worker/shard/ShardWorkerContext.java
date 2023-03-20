@@ -764,7 +764,7 @@ class ShardWorkerContext implements WorkerContext {
 
   void createOperationExecutionLimits() {
     try {
-      int availableProcessors = SystemProcessors.get(configs.getProcessorsDerive());
+      int availableProcessors = SystemProcessors.get();
       Preconditions.checkState(availableProcessors >= executeStageWidth);
       int executionsShares =
           Group.getRoot().getCpu().getShares() * executeStageWidth / availableProcessors;
