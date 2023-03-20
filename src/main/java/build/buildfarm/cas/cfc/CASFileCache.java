@@ -56,6 +56,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
@@ -130,9 +131,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
 import org.json.simple.JSONObject;
-import oshi.SystemInfo;
-import oshi.hardware.HardwareAbstractionLayer;
-import oshi.hardware.CentralProcessor;
 
 @Log
 public abstract class CASFileCache implements ContentAddressableStorage {
@@ -1341,14 +1339,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       log.log(Level.SEVERE, "failure to delete CAS content: ", e);
     }
   }
-  
-  private static int deriveCoreCount(){
-    
-    SystemInfo systemInfo = new SystemInfo();
-    HardwareAbstractionLayer hardwareAbstractionLayer = systemInfo.getHardware();
-    CentralProcessor centralProcessor = hardwareAbstractionLayer.getProcessor();
-    return centralProcessor.getLogicalProcessorCount();
-  }
 
   @SuppressWarnings("unchecked")
   private void logCacheScanResults(CacheScanResults cacheScanResults) {
@@ -1369,7 +1359,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private CacheScanResults scanRoot(Consumer<Digest> onStartPut)
       throws IOException, InterruptedException {
     // create thread pool
-    int nThreads = deriveCoreCount();
+    int nThreads = SystemProcessors.get();
     String threadNameFormat = "scan-cache-pool-%d";
     ExecutorService pool =
         Executors.newFixedThreadPool(
@@ -1493,7 +1483,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private List<Path> computeDirectories(CacheScanResults cacheScanResults)
       throws InterruptedException {
     // create thread pool
-    int nThreads = deriveCoreCount();
+    int nThreads = SystemProcessors.get();
     String threadNameFormat = "compute-cache-pool-%d";
     ExecutorService pool =
         Executors.newFixedThreadPool(
