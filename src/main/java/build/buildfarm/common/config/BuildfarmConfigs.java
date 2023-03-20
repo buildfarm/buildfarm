@@ -24,6 +24,7 @@ import org.yaml.snakeyaml.constructor.Constructor;
 import oshi.SystemInfo;
 import oshi.hardware.CentralProcessor;
 import oshi.hardware.HardwareAbstractionLayer;
+import build.buildfarm.common.SystemProcessors;
 
 @Data
 @Log
@@ -167,20 +168,11 @@ public final class BuildfarmConfigs {
       configs
           .getWorker()
           .setExecuteStageWidth(
-              Math.max(1, deriveCoreCount() - configs.getWorker().getExecuteStageWidthOffset()));
+              Math.max(1, SystemProcessors.get() - configs.getWorker().getExecuteStageWidthOffset()));
       log.info(
           String.format(
               "executeStageWidth modified to %d", configs.getWorker().getExecuteStageWidth()));
     }
-  }
-
-  private static int deriveCoreCount() {
-    // return Runtime.getRuntime().availableProcessors();
-
-    SystemInfo systemInfo = new SystemInfo();
-    HardwareAbstractionLayer hardwareAbstractionLayer = systemInfo.getHardware();
-    CentralProcessor centralProcessor = hardwareAbstractionLayer.getProcessor();
-    return centralProcessor.getLogicalProcessorCount();
   }
 
   private static void adjustInputFetchStageWidth(BuildfarmConfigs configs) {
