@@ -401,6 +401,7 @@ public class ShardInstance extends AbstractServerInstance {
                   poller.resume(
                       () -> {
                         try {
+                          log.log(Level.INFO, "backplane.queueing");
                           backplane.queueing(executeEntry.getOperationName());
                         } catch (IOException e) {
                           if (!stopping && !stopped) {
@@ -2149,6 +2150,7 @@ public class ShardInstance extends AbstractServerInstance {
                     getName(), operation.getName(), checkCacheUSecs));
             return IMMEDIATE_VOID_FUTURE;
           }
+          log.log(Level.INFO, "transformAndQueue");
           return transformAndQueue(executeEntry, poller, operation, stopwatch, timeout);
         },
         operationTransformService);
@@ -2338,6 +2340,8 @@ public class ShardInstance extends AbstractServerInstance {
 
           @Override
           public void onFailure(Throwable t) {
+            queueFailureCounter.inc();
+            log.log(Level.SEVERE, "failure at end of transformAndQueue");
             poller.pause();
             com.google.rpc.Status status = StatusProto.fromThrowable(t);
             if (status == null) {
