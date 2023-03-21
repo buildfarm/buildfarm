@@ -253,7 +253,7 @@ public class ShardInstance extends AbstractServerInstance {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   // TODO: move to config
-  private static final Duration queueTimeout = Durations.fromSeconds(60);
+  private static final Duration queueTimeout = Durations.fromSeconds(300);
 
   private static Backplane createBackplane(String identifier) throws ConfigurationException {
     if (configs.getBackplane().getType().equals(SHARD)) {
@@ -1306,7 +1306,7 @@ public class ShardInstance extends AbstractServerInstance {
   protected <T> ListenableFuture<T> expect(
       Digest digest, Parser<T> parser, Executor executor, RequestMetadata requestMetadata) {
     Context.CancellableContext withDeadline =
-        Context.current().withDeadlineAfter(60, SECONDS, contextDeadlineScheduler);
+        Context.current().withDeadlineAfter(300, SECONDS, contextDeadlineScheduler);
     Context previousContext = withDeadline.attach();
     try {
       ListenableFuture<T> future = super.expect(digest, parser, executor, requestMetadata);
@@ -2069,7 +2069,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     Context.CancellableContext withDeadline =
-        Context.current().withDeadlineAfter(60, SECONDS, contextDeadlineScheduler);
+        Context.current().withDeadlineAfter(300, SECONDS, contextDeadlineScheduler);
     try {
       return checkCacheFutureCancellable(actionKey, operation, requestMetadata, withDeadline);
     } catch (RuntimeException e) {
