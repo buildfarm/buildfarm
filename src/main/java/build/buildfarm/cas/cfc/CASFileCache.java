@@ -2042,7 +2042,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           log.log(Level.FINE, format("directory %s has been unlocked", path.getFileName()));
         },
         service);
-
     return putFuture;
   }
 
