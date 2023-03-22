@@ -12,6 +12,7 @@ load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 load("@io_bazel_rules_k8s//k8s:k8s.bzl", "k8s_repositories")
+load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 
 IO_NETTY_MODULES = [
     "buffer",
@@ -152,6 +153,8 @@ def buildfarm_init(name = "buildfarm"):
     grpc_java_repositories()
 
     k8s_repositories()
+
+    rules_pkg_dependencies()
 
     native.bind(
         name = "jar/redis/clients/jedis",

@@ -5,6 +5,7 @@ load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "instal
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 load("@rules_oss_audit//oss_audit:java/oss_audit.bzl", "oss_audit")
 load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -194,4 +195,13 @@ oss_audit(
     name = "buildfarm-shard-worker-audit",
     src = "//src/main/java/build/buildfarm:buildfarm-shard-worker",
     tags = ["audit"],
+)
+
+pkg_tar(
+    name = "buildfarm-shard-worker-tar",
+    srcs = [
+        "//src/main/java/build/buildfarm:buildfarm-shard-worker_deploy.jar",
+        "//src/main/java/build/buildfarm:configs",
+        "//examples:example_configs",
+    ],
 )
