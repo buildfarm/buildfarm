@@ -321,6 +321,9 @@ public class InputFetcher implements Runnable {
 
     try {
       workerContext.putOperation(failedOperation);
+      OperationContext newOperationContext =
+          operationContext.toBuilder().setOperation(failedOperation).build();
+      owner.error().put(newOperationContext);
     } catch (Exception e) {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
       log.log(Level.SEVERE, format("Cannot report failed operation %s", operationName), e);
