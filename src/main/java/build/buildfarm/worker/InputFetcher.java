@@ -320,10 +320,13 @@ public class InputFetcher implements Runnable {
             failureDetails);
 
     try {
-      workerContext.putOperation(failedOperation);
-      OperationContext newOperationContext =
-          operationContext.toBuilder().setOperation(failedOperation).build();
-      owner.error().put(newOperationContext);
+      
+      // FIXME
+      // To preserve behavior while testing on existing cluster, we will not actually fail the operation.
+      //workerContext.putOperation(failedOperation);
+      //OperationContext newOperationContext =
+      //    operationContext.toBuilder().setOperation(failedOperation).build();
+      owner.error().put(operationContext);
     } catch (Exception e) {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
       log.log(Level.SEVERE, format("Cannot report failed operation %s", operationName), e);
