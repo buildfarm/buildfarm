@@ -295,7 +295,8 @@ class CFCExecFileSystem implements ExecFileSystem {
     private final List<Throwable> exceptions;
 
     ExecDirException(Path path, List<Throwable> exceptions) {
-      super(String.format("%s: %d exceptions", path, exceptions.size()));
+      // When printing the exception, show the captured sub-exceptions.
+      super(getErrorMessage(path, exceptions));
       this.path = path;
       this.exceptions = exceptions;
       for (Throwable exception : exceptions) {
@@ -310,6 +311,12 @@ class CFCExecFileSystem implements ExecFileSystem {
     List<Throwable> getExceptions() {
       return exceptions;
     }
+  }
+
+  private static String getErrorMessage(Path path, List<Throwable> exceptions) {
+    return String.format(
+        "%s: %d %s: %s",
+        path, exceptions.size(), exceptions.size() == 1 ? "exception" : "exceptions", exceptions);
   }
 
   private static void checkExecErrors(Path path, List<Throwable> errors) throws ExecDirException {
