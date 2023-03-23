@@ -2604,10 +2604,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private void deleteExpiredKey(String expiredKey) throws IOException {
     Path path = getPath(expiredKey);
-    Files.delete(path);
     if (publishTtlMetric) {
       publishExpirationMetric(path);
     }
+    Files.delete(path);
   }
 
   private void publishExpirationMetric(Path path) {
