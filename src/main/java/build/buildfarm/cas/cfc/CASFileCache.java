@@ -2804,6 +2804,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
 
       void commit() throws IOException {
+        // Check some preconditions before committing the file to the CAS.
+        // 1. The filename must match the hash that we store.
+        // 2. The file must be read-only.
         String hash = hashSupplier.get().toString();
         String fileName = writePath.getFileName().toString();
         if (!fileName.startsWith(hash)) {
@@ -2819,7 +2822,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           throw e;
         }
 
-        Entry entry = new Entry(key, blobSizeInBytes, Deadline.after(10, SECONDS));
+        // Create the new entry to track the file.
+        // FIXME: How is this deadline decided?
+        // FIXME: Could it get deleted before we finish committing?
+        // TEST: Bump it higher to see if it avoids failures setting up the exec dir.
+        Entry entry = new Entry(key, blobSizeInBytes, Deadline.after(5, MINUTES));
 
         Entry existingEntry = null;
         boolean inserted = false;
@@ -2828,7 +2835,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           existingEntry = storage.putIfAbsent(key, entry);
           inserted = existingEntry == null;
         } catch (FileAlreadyExistsException e) {
-          log.log(Level.FINE, "file already exists for " + key + ", nonexistent entry will fail");
+          // FIXME: Why skip adding the entry to storage if the hardlink already exists?
+          // This seems like it would lead to the in-memory and disk storage being out of sync.
+          // TEST: To avoid failures setting up the exec dir, we will excuse the existing hardlink
+          // and register the entry in storage on behalf of the pre-existing file.  After all,
+          // these file names should be unique to their content, so I don't think the existing
+          // hardlink should contain different data than what we were attempting to link, right?
+          existingEntry = storage.putIfAbsent(key, entry);
+          inserted = existingEntry == null;
+          log.log(Level.INFO, "file already exists for " + key + ", nonexistent entry will fail");
         } finally {
           Files.delete(writePath);
           if (!inserted) {
@@ -2836,6 +2851,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           }
         }
 
+        // FIXME: If our attempt to add it to storage failed,
+        // why would we iterate multiple times trying to get it from storage?
+        // Was there an expectation that another thread would add it?
         int attempts = 10;
         if (!inserted) {
           while (existingEntry == null && attempts-- != 0) {
@@ -2852,21 +2870,22 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           }
         }
 
+        // FIXME: Why are we racing?
         if (existingEntry != null) {
-          log.log(Level.FINE, "lost the race to insert " + key);
+          log.log(Level.INFO, "lost the race to insert " + key);
           if (!referenceIfExists(key)) {
             // we would lose our accountability and have a presumed reference if we returned
             throw new IllegalStateException("storage conflict with existing key for " + key);
           }
         } else if (writeWinner.get()) {
-          log.log(Level.FINE, "won the race to insert " + key);
+          log.log(Level.INFO, "won the race to insert " + key);
           try {
             onInsert.run();
           } catch (RuntimeException e) {
             throw new IOException(e);
           }
         } else {
-          log.log(Level.FINE, "did not win the race to insert " + key);
+          log.log(Level.INFO, "did not win the race to insert " + key);
         }
       }
     };
