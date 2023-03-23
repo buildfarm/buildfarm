@@ -2828,7 +2828,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         // TEST: Bump it higher to see if it avoids failures setting up the exec dir.
         Entry entry = new Entry(key, blobSizeInBytes, Deadline.after(5, MINUTES));
 
-        Entry existingEntry = null;
+        Entry existingEntry;
         boolean inserted = false;
         try {
           Files.createLink(CASFileCache.this.getPath(key), writePath);
