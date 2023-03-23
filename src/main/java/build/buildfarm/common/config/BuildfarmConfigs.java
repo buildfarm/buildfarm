@@ -46,7 +46,7 @@ public final class BuildfarmConfigs {
       Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
       buildfarmConfigs = yaml.load(inputStream);
       if (buildfarmConfigs == null) {
-          throw new RuntimeException("Could not load configs from path: " + configLocation);
+        throw new RuntimeException("Could not load configs from path: " + configLocation);
       }
       log.info(buildfarmConfigs.toString());
       return buildfarmConfigs;
