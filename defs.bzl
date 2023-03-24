@@ -39,6 +39,7 @@ IO_GRPC_MODULES = [
     "protobuf",
     "testing",
     "services",
+    "netty-shaded",
 ]
 
 COM_AWS_MODULES = [
@@ -91,7 +92,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.errorprone:error_prone_annotations:2.9.0",
                         "com.google.errorprone:error_prone_core:0.92",
                         "com.google.guava:failureaccess:1.0.1",
-                        "com.google.guava:guava:30.1.1-jre",
+                        "com.google.guava:guava:31.1-jre",
                         "com.google.j2objc:j2objc-annotations:1.1",
                         "com.google.jimfs:jimfs:1.1",
                         "com.google.protobuf:protobuf-java-util:3.10.0",
@@ -104,7 +105,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.bouncycastle:bcprov-jdk15on:1.70",
                         "net.jcip:jcip-annotations:1.0",
                     ] + ["io.netty:netty-%s:4.1.68.Final" % module for module in IO_NETTY_MODULES] +
-                    ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
+                    ["io.grpc:grpc-%s:1.53.0" % module for module in IO_GRPC_MODULES] +
                     [
                         "io.prometheus:simpleclient:0.10.0",
                         "io.prometheus:simpleclient_hotspot:0.10.0",
