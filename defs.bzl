@@ -39,6 +39,7 @@ IO_GRPC_MODULES = [
     "protobuf",
     "testing",
     "services",
+    "netty-shaded",
 ]
 
 COM_AWS_MODULES = [
@@ -100,11 +101,11 @@ def buildfarm_init(name = "buildfarm"):
                         "org.slf4j:slf4j-simple:1.7.35",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
-                        "io.github.lognet:grpc-spring-boot-starter:4.5.4",
+                        "io.github.lognet:grpc-spring-boot-starter:5.0.0",
                         "org.bouncycastle:bcprov-jdk15on:1.70",
                         "net.jcip:jcip-annotations:1.0",
                     ] + ["io.netty:netty-%s:4.1.68.Final" % module for module in IO_NETTY_MODULES] +
-                    ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
+                    ["io.grpc:grpc-%s:1.53.0" % module for module in IO_GRPC_MODULES] +
                     [
                         "io.prometheus:simpleclient:0.10.0",
                         "io.prometheus:simpleclient_hotspot:0.10.0",
@@ -124,7 +125,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.openjdk.jmh:jmh-generator-annprocess:1.23",
                         "org.redisson:redisson:3.13.1",
                     ] + ["org.springframework.boot:%s:2.7.4" % module for module in ORG_SPRING_BOOT_MODULES] +
-                    ["org.springframework:%s:5.3.23" % module for module in ORG_SPRING_MODULES] +
+                    ["org.springframework:%s:6.0.7" % module for module in ORG_SPRING_MODULES] +
                     [
                         "org.threeten:threetenbp:1.3.3",
                         "org.xerial:sqlite-jdbc:3.34.0",
