@@ -1,4 +1,7 @@
 build --java_language_version=17
+build --tool_java_language_version=17
+build --tool_java_runtime_version=17
+build --java_runtime_version=17
 
 common --enable_platform_specific_config
 
