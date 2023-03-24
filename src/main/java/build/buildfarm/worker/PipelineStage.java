@@ -30,7 +30,7 @@ public abstract class PipelineStage implements Runnable {
   private volatile boolean closed = false;
   private Thread tickThread = null;
   private boolean tickCancelledFlag = false;
-  private boolean restartStageOnFailure = true;
+  private boolean continueStageOnException = true;
 
   PipelineStage(
       String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -48,22 +48,31 @@ public abstract class PipelineStage implements Runnable {
 
   @Override
   public void run() {
-    boolean runStage = true;
-    while (runStage) {
+    boolean keepRunningStage = true;
+    while (keepRunningStage) {
       try {
         runInterruptible();
-        runStage = false;
+
+        // If the run finishes without exception, the stage can also stop running.
+        keepRunningStage = false;
 
       } catch (Exception e) {
-        runStage = handleTermination(e);
+        keepRunningStage = decideTermination(e);
       }
     }
 
     close();
   }
 
-  private boolean handleTermination(Exception e) {
-    // This is a normal way for a pipeline stage to terminate.
+  /**
+   * @brief When the stage has an uncaught exception, this method determines whether the pipeline
+   *     stage should terminate.
+   * @details This is a customization of the pipeline stage to allow logging exceptions but keeping
+   *     the pipeline stage running.
+   * @return Whether the stage should terminate or continue running.
+   */
+  private boolean decideTermination(Exception e) {
+    // This is a normal way for the pipeline stage to terminate.
     // If an interrupt is received, there is no reason to continue the pipeline stage.
     if (e instanceof InterruptedException) {
       getLogger()
@@ -71,12 +80,12 @@ public abstract class PipelineStage implements Runnable {
       return false;
     }
 
-    // This is an abnormal way for a pipeline stage to terminate.
-    // For robustness of the distributed system we may want to log the error but continue the
+    // On the other hand, this is an abnormal way for a pipeline stage to terminate.
+    // For robustness of the distributed system, we may want to log the error but continue the
     // pipeline stage.
     getLogger()
         .log(Level.SEVERE, String.format("%s::run(): stage terminated due to exception", name), e);
-    return restartStageOnFailure;
+    return continueStageOnException;
   }
 
   public String name() {
