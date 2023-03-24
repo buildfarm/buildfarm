@@ -1,7 +1,7 @@
 package build.buildfarm.cas.cfc;
 
-import static com.google.common.io.MoreFiles.asCharSink;
-import static com.google.common.io.MoreFiles.asCharSource;
+import static com.google.common.io.Files.asCharSink;
+import static com.google.common.io.Files.asCharSource;
 
 import build.bazel.remote.execution.v2.Digest;
 import com.google.common.collect.ImmutableList;
@@ -34,7 +34,7 @@ abstract class FileDirectoriesIndex implements DirectoriesIndex {
   @Override
   public Iterable<String> directoryEntries(Digest directory) throws IOException {
     try {
-      return asCharSource(path(directory), UTF_8).readLines();
+      return asCharSource(path(directory).toFile(), UTF_8).readLines();
     } catch (NoSuchFileException e) {
       return ImmutableList.of();
     }
@@ -42,7 +42,7 @@ abstract class FileDirectoriesIndex implements DirectoriesIndex {
 
   @Override
   public void put(Digest directory, Iterable<String> entries) throws IOException {
-    asCharSink(path(directory), UTF_8).writeLines(entries);
+    asCharSink(path(directory).toFile(), UTF_8).writeLines(entries);
   }
 
   @Override

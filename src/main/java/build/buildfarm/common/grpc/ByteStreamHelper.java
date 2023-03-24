@@ -19,6 +19,7 @@ import build.buildfarm.common.io.ByteStringQueueInputStream;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
+import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -37,7 +38,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
 import javax.annotation.Nullable;
 
 public final class ByteStreamHelper {
@@ -95,7 +95,7 @@ public final class ByteStreamHelper {
                 && currentOffset != requestOffset) {
               backoff = backoffSupplier.get();
               retryRequest();
-            } else if (retryService == null || nextDelayMillis < 0 || !isRetriable.test(status)) {
+            } else if (retryService == null || nextDelayMillis < 0 || !isRetriable.apply(status)) {
               streamReadyFuture.setException(t);
               inputStream.setException(t);
             } else {

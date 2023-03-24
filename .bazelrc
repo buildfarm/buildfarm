@@ -1,3 +1,5 @@
+build --java_language_version=17
+
 common --enable_platform_specific_config
 
 build:fuse --define=fuse=true
