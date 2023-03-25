@@ -104,7 +104,7 @@ def buildfarm_init(name = "buildfarm"):
                         "io.github.lognet:grpc-spring-boot-starter:4.5.4",
                         "org.bouncycastle:bcprov-jdk15on:1.70",
                         "net.jcip:jcip-annotations:1.0",
-                    ] + ["io.netty:netty-%s:4.1.68.Final" % module for module in IO_NETTY_MODULES] +
+                    ] + ["io.netty:netty-%s:4.1.90.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.53.0" % module for module in IO_GRPC_MODULES] +
                     [
                         "io.prometheus:simpleclient:0.10.0",
