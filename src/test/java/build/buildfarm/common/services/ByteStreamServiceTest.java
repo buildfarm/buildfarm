@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server.services;
+package build.buildfarm.common.services;
 
 import static build.buildfarm.common.DigestUtil.HashFunction.SHA256;
 import static build.buildfarm.common.services.ByteStreamService.CHUNK_SIZE;
@@ -33,7 +33,6 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.bytestream.ByteStreamGrpc;
