@@ -21,6 +21,7 @@ import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.grpc.Status.ABORTED;
+import static io.grpc.Status.CANCELLED;
 import static io.grpc.Status.INVALID_ARGUMENT;
 import static java.lang.String.format;
 
@@ -269,6 +270,9 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
   private boolean errorResponse(Throwable t) {
     if (exception.compareAndSet(null, t)) {
+      if (Status.fromThrowable(t).getCode() == Status.Code.CANCELLED) {
+        return false;
+      }
       boolean isEntryLimitException = t instanceof EntryLimitException;
       if (isEntryLimitException) {
         t = Status.OUT_OF_RANGE.withDescription(t.getMessage()).asException();
@@ -449,6 +453,10 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
               }
             },
             directExecutor());
+        // we were already cancelled in this case
+        if (out == null) {
+          throw CANCELLED.asRuntimeException();
+        }
       }
     }
     return out;
