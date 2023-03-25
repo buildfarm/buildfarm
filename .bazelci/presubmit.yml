@@ -62,6 +62,7 @@ tasks:
     test_flags:
     - "--test_tag_filters=-integration,-redis"
     test_targets:
+    - "..."
   macos:
     name: "Unit Tests"
     build_flags:
