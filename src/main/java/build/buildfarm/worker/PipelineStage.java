@@ -40,7 +40,7 @@ public abstract class PipelineStage implements Runnable {
     this.error = error;
   }
 
-  private void runInterruptible() throws InterruptedException {
+  protected void runInterruptible() throws InterruptedException {
     while (!output.isClosed() || isClaimed()) {
       iterate();
     }
