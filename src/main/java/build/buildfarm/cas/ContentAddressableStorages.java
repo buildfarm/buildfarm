@@ -15,39 +15,26 @@
 package build.buildfarm.cas;
 
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Multimaps.synchronizedListMultimap;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
-import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.Write;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Cas;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.protobuf.ByteString;
 import io.grpc.Channel;
-import io.grpc.Status;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import javax.naming.ConfigurationException;
 
 public final class ContentAddressableStorages {
@@ -126,113 +113,5 @@ public final class ContentAddressableStorages {
       case MEMORY:
         return new MemoryCAS(cas.getMaxSizeBytes());
     }
-  }
-
-  /** decorates a map with a CAS interface, does not react to removals with expirations */
-  public static ContentAddressableStorage casMapDecorator(Map<String, ByteString> map) {
-    return new ContentAddressableStorage() {
-      final Writes writes = new Writes(this);
-
-      @Override
-      public boolean contains(Digest digest, Digest.Builder result) {
-        ByteString data = getData(digest);
-        if (data != null) {
-          result.mergeFrom(digest).setSizeBytes(data.size());
-          return true;
-        }
-        return false;
-      }
-
-      @Override
-      public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
-        ImmutableList.Builder<Digest> missing = ImmutableList.builder();
-        for (Digest digest : digests) {
-          if (getData(digest) == null) {
-            missing.add(digest);
-          }
-        }
-        return missing.build();
-      }
-
-      @Override
-      public Write getWrite(
-          Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
-        return writes.get(compressor, digest, uuid);
-      }
-
-      @SuppressWarnings("ResultOfMethodCallIgnored")
-      @Override
-      public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
-          throws IOException {
-        checkArgument(compressor == Compressor.Value.IDENTITY);
-        ByteString data = getData(digest);
-        if (data == null) {
-          throw new NoSuchFileException(digest.getHash());
-        }
-        InputStream in = data.newInput();
-        in.skip(offset);
-        return in;
-      }
-
-      @Override
-      public void get(
-          Compressor.Value compressor,
-          Digest digest,
-          long offset,
-          long count,
-          ServerCallStreamObserver<ByteString> responseObserver,
-          RequestMetadata requestMetadata) {
-        checkArgument(compressor == Compressor.Value.IDENTITY);
-        ByteString data = getData(digest);
-        if (data != null) {
-          responseObserver.onNext(data);
-          responseObserver.onCompleted();
-        } else {
-          responseObserver.onError(Status.NOT_FOUND.asException());
-        }
-      }
-
-      private ByteString getData(Digest digest) {
-        if (digest.getSizeBytes() == 0) {
-          return ByteString.EMPTY;
-        }
-        ByteString data = map.get(digest.getHash());
-        if (data == null || (digest.getSizeBytes() > 0 && digest.getSizeBytes() != data.size())) {
-          return null;
-        }
-        return data;
-      }
-
-      @Override
-      public ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests) {
-        return immediateFuture(MemoryCAS.getAll(digests, this::getData));
-      }
-
-      @Override
-      public Blob get(Digest digest) {
-        ByteString data = getData(digest);
-        if (data == null) {
-          return null;
-        }
-        return new Blob(data, digest);
-      }
-
-      @Override
-      public void put(Blob blob) {
-        map.put(blob.getDigest().getHash(), blob.getData());
-
-        writes.getFuture(blob.getDigest()).set(blob.getData());
-      }
-
-      @Override
-      public void put(Blob blob, Runnable onExpiration) {
-        put(blob);
-      }
-
-      @Override
-      public long maxEntrySize() {
-        return UNLIMITED_ENTRY_SIZE_MAX;
-      }
-    };
   }
 }

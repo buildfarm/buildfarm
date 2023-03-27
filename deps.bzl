@@ -50,9 +50,9 @@ def archive_dependencies(third_party):
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "sha256": "2484054e9ac47d3b4d4a797b9a0caaf4f50f23e13efb5b23ce3703b363f13023",
-            "strip_prefix": "grpc-java-1.52.1",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.52.1.zip"],
+            "sha256": "3de8e250118c7f259426afa907fe214e55728887a7f0da0026245b42afe78128",
+            "strip_prefix": "grpc-java-1.53.0",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.53.0.zip"],
         },
 
         # The APIs that we implement.
@@ -100,9 +100,9 @@ def archive_dependencies(third_party):
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
         {
             "name": "bazel",
-            "sha256": "bca2303a43c696053317a8c7ac09a5e6d90a62fec4726e55357108bb60d7a807",
-            "strip_prefix": "bazel-3.7.2",
-            "urls": ["https://github.com/bazelbuild/bazel/archive/3.7.2.tar.gz"],
+            "sha256": "06d3dbcba2286d45fc6479a87ccc649055821fc6da0c3c6801e73da780068397",
+            "strip_prefix": "bazel-6.0.0",
+            "urls": ["https://github.com/bazelbuild/bazel/archive/refs/tags/6.0.0.tar.gz"],
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
         },

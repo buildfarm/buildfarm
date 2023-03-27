@@ -74,6 +74,7 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.net.URL;
 import build.buildfarm.common.resources.BlobInformation;
 import build.buildfarm.common.resources.DownloadBlobRequest;
 import build.buildfarm.common.resources.ResourceParser;
@@ -122,7 +123,6 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.file.NoSuchFileException;
 import java.util.HashSet;
 import java.util.List;
@@ -615,16 +615,15 @@ public abstract class AbstractServerInstance implements Instance {
     OutputStream create(long contentLength) throws IOException;
   }
 
-  private static void downloadUri(String uri, ContentOutputStreamFactory getContentOutputStream)
+  private static void downloadUrl(URL url, ContentOutputStreamFactory getContentOutputStream)
       throws IOException {
-    URL url = new URL(uri);
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
     // connect timeout?
     // proxy?
     // authenticator?
     connection.setInstanceFollowRedirects(true);
     // request timeout?
-    long contentLength = connection.getContentLength();
+    long contentLength = connection.getContentLengthLong();
     int status = connection.getResponseCode();
 
     if (status != HttpURLConnection.HTTP_OK) {
@@ -634,7 +633,7 @@ public abstract class AbstractServerInstance implements Instance {
       if (message == null) {
         message = "Invalid HTTP Response";
       }
-      message = "Download Failed: " + message + " from " + uri;
+      message = "Download Failed: " + message + " from " + url;
       throw new IOException(message);
     }
 
@@ -647,12 +646,26 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public ListenableFuture<Digest> fetchBlob(
       Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata) {
+    ImmutableList.Builder<URL> urls = ImmutableList.builder();
     for (String uri : uris) {
       try {
+        urls.add(new URL(new java.net.URL(uri)));
+      } catch (Exception e) {
+        return immediateFailedFuture(e);
+      }
+    }
+    return fetchBlobUrls(urls.build(), expectedDigest, requestMetadata);
+  }
+
+  @VisibleForTesting
+  ListenableFuture<Digest> fetchBlobUrls(
+      Iterable<URL> urls, Digest expectedDigest, RequestMetadata requestMetadata) {
+    for (URL url : urls) {
+      Digest.Builder actualDigestBuilder = expectedDigest.toBuilder();
+      try {
         // some minor abuse here, we want the download to set our built digest size as side effect
-        Digest.Builder actualDigestBuilder = expectedDigest.toBuilder();
-        downloadUri(
-            uri,
+        downloadUrl(
+            url,
             contentLength -> {
               Digest actualDigest = actualDigestBuilder.setSizeBytes(contentLength).build();
               if (expectedDigest.getSizeBytes() >= 0
@@ -663,6 +676,8 @@ public abstract class AbstractServerInstance implements Instance {
                       Compressor.Value.IDENTITY, actualDigest, UUID.randomUUID(), requestMetadata)
                   .getOutput(1, DAYS, () -> {});
             });
+        return immediateFuture(actualDigestBuilder.build());
+      } catch (Write.WriteCompleteException e) {
         return immediateFuture(actualDigestBuilder.build());
       } catch (Exception e) {
         log.log(Level.WARNING, "download attempt failed", e);
@@ -1882,8 +1897,20 @@ public abstract class AbstractServerInstance implements Instance {
         .setExecEnabled(true)
         .setExecutionPriorityCapabilities(
             PriorityCapabilities.newBuilder()
+
+                // The priority (relative importance) of this action. Generally, a lower value
+                // means that the action should be run sooner than actions having a greater
+                // priority value, but the interpretation of a given value is server-
+                // dependent. A priority of 0 means the *default* priority. Priorities may be
+                // positive or negative, and such actions should run later or sooner than
+                // actions having the default priority, respectively. The particular semantics
+                // of this field is up to the server. In particular, every server will have
+                // their own supported range of priorities, and will decide how these map into
+                // scheduling policy.
                 .addPriorities(
-                    PriorityRange.newBuilder().setMinPriority(0).setMaxPriority(Integer.MAX_VALUE)))
+                    PriorityRange.newBuilder()
+                        .setMinPriority(Integer.MIN_VALUE)
+                        .setMaxPriority(Integer.MAX_VALUE)))
         .build();
   }
 
