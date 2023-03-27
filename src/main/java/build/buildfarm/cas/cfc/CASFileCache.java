@@ -39,7 +39,6 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static java.lang.String.format;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
-import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -2910,7 +2909,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
     };
   }
-  
+
   @VisibleForTesting
   public static class Entry {
     Entry before;

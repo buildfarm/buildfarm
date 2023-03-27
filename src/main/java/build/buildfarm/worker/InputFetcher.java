@@ -320,11 +320,11 @@ public class InputFetcher implements Runnable {
             failureDetails);
 
     try {
-      
       // FIXME
-      // To preserve behavior while testing on existing cluster, we will not actually fail the operation.
-      //workerContext.putOperation(failedOperation);
-      //OperationContext newOperationContext =
+      // To preserve behavior while testing on existing cluster, we will not actually fail the
+      // operation.
+      // workerContext.putOperation(failedOperation);
+      // OperationContext newOperationContext =
       //    operationContext.toBuilder().setOperation(failedOperation).build();
       owner.error().put(operationContext);
     } catch (Exception e) {
