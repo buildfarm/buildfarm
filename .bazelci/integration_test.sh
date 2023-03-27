@@ -18,4 +18,5 @@ docker run \
     --env RUN_TEST=$RUN_TEST \
     --env TEST_ARG1=$TEST_ARG1 \
     --env EXECUTION_STAGE_WIDTH=$EXECUTION_STAGE_WIDTH \
+    --env BUILDFARM_CONFIG=$BUILDFARM_CONFIG \
     buildfarm buildfarm/.bazelci/test_buildfarm_container.sh

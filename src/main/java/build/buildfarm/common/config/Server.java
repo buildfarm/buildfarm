@@ -37,7 +37,8 @@ public class Server {
   private String clusterId = "";
   private String cloudRegion;
   private String publicName;
-
+  private ServerCacheConfigs caches = new ServerCacheConfigs();
+  
   public String getSession() {
     return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);
   }
