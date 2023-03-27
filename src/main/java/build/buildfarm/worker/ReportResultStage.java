@@ -42,10 +42,10 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 public class ReportResultStage extends PipelineStage {
-  private static final Logger logger = Logger.getLogger(ReportResultStage.class.getName());
-
   private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public ReportResultStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -54,7 +54,7 @@ public class ReportResultStage extends PipelineStage {
 
   @Override
   protected Logger getLogger() {
-    return logger;
+    return log;
   }
 
   @Override
@@ -98,8 +98,7 @@ public class ReportResultStage extends PipelineStage {
           operationContext.queueEntry.getExecuteEntry().getActionDigest(),
           resultBuilder,
           operationContext.execDir,
-          operationContext.command.getOutputFilesList(),
-          operationContext.command.getOutputDirectoriesList());
+          operationContext.command);
     } catch (StatusException e) {
       ExecuteResponse executeResponse = operationContext.executeResponse.build();
       if (executeResponse.getStatus().getCode() == Code.OK.getNumber()
@@ -108,7 +107,7 @@ public class ReportResultStage extends PipelineStage {
         // already failing
         Status status = StatusProto.fromThrowable(e);
         if (status == null) {
-          logger.log(
+          log.log(
               Level.SEVERE, String.format("no rpc status from exception for %s", operationName), e);
           status = asExecutionStatus(e);
         }
@@ -121,7 +120,7 @@ public class ReportResultStage extends PipelineStage {
       // cancellation here should not be logged
       return null;
     } catch (IOException e) {
-      logger.log(Level.SEVERE, String.format("error uploading outputs for %s", operationName), e);
+      log.log(Level.SEVERE, String.format("error uploading outputs for %s", operationName), e);
       return null;
     }
 
@@ -134,7 +133,7 @@ public class ReportResultStage extends PipelineStage {
               .unpack(ExecutingOperationMetadata.class)
               .getExecuteOperationMetadata();
     } catch (InvalidProtocolBufferException e) {
-      logger.log(
+      log.log(
           Level.SEVERE,
           String.format("invalid execute operation metadata for %s", operationName),
           e);
@@ -161,7 +160,7 @@ public class ReportResultStage extends PipelineStage {
               DigestUtil.asActionKey(metadata.getActionDigest()), executeResponse.getResult());
         }
       } catch (IOException e) {
-        logger.log(
+        log.log(
             Level.SEVERE, String.format("error reporting action result for %s", operationName), e);
         return null;
       }
@@ -188,7 +187,7 @@ public class ReportResultStage extends PipelineStage {
         return null;
       }
     } catch (IOException e) {
-      logger.log(
+      log.log(
           Level.SEVERE,
           String.format("error reporting operation complete for %s", operationName),
           e);
@@ -205,7 +204,7 @@ public class ReportResultStage extends PipelineStage {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } catch (IOException e) {
-      logger.log(
+      log.log(
           Level.SEVERE,
           String.format("error destroying exec dir %s", operationContext.execDir.toString()),
           e);

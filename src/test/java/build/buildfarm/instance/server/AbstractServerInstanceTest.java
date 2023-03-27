@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.server;
 
+import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.instance.server.AbstractServerInstance.ACTION_INPUT_ROOT_DIRECTORY_PATH;
 import static build.buildfarm.instance.server.AbstractServerInstance.DIRECTORY_NOT_SORTED;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -41,7 +43,7 @@ import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.Tree;
-import build.buildfarm.ac.ActionCache;
+import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
@@ -51,6 +53,9 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.WriteCompleteException;
+import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.common.net.URL;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
@@ -69,12 +74,16 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
+import io.grpc.StatusException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.util.Stack;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
+import lombok.extern.java.Log;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -82,9 +91,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
+@Log
 public class AbstractServerInstanceTest {
-  private static final Logger logger = Logger.getLogger(AbstractServerInstanceTest.class.getName());
-
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   static class DummyServerInstance extends AbstractServerInstance {
@@ -107,7 +115,7 @@ public class AbstractServerInstanceTest {
 
     @Override
     protected Logger getLogger() {
-      return logger;
+      return log;
     }
 
     @Override
@@ -193,7 +201,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public CasIndexResults reindexCas(@Nullable String hostName) {
+    public CasIndexResults reindexCas() {
       throw new UnsupportedOperationException();
     }
 
@@ -247,6 +255,37 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("/: foo");
     assertThat(violation.getDescription()).isEqualTo(DUPLICATE_DIRENT);
+  }
+
+  @Test
+  public void duplicateEmptyDirectoryCheckPasses() throws StatusException {
+    Directory emptyDirectory = Directory.getDefaultInstance();
+    Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+    AbstractServerInstance.validateActionInputDirectory(
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
+        Directory.newBuilder()
+            .addAllDirectories(
+                ImmutableList.of(
+                    DirectoryNode.newBuilder()
+                        .setName("bar")
+                        .setDigest(emptyDirectoryDigest)
+                        .build(),
+                    DirectoryNode.newBuilder()
+                        .setName("foo")
+                        .setDigest(emptyDirectoryDigest)
+                        .build()))
+            .build(),
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ ImmutableMap.of(Digest.getDefaultInstance(), emptyDirectory),
+        /* onInputFiles=*/ file -> {},
+        /* onInputDirectories=*/ directory -> {},
+        /* onInputDigests=*/ digest -> {},
+        preconditionFailure);
+
+    checkPreconditionFailure(
+        Digest.newBuilder().setHash("should not fail").build(), preconditionFailure.build());
   }
 
   @Test
@@ -466,13 +505,14 @@ public class AbstractServerInstanceTest {
             (Answer<Void>)
                 invocation -> {
                   StreamObserver<ByteString> blobObserver =
-                      (StreamObserver) invocation.getArguments()[3];
+                      (StreamObserver) invocation.getArguments()[4];
                   blobObserver.onNext(content);
                   blobObserver.onCompleted();
                   return null;
                 })
         .when(contentAddressableStorage)
         .get(
+            eq(Compressor.Value.IDENTITY),
             eq(digest),
             /* offset=*/ eq(0L),
             eq(digest.getSizeBytes()),
@@ -542,6 +582,7 @@ public class AbstractServerInstanceTest {
         ArgumentCaptor.forClass(Iterable.class);
     verify(contentAddressableStorage, times(1))
         .get(
+            eq(Compressor.Value.IDENTITY),
             eq(treeDigest),
             /* offset=*/ eq(0L),
             eq(treeDigest.getSizeBytes()),
@@ -550,5 +591,52 @@ public class AbstractServerInstanceTest {
     verify(contentAddressableStorage, times(1)).findMissingBlobs(findMissingBlobsCaptor.capture());
     assertThat(findMissingBlobsCaptor.getValue())
         .containsAtLeast(fileDigest, childFileDigest, otherFileDigest);
+  }
+
+  @Test
+  public void fetchBlobWriteCompleteIsSuccess() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
+    Digest contentDigest = DIGEST_UTIL.compute(content);
+    Digest expectedDigest = contentDigest.toBuilder().setSizeBytes(-1).build();
+
+    ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
+    AbstractServerInstance instance = new DummyServerInstance(contentAddressableStorage, null);
+    RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
+    Write write = mock(Write.class);
+
+    FeedbackOutputStream writeCompleteOutputStream =
+        new FeedbackOutputStream() {
+          @Override
+          public void write(int n) throws WriteCompleteException {
+            throw new WriteCompleteException();
+          }
+
+          @Override
+          public boolean isReady() {
+            return true;
+          }
+        };
+    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+        .thenReturn(writeCompleteOutputStream);
+    when(contentAddressableStorage.getWrite(
+            eq(Compressor.Value.IDENTITY), eq(contentDigest), any(UUID.class), eq(requestMetadata)))
+        .thenReturn(write);
+
+    HttpURLConnection httpURLConnection = mock(HttpURLConnection.class);
+    when(httpURLConnection.getContentLengthLong()).thenReturn(contentDigest.getSizeBytes());
+    when(httpURLConnection.getResponseCode()).thenReturn(HttpURLConnection.HTTP_OK);
+    when(httpURLConnection.getInputStream()).thenReturn(content.newInput());
+    URL url = mock(URL.class);
+    when(url.openConnection()).thenReturn(httpURLConnection);
+
+    assertThat(instance.fetchBlobUrls(ImmutableList.of(url), expectedDigest, requestMetadata).get())
+        .isEqualTo(contentDigest);
+    verify(contentAddressableStorage, times(1))
+        .getWrite(
+            eq(Compressor.Value.IDENTITY), eq(contentDigest), any(UUID.class), eq(requestMetadata));
+    verify(write, times(1)).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
+    verify(httpURLConnection, times(1)).getContentLengthLong();
+    verify(httpURLConnection, times(1)).getResponseCode();
+    verify(url, times(1)).openConnection();
   }
 }

@@ -15,6 +15,9 @@
 package build.buildfarm.admin.aws;
 
 import build.buildfarm.admin.Admin;
+import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.v1test.AdminGrpc;
+import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.Host;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
@@ -37,6 +40,9 @@ import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementClientBuilder;
 import com.amazonaws.services.simplesystemsmanagement.model.SendCommandRequest;
 import com.google.protobuf.util.Timestamps;
+import io.grpc.ManagedChannel;
+import io.grpc.netty.NegotiationType;
+import io.grpc.netty.NettyChannelBuilder;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -46,24 +52,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
+import org.springframework.stereotype.Component;
 
+@Log
+@Component
 public class AwsAdmin implements Admin {
-  private static final Logger logger = Logger.getLogger(Admin.class.getName());
-  private final AmazonAutoScaling scale;
-  private final AmazonEC2 ec2;
-  private final AWSSimpleSystemsManagement ssm;
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+  private AmazonAutoScaling scale;
+  private AmazonEC2 ec2;
+  private AWSSimpleSystemsManagement ssm;
 
-  public AwsAdmin(String region) {
-    scale = AmazonAutoScalingClientBuilder.standard().withRegion(region).build();
-    ec2 = AmazonEC2ClientBuilder.standard().withRegion(region).build();
-    ssm = AWSSimpleSystemsManagementClientBuilder.standard().withRegion(region).build();
+  public AwsAdmin() {
+    String region = configs.getServer().getCloudRegion();
+    if (region != null) {
+      scale = AmazonAutoScalingClientBuilder.standard().withRegion(region).build();
+      ec2 = AmazonEC2ClientBuilder.standard().withRegion(region).build();
+      ssm = AWSSimpleSystemsManagementClientBuilder.standard().withRegion(region).build();
+    } else {
+      log.warning("Missing cloudRegion configuration. AWS Admin will not be enabled.");
+    }
   }
 
   @Override
   public void terminateHost(String hostId) {
     ec2.terminateInstances(new TerminateInstancesRequest().withInstanceIds(hostId));
-    logger.log(Level.INFO, String.format("Terminated host: %s", hostId));
+    log.log(Level.INFO, String.format("Terminated host: %s", hostId));
   }
 
   @Override
@@ -77,8 +91,7 @@ public class AwsAdmin implements Admin {
             .withDocumentName("AWS-RunShellScript")
             .withInstanceIds(hostId)
             .withParameters(parameters));
-    logger.log(
-        Level.INFO, String.format("Stopped container: %s on host: %s", containerName, hostId));
+    log.log(Level.INFO, String.format("Stopped container: %s on host: %s", containerName, hostId));
   }
 
   @Override
@@ -114,7 +127,7 @@ public class AwsAdmin implements Admin {
     }
     resultBuilder.addAllHosts(hosts);
     resultBuilder.setNumHosts(hosts.size());
-    logger.log(Level.FINE, String.format("Got %d hosts for filter: %s", hosts.size(), filter));
+    log.log(Level.FINE, String.format("Got %d hosts for filter: %s", hosts.size(), filter));
     return resultBuilder.build();
   }
 
@@ -144,7 +157,7 @@ public class AwsAdmin implements Admin {
                       .withOnDemandPercentageAboveBaseCapacity(targetReservedHostsPercent)));
     }
     scale.updateAutoScalingGroup(request);
-    logger.log(Level.INFO, String.format("Scaled: %s", scaleGroupName));
+    log.log(Level.INFO, String.format("Scaled: %s", scaleGroupName));
   }
 
   private long getHostUptimeInMinutes(Date launchTime) {
@@ -163,7 +176,7 @@ public class AwsAdmin implements Admin {
     Instance workerInstance = getInstanceId(privateDnsName);
     if (workerInstance == null) {
       String errorMessage = "Cannot find instance with private DNS name " + privateDnsName;
-      logger.log(Level.SEVERE, errorMessage);
+      log.log(Level.SEVERE, errorMessage);
       throw new RuntimeException(errorMessage);
     }
     String instanceId = workerInstance.getInstanceId();
@@ -171,7 +184,7 @@ public class AwsAdmin implements Admin {
     if (autoScalingGroup == null || autoScalingGroup.length() == 0) {
       String errorMessage =
           "Cannot find AutoScalingGroup name of worker with private DNS name " + privateDnsName;
-      logger.log(Level.SEVERE, errorMessage);
+      log.log(Level.SEVERE, errorMessage);
       throw new RuntimeException(errorMessage);
     }
 
@@ -182,11 +195,28 @@ public class AwsAdmin implements Admin {
             .withAutoScalingGroupName(autoScalingGroup)
             .withProtectedFromScaleIn(false);
     SetInstanceProtectionResult result = scale.setInstanceProtection(disableProtectionRequest);
-    logger.log(
+    log.log(
         Level.INFO,
         String.format(
             "Disable protection of host: %s in AutoScalingGroup: %s and get result: %s",
             instanceId, autoScalingGroup, result.toString()));
+  }
+
+  @Override
+  public void disableHostScaleInProtection(String clusterEndpoint, String instanceIp) {
+    ManagedChannel channel = null;
+    try {
+      NettyChannelBuilder builder =
+          NettyChannelBuilder.forTarget(clusterEndpoint).negotiationType(NegotiationType.PLAINTEXT);
+      channel = builder.build();
+      AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
+      adminBlockingStub.disableScaleInProtection(
+          DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
+    } finally {
+      if (channel != null) {
+        channel.shutdown();
+      }
+    }
   }
 
   private String getTagValue(List<Tag> tags) {

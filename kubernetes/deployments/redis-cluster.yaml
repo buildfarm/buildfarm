@@ -5,7 +5,7 @@ metadata:
   labels:
     name: redis-cluster
 spec:
-  replicas: 1 
+  replicas: 1
   selector:
     matchLabels:
       name: redis-cluster

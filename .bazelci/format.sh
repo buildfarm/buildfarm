@@ -4,12 +4,15 @@
 # Use the flag --check if you want the script to fail when formatting is not correct.
 
 FORMAT_JAVA=true
+REMOVE_NEWLINES_AFTER_START_BRACKET=true
 JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/google-java-format-1.7/google-java-format-1.7-all-deps.jar
 LOCAL_FORMATTER="java_formatter.jar"
 
 FORMAT_PROTO=true
-CLANG_FORMAT=@llvm_toolchain//:bin/clang-format
-BAZEL_WRAPPER=bazel
+CLANG_FORMAT=@llvm_toolchain//:clang-format
+if [ -z "$BAZEL" ]; then
+  BAZEL=bazel
+fi
 
 FORMAT_BUILD=true
 BUILDIFIER=//:buildifier
@@ -51,16 +54,18 @@ run_java_formatter () {
         return
     fi
 
-    # The formatter is lax on certain whitespace decisons.
+    # The formatter is lax on certain whitespace decisions.
     # Therefore, we perform these adjustements before running the formatter.
     # This will make the formatting more consistent overall.
-    for file in $files
-    do
-	# Remove whitespace lines after starting bracket '{'
-	# Ignore any issues if this does not succeed.
-	# The CI doesn't gate on this adjustment.
-        awk -i inplace -v n=-2 'NR==n+1 && !NF{next} /\{/ {n=NR}1' $file > /dev/null 2>&1
-    done
+    if [ "${REMOVE_NEWLINES_AFTER_START_BRACKET:-false}" = true ]; then
+        for file in $files
+        do
+    	# Remove whitespace lines after starting bracket '{'
+    	# Ignore any issues if this does not succeed.
+    	# The CI doesn't gate on this adjustment.
+            awk -i inplace -v n=-2 'NR==n+1 && !NF{next} /\{/ {n=NR}1' $file > /dev/null 2>&1
+        done
+    fi;
 
     # Fixes formatting issues
     java -jar $LOCAL_FORMATTER -i $files
@@ -72,17 +77,17 @@ run_proto_formatter () {
     # This is intended to be done by the CI.
     if [[ "$@" == "--check" ]]
     then
-        find . -name '*.proto' -exec $BAZEL_WRAPPER run $CLANG_FORMAT -- -i --dry-run --Werror {} +
+        find . -name '*.proto' -exec $BAZEL run $CLANG_FORMAT -- -i --dry-run --Werror {} +
         handle_format_error_check
         return
     fi
 
     # Fixes formatting issues
-    find . -name '*.proto' -exec $BAZEL_WRAPPER run $CLANG_FORMAT -- -i {} +
+    find . -name '*.proto' -exec $BAZEL run $CLANG_FORMAT -- -i {} +
 }
 
 run_buildifier () {
-    $BAZEL_WRAPPER run $BUILDIFIER -- -r > /dev/null 2>&1
+    $BAZEL run $BUILDIFIER -- -r > /dev/null 2>&1
 }
 
 if [ "${FORMAT_JAVA:-false}" = true ]; then

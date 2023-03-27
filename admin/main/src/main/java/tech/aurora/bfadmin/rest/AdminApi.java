@@ -20,7 +20,7 @@ import java.util.List;
 @RequestMapping(value = "admin", method = RequestMethod.POST)
 public class AdminApi {
   private static final Logger logger = LoggerFactory.getLogger(AdminApi.class);
-  
+
   @Autowired
   AdminService adminService;
 
@@ -53,9 +53,9 @@ public class AdminApi {
     return adminService.getClusterDetails();
   }
 
-  @RequestMapping("/reindexallcas")
-  public void reindexAllCas() {
-    adminService.reindexAllCas();
+  @RequestMapping("/reindexcas")
+  public void reindexCas() {
+    adminService.reindexCas();
   }
 
   @RequestMapping("/restart/{instanceId}")

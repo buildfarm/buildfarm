@@ -3,6 +3,8 @@ load("@io_bazel_rules_docker//java:image.bzl", "java_image")
 load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "download_pkgs")
 load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+load("@rules_oss_audit//oss_audit:java/oss_audit.bzl", "oss_audit")
+load("//:defs.bzl", "ensure_accurate_metadata")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -38,6 +40,7 @@ java_library(
         ":as-nobody",
         ":delay",
         ":linux-sandbox.binary",
+        ":macos-wrapper",
         ":process-wrapper.binary",
         ":skip_sleep.binary",
         ":skip_sleep.preload",
@@ -108,10 +111,35 @@ sh_binary(
     srcs = ["delay.sh"],
 )
 
+sh_binary(
+    name = "macos-wrapper",
+    srcs = ["macos-wrapper.sh"],
+)
+
+SERVER_TELEMETRY_JVM_FLAGS = [
+    "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
+    "-Dotel.resource.attributes=service.name=server",
+    "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
+    "-Dotel.instrumentation.http.capture-headers.client.request",
+    "-Dotel.instrumentation.http.capture-headers.client.response",
+    "-Dotel.instrumentation.http.capture-headers.server.request",
+    "-Dotel.instrumentation.http.capture-headers.server.response",
+]
+
+WORKER_TELEMETRY_JVM_FLAGS = [
+    "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
+    "-Dotel.resource.attributes=service.name=worker",
+    "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
+    "-Dotel.instrumentation.http.capture-headers.client.request",
+    "-Dotel.instrumentation.http.capture-headers.client.response",
+    "-Dotel.instrumentation.http.capture-headers.server.request",
+    "-Dotel.instrumentation.http.capture-headers.server.response",
+]
+
 # Docker images for buildfarm components
 java_image(
     name = "buildfarm-server",
-    args = ["/app/build_buildfarm/examples/shard-server.config.example"],
+    args = ["/app/build_buildfarm/examples/config.minimal.yml"],
     base = "@amazon_corretto_java_image_base//image",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
@@ -120,24 +148,24 @@ java_image(
         "//examples:example_configs",
         "//src/main/java/build/buildfarm:configs",
     ],
-    jvm_flags = [
-        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-
-        # Flags related to OpenTelemetry
-        "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-        "-Dotel.resource.attributes=service.name=server",
-        "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-        "-Dotel.instrumentation.http.capture-headers.client.request",
-        "-Dotel.instrumentation.http.capture-headers.client.response",
-        "-Dotel.instrumentation.http.capture-headers.server.request",
-        "-Dotel.instrumentation.http.capture-headers.server.response",
-    ],
+    jvm_flags = ensure_accurate_metadata() + [
+        "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+    ] + select({
+        "//config:open_telemetry": SERVER_TELEMETRY_JVM_FLAGS,
+        "//conditions:default": [],
+    }),
     main_class = "build.buildfarm.server.BuildFarmServer",
     tags = ["container"],
     runtime_deps = [
         ":telemetry_tools",
         "//src/main/java/build/buildfarm/server",
     ],
+)
+
+oss_audit(
+    name = "buildfarm-server-audit",
+    src = "//src/main/java/build/buildfarm:buildfarm-server",
+    tags = ["audit"],
 )
 
 # A worker image may need additional packages installed that are not in the base image.
@@ -168,7 +196,7 @@ container_image(
 
 java_image(
     name = "buildfarm-shard-worker",
-    args = ["/app/build_buildfarm/examples/shard-worker.config.example"],
+    args = ["/app/build_buildfarm/examples/config.minimal.yml"],
     base = ":worker_pkgs_image_wrapper",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
@@ -177,18 +205,12 @@ java_image(
         "//examples:example_configs",
         "//src/main/java/build/buildfarm:configs",
     ],
-    jvm_flags = [
-        "-Djava.util.logging.config.file=/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-
-        # Flags related to OpenTelemetry
-        "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-        "-Dotel.resource.attributes=service.name=worker",
-        "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-        "-Dotel.instrumentation.http.capture-headers.client.request",
-        "-Dotel.instrumentation.http.capture-headers.client.response",
-        "-Dotel.instrumentation.http.capture-headers.server.request",
-        "-Dotel.instrumentation.http.capture-headers.server.response",
-    ],
+    jvm_flags = ensure_accurate_metadata() + [
+        "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
+    ] + select({
+        "//config:open_telemetry": WORKER_TELEMETRY_JVM_FLAGS,
+        "//conditions:default": [],
+    }),
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
     runtime_deps = [
@@ -196,4 +218,10 @@ java_image(
         ":telemetry_tools",
         "//src/main/java/build/buildfarm/worker/shard",
     ],
+)
+
+oss_audit(
+    name = "buildfarm-shard-worker-audit",
+    src = "//src/main/java/build/buildfarm:buildfarm-shard-worker",
+    tags = ["audit"],
 )

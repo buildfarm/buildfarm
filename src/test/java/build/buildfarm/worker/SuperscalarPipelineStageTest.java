@@ -22,14 +22,14 @@ import com.google.longrunning.Operation;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
+import lombok.extern.java.Log;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
+@Log
 public class SuperscalarPipelineStageTest {
-  private static final Logger logger = Logger.getLogger(PipelineStageTest.class.getName());
-
   static class AbstractSuperscalarPipelineStage extends SuperscalarPipelineStage {
     public AbstractSuperscalarPipelineStage(String name, PipelineStage output, int width) {
       this(name, null, output, null, width);
@@ -46,7 +46,7 @@ public class SuperscalarPipelineStageTest {
 
     @Override
     public Logger getLogger() {
-      return logger;
+      return log;
     }
 
     @Override

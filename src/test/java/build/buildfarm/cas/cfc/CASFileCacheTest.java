@@ -15,6 +15,7 @@
 package build.buildfarm.cas.cfc;
 
 import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
@@ -23,6 +24,7 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -30,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -38,6 +41,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.DigestMismatchException;
+import build.buildfarm.cas.cfc.CASFileCache.CancellableOutputStream;
 import build.buildfarm.cas.cfc.CASFileCache.Entry;
 import build.buildfarm.cas.cfc.CASFileCache.PutDirectoryException;
 import build.buildfarm.cas.cfc.CASFileCache.StartupCacheResults;
@@ -88,6 +92,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.stubbing.Answer;
 
 class CASFileCacheTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
@@ -116,10 +121,21 @@ class CASFileCacheTest {
   @Before
   public void setUp() throws IOException, InterruptedException {
     MockitoAnnotations.initMocks(this);
-    when(delegate.getWrite(any(Digest.class), any(UUID.class), any(RequestMetadata.class)))
+    when(delegate.getWrite(
+            any(Compressor.Value.class),
+            any(Digest.class),
+            any(UUID.class),
+            any(RequestMetadata.class)))
         .thenReturn(new NullWrite());
-    when(delegate.newInput(any(Digest.class), any(Long.class)))
+    when(delegate.newInput(any(Compressor.Value.class), any(Digest.class), any(Long.class)))
         .thenThrow(new NoSuchFileException("null sink delegate"));
+    doAnswer(
+            (Answer<Iterable<Digest>>)
+                invocation -> {
+                  return (Iterable<Digest>) invocation.getArguments()[0];
+                })
+        .when(delegate)
+        .findMissingBlobs(any(Iterable.class));
     blobs = Maps.newHashMap();
     putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
@@ -138,13 +154,16 @@ class CASFileCacheTest {
             /* directoriesIndexDbName=*/ ":memory:",
             onPut,
             onExpire,
-            delegate) {
+            delegate,
+            /* delegateSkipLoad=*/ false) {
           @Override
-          protected InputStream newExternalInput(Digest digest) throws IOException {
+          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+              throws IOException {
             ByteString content = blobs.get(digest);
             if (content == null) {
-              return fileCache.newTransparentInput(digest, 0);
+              return fileCache.newTransparentInput(compressor, digest, 0);
             }
+            checkArgument(compressor == Compressor.Value.IDENTITY);
             return content.substring((int) (long) 0).newInput();
           }
         };
@@ -181,7 +200,7 @@ class CASFileCacheTest {
     ByteString blob = ByteString.copyFromUtf8("");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     // supply an empty input stream if called for test clarity
-    when(mockInputStreamFactory.newInput(blobDigest, /* offset=*/ 0))
+    when(mockInputStreamFactory.newInput(Compressor.Value.IDENTITY, blobDigest, /* offset=*/ 0))
         .thenReturn(ByteString.EMPTY.newInput());
     try {
       fileCache.put(blobDigest, false);
@@ -389,7 +408,7 @@ class CASFileCacheTest {
     entry.after = entry;
     storage.put(nonexistentKey, entry);
     NoSuchFileException noSuchFileException = null;
-    try (InputStream in = fileCache.newInput(nonexistentDigest, 0)) {
+    try (InputStream in = fileCache.newInput(Compressor.Value.IDENTITY, nonexistentDigest, 0)) {
       fail("should not get here");
     } catch (NoSuchFileException e) {
       noSuchFileException = e;
@@ -490,7 +509,8 @@ class CASFileCacheTest {
   }
 
   Write getWrite(Digest digest) throws IOException {
-    return fileCache.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+    return fileCache.getWrite(
+        Compressor.Value.IDENTITY, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
   }
 
   @Test
@@ -535,6 +555,49 @@ class CASFileCacheTest {
   }
 
   @Test
+  public void cancelDischargesWriteSize() throws IOException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    Write cancellingWrite = getWrite(digest);
+    OutputStream out = cancellingWrite.getOutput(1, SECONDS, () -> {});
+    assertThat(out).isInstanceOf(CancellableOutputStream.class);
+    CancellableOutputStream cancelOut = (CancellableOutputStream) out;
+    assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes());
+    cancelOut.cancel();
+    assertThat(fileCache.size()).isEqualTo(0);
+    assertThat(cancellingWrite.getCommittedSize()).isEqualTo(0);
+    assertThat(cancellingWrite.isComplete()).isFalse();
+  }
+
+  @Test
+  public void cancelNegatesProgressAndCanRestart() throws IOException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    Write cancellingWrite = getWrite(digest);
+    AtomicBoolean notified = new AtomicBoolean(false);
+    cancellingWrite.getFuture().addListener(() -> notified.set(true), directExecutor());
+    OutputStream out = cancellingWrite.getOutput(1, SECONDS, () -> {});
+    assertThat(out).isInstanceOf(CancellableOutputStream.class);
+    CancellableOutputStream cancelOut = (CancellableOutputStream) out;
+    assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes());
+    content.substring(0, 6).writeTo(out);
+    assertThat(cancellingWrite.getCommittedSize()).isEqualTo(6);
+    assertThat(cancellingWrite.isComplete()).isFalse();
+    cancelOut.cancel();
+    assertThat(cancellingWrite.getCommittedSize()).isEqualTo(0);
+    assertThat(cancellingWrite.isComplete()).isFalse();
+    try (OutputStream restartedOut = cancellingWrite.getOutput(1, SECONDS, () -> {})) {
+      content.writeTo(restartedOut);
+    }
+    assertThat(notified.get()).isTrue();
+    assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes());
+    assertThat(cancellingWrite.getCommittedSize()).isEqualTo(digest.getSizeBytes());
+    assertThat(cancellingWrite.isComplete()).isTrue();
+  }
+
+  @Test
   public void incompleteWriteFileIsResumed() throws IOException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Digest digest = DIGEST_UTIL.compute(content);
@@ -545,12 +608,19 @@ class CASFileCacheTest {
     try (OutputStream out = Files.newOutputStream(writePath)) {
       content.substring(0, 6).writeTo(out);
     }
-    Write write = fileCache.getWrite(digest, writeId, RequestMetadata.getDefaultInstance());
+    Write write =
+        fileCache.getWrite(
+            Compressor.Value.IDENTITY, digest, writeId, RequestMetadata.getDefaultInstance());
     AtomicBoolean notified = new AtomicBoolean(false);
     write.getFuture().addListener(() -> notified.set(true), directExecutor());
     assertThat(write.getCommittedSize()).isEqualTo(6);
     try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
-      content.substring(6).writeTo(out);
+      content.substring(6, 9).writeTo(out);
+    }
+    // ensure that we can continue via a full call to getOutput
+    assertThat(write.getCommittedSize()).isEqualTo(9);
+    try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
+      content.substring(9).writeTo(out);
     }
     assertThat(notified.get()).isTrue();
     assertThat(write.getCommittedSize()).isEqualTo(digest.getSizeBytes());
@@ -581,6 +651,7 @@ class CASFileCacheTest {
     try (OutputStream secondOut = write.getOutput(1, SECONDS, () -> {})) {
       assertThat(writeClosed.get()).isTrue();
     }
+    write.reset(); // ensure that the output stream is closed
   }
 
   @Test
@@ -597,6 +668,7 @@ class CASFileCacheTest {
     firstOut.get().close();
     assertThat(secondOut.isDone()).isTrue();
     secondOut.get().close();
+    write.reset(); // ensure that the output stream is closed
   }
 
   @Test(expected = DigestMismatchException.class)
@@ -622,7 +694,8 @@ class CASFileCacheTest {
     // update entry with expired deadline
     storage.get(key).existsDeadline = Deadline.after(0, SECONDS);
 
-    try (InputStream in = fileCache.newInput(blob.getDigest(), /* offset=*/ 0)) {
+    try (InputStream in =
+        fileCache.newInput(Compressor.Value.IDENTITY, blob.getDigest(), /* offset=*/ 0)) {
       fail("should not get here");
     } catch (NoSuchFileException e) {
       // success
@@ -632,12 +705,43 @@ class CASFileCacheTest {
 
   @Test
   public void emptyWriteIsComplete() throws IOException {
-    Write write =
-        fileCache.getWrite(
-            DIGEST_UTIL.compute(ByteString.EMPTY),
-            UUID.randomUUID(),
-            RequestMetadata.getDefaultInstance());
+    Write write = getWrite(DIGEST_UTIL.compute(ByteString.EMPTY));
     assertThat(write.isComplete()).isTrue();
+  }
+
+  class UnsupportedWrite implements Write {
+    @Override
+    public long getCommittedSize() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean isComplete() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public FeedbackOutputStream getOutput(
+        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+        throws IOException {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ListenableFuture<FeedbackOutputStream> getOutputFuture(
+        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void reset() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ListenableFuture<Long> getFuture() {
+      throw new UnsupportedOperationException();
+    }
   }
 
   @Test
@@ -654,18 +758,8 @@ class CASFileCacheTest {
 
     // set the delegate to throw interrupted on write output creation
     Write interruptingWrite =
-        new Write() {
+        new UnsupportedWrite() {
           boolean canReset = false;
-
-          @Override
-          public long getCommittedSize() {
-            throw new UnsupportedOperationException();
-          }
-
-          @Override
-          public boolean isComplete() {
-            throw new UnsupportedOperationException();
-          }
 
           @Override
           public FeedbackOutputStream getOutput(
@@ -676,24 +770,17 @@ class CASFileCacheTest {
           }
 
           @Override
-          public ListenableFuture<FeedbackOutputStream> getOutputFuture(
-              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
-            throw new UnsupportedOperationException();
-          }
-
-          @Override
           public void reset() {
             if (!canReset) {
               throw new UnsupportedOperationException();
             }
           }
-
-          @Override
-          public ListenableFuture<Long> getFuture() {
-            throw new UnsupportedOperationException();
-          }
         };
-    when(delegate.getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class)))
+    when(delegate.getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(expiringDigest),
+            any(UUID.class),
+            any(RequestMetadata.class)))
         .thenReturn(interruptingWrite);
 
     // FIXME we should have a guarantee that we did not iterate over another expiration
@@ -707,7 +794,62 @@ class CASFileCacheTest {
     assertThat(sequenceException).isNotNull();
 
     verify(delegate, times(1))
-        .getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class));
+        .getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(expiringDigest),
+            any(UUID.class),
+            any(RequestMetadata.class));
+    assertThat(storage).isEmpty();
+  }
+
+  @Test
+  public void delegateWriteCompleteIsNotAnError() throws IOException, InterruptedException {
+    Blob expiringBlob;
+    try (ByteString.Output out = ByteString.newOutput(1024)) {
+      for (int i = 0; i < 1024; i++) {
+        out.write(0);
+      }
+      expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
+      fileCache.put(expiringBlob);
+    }
+    Digest expiringDigest = expiringBlob.getDigest();
+
+    // set the delegate to throw on stream create, indicate write complete after
+    Write completingWrite =
+        new UnsupportedWrite() {
+          boolean completed = false;
+
+          @Override
+          public FeedbackOutputStream getOutput(
+              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+              throws IOException {
+            completed = true;
+            throw new IOException("indicates already complete");
+          }
+
+          @Override
+          public boolean isComplete() {
+            return completed;
+          }
+        };
+    when(delegate.getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(expiringDigest),
+            any(UUID.class),
+            any(RequestMetadata.class)))
+        .thenReturn(completingWrite);
+
+    Blob blob = new Blob(ByteString.copyFromUtf8("Hello, World"), DIGEST_UTIL);
+    fileCache.put(blob);
+
+    verify(delegate, times(1))
+        .getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(expiringDigest),
+            any(UUID.class),
+            any(RequestMetadata.class));
+    assertThat(completingWrite.isComplete()).isTrue();
+    assertThat(storage.keySet()).containsExactly(blob.getDigest().getHash());
   }
 
   void decrementReference(Path path) throws IOException, InterruptedException {
@@ -777,7 +919,10 @@ class CASFileCacheTest {
               return null;
             });
     when(delegate.getWrite(
-            eq(expiringBlob.getDigest()), any(UUID.class), any(RequestMetadata.class)))
+            eq(Compressor.Value.IDENTITY),
+            eq(expiringBlob.getDigest()),
+            any(UUID.class),
+            any(RequestMetadata.class)))
         .thenReturn(
             new NullWrite() {
               @Override
@@ -844,19 +989,21 @@ class CASFileCacheTest {
   public void readThroughSwitchesToLocalOnComplete() throws IOException, InterruptedException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Blob blob = new Blob(content, DIGEST_UTIL);
-    when(delegate.newInput(eq(blob.getDigest()), eq(0L))).thenReturn(content.newInput());
-    InputStream in = fileCache.newInput(blob.getDigest(), 0);
+    when(delegate.newInput(eq(Compressor.Value.IDENTITY), eq(blob.getDigest()), eq(0L)))
+        .thenReturn(content.newInput());
+    InputStream in = fileCache.newInput(Compressor.Value.IDENTITY, blob.getDigest(), 0L);
     byte[] buf = new byte[content.size()];
     // advance to the middle of the content
     assertThat(in.read(buf, 0, 6)).isEqualTo(6);
     assertThat(ByteString.copyFrom(buf, 0, 6)).isEqualTo(content.substring(0, 6));
-    verify(delegate, times(1)).newInput(blob.getDigest(), 0L);
+    verify(delegate, times(1)).newInput(Compressor.Value.IDENTITY, blob.getDigest(), 0L);
     // trigger the read through to complete immediately by supplying the blob
     fileCache.put(blob);
     // read the remaining content
     int remaining = content.size() - 6;
     assertThat(in.read(buf, 6, remaining)).isEqualTo(remaining);
     assertThat(ByteString.copyFrom(buf)).isEqualTo(content);
+    in.close();
   }
 
   @Test
@@ -902,19 +1049,26 @@ class CASFileCacheTest {
             };
           }
         };
-    when(delegate.getWrite(eq(blob.getDigest()), any(UUID.class), any(RequestMetadata.class)))
+    when(delegate.getWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(blob.getDigest()),
+            any(UUID.class),
+            any(RequestMetadata.class)))
         .thenReturn(write);
-    when(delegate.newInput(eq(blob.getDigest()), eq(0L))).thenReturn(content.newInput());
+    when(delegate.newInput(eq(Compressor.Value.IDENTITY), eq(blob.getDigest()), eq(0L)))
+        .thenReturn(content.newInput());
     // the switch will reset to this point
     InputStream switchedIn = content.newInput();
     switchedIn.skip(6);
-    when(delegate.newInput(eq(blob.getDigest()), eq(6L))).thenReturn(switchedIn);
-    InputStream in = fileCache.newReadThroughInput(blob.getDigest(), 0, write);
+    when(delegate.newInput(eq(Compressor.Value.IDENTITY), eq(blob.getDigest()), eq(6L)))
+        .thenReturn(switchedIn);
+    InputStream in =
+        fileCache.newReadThroughInput(Compressor.Value.IDENTITY, blob.getDigest(), 0, write);
     byte[] buf = new byte[content.size()];
     // advance to the middle of the content
     assertThat(in.read(buf, 0, 6)).isEqualTo(6);
     assertThat(ByteString.copyFrom(buf, 0, 6)).isEqualTo(content.substring(0, 6));
-    verify(delegate, times(1)).newInput(blob.getDigest(), 0L);
+    verify(delegate, times(1)).newInput(Compressor.Value.IDENTITY, blob.getDigest(), 0L);
     // read the remaining content
     int remaining = content.size() - 6;
     assertThat(in.read(buf, 6, remaining)).isEqualTo(remaining);
@@ -928,6 +1082,21 @@ class CASFileCacheTest {
   public void findMissingBlobsFiltersEmptyBlobs() throws Exception {
     Digest emptyDigest = Digest.getDefaultInstance();
     assertThat(fileCache.findMissingBlobs(ImmutableList.of(emptyDigest))).isEmpty();
+  }
+
+  @Test
+  public void findMissingBlobsPopulatesUnknownSize() throws Exception {
+    Blob blob = new Blob(ByteString.copyFromUtf8("content"), DIGEST_UTIL);
+    Digest queryDigest = blob.getDigest().toBuilder().setSizeBytes(-1).build();
+    Iterable<Digest> digests = ImmutableList.of(queryDigest);
+    Digest responseDigest = Iterables.getOnlyElement(fileCache.findMissingBlobs(digests));
+    assertThat(responseDigest).isEqualTo(queryDigest);
+
+    // populate the digest
+    fileCache.put(blob);
+
+    responseDigest = Iterables.getOnlyElement(fileCache.findMissingBlobs(digests));
+    assertThat(responseDigest).isEqualTo(blob.getDigest());
   }
 
   @Test
@@ -946,20 +1115,24 @@ class CASFileCacheTest {
             /* directoriesIndexDbName=*/ ":memory:",
             /* onPut=*/ digest -> {},
             /* onExpire=*/ digests -> {},
-            /* delegate=*/ null) {
+            /* delegate=*/ null,
+            /* delegateSkipLoad=*/ false) {
           @Override
-          protected InputStream newExternalInput(Digest digest) throws IOException {
+          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+              throws IOException {
             ByteString content = blobs.get(digest);
             if (content == null) {
-              return fileCache.newTransparentInput(digest, 0);
+              return fileCache.newTransparentInput(compressor, digest, 0);
             }
+            checkArgument(compressor == Compressor.Value.IDENTITY);
             return content.substring((int) (long) 0).newInput();
           }
         };
     ByteString blob = ByteString.copyFromUtf8("Missing Entry");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     NoSuchFileException expected = null;
-    try (InputStream in = undelegatedCAS.newInput(blobDigest, /* offset=*/ 0)) {
+    try (InputStream in =
+        undelegatedCAS.newInput(Compressor.Value.IDENTITY, blobDigest, /* offset=*/ 0)) {
       fail("should not get here");
     } catch (NoSuchFileException e) {
       expected = e;

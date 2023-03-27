@@ -1,7 +1,7 @@
 $(document).ready(function() {
 
   $.ajaxSetup({ cache: false });
-  
+
   // Display widget status in new window in the status dashboard
   $('#widgetModal').on('show.bs.modal', function (event) {
     var button = $(event.relatedTarget)
@@ -9,7 +9,7 @@ $(document).ready(function() {
     var modal = $(this)
     modal.find('.modal-img').attr('src', widgetSrc)
   })
-  
+
   // Handle actionable buttons
   $("a.actionable-btn").click(function(e){
     e.preventDefault();
@@ -29,8 +29,8 @@ $(document).ready(function() {
     });
     return false;
   });
-  
-  
+
+
   // Handle actionable buttons with prompt
   $("a.actionable-btn-prompt").click(function(e){
     e.preventDefault();
@@ -52,7 +52,7 @@ $(document).ready(function() {
     }
     return false;
   });
-  
+
   // Handle actionable buttons with a field value
   $("a.actionable-btn-with-value").click(function(e){
     e.preventDefault();
@@ -72,7 +72,7 @@ $(document).ready(function() {
     });
     return false;
   });
-  
+
   // Handle actionable buttons with a field value as data
   $("a.actionable-btn-with-value-as-data").click(function(e){
     e.preventDefault();
@@ -93,5 +93,5 @@ $(document).ready(function() {
     });
     return false;
   });
-  
+
 });

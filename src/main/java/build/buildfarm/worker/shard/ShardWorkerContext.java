@@ -24,6 +24,7 @@ import static java.util.concurrent.TimeUnit.DAYS;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -32,26 +33,27 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
-import build.buildfarm.common.ExecutionWrappers;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LinuxSandboxOptions;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
+import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.worker.DequeueMatchEvaluator;
-import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
@@ -90,11 +92,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 
+@Log
 class ShardWorkerContext implements WorkerContext {
-  private static final Logger logger = Logger.getLogger(ShardWorkerContext.class.getName());
-
   private static final String PROVISION_CORES_NAME = "cores";
 
   private static final Counter completedOperations =
@@ -102,9 +103,9 @@ class ShardWorkerContext implements WorkerContext {
   private static final Counter operationPollerCounter =
       Counter.build().name("operation_poller").help("Number of operations polled.").register();
 
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   private final String name;
-  private final Platform platform;
-  private final DequeueMatchSettings matchSettings;
   private final SetMultimap<String, String> matchProvisions;
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
@@ -129,9 +130,11 @@ class ShardWorkerContext implements WorkerContext {
   private final boolean errorOperationRemainingResources;
 
   static SetMultimap<String, String> getMatchProvisions(
-      Platform platform, Iterable<ExecutionPolicy> policies, int executeStageWidth) {
+      Iterable<ExecutionPolicy> policies, int executeStageWidth) {
     ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
-    Platform matchPlatform = ExecutionPolicies.getMatchPlatform(platform, policies);
+    Platform matchPlatform =
+        ExecutionPolicies.getMatchPlatform(
+            configs.getBackplane().getQueues()[0].getPlatform(), policies);
     for (Platform.Property property : matchPlatform.getPropertiesList()) {
       provisions.put(property.getName(), property.getValue());
     }
@@ -141,8 +144,6 @@ class ShardWorkerContext implements WorkerContext {
 
   ShardWorkerContext(
       String name,
-      DequeueMatchSettings matchSettings,
-      Platform platform,
       Duration operationPollPeriod,
       OperationPoller operationPoller,
       int inputFetchStageWidth,
@@ -162,9 +163,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean errorOperationRemainingResources,
       CasWriter writer) {
     this.name = name;
-    this.matchSettings = matchSettings;
-    this.platform = platform;
-    this.matchProvisions = getMatchProvisions(platform, policies, executeStageWidth);
+    this.matchProvisions = getMatchProvisions(policies, executeStageWidth);
     this.operationPollPeriod = operationPollPeriod;
     this.operationPoller = operationPoller;
     this.inputFetchStageWidth = inputFetchStageWidth;
@@ -229,24 +228,23 @@ class ShardWorkerContext implements WorkerContext {
             success =
                 operationPoller.poll(queueEntry, stage, System.currentTimeMillis() + 30 * 1000);
           } catch (IOException e) {
-            logger.log(
+            log.log(
                 Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
           if (!success) {
-            logger.log(
+            log.log(
                 Level.INFO,
                 format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
           } else {
             operationPollerCounter.inc();
-            logger.log(
+            log.log(
                 Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
         () -> {
-          logger.log(
-              Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
+          log.log(Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);
@@ -258,7 +256,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private ByteString getBlob(Digest digest) throws IOException, InterruptedException {
-    try (InputStream in = inputStreamFactory.newInput(digest, 0)) {
+    try (InputStream in = inputStreamFactory.newInput(Compressor.Value.IDENTITY, digest, 0)) {
       return ByteString.readFrom(in);
     } catch (NoSuchFileException e) {
       return null;
@@ -277,15 +275,17 @@ class ShardWorkerContext implements WorkerContext {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
     try {
-      queueEntry = backplane.dispatchOperation(platform.getPropertiesList());
+      queueEntry =
+          backplane.dispatchOperation(
+              configs.getBackplane().getQueues()[0].getPlatform().getPropertiesList());
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {
         case DEADLINE_EXCEEDED:
-          logger.log(Level.WARNING, "backplane timed out for match during bookkeeping");
+          log.log(Level.WARNING, "backplane timed out for match during bookkeeping");
           break;
         case UNAVAILABLE:
-          logger.log(Level.WARNING, "backplane was unavailable for match");
+          log.log(Level.WARNING, "backplane was unavailable for match");
           break;
         default:
           throw e;
@@ -295,7 +295,7 @@ class ShardWorkerContext implements WorkerContext {
     listener.onWaitEnd();
 
     if (queueEntry == null
-        || DequeueMatchEvaluator.shouldKeepOperation(matchSettings, matchProvisions, queueEntry)) {
+        || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -334,7 +334,7 @@ class ShardWorkerContext implements WorkerContext {
             }
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
-              logger.log(Level.WARNING, "matched duplicate operation " + operationName);
+              log.log(Level.WARNING, "matched duplicate operation " + operationName);
               return false;
             }
             matched = true;
@@ -371,7 +371,7 @@ class ShardWorkerContext implements WorkerContext {
       operationPoller.poll(queueEntry, ExecutionStage.Value.QUEUED, 0);
     } catch (IOException e) {
       // ignore, at least dispatcher will pick us up in 30s
-      logger.log(Level.SEVERE, "Failure while trying to fast requeue " + operationName, e);
+      log.log(Level.SEVERE, "Failure while trying to fast requeue " + operationName, e);
     }
   }
 
@@ -477,13 +477,13 @@ class ShardWorkerContext implements WorkerContext {
 
   private void uploadOutputFile(
       ActionResult.Builder resultBuilder,
-      String outputFile,
+      Path outputPath,
       Path actionRoot,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
-    Path outputPath = actionRoot.resolve(outputFile);
+    String outputFile = actionRoot.relativize(outputPath).toString();
     if (!Files.exists(outputPath)) {
-      logger.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
+      log.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
       return;
     }
 
@@ -491,7 +491,7 @@ class ShardWorkerContext implements WorkerContext {
       String message =
           String.format(
               "ReportResultStage: %s is a directory but it should have been a file", outputPath);
-      logger.log(Level.FINE, message);
+      log.log(Level.FINE, message);
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -566,18 +566,18 @@ class ShardWorkerContext implements WorkerContext {
 
   private void uploadOutputDirectory(
       ActionResult.Builder resultBuilder,
-      String outputDir,
+      Path outputDirPath,
       Path actionRoot,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
-    Path outputDirPath = actionRoot.resolve(outputDir);
+    String outputDir = actionRoot.relativize(outputDirPath).toString();
     if (!Files.exists(outputDirPath)) {
-      logger.log(Level.FINE, "ReportResultStage: " + outputDir + " does not exist...");
+      log.log(Level.FINE, "ReportResultStage: " + outputDir + " does not exist...");
       return;
     }
 
     if (!Files.isDirectory(outputDirPath)) {
-      logger.log(Level.FINE, "ReportResultStage: " + outputDir + " is not a directory...");
+      log.log(Level.FINE, "ReportResultStage: " + outputDir + " is not a directory...");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -601,7 +601,7 @@ class ShardWorkerContext implements WorkerContext {
             try {
               digest = getDigestUtil().compute(file);
             } catch (NoSuchFileException e) {
-              logger.log(
+              log.log(
                   Level.SEVERE,
                   format(
                       "error visiting file %s under output dir %s",
@@ -672,18 +672,17 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public void uploadOutputs(
-      Digest actionDigest,
-      ActionResult.Builder resultBuilder,
-      Path actionRoot,
-      Iterable<String> outputFiles,
-      Iterable<String> outputDirs)
+      Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Command command)
       throws IOException, InterruptedException, StatusException {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    for (String outputFile : outputFiles) {
-      uploadOutputFile(resultBuilder, outputFile, actionRoot, preconditionFailure);
-    }
-    for (String outputDir : outputDirs) {
-      uploadOutputDirectory(resultBuilder, outputDir, actionRoot, preconditionFailure);
+
+    List<Path> outputPaths = CommandUtils.getResolvedOutputPaths(command, actionRoot);
+    for (Path outputPath : outputPaths) {
+      if (Files.isDirectory(outputPath)) {
+        uploadOutputDirectory(resultBuilder, outputPath, actionRoot, preconditionFailure);
+      } else {
+        uploadOutputFile(resultBuilder, outputPath, actionRoot, preconditionFailure);
+      }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
 
@@ -692,7 +691,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Iterable<ExecutionPolicy> getExecutionPolicies(String name) {
+  public List<ExecutionPolicy> getExecutionPolicies(String name) {
     return policies.get(name);
   }
 
@@ -701,7 +700,7 @@ class ShardWorkerContext implements WorkerContext {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
       completedOperations.inc();
-      logger.log(Level.FINE, "CompletedOperation: " + operation.getName());
+      log.log(Level.FINE, "CompletedOperation: " + operation.getName());
     }
     return success;
   }
@@ -765,7 +764,7 @@ class ShardWorkerContext implements WorkerContext {
 
   void createOperationExecutionLimits() {
     try {
-      int availableProcessors = Runtime.getRuntime().availableProcessors();
+      int availableProcessors = SystemProcessors.get();
       Preconditions.checkState(availableProcessors >= executeStageWidth);
       int executionsShares =
           Group.getRoot().getCpu().getShares() * executeStageWidth / availableProcessors;
@@ -870,7 +869,7 @@ class ShardWorkerContext implements WorkerContext {
     // Decide the CLI for running under cgroups
     if (!usedGroups.isEmpty()) {
       arguments.add(
-          ExecutionWrappers.CGROUPS,
+          configs.getExecutionWrappers().getCgroups(),
           "-g",
           String.join(",", usedGroups) + ":" + group.getHierarchy());
     }
@@ -879,7 +878,7 @@ class ShardWorkerContext implements WorkerContext {
     // This is not the ideal implementation of block-network.
     // For now, without the linux-sandbox, we will unshare the network namespace.
     if (limits.network.blockNetwork && !limits.useLinuxSandbox) {
-      arguments.add(ExecutionWrappers.UNSHARE, "-n", "-r");
+      arguments.add(configs.getExecutionWrappers().getUnshare(), "-n", "-r");
     }
 
     // Decide the CLI for running the sandbox
@@ -891,15 +890,15 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     if (limits.time.skipSleep) {
-      arguments.add(ExecutionWrappers.SKIP_SLEEP);
+      arguments.add(configs.getExecutionWrappers().getSkipSleep());
 
       // we set these values very high because we want sleep calls to return immediately.
       arguments.add("90000000"); // delay factor
       arguments.add("90000000"); // time factor
-      arguments.add(ExecutionWrappers.SKIP_SLEEP_PRELOAD);
+      arguments.add(configs.getExecutionWrappers().getSkipSleepPreload());
 
       if (limits.time.timeShift != 0) {
-        arguments.add(ExecutionWrappers.DELAY);
+        arguments.add(configs.getExecutionWrappers().getDelay());
         arguments.add(String.valueOf(limits.time.timeShift));
       }
     }
@@ -915,6 +914,7 @@ class ShardWorkerContext implements WorkerContext {
     // Construct the CLI options for this binary.
     LinuxSandboxOptions options = new LinuxSandboxOptions();
     options.createNetns = limits.network.blockNetwork;
+    options.fakeHostname = limits.network.fakeHostname;
     options.workingDir = workingDirectory.toString();
 
     // Bazel encodes these directly
@@ -953,14 +953,18 @@ class ShardWorkerContext implements WorkerContext {
 
   private void addLinuxSandboxCli(
       ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
-    arguments.add(ExecutionWrappers.AS_NOBODY);
+    arguments.add(configs.getExecutionWrappers().getAsNobody());
 
     // Choose the sandbox which is built and deployed with the worker image.
-    arguments.add(ExecutionWrappers.LINUX_SANDBOX);
+    arguments.add(configs.getExecutionWrappers().getLinuxSandbox());
 
     // Pass flags based on the sandbox CLI options.
     if (options.createNetns) {
       arguments.add("-N");
+    }
+
+    if (options.fakeHostname) {
+      arguments.add("-H");
     }
 
     if (options.fakeUsername) {

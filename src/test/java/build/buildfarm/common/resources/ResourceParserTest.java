@@ -57,7 +57,7 @@ public class ResourceParserTest {
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("");
     assertThat(request.getUuid()).isEqualTo("00000000-0000-0000-0000-000000000000");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -87,7 +87,7 @@ public class ResourceParserTest {
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("instance_name");
     assertThat(request.getUuid()).isEqualTo("00000000-0000-0000-0000-000000000000");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -117,7 +117,7 @@ public class ResourceParserTest {
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("");
     assertThat(request.getUuid()).isEqualTo("00000000-0000-0000-0000-000000000000");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -147,7 +147,7 @@ public class ResourceParserTest {
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("instance_name");
     assertThat(request.getUuid()).isEqualTo("00000000-0000-0000-0000-000000000000");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -176,7 +176,7 @@ public class ResourceParserTest {
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("this/instance/name/is/multipart");
     assertThat(request.getUuid()).isEqualTo("00000000-0000-0000-0000-000000000000");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -205,7 +205,7 @@ public class ResourceParserTest {
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("");
     assertThat(request.getUuid()).isEqualTo("00000000-0000-0000-0000-000000000000");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -235,7 +235,7 @@ public class ResourceParserTest {
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("this/instance/name/is/multipart");
     assertThat(request.getUuid()).isEqualTo("00000000-0000-0000-0000-000000000000");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -264,7 +264,7 @@ public class ResourceParserTest {
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("this/instance/name/is/multipart");
     assertThat(request.getUuid()).isEqualTo("00000000-0000-0000-0000-000000000000");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.ZSTD);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.ZSTD);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -293,7 +293,7 @@ public class ResourceParserTest {
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("this/instance/name/is/multipart");
     assertThat(request.getUuid()).isEqualTo("00000000-0000-0000-0000-000000000000");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -322,7 +322,7 @@ public class ResourceParserTest {
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("");
     assertThat(request.getUuid()).isEqualTo("00000000-0000-0000-0000-000000000000");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -351,7 +351,7 @@ public class ResourceParserTest {
 
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -378,7 +378,7 @@ public class ResourceParserTest {
 
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("instance_name");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -405,7 +405,7 @@ public class ResourceParserTest {
 
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("multi-segment/instance/name");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -432,7 +432,7 @@ public class ResourceParserTest {
 
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("multi-segment/instance/name");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.ZSTD);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.ZSTD);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
@@ -459,7 +459,7 @@ public class ResourceParserTest {
 
     // ASSERT
     assertThat(request.getInstanceName()).isEqualTo("multi-segment/instance/name");
-    assertThat(request.getBlob().getCompression()).isEqualTo(Compressor.Value.IDENTITY);
+    assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
     assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);

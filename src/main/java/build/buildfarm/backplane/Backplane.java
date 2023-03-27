@@ -82,7 +82,7 @@ public interface Backplane {
    */
   boolean removeWorker(String workerName, String reason) throws IOException;
 
-  CasIndexResults reindexCas(String workerName) throws IOException;
+  CasIndexResults reindexCas() throws IOException;
 
   void deregisterWorker(String hostName) throws IOException;
 
@@ -248,9 +248,6 @@ public interface Backplane {
   void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException;
 
   void queue(QueueEntry queueEntry, Operation operation) throws IOException;
-
-  /** Page through action cache */
-  ActionCacheScanResult scanActionCache(String scanToken, int count) throws IOException;
 
   /** Test for whether a request is blacklisted */
   boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException;

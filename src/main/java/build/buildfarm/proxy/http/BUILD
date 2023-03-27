@@ -1,6 +1,7 @@
 java_library(
     name = "http",
     srcs = glob(["*.java"]),
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -28,9 +29,12 @@ java_library(
         "@maven//:io_netty_netty_common",
         "@maven//:io_netty_netty_handler",
         "@maven//:io_netty_netty_transport",
+        "@maven//:io_netty_netty_transport_classes_epoll",
+        "@maven//:io_netty_netty_transport_classes_kqueue",
         "@maven//:io_netty_netty_transport_native_epoll",
         "@maven//:io_netty_netty_transport_native_kqueue",
         "@maven//:io_netty_netty_transport_native_unix_common",
+        "@maven//:org_projectlombok_lombok",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],

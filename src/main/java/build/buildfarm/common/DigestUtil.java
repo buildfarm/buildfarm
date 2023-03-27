@@ -17,10 +17,6 @@ package build.buildfarm.common;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
-import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.Tree;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Sets;
 import com.google.common.hash.Funnels;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hasher;
@@ -35,9 +31,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Set;
 
 /** Utility methods to work with {@link Digest}. */
 public class DigestUtil {
@@ -251,106 +244,5 @@ public class DigestUtil {
 
   public static DigestUtil forDigest(Digest digest) {
     return new DigestUtil(HashFunction.forHash(digest.getHash()));
-  }
-
-  public static Map<Digest, Directory> proxyDirectoriesIndex(
-      Map<String, Directory> directoriesIndex) {
-    return new Map<Digest, Directory>() {
-      @Override
-      public void clear() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public boolean containsKey(Object key) {
-        if (key instanceof Digest) {
-          return directoriesIndex.containsKey(DigestUtil.toString((Digest) key));
-        }
-        return false;
-      }
-
-      @Override
-      public boolean containsValue(Object value) {
-        return directoriesIndex.containsValue(value);
-      }
-
-      @SuppressWarnings("NullableProblems")
-      @Override
-      public Set<Map.Entry<Digest, Directory>> entrySet() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public boolean equals(Object o) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public Directory get(Object key) {
-        if (key instanceof Digest) {
-          Digest digest = (Digest) key;
-          return directoriesIndex.get(digest.getHash());
-        }
-        return null;
-      }
-
-      @Override
-      public int hashCode() {
-        return directoriesIndex.hashCode();
-      }
-
-      @Override
-      public boolean isEmpty() {
-        return directoriesIndex.isEmpty();
-      }
-
-      @SuppressWarnings("NullableProblems")
-      @Override
-      public Set<Digest> keySet() {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public Directory put(Digest key, Directory value) {
-        throw new UnsupportedOperationException();
-      }
-
-      @SuppressWarnings("NullableProblems")
-      @Override
-      public void putAll(Map<? extends Digest, ? extends Directory> m) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public Directory remove(Object key) {
-        throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public int size() {
-        return directoriesIndex.size();
-      }
-
-      @SuppressWarnings("NullableProblems")
-      @Override
-      public Collection<Directory> values() {
-        return directoriesIndex.values();
-      }
-    };
-  }
-
-  public Map<Digest, Directory> createDirectoriesIndex(Tree tree) {
-    Set<Digest> directoryDigests = Sets.newHashSet();
-    ImmutableMap.Builder<Digest, Directory> directoriesIndex = ImmutableMap.builder();
-    directoriesIndex.put(compute(tree.getRoot()), tree.getRoot());
-    for (Directory directory : tree.getChildrenList()) {
-      Digest directoryDigest = compute(directory);
-      if (!directoryDigests.add(directoryDigest)) {
-        continue;
-      }
-      directoriesIndex.put(directoryDigest, directory);
-    }
-
-    return directoriesIndex.build();
   }
 }
