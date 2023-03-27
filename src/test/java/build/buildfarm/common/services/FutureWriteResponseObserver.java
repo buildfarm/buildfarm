@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server.services;
+package build.buildfarm.common.services;
 
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.util.concurrent.SettableFuture;

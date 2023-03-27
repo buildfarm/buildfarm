@@ -1,5 +1,6 @@
 package build.buildfarm.common.config;
 
+import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.v1test.WorkerType;
 import com.google.common.base.Strings;
 import java.net.InetAddress;
@@ -71,7 +72,7 @@ public class Worker {
     }
 
     // derive a value
-    return Math.max(1, Runtime.getRuntime().availableProcessors() - executeStageWidthOffset);
+    return Math.max(1, SystemProcessors.get() - executeStageWidthOffset);
   }
 
   public int getInputFetchStageWidth() {
