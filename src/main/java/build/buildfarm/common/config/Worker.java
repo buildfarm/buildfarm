@@ -1,6 +1,5 @@
 package build.buildfarm.common.config;
 
-import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.v1test.WorkerType;
 import com.google.common.base.Strings;
 import java.nio.file.Files;
@@ -37,7 +36,7 @@ public class Worker {
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
   private ExecutionPolicy[] executionPolicies = {};
-  
+
   public ExecutionPolicy[] getExecutionPolicies() {
     if (executionPolicies != null) {
       return executionPolicies;
