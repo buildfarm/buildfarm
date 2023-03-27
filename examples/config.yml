@@ -29,6 +29,11 @@ server:
   recordBesEvents: false
   clusterId: local
   cloudRegion: us-east-1
+  caches:
+    directoryCacheMaxEntries: 10000
+    commandCacheMaxEntries: 10000
+    digestToActionCacheMaxEntries: 10000
+    recentServedExecutionsCacheMaxEntries: 10000
   admin:
     deploymentEnvironment: AWS
     clusterEndpoint: "grpc://localhost"

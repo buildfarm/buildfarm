@@ -42,6 +42,8 @@ public class Server {
   private int maxInboundMessageSizeBytes = 0;
   private int maxInboundMetadataSize = 0;
 
+  private ServerCacheConfigs caches = new ServerCacheConfigs();
+
   public String getPublicName() {
     // use environment override (useful for containerized deployment)
     if (!Strings.isNullOrEmpty(System.getenv("INSTANCE_NAME"))) {
