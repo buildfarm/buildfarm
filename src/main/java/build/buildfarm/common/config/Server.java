@@ -37,6 +37,8 @@ public class Server {
   private String clusterId = "";
   private String cloudRegion;
   private String publicName;
+  private int maxInboundMessageSizeBytes = 0;
+  private int maxInboundMetadataSize = 0;
   private ServerCacheConfigs caches = new ServerCacheConfigs();
 
   public String getSession() {
