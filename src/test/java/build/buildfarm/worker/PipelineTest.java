@@ -99,7 +99,7 @@ public class PipelineTest {
 
     @Override
     public Logger getLogger() {
-      return logger;
+      return log;
     }
   }
 
@@ -136,7 +136,7 @@ public class PipelineTest {
 
     @Override
     public Logger getLogger() {
-      return logger;
+      return log;
     }
   }
 
