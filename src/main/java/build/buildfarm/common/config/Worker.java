@@ -37,9 +37,10 @@ public class Worker {
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
   private ExecutionPolicy[] executionPolicies = {};
+  private SandboxSettings sandboxSettings = new SandboxSettings();
+  
   // These limited resources are specific to the individual worker.
   private List<LimitedResource> resources = new ArrayList<>();
-  private SandboxSettings sandboxSettings = new SandboxSettings();
 
   public ExecutionPolicy[] getExecutionPolicies() {
     if (executionPolicies != null) {
