@@ -3,6 +3,7 @@ package build.buildfarm.common.config;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.ExecutionWrapperProperties;
+import build.buildfarm.common.SystemProcessors;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
@@ -168,9 +169,7 @@ public final class BuildfarmConfigs {
           .getWorker()
           .setExecuteStageWidth(
               Math.max(
-                  1,
-                  Runtime.getRuntime().availableProcessors()
-                      - configs.getWorker().getExecuteStageWidthOffset()));
+                  1, SystemProcessors.get() - configs.getWorker().getExecuteStageWidthOffset()));
       log.info(
           String.format(
               "executeStageWidth modified to %d", configs.getWorker().getExecuteStageWidth()));
