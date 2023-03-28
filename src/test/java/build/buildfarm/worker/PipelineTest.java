@@ -77,7 +77,7 @@ public class PipelineTest {
     pipeline.join();
   }
 
-  // Create a test stage that exists because of an interrupt.
+  // Create a test stage that exits because of an interrupt.
   // This proves the stage can be interupted.
   public class TestStage extends PipelineStage {
     public TestStage(String name) {
