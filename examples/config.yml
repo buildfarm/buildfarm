@@ -11,6 +11,8 @@ server:
   grpcMetrics:
     enabled: false
     provideLatencyHistograms: false
+  maxInboundMessageSizeBytes: 0
+  maxInboundMetadataSize: 0
   casWriteTimeout: 3600
   bytestreamTimeout: 3600
   sslCertificatePath:

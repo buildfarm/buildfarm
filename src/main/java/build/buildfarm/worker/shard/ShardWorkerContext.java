@@ -755,9 +755,13 @@ class ShardWorkerContext implements WorkerContext {
     return Size.mbToBytes(100);
   }
 
+  boolean shouldLimitCoreUsage() {
+    return limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0;
+  }
+
   @Override
   public void createExecutionLimits() {
-    if (limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0) {
+    if (shouldLimitCoreUsage()) {
       createOperationExecutionLimits();
     }
   }
@@ -827,7 +831,7 @@ class ShardWorkerContext implements WorkerContext {
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory) {
-    if (limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0) {
+    if (shouldLimitCoreUsage()) {
       ResourceLimits limits = commandExecutionSettings(command);
       return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
     }

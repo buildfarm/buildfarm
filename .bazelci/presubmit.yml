@@ -55,6 +55,14 @@ tasks:
     - "--test_tag_filters=-integration,-redis"
     test_targets:
     - "..."
+  ubuntu2004:
+    name: "Unit Tests"
+    build_targets:
+    - "..."
+    test_flags:
+    - "--test_tag_filters=-integration,-redis"
+    test_targets:
+    - "..."
   macos:
     name: "Unit Tests"
     build_flags:
