@@ -779,6 +779,40 @@ public class ResourceDeciderTest {
   }
 
   // Function under test: decideResourceLimitations
+  // Reason for testing: Sandbox is NOT selected based on sandbox settings.
+  // Failure explanation: The sandbox should not have been selected.
+  @Test
+  public void decideResourceLimitationsSandboxNotChosenViaBlockNetwork() throws Exception {
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder()
+                            .setName(ExecutionProperties.TMPFS)
+                            .setValue("true")))
+            .build();
+    SandboxSettings sandboxSettings = new SandboxSettings();
+    sandboxSettings.selectForBlockNetwork = true;
+
+    // ACT
+    ResourceLimits limits =
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "foo",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false,
+            sandboxSettings);
+
+    // ASSERT
+    assertThat(limits.useLinuxSandbox).isFalse();
+  }
+
+  // Function under test: decideResourceLimitations
   // Reason for testing: Sandbox is selected based on sandbox settings.
   // Failure explanation: The sandbox should have been selected.
   @Test
@@ -810,5 +844,39 @@ public class ResourceDeciderTest {
 
     // ASSERT
     assertThat(limits.useLinuxSandbox).isTrue();
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: Sandbox is NOT selected based on sandbox settings.
+  // Failure explanation: The sandbox should not have been selected.
+  @Test
+  public void decideResourceLimitationsSandboxNotChosenViaTmpFs() throws Exception {
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder()
+                            .setName(ExecutionProperties.BLOCK_NETWORK)
+                            .setValue("true")))
+            .build();
+    SandboxSettings sandboxSettings = new SandboxSettings();
+    sandboxSettings.selectForTmpFs = true;
+
+    // ACT
+    ResourceLimits limits =
+        ResourceDecider.decideResourceLimitations(
+            command,
+            "foo",
+            /* defaultMaxCores=*/ 0,
+            /* onlyMulticoreTests=*/ false,
+            /* limitGlobalExecution=*/ false,
+            /* executeStageWidth=*/ 100,
+            /* allowBringYourOwnContainer=*/ false,
+            sandboxSettings);
+
+    // ASSERT
+    assertThat(limits.useLinuxSandbox).isFalse();
   }
 }

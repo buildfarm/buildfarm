@@ -285,11 +285,11 @@ worker:
 
 ### Sandbox Settings
 
-| Configuration | Accepted and _Default_ Values | Description                                     |
-|---------------|-------------------------------|-------------------------------------------------|
-| alwaysUse             | boolean, _false_      | Enforce that the sandbox be used on every acion.|
-| selectForBlockNetwork | boolean, _false_      | Only use the sandbox when blocking the network. |
-| selectForTmpFs        | boolean, _false_      | Only use the sandbox when using tmpfs.          |
+| Configuration | Accepted and _Default_ Values | Description                                       |
+|---------------|-------------------------------|---------------------------------------------------|
+| alwaysUse             | boolean, _false_      | Enforce that the sandbox be used on every acion.  |
+| selectForBlockNetwork | boolean, _false_      | `block-network` enables sandbox action execution. |
+| selectForTmpFs        | boolean, _false_      | `tmpfs` enables sandbox action execution.         |
 
 Example:
 
