@@ -1,9 +1,7 @@
 package build.buildfarm.common.config;
 
-import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.v1test.WorkerType;
 import com.google.common.base.Strings;
-import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -38,49 +36,7 @@ public class Worker {
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
   private ExecutionPolicy[] executionPolicies = {};
-
-  public String getPublicName() {
-    // use environment override (useful for containerized deployment)
-    if (!Strings.isNullOrEmpty(System.getenv("INSTANCE_NAME"))) {
-      return System.getenv("INSTANCE_NAME");
-    }
-
-    // use configured value
-    if (!Strings.isNullOrEmpty(publicName)) {
-      return publicName;
-    }
-
-    // derive a value
-    try {
-      return InetAddress.getLocalHost().getHostAddress() + ":" + port;
-    } catch (Exception e) {
-      log.severe("publicName could not be derived:" + e);
-      return publicName;
-    }
-  }
-
-  public int getExecuteStageWidth() {
-    // use environment override (useful for containerized deployment)
-    if (!Strings.isNullOrEmpty(System.getenv("EXECUTION_STAGE_WIDTH"))) {
-      return Integer.parseInt(System.getenv("EXECUTION_STAGE_WIDTH"));
-    }
-
-    // use configured value
-    if (executeStageWidth > 0) {
-      return executeStageWidth;
-    }
-
-    // derive a value
-    return Math.max(1, SystemProcessors.get() - executeStageWidthOffset);
-  }
-
-  public int getInputFetchStageWidth() {
-    if (inputFetchStageWidth > 0) {
-      return inputFetchStageWidth;
-    } else {
-      return Math.max(1, getExecuteStageWidth() / 5);
-    }
-  }
+  private SandboxSettings sandboxSettings = new SandboxSettings();
 
   public ExecutionPolicy[] getExecutionPolicies() {
     if (executionPolicies != null) {

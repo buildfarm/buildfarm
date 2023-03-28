@@ -17,6 +17,7 @@ package build.buildfarm.worker.resources;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.buildfarm.common.CommandUtils;
+import build.buildfarm.common.config.SandboxSettings;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -38,6 +39,7 @@ public final class ResourceDecider {
    * @param executeStageWidth The maximum amount of cores available for the operation.
    * @param allowBringYourOwnContainer Whether or not the feature of "bringing your own containers"
    *     is allowed.
+   * @param sandbox Settings on whether to use a sandbox."
    * @return Default resource limits.
    * @note Suggested return identifier: resourceLimits.
    */
@@ -48,7 +50,8 @@ public final class ResourceDecider {
       boolean onlyMulticoreTests,
       boolean limitGlobalExecution,
       int executeStageWidth,
-      boolean allowBringYourOwnContainer) {
+      boolean allowBringYourOwnContainer,
+      SandboxSettings sandbox) {
     // Get all of the user suggested resource changes.
     ResourceLimits limits = ExecutionPropertiesParser.Parse(command);
 
@@ -61,7 +64,8 @@ public final class ResourceDecider {
         onlyMulticoreTests,
         limitGlobalExecution,
         executeStageWidth,
-        allowBringYourOwnContainer);
+        allowBringYourOwnContainer,
+        sandbox);
 
     return limits;
   }
@@ -78,6 +82,7 @@ public final class ResourceDecider {
    * @param executeStageWidth The maximum amount of cores available for the operation.
    * @param allowBringYourOwnContainer Whether or not the feature of "bringing your own containers"
    *     is allowed.
+   * @param sandbox Settings on whether to use a sandbox."
    */
   private static void adjustLimits(
       ResourceLimits limits,
@@ -87,7 +92,8 @@ public final class ResourceDecider {
       boolean onlyMulticoreTests,
       boolean limitGlobalExecution,
       int executeStageWidth,
-      boolean allowBringYourOwnContainer) {
+      boolean allowBringYourOwnContainer,
+      SandboxSettings sandbox) {
     // store worker name
     limits.workerName = workerName;
 
@@ -168,17 +174,7 @@ public final class ResourceDecider {
     // the future, than picking the sandbox automatically can be removed. For now however, its
     // better to choose the sandbox in order to honor the user's request instead of silently
     // ignoring the request due to a disabled sandbox.
-    boolean deriveSandboxUsingBlockNetwork = false;
-    boolean deriveSandboxUsingTmpFs = false;
-
-    if (limits.network.blockNetwork && deriveSandboxUsingBlockNetwork) {
-      limits.useLinuxSandbox = true;
-      limits.description.add("sandbox is chosen because of block network usage");
-    }
-    if (limits.tmpFs && deriveSandboxUsingTmpFs) {
-      limits.useLinuxSandbox = true;
-      limits.description.add("sandbox is chosen because of tmpfs usage");
-    }
+    decideSandboxUsage(limits, sandbox);
 
     // Avoid using the existing execution policies when using the linux sandbox.
     // Using these execution policies under the sandbox do not have the right permissions to work.
@@ -201,6 +197,25 @@ public final class ResourceDecider {
 
     // we choose to resolve variables after the other variable values have been decided
     resolveEnvironmentVariables(limits);
+  }
+
+  private static void decideSandboxUsage(ResourceLimits limits, SandboxSettings sandbox) {
+    // configured on
+    if (sandbox.isAlwaysUse()) {
+      limits.useLinuxSandbox = true;
+      limits.description.add("enabled");
+      return;
+    }
+
+    // selected based on other features
+    if (limits.network.blockNetwork && sandbox.isSelectForBlockNetwork()) {
+      limits.useLinuxSandbox = true;
+      limits.description.add("sandbox is chosen because of block network usage");
+    }
+    if (limits.tmpFs && sandbox.isSelectForTmpFs()) {
+      limits.useLinuxSandbox = true;
+      limits.description.add("sandbox is chosen because of tmpfs usage");
+    }
   }
 
   private static void adjustContainerFlags(ResourceLimits limits) {
