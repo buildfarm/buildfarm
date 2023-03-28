@@ -36,6 +36,7 @@ public class Worker {
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
   private ExecutionPolicy[] executionPolicies = {};
+  private SandboxSettings sandboxSettings = new SandboxSettings();
 
   public ExecutionPolicy[] getExecutionPolicies() {
     if (executionPolicies != null) {
