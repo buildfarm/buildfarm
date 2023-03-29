@@ -24,42 +24,37 @@ import java.util.concurrent.Executors;
 /**
  * @class ExecutorServices
  * @brief Group executor services to easier manage thread counts across software stack.
+ * @details Thread usage is a global concern across the java application. Although these thread
+ *     pools are used in different contexts we group them here so the application's threads can be
+ *     managed and derived from the same class.
  */
 public class ExecutorServices {
   public static ExecutorService getScanCachePool() {
     int nThreads = SystemProcessors.get();
     String threadNameFormat = "scan-cache-pool-%d";
-    ExecutorService pool =
-        Executors.newFixedThreadPool(
-            nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
-    return pool;
+    return Executors.newFixedThreadPool(
+        nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
   public static ExecutorService getComputeCachePool() {
     int nThreads = SystemProcessors.get();
     String threadNameFormat = "compute-cache-pool-%d";
-    ExecutorService pool =
-        Executors.newFixedThreadPool(
-            nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
-    return pool;
+    return Executors.newFixedThreadPool(
+        nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
   public static ExecutorService getRemoveDirectoryPool() {
     int nThreads = 32;
     String threadNameFormat = "remove-directory-pool-%d";
-    ExecutorService pool =
-        Executors.newFixedThreadPool(
-            nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
-    return pool;
+    return Executors.newFixedThreadPool(
+        nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
   public static ExecutorService getSubscriberPool() {
     int nThreads = 32;
     String threadNameFormat = "subscriber-service-pool-%d";
-    ExecutorService pool =
-        Executors.newFixedThreadPool(
-            nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
-    return pool;
+    return Executors.newFixedThreadPool(
+        nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
   public static ListeningExecutorService getTransformServicePool() {
@@ -82,7 +77,6 @@ public class ExecutorServices {
 
   public static ExecutorService getFetchServicePool() {
     int nThreads = 128;
-    ExecutorService pool = Executors.newWorkStealingPool(nThreads);
-    return pool;
+    return Executors.newWorkStealingPool(nThreads);
   }
 }
