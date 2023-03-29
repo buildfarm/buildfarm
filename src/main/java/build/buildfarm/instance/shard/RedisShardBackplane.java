@@ -27,6 +27,7 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.ExecutorServices;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Watcher;
@@ -79,7 +80,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -446,7 +446,7 @@ public class RedisShardBackplane implements Backplane {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    subscriberService = Executors.newFixedThreadPool(32);
+    subscriberService = ExecutorServices.getSubscriberPool();
     subscriber =
         new RedisShardSubscriber(
             watchers, workerSet, configs.getBackplane().getWorkerChannel(), subscriberService);

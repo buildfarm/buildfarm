@@ -35,9 +35,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.lang.String.format;
-import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -70,6 +68,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.ExecutionProperties;
+import build.buildfarm.common.ExecutorServices;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
@@ -231,7 +230,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final int maxRequeueAttempts;
 
   private final ListeningExecutorService operationTransformService =
-      listeningDecorator(newFixedThreadPool(24));
+      ExecutorServices.getTransformServicePool();
   private final ListeningExecutorService actionCacheFetchService;
   private final ScheduledExecutorService contextDeadlineScheduler =
       newSingleThreadScheduledExecutor();
@@ -264,7 +263,7 @@ public class ShardInstance extends AbstractServerInstance {
         digestUtil,
         createBackplane(identifier),
         onStop,
-        /* actionCacheFetchService=*/ listeningDecorator(newFixedThreadPool(24)));
+        /* actionCacheFetchService=*/ ExecutorServices.getActionCacheFetchServicePool());
   }
 
   private ShardInstance(
