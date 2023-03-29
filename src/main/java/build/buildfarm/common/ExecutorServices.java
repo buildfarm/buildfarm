@@ -23,13 +23,12 @@ import java.util.concurrent.Executors;
 
 /**
  * @class ExecutorServices
- * @brief Group executor services to easier manage thread counts.
+ * @brief Group executor services to easier manage thread counts across software stack.
  */
 public class ExecutorServices {
   public static ExecutorService getScanCachePool() {
     int nThreads = SystemProcessors.get();
     String threadNameFormat = "scan-cache-pool-%d";
-
     ExecutorService pool =
         Executors.newFixedThreadPool(
             nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
@@ -39,7 +38,6 @@ public class ExecutorServices {
   public static ExecutorService getComputeCachePool() {
     int nThreads = SystemProcessors.get();
     String threadNameFormat = "compute-cache-pool-%d";
-
     ExecutorService pool =
         Executors.newFixedThreadPool(
             nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
@@ -49,7 +47,6 @@ public class ExecutorServices {
   public static ExecutorService getRemoveDirectoryPool() {
     int nThreads = 32;
     String threadNameFormat = "remove-directory-pool-%d";
-
     ExecutorService pool =
         Executors.newFixedThreadPool(
             nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
@@ -59,7 +56,6 @@ public class ExecutorServices {
   public static ExecutorService getSubscriberPool() {
     int nThreads = 32;
     String threadNameFormat = "subscriber-service-pool-%d";
-
     ExecutorService pool =
         Executors.newFixedThreadPool(
             nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
@@ -69,7 +65,6 @@ public class ExecutorServices {
   public static ListeningExecutorService getTransformServicePool() {
     int nThreads = 24;
     String threadNameFormat = "transform-service-pool-%d";
-
     ExecutorService pool =
         Executors.newFixedThreadPool(
             nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
@@ -79,10 +74,15 @@ public class ExecutorServices {
   public static ListeningExecutorService getActionCacheFetchServicePool() {
     int nThreads = 24;
     String threadNameFormat = "action-cache-pool-%d";
-
     ExecutorService pool =
         Executors.newFixedThreadPool(
             nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
     return listeningDecorator(pool);
+  }
+
+  public static ExecutorService getFetchServicePool() {
+    int nThreads = 128;
+    ExecutorService pool = Executors.newWorkStealingPool(nThreads);
+    return pool;
   }
 }
