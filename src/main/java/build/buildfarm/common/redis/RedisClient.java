@@ -16,6 +16,7 @@ package build.buildfarm.common.redis;
 
 import io.grpc.Status;
 import io.grpc.Status.Code;
+import io.prometheus.client.Counter;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.ConnectException;
@@ -23,13 +24,29 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
 
+/**
+ * @class RedisClient
+ * @brief Responsible for making calls to redis.
+ */
 public class RedisClient implements Closeable {
+  // Metrics to detect any kind of redis failures.
+  // Often due to network issues are the redis cluster going down.
+  private static final Counter redisErrorCounter =
+      Counter.build().name("redis_client_error").help("Count of redis client failures").register();
+  private static final Counter redisClientRebuildErrorCounter =
+      Counter.build()
+          .name("redis_client_rebuild_error")
+          .help("Count of failures rebuilding redis client")
+          .register();
+  private boolean restablishClientOnFailures = false;
+
   private static final String MISCONF_RESPONSE = "MISCONF";
 
   @FunctionalInterface
@@ -56,12 +73,25 @@ public class RedisClient implements Closeable {
     }
   }
 
-  private final JedisCluster jedis;
+  // We store the factory in case we want to re-create the jedis client.
+  private Supplier<JedisCluster> jedisClusterFactory;
+
+  // The jedis client.
+  private JedisCluster jedis;
 
   private boolean closed = false;
 
   public RedisClient(JedisCluster jedis) {
     this.jedis = jedis;
+  }
+
+  public RedisClient(
+      JedisCluster jedis,
+      Supplier<JedisCluster> jedisClusterFactory,
+      boolean restablishClientOnFailures) {
+    this.jedis = jedis;
+    this.jedisClusterFactory = jedisClusterFactory;
+    this.restablishClientOnFailures = restablishClientOnFailures;
   }
 
   @Override
@@ -81,7 +111,7 @@ public class RedisClient implements Closeable {
   }
 
   public void run(Consumer<JedisCluster> withJedis) throws IOException {
-    call(
+    callImpl(
         (JedisContext<Void>)
             jedis -> {
               withJedis.accept(jedis);
@@ -91,9 +121,14 @@ public class RedisClient implements Closeable {
 
   public <T> T blockingCall(JedisInterruptibleContext<T> withJedis)
       throws IOException, InterruptedException {
+    return defaultBlockingCall(withJedis);
+  }
+
+  private <T> T defaultBlockingCall(JedisInterruptibleContext<T> withJedis)
+      throws IOException, InterruptedException {
     AtomicReference<InterruptedException> interruption = new AtomicReference<>(null);
     T result =
-        call(
+        callImpl(
             jedis -> {
               try {
                 return withJedis.run(jedis);
@@ -109,8 +144,47 @@ public class RedisClient implements Closeable {
     return result;
   }
 
-  @SuppressWarnings("ConstantConditions")
   public <T> T call(JedisContext<T> withJedis) throws IOException {
+    return callImpl(withJedis);
+  }
+
+  private <T> T callImpl(JedisContext<T> withJedis) throws IOException {
+    // Typical configuration that does not handle exceptions
+    // or try to restablish the jedis client on failures.
+    if (!restablishClientOnFailures) {
+      return defaultCall(withJedis);
+    }
+
+    // Alternatively,
+    // Capture all redis problems at the client level.
+    // Try to re-establish the client and log all issues.
+    // This will block the overall thread until redis can be connected to.
+    // It may be a useful strategy for gaining stability on a poorly performing network,
+    // or a redis cluster that goes down.
+    while (true) {
+      try {
+        return defaultCall(withJedis);
+      } catch (Exception e) {
+        redisErrorCounter.inc();
+        System.out.println("Failure in RedisClient::call");
+        System.out.println(e.toString());
+        rebuildJedisCluser();
+      }
+    }
+  }
+
+  private void rebuildJedisCluser() {
+    try {
+      System.out.println("Rebuilding redis client");
+      jedis = jedisClusterFactory.get();
+    } catch (Exception e) {
+      redisClientRebuildErrorCounter.inc();
+      System.out.println("Failed to rebuild redis client");
+      System.out.println(e.toString());
+    }
+  }
+
+  private <T> T defaultCall(JedisContext<T> withJedis) throws IOException {
     throwIfClosed();
     try {
       try {

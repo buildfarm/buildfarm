@@ -43,6 +43,7 @@ public class Backplane {
   private int timeout = 10000;
   private String[] redisNodes = {};
   private int maxAttempts = 20;
+  private boolean reconnectClient = true;
   private boolean cacheCas = false;
 
   // These limited resources are shared across all workers.
