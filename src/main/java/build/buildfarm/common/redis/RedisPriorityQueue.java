@@ -122,16 +122,17 @@ public class RedisPriorityQueue extends QueueInterface {
    */
   @Override
   public String dequeue(JedisCluster jedis, int timeout_s) throws InterruptedException {
+    double pollInterval = 0.1;
+    int maxAttempts = (int) (timeout_s / pollInterval);
     List<String> args = Arrays.asList(name, getDequeueName(), "true");
     String val;
-    for (int i = 0; i < timeout_s; ++i) {
-      do {
-        Object obj_val = jedis.eval(script, keys, args);
-        val = String.valueOf(obj_val);
-        if (!isEmpty(val)) {
-          return val;
-        }
-      } while (!isEmpty(val));
+    for (int i = 0; i < maxAttempts; i++) {
+      Object obj_val = jedis.eval(script, keys, args);
+      val = String.valueOf(obj_val);
+      if (!isEmpty(val)) {
+        return val;
+      }
+      Thread.sleep((long) (pollInterval * 1000));
     }
     return null;
   }
