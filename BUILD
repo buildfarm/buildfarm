@@ -142,11 +142,6 @@ RECOMMENDED_JVM_FLAGS = [
     # configured optimally for containerized environments.
     "-XX:+UseContainerSupport",
 
-    # Setting the -XX:ActiveProcessorCount flag can help the JVM make more informed decisions
-    # about how to allocate its internal resources, such as the number of
-    # threads to use for garbage collection.  To avoid it being derived as 1, we'll set an appropriate value.
-    "-XX:ActiveProcessorCount=16",
-
     # By default, the JVM sets the maximum heap size to 25% of the available memory.
     # It’s quite conservative.  Let's give the heap more space:
     "-XX:MaxRAMPercentage=80",
@@ -169,10 +164,6 @@ RECOMMENDED_JVM_FLAGS = [
     # This can be useful for debugging memory-related issues.
     # At the very least, seeing a heap dump presented will be a clear indication of OOM.
     "-XX:+HeapDumpOnOutOfMemoryError",
-
-    # Print the time that the JVM spends stopped for garbage collection.
-    # This can be useful for performance monitoring.
-    #"-XX:+PrintGCApplicationStoppedTime",
 ]
 
 # Docker images for buildfarm components
