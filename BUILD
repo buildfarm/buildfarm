@@ -4,7 +4,7 @@ load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "downl
 load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 load("@rules_oss_audit//oss_audit:java/oss_audit.bzl", "oss_audit")
-load("//:defs.bzl", "ensure_accurate_metadata")
+load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -116,56 +116,6 @@ sh_binary(
     srcs = ["macos-wrapper.sh"],
 )
 
-SERVER_TELEMETRY_JVM_FLAGS = [
-    "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-    "-Dotel.resource.attributes=service.name=server",
-    "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-    "-Dotel.instrumentation.http.capture-headers.client.request",
-    "-Dotel.instrumentation.http.capture-headers.client.response",
-    "-Dotel.instrumentation.http.capture-headers.server.request",
-    "-Dotel.instrumentation.http.capture-headers.server.response",
-]
-
-WORKER_TELEMETRY_JVM_FLAGS = [
-    "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-    "-Dotel.resource.attributes=service.name=worker",
-    "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-    "-Dotel.instrumentation.http.capture-headers.client.request",
-    "-Dotel.instrumentation.http.capture-headers.client.response",
-    "-Dotel.instrumentation.http.capture-headers.server.request",
-    "-Dotel.instrumentation.http.capture-headers.server.response",
-]
-
-RECOMMENDED_JVM_FLAGS = [
-    # Enables the JVM to detect if it is running inside a container and automatically adjusts
-    # its behavior to optimize performance. This flag can help ensure that the JVM is
-    # configured optimally for containerized environments.
-    "-XX:+UseContainerSupport",
-
-    # By default, the JVM sets the maximum heap size to 25% of the available memory.
-    # It’s quite conservative.  Let's give the heap more space:
-    "-XX:MaxRAMPercentage=80",
-
-    # The -XX:+UseG1GC flag is recommended for use in Kubernetes environments.
-    # This enables the Garbage-First Garbage Collector, which is optimized for
-    # high-throughput, low-latency applications.  It can help reduce
-    # the memory footprint of the JVM.
-    "-XX:+UseG1GC",
-
-    # Enables the deduplication of identical strings in the JVM's string pool,
-    # which can help reduce memory usage.
-    "-XX:+UseStringDeduplication",
-
-    # This flag enables compressed object pointers in the JVM,
-    # which can reduce the memory footprint of objects on system.
-    "-XX:+UseCompressedOops",
-
-    # Create a heap dump when the JVM runs out of memory.
-    # This can be useful for debugging memory-related issues.
-    # At the very least, seeing a heap dump presented will be a clear indication of OOM.
-    "-XX:+HeapDumpOnOutOfMemoryError",
-]
-
 # Docker images for buildfarm components
 java_image(
     name = "buildfarm-server",
@@ -178,12 +128,7 @@ java_image(
         "//examples:example_configs",
         "//src/main/java/build/buildfarm:configs",
     ],
-    jvm_flags = RECOMMENDED_JVM_FLAGS + ensure_accurate_metadata() + [
-        "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-    ] + select({
-        "//config:open_telemetry": SERVER_TELEMETRY_JVM_FLAGS,
-        "//conditions:default": [],
-    }),
+    jvm_flags = server_jvm_flags(),
     main_class = "build.buildfarm.server.BuildFarmServer",
     tags = ["container"],
     runtime_deps = [
@@ -235,12 +180,7 @@ java_image(
         "//examples:example_configs",
         "//src/main/java/build/buildfarm:configs",
     ],
-    jvm_flags = RECOMMENDED_JVM_FLAGS + ensure_accurate_metadata() + [
-        "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-    ] + select({
-        "//config:open_telemetry": WORKER_TELEMETRY_JVM_FLAGS,
-        "//conditions:default": [],
-    }),
+    jvm_flags = worker_jvm_flags(),
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
     runtime_deps = [
