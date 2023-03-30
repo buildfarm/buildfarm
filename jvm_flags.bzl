@@ -32,12 +32,6 @@ RECOMMENDED_JVM_FLAGS = [
     # It’s quite conservative.  Let's give the heap more space:
     "-XX:MaxRAMPercentage=80",
 
-    # The -XX:+UseG1GC flag is recommended for use in Kubernetes environments.
-    # This enables the Garbage-First Garbage Collector, which is optimized for
-    # high-throughput, low-latency applications.  It can help reduce
-    # the memory footprint of the JVM.
-    "-XX:+UseG1GC",
-
     # Enables the deduplication of identical strings in the JVM's string pool,
     # which can help reduce memory usage.
     "-XX:+UseStringDeduplication",
