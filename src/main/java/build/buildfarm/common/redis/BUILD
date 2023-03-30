@@ -10,5 +10,7 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:io_grpc_grpc_api",
         "@maven//:org_redisson_redisson",
+        "@maven//:org_projectlombok_lombok",
+        "@maven//:io_prometheus_simpleclient",
     ],
 )
