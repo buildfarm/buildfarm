@@ -85,11 +85,6 @@ public class RedisClient implements Closeable {
     this.jedis = jedis;
   }
 
-  public RedisClient(JedisCluster jedis, Supplier<JedisCluster> jedisClusterFactory) {
-    this.jedis = jedis;
-    this.jedisClusterFactory = jedisClusterFactory;
-  }
-
   public RedisClient(
       JedisCluster jedis,
       Supplier<JedisCluster> jedisClusterFactory,
@@ -168,8 +163,7 @@ public class RedisClient implements Closeable {
     // or a redis cluster that goes down.
     while (true) {
       try {
-        T result = defaultCall(withJedis);
-        return result;
+        return defaultCall(withJedis);
       } catch (Exception e) {
         redisErrorCounter.inc();
         System.out.println("Failure in RedisClient::call");
