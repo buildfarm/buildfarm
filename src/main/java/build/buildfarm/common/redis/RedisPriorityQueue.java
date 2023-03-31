@@ -43,15 +43,6 @@ public class RedisPriorityQueue extends QueueInterface {
 
   /**
    * @brief Constructor.
-   * @details Construct a named redis queue with an established redis cluster.
-   * @param name The global name of the queue.
-   */
-  public RedisPriorityQueue(String name) {
-    this(name);
-  }
-
-  /**
-   * @brief Constructor.
    * @details Construct a named redis queue with an established redis cluster. Used to ease the
    *     testing of the order of the queued actions
    * @param name The global name of the queue.
