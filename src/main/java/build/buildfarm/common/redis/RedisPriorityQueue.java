@@ -39,7 +39,6 @@ public class RedisPriorityQueue extends QueueInterface {
   private final String name;
 
   private final String script;
-  private Timestamp time;
   private final List<String> keys;
 
   /**
@@ -48,7 +47,7 @@ public class RedisPriorityQueue extends QueueInterface {
    * @param name The global name of the queue.
    */
   public RedisPriorityQueue(String name) {
-    this(name, new Timestamp());
+    this(name);
   }
 
   /**
@@ -56,11 +55,9 @@ public class RedisPriorityQueue extends QueueInterface {
    * @details Construct a named redis queue with an established redis cluster. Used to ease the
    *     testing of the order of the queued actions
    * @param name The global name of the queue.
-   * @param time Timestamp of the operation.
    */
-  public RedisPriorityQueue(String name, Timestamp time) {
+  public RedisPriorityQueue(String name) {
     this.name = name;
-    this.time = time;
     this.keys = Arrays.asList(name);
     this.script = getLuaScript();
   }
@@ -83,7 +80,7 @@ public class RedisPriorityQueue extends QueueInterface {
    */
   @Override
   public void push(JedisCluster jedis, String val, double priority) {
-    jedis.zadd(name, priority, time.getNanos() + ":" + val);
+    jedis.zadd(name, priority, val);
   }
 
   /**
