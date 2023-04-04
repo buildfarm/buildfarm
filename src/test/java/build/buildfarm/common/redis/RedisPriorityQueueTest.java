@@ -19,6 +19,8 @@ import static com.google.common.truth.Truth.assertThat;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.shard.JedisClusterFactory;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.After;
@@ -252,6 +254,23 @@ public class RedisPriorityQueueTest {
     val = queue.dequeue(redis, 1);
     assertThat(val).isEqualTo("baz");
     assertThat(queue.size(redis)).isEqualTo(0);
+  }
+
+  // Function under test: dequeue
+  // Reason for testing: Test dequeue times out correctly
+  // Failure explanation: dequeue does not spend the full time waiting for response
+  @Test
+  public void checkDequeueTimeout() throws Exception {
+    // ARRANGE
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+
+    Instant start = Instant.now();
+    String val = queue.dequeue(redis, 1);
+    Instant finish = Instant.now();
+
+    long timeElapsed = Duration.between(start, finish).toMillis();
+    assertThat(timeElapsed).isGreaterThan(1000L);
+    assertThat(val).isEqualTo(null);
   }
 
   // Function under test: dequeue
