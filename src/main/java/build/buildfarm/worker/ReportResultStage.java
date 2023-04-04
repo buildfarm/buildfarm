@@ -203,7 +203,7 @@ public class ReportResultStage extends PipelineStage {
       workerContext.destroyExecDir(operationContext.execDir);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-    } catch (IOException e) {
+    } catch (Exception e) {
       log.log(
           Level.SEVERE,
           String.format("error destroying exec dir %s", operationContext.execDir.toString()),
