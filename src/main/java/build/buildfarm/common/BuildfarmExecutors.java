@@ -26,7 +26,9 @@ import java.util.concurrent.Executors;
  * @brief Group executor services to easier manage thread counts across software stack.
  * @details Thread usage is a global concern across the java application. Although these thread
  *     pools are used in different contexts we group them here so the application's threads can be
- *     managed and derived from the same class.  Ideally we won't have any of these at all. Grpc does its threading thing, IO should be all async, and we only have as many threads as cores in a single per-process pool.
+ *     managed and derived from the same class. Ideally we won't have any of these at all. Grpc does
+ *     its threading thing, IO should be all async, and we only have as many threads as cores in a
+ *     single per-process pool.
  */
 public class BuildfarmExecutors {
   public static ExecutorService getScanCachePool() {
