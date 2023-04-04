@@ -68,7 +68,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.ExecutionProperties;
-import build.buildfarm.common.ExecutorServices;
+import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
@@ -230,7 +230,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final int maxRequeueAttempts;
 
   private final ListeningExecutorService operationTransformService =
-      ExecutorServices.getTransformServicePool();
+      BuildfarmExecutors.getTransformServicePool();
   private final ListeningExecutorService actionCacheFetchService;
   private final ScheduledExecutorService contextDeadlineScheduler =
       newSingleThreadScheduledExecutor();
@@ -263,7 +263,7 @@ public class ShardInstance extends AbstractServerInstance {
         digestUtil,
         createBackplane(identifier),
         onStop,
-        /* actionCacheFetchService=*/ ExecutorServices.getActionCacheFetchServicePool());
+        /* actionCacheFetchService=*/ BuildfarmExecutors.getActionCacheFetchServicePool());
   }
 
   private ShardInstance(

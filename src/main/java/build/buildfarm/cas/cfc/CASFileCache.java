@@ -56,7 +56,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
-import build.buildfarm.common.ExecutorServices;
+import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
@@ -1340,7 +1340,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private CacheScanResults scanRoot(Consumer<Digest> onStartPut)
       throws IOException, InterruptedException {
     // create thread pool
-    ExecutorService pool = ExecutorServices.getScanCachePool();
+    ExecutorService pool = BuildfarmExecutors.getScanCachePool();
 
     // collect keys from cache root.
     ImmutableList.Builder<Path> computeDirsBuilder = new ImmutableList.Builder<>();
@@ -1460,7 +1460,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private List<Path> computeDirectories(CacheScanResults cacheScanResults)
       throws InterruptedException {
     // create thread pool
-    ExecutorService pool = ExecutorServices.getComputeCachePool();
+    ExecutorService pool = BuildfarmExecutors.getComputeCachePool();
 
     ImmutableList.Builder<Path> invalidDirectories = new ImmutableList.Builder<>();
 

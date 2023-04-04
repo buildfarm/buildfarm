@@ -34,7 +34,7 @@ import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.ExecutorServices;
+import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Cas;
@@ -533,7 +533,7 @@ public class Worker {
             digestUtil,
             Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build());
 
-    ExecutorService removeDirectoryService = ExecutorServices.getRemoveDirectoryPool();
+    ExecutorService removeDirectoryService = BuildfarmExecutors.getRemoveDirectoryPool();
     ExecutorService accessRecorder = newSingleThreadExecutor();
 
     InputStreamFactory remoteInputStreamFactory =
