@@ -20,7 +20,6 @@ import static build.buildfarm.common.io.Utils.formatIOError;
 import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
@@ -34,6 +33,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
 import build.buildfarm.cas.cfc.CASFileCache;
+import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.BuildfarmConfigs;
@@ -57,7 +57,6 @@ import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParsingException;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
@@ -534,10 +533,7 @@ public class Worker {
             digestUtil,
             Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build());
 
-    ExecutorService removeDirectoryService =
-        newFixedThreadPool(
-            /* nThreads=*/ 32,
-            new ThreadFactoryBuilder().setNameFormat("remove-directory-pool-%d").build());
+    ExecutorService removeDirectoryService = BuildfarmExecutors.getRemoveDirectoryPool();
     ExecutorService accessRecorder = newSingleThreadExecutor();
 
     InputStreamFactory remoteInputStreamFactory =
