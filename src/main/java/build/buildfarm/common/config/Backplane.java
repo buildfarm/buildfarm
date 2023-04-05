@@ -45,6 +45,7 @@ public class Backplane {
   private int maxAttempts = 20;
   private boolean reconnectClient = true;
   private boolean cacheCas = false;
+  private long priorityPollIntervalMillis = 100;
 
   // These limited resources are shared across all workers.
   private List<LimitedResource> resources = new ArrayList<>();

@@ -27,7 +27,6 @@ import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
-import static java.util.concurrent.Executors.newWorkStealingPool;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 import build.bazel.remote.execution.v2.Action;
@@ -40,6 +39,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.SymlinkNode;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
+import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.Dirent;
@@ -77,7 +77,7 @@ class CFCExecFileSystem implements ExecFileSystem {
 
   private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
-  private final ExecutorService fetchService = newWorkStealingPool(128);
+  private final ExecutorService fetchService = BuildfarmExecutors.getFetchServicePool();
   private final ExecutorService removeDirectoryService;
   private final ExecutorService accessRecorder;
 

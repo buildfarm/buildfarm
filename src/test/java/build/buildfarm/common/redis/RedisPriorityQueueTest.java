@@ -257,6 +257,23 @@ public class RedisPriorityQueueTest {
   }
 
   // Function under test: dequeue
+  // Reason for testing: Test dequeue times out correctly
+  // Failure explanation: dequeue does not spend the full time waiting for response
+  @Test
+  public void checkDequeueTimeout() throws Exception {
+    // ARRANGE
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+
+    Instant start = Instant.now();
+    String val = queue.dequeue(redis, 1);
+    Instant finish = Instant.now();
+
+    long timeElapsed = Duration.between(start, finish).toMillis();
+    assertThat(timeElapsed).isGreaterThan(1000L);
+    assertThat(val).isEqualTo(null);
+  }
+
+  // Function under test: dequeue
   // Reason for testing: The queue supports negative priorities.
   // Failure explanation: negative prioritizes are not handled in the correct order.
   @Test

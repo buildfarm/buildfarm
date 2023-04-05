@@ -41,6 +41,8 @@ public class RedisPriorityQueue extends QueueInterface {
   private final String script;
   private Timestamp time;
   private final List<String> keys;
+  private final long pollIntervalMillis;
+  private static long defaultPollIntervalMillis = 100;
 
   /**
    * @brief Constructor.
@@ -48,7 +50,7 @@ public class RedisPriorityQueue extends QueueInterface {
    * @param name The global name of the queue.
    */
   public RedisPriorityQueue(String name) {
-    this(name, new Timestamp());
+    this(name, new Timestamp(), defaultPollIntervalMillis);
   }
 
   /**
@@ -59,10 +61,34 @@ public class RedisPriorityQueue extends QueueInterface {
    * @param time Timestamp of the operation.
    */
   public RedisPriorityQueue(String name, Timestamp time) {
+    this(name, time, defaultPollIntervalMillis);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct a named redis queue with an established redis cluster. Used to ease the
+   *     testing of the order of the queued actions
+   * @param name The global name of the queue.
+   * @param pollIntervalMillis pollInterval to use when dqueuing from redis.
+   */
+  public RedisPriorityQueue(String name, long pollIntervalMillis) {
+    this(name, new Timestamp(), pollIntervalMillis);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct a named redis queue with an established redis cluster. Used to ease the
+   *     testing of the order of the queued actions
+   * @param name The global name of the queue.
+   * @param time Timestamp of the operation.
+   * @param pollIntervalMillis pollInterval to use when dqueuing from redis.
+   */
+  public RedisPriorityQueue(String name, Timestamp time, long pollIntervalMillis) {
     this.name = name;
     this.time = time;
     this.keys = Arrays.asList(name);
     this.script = getLuaScript();
+    this.pollIntervalMillis = pollIntervalMillis;
   }
 
   /**
@@ -122,17 +148,16 @@ public class RedisPriorityQueue extends QueueInterface {
    */
   @Override
   public String dequeue(JedisCluster jedis, int timeout_s) throws InterruptedException {
-    double pollInterval = 0.1;
-    int maxAttempts = (int) (timeout_s / pollInterval);
+    int maxAttempts = (int) (timeout_s / (pollIntervalMillis / 1000.0));
     List<String> args = Arrays.asList(name, getDequeueName(), "true");
     String val;
-    for (int i = 0; i < maxAttempts; i++) {
+    for (int i = 0; i < maxAttempts; ++i) {
       Object obj_val = jedis.eval(script, keys, args);
       val = String.valueOf(obj_val);
       if (!isEmpty(val)) {
         return val;
       }
-      Thread.sleep((long) (pollInterval * 1000));
+      Thread.sleep(pollIntervalMillis);
     }
     return null;
   }
