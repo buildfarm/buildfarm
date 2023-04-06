@@ -44,6 +44,8 @@ public class PipelineTest {
     }
   }
 
+  private void emptyPostPipelineFailure() {}
+
   @Test
   public void stageThreadReturnCompletesJoin() throws InterruptedException {
     Pipeline pipeline = new Pipeline();
@@ -53,7 +55,7 @@ public class PipelineTest {
           public void run() {}
         },
         1);
-    pipeline.start();
+    pipeline.start(this::emptyPostPipelineFailure);
     pipeline.join();
   }
 
@@ -68,7 +70,7 @@ public class PipelineTest {
           }
         },
         1);
-    pipeline.start();
+    pipeline.start(this::emptyPostPipelineFailure);
     pipeline.join();
   }
 }

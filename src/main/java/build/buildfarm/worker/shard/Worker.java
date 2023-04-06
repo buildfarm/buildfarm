@@ -89,6 +89,7 @@ import lombok.extern.java.Log;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
 
 @Log
@@ -137,6 +138,7 @@ public class Worker {
   private LoadingCache<String, Instance> workerStubs;
   @Autowired private AwsAdmin awsAdmin;
 
+  @Autowired private ApplicationContext springContext;
   /**
    * The method will prepare the worker for graceful shutdown and send out grpc request to disable
    * scale in protection when the worker is ready. If unexpected errors happened, it will cancel the
@@ -183,6 +185,16 @@ public class Worker {
         inGracefulShutdown = false;
       }
     }
+  }
+
+  private void exitPostPipelineFailure() {
+    // Shutdown the worker if a pipeline fails. By means of the spring lifecycle
+    // hooks - e.g. the `PreDestroy` hook here - it will attempt to gracefully
+    // spin down the pipeline
+    // Consider defining exit codes to better afford out of band instance
+    // recovery
+    int code = SpringApplication.exit(springContext, () -> 1);
+    System.exit(code);
   }
 
   private Operation stripOperation(Operation operation) {
@@ -613,7 +625,7 @@ public class Worker {
       log.log(INFO, "Skipping worker registration");
     }
 
-    pipeline.start();
+    pipeline.start(this::exitPostPipelineFailure);
     healthCheckMetric.labels("start").inc();
     executionSlotsTotal.set(configs.getWorker().getExecuteStageWidth());
     inputFetchSlotsTotal.set(configs.getWorker().getInputFetchStageWidth());

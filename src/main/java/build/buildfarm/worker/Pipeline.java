@@ -27,22 +27,59 @@ public class Pipeline {
   private final Map<PipelineStage, Integer> stageClosePriorities;
   private Thread joiningThread = null;
   private boolean closing = false;
-  // FIXME ThreadGroup?
+  private ThreadGroup stageThreadGroup;
+  private Runnable onUncaughtFailure = null;
 
   public Pipeline() {
     stageThreads = new HashMap<>();
     stageClosePriorities = new HashMap<>();
+    stageThreadGroup =
+        new ThreadGroup("pipeline-stages") {
+          // If there is an uncaught exception the thread group, interrupt
+          // stage threads and notify the caller to decide how to handle it
+          @Override
+          public void uncaughtException(Thread th, Throwable ex) {
+            for (Map.Entry<PipelineStage, Thread> entry : stageThreads.entrySet()) {
+              Thread stageThread = entry.getValue();
+              if (stageThread == th) {
+                PipelineStage caughtStage = entry.getKey();
+                log.log(
+                    Level.SEVERE,
+                    String.format(
+                        "%s: stage terminating due to uncaught exception", caughtStage.name()),
+                    ex);
+                break;
+              }
+            }
+            // Interrupt the entire threadgroup
+            try {
+              interrupt();
+            } catch (Exception e) {
+              log.log(Level.SEVERE, "Pipeline stage interrupt caught exception", e);
+            }
+            if (onUncaughtFailure != null) {
+              new Thread(onUncaughtFailure).start();
+            }
+          }
+        };
   }
 
   public void add(PipelineStage stage, int closePriority) {
-    stageThreads.put(stage, new Thread(stage));
+    stageThreads.put(stage, new Thread(stageThreadGroup, stage));
     if (closePriority < 0) {
       throw new IllegalArgumentException("closePriority cannot be negative");
     }
     stageClosePriorities.put(stage, closePriority);
   }
 
-  public void start() {
+  /**
+   * Start the pipeline.
+   *
+   * <p>You can provide callback which is invoked when any stage has an uncaught exception, for
+   * instance to shutdown the worker gracefully
+   */
+  public void start(Runnable onUncaughtFailure) {
+    this.onUncaughtFailure = onUncaughtFailure;
     for (Thread stageThread : stageThreads.values()) {
       stageThread.start();
     }
