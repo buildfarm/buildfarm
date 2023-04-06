@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import com.google.common.util.concurrent.SettableFuture;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,25 +25,33 @@ import lombok.extern.java.Log;
 @Log
 public class Pipeline {
   private final Map<PipelineStage, Thread> stageThreads;
+  private final PipelineStageThreadGroup stageThreadGroup;
   private final Map<PipelineStage, Integer> stageClosePriorities;
   private Thread joiningThread = null;
   private boolean closing = false;
-  // FIXME ThreadGroup?
 
   public Pipeline() {
     stageThreads = new HashMap<>();
     stageClosePriorities = new HashMap<>();
+    stageThreadGroup = new PipelineStageThreadGroup();
   }
 
   public void add(PipelineStage stage, int closePriority) {
-    stageThreads.put(stage, new Thread(stage));
+    stageThreads.put(stage, new Thread(stageThreadGroup, stage, stage.name()));
     if (closePriority < 0) {
       throw new IllegalArgumentException("closePriority cannot be negative");
     }
     stageClosePriorities.put(stage, closePriority);
   }
 
-  public void start() {
+  /**
+   * Start the pipeline.
+   *
+   * <p>You can provide callback which is invoked when any stage has an uncaught exception, for
+   * instance to shutdown the worker gracefully
+   */
+  public void start(SettableFuture<Void> uncaughtExceptionFuture) {
+    stageThreadGroup.setUncaughtExceptionFuture(uncaughtExceptionFuture);
     for (Thread stageThread : stageThreads.values()) {
       stageThread.start();
     }
