@@ -627,6 +627,8 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
       Iterable<Digest> blobDigests, RequestMetadata requestMetadata) {
+
+    // Some requests have been blocked, and we should tell the client we refuse to perform a lookup.
     try {
       if (inDenyList(requestMetadata)) {
         return immediateFailedFuture(
@@ -638,12 +640,16 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFailedFuture(Status.fromThrowable(e).asException());
     }
 
+    // Empty blobs are an exceptional case.  Filter them out.  
+    // If the user only requested empty blobs we can immedaitely tell them we already have it.
     Iterable<Digest> nonEmptyDigests =
         Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() != 0);
     if (Iterables.isEmpty(nonEmptyDigests)) {
       return immediateFuture(ImmutableList.of());
     }
 
+    // Get all of the worker nodes that are particpating in the CAS as a random list to search through.  
+    // If there are no workers avaiable, tell the client all blobs are missing.
     Deque<String> workers;
     try {
       Set<String> workerSet = backplane.getWorkers();
@@ -656,11 +662,11 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (IOException e) {
       return immediateFailedFuture(Status.fromThrowable(e).asException());
     }
-
     if (workers.isEmpty()) {
       return immediateFuture(nonEmptyDigests);
     }
 
+    // Search through all of the workers to decide how many CAS blobs are missing.
     SettableFuture<Iterable<Digest>> missingDigestsFuture = SettableFuture.create();
     findMissingBlobsOnWorker(
         UUID.randomUUID().toString(),
