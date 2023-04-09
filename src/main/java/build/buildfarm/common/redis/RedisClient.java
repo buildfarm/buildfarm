@@ -48,7 +48,10 @@ public class RedisClient implements Closeable {
           .name("redis_client_rebuild_error")
           .help("Count of failures rebuilding redis client")
           .register();
-  private boolean restablishClientOnFailures = false;
+
+  // Settings for attempting to reconnect the client on redis failures.
+  private int reconnectClientAttempts = 0;
+  private int reconnectClientWaitDurationMs = 0;
 
   private static final String MISCONF_RESPONSE = "MISCONF";
 
@@ -91,10 +94,12 @@ public class RedisClient implements Closeable {
   public RedisClient(
       JedisCluster jedis,
       Supplier<JedisCluster> jedisClusterFactory,
-      boolean restablishClientOnFailures) {
+      int reconnectClientAttempts,
+      int reconnectClientWaitDurationMs) {
     this.jedis = jedis;
     this.jedisClusterFactory = jedisClusterFactory;
-    this.restablishClientOnFailures = restablishClientOnFailures;
+    this.reconnectClientAttempts = reconnectClientAttempts;
+    this.reconnectClientWaitDurationMs = reconnectClientWaitDurationMs;
   }
 
   @Override
@@ -152,28 +157,34 @@ public class RedisClient implements Closeable {
   }
 
   private <T> T callImpl(JedisContext<T> withJedis) throws IOException {
-    // Typical configuration that does not handle exceptions
-    // or try to restablish the jedis client on failures.
-    if (!restablishClientOnFailures) {
-      return defaultCall(withJedis);
-    }
-
-    // Alternatively,
     // Capture all redis problems at the client level.
     // Try to re-establish the client and log all issues.
     // This will block the overall thread until redis can be connected to.
     // It may be a useful strategy for gaining stability on a poorly performing network,
-    // or a redis cluster that goes down.
-    while (true) {
+    // or a redis cluster that goes down.  For example, if you need to perform redis maintance on a
+    // production cluster and do not want to affect build clients.
+    for (int i = 0; i < reconnectClientAttempts; ++i) {
       try {
         return defaultCall(withJedis);
-      } catch (Exception e) {
+      } catch (Exception redisException) {
+        // Record redis failure.
         redisErrorCounter.inc();
         log.log(Level.SEVERE, "Failure in RedisClient::call");
-        log.log(Level.SEVERE, e.toString());
+        log.log(Level.SEVERE, redisException.toString());
+
+        // Wait before restablishing the client and trying again.
+        try {
+          Thread.sleep(reconnectClientWaitDurationMs);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
         rebuildJedisCluser();
       }
     }
+
+    // If all attempts to re-establish the redis client has failed,
+    // perform the redis command and allow the exception to be thrown.
+    return defaultCall(withJedis);
   }
 
   private void rebuildJedisCluser() {

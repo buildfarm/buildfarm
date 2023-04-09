@@ -501,7 +501,8 @@ public class RedisShardBackplane implements Backplane {
         new RedisClient(
             jedisClusterFactory.get(),
             jedisClusterFactory,
-            configs.getBackplane().isReconnectClient());
+            configs.getBackplane().getReconnectClientAttempts(),
+            configs.getBackplane().getReconnectClientWaitDurationMs());
     // Create containers that make up the backplane
     state = DistributedStateCreator.create(client);
 
