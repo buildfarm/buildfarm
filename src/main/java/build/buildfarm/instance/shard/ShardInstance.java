@@ -659,14 +659,16 @@ public class ShardInstance extends AbstractServerInstance {
     // will come down to the client's resiliency if the backplane is out-of-date and the server lies
     // about which blobs are actually present.  We provide this alternative strategy for calculating
     // missing blobs.
-    try {
-      Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(blobDigests);
-      return immediateFuture(
-          StreamSupport.stream(blobDigests.spliterator(), false)
-              .filter(digest -> !foundBlobs.containsKey(digest))
-              .collect(Collectors.toList()));
-    } catch (Exception e) {
-      return immediateFailedFuture(Status.fromThrowable(e).asException());
+    if (configs.getServer().isFindMissingBlobsViaBackplane()) {
+      try {
+        Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(blobDigests);
+        return immediateFuture(
+            StreamSupport.stream(blobDigests.spliterator(), false)
+                .filter(digest -> !foundBlobs.containsKey(digest))
+                .collect(Collectors.toList()));
+      } catch (Exception e) {
+        return immediateFailedFuture(Status.fromThrowable(e).asException());
+      }
     }
 
     // A more accurate way to verify missing blobs is to ask the CAS participants directly if they
