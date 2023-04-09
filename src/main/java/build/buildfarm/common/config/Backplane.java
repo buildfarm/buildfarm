@@ -44,6 +44,7 @@ public class Backplane {
   private int maxAttempts = 20;
   private boolean reconnectClient = true;
   private boolean cacheCas = false;
+  private long priorityPollIntervalMillis = 100;
 
   public String getRedisUri() {
     // use environment override (useful for containerized deployment)
