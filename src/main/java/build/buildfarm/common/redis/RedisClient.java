@@ -119,7 +119,7 @@ public class RedisClient implements Closeable {
   }
 
   public void run(Consumer<JedisCluster> withJedis) throws IOException {
-    callImpl(
+    call(
         (JedisContext<Void>)
             jedis -> {
               withJedis.accept(jedis);
@@ -136,7 +136,7 @@ public class RedisClient implements Closeable {
       throws IOException, InterruptedException {
     AtomicReference<InterruptedException> interruption = new AtomicReference<>(null);
     T result =
-        callImpl(
+        call(
             jedis -> {
               try {
                 return withJedis.run(jedis);
@@ -169,7 +169,11 @@ public class RedisClient implements Closeable {
       } catch (Exception redisException) {
         // Record redis failure.
         redisErrorCounter.inc();
-        log.log(Level.SEVERE, "Failure in RedisClient::call");
+        log.log(
+            Level.SEVERE,
+            String.format(
+                "Failure in RedisClient::callImpl (attempt %d of %d)",
+                i + 1, reconnectClientAttempts));
         log.log(Level.SEVERE, redisException.toString());
 
         // Wait before restablishing the client and trying again.
