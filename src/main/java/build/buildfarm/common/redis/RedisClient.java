@@ -92,11 +92,14 @@ public class RedisClient implements Closeable {
   }
 
   public RedisClient(
-      JedisCluster jedis,
       Supplier<JedisCluster> jedisClusterFactory,
       int reconnectClientAttempts,
       int reconnectClientWaitDurationMs) {
-    this.jedis = jedis;
+    try {
+      this.jedis = jedisClusterFactory.get();
+    } catch (Exception e) {
+      log.log(Level.SEVERE, "Unable to establish redis client: " + e.toString());
+    }
     this.jedisClusterFactory = jedisClusterFactory;
     this.reconnectClientAttempts = reconnectClientAttempts;
     this.reconnectClientWaitDurationMs = reconnectClientWaitDurationMs;

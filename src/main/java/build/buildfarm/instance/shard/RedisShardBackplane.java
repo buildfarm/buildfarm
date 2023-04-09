@@ -499,7 +499,6 @@ public class RedisShardBackplane implements Backplane {
     // multiple clients.
     client =
         new RedisClient(
-            jedisClusterFactory.get(),
             jedisClusterFactory,
             configs.getBackplane().getReconnectClientAttempts(),
             configs.getBackplane().getReconnectClientWaitDurationMs());
