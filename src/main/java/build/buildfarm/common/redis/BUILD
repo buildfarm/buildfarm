@@ -1,6 +1,7 @@
 java_library(
     name = "redis",
     srcs = glob(["*.java"]),
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",

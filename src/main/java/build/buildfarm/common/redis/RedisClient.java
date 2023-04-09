@@ -25,6 +25,8 @@ import java.net.SocketTimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import lombok.extern.java.Log;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisDataException;
@@ -35,6 +37,7 @@ import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
  * @class RedisClient
  * @brief Responsible for making calls to redis.
  */
+@Log
 public class RedisClient implements Closeable {
   // Metrics to detect any kind of redis failures.
   // Often due to network issues are the redis cluster going down.
@@ -166,8 +169,8 @@ public class RedisClient implements Closeable {
         return defaultCall(withJedis);
       } catch (Exception e) {
         redisErrorCounter.inc();
-        System.out.println("Failure in RedisClient::call");
-        System.out.println(e.toString());
+        log.log(Level.SEVERE, "Failure in RedisClient::call");
+        log.log(Level.SEVERE, e.toString());
         rebuildJedisCluser();
       }
     }
@@ -175,12 +178,12 @@ public class RedisClient implements Closeable {
 
   private void rebuildJedisCluser() {
     try {
-      System.out.println("Rebuilding redis client");
+      log.log(Level.SEVERE, "Rebuilding redis client");
       jedis = jedisClusterFactory.get();
     } catch (Exception e) {
       redisClientRebuildErrorCounter.inc();
-      System.out.println("Failed to rebuild redis client");
-      System.out.println(e.toString());
+      log.log(Level.SEVERE, "Failed to rebuild redis client");
+      log.log(Level.SEVERE, e.toString());
     }
   }
 
