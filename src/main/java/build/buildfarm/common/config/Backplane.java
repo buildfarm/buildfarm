@@ -48,4 +48,5 @@ public class Backplane {
   private long priorityPollIntervalMillis = 100;
 
   // These limited resources are shared across all workers.
+  // An example would be a limited number of seats to a license server.
   private List<LimitedResource> resources = new ArrayList<>();
