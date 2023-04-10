@@ -117,8 +117,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -1098,68 +1098,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return maxEntrySizeInBytes;
   }
 
-  private static final class SharedLock implements Lock {
-    private final AtomicBoolean locked = new AtomicBoolean(false);
-
-    @Override
-    public void lock() {
-      for (; ; ) {
-        try {
-          lockInterruptibly();
-          return;
-        } catch (InterruptedException e) {
-          // ignore
-        }
-      }
-    }
-
-    @Override
-    public void lockInterruptibly() throws InterruptedException {
-      // attempt to atomically synchronize
-      synchronized (locked) {
-        while (!locked.compareAndSet(/* expected=*/ false, /* update=*/ true)) {
-          locked.wait();
-        }
-      }
-    }
-
-    @SuppressWarnings("NullableProblems")
-    @Override
-    public Condition newCondition() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean tryLock() {
-      synchronized (locked) {
-        return locked.compareAndSet(false, true);
-      }
-    }
-
-    @SuppressWarnings("NullableProblems")
-    @Override
-    public boolean tryLock(long time, TimeUnit unit) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void unlock() {
-      if (!locked.compareAndSet(/* expected=*/ true, /* update=*/ false)) {
-        throw new IllegalMonitorStateException("the lock was not held");
-      }
-      synchronized (locked) {
-        locked.notify();
-      }
-    }
-  }
-
   private static final class LockMap {
     private final Map<Path, Lock> mutexes = Maps.newHashMap();
 
     private synchronized Lock acquire(Path key) {
       Lock mutex = mutexes.get(key);
       if (mutex == null) {
-        mutex = new SharedLock();
+        mutex = new ReentrantLock();
         mutexes.put(key, mutex);
       }
       return mutex;
