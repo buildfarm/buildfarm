@@ -1062,7 +1062,7 @@ public class ShardInstance extends AbstractServerInstance {
     @Override
     public void onSuccess(List<String> workersList) {
       if (workersList.isEmpty()) {
-        onFailure(Status.NOT_FOUND.asException());
+        onFailure(Status.NOT_FOUND.withDescription("No workers found.").asException());
       } else {
         Collections.shuffle(workersList, rand);
         onQueue(new ArrayDeque<String>(workersList));
@@ -2500,7 +2500,10 @@ public class ShardInstance extends AbstractServerInstance {
   public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
     Operation operation = getOperation(operationName);
     if (operation == null) {
-      return immediateFailedFuture(Status.NOT_FOUND.asException());
+      return immediateFailedFuture(
+          Status.NOT_FOUND
+              .withDescription(String.format("Could not find operation: %s", operationName))
+              .asException());
     }
     return watchOperation(operation, watcher, /* initial=*/ true);
   }
