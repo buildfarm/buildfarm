@@ -1,7 +1,5 @@
 package build.buildfarm.common.config;
 
-import com.google.common.base.Strings;
-import java.net.InetAddress;
 import java.util.UUID;
 import lombok.Data;
 import lombok.extern.java.Log;
@@ -39,26 +37,9 @@ public class Server {
   private String clusterId = "";
   private String cloudRegion;
   private String publicName;
-
-  public String getPublicName() {
-    // use environment override (useful for containerized deployment)
-    if (!Strings.isNullOrEmpty(System.getenv("INSTANCE_NAME"))) {
-      return System.getenv("INSTANCE_NAME");
-    }
-
-    // use configured value
-    if (!Strings.isNullOrEmpty(publicName)) {
-      return publicName;
-    }
-
-    // derive a value
-    try {
-      return InetAddress.getLocalHost().getHostAddress() + ":" + port;
-    } catch (Exception e) {
-      log.severe("publicName could not be derived:" + e);
-      return publicName;
-    }
-  }
+  private int maxInboundMessageSizeBytes = 0;
+  private int maxInboundMetadataSize = 0;
+  private ServerCacheConfigs caches = new ServerCacheConfigs();
 
   public String getSession() {
     return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);

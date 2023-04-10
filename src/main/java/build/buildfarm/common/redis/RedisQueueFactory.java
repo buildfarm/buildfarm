@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.redis;
 
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Queue;
 
 /**
@@ -21,6 +22,8 @@ import build.buildfarm.common.config.Queue;
  * @brief A redis queue factory.
  */
 public class RedisQueueFactory {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   public QueueInterface getQueue(Queue.QUEUE_TYPE queueType, String name) {
     if (queueType == null) {
       return null;
@@ -28,7 +31,7 @@ public class RedisQueueFactory {
     if (queueType.equals(Queue.QUEUE_TYPE.standard)) {
       return new RedisQueue(name);
     } else if (queueType.equals(Queue.QUEUE_TYPE.priority)) {
-      return new RedisPriorityQueue(name);
+      return new RedisPriorityQueue(name, configs.getBackplane().getPriorityPollIntervalMillis());
     }
     return null;
   }

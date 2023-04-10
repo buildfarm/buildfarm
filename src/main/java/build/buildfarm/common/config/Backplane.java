@@ -45,17 +45,7 @@ public class Backplane {
   private String[] redisNodes = {};
   private int maxAttempts = 20;
   private boolean cacheCas = false;
+  private long priorityPollIntervalMillis = 100;
 
   // These limited resources are shared across all workers.
   private List<LimitedResource> resources = new ArrayList<>();
-
-  public String getRedisUri() {
-    // use environment override (useful for containerized deployment)
-    if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
-      return System.getenv("REDIS_URI");
-    }
-
-    // use configured value
-    return redisUri;
-  }
-}

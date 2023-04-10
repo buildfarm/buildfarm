@@ -35,9 +35,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.lang.String.format;
-import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -65,6 +63,7 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.actioncache.ShardActionCache;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -220,14 +219,10 @@ public class ShardInstance extends AbstractServerInstance {
   private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
   private final Thread dispatchedMonitor;
   private final Duration maxActionTimeout;
-  private final AsyncCache<Digest, Directory> directoryCache =
-      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
-  private final AsyncCache<Digest, Command> commandCache =
-      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
-  private final AsyncCache<Digest, Action> digestToActionCache =
-      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
-  private final Cache<RequestMetadata, Boolean> recentCacheServedExecutions =
-      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).build();
+  private AsyncCache<Digest, Directory> directoryCache;
+  private AsyncCache<Digest, Command> commandCache;
+  private AsyncCache<Digest, Action> digestToActionCache;
+  private Cache<RequestMetadata, Boolean> recentCacheServedExecutions;
 
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
@@ -235,7 +230,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final int maxRequeueAttempts;
 
   private final ListeningExecutorService operationTransformService =
-      listeningDecorator(newFixedThreadPool(24));
+      BuildfarmExecutors.getTransformServicePool();
   private final ListeningExecutorService actionCacheFetchService;
   private final ScheduledExecutorService contextDeadlineScheduler =
       newSingleThreadScheduledExecutor();
@@ -268,7 +263,7 @@ public class ShardInstance extends AbstractServerInstance {
         digestUtil,
         createBackplane(identifier),
         onStop,
-        /* actionCacheFetchService=*/ listeningDecorator(newFixedThreadPool(24)));
+        /* actionCacheFetchService=*/ BuildfarmExecutors.getActionCacheFetchServicePool());
   }
 
   private ShardInstance(
@@ -298,6 +293,29 @@ public class ShardInstance extends AbstractServerInstance {
             Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build()),
         actionCacheFetchService,
         configs.getServer().isEnsureOutputsPresent());
+  }
+
+  void initializeCaches() {
+    directoryCache =
+        Caffeine.newBuilder()
+            .newBuilder()
+            .maximumSize(configs.getServer().getCaches().getDirectoryCacheMaxEntries())
+            .buildAsync();
+    commandCache =
+        Caffeine.newBuilder()
+            .newBuilder()
+            .maximumSize(configs.getServer().getCaches().getCommandCacheMaxEntries())
+            .buildAsync();
+    digestToActionCache =
+        Caffeine.newBuilder()
+            .newBuilder()
+            .maximumSize(configs.getServer().getCaches().getDigestToActionCacheMaxEntries())
+            .buildAsync();
+    recentCacheServedExecutions =
+        Caffeine.newBuilder()
+            .newBuilder()
+            .maximumSize(configs.getServer().getCaches().getRecentServedExecutionsCacheMaxEntries())
+            .build();
   }
 
   public ShardInstance(
@@ -337,6 +355,8 @@ public class ShardInstance extends AbstractServerInstance {
     this.useDenyList = useDenyList;
     this.actionCacheFetchService = actionCacheFetchService;
     backplane.setOnUnsubscribe(this::stop);
+
+    initializeCaches();
 
     remoteInputStreamFactory =
         new RemoteInputStreamFactory(
