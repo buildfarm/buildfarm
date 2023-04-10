@@ -2502,7 +2502,7 @@ public class ShardInstance extends AbstractServerInstance {
     if (operation == null) {
       return immediateFailedFuture(
           Status.NOT_FOUND
-              .withDescription(String.format("Could not find operation: %s", operationName))
+              .withDescription(String.format("Operation not found: %s", operationName))
               .asException());
     }
     return watchOperation(operation, watcher, /* initial=*/ true);
