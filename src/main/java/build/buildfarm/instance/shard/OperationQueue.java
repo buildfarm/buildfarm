@@ -91,14 +91,13 @@ public class OperationQueue {
             index ->
                 dequeueService.execute(
                     () -> {
-                        while (true) {
-                          try {
-                            String value = queues.get(index).dequeue(jedis);
-                            if (value != null) {
-                              dequeued.put(value);
-                            }
-                        }
-                        catch (Exception e) {
+                      while (true) {
+                        try {
+                          String value = queues.get(index).dequeue(jedis);
+                          if (value != null) {
+                            dequeued.put(value);
+                          }
+                        } catch (Exception e) {
                         }
                       }
                     }));

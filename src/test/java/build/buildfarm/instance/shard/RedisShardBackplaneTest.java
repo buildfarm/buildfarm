@@ -190,7 +190,6 @@ public class RedisShardBackplaneTest {
         new RedisShardBackplane(
             "requeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
     backplane.start("startTime/test:0000");
-    backplane.startDequeuePool();
 
     // ARRANGE
     // Assume the operation queue is already populated with a first-time operation.
@@ -202,7 +201,8 @@ public class RedisShardBackplaneTest {
             .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    when(jedisCluster.brpoplpush(any(String.class), any(String.class), any(Integer.class))).thenReturn(queueEntryJson);
+    when(jedisCluster.brpoplpush(any(String.class), any(String.class), any(Integer.class)))
+        .thenReturn(queueEntryJson);
 
     // PRE-ASSERT
     when(jedisCluster.hsetnx(any(String.class), any(String.class), any(String.class)))
@@ -224,6 +224,7 @@ public class RedisShardBackplaneTest {
     // ACT
     // dispatch the operation and test properties of the QueueEntry and internal jedis calls.
     List<Platform.Property> properties = new ArrayList<>();
+    backplane.startDequeuePool();
     QueueEntry readyForRequeue = backplane.dispatchOperation(properties);
 
     // ASSERT
@@ -246,7 +247,6 @@ public class RedisShardBackplaneTest {
         new RedisShardBackplane(
             "requeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
     backplane.start("startTime/test:0000");
-    backplane.startDequeuePool();
 
     // Assume the operation queue is already populated from a first re-queue.
     // this means the operation's requeue amount will be 1.
@@ -257,7 +257,8 @@ public class RedisShardBackplaneTest {
             .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    when(jedisCluster.brpoplpush(any(String.class), any(String.class), any(Integer.class))).thenReturn(queueEntryJson);
+    when(jedisCluster.brpoplpush(any(String.class), any(String.class), any(Integer.class)))
+        .thenReturn(queueEntryJson);
 
     // PRE-ASSERT
     when(jedisCluster.hsetnx(any(String.class), any(String.class), any(String.class)))
@@ -279,6 +280,7 @@ public class RedisShardBackplaneTest {
     // ACT
     // dispatch the operation and test properties of the QueueEntry and internal jedis calls.
     List<Platform.Property> properties = new ArrayList<>();
+    backplane.startDequeuePool();
     QueueEntry readyForRequeue = backplane.dispatchOperation(properties);
 
     // ASSERT
