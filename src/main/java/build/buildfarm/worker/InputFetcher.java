@@ -328,6 +328,7 @@ public class InputFetcher implements Runnable {
         workerContext.putOperation(failedOperation);
         OperationContext newOperationContext =
             operationContext.toBuilder().setOperation(failedOperation).build();
+        owner.error().put(newOperationContex);
       }
       owner.error().put(operationContext);
     } catch (Exception e) {
