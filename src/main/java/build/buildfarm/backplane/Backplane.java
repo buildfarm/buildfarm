@@ -263,4 +263,6 @@ public interface Backplane {
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
 
   GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) throws IOException;
+
+  void startDequeuePool() throws IOException;
 }

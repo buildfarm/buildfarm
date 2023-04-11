@@ -527,6 +527,7 @@ public class Worker {
       backplane =
           new RedisShardBackplane(identifier, this::stripOperation, this::stripQueuedOperation);
       backplane.start(configs.getWorker().getPublicName());
+      backplane.startDequeuePool();
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
     }

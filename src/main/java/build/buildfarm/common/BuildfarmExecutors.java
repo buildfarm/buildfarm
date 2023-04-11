@@ -81,4 +81,11 @@ public class BuildfarmExecutors {
     int nThreads = 128;
     return Executors.newWorkStealingPool(nThreads);
   }
+
+  public static ExecutorService getOperationDequeuePool(int queueAmount) {
+    int nThreads = queueAmount;
+    String threadNameFormat = "operation-dequeue-%d";
+    return Executors.newFixedThreadPool(
+        nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
+  }
 }

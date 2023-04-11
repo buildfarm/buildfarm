@@ -190,6 +190,7 @@ public class RedisShardBackplaneTest {
         new RedisShardBackplane(
             "requeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
     backplane.start("startTime/test:0000");
+    backplane.startDequeuePool();
 
     // ARRANGE
     // Assume the operation queue is already populated with a first-time operation.
@@ -245,6 +246,7 @@ public class RedisShardBackplaneTest {
         new RedisShardBackplane(
             "requeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
     backplane.start("startTime/test:0000");
+    backplane.startDequeuePool();
 
     // Assume the operation queue is already populated from a first re-queue.
     // this means the operation's requeue amount will be 1.

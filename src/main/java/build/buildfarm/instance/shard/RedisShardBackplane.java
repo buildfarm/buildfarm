@@ -936,6 +936,15 @@ public class RedisShardBackplane implements Backplane {
     state.operationQueue.push(jedis, provisions, queueEntryJson, priority);
   }
 
+  // call this for workers only
+  @Override
+  public void startDequeuePool() throws IOException {
+    client.run(
+        jedis -> {
+          state.operationQueue.startDequeuePool(jedis);
+        });
+  }
+
   @SuppressWarnings("ConstantConditions")
   @Override
   public void queue(QueueEntry queueEntry, Operation operation) throws IOException {
