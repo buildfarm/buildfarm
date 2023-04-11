@@ -40,6 +40,7 @@ public class Server {
   private int maxInboundMessageSizeBytes = 0;
   private int maxInboundMetadataSize = 0;
   private ServerCacheConfigs caches = new ServerCacheConfigs();
+  private boolean findMissingBlobsViaBackplane = false;
 
   public String getSession() {
     return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);
