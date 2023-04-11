@@ -202,7 +202,7 @@ public class RedisShardBackplaneTest {
             .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    when(jedisCluster.rpoplpush(any(String.class), any(String.class))).thenReturn(queueEntryJson);
+    when(jedisCluster.brpoplpush(any(String.class), any(String.class), any(Integer.class))).thenReturn(queueEntryJson);
 
     // PRE-ASSERT
     when(jedisCluster.hsetnx(any(String.class), any(String.class), any(String.class)))
@@ -257,7 +257,7 @@ public class RedisShardBackplaneTest {
             .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    when(jedisCluster.rpoplpush(any(String.class), any(String.class))).thenReturn(queueEntryJson);
+    when(jedisCluster.brpoplpush(any(String.class), any(String.class), any(Integer.class))).thenReturn(queueEntryJson);
 
     // PRE-ASSERT
     when(jedisCluster.hsetnx(any(String.class), any(String.class), any(String.class)))
