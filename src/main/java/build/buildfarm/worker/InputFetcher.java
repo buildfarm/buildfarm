@@ -310,20 +310,23 @@ public class InputFetcher implements Runnable {
 
   private void failOperation(String failureMessage, String failureDetails)
       throws InterruptedException {
-    // Operation failedOperation =
-    //     FailedOperationGetter.get(
-    //         operationContext.operation,
-    //         operationContext.queueEntry.getExecuteEntry(),
-    //         failureMessage,
-    //         failureDetails);
+    Operation failedOperation =
+        FailedOperationGetter.get(
+            operationContext.operation,
+            operationContext.queueEntry.getExecuteEntry(),
+            failureMessage,
+            failureDetails);
 
     try {
       // FIXME
       // To preserve behavior while testing on existing cluster, we will not actually fail the
       // operation.
-      // workerContext.putOperation(failedOperation);
-      // OperationContext newOperationContext =
-      //    operationContext.toBuilder().setOperation(failedOperation).build();
+      bool putFailedOperation = false;
+      if (putFailedOperation) {
+        workerContext.putOperation(failedOperation);
+        OperationContext newOperationContext =
+            operationContext.toBuilder().setOperation(failedOperation).build();
+      }
       owner.error().put(operationContext);
     } catch (Exception e) {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
