@@ -16,6 +16,7 @@ package build.buildfarm.common;
 
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 
+import build.buildfarm.common.config.BuildfarmConfigs;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.ExecutorService;
@@ -31,18 +32,30 @@ import java.util.concurrent.Executors;
  *     single per-process pool.
  */
 public class BuildfarmExecutors {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   public static ExecutorService getScanCachePool() {
-    int nThreads = SystemProcessors.get();
+    int nThreads = executorWidth();
     String threadNameFormat = "scan-cache-pool-%d";
+    // We had workers locking up on startup so we lower the priority of the CAS loading threads.
     return Executors.newFixedThreadPool(
-        nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
+        nThreads,
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNameFormat)
+            .setPriority(Thread.MIN_PRIORITY)
+            .build());
   }
 
   public static ExecutorService getComputeCachePool() {
-    int nThreads = SystemProcessors.get();
+    int nThreads = executorWidth();
     String threadNameFormat = "compute-cache-pool-%d";
+    // We had workers locking up on startup so we lower the priority of the CAS loading threads.
     return Executors.newFixedThreadPool(
-        nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
+        nThreads,
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNameFormat)
+            .setPriority(Thread.MIN_PRIORITY)
+            .build());
   }
 
   public static ExecutorService getRemoveDirectoryPool() {
@@ -53,7 +66,7 @@ public class BuildfarmExecutors {
   }
 
   public static ExecutorService getSubscriberPool() {
-    int nThreads = 32;
+    int nThreads = SystemProcessors.get();
     String threadNameFormat = "subscriber-service-pool-%d";
     return Executors.newFixedThreadPool(
         nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
@@ -87,5 +100,9 @@ public class BuildfarmExecutors {
     String threadNameFormat = "operation-dequeue-%d";
     return Executors.newFixedThreadPool(
         nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
+  }
+
+  private static int executorWidth() {
+    return Math.max(1, SystemProcessors.get() - configs.getWorker().getExecuteStageWidthOffset());
   }
 }
