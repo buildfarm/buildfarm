@@ -27,10 +27,12 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.FileNode;
+import build.buildfarm.common.FailedOperationGetter;
 import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
+import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
@@ -321,7 +323,7 @@ public class InputFetcher implements Runnable {
       // FIXME
       // To preserve behavior while testing on existing cluster, we will not actually fail the
       // operation.
-      bool putFailedOperation = false;
+      boolean putFailedOperation = false;
       if (putFailedOperation) {
         workerContext.putOperation(failedOperation);
         OperationContext newOperationContext =
