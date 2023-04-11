@@ -307,35 +307,10 @@ public class OperationQueue {
     return null;
   }
 
-  /**
-   * @brief Choose an eligible queues based on given properties.
-   * @details We use the platform execution properties of a queue entry to determine the appropriate
-   *     queues. If there no eligible queues, an exception is thrown.
-   * @param provisions Provisions to check that requirements are met.
-   * @return The chosen queues.
-   * @note Suggested return identifier: queues.
-   */
-  private List<BalancedRedisQueue> chooseEligibleQueues(List<Platform.Property> provisions) {
-    List<BalancedRedisQueue> eligibleQueues =
-        queues.stream()
-            .filter(provisionedQueue -> provisionedQueue.isEligible(toMultimap(provisions)))
-            .map(provisionedQueue -> provisionedQueue.queue())
-            .collect(Collectors.toList());
-
-    if (eligibleQueues.isEmpty()) {
-      throwNoEligibleQueueException(provisions);
-    }
-
-    return eligibleQueues;
-  }
-
   private List<BalancedRedisQueue> chooseAllQueues() {
-    List<BalancedRedisQueue> eligibleQueues =
-        queues.stream()
-            .map(provisionedQueue -> provisionedQueue.queue())
-            .collect(Collectors.toList());
-
-    return eligibleQueues;
+    return queues.stream()
+        .map(provisionedQueue -> provisionedQueue.queue())
+        .collect(Collectors.toList());
   }
 
   /**

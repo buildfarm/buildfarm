@@ -27,12 +27,10 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.FileNode;
-import build.buildfarm.common.FailedOperationGetter;
 import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
-import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
@@ -312,12 +310,12 @@ public class InputFetcher implements Runnable {
 
   private void failOperation(String failureMessage, String failureDetails)
       throws InterruptedException {
-    Operation failedOperation =
-        FailedOperationGetter.get(
-            operationContext.operation,
-            operationContext.queueEntry.getExecuteEntry(),
-            failureMessage,
-            failureDetails);
+    // Operation failedOperation =
+    //     FailedOperationGetter.get(
+    //         operationContext.operation,
+    //         operationContext.queueEntry.getExecuteEntry(),
+    //         failureMessage,
+    //         failureDetails);
 
     try {
       // FIXME
