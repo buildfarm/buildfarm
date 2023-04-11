@@ -47,11 +47,10 @@ public class OperationQueue {
    */
   private final int maxQueueSize;
 
-  // threads that block
+  // threads that each target a specific queue and block on dequeuing.
   ExecutorService dequeueService;
 
-  // For the threads to put dequeued operations.
-  // For the worker to wait on.
+  // This is used for dequeueing threads to put operations and for workers to wait on.
   BlockingQueue<String> dequeued = new ArrayBlockingQueue<>(1);
 
   /**
