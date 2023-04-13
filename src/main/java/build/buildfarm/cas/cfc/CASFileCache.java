@@ -2604,15 +2604,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private void deleteExpiredKey(String expiredKey) throws IOException {
     Path path = getPath(expiredKey);
+
+    // We don't want the metric publishing to delay the deletion of the file.
+    // We publish the metric only after the file has been deleted.
     if (publishTtlMetric) {
-      publishExpirationMetric(path);
+      long createdTime = path.toFile().lastModified();
+      Files.delete(path);
+      publishExpirationMetric(createdTime);
+    } else {
+      Files.delete(path);
     }
-    Files.delete(path);
   }
 
-  private void publishExpirationMetric(Path path) {
+  private void publishExpirationMetric(long createdTime) {
     long currentTime = new Date().getTime();
-    long createdTime = path.toFile().lastModified();
     long ttl = currentTime - createdTime;
     casTtl.observe(ttl);
   }
