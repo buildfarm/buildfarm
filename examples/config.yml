@@ -11,6 +11,8 @@ server:
   grpcMetrics:
     enabled: false
     provideLatencyHistograms: false
+  maxInboundMessageSizeBytes: 0
+  maxInboundMetadataSize: 0
   casWriteTimeout: 3600
   bytestreamTimeout: 3600
   sslCertificatePath:
@@ -27,6 +29,11 @@ server:
   recordBesEvents: false
   clusterId: local
   cloudRegion: us-east-1
+  caches:
+    directoryCacheMaxEntries: 10000
+    commandCacheMaxEntries: 10000
+    digestToActionCacheMaxEntries: 10000
+    recentServedExecutionsCacheMaxEntries: 10000
   admin:
     deploymentEnvironment: AWS
     clusterEndpoint: "grpc://localhost"
@@ -68,6 +75,7 @@ backplane:
   maxQueueDepth: 100000
   maxPreQueueDepth: 1000000
   priorityQueue: false
+  priorityPollIntervalMillis: 100
   timeout: 10000
   maxAttempts: 20
   cacheCas: false
@@ -101,6 +109,7 @@ worker:
       fileDirectoriesIndexInMemory: false
       skipLoad: false
       hexBucketLevels: 0
+      execRootCopyFallback: false
       target:
   executeStageWidth: 1
   inputFetchStageWidth: 1
@@ -114,6 +123,10 @@ worker:
   onlyMulticoreTests: false
   allowBringYourOwnContainer: false
   errorOperationRemainingResources: false
+  sandboxSettings:
+    alwaysUse: false
+    selectForBlockNetwork: false
+    selectForTmpFs: false
   executionPolicies:
     - name: test
       executionWrapper:
