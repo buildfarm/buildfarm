@@ -98,7 +98,7 @@ public class RedisClient implements Closeable {
     try {
       this.jedis = jedisClusterFactory.get();
     } catch (Exception e) {
-      log.log(Level.SEVERE, "Unable to establish redis client: " + e.toString());
+      log.log(Level.ERROR, "Unable to establish redis client: " + e.toString());
     }
     this.jedisClusterFactory = jedisClusterFactory;
     this.reconnectClientAttempts = reconnectClientAttempts;
@@ -156,10 +156,6 @@ public class RedisClient implements Closeable {
   }
 
   public <T> T call(JedisContext<T> withJedis) throws IOException {
-    return callImpl(withJedis);
-  }
-
-  private <T> T callImpl(JedisContext<T> withJedis) throws IOException {
     // Capture all redis problems at the client level.
     // Try to re-establish the client and log all issues.
     // This will block the overall thread until redis can be connected to.
@@ -173,11 +169,10 @@ public class RedisClient implements Closeable {
         // Record redis failure.
         redisErrorCounter.inc();
         log.log(
-            Level.SEVERE,
+            Level.ERROR,
             String.format(
-                "Failure in RedisClient::callImpl (attempt %d of %d)",
-                i + 1, reconnectClientAttempts));
-        log.log(Level.SEVERE, redisException.toString());
+                "Failure in RedisClient::call (attempt %d of %d)", i + 1, reconnectClientAttempts));
+        log.log(Level.ERROR, redisException.toString());
 
         // Wait before restablishing the client and trying again.
         try {
@@ -196,12 +191,11 @@ public class RedisClient implements Closeable {
 
   private void rebuildJedisCluser() {
     try {
-      log.log(Level.SEVERE, "Rebuilding redis client");
       jedis = jedisClusterFactory.get();
     } catch (Exception e) {
       redisClientRebuildErrorCounter.inc();
-      log.log(Level.SEVERE, "Failed to rebuild redis client");
-      log.log(Level.SEVERE, e.toString());
+      log.log(Level.ERROR, "Failed to rebuild redis client");
+      log.log(Level.ERROR, e.toString());
     }
   }
 
