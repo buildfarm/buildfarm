@@ -98,7 +98,7 @@ public class RedisClient implements Closeable {
     try {
       this.jedis = jedisClusterFactory.get();
     } catch (Exception e) {
-      log.log(Level.ERROR, "Unable to establish redis client: " + e.toString());
+      log.log(Level.WARNING, "Unable to establish redis client: " + e.toString());
     }
     this.jedisClusterFactory = jedisClusterFactory;
     this.reconnectClientAttempts = reconnectClientAttempts;
@@ -169,10 +169,10 @@ public class RedisClient implements Closeable {
         // Record redis failure.
         redisErrorCounter.inc();
         log.log(
-            Level.ERROR,
+            Level.WARNING,
             String.format(
                 "Failure in RedisClient::call (attempt %d of %d)", i + 1, reconnectClientAttempts));
-        log.log(Level.ERROR, redisException.toString());
+        log.log(Level.WARNING, redisException.toString());
 
         // Wait before restablishing the client and trying again.
         try {
@@ -194,8 +194,8 @@ public class RedisClient implements Closeable {
       jedis = jedisClusterFactory.get();
     } catch (Exception e) {
       redisClientRebuildErrorCounter.inc();
-      log.log(Level.ERROR, "Failed to rebuild redis client");
-      log.log(Level.ERROR, e.toString());
+      log.log(Level.WARNING, "Failed to rebuild redis client");
+      log.log(Level.WARNING, e.toString());
     }
   }
 
