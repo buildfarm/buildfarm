@@ -162,9 +162,3 @@ def buildfarm_init(name = "buildfarm"):
         name = "llvm_toolchain",
         llvm_version = "10.0.0",
     )
-
-def ensure_accurate_metadata():
-    return select({
-        "//conditions:default": [],
-        "//config:windows": ["-Dsun.nio.fs.ensureAccurateMetadata=true"],
-    })
