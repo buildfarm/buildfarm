@@ -56,6 +56,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
@@ -336,9 +337,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     if (publishTtlMetric) {
       casTtl =
           Histogram.build()
-              .name("cas_ttl_ms")
-              .help(
-                  "The amount of time CAS entries live on L1 storage before expiration (milliseconds)")
+              .name("cas_ttl_s")
+              .buckets(
+                  3600, // 1 hour
+                  21600, // 6 hours
+                  86400, // 1 day
+                  345600, // 4 days
+                  604800, // 1 week
+                  1210000 // 2 weeks
+                  )
+              .help("The amount of time CAS entries live on L1 storage before expiration (seconds)")
               .register();
     }
 
@@ -2602,24 +2610,25 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  private void deleteExpiredKey(String expiredKey) throws IOException {
-    Path path = getPath(expiredKey);
-
-    // We don't want the metric publishing to delay the deletion of the file.
+  private void deleteExpiredKey(Path path) throws IOException {
+    // We don't want publishing the metric to delay the deletion of the file.
     // We publish the metric only after the file has been deleted.
+    long createdTime = 0;
     if (publishTtlMetric) {
-      long createdTime = path.toFile().lastModified();
-      Files.delete(path);
+      createdTime = path.toFile().lastModified();
+    }
+
+    Files.delete(path);
+
+    if (publishTtlMetric) {
       publishExpirationMetric(createdTime);
-    } else {
-      Files.delete(path);
     }
   }
 
   private void publishExpirationMetric(long createdTime) {
     long currentTime = new Date().getTime();
     long ttl = currentTime - createdTime;
-    casTtl.observe(ttl);
+    casTtl.observe(Time.millisecondsToSeconds(ttl));
   }
 
   @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored"})
@@ -2646,7 +2655,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     (expiredEntry) -> {
                       String expiredKey = expiredEntry.key;
                       try {
-                        deleteExpiredKey(expiredKey);
+                        Path path = getPath(expiredKey);
+                        deleteExpiredKey(path);
                       } catch (NoSuchFileException eNoEnt) {
                         log.log(
                             Level.SEVERE,
