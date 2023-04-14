@@ -35,9 +35,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.lang.String.format;
-import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -65,6 +63,7 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.actioncache.ShardActionCache;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -157,6 +156,8 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
@@ -220,14 +221,10 @@ public class ShardInstance extends AbstractServerInstance {
   private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
   private final Thread dispatchedMonitor;
   private final Duration maxActionTimeout;
-  private final AsyncCache<Digest, Directory> directoryCache =
-      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
-  private final AsyncCache<Digest, Command> commandCache =
-      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
-  private final AsyncCache<Digest, Action> digestToActionCache =
-      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
-  private final Cache<RequestMetadata, Boolean> recentCacheServedExecutions =
-      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).build();
+  private AsyncCache<Digest, Directory> directoryCache;
+  private AsyncCache<Digest, Command> commandCache;
+  private AsyncCache<Digest, Action> digestToActionCache;
+  private Cache<RequestMetadata, Boolean> recentCacheServedExecutions;
 
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
@@ -235,7 +232,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final int maxRequeueAttempts;
 
   private final ListeningExecutorService operationTransformService =
-      listeningDecorator(newFixedThreadPool(24));
+      BuildfarmExecutors.getTransformServicePool();
   private final ListeningExecutorService actionCacheFetchService;
   private final ScheduledExecutorService contextDeadlineScheduler =
       newSingleThreadScheduledExecutor();
@@ -268,7 +265,7 @@ public class ShardInstance extends AbstractServerInstance {
         digestUtil,
         createBackplane(identifier),
         onStop,
-        /* actionCacheFetchService=*/ listeningDecorator(newFixedThreadPool(24)));
+        /* actionCacheFetchService=*/ BuildfarmExecutors.getActionCacheFetchServicePool());
   }
 
   private ShardInstance(
@@ -298,6 +295,29 @@ public class ShardInstance extends AbstractServerInstance {
             Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build()),
         actionCacheFetchService,
         configs.getServer().isEnsureOutputsPresent());
+  }
+
+  void initializeCaches() {
+    directoryCache =
+        Caffeine.newBuilder()
+            .newBuilder()
+            .maximumSize(configs.getServer().getCaches().getDirectoryCacheMaxEntries())
+            .buildAsync();
+    commandCache =
+        Caffeine.newBuilder()
+            .newBuilder()
+            .maximumSize(configs.getServer().getCaches().getCommandCacheMaxEntries())
+            .buildAsync();
+    digestToActionCache =
+        Caffeine.newBuilder()
+            .newBuilder()
+            .maximumSize(configs.getServer().getCaches().getDigestToActionCacheMaxEntries())
+            .buildAsync();
+    recentCacheServedExecutions =
+        Caffeine.newBuilder()
+            .newBuilder()
+            .maximumSize(configs.getServer().getCaches().getRecentServedExecutionsCacheMaxEntries())
+            .build();
   }
 
   public ShardInstance(
@@ -337,6 +357,8 @@ public class ShardInstance extends AbstractServerInstance {
     this.useDenyList = useDenyList;
     this.actionCacheFetchService = actionCacheFetchService;
     backplane.setOnUnsubscribe(this::stop);
+
+    initializeCaches();
 
     remoteInputStreamFactory =
         new RemoteInputStreamFactory(
@@ -607,6 +629,7 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
       Iterable<Digest> blobDigests, RequestMetadata requestMetadata) {
+    // Some requests have been blocked, and we should tell the client we refuse to perform a lookup.
     try {
       if (inDenyList(requestMetadata)) {
         return immediateFailedFuture(
@@ -618,12 +641,40 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFailedFuture(Status.fromThrowable(e).asException());
     }
 
+    // Empty blobs are an exceptional case.  Filter them out.
+    // If the user only requested empty blobs we can immedaitely tell them we already have it.
     Iterable<Digest> nonEmptyDigests =
         Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() != 0);
     if (Iterables.isEmpty(nonEmptyDigests)) {
       return immediateFuture(ImmutableList.of());
     }
 
+    // This is a faster strategy to check missing blobs which does not require querying the CAS.
+    // With hundreds of worker machines, it may be too expensive to query all of them for "find
+    // missing blobs".  Assuming the backplane has an accurate accounting of which blobs are hosted
+    // on which workers, the server could instead check the backplane to determine which blobs are
+    // missing.  This may come with risks if the backplane is not up-to-date with the workers or is
+    // not considered an authortiative source of truth.  However, checking workers directly is not a
+    // guarantee either since workers could leave the cluster after being queried.  Ultimitely, it
+    // will come down to the client's resiliency if the backplane is out-of-date and the server lies
+    // about which blobs are actually present.  We provide this alternative strategy for calculating
+    // missing blobs.
+    if (configs.getServer().isFindMissingBlobsViaBackplane()) {
+      try {
+        Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(blobDigests);
+        return immediateFuture(
+            StreamSupport.stream(blobDigests.spliterator(), false)
+                .filter(digest -> !foundBlobs.containsKey(digest))
+                .collect(Collectors.toList()));
+      } catch (Exception e) {
+        return immediateFailedFuture(Status.fromThrowable(e).asException());
+      }
+    }
+
+    // A more accurate way to verify missing blobs is to ask the CAS participants directly if they
+    // have the blobs.  To do this, we get all of the worker nodes that are particpating in the CAS
+    // as a random list to begin our search.  If there are no workers avaiable, tell the client all
+    // blobs are missing.
     Deque<String> workers;
     try {
       Set<String> workerSet = backplane.getWorkers();
@@ -636,11 +687,11 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (IOException e) {
       return immediateFailedFuture(Status.fromThrowable(e).asException());
     }
-
     if (workers.isEmpty()) {
       return immediateFuture(nonEmptyDigests);
     }
 
+    // Search through all of the workers to decide how many CAS blobs are missing.
     SettableFuture<Iterable<Digest>> missingDigestsFuture = SettableFuture.create();
     findMissingBlobsOnWorker(
         UUID.randomUUID().toString(),
@@ -1042,7 +1093,7 @@ public class ShardInstance extends AbstractServerInstance {
     @Override
     public void onSuccess(List<String> workersList) {
       if (workersList.isEmpty()) {
-        onFailure(Status.NOT_FOUND.asException());
+        onFailure(Status.NOT_FOUND.withDescription("No workers found.").asException());
       } else {
         Collections.shuffle(workersList, rand);
         onQueue(new ArrayDeque<String>(workersList));
@@ -2480,7 +2531,10 @@ public class ShardInstance extends AbstractServerInstance {
   public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
     Operation operation = getOperation(operationName);
     if (operation == null) {
-      return immediateFailedFuture(Status.NOT_FOUND.asException());
+      return immediateFailedFuture(
+          Status.NOT_FOUND
+              .withDescription(String.format("Operation not found: %s", operationName))
+              .asException());
     }
     return watchOperation(operation, watcher, /* initial=*/ true);
   }

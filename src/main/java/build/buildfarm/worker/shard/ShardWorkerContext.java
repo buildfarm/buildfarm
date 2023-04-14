@@ -42,6 +42,7 @@ import build.buildfarm.common.LinuxSandboxOptions;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
+import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ExecutionPolicy;
@@ -754,16 +755,20 @@ class ShardWorkerContext implements WorkerContext {
     return Size.mbToBytes(100);
   }
 
+  boolean shouldLimitCoreUsage() {
+    return limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0;
+  }
+
   @Override
   public void createExecutionLimits() {
-    if (limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0) {
+    if (shouldLimitCoreUsage()) {
       createOperationExecutionLimits();
     }
   }
 
   void createOperationExecutionLimits() {
     try {
-      int availableProcessors = Runtime.getRuntime().availableProcessors();
+      int availableProcessors = SystemProcessors.get();
       Preconditions.checkState(availableProcessors >= executeStageWidth);
       int executionsShares =
           Group.getRoot().getCpu().getShares() * executeStageWidth / availableProcessors;
@@ -816,7 +821,8 @@ class ShardWorkerContext implements WorkerContext {
         onlyMulticoreTests,
         limitGlobalExecution,
         getExecuteStageWidth(),
-        allowBringYourOwnContainer);
+        allowBringYourOwnContainer,
+        configs.getWorker().getSandboxSettings());
   }
 
   @Override
@@ -825,7 +831,7 @@ class ShardWorkerContext implements WorkerContext {
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory) {
-    if (limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0) {
+    if (shouldLimitCoreUsage()) {
       ResourceLimits limits = commandExecutionSettings(command);
       return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
     }
