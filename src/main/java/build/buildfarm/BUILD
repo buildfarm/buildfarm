@@ -1,4 +1,4 @@
-load("//:defs.bzl", "ensure_accurate_metadata")
+load("//:jvm_flags.bzl", "ensure_accurate_metadata")
 
 package(
     default_visibility = ["//src:__subpackages__"],
