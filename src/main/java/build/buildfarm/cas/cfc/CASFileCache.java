@@ -54,14 +54,15 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.SymlinkNode;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.DigestMismatchException;
+import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
-import build.buildfarm.common.SystemProcessors;
+import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.common.ZstdDecompressingOutputStream;
-import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.io.CountingOutputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -83,13 +84,13 @@ import com.google.common.hash.HashingOutputStream;
 import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
+import io.prometheus.client.Histogram;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -106,6 +107,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -115,7 +117,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -139,6 +140,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Gauge.build().name("cas_size").help("CAS size.").register();
   private static final Gauge casEntryCountMetric =
       Gauge.build().name("cas_entry_count").help("Number of entries in the CAS.").register();
+  private static Histogram casTtl;
 
   private static final Gauge casCopyFallbackMetric =
       Gauge.build()
@@ -149,11 +151,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
-  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final Path root;
   private final EntryPathStrategy entryPathStrategy;
   private final long maxSizeInBytes;
   private final long maxEntrySizeInBytes;
+  private final boolean publishTtlMetric;
+  private final boolean execRootFallback;
   private final DigestUtil digestUtil;
   private final ConcurrentMap<String, Entry> storage;
   private final Consumer<Digest> onPut;
@@ -274,19 +277,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   public CASFileCache(
       Path root,
-      long maxSizeInBytes,
+      Cas config,
       long maxEntrySizeInBytes,
-      int hexBucketLevels,
-      boolean storeFileDirsIndexInMemory,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder) {
     this(
         root,
-        maxSizeInBytes,
+        config.getMaxSizeBytes(),
         maxEntrySizeInBytes,
-        hexBucketLevels,
-        storeFileDirsIndexInMemory,
+        config.getHexBucketLevels(),
+        config.isFileDirectoriesIndexInMemory(),
+        config.isPublishTtlMetric(),
+        config.isExecRootCopyFallback(),
         digestUtil,
         expireService,
         accessRecorder,
@@ -304,6 +307,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       long maxEntrySizeInBytes,
       int hexBucketLevels,
       boolean storeFileDirsIndexInMemory,
+      boolean publishTtlMetric,
+      boolean execRootFallback,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder,
@@ -316,6 +321,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.root = root;
     this.maxSizeInBytes = maxSizeInBytes;
     this.maxEntrySizeInBytes = maxEntrySizeInBytes;
+    this.publishTtlMetric = publishTtlMetric;
+    this.execRootFallback = execRootFallback;
     this.digestUtil = digestUtil;
     this.expireService = expireService;
     this.accessRecorder = accessRecorder;
@@ -325,6 +332,22 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.delegate = delegate;
     this.delegateSkipLoad = delegateSkipLoad;
     this.directoriesIndexDbName = directoriesIndexDbName;
+
+    if (publishTtlMetric) {
+      casTtl =
+          Histogram.build()
+              .name("cas_ttl_s")
+              .buckets(
+                  3600, // 1 hour
+                  21600, // 6 hours
+                  86400, // 1 day
+                  345600, // 4 days
+                  604800, // 1 week
+                  1210000 // 2 weeks
+                  )
+              .help("The amount of time CAS entries live on L1 storage before expiration (seconds)")
+              .register();
+    }
 
     entryPathStrategy = new HexBucketEntryPathStrategy(root, hexBucketLevels);
 
@@ -1342,11 +1365,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private CacheScanResults scanRoot(Consumer<Digest> onStartPut)
       throws IOException, InterruptedException {
     // create thread pool
-    int nThreads = SystemProcessors.get();
-    String threadNameFormat = "scan-cache-pool-%d";
-    ExecutorService pool =
-        Executors.newFixedThreadPool(
-            nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
+    ExecutorService pool = BuildfarmExecutors.getScanCachePool();
 
     // collect keys from cache root.
     ImmutableList.Builder<Path> computeDirsBuilder = new ImmutableList.Builder<>();
@@ -1466,11 +1485,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private List<Path> computeDirectories(CacheScanResults cacheScanResults)
       throws InterruptedException {
     // create thread pool
-    int nThreads = SystemProcessors.get();
-    String threadNameFormat = "compute-cache-pool-%d";
-    ExecutorService pool =
-        Executors.newFixedThreadPool(
-            nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
+    ExecutorService pool = BuildfarmExecutors.getComputeCachePool();
 
     ImmutableList.Builder<Path> invalidDirectories = new ImmutableList.Builder<>();
 
@@ -1989,7 +2004,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     } catch (IOException e) {
       // propagate the exception if we do not want to perform the fallback strategy.
       // The client should expect a failed action with an explanation of 'Too many links...`.
-      if (!configs.getWorker().getStorages().get(0).isExecRootCopyFallback()) {
+      if (!execRootFallback) {
         throw e;
       }
 
@@ -2586,6 +2601,27 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  private void deleteExpiredKey(Path path) throws IOException {
+    // We don't want publishing the metric to delay the deletion of the file.
+    // We publish the metric only after the file has been deleted.
+    long createdTime = 0;
+    if (publishTtlMetric) {
+      createdTime = path.toFile().lastModified();
+    }
+
+    Files.delete(path);
+
+    if (publishTtlMetric) {
+      publishExpirationMetric(createdTime);
+    }
+  }
+
+  private void publishExpirationMetric(long createdTime) {
+    long currentTime = new Date().getTime();
+    long ttl = currentTime - createdTime;
+    casTtl.observe(Time.millisecondsToSeconds(ttl));
+  }
+
   @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored"})
   private boolean charge(String key, long blobSizeInBytes, AtomicBoolean requiresDischarge)
       throws IOException, InterruptedException {
@@ -2610,7 +2646,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     (expiredEntry) -> {
                       String expiredKey = expiredEntry.key;
                       try {
-                        Files.delete(getPath(expiredKey));
+                        Path path = getPath(expiredKey);
+                        deleteExpiredKey(path);
                       } catch (NoSuchFileException eNoEnt) {
                         log.log(
                             Level.SEVERE,

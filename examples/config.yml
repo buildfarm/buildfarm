@@ -75,6 +75,7 @@ backplane:
   maxQueueDepth: 100000
   maxPreQueueDepth: 1000000
   priorityQueue: false
+  priorityPollIntervalMillis: 100
   timeout: 10000
   maxAttempts: 20
   cacheCas: false
@@ -110,6 +111,7 @@ worker:
       hexBucketLevels: 0
       execRootCopyFallback: false
       target:
+      publishTtlMetric: false
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60

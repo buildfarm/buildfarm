@@ -62,29 +62,23 @@ public final class ContentAddressableStorages {
     if (path.isEmpty()) {
       throw new ConfigurationException("filesystem cas path is empty");
     }
-    long maxSizeBytes = config.getMaxSizeBytes();
-    long maxEntrySizeBytes = configs.getMaxEntrySizeBytes();
-    int hexBucketLevels = config.getHexBucketLevels();
-    boolean storeFileDirsIndexInMemory = config.isFileDirectoriesIndexInMemory();
-    if (maxSizeBytes <= 0) {
+    if (config.getMaxSizeBytes() <= 0) {
       throw new ConfigurationException("filesystem cas max_size_bytes <= 0");
     }
-    if (maxEntrySizeBytes <= 0) {
+    if (configs.getMaxEntrySizeBytes() <= 0) {
       throw new ConfigurationException("filesystem cas max_entry_size_bytes <= 0");
     }
-    if (maxEntrySizeBytes > maxSizeBytes) {
+    if (configs.getMaxEntrySizeBytes() > config.getMaxSizeBytes()) {
       throw new ConfigurationException("filesystem cas max_entry_size_bytes > maxSizeBytes");
     }
-    if (hexBucketLevels < 0) {
+    if (config.getHexBucketLevels() < 0) {
       throw new ConfigurationException("filesystem cas hex_bucket_levels <= 0");
     }
     CASFileCache cas =
         new CASFileCache(
             Paths.get(path),
-            maxSizeBytes,
-            maxEntrySizeBytes,
-            hexBucketLevels,
-            storeFileDirsIndexInMemory,
+            config,
+            configs.getMaxEntrySizeBytes(),
             DigestUtil.forHash("SHA256"),
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor()) {
