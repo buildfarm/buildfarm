@@ -222,7 +222,7 @@ public class Worker {
     // Consider defining exit codes to better afford out of band instance
     // recovery
     int code = SpringApplication.exit(springContext, () -> 1);
-    // Don't cancel the future here
+    termFuture.cancel(false);
     System.exit(code);
   }
 
