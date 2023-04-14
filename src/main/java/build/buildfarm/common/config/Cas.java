@@ -29,6 +29,9 @@ public class Cas {
   // GRPC
   private String target;
 
+  // Metrics
+  private boolean publishTtlMetric = false;
+
   public Path getValidPath(Path root) throws ConfigurationException {
     if (Strings.isNullOrEmpty(path)) {
       throw new ConfigurationException("Cas cache directory value in config missing");
