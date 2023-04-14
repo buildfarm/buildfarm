@@ -35,7 +35,10 @@ public class Pipeline {
     stageClosePriorities = new HashMap<>();
     stageThreadGroup =
         new ThreadGroup("pipeline-stages") {
-          // If there is an uncaught exception the thread group, interrupt
+          private boolean handlingUncaughtException = false;
+          private Thread callbackThread = null;
+
+          // If there is an uncaught exception in the thread group, interrupt
           // stage threads and notify the caller to decide how to handle it
           @Override
           public void uncaughtException(Thread th, Throwable ex) {
@@ -57,8 +60,19 @@ public class Pipeline {
             } catch (Exception e) {
               log.log(Level.SEVERE, "Pipeline stage interrupt caught exception", e);
             }
+
+            // Bail out to avoid duplicating callbacks in highly concurrent
+            // failure modes
+            synchronized (this) {
+              if (handlingUncaughtException) {
+                return;
+              }
+              handlingUncaughtException = true;
+            }
+
             if (onUncaughtFailure != null) {
-              new Thread(onUncaughtFailure).start();
+              callbackThread = new Thread(onUncaughtFailure);
+              callbackThread.start();
             }
           }
         };
