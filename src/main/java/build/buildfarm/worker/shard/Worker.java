@@ -21,6 +21,7 @@ import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
@@ -80,6 +81,8 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
@@ -191,9 +194,35 @@ public class Worker {
     // Shutdown the worker if a pipeline fails. By means of the spring lifecycle
     // hooks - e.g. the `PreDestroy` hook here - it will attempt to gracefully
     // spin down the pipeline
+
+    // By calling these spring shutdown facilities; we're open to the risk that
+    // a subsystem may be hanging a criticial thread indeffinitly. Deadline the
+    // shutdown workflow to ensure we don't leave a zombie worker in this
+    // situation
+    ScheduledExecutorService shutdownDeadlineExecutor = newSingleThreadScheduledExecutor();
+
+    // This may be shorter than the action timeout; assume we have interrupted
+    // actions in a fatal uncaught exception.
+    long forceShutdownDeadline = 60;
+    ScheduledFuture<?> termFuture =
+        shutdownDeadlineExecutor.schedule(
+            new Runnable() {
+              public void run() {
+                log.log(
+                    Level.SEVERE,
+                    String.format(
+                        "Force terminating due to shutdown deadline exceeded (%d seconds)",
+                        forceShutdownDeadline));
+                System.exit(1);
+              }
+            },
+            forceShutdownDeadline,
+            SECONDS);
+
     // Consider defining exit codes to better afford out of band instance
     // recovery
     int code = SpringApplication.exit(springContext, () -> 1);
+    // Don't cancel the future here
     System.exit(code);
   }
 
