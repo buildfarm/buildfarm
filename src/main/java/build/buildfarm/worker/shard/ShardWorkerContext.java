@@ -715,8 +715,7 @@ class ShardWorkerContext implements WorkerContext {
   // might want to split for removeDirectory and decrement references to avoid removing for streamed
   // output
   @Override
-  public void destroyExecDir(Path execDir)
-      throws IllegalStateException, IOException, InterruptedException {
+  public void destroyExecDir(Path execDir) throws IOException, InterruptedException {
     execFileSystem.destroyExecDir(execDir);
   }
 
