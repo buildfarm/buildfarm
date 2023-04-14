@@ -203,7 +203,7 @@ public class Worker {
 
     // This may be shorter than the action timeout; assume we have interrupted
     // actions in a fatal uncaught exception.
-    long forceShutdownDeadline = 60;
+    int forceShutdownDeadline = 60;
     ScheduledFuture<?> termFuture =
         shutdownDeadlineExecutor.schedule(
             new Runnable() {
