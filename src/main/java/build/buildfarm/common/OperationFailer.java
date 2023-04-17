@@ -14,7 +14,6 @@
 
 package build.buildfarm.common;
 
-
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionStage;

@@ -15,7 +15,7 @@
 package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -317,7 +317,7 @@ public class InputFetcher implements Runnable {
         OperationFailer.get(
             operationContext.operation,
             operationContext.queueEntry.getExecuteEntry(),
-            VIOLATION_TYPE_MISSING,
+            VIOLATION_TYPE_INVALID,
             failureMessage,
             failureDetails);
 
