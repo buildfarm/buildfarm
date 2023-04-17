@@ -306,7 +306,12 @@ public class ByteStreamService extends ByteStreamImplBase {
           limit,
           onErrorLogReadObserver(resourceName, Compressor.Value.IDENTITY, offset, target));
     } catch (NoSuchFileException e) {
-      responseObserver.onError(NOT_FOUND.asException());
+      responseObserver.onError(
+          NOT_FOUND
+              .withDescription(
+                  String.format(
+                      "Resource not found: %s, offset: %d, limit: %d", resourceName, offset, limit))
+              .asException());
     } catch (IOException e) {
       responseObserver.onError(Status.fromThrowable(e).asException());
     }
