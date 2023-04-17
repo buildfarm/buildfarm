@@ -14,7 +14,6 @@
 
 package build.buildfarm.common;
 
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
@@ -26,15 +25,16 @@ import com.google.rpc.PreconditionFailure;
 import io.grpc.Status.Code;
 
 /**
- * @class FailedOperationGetter
+ * @class OperationFailer
  * @brief Converts any operation into a failed operation.
  * @details Sets properties on the existing operation so that the new operation is considered
  *     finished and failed.
  */
-public class FailedOperationGetter {
+public class OperationFailer {
   public static Operation get(
       Operation operation,
       ExecuteEntry executeEntry,
+      String failureType,
       String failureMessage,
       String failureDetails) {
     return operation
@@ -43,7 +43,8 @@ public class FailedOperationGetter {
         .setDone(true)
         .setMetadata(
             Any.pack(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED)))
-        .setResponse(Any.pack(failResponse(executeEntry, failureMessage, failureDetails)))
+        .setResponse(
+            Any.pack(failResponse(executeEntry, failureType, failureMessage, failureDetails)))
         .build();
   }
 
@@ -58,11 +59,11 @@ public class FailedOperationGetter {
   }
 
   private static ExecuteResponse failResponse(
-      ExecuteEntry executeEntry, String failureMessage, String failureDetails) {
+      ExecuteEntry executeEntry, String failureType, String failureMessage, String failureDetails) {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     preconditionFailureBuilder
         .addViolationsBuilder()
-        .setType(VIOLATION_TYPE_MISSING)
+        .setType(failureType)
         .setSubject("blobs/" + DigestUtil.toString(executeEntry.getActionDigest()))
         .setDescription(failureDetails);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();

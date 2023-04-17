@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -27,7 +28,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.FileNode;
-import build.buildfarm.common.FailedOperationGetter;
+import build.buildfarm.common.OperationFailer;
 import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
@@ -313,9 +314,10 @@ public class InputFetcher implements Runnable {
   private void failOperation(String failureMessage, String failureDetails)
       throws InterruptedException {
     Operation failedOperation =
-        FailedOperationGetter.get(
+        OperationFailer.get(
             operationContext.operation,
             operationContext.queueEntry.getExecuteEntry(),
+            VIOLATION_TYPE_MISSING,
             failureMessage,
             failureDetails);
 

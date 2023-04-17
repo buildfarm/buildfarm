@@ -314,9 +314,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   }
 
   private static String getErrorMessage(Path path, List<Throwable> exceptions) {
-    return String.format(
-        "%s: %d %s: %s",
-        path, exceptions.size(), exceptions.size() == 1 ? "exception" : "exceptions", exceptions);
+    return String.format("%s: %d %s: %s", path, exceptions.size(), "exceptions", exceptions);
   }
 
   private static void checkExecErrors(Path path, List<Throwable> errors) throws ExecDirException {

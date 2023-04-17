@@ -2179,9 +2179,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private static String getErrorMessage(Path path, List<Throwable> exceptions) {
-    return String.format(
-        "%s: %d %s: %s",
-        path, exceptions.size(), exceptions.size() == 1 ? "exception" : "exceptions", exceptions);
+    return String.format("%s: %d %s: %s", path, exceptions.size(), "exceptions", exceptions);
   }
 
   @SuppressWarnings("ConstantConditions")
