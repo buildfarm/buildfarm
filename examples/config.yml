@@ -111,6 +111,7 @@ worker:
       hexBucketLevels: 0
       execRootCopyFallback: false
       target:
+      publishTtlMetric: false
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
