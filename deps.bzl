@@ -62,6 +62,14 @@ def archive_dependencies(third_party):
                 "https://github.com/bazelbuild/rules_pkg/releases/download/0.9.0/rules_pkg-0.9.0.tar.gz",
             ],
         },
+        {
+            "name": "rules_license",
+            "sha256": "6157e1e68378532d0241ecd15d3c45f6e5cfd98fc10846045509fb2a7cc9e381",
+            "urls": [
+                "https://github.com/bazelbuild/rules_license/releases/download/0.0.4/rules_license-0.0.4.tar.gz",
+                "https://mirror.bazel.build/github.com/bazelbuild/rules_license/releases/download/0.0.4/rules_license-0.0.4.tar.gz",
+            ],
+        },
 
         # The APIs that we implement.
         {
