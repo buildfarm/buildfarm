@@ -50,9 +50,25 @@ def archive_dependencies(third_party):
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "sha256": "3de8e250118c7f259426afa907fe214e55728887a7f0da0026245b42afe78128",
-            "strip_prefix": "grpc-java-1.53.0",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.53.0.zip"],
+            "sha256": "78bf175f9a8fa23cda724bbef52ad9d0d555cdd1122bcb06484b91174f931239",
+            "strip_prefix": "grpc-java-1.54.1",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.54.1.zip"],
+        },
+        {
+            "name": "rules_pkg",
+            "sha256": "335632735e625d408870ec3e361e192e99ef7462315caa887417f4d88c4c8fb8",
+            "urls": [
+                "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.9.0/rules_pkg-0.9.0.tar.gz",
+                "https://github.com/bazelbuild/rules_pkg/releases/download/0.9.0/rules_pkg-0.9.0.tar.gz",
+            ],
+        },
+        {
+            "name": "rules_license",
+            "sha256": "6157e1e68378532d0241ecd15d3c45f6e5cfd98fc10846045509fb2a7cc9e381",
+            "urls": [
+                "https://github.com/bazelbuild/rules_license/releases/download/0.0.4/rules_license-0.0.4.tar.gz",
+                "https://mirror.bazel.build/github.com/bazelbuild/rules_license/releases/download/0.0.4/rules_license-0.0.4.tar.gz",
+            ],
         },
 
         # The APIs that we implement.
@@ -76,9 +92,9 @@ def archive_dependencies(third_party):
         },
         {
             "name": "rules_cc",
-            "sha256": "34b2ebd4f4289ebbc27c7a0d854dcd510160109bb0194c0ba331c9656ffcb556",
-            "strip_prefix": "rules_cc-daf6ace7cfeacd6a83e9ff2ed659f416537b6c74",
-            "url": "https://github.com/bazelbuild/rules_cc/archive/daf6ace7cfeacd6a83e9ff2ed659f416537b6c74.tar.gz",
+            "sha256": "3d9e271e2876ba42e114c9b9bc51454e379cbf0ec9ef9d40e2ae4cec61a31b40",
+            "strip_prefix": "rules_cc-0.0.6",
+            "url": "https://github.com/bazelbuild/rules_cc/releases/download/0.0.6/rules_cc-0.0.6.tar.gz",
         },
 
         # Used to format proto files
@@ -92,9 +108,8 @@ def archive_dependencies(third_party):
         },
         {
             "name": "io_bazel_rules_docker",
-            "sha256": "59536e6ae64359b716ba9c46c39183403b01eabfbd57578e84398b4829ca499a",
-            "strip_prefix": "rules_docker-0.22.0",
-            "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.22.0/rules_docker-v0.22.0.tar.gz"],
+            "sha256": "b1e80761a8a8243d03ebca8845e9cc1ba6c82ce7c5179ce2b295cd36f7e394bf",
+            "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.25.0/rules_docker-v0.25.0.tar.gz"],
         },
 
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
