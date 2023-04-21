@@ -126,6 +126,7 @@ worker:
   errorOperationRemainingResources: false
   sandboxSettings:
     alwaysUse: false
+    alwaysUseTmpFs: false
     selectForBlockNetwork: false
     selectForTmpFs: false
   executionPolicies:

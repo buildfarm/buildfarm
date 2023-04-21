@@ -33,6 +33,13 @@ public class SandboxSettings {
   public boolean alwaysUse = false;
 
   /**
+   * @field alwaysUseTmpFs
+   * @brief Whether or not to always use tmpfs when using the sandbox.
+   * @details It may be preferred to enforce sandbox usage than rely on client selection.
+   */
+  public boolean alwaysUseTmpFs = false;
+
+  /**
    * @field selectForBlockNetwork
    * @brief If the action requires "block network" use the sandbox to fulfill this request.
    * @details Otherwise, there may be no alternative solution and the "block network" request will

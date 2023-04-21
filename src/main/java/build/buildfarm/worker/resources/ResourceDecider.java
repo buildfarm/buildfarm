@@ -203,8 +203,14 @@ public final class ResourceDecider {
     // configured on
     if (sandbox.isAlwaysUse()) {
       limits.useLinuxSandbox = true;
-      limits.description.add("enabled");
+      limits.description.add("enabled sandbox by default");
       return;
+    }
+
+    // configured on
+    if (sandbox.isAlwaysUseTmpFs()) {
+      limits.tmpFs = true;
+      limits.description.add("enabled tmpfs by default");
     }
 
     // selected based on other features
