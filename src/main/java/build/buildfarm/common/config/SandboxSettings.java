@@ -26,11 +26,11 @@ import lombok.Data;
 @Data
 public class SandboxSettings {
   /**
-   * @field alwaysUse
+   * @field alwaysUseSandbox
    * @brief Whether or not to always use the sandbox when running actions.
    * @details It may be preferred to enforce sandbox usage than rely on client selection.
    */
-  public boolean alwaysUse = false;
+  public boolean alwaysUseSandbox = false;
 
   /**
    * @field alwaysUseCgroups

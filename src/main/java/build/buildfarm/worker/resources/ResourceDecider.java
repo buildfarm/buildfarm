@@ -200,10 +200,9 @@ public final class ResourceDecider {
   }
 
   private static void decideSandboxUsage(ResourceLimits limits, SandboxSettings sandbox) {
-
     // Decide which sandbox limitations are enabled by default acording to the deployment's
     // configuration.
-    if (sandbox.isAlwaysUse()) {
+    if (sandbox.isAlwaysUseSandbox()) {
       limits.useLinuxSandbox = true;
       limits.description.add("enabled sandbox by default");
     }

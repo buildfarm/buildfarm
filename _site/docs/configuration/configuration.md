@@ -293,7 +293,8 @@ worker:
 
 | Configuration | Accepted and _Default_ Values | Description                                          |
 |---------------|-------------------------------|------------------------------------------------------|
-| alwaysUse             | boolean, _false_      | Enforce that the sandbox be used on every acion.     |
+| alwaysUseSandbox      | boolean, _false_      | Enforce that the sandbox be used on every acion.     |
+| alwaysUseCgroups      | boolean, _true_       | Enforce that actions run under cgroups.              |
 | alwaysUseTmpFs        | boolean, _false_      | Enforce that the sandbox uses tmpfs on every acion.  |
 | selectForBlockNetwork | boolean, _false_      | `block-network` enables sandbox action execution.    |
 | selectForTmpFs        | boolean, _false_      | `tmpfs` enables sandbox action execution.            |
@@ -303,11 +304,14 @@ Example:
 ```yaml
 worker:
   sandboxSettings:
-    alwaysUse: true
+    alwaysUseSandbox: true
+    alwaysUseCgroups: true
     alwaysUseTmpFs: true
     selectForBlockNetwork: false
     selectForTmpFs: false
 ```
+
+Note: In order for these settings to take effect, you must also configure `limitGlobalExecution: true`.
 
 ### Dequeue Match
 

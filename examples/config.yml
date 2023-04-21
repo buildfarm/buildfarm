@@ -129,7 +129,8 @@ worker:
   errorOperationOutputSizeExceeded: false
   gracefulShutdownSeconds: 0
   sandboxSettings:
-    alwaysUse: false
+    alwaysUseSandbox: false
+    alwaysUseCgroups: false
     alwaysUseTmpFs: false
     selectForBlockNetwork: false
     selectForTmpFs: false
