@@ -125,7 +125,9 @@ worker:
   allowBringYourOwnContainer: false
   errorOperationRemainingResources: false
   sandboxSettings:
-    alwaysUse: false
+    alwaysUseSandbox: false
+    alwaysUseCgroups: false
+    alwaysUseTmpFs: false
     selectForBlockNetwork: false
     selectForTmpFs: false
   executionPolicies:
