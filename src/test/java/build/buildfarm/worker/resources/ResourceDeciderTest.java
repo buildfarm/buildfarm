@@ -726,7 +726,7 @@ public class ResourceDeciderTest {
     // ARRANGE
     Command command = Command.newBuilder().build();
     SandboxSettings sandboxSettings = new SandboxSettings();
-    sandboxSettings.alwaysUse = true;
+    sandboxSettings.alwaysUseSandbox = true;
 
     // ACT
     ResourceLimits limits =
