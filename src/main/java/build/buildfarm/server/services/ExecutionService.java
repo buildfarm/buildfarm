@@ -122,9 +122,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     public final synchronized void observe(Operation operation) {
       cancel();
       if (operation == null) {
-        throw Status.NOT_FOUND
-            .withDescription(String.format("Operation not found: %s", operation.getName()))
-            .asRuntimeException();
+        throw Status.NOT_FOUND.withDescription("Operation not found.").asRuntimeException();
       }
       deliver(operation);
       keepaliveFuture = scheduleKeepalive(operation.getName());
