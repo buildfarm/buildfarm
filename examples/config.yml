@@ -130,6 +130,7 @@ worker:
   gracefulShutdownSeconds: 0
   sandboxSettings:
     alwaysUse: false
+    alwaysUseTmpFs: false
     selectForBlockNetwork: false
     selectForTmpFs: false
   createSymlinkOutputs: false
