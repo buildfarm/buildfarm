@@ -2867,7 +2867,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         boolean inserted = false;
         try {
           Files.createLink(CASFileCache.this.getPath(key), writePath);
-          existingEntry = storage.putIfAbsent(key, entry);
+          existingEntry = storage.put(key, entry);
           inserted = existingEntry == null;
         } catch (FileAlreadyExistsException e) {
           log.log(Level.FINE, "file already exists for " + key + ", nonexistent entry will fail");
