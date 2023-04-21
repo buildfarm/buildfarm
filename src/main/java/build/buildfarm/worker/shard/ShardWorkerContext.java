@@ -922,28 +922,31 @@ class ShardWorkerContext implements WorkerContext {
     // ResourceLimits object. We apply the cgroup settings to file resources
     // and collect group names to use on the CLI.
     String operationId = getOperationId(operationName);
-    final Group group = operationsGroup.getChild(operationId);
     ArrayList<IOResource> resources = new ArrayList<>();
-    ArrayList<String> usedGroups = new ArrayList<>();
 
-    // Possibly set core restrictions.
-    if (limits.cpu.limit) {
-      applyCpuLimits(group, limits, resources);
-      usedGroups.add(group.getCpu().getName());
-    }
+    if (limits.cgroups) {
+      final Group group = operationsGroup.getChild(operationId);
+      ArrayList<String> usedGroups = new ArrayList<>();
 
-    // Possibly set memory restrictions.
-    if (limits.mem.limit) {
-      applyMemLimits(group, limits, resources);
-      usedGroups.add(group.getMem().getName());
-    }
+      // Possibly set core restrictions.
+      if (limits.cpu.limit) {
+        applyCpuLimits(group, limits, resources);
+        usedGroups.add(group.getCpu().getName());
+      }
 
-    // Decide the CLI for running under cgroups
-    if (!usedGroups.isEmpty()) {
-      arguments.add(
-          configs.getExecutionWrappers().getCgroups(),
-          "-g",
-          String.join(",", usedGroups) + ":" + group.getHierarchy());
+      // Possibly set memory restrictions.
+      if (limits.mem.limit) {
+        applyMemLimits(group, limits, resources);
+        usedGroups.add(group.getMem().getName());
+      }
+
+      // Decide the CLI for running under cgroups
+      if (!usedGroups.isEmpty()) {
+        arguments.add(
+            configs.getExecutionWrappers().getCgroups(),
+            "-g",
+            String.join(",", usedGroups) + ":" + group.getHierarchy());
+      }
     }
 
     // Possibly set network restrictions.

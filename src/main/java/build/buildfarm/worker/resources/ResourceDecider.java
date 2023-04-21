@@ -200,14 +200,17 @@ public final class ResourceDecider {
   }
 
   private static void decideSandboxUsage(ResourceLimits limits, SandboxSettings sandbox) {
-    // configured on
+
+    // Decide which sandbox limitations are enabled by default acording to the deployment's
+    // configuration.
     if (sandbox.isAlwaysUse()) {
       limits.useLinuxSandbox = true;
       limits.description.add("enabled sandbox by default");
-      return;
     }
-
-    // configured on
+    if (sandbox.isAlwaysUseCgroups()) {
+      limits.cgroups = true;
+      limits.description.add("enabled cgroups by default");
+    }
     if (sandbox.isAlwaysUseTmpFs()) {
       limits.tmpFs = true;
       limits.description.add("enabled tmpfs by default");

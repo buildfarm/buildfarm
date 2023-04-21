@@ -33,6 +33,13 @@ public class SandboxSettings {
   public boolean alwaysUse = false;
 
   /**
+   * @field alwaysUseCgroups
+   * @brief Whether or not to use cgroups when sandboxing actions.
+   * @details It may be preferred to enforce cgroup usage.
+   */
+  public boolean alwaysUseCgroups = false;
+
+  /**
    * @field alwaysUseTmpFs
    * @brief Whether or not to always use tmpfs when using the sandbox.
    * @details It may be preferred to enforce sandbox usage than rely on client selection.
