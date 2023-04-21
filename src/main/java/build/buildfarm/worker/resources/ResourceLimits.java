@@ -76,6 +76,13 @@ public class ResourceLimits {
   public ContainerSettings containerSettings = new ContainerSettings();
 
   /**
+   * @field cgroups
+   * @brief Whether to use cgroups for resource limitation.
+   * @details Decides whether to use cgroups for restricting cores, mem, etc.
+   */
+  public boolean cgroups = true;
+
+  /**
    * @field cpu
    * @brief Resource limitations on CPUs.
    * @details Decides specific CPU limitations and whether to apply them for a given action.
