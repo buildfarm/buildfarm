@@ -37,7 +37,7 @@ public class SandboxSettings {
    * @brief Whether or not to use cgroups when sandboxing actions.
    * @details It may be preferred to enforce cgroup usage.
    */
-  public boolean alwaysUseCgroups = false;
+  public boolean alwaysUseCgroups = true;
 
   /**
    * @field alwaysUseTmpFs
