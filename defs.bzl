@@ -2,16 +2,19 @@
 buildfarm definitions that can be imported into other WORKSPACE files
 """
 
-load("@rules_jvm_external//:defs.bzl", "maven_install")
-load("@remote_apis//:repository_rules.bzl", "switched_rules_by_language")
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 load(
     "@io_bazel_rules_docker//repositories:repositories.bzl",
     container_repositories = "repositories",
 )
-load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
-load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
-load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 load("@io_bazel_rules_k8s//k8s:k8s.bzl", "k8s_repositories")
+load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
+load("@remote_apis//:repository_rules.bzl", "switched_rules_by_language")
+load("@rules_jvm_external//:defs.bzl", "maven_install")
+load("@rules_oss_audit//oss_audit:setup.bzl", "rules_oss_audit_setup")
+load("@rules_pkg//toolchains/rpm:rpmbuild_configure.bzl", "find_system_rpmbuild")
+load("@rules_python//python:repositories.bzl", "python_register_toolchains")
 
 IO_NETTY_MODULES = [
     "buffer",
@@ -161,4 +164,16 @@ def buildfarm_init(name = "buildfarm"):
     llvm_toolchain(
         name = "llvm_toolchain",
         llvm_version = "10.0.0",
+    )
+
+    rules_oss_audit_setup()
+
+    # Find rpmbuild if it exists.
+    find_system_rpmbuild(name = "rules_pkg_rpmbuild")
+
+    python_register_toolchains(
+        name = "python3_9",
+        # Available versions are listed in @rules_python//python:versions.bzl.
+        # We recommend using the same version your team is already standardized on.
+        python_version = "3.9",
     )

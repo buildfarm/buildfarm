@@ -121,6 +121,20 @@ def archive_dependencies(third_party):
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
         },
+        {
+            "name": "rules_python",
+            "sha256": "a644da969b6824cc87f8fe7b18101a8a6c57da5db39caa6566ec6109f37d2141",
+            "strip_prefix": "rules_python-0.20.0",
+            "urls": ["https://github.com/bazelbuild/rules_python/releases/download/0.20.0/rules_python-0.20.0.tar.gz"],
+        },
+        {
+            "name": "rules_proto",
+            "sha256": "dc3fb206a2cb3441b485eb1e423165b231235a1ea9b031b4433cf7bc1fa460dd",
+            "strip_prefix": "rules_proto-5.3.0-21.7",
+            "urls": [
+                "https://github.com/bazelbuild/rules_proto/archive/refs/tags/5.3.0-21.7.tar.gz",
+            ],
+        },
 
         # Optional execution wrappers
         {
@@ -135,6 +149,14 @@ def archive_dependencies(third_party):
             "sha256": "02962810bcf82d0c66f929ccc163423f53773b8b154574ca956345523243e70d",
             "strip_prefix": "rules_oss_audit-1b2690cefd5a960c181e0d89bf3c076294a0e6f4",
             "url": "https://github.com/vmware/rules_oss_audit/archive/1b2690cefd5a960c181e0d89bf3c076294a0e6f4.zip",
+        },
+        {
+            "name": "bazel_skylib",
+            "sha256": "1c531376ac7e5a180e0237938a2536de0c54d93f5c278634818e0efc952dd56c",
+            "urls": [
+                "https://github.com/bazelbuild/bazel-skylib/releases/download/1.0.3/bazel-skylib-1.0.3.tar.gz",
+                "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.0.3/bazel-skylib-1.0.3.tar.gz",
+            ],
         },
     ]
 

@@ -8,23 +8,14 @@ load(":defs.bzl", "buildfarm_init")
 
 buildfarm_init()
 
-load("@rules_oss_audit//oss_audit:repositories.bzl", "rules_oss_audit_dependencies")
+load(":generated.bzl", "buildfarm_generated")
 
-rules_oss_audit_dependencies()
+buildfarm_generated()
 
-load("@rules_oss_audit//oss_audit:setup.bzl", "rules_oss_audit_setup")
+load("@oss_audit_deps//:requirements.bzl", "install_deps")
 
-rules_oss_audit_setup()
-
-load("@maven//:compat.bzl", "compat_repositories")
-
-compat_repositories()
+install_deps()
 
 load(":images.bzl", "buildfarm_images")
 
 buildfarm_images()
-
-# Find rpmbuild if it exists.
-load("@rules_pkg//toolchains/rpm:rpmbuild_configure.bzl", "find_system_rpmbuild")
-
-find_system_rpmbuild(name = "rules_pkg_rpmbuild")
