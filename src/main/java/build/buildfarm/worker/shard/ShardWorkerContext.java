@@ -310,7 +310,7 @@ class ShardWorkerContext implements WorkerContext {
   private void decideWhetherToKeepOperation(QueueEntry queueEntry, MatchListener listener)
       throws IOException, InterruptedException {
     if (queueEntry == null
-        || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, resourceSet, queueEntry)) {
+        || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, name, resourceSet, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -961,11 +961,13 @@ class ShardWorkerContext implements WorkerContext {
 
     // these were hardcoded in bazel based on a filesystem configuration typical to ours
     // TODO: they may be incorrect for say Windows, and support will need adjusted in the future.
-    options.writableFiles.add("/tmp");
-    options.writableFiles.add("/dev/shm");
+    // options.writableFiles.add("/tmp");
+    // options.writableFiles.add("/dev/shm");
+    options.writableFiles.addAll(configs.getWorker().getSandboxSettings().getAdditionalWritePaths());
 
     if (limits.tmpFs) {
       options.tmpfsDirs.add("/tmp");
+      options.writableFiles.addAll(configs.getWorker().getSandboxSettings().getTmpFsPaths());
     }
 
     if (limits.debugAfterExecution) {
