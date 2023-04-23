@@ -762,7 +762,9 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public void createExecutionLimits() {
     if (shouldLimitCoreUsage()) {
-      createOperationExecutionLimits();
+      if (configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
+        createOperationExecutionLimits();
+      }
     }
   }
 
@@ -793,11 +795,13 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public void destroyExecutionLimits() {
-    try {
-      operationsGroup.getCpu().close();
-      executionsGroup.getCpu().close();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    if (configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
+      try {
+        operationsGroup.getCpu().close();
+        executionsGroup.getCpu().close();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
