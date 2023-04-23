@@ -80,7 +80,7 @@ public class ResourceLimits {
    * @brief Whether to use cgroups for resource limitation.
    * @details Decides whether to use cgroups for restricting cores, mem, etc.
    */
-  public boolean cgroups = true;
+  public boolean cgroups = false;
 
   /**
    * @field cpu
