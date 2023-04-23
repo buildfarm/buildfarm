@@ -37,16 +37,6 @@ tasks:
     - ./generate_coverage.sh
 
   # Typical unit tests that run across a variety of operating systems.
-  ubuntu1604:
-    name: "Unit Tests"
-    build_flags:
-    - "--build_tag_filters=-audit"
-    build_targets:
-    - "..."
-    test_flags:
-    - "--test_tag_filters=-integration,-redis"
-    test_targets:
-    - "..."
   ubuntu1804:
     name: "Unit Tests"
     build_targets:
