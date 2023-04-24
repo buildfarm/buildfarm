@@ -34,6 +34,11 @@ public class SandboxSettings {
    */
   public boolean alwaysUseSandbox = false;
 
+  /**
+   * @field alwaysUseAsNobody
+   * @brief Whether or not to always use the as-nobody wrapper when running actions.
+   * @details It may be preferred to enforce this wrapper instead of relying on client selection.
+   */
   public boolean alwaysUseAsNobody = false;
 
   /**
