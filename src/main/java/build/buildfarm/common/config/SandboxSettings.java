@@ -34,6 +34,8 @@ public class SandboxSettings {
    */
   public boolean alwaysUseSandbox = false;
 
+  public boolean alwaysUseAsNobody = false;
+
   /**
    * @field alwaysUseCgroups
    * @brief Whether or not to use cgroups when sandboxing actions.
