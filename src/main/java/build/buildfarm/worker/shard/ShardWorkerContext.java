@@ -921,7 +921,7 @@ class ShardWorkerContext implements WorkerContext {
       addLinuxSandboxCli(arguments, options);
     }
 
-    if (configs.getWorker().getSandboxSettings().isAlwaysUseAsNobody()){
+    if (configs.getWorker().getSandboxSettings().isAlwaysUseAsNobody() || limits.fakeUsername){
       arguments.add(configs.getExecutionWrappers().getAsNobody());
     }
 
