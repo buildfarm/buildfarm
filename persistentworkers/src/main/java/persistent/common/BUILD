@@ -4,7 +4,7 @@ java_library(
     visibility = ["//visibility:public"],
     deps = [
         "//persistentworkers/src/main/java/persistent/common/util",
-        "@bazel_tools//src/main/protobuf:worker_protocol_java_proto",
+        "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
         "@maven//:com_github_pcj_google_options",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
