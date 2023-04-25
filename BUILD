@@ -123,7 +123,6 @@ java_image(
     base = "@amazon_corretto_java_image_base//image",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
-        "//src/main/resources:ui_resources",
     ],
     data = [
         "//examples:example_configs",
