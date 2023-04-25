@@ -62,6 +62,7 @@ public class RedisMap {
    * @brief Constructor.
    * @details Construct a named redis map with an established redis cluster.
    * @param name The global name of the map.
+   * @param timeout_s When to expire entries.
    */
   public RedisMap(String name, int timeout_s) {
     this.name = name;

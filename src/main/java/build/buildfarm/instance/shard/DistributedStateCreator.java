@@ -47,7 +47,7 @@ public class DistributedStateCreator {
     state.blockedActions = new RedisMap(configs.getBackplane().getActionBlacklistPrefix());
     state.blockedInvocations = new RedisMap(configs.getBackplane().getInvocationBlacklistPrefix());
     state.operations =
-        new RedisMap(
+        new Operations(
             configs.getBackplane().getOperationPrefix(),
             configs.getBackplane().getOperationExpire());
     state.processingOperations = new RedisMap(configs.getBackplane().getProcessingPrefix());

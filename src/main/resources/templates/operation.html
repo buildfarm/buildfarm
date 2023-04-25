@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Buildfarm UI</title>
+
+    <script th:inline="javascript">
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const rawData = JSON.parse([[${fullOperation}]]);
+            document.getElementById("operation").innerHTML = JSON.stringify(rawData, null, 4);
+        });
+    </script>
+</head>
+<body>
+    <code id="operation", style="white-space: pre;"></code>
+</body>
+</html>

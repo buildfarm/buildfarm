@@ -37,8 +37,10 @@ import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
+import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
+import build.buildfarm.operations.finder.EnrichedOperationBuilder;
 import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
@@ -63,6 +65,7 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
@@ -626,13 +629,32 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public FindOperationsResults findOperations(Instance instance, String filterPredicate)
+  public FindOperationsResults findEnrichedOperations(Instance instance, String filterPredicate)
       throws IOException {
     FindOperationsSettings settings = new FindOperationsSettings();
     settings.filterPredicate = filterPredicate;
     settings.operationQuery = configs.getBackplane().getOperationPrefix() + ":*";
     settings.scanAmount = 10000;
-    return client.call(jedis -> OperationsFinder.findOperations(jedis, instance, settings));
+    return client.call(jedis -> OperationsFinder.findEnrichedOperations(jedis, instance, settings));
+  }
+
+  @Override
+  public EnrichedOperation findEnrichedOperation(Instance instance, String operationId)
+      throws IOException {
+    return client.call(
+        jedis -> {
+          return EnrichedOperationBuilder.build(
+              jedis, instance, configs.getBackplane().getOperationPrefix() + ":" + operationId);
+        });
+  }
+
+  @Override
+  public List<Operation> findOperations(String filterPredicate) throws IOException {
+    FindOperationsSettings settings = new FindOperationsSettings();
+    settings.filterPredicate = filterPredicate;
+    settings.operationQuery = configs.getBackplane().getOperationPrefix() + ":*";
+    settings.scanAmount = 10000;
+    return client.call(jedis -> OperationsFinder.findOperations(jedis, settings));
   }
 
   @Override
@@ -868,6 +890,15 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  @Override
+  public Iterable<Map.Entry<String, String>> getOperations(Set<String> operationIds)
+      throws IOException {
+    return client.call(
+        jedis -> {
+          return state.operations.get(jedis, operationIds);
+        });
+  }
+
   private String getOperation(JedisCluster jedis, String operationName) {
     return state.operations.get(jedis, operationName);
   }
@@ -906,10 +937,11 @@ public class RedisShardBackplane implements Backplane {
       publishOperation = null;
     }
 
+    String invocationId = extractInvocationId(operation);
     String name = operation.getName();
     client.run(
         jedis -> {
-          state.operations.insert(jedis, name, json);
+          state.operations.insert(jedis, invocationId, name, json);
           if (publishOperation != null) {
             publishReset(jedis, publishOperation);
           }
@@ -935,6 +967,7 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void queue(QueueEntry queueEntry, Operation operation) throws IOException {
+    String invocationId = extractInvocationId(operation);
     String operationName = operation.getName();
     String operationJson = operationPrinter.print(operation);
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
@@ -942,7 +975,7 @@ public class RedisShardBackplane implements Backplane {
     int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
     client.run(
         jedis -> {
-          state.operations.insert(jedis, operationName, operationJson);
+          state.operations.insert(jedis, invocationId, operationName, operationJson);
           queue(
               jedis,
               operation.getName(),
@@ -951,6 +984,72 @@ public class RedisShardBackplane implements Backplane {
               priority);
           publishReset(jedis, publishOperation);
         });
+  }
+
+  public Set<String> findOperationsByInvocationId(String invocationId) throws IOException {
+    return client.call(
+        jedis -> {
+          return state.operations.getByInvocationId(jedis, invocationId);
+        });
+  }
+
+  private String extractInvocationId(Operation operation) {
+    return expectRequestMetadata(operation).getToolInvocationId();
+  }
+
+  private static RequestMetadata expectRequestMetadata(Operation operation) {
+    String name = operation.getName();
+    Any metadata = operation.getMetadata();
+    QueuedOperationMetadata queuedOperationMetadata = maybeQueuedOperationMetadata(name, metadata);
+    if (queuedOperationMetadata != null) {
+      return queuedOperationMetadata.getRequestMetadata();
+    }
+    ExecutingOperationMetadata executingOperationMetadata =
+        maybeExecutingOperationMetadata(name, metadata);
+    if (executingOperationMetadata != null) {
+      return executingOperationMetadata.getRequestMetadata();
+    }
+    CompletedOperationMetadata completedOperationMetadata =
+        maybeCompletedOperationMetadata(name, metadata);
+    if (completedOperationMetadata != null) {
+      return completedOperationMetadata.getRequestMetadata();
+    }
+    return RequestMetadata.getDefaultInstance();
+  }
+
+  private static QueuedOperationMetadata maybeQueuedOperationMetadata(String name, Any metadata) {
+    if (metadata.is(QueuedOperationMetadata.class)) {
+      try {
+        return metadata.unpack(QueuedOperationMetadata.class);
+      } catch (InvalidProtocolBufferException e) {
+        log.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
+      }
+    }
+    return null;
+  }
+
+  private static ExecutingOperationMetadata maybeExecutingOperationMetadata(
+      String name, Any metadata) {
+    if (metadata.is(ExecutingOperationMetadata.class)) {
+      try {
+        return metadata.unpack(ExecutingOperationMetadata.class);
+      } catch (InvalidProtocolBufferException e) {
+        log.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
+      }
+    }
+    return null;
+  }
+
+  private static CompletedOperationMetadata maybeCompletedOperationMetadata(
+      String name, Any metadata) {
+    if (metadata.is(CompletedOperationMetadata.class)) {
+      try {
+        return metadata.unpack(CompletedOperationMetadata.class);
+      } catch (InvalidProtocolBufferException e) {
+        log.log(Level.SEVERE, format("invalid completed operation metadata %s", name), e);
+      }
+    }
+    return null;
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -1162,6 +1261,7 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException {
+    String invocationId = extractInvocationId(operation);
     String operationName = operation.getName();
     String operationJson = operationPrinter.print(operation);
     String executeEntryJson = JsonFormat.printer().print(executeEntry);
@@ -1169,7 +1269,7 @@ public class RedisShardBackplane implements Backplane {
     int priority = executeEntry.getExecutionPolicy().getPriority();
     client.run(
         jedis -> {
-          state.operations.insert(jedis, operationName, operationJson);
+          state.operations.insert(jedis, invocationId, operationName, operationJson);
           state.prequeue.push(jedis, executeEntryJson, priority);
           publishReset(jedis, publishOperation);
         });
