@@ -1301,7 +1301,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               }
             },
             "Prometheus CAS Metrics Collector");
+    log.log(Level.INFO, "Starting prometheus thread");
     prometheusMetricsThread.start();
+    log.log(Level.INFO, "Starting prometheus thread started");
 
     // return information about the cache startup.
     StartupCacheResults startupResults = new StartupCacheResults();

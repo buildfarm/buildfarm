@@ -132,6 +132,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     onDigests.accept(blobDigests.build());
 
     getInterruptiblyOrIOException(allAsList(removeDirectoryFutures.build()));
+    log.log(Level.INFO, "Started CFCExecFileSystem");
   }
 
   @Override
