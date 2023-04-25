@@ -381,7 +381,7 @@ class Executor {
 
     arguments.add(wrapper.getPath());
 
-    if(wrapper.getArguments() != null) {
+    if (wrapper.getArguments() != null) {
       for (String argument : wrapper.getArguments()) {
         // If the argument is of the form <propertyName>, substitute the value of
         // the property from the platform specification.
