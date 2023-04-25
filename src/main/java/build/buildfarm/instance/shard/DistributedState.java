@@ -80,9 +80,11 @@ public class DistributedState {
    * @field operations
    * @brief Operations involved in action execution on the system.
    * @details We keep track of them in the distributed state to avoid them getting lost if a
-   *     particular machine goes down.
+   *     particular machine goes down. They should also exist for some period of time after a build
+   *     invocation has finished so that developers can lookup the status of their build and
+   *     information about the operations that ran.
    */
-  public RedisMap operations;
+  public Operations operations;
 
   /**
    * @field processingOperations

@@ -56,11 +56,14 @@ ORG_SPRING_MODULES = [
     "spring-beans",
     "spring-core",
     "spring-context",
+    "spring-web",
 ]
 
 ORG_SPRING_BOOT_MODULES = [
     "spring-boot-autoconfigure",
     "spring-boot",
+    "spring-boot-starter-web",
+    "spring-boot-starter-thymeleaf",
 ]
 
 def buildfarm_init(name = "buildfarm"):
