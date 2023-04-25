@@ -29,6 +29,7 @@ import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
+import build.buildfarm.server.controllers.WebController;
 import build.buildfarm.server.services.ActionCacheService;
 import build.buildfarm.server.services.AdminService;
 import build.buildfarm.server.services.CapabilitiesService;
@@ -81,7 +82,6 @@ public class BuildFarmServer {
   private io.grpc.Server server;
   private boolean stopping = false;
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-  // private WebController ui;
 
   private ShardInstance createInstance()
       throws IOException, ConfigurationException, InterruptedException {
