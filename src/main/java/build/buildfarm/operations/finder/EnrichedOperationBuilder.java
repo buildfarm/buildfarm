@@ -58,12 +58,10 @@ public class EnrichedOperationBuilder {
       JedisCluster cluster, Instance instance, String operationKey) {
     EnrichedOperation operationWithMetadata = new EnrichedOperation();
     operationWithMetadata.operation = operationKeyToOperation(cluster, operationKey);
-
     // the operation could not be fetched so there is nothing further to derive
     if (operationWithMetadata.operation == null) {
       return operationWithMetadata;
     }
-
     operationWithMetadata.action =
         actionDigestToAction(instance, operationToActionDigest(operationWithMetadata.operation));
 
@@ -85,7 +83,7 @@ public class EnrichedOperationBuilder {
    * @return The looked up operation.
    * @note Suggested return identifier: operation.
    */
-  private static Operation operationKeyToOperation(JedisCluster cluster, String operationKey) {
+  public static Operation operationKeyToOperation(JedisCluster cluster, String operationKey) {
     String json = cluster.get(operationKey);
     return jsonToOperation(json);
   }

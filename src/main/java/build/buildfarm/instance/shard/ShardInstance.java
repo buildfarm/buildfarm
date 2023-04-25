@@ -80,6 +80,7 @@ import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.AbstractServerInstance;
+import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -2592,9 +2593,43 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public FindOperationsResults findOperations(String filterPredicate) {
+  public FindOperationsResults findEnrichedOperations(String filterPredicate) {
     try {
-      return backplane.findOperations(this, filterPredicate);
+      return backplane.findEnrichedOperations(this, filterPredicate);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  @Override
+  public EnrichedOperation findEnrichedOperation(String operationId) {
+    try {
+      return backplane.findEnrichedOperation(this, operationId);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  @Override
+  public List<Operation> findOperations(String filterPredicate) {
+    try {
+      return backplane.findOperations(filterPredicate);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  public Set<String> findOperationsByInvocationId(String invocationId) {
+    try {
+      return backplane.findOperationsByInvocationId(invocationId);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  public Iterable<Map.Entry<String, String>> getOperations(Set<String> invocationIds) {
+    try {
+      return backplane.getOperations(invocationIds);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
