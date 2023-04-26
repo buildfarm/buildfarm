@@ -13,6 +13,20 @@ buildifier(
     name = "buildifier",
 )
 
+genrule(
+    name = "opentelemetry-javaagent",
+    srcs = ["@opentelemetry//jar"],
+    outs = ["opentelemetry-javaagent.jar"],
+    cmd = "cp $< $@;",
+)
+
+java_library(
+    name = "telemetry_tools",
+    data = [
+        ":opentelemetry-javaagent",
+    ],
+)
+
 # == Docker Image Creation ==
 # When deploying buildfarm, you may want to include additional dependencies within your deployment.
 # These dependencies can enable features related to the observability and runtime of the system.
@@ -89,8 +103,8 @@ java_image(
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
     runtime_deps = [
-        ":execution_wrappers",
         ":telemetry_tools",
+        "//src/main/execution_wrappers",
         "//src/main/java/build/buildfarm/worker/shard",
     ],
 )
