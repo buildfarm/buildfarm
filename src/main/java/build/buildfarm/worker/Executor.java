@@ -482,8 +482,8 @@ class Executor {
         new ByteStringWriteReader(
             process.getErrorStream(), stderrWrite, (int) workerContext.getStandardErrorLimit());
 
-    Thread stdoutReaderThread = new Thread(stdoutReader);
-    Thread stderrReaderThread = new Thread(stderrReader);
+    Thread stdoutReaderThread = new Thread(stdoutReader, "executor.stdout-reader");
+    Thread stderrReaderThread = new Thread(stderrReader, "executor.stderr-reader");
     stdoutReaderThread.start();
     stderrReaderThread.start();
 
