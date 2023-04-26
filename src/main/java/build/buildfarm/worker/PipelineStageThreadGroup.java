@@ -16,6 +16,12 @@ package build.buildfarm.worker;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
+import java.util.Set;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
+import java.lang.management.ThreadInfo;
 
 @Log
 public class PipelineStageThreadGroup extends ThreadGroup {
@@ -29,18 +35,35 @@ public class PipelineStageThreadGroup extends ThreadGroup {
     this.uncaughtExceptionFuture = uncaughtExceptionFuture;
   }
 
+  public void dumpAllThreads() {
+    // This is a similar device of calling jstack on the pid but we do it at
+    // the precisce moment, and here prior to interrupting pipeline threads
+    System.err.println("SEVERE: PipelineStageThreadGroup BEGIN uncaught stack trace");
+    ThreadMXBean bean = ManagementFactory.getThreadMXBean();
+    ThreadInfo[] infos = bean.dumpAllThreads(true, true);
+    String errs = Arrays.stream(infos).map(Object::toString)
+	.collect(Collectors.joining());
+    System.err.println(errs);
+    System.err.println("SEVERE: PipelineStageThreadGroup END uncaught stack trace");
+  }
+
+
   // If there is an uncaught exception in the thread group, interrupt
   // stage threads and notify the caller to decide how to handle it
   @Override
   public void uncaughtException(Thread caughtThread, Throwable exception) {
     // This will catch any uncaught exception in a pipeline. Include the thread
     // name to further identifty failing sub-systems
+
     log.log(
         Level.SEVERE,
         String.format(
             "PipelineStage thread %s: terminating due to uncaught exception",
             caughtThread.getName()),
         exception);
+    // TODO: probably put this behind a flag..
+    dumpAllThreads();
+
     interrupt();
 
     if (uncaughtExceptionFuture != null) {
