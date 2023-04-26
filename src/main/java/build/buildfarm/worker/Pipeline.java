@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import com.google.common.util.concurrent.SettableFuture;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,62 +25,19 @@ import lombok.extern.java.Log;
 @Log
 public class Pipeline {
   private final Map<PipelineStage, Thread> stageThreads;
+  private final PipelineStageThreadGroup stageThreadGroup;
   private final Map<PipelineStage, Integer> stageClosePriorities;
   private Thread joiningThread = null;
   private boolean closing = false;
-  private ThreadGroup stageThreadGroup;
-  private Runnable onUncaughtFailure = null;
 
   public Pipeline() {
     stageThreads = new HashMap<>();
     stageClosePriorities = new HashMap<>();
-    stageThreadGroup =
-        new ThreadGroup("pipeline-stages") {
-          private boolean handlingUncaughtException = false;
-          private Thread callbackThread = null;
-
-          // If there is an uncaught exception in the thread group, interrupt
-          // stage threads and notify the caller to decide how to handle it
-          @Override
-          public void uncaughtException(Thread th, Throwable ex) {
-            for (Map.Entry<PipelineStage, Thread> entry : stageThreads.entrySet()) {
-              Thread stageThread = entry.getValue();
-              if (stageThread == th) {
-                PipelineStage caughtStage = entry.getKey();
-                log.log(
-                    Level.SEVERE,
-                    String.format(
-                        "%s: stage terminating due to uncaught exception", caughtStage.name()),
-                    ex);
-                break;
-              }
-            }
-            // Interrupt the entire threadgroup
-            try {
-              interrupt();
-            } catch (Exception e) {
-              log.log(Level.SEVERE, "Pipeline stage interrupt caught exception", e);
-            }
-
-            // Bail out to avoid duplicating callbacks in highly concurrent
-            // failure modes
-            synchronized (this) {
-              if (handlingUncaughtException) {
-                return;
-              }
-              handlingUncaughtException = true;
-            }
-
-            if (onUncaughtFailure != null) {
-              callbackThread = new Thread(onUncaughtFailure);
-              callbackThread.start();
-            }
-          }
-        };
+    stageThreadGroup = new PipelineStageThreadGroup();
   }
 
   public void add(PipelineStage stage, int closePriority) {
-    stageThreads.put(stage, new Thread(stageThreadGroup, stage));
+    stageThreads.put(stage, new Thread(stageThreadGroup, stage, stage.name()));
     if (closePriority < 0) {
       throw new IllegalArgumentException("closePriority cannot be negative");
     }
@@ -92,8 +50,8 @@ public class Pipeline {
    * <p>You can provide callback which is invoked when any stage has an uncaught exception, for
    * instance to shutdown the worker gracefully
    */
-  public void start(Runnable onUncaughtFailure) {
-    this.onUncaughtFailure = onUncaughtFailure;
+  public void start(SettableFuture<Void> uncaughtExceptionFuture) {
+    stageThreadGroup.setUncaughtExceptionFuture(uncaughtExceptionFuture);
     for (Thread stageThread : stageThreads.values()) {
       stageThread.start();
     }

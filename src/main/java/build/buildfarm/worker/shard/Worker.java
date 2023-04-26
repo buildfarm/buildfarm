@@ -58,6 +58,7 @@ import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.devtools.common.options.OptionsParsingException;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
@@ -223,6 +224,7 @@ public class Worker {
     // recovery
     int code = SpringApplication.exit(springContext, () -> 1);
     termFuture.cancel(false);
+    shutdownDeadlineExecutor.shutdown();
     System.exit(code);
   }
 
@@ -654,7 +656,13 @@ public class Worker {
       log.log(INFO, "Skipping worker registration");
     }
 
-    pipeline.start(this::exitPostPipelineFailure);
+    // Listen for pipeline unhandled exceptions
+    ExecutorService pipelineExceptionExecutor = newSingleThreadExecutor();
+    SettableFuture<Void> pipelineExceptionFuture = SettableFuture.create();
+    pipelineExceptionFuture.addListener(this::exitPostPipelineFailure, pipelineExceptionExecutor);
+
+    pipeline.start(pipelineExceptionFuture);
+
     healthCheckMetric.labels("start").inc();
     executionSlotsTotal.set(configs.getWorker().getExecuteStageWidth());
     inputFetchSlotsTotal.set(configs.getWorker().getInputFetchStageWidth());
