@@ -160,7 +160,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     Set<String> remoteWorkers;
     Set<String> locationSet;
     try {
-      Set<String> workers = backplane.getWorkers();
+      Set<String> workers = backplane.getStorageWorkers();
       if (publicName == null) {
         remoteWorkers = workers;
       } else {

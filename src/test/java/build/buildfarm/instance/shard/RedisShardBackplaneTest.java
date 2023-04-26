@@ -70,16 +70,18 @@ public class RedisShardBackplaneTest {
   public void workersWithInvalidProtobufAreRemoved() throws IOException {
     JedisCluster jedisCluster = mock(JedisCluster.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
-    when(jedisCluster.hgetAll(configs.getBackplane().getWorkersHashName()))
+    when(jedisCluster.hgetAll(configs.getBackplane().getWorkersHashName() + "_storage"))
         .thenReturn(ImmutableMap.of("foo", "foo"));
-    when(jedisCluster.hdel(configs.getBackplane().getWorkersHashName(), "foo")).thenReturn(1L);
+    when(jedisCluster.hdel(configs.getBackplane().getWorkersHashName() + "_storage", "foo"))
+        .thenReturn(1L);
     backplane =
         new RedisShardBackplane(
             "invalid-protobuf-worker-removed-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
     backplane.start("startTime/test:0000");
 
-    assertThat(backplane.getWorkers()).isEmpty();
-    verify(jedisCluster, times(1)).hdel(configs.getBackplane().getWorkersHashName(), "foo");
+    assertThat(backplane.getStorageWorkers()).isEmpty();
+    verify(jedisCluster, times(1))
+        .hdel(configs.getBackplane().getWorkersHashName() + "_storage", "foo");
     ArgumentCaptor<String> changeCaptor = ArgumentCaptor.forClass(String.class);
     verify(jedisCluster, times(1))
         .publish(eq(configs.getBackplane().getWorkerChannel()), changeCaptor.capture());

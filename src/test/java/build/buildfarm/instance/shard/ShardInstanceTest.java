@@ -193,7 +193,7 @@ public class ShardInstanceTest {
     when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
 
     ImmutableSet<String> workers = ImmutableSet.of(workerName);
-    when(mockBackplane.getWorkers()).thenReturn(workers);
+    when(mockBackplane.getStorageWorkers()).thenReturn(workers);
 
     ByteString commandBlob = command.toByteString();
     Digest commandDigest = DIGEST_UTIL.compute(commandBlob);
@@ -816,7 +816,7 @@ public class ShardInstanceTest {
 
   @Test
   public void blobsAreMissingWhenWorkersIsEmpty() throws Exception {
-    when(mockBackplane.getWorkers()).thenReturn(ImmutableSet.of());
+    when(mockBackplane.getStorageWorkers()).thenReturn(ImmutableSet.of());
     Digest digest = Digest.newBuilder().setHash("hash").setSizeBytes(1).build();
     Iterable<Digest> missingDigests =
         instance
@@ -831,7 +831,7 @@ public class ShardInstanceTest {
     when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
 
     ImmutableSet<String> workers = ImmutableSet.of(workerName);
-    when(mockBackplane.getWorkers()).thenReturn(workers);
+    when(mockBackplane.getStorageWorkers()).thenReturn(workers);
 
     Digest digest = Digest.newBuilder().setHash("hash").setSizeBytes(1).build();
     List<Digest> queryDigests = ImmutableList.of(digest);
@@ -998,7 +998,7 @@ public class ShardInstanceTest {
     when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
 
     ImmutableSet<String> workers = ImmutableSet.of(workerName);
-    when(mockBackplane.getWorkers()).thenReturn(workers);
+    when(mockBackplane.getStorageWorkers()).thenReturn(workers);
 
     ByteString blob = ByteString.copyFromUtf8("blobOnWorker");
     Digest actualDigest = DIGEST_UTIL.compute(blob);
@@ -1039,7 +1039,7 @@ public class ShardInstanceTest {
     assertThat(containsAfterAdding).isTrue();
     assertThat(result.build()).isEqualTo(actualDigest);
 
-    verify(mockBackplane, atLeastOnce()).getWorkers();
+    verify(mockBackplane, atLeastOnce()).getStorageWorkers();
     verify(mockInstanceLoader, atLeastOnce()).load(eq(workerName));
   }
 }
