@@ -14,16 +14,12 @@
 
 package build.buildfarm.worker;
 
-import build.buildfarm.worker.resources.ResourceLimits;
-import com.google.protobuf.Duration;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
 
 /**
  * @class DequeueResults
  * @brief Ehe results of evaluating a dequeued operation.
- * @details Contains information about whether the operation should be kept and if resources were claimed.
+ * @details Contains information about whether the operation should be kept and if resources were
+ *     claimed.
  */
 public class DequeueResults {
   /**
@@ -36,8 +32,8 @@ public class DequeueResults {
   /**
    * @field resourcesClaimed
    * @brief Whether resources have been claimed while deciding to keep operation.
-   * @details If resources are claimed but the operation is not kept, the resources should be released.
+   * @details If resources are claimed but the operation is not kept, the resources should be
+   *     released.
    */
   public boolean resourcesClaimed = false;
-
 }

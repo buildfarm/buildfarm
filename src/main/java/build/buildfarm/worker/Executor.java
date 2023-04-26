@@ -359,9 +359,10 @@ class Executor {
     } finally {
       boolean wasInterrupted = Thread.interrupted();
       try {
-        // Now that the execution has finished we can return any of the claims against local
-        // resources.
-        workerContext.returnLocalResources(operationContext.queueEntry);
+        // FIXME(thickey): Semaphore leaks are still possible in exceptional cases.
+        // Now that the execution has finished,
+        // we can return any of the claims against local resources.
+        // workerContext.returnLocalResources(operationContext.queueEntry);
         owner.releaseExecutor(
             operationName,
             limits.cpu.claimed,

@@ -14,9 +14,9 @@
 
 package build.buildfarm.common.config;
 
-import lombok.Data;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Data;
 
 /**
  * @class Sandbox Settings
@@ -62,7 +62,7 @@ public class SandboxSettings {
    */
   public List<String> additionalWritePaths = new ArrayList();
 
-    /**
+  /**
    * @field tmpFsPaths
    * @brief Additional paths the sandbox uses for tmpfs
    * @details Suggestions may include: /tmp

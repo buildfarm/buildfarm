@@ -14,14 +14,9 @@
 
 package build.buildfarm.worker.resources;
 
-import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Platform;
-import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.worker.resources.LocalResourceSet;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.SetMultimap;
 import java.util.concurrent.Semaphore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -39,7 +34,6 @@ public class LocalResourceSetUtilsTest {
   // Failure explanation: can't return claims that were never taken.
   @Test
   public void decideResourceLimitationsTestCoreSetting() throws Exception {
-    
     // ARRANGE
     LocalResourceSet resourceSet = new LocalResourceSet();
     resourceSet.resources.put("FOO", new Semaphore(1));
@@ -53,6 +47,6 @@ public class LocalResourceSetUtilsTest {
             .build();
 
     // ACT
-    LocalResourceSetUtils.releaseClaims(entry.getPlatform(),resourceSet);
+    LocalResourceSetUtils.releaseClaims(entry.getPlatform(), resourceSet);
   }
 }

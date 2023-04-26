@@ -60,7 +60,7 @@ public class DequeueMatchEvaluator {
       String name,
       LocalResourceSet resourceSet,
       QueueEntry queueEntry) {
-    return shouldKeepViaPlatform(workerProvisions, name,  resourceSet, queueEntry.getPlatform());
+    return shouldKeepViaPlatform(workerProvisions, name, resourceSet, queueEntry.getPlatform());
   }
 
   /**
@@ -92,7 +92,7 @@ public class DequeueMatchEvaluator {
     results.resourcesClaimed = true;
 
     // The action might be requesting to run on a particular action
-    if (!requestingThisWorker(platform,name)){
+    if (!requestingThisWorker(platform, name)) {
       return results;
     }
 

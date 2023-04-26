@@ -310,12 +310,12 @@ class ShardWorkerContext implements WorkerContext {
 
   private void decideWhetherToKeepOperation(QueueEntry queueEntry, MatchListener listener)
       throws IOException, InterruptedException {
-      
-    DequeueResults results = DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, name, resourceSet, queueEntry);
+    DequeueResults results =
+        DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, name, resourceSet, queueEntry);
     if (results.keep) {
       listener.onEntry(queueEntry);
     } else {
-      if (results.resourcesClaimed){
+      if (results.resourcesClaimed) {
         returnLocalResources(queueEntry);
       }
       backplane.rejectOperation(queueEntry);
@@ -392,6 +392,7 @@ class ShardWorkerContext implements WorkerContext {
 
   private void requeue(String operationName) {
     QueueEntry queueEntry = activeOperations.remove(operationName);
+    returnLocalResources(queueEntry);
     try {
       operationPoller.poll(queueEntry, ExecutionStage.Value.QUEUED, 0);
     } catch (IOException e) {
@@ -405,7 +406,8 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   void deactivate(String operationName) {
-    activeOperations.remove(operationName);
+    QueueEntry queueEntry = activeOperations.remove(operationName);
+    returnLocalResources(queueEntry);
   }
 
   @Override
@@ -926,7 +928,7 @@ class ShardWorkerContext implements WorkerContext {
       addLinuxSandboxCli(arguments, options);
     }
 
-    if (configs.getWorker().getSandboxSettings().isAlwaysUseAsNobody() || limits.fakeUsername){
+    if (configs.getWorker().getSandboxSettings().isAlwaysUseAsNobody() || limits.fakeUsername) {
       arguments.add(configs.getExecutionWrappers().getAsNobody());
     }
 
@@ -966,10 +968,10 @@ class ShardWorkerContext implements WorkerContext {
     // does not pair with buildfarm's implementation of exec_owner: "nobody".
     // This will need fixed to enable using fakeUsername with the sandbox.
     // TODO: provide proper support for bazel sandbox's fakeUsername "-U" flag.
-    //options.fakeUsername = limits.fakeUsername;
+    // options.fakeUsername = limits.fakeUsername;
 
-    
-    options.writableFiles.addAll(configs.getWorker().getSandboxSettings().getAdditionalWritePaths());
+    options.writableFiles.addAll(
+        configs.getWorker().getSandboxSettings().getAdditionalWritePaths());
 
     if (limits.tmpFs) {
       options.writableFiles.addAll(configs.getWorker().getSandboxSettings().getTmpFsPaths());
@@ -992,7 +994,6 @@ class ShardWorkerContext implements WorkerContext {
 
   private void addLinuxSandboxCli(
       ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
-
     // Choose the sandbox which is built and deployed with the worker image.
     arguments.add(configs.getExecutionWrappers().getLinuxSandbox());
 
