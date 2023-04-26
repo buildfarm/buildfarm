@@ -54,6 +54,7 @@ import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.worker.DequeueMatchEvaluator;
+import build.buildfarm.worker.DequeueResults;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
@@ -309,10 +310,14 @@ class ShardWorkerContext implements WorkerContext {
 
   private void decideWhetherToKeepOperation(QueueEntry queueEntry, MatchListener listener)
       throws IOException, InterruptedException {
-    if (queueEntry == null
-        || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, name, resourceSet, queueEntry)) {
+      
+    DequeueResults results = DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, name, resourceSet, queueEntry);
+    if (results.keep) {
       listener.onEntry(queueEntry);
     } else {
+      if (results.resourcesClaimed){
+        returnLocalResources(queueEntry);
+      }
       backplane.rejectOperation(queueEntry);
     }
     if (Thread.interrupted()) {
