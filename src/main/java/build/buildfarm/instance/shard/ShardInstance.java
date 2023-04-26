@@ -678,7 +678,7 @@ public class ShardInstance extends AbstractServerInstance {
     // blobs are missing.
     Deque<String> workers;
     try {
-      Set<String> workerSet = backplane.getWorkers();
+      Set<String> workerSet = backplane.getStorageWorkers();
       List<String> workersList;
       synchronized (workerSet) {
         workersList = new ArrayList<>(workerSet);
@@ -942,7 +942,7 @@ public class ShardInstance extends AbstractServerInstance {
     Set<String> workerSet;
     Set<String> locationSet;
     try {
-      workerSet = backplane.getWorkers();
+      workerSet = backplane.getStorageWorkers();
       locationSet = backplane.getBlobLocationSet(blobDigest);
       synchronized (workerSet) {
         workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
@@ -1112,7 +1112,7 @@ public class ShardInstance extends AbstractServerInstance {
   String getRandomWorker() {
     Set<String> workerSet;
     try {
-      workerSet = backplane.getWorkers();
+      workerSet = backplane.getStorageWorkers();
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
