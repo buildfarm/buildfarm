@@ -257,11 +257,11 @@ message S3BucketConfig {
 }
 
 enum WorkerType {
-  EXECUTE = 0;
+  NONE = 0;
 
-  STORAGE = 1;
+  EXECUTE = 1;
 
-  EXECUTE_AND_STORAGE = 2;
+  STORAGE = 2;
 }
 
 message ShardWorker {
@@ -269,7 +269,7 @@ message ShardWorker {
 
   int64 expire_at = 2;
 
-  WorkerType worker_type = 3;
+  int32 worker_type = 3;
 }
 
 message WorkerChange {

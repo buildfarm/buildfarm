@@ -123,7 +123,7 @@ class WorkerProfile {
   private static Set<String> fetchWorkers(JedisCluster jedis, long now) {
     Set<String> workers = Sets.newConcurrentHashSet();
     for (Map.Entry<String, String> entry :
-        jedis.hgetAll(configs.getBackplane().getWorkersHashName()).entrySet()) {
+        jedis.hgetAll(configs.getBackplane().getWorkersHashName() + "_storage").entrySet()) {
       String json = entry.getValue();
       try {
         if (json != null) {
