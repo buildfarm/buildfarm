@@ -3,6 +3,7 @@ package build.buildfarm.common.config;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.ExecutionWrapperProperties;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.SystemProcessors;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
@@ -227,14 +228,26 @@ public final class BuildfarmConfigs {
   private static void deriveCasStorage(Cas storage) {
     if (storage.getMaxSizeBytes() == 0) {
       try {
-        storage.setMaxSizeBytes(
-            (long)
-                (BuildfarmConfigs.getInstance().getWorker().getValidRoot().toFile().getTotalSpace()
-                    * 0.9));
+        // Calculate total disk size.
+        long totalSpace =
+            BuildfarmConfigs.getInstance().getWorker().getValidRoot().toFile().getTotalSpace();
+        log.info(String.format("Total disk space found to be: %d", totalSpace));
+
+        // Decide a resonable size to set the CAS.
+        long derivedSpace = (long) (totalSpace * 0.9);
+        storage.setMaxSizeBytes(derivedSpace);
+
       } catch (Exception e) {
+        // Set fallback if we could not properly calculate.
+        log.info(
+            String.format(
+                "An exception was thrown trying to derive storage size: %s", e.toString()));
         storage.setMaxSizeBytes(DEFAULT_CAS_SIZE);
       }
-      log.info(String.format("CAS size changed to %d", storage.getMaxSizeBytes()));
+
+      // Show user the new size.
+      log.info(
+          String.format("CAS size changed to %d GB", Size.bytesToGb(storage.getMaxSizeBytes())));
     }
   }
 
