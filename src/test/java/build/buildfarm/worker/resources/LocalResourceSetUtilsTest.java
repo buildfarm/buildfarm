@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker.resources;
 
-
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.v1test.QueueEntry;
 import java.util.concurrent.Semaphore;

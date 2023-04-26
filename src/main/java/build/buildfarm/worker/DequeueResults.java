@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-
 /**
  * @class DequeueResults
  * @brief Ehe results of evaluating a dequeued operation.

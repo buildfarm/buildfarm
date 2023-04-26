@@ -107,10 +107,8 @@ public class DequeueMatchEvaluator {
 
   private static boolean requestingThisWorker(Platform platform, String name) {
     for (Platform.Property property : platform.getPropertiesList()) {
-      if (property.getName().equals(ExecutionProperties.WORKER)) {
-        if (property.getValue() != name) {
-          return false;
-        }
+      if (property.getName().equals(ExecutionProperties.WORKER) && property.getValue() != name) {
+        return false;
       }
     }
     return true;
