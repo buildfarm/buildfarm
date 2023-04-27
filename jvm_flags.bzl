@@ -30,7 +30,7 @@ RECOMMENDED_JVM_FLAGS = [
 
     # By default, the JVM sets the maximum heap size to 25% of the available memory.
     # It’s quite conservative.  Let's give the heap more space:
-    "-XX:MaxRAMPercentage=80",
+    "-XX:MaxRAMPercentage=80.0",
 
     # Enables the deduplication of identical strings in the JVM's string pool,
     # which can help reduce memory usage.

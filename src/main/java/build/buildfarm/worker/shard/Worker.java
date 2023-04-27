@@ -605,7 +605,7 @@ public class Worker {
     // Create the appropriate writer for the context
     CasWriter writer;
     if (!configs.getWorker().getCapabilities().isCas()) {
-      writer = new RemoteCasWriter(backplane.getWorkers(), workerStubs);
+      writer = new RemoteCasWriter(backplane.getStorageWorkers(), workerStubs);
     } else {
       writer = new LocalCasWriter(execFileSystem);
     }
@@ -647,14 +647,7 @@ public class Worker {
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
     PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
-    // Not all workers need to be registered and visible in the backplane.
-    // For example, a GPU worker may wish to perform work that we do not want to cache locally for
-    // other workers.
-    if (configs.getWorker().getCapabilities().isCas()) {
-      startFailsafeRegistration();
-    } else {
-      log.log(INFO, "Skipping worker registration");
-    }
+    startFailsafeRegistration();
 
     // Listen for pipeline unhandled exceptions
     ExecutorService pipelineExceptionExecutor = newSingleThreadExecutor();

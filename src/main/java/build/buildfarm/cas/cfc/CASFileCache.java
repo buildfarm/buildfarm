@@ -2086,6 +2086,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   public ListenableFuture<Path> putDirectory(
       Digest digest, Map<Digest, Directory> directoriesIndex, ExecutorService service) {
+    // Claim lock.
+    // Claim the directory path so no other threads try to create/delete it.
     Path path = getDirectoryPath(digest);
     Lock l = locks.acquire(path);
     log.log(Level.FINE, format("locking directory %s", path.getFileName()));
@@ -2096,12 +2098,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return immediateFailedFuture(e);
     }
     log.log(Level.FINE, format("locked directory %s", path.getFileName()));
+
+    // Now that a lock has been claimed, we can proceed to create the directory.
     ListenableFuture<Path> putFuture;
     try {
       putFuture = putDirectorySynchronized(path, digest, directoriesIndex, service);
     } catch (IOException e) {
       putFuture = immediateFailedFuture(e);
     }
+
+    // Release lock.
     putFuture.addListener(
         () -> {
           l.unlock();
@@ -2155,7 +2161,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     private final List<Throwable> exceptions;
 
     PutDirectoryException(Path path, Digest digest, List<Throwable> exceptions) {
-      super(String.format("%s: %d exceptions", path, exceptions.size()));
+      // When printing the exception, show the captured sub-exceptions.
+      super(getErrorMessage(path, exceptions));
       this.path = path;
       this.digest = digest;
       this.exceptions = exceptions;
@@ -2175,6 +2182,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     List<Throwable> getExceptions() {
       return exceptions;
     }
+  }
+
+  private static String getErrorMessage(Path path, List<Throwable> exceptions) {
+    return String.format("%s: %d %s: %s", path, exceptions.size(), "exceptions", exceptions);
   }
 
   @SuppressWarnings("ConstantConditions")

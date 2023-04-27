@@ -46,14 +46,15 @@ public class Worker {
     }
   }
 
-  public WorkerType getWorkerType() {
-    if (getCapabilities().isCas() && getCapabilities().isExecution()) {
-      return WorkerType.EXECUTE_AND_STORAGE;
-    }
+  public int getWorkerType() {
+    int workerType = 0;
     if (getCapabilities().isCas()) {
-      return WorkerType.STORAGE;
+      workerType |= WorkerType.STORAGE.getNumber();
     }
-    return WorkerType.EXECUTE;
+    if (getCapabilities().isExecution()) {
+      workerType |= WorkerType.EXECUTE.getNumber();
+    }
+    return workerType;
   }
 
   public Path getValidRoot() throws ConfigurationException {
