@@ -507,7 +507,8 @@ public class Worker {
                   }
                 }
               }
-            }, "Worker.failsafeRegistration")
+            },
+            "Worker.failsafeRegistration")
         .start();
   }
 
