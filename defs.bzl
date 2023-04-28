@@ -76,7 +76,7 @@ def buildfarm_init(name = "buildfarm"):
     maven_install(
         artifacts = ["com.amazonaws:aws-java-sdk-%s:1.11.729" % module for module in COM_AWS_MODULES] +
                     [
-                        "com.fasterxml.jackson.core:jackson-databind:2.13.3",
+                        "com.fasterxml.jackson.core:jackson-databind:2.15.0",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
                         "com.github.docker-java:docker-java:3.2.11",
                         "com.github.jnr:jffi:1.2.16",
@@ -133,7 +133,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.threeten:threetenbp:1.3.3",
                         "org.xerial:sqlite-jdbc:3.34.0",
                         "org.jetbrains:annotations:16.0.2",
-                        "org.yaml:snakeyaml:1.30",
+                        "org.yaml:snakeyaml:2.0",
                         "org.projectlombok:lombok:1.18.24",
                     ],
         generate_compat_repositories = True,
