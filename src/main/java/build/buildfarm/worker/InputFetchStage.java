@@ -98,7 +98,9 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   @Override
   protected void iterate() throws InterruptedException {
     OperationContext operationContext = take();
-    Thread fetcher = new Thread(new InputFetcher(workerContext, operationContext, this));
+    Thread fetcher =
+        new Thread(
+            new InputFetcher(workerContext, operationContext, this), "InputFetchStage.fetcher");
 
     synchronized (this) {
       fetchers.add(fetcher);
