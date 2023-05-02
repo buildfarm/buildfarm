@@ -103,6 +103,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -2177,6 +2178,58 @@ public class ShardInstance extends AbstractServerInstance {
         operationTransformService);
   }
 
+  private ListenableFuture<Action> fetchAction(
+      RequestMetadata requestMetadata, ExecuteOperationMetadata metadata, Operation operation) {
+    Digest actionDigest = metadata.getActionDigest();
+
+    log.log(
+        Level.FINE,
+        format(
+            "ShardInstance(%s): queue(%s): fetching action %s",
+            getName(), operation.getName(), actionDigest.getHash()));
+
+    return FluentFuture.from(expectAction(actionDigest, requestMetadata))
+        .transformAsync(
+            action -> transformActionViaActionCache(action, metadata, operation),
+            operationTransformService)
+        .catchingAsync(
+            StatusException.class,
+            e -> describeFailedActionFetch(e, actionDigest),
+            operationTransformService);
+  }
+
+  private ListenableFuture<Action> transformActionViaActionCache(
+      Action action, ExecuteOperationMetadata metadata, Operation operation)
+      throws IOException, StatusException {
+    if (action == null) {
+      throw Status.NOT_FOUND.asException();
+    }
+
+    if (action.getDoNotCache()) {
+      // invalidate our action cache result as well as watcher owner
+      actionCache.invalidate(DigestUtil.asActionKey(metadata.getActionDigest()));
+      backplane.putOperation(
+          operation.toBuilder().setMetadata(Any.pack(action)).build(), metadata.getStage());
+    }
+
+    return immediateFuture(action);
+  }
+
+  private ListenableFuture<Action> describeFailedActionFetch(Throwable e, Digest actionDigest)
+      throws StatusException {
+    Status st = Status.fromThrowable(e);
+    if (st.getCode() == Code.NOT_FOUND) {
+      PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+      preconditionFailure
+          .addViolationsBuilder()
+          .setType(VIOLATION_TYPE_MISSING)
+          .setSubject("blobs/" + DigestUtil.toString(actionDigest))
+          .setDescription(MISSING_ACTION);
+      checkPreconditionFailure(actionDigest, preconditionFailure.build());
+    }
+    throw st.asRuntimeException();
+  }
+
   private ListenableFuture<Void> transformAndQueue(
       ExecuteEntry executeEntry,
       Poller poller,
@@ -2191,45 +2244,11 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFailedFuture(e);
     }
     Digest actionDigest = metadata.getActionDigest();
-    SettableFuture<Void> queueFuture = SettableFuture.create();
-    log.log(
-        Level.FINE,
-        format(
-            "ShardInstance(%s): queue(%s): fetching action %s",
-            getName(), operation.getName(), actionDigest.getHash()));
     RequestMetadata requestMetadata = executeEntry.getRequestMetadata();
-    ListenableFuture<Action> actionFuture =
-        catchingAsync(
-            transformAsync(
-                expectAction(actionDigest, requestMetadata),
-                (action) -> {
-                  if (action == null) {
-                    throw Status.NOT_FOUND.asException();
-                  } else if (action.getDoNotCache()) {
-                    // invalidate our action cache result as well as watcher owner
-                    actionCache.invalidate(DigestUtil.asActionKey(actionDigest));
-                    backplane.putOperation(
-                        operation.toBuilder().setMetadata(Any.pack(action)).build(),
-                        metadata.getStage());
-                  }
-                  return immediateFuture(action);
-                },
-                operationTransformService),
-            StatusException.class,
-            (e) -> {
-              Status st = Status.fromThrowable(e);
-              if (st.getCode() == Code.NOT_FOUND) {
-                PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-                preconditionFailure
-                    .addViolationsBuilder()
-                    .setType(VIOLATION_TYPE_MISSING)
-                    .setSubject("blobs/" + DigestUtil.toString(actionDigest))
-                    .setDescription(MISSING_ACTION);
-                checkPreconditionFailure(actionDigest, preconditionFailure.build());
-              }
-              throw st.asRuntimeException();
-            },
-            operationTransformService);
+
+    // Fetch an action from the CAS and invalidate it from the AC if requested.
+    ListenableFuture<Action> actionFuture = fetchAction(requestMetadata, metadata, operation);
+
     QueuedOperation.Builder queuedOperationBuilder = QueuedOperation.newBuilder();
     ListenableFuture<ProfiledQueuedOperationMetadata.Builder> queuedFuture =
         transformAsync(
@@ -2314,6 +2333,8 @@ public class ShardInstance extends AbstractServerInstance {
                   operationTransformService);
             },
             operationTransformService);
+
+    SettableFuture<Void> queueFuture = SettableFuture.create();
 
     // onQueue call?
     addCallback(
