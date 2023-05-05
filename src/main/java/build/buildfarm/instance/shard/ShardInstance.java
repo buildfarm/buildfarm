@@ -671,8 +671,11 @@ public class ShardInstance extends AbstractServerInstance {
         Set<String> workerSet = getActiveWorkerCopy();
         return immediateFuture(
             StreamSupport.stream(blobDigests.spliterator(), false)
-                .filter(digest -> !Sets.intersection(foundBlobs.getOrDefault(digest, Collections.emptySet()), workerSet)
-                    .isEmpty())
+                .filter(
+                    digest ->
+                        !Sets.intersection(
+                                foundBlobs.getOrDefault(digest, Collections.emptySet()), workerSet)
+                            .isEmpty())
                 .collect(Collectors.toList()));
       } catch (Exception e) {
         return immediateFailedFuture(Status.fromThrowable(e).asException());

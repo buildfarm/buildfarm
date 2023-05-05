@@ -94,7 +94,9 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -1050,20 +1052,22 @@ public class ShardInstanceTest {
   @Test
   public void findMissingBlobsTest_ViaBackPlane() throws Exception {
 
-    Set<String> activeWorkers = Set.of("worker1", "worker2", "worker3");
-    Set<String> expiredWorker = Set.of("workerX", "workerY", "workerZ");
+    Set<String> activeWorkers = new HashSet<>(Arrays.asList("worker1", "worker2", "worker3"));
+    Set<String> expiredWorker = new HashSet<>(Arrays.asList("workerX", "workerY", "workerZ"));
 
-    Set<Digest> digestToBeFound = Set.of(
-        Digest.newBuilder().setHash("toBeFound1").setSizeBytes(1).build(),
-        Digest.newBuilder().setHash("toBeFound2").setSizeBytes(1).build(),
-        Digest.newBuilder().setHash("toBeFound3").setSizeBytes(1).build()
-    );
+    Set<Digest> digestToBeFound =
+        new HashSet<>(
+            Arrays.asList(
+                Digest.newBuilder().setHash("toBeFound1").setSizeBytes(1).build(),
+                Digest.newBuilder().setHash("toBeFound2").setSizeBytes(1).build(),
+                Digest.newBuilder().setHash("toBeFound3").setSizeBytes(1).build()));
 
-    Set<Digest> missingDigests = Set.of(
-        Digest.newBuilder().setHash("missing1").setSizeBytes(1).build(),
-        Digest.newBuilder().setHash("missing2").setSizeBytes(1).build(),
-        Digest.newBuilder().setHash("missing3").setSizeBytes(1).build()
-    );
+    Set<Digest> missingDigests =
+        new HashSet<>(
+            Arrays.asList(
+                Digest.newBuilder().setHash("missing1").setSizeBytes(1).build(),
+                Digest.newBuilder().setHash("missing2").setSizeBytes(1).build(),
+                Digest.newBuilder().setHash("missing3").setSizeBytes(1).build()));
 
     Iterable<Digest> allDigests = Iterables.concat(digestToBeFound, missingDigests);
 
@@ -1081,7 +1085,8 @@ public class ShardInstanceTest {
     when(mockBackplane.getStorageWorkers()).thenReturn(activeWorkers);
     when(mockBackplane.getBlobDigestsWorkers(any(Iterable.class))).thenReturn(digestAndWorkersMap);
 
-    Iterable<Digest> actualDigestFound = instance.findMissingBlobs(allDigests, RequestMetadata.getDefaultInstance()).get();
+    Iterable<Digest> actualDigestFound =
+        instance.findMissingBlobs(allDigests, RequestMetadata.getDefaultInstance()).get();
 
     for (Digest digest : actualDigestFound) {
       assertThat(digest).isIn(digestToBeFound);
