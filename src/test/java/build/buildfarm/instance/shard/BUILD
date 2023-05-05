@@ -2,7 +2,10 @@ java_test(
     name = "tests",
     size = "small",
     srcs = glob(["*.java"]),
-    data = ["//examples:example_configs"],
+    data = [
+        "//examples:example_configs",
+        "//src/test/java/build/buildfarm/instance/shard/config:test_configs"
+    ],
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/actioncache",

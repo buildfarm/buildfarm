@@ -65,6 +65,8 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write.NullWrite;
+import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Server;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -93,8 +95,13 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -1041,5 +1048,65 @@ public class ShardInstanceTest {
 
     verify(mockBackplane, atLeastOnce()).getStorageWorkers();
     verify(mockInstanceLoader, atLeastOnce()).load(eq(workerName));
+  }
+
+  @Test
+  public void findMissingBlobsTest_ViaBackPlane() throws Exception {
+
+    Set<String> activeWorkers = Set.of("worker1", "worker2", "worker3");
+    Set<String> expiredWorker = Set.of("workerX", "workerY", "workerZ");
+
+    Set<Digest> digestToBeFound = Set.of(
+        Digest.newBuilder().setHash("toBeFound1").setSizeBytes(1).build(),
+        Digest.newBuilder().setHash("toBeFound2").setSizeBytes(1).build(),
+        Digest.newBuilder().setHash("toBeFound3").setSizeBytes(1).build()
+    );
+
+    Set<Digest> missingDigests = Set.of(
+        Digest.newBuilder().setHash("missing1").setSizeBytes(1).build(),
+        Digest.newBuilder().setHash("missing2").setSizeBytes(1).build(),
+        Digest.newBuilder().setHash("missing3").setSizeBytes(1).build()
+    );
+
+    Iterable<Digest> allDigests = Iterables.concat(digestToBeFound, missingDigests);
+
+    Map<Digest, Set<String>> digestAndWorkersMap = new HashMap<>();
+
+    for (Digest digest : digestToBeFound) {
+      digestAndWorkersMap.put(digest, getRandomSubset(activeWorkers));
+    }
+    for (Digest digest : missingDigests) {
+      digestAndWorkersMap.put(digest, getRandomSubset(expiredWorker));
+    }
+
+    instance.setBuildFarmConfigs(loadTestConfig());
+    when(mockBackplane.getStorageWorkers()).thenReturn(activeWorkers);
+    when(mockBackplane.getBlobDigestsWorkers(any(Iterable.class))).thenReturn(digestAndWorkersMap);
+
+    Iterable<Digest> actualDigestFound = instance.findMissingBlobs(allDigests, RequestMetadata.getDefaultInstance()).get();
+
+    for (Digest digest : actualDigestFound) {
+      assertThat(digest).isIn(digestToBeFound);
+      assertThat(digest).isNotIn(missingDigests);
+    }
+    for (Digest digest : digestToBeFound) {
+      assertThat(digest).isIn(actualDigestFound);
+    }
+  }
+
+  private BuildfarmConfigs loadTestConfig() throws Exception {
+    Path configPath =
+        Paths.get(
+            System.getenv("TEST_SRCDIR"),
+            "build_buildfarm/src/test/java/build/buildfarm/instance/shard/config/config.testviabackplane.yaml");
+    BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+    return configs.loadConfigs(configPath);
+
+  }
+  private Set<String> getRandomSubset(Set<String> input) {
+    Random random = new Random();
+    int end = random.nextInt(input.size()) + 1;
+    int start = random.nextInt(end);
+    return input.stream().skip(start).limit(end - start).collect(Collectors.toSet());
   }
 }
