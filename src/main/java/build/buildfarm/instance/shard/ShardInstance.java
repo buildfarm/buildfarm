@@ -136,7 +136,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -668,7 +667,7 @@ public class ShardInstance extends AbstractServerInstance {
     if (configs.getServer().isFindMissingBlobsViaBackplane()) {
       try {
         Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(blobDigests);
-        Set<String> workerSet = getActiveWorkerCopy();
+        Set<String> workerSet = backplane.getStorageWorkers();
         return immediateFuture(
             StreamSupport.stream(blobDigests.spliterator(), false)
                 .filter(
@@ -688,8 +687,7 @@ public class ShardInstance extends AbstractServerInstance {
     // blobs are missing.
     Deque<String> workers;
     try {
-      Set<String> workerSet = getActiveWorkerCopy();
-      List<String> workersList = new ArrayList<>(workerSet);
+      List<String> workersList = new ArrayList<>(backplane.getStorageWorkers());
       Collections.shuffle(workersList, rand);
       workers = new ArrayDeque<>(workersList);
     } catch (IOException e) {
@@ -951,9 +949,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       workerSet = backplane.getStorageWorkers();
       locationSet = backplane.getBlobLocationSet(blobDigest);
-      synchronized (workerSet) {
-        workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
-      }
+      workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
     } catch (IOException e) {
       blobObserver.onError(e);
       return;
@@ -1123,19 +1119,17 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
-    synchronized (workerSet) {
-      if (workerSet.isEmpty()) {
-        throw Status.UNAVAILABLE.withDescription("no available workers").asRuntimeException();
-      }
-      int index = rand.nextInt(workerSet.size());
-      // best case no allocation average n / 2 selection
-      Iterator<String> iter = workerSet.iterator();
-      String worker = null;
-      while (iter.hasNext() && index-- >= 0) {
-        worker = iter.next();
-      }
-      return worker;
+    if (workerSet.isEmpty()) {
+      throw Status.UNAVAILABLE.withDescription("no available workers").asRuntimeException();
     }
+    int index = rand.nextInt(workerSet.size());
+    // best case no allocation average n / 2 selection
+    Iterator<String> iter = workerSet.iterator();
+    String worker = null;
+    while (iter.hasNext() && index-- >= 0) {
+      worker = iter.next();
+    }
+    return worker;
   }
 
   private Instance workerStub(String worker) {
@@ -2651,12 +2645,5 @@ public class ShardInstance extends AbstractServerInstance {
       return false;
     }
     return backplane.isBlacklisted(requestMetadata);
-  }
-
-  private Set<String> getActiveWorkerCopy() throws IOException {
-    Set<String> workerSet = backplane.getStorageWorkers();
-    synchronized (workerSet) {
-      return new HashSet<>(workerSet);
-    }
   }
 }
