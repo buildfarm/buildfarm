@@ -66,7 +66,6 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.common.config.Server;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -1079,7 +1078,8 @@ public class ShardInstanceTest {
       digestAndWorkersMap.put(digest, getRandomSubset(expiredWorker));
     }
 
-    instance.setBuildFarmConfigs(loadTestConfig());
+    BuildfarmConfigs buildfarmConfigs = instance.getBuildFarmConfigs();
+    buildfarmConfigs.getServer().setFindMissingBlobsViaBackplane(true);
     when(mockBackplane.getStorageWorkers()).thenReturn(activeWorkers);
     when(mockBackplane.getBlobDigestsWorkers(any(Iterable.class))).thenReturn(digestAndWorkersMap);
 
@@ -1092,17 +1092,11 @@ public class ShardInstanceTest {
     for (Digest digest : digestToBeFound) {
       assertThat(digest).isIn(actualDigestFound);
     }
+
+    // reset BuildfarmConfigs
+    buildfarmConfigs.getServer().setFindMissingBlobsViaBackplane(false);
   }
 
-  private BuildfarmConfigs loadTestConfig() throws Exception {
-    Path configPath =
-        Paths.get(
-            System.getenv("TEST_SRCDIR"),
-            "build_buildfarm/src/test/java/build/buildfarm/instance/shard/config/config.testviabackplane.yaml");
-    BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-    return configs.loadConfigs(configPath);
-
-  }
   private Set<String> getRandomSubset(Set<String> input) {
     Random random = new Random();
     int end = random.nextInt(input.size()) + 1;

@@ -2639,8 +2639,8 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  void setBuildFarmConfigs(BuildfarmConfigs buildfarmConfigs) {
-    ShardInstance.configs = buildfarmConfigs;
+  BuildfarmConfigs getBuildFarmConfigs() {
+    return configs;
   }
 
   private boolean inDenyList(RequestMetadata requestMetadata) throws IOException {
