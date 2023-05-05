@@ -686,7 +686,7 @@ public class ShardInstance extends AbstractServerInstance {
     Deque<String> workers;
     try {
       Set<String> workerSet = getActiveWorkerCopy();
-      List<String> workersList = new ArrayList<>(workerSet);;
+      List<String> workersList = new ArrayList<>(workerSet);
       Collections.shuffle(workersList, rand);
       workers = new ArrayDeque<>(workersList);
     } catch (IOException e) {
