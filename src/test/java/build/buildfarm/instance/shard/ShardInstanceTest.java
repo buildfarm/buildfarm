@@ -1055,7 +1055,7 @@ public class ShardInstanceTest {
     Set<String> activeWorkers = new HashSet<>(Arrays.asList("worker1", "worker2", "worker3"));
     Set<String> expiredWorker = new HashSet<>(Arrays.asList("workerX", "workerY", "workerZ"));
 
-    Set<Digest> digestToBeFound =
+    Set<Digest> availableDigests =
         new HashSet<>(
             Arrays.asList(
                 Digest.newBuilder().setHash("toBeFound1").setSizeBytes(1).build(),
@@ -1069,11 +1069,11 @@ public class ShardInstanceTest {
                 Digest.newBuilder().setHash("missing2").setSizeBytes(1).build(),
                 Digest.newBuilder().setHash("missing3").setSizeBytes(1).build()));
 
-    Iterable<Digest> allDigests = Iterables.concat(digestToBeFound, missingDigests);
+    Iterable<Digest> allDigests = Iterables.concat(availableDigests, missingDigests);
 
     Map<Digest, Set<String>> digestAndWorkersMap = new HashMap<>();
 
-    for (Digest digest : digestToBeFound) {
+    for (Digest digest : availableDigests) {
       digestAndWorkersMap.put(digest, getRandomSubset(activeWorkers));
     }
     for (Digest digest : missingDigests) {
@@ -1085,15 +1085,15 @@ public class ShardInstanceTest {
     when(mockBackplane.getStorageWorkers()).thenReturn(activeWorkers);
     when(mockBackplane.getBlobDigestsWorkers(any(Iterable.class))).thenReturn(digestAndWorkersMap);
 
-    Iterable<Digest> actualDigestFound =
+    Iterable<Digest> actualMissingDigests =
         instance.findMissingBlobs(allDigests, RequestMetadata.getDefaultInstance()).get();
 
-    for (Digest digest : actualDigestFound) {
-      assertThat(digest).isIn(digestToBeFound);
-      assertThat(digest).isNotIn(missingDigests);
+    for (Digest digest : actualMissingDigests) {
+      assertThat(digest).isNotIn(availableDigests);
+      assertThat(digest).isIn(missingDigests);
     }
-    for (Digest digest : digestToBeFound) {
-      assertThat(digest).isIn(actualDigestFound);
+    for (Digest digest : missingDigests) {
+      assertThat(digest).isIn(actualMissingDigests);
     }
 
     // reset BuildfarmConfigs

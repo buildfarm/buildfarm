@@ -673,7 +673,7 @@ public class ShardInstance extends AbstractServerInstance {
             StreamSupport.stream(blobDigests.spliterator(), false)
                 .filter(
                     digest ->
-                        !Sets.intersection(
+                        Sets.intersection(
                                 foundBlobs.getOrDefault(digest, Collections.emptySet()), workerSet)
                             .isEmpty())
                 .collect(Collectors.toList()));
