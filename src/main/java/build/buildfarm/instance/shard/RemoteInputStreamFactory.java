@@ -33,7 +33,6 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance.WorkersCallback;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -148,7 +147,6 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
         compressor, blobDigest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
   }
 
-  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   public InputStream newInput(
       Compressor.Value compressor,
       Digest blobDigest,
@@ -160,14 +158,13 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     Set<String> remoteWorkers;
     Set<String> locationSet;
     try {
-      Set<String> workers = backplane.getStorageWorkers();
-      if (publicName == null) {
-        remoteWorkers = workers;
-      } else {
-        remoteWorkers = Sets.difference(workers, ImmutableSet.of(publicName)).immutableCopy();
+      remoteWorkers = backplane.getStorageWorkers();
+      if (publicName != null) {
+        remoteWorkers.remove(publicName);
       }
       locationSet =
-          Sets.newHashSet(Sets.intersection(backplane.getBlobLocationSet(blobDigest), workers));
+          Sets.newHashSet(
+              Sets.intersection(backplane.getBlobLocationSet(blobDigest), remoteWorkers));
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
