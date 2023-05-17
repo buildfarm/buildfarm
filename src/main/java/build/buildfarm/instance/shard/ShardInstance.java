@@ -652,20 +652,29 @@ public class ShardInstance extends AbstractServerInstance {
 
     // This is a faster strategy to check missing blobs which does not require querying the CAS.
     // With hundreds of worker machines, it may be too expensive to query all of them for "find
-    // missing blobs".  Assuming the backplane has an accurate accounting of which blobs are hosted
-    // on which workers, the server could instead check the backplane to determine which blobs are
-    // missing.  This may come with risks if the backplane is not up-to-date with the workers or is
-    // not considered an authortiative source of truth.  However, checking workers directly is not a
-    // guarantee either since workers could leave the cluster after being queried.  Ultimitely, it
-    // will come down to the client's resiliency if the backplane is out-of-date and the server lies
-    // about which blobs are actually present.  We provide this alternative strategy for calculating
-    // missing blobs.
+    // missing blobs".
+    // Workers register themselves with the backplane for a 30-second window, and if they fail to
+    // re-register within this time frame, they are automatically removed from the backplane. While
+    // this alternative strategy for finding missing blobs is faster and more cost-effective than
+    // the exhaustive approach of querying each worker to find the digest, it comes with a higher
+    // risk of returning expired workers despite filtering by active workers below. This is because
+    // the strategy may return workers that have expired in the last 30 seconds. However, checking
+    // workers directly is not a guarantee either since workers could leave the cluster after being
+    // queried. Ultimitely, it will come down to the client's resiliency if the backplane is
+    // out-of-date and the server lies about which blobs are actually present. We provide this
+    // alternative strategy for calculating missing blobs.
+
     if (configs.getServer().isFindMissingBlobsViaBackplane()) {
       try {
         Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(blobDigests);
+        Set<String> workerSet = backplane.getStorageWorkers();
         return immediateFuture(
             StreamSupport.stream(blobDigests.spliterator(), false)
-                .filter(digest -> !foundBlobs.containsKey(digest))
+                .filter( // best effort to present digests only missing on active workers
+                    digest ->
+                        Sets.intersection(
+                                foundBlobs.getOrDefault(digest, Collections.emptySet()), workerSet)
+                            .isEmpty())
                 .collect(Collectors.toList()));
       } catch (Exception e) {
         return immediateFailedFuture(Status.fromThrowable(e).asException());
@@ -678,13 +687,9 @@ public class ShardInstance extends AbstractServerInstance {
     // blobs are missing.
     Deque<String> workers;
     try {
-      Set<String> workerSet = backplane.getStorageWorkers();
-      List<String> workersList;
-      synchronized (workerSet) {
-        workersList = new ArrayList<>(workerSet);
-      }
+      List<String> workersList = new ArrayList<>(backplane.getStorageWorkers());
       Collections.shuffle(workersList, rand);
-      workers = new ArrayDeque(workersList);
+      workers = new ArrayDeque<>(workersList);
     } catch (IOException e) {
       return immediateFailedFuture(Status.fromThrowable(e).asException());
     }
@@ -944,9 +949,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       workerSet = backplane.getStorageWorkers();
       locationSet = backplane.getBlobLocationSet(blobDigest);
-      synchronized (workerSet) {
-        workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
-      }
+      workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
     } catch (IOException e) {
       blobObserver.onError(e);
       return;
@@ -1116,19 +1119,17 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
-    synchronized (workerSet) {
-      if (workerSet.isEmpty()) {
-        throw Status.UNAVAILABLE.withDescription("no available workers").asRuntimeException();
-      }
-      int index = rand.nextInt(workerSet.size());
-      // best case no allocation average n / 2 selection
-      Iterator<String> iter = workerSet.iterator();
-      String worker = null;
-      while (iter.hasNext() && index-- >= 0) {
-        worker = iter.next();
-      }
-      return worker;
+    if (workerSet.isEmpty()) {
+      throw Status.UNAVAILABLE.withDescription("no available workers").asRuntimeException();
     }
+    int index = rand.nextInt(workerSet.size());
+    // best case no allocation average n / 2 selection
+    Iterator<String> iter = workerSet.iterator();
+    String worker = null;
+    while (iter.hasNext() && index-- >= 0) {
+      worker = iter.next();
+    }
+    return worker;
   }
 
   private Instance workerStub(String worker) {
@@ -2632,6 +2633,11 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
+  }
+
+  @VisibleForTesting
+  BuildfarmConfigs getBuildFarmConfigs() {
+    return configs;
   }
 
   private boolean inDenyList(RequestMetadata requestMetadata) throws IOException {

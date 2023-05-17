@@ -673,7 +673,7 @@ public class RedisShardBackplane implements Backplane {
   public synchronized Set<String> getStorageWorkers() throws IOException {
     long now = System.currentTimeMillis();
     if (now < workerSetExpiresAt) {
-      return storageWorkerSet;
+      return new HashSet<>(storageWorkerSet);
     }
 
     synchronized (storageWorkerSet) {
@@ -684,7 +684,7 @@ public class RedisShardBackplane implements Backplane {
 
     // fetch every 3 seconds
     workerSetExpiresAt = now + 3000;
-    return storageWorkerSet;
+    return new HashSet<>(storageWorkerSet);
   }
 
   // When performing a graceful scale down of workers, the backplane can provide worker names to the

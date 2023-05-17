@@ -7,6 +7,10 @@
 int
 main(int argc, char *argv[])
 {
+  if (argc <= 1) {
+    fprintf(stderr, "usage: as-nobody [command]\n");
+    return EXIT_FAILURE;
+  }
   struct passwd *pw = getpwnam("nobody");
   if (pw == NULL) {
     perror("getpwnam");
