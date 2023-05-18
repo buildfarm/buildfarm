@@ -134,6 +134,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
@@ -669,8 +670,7 @@ public class ShardInstance extends AbstractServerInstance {
         Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(blobDigests);
         Set<String> workerSet = backplane.getStorageWorkers();
         return immediateFuture(
-            StreamSupport.stream(blobDigests.spliterator(), false)
-                .filter(digest -> digest.getSizeBytes() > 0)
+            StreamSupport.stream(nonEmptyDigests.spliterator(), false)
                 .filter( // best effort to present digests only missing on active workers
                     digest ->
                         Sets.intersection(
@@ -949,8 +949,11 @@ public class ShardInstance extends AbstractServerInstance {
     Set<String> locationSet;
     try {
       workerSet = backplane.getStorageWorkers();
+      log.log(Level.FINE, format("Available workers are %s", Arrays.toString(workerSet.toArray())));
       locationSet = backplane.getBlobLocationSet(blobDigest);
+      log.log(Level.FINE, format("Digest %s available on workers are %s", DigestUtil.toString(blobDigest), Arrays.toString(locationSet.toArray())));
       workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
+      log.log(Level.FINE, format("Digest %s available on %s active workers", DigestUtil.toString(blobDigest), Arrays.toString(locationSet.toArray())));
     } catch (IOException e) {
       blobObserver.onError(e);
       return;
