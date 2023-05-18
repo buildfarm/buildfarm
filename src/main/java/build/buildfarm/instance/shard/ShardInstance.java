@@ -137,6 +137,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -667,10 +668,12 @@ public class ShardInstance extends AbstractServerInstance {
 
     if (configs.getServer().isFindMissingBlobsViaBackplane()) {
       try {
-        Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(blobDigests);
+        Set<Digest> distinctDigest = new HashSet<>();
+        nonEmptyDigests.forEach(distinctDigest::add);
+        Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(distinctDigest);
         Set<String> workerSet = backplane.getStorageWorkers();
         return immediateFuture(
-            StreamSupport.stream(nonEmptyDigests.spliterator(), false)
+            distinctDigest.stream()
                 .filter( // best effort to present digests only missing on active workers
                     digest ->
                         Sets.intersection(
@@ -949,16 +952,16 @@ public class ShardInstance extends AbstractServerInstance {
     Set<String> locationSet;
     try {
       workerSet = backplane.getStorageWorkers();
-      log.log(Level.FINE, format("Available workers are %s", Arrays.toString(workerSet.toArray())));
+      log.log(Level.WARNING, format("Available workers are %s", Arrays.toString(workerSet.toArray())));
       locationSet = backplane.getBlobLocationSet(blobDigest);
       log.log(
-          Level.FINE,
+          Level.WARNING,
           format(
               "Digest %s available on workers are %s",
               DigestUtil.toString(blobDigest), Arrays.toString(locationSet.toArray())));
       workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
       log.log(
-          Level.FINE,
+          Level.WARNING,
           format(
               "Digest %s available on %s active workers",
               DigestUtil.toString(blobDigest), Arrays.toString(locationSet.toArray())));
