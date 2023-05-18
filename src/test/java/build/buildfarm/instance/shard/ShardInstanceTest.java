@@ -1069,7 +1069,13 @@ public class ShardInstanceTest {
                 Digest.newBuilder().setHash("missing2").setSizeBytes(1).build(),
                 Digest.newBuilder().setHash("missing3").setSizeBytes(1).build()));
 
-    Iterable<Digest> allDigests = Iterables.concat(availableDigests, missingDigests);
+    Set<Digest> emptyDigests =
+        new HashSet<>(
+            Arrays.asList(
+                Digest.newBuilder().setHash("empty1").build(),
+                Digest.newBuilder().setHash("empty2").build()));
+
+    Iterable<Digest> allDigests = Iterables.concat(Iterables.concat(availableDigests, missingDigests), emptyDigests);
 
     Map<Digest, Set<String>> digestAndWorkersMap = new HashMap<>();
 
@@ -1090,6 +1096,7 @@ public class ShardInstanceTest {
 
     for (Digest digest : actualMissingDigests) {
       assertThat(digest).isNotIn(availableDigests);
+      assertThat(digest).isNotIn(emptyDigests);
       assertThat(digest).isIn(missingDigests);
     }
     for (Digest digest : missingDigests) {

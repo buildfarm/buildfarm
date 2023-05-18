@@ -670,6 +670,7 @@ public class ShardInstance extends AbstractServerInstance {
         Set<String> workerSet = backplane.getStorageWorkers();
         return immediateFuture(
             StreamSupport.stream(blobDigests.spliterator(), false)
+                .filter(digest -> digest.getSizeBytes() > 0)
                 .filter( // best effort to present digests only missing on active workers
                     digest ->
                         Sets.intersection(
