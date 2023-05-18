@@ -1075,7 +1075,8 @@ public class ShardInstanceTest {
                 Digest.newBuilder().setHash("empty1").build(),
                 Digest.newBuilder().setHash("empty2").build()));
 
-    Iterable<Digest> allDigests = Iterables.concat(Iterables.concat(availableDigests, missingDigests), emptyDigests);
+    Iterable<Digest> allDigests =
+        Iterables.concat(Iterables.concat(availableDigests, missingDigests), emptyDigests);
 
     Map<Digest, Set<String>> digestAndWorkersMap = new HashMap<>();
 
