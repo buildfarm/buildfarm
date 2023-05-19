@@ -952,19 +952,8 @@ public class ShardInstance extends AbstractServerInstance {
     Set<String> locationSet;
     try {
       workerSet = backplane.getStorageWorkers();
-      log.log(Level.WARNING, format("Available workers are %s", Arrays.toString(workerSet.toArray())));
       locationSet = backplane.getBlobLocationSet(blobDigest);
-      log.log(
-          Level.WARNING,
-          format(
-              "Digest %s available on workers are %s",
-              DigestUtil.toString(blobDigest), Arrays.toString(locationSet.toArray())));
       workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
-      log.log(
-          Level.WARNING,
-          format(
-              "Digest %s available on %s active workers",
-              DigestUtil.toString(blobDigest), Arrays.toString(locationSet.toArray())));
     } catch (IOException e) {
       blobObserver.onError(e);
       return;
