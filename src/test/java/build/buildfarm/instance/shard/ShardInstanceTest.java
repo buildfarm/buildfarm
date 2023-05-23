@@ -1080,8 +1080,12 @@ public class ShardInstanceTest {
                 Digest.newBuilder().setHash("empty2").build()));
 
     Iterable<Digest> allDigests =
-        Iterables.concat(availableDigests, missingDigests, emptyDigests,
-            Arrays.asList(Digest.newBuilder().setHash("toBeFoundDuplicate").setSizeBytes(1).build(),
+        Iterables.concat(
+            availableDigests,
+            missingDigests,
+            emptyDigests,
+            Arrays.asList(
+                Digest.newBuilder().setHash("toBeFoundDuplicate").setSizeBytes(1).build(),
                 Digest.newBuilder().setHash("missingDuplicate").setSizeBytes(1).build()));
 
     Map<Digest, Set<String>> digestAndWorkersMap = new HashMap<>();
