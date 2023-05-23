@@ -666,12 +666,12 @@ public class ShardInstance extends AbstractServerInstance {
 
     if (configs.getServer().isFindMissingBlobsViaBackplane()) {
       try {
-        Set<Digest> distinctDigest = new HashSet<>();
-        nonEmptyDigests.forEach(distinctDigest::add);
-        Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(distinctDigest);
+        Set<Digest> uniqueDigests = new HashSet<>();
+        nonEmptyDigests.forEach(uniqueDigests::add);
+        Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(uniqueDigests);
         Set<String> workerSet = backplane.getStorageWorkers();
         return immediateFuture(
-            distinctDigest.stream()
+            uniqueDigests.stream()
                 .filter( // best effort to present digests only missing on active workers
                     digest ->
                         Sets.intersection(

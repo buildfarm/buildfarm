@@ -1060,14 +1060,18 @@ public class ShardInstanceTest {
             Arrays.asList(
                 Digest.newBuilder().setHash("toBeFound1").setSizeBytes(1).build(),
                 Digest.newBuilder().setHash("toBeFound2").setSizeBytes(1).build(),
-                Digest.newBuilder().setHash("toBeFound3").setSizeBytes(1).build()));
+                Digest.newBuilder().setHash("toBeFound3").setSizeBytes(1).build(),
+                // a copy is added in final digest list
+                Digest.newBuilder().setHash("toBeFoundDuplicate").setSizeBytes(1).build()));
 
     Set<Digest> missingDigests =
         new HashSet<>(
             Arrays.asList(
                 Digest.newBuilder().setHash("missing1").setSizeBytes(1).build(),
                 Digest.newBuilder().setHash("missing2").setSizeBytes(1).build(),
-                Digest.newBuilder().setHash("missing3").setSizeBytes(1).build()));
+                Digest.newBuilder().setHash("missing3").setSizeBytes(1).build(),
+                // a copy is added in final digest list
+                Digest.newBuilder().setHash("missingDuplicate").setSizeBytes(1).build()));
 
     Set<Digest> emptyDigests =
         new HashSet<>(
@@ -1076,7 +1080,9 @@ public class ShardInstanceTest {
                 Digest.newBuilder().setHash("empty2").build()));
 
     Iterable<Digest> allDigests =
-        Iterables.concat(Iterables.concat(availableDigests, missingDigests), emptyDigests);
+        Iterables.concat(availableDigests, missingDigests, emptyDigests,
+            Arrays.asList(Digest.newBuilder().setHash("toBeFoundDuplicate").setSizeBytes(1).build(),
+                Digest.newBuilder().setHash("missingDuplicate").setSizeBytes(1).build()));
 
     Map<Digest, Set<String>> digestAndWorkersMap = new HashMap<>();
 
