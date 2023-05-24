@@ -670,7 +670,7 @@ public abstract class AbstractServerInstance implements Instance {
               Digest actualDigest = actualDigestBuilder.setSizeBytes(contentLength).build();
               if (expectedDigest.getSizeBytes() >= 0
                   && expectedDigest.getSizeBytes() != contentLength) {
-                throw new DigestMismatchException(actualDigest, expectedDigest);
+                throw new DigestMismatchException(actualDigest, expectedDigest, "AbstractServerInstance.fetch");
               }
               return getBlobWrite(
                       Compressor.Value.IDENTITY, actualDigest, UUID.randomUUID(), requestMetadata)

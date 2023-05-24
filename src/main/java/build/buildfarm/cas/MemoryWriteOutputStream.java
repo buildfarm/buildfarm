@@ -80,7 +80,7 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
       closedFuture.set(null);
       Digest actual = getActual();
       if (!actual.equals(digest)) {
-        DigestMismatchException e = new DigestMismatchException(actual, digest);
+        DigestMismatchException e = new DigestMismatchException(actual, digest, "MemoryWriteOutputStream.close");
         future.setException(e);
         throw e;
       }

@@ -22,6 +22,8 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Status.Code;
+import java.net.InetAddress;
+import com.google.common.base.Strings;
 
 /**
  * @class OperationFailer
@@ -30,6 +32,21 @@ import io.grpc.Status.Code;
  *     finished and failed.
  */
 public class OperationFailer {
+
+  // Not great - consider using publicName if we upstream
+  private static String hostname = null;
+  private static String getHostname() {
+    if (!Strings.isNullOrEmpty(hostname)) {
+      return hostname;
+    }
+    try {
+      hostname = InetAddress.getLocalHost().getHostName();
+    } catch (Exception e) {
+      hostname = "_unknown_host_";
+    }
+    return hostname;
+  }
+
   public static Operation get(
       Operation operation,
       ExecuteEntry executeEntry,
@@ -63,8 +80,8 @@ public class OperationFailer {
     preconditionFailureBuilder
         .addViolationsBuilder()
         .setType(failureType)
-        .setSubject("blobs/" + DigestUtil.toString(executeEntry.getActionDigest()))
-        .setDescription(failureDetails);
+        .setSubject(String.format("[%s] %s", OperationFailer.getHostname(), "blobs/" + DigestUtil.toString(executeEntry.getActionDigest())))
+        .setDescription(String.format("[%s] %s", OperationFailer.getHostname(), failureDetails));
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
 
     return ExecuteResponse.newBuilder()

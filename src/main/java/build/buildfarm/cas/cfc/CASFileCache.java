@@ -3028,7 +3028,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             dischargeAndNotify(blobSizeInBytes);
           }
           Digest actual = Digest.newBuilder().setHash(hash).setSizeBytes(size).build();
-          throw new DigestMismatchException(actual, expectedDigest);
+          throw new DigestMismatchException(actual, expectedDigest, "CASFileCache.close");
         }
 
         if (size != blobSizeInBytes) {
@@ -3046,7 +3046,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           dischargeAndNotify(blobSizeInBytes);
           Digest actual =
               Digest.newBuilder().setHash(hash).setSizeBytes(countingOut.written()).build();
-          throw new DigestMismatchException(actual, expectedDigest);
+          throw new DigestMismatchException(actual, expectedDigest, "CASFileCache.commit");
         }
         try {
           setReadOnlyPerms(writePath, isExecutable, fileStore);
