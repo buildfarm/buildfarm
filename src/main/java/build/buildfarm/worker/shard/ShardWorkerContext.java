@@ -33,6 +33,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.config.Queue;
 import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -132,13 +133,17 @@ class ShardWorkerContext implements WorkerContext {
   static SetMultimap<String, String> getMatchProvisions(
       Iterable<ExecutionPolicy> policies, int executeStageWidth) {
     ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
-    Platform matchPlatform =
+    Queue[] queues = configs.getBackplane().getQueues();
+    if (queues.length != 0) {
+        Platform matchPlatform =
         ExecutionPolicies.getMatchPlatform(
             configs.getBackplane().getQueues()[0].getPlatform(), policies);
-    for (Platform.Property property : matchPlatform.getPropertiesList()) {
-      provisions.put(property.getName(), property.getValue());
+        for (Platform.Property property : matchPlatform.getPropertiesList()) {
+            provisions.put(property.getName(), property.getValue());
+        }
+        provisions.put(PROVISION_CORES_NAME, String.format("%d", executeStageWidth));
     }
-    provisions.put(PROVISION_CORES_NAME, String.format("%d", executeStageWidth));
+
     return provisions.build();
   }
 
