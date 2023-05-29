@@ -103,7 +103,7 @@ java_image(
     tags = ["container"],
     runtime_deps = [
         ":telemetry_tools",
-        "//src/main/execution_wrappers",
+        "//src:execution_wrappers",
         "//src/main/java/build/buildfarm/worker/shard",
     ],
 )
