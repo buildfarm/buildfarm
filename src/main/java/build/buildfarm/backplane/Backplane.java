@@ -98,8 +98,8 @@ public interface Backplane {
 
   Iterable<Map.Entry<String, String>> getOperations(Set<String> operationIds) throws IOException;
 
-  /** Returns a set of the names of all active workers. */
-  Set<String> getWorkers() throws IOException;
+  /** Returns a set of the names of all active storage workers. */
+  Set<String> getStorageWorkers() throws IOException;
 
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the digest of the action

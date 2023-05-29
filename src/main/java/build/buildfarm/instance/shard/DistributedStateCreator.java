@@ -58,7 +58,6 @@ public class DistributedStateCreator {
         new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_execute");
     state.storageWorkers =
         new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_storage");
-    state.executeAndStorageWorkers = new RedisHashMap(configs.getBackplane().getWorkersHashName());
 
     return state;
   }

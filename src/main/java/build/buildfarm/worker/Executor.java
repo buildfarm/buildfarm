@@ -380,25 +380,29 @@ class Executor {
         uniqueIndex(operationContext.command.getPlatform().getPropertiesList(), Property::getName);
 
     arguments.add(wrapper.getPath());
-    for (String argument : wrapper.getArguments()) {
-      // If the argument is of the form <propertyName>, substitute the value of
-      // the property from the platform specification.
-      if (!argument.equals("<>")
-          && argument.charAt(0) == '<'
-          && argument.charAt(argument.length() - 1) == '>') {
-        // substitute with matching platform property content
-        // if this property is not present, the wrapper is ignored
-        String propertyName = argument.substring(1, argument.length() - 1);
-        Property property = properties.get(propertyName);
-        if (property == null) {
-          return ImmutableList.of();
+
+    if (wrapper.getArguments() != null) {
+      for (String argument : wrapper.getArguments()) {
+        // If the argument is of the form <propertyName>, substitute the value of
+        // the property from the platform specification.
+        if (!argument.equals("<>")
+            && argument.charAt(0) == '<'
+            && argument.charAt(argument.length() - 1) == '>') {
+          // substitute with matching platform property content
+          // if this property is not present, the wrapper is ignored
+          String propertyName = argument.substring(1, argument.length() - 1);
+          Property property = properties.get(propertyName);
+          if (property == null) {
+            return ImmutableList.of();
+          }
+          arguments.add(property.getValue());
+        } else {
+          // If the argument isn't of the form <propertyName>, add the argument directly:
+          arguments.add(argument);
         }
-        arguments.add(property.getValue());
-      } else {
-        // If the argument isn't of the form <propertyName>, add the argument directly:
-        arguments.add(argument);
       }
     }
+
     return arguments.build();
   }
 
@@ -482,8 +486,8 @@ class Executor {
         new ByteStringWriteReader(
             process.getErrorStream(), stderrWrite, (int) workerContext.getStandardErrorLimit());
 
-    Thread stdoutReaderThread = new Thread(stdoutReader);
-    Thread stderrReaderThread = new Thread(stderrReader);
+    Thread stdoutReaderThread = new Thread(stdoutReader, "Executor.stdoutReader");
+    Thread stderrReaderThread = new Thread(stderrReader, "Executor.stderrReader");
     stdoutReaderThread.start();
     stderrReaderThread.start();
 

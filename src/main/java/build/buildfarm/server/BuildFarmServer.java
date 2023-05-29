@@ -211,6 +211,9 @@ public class BuildFarmServer {
     SpringApplication app = new SpringApplication(BuildFarmServer.class);
     Map<String, Object> springConfig = new HashMap<>();
 
+    // Disable Logback
+    System.setProperty("org.springframework.boot.logging.LoggingSystem", "none");
+
     springConfig.put("ui.frontend.enable", configs.getUi().isEnable());
     springConfig.put("server.port", configs.getUi().getPort());
     app.setDefaultProperties(springConfig);

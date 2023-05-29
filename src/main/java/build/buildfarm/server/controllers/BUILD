@@ -1,9 +1,7 @@
 java_library(
     name = "WebController",
     srcs = ["WebController.java"],
-    data = ["//src/main/resources:ui_resources"],
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
-    resources = ["//src/main/resources:ui_resources"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",

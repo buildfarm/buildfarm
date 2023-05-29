@@ -28,7 +28,7 @@ import build.buildfarm.common.redis.RedisMap;
 public class DistributedState {
   /**
    * @field executeWorkers
-   * @brief All of the execute-only workers register themselves to the cluster.
+   * @brief All of the execute-capable workers register themselves to the cluster.
    * @details This is done to keep track of which machines are online and known by the rest of the
    *     cluster.
    */
@@ -36,19 +36,11 @@ public class DistributedState {
 
   /**
    * @field storageWorkers
-   * @brief All of the storage-only workers register themselves to the cluster.
+   * @brief All of the storage-capable workers register themselves to the cluster.
    * @details This is done to keep track of which machines are online and known by the rest of the
    *     cluster.
    */
   public RedisHashMap storageWorkers;
-
-  /**
-   * @field executeAndStorageWorkers
-   * @brief All of the workers with both execute and storage register themselves to the cluster.
-   * @details This is done to keep track of which machines are online and known by the rest of the
-   *     cluster.
-   */
-  public RedisHashMap executeAndStorageWorkers;
 
   /**
    * @field prequeue
