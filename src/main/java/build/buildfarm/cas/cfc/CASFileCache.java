@@ -1881,7 +1881,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       } else {
         // When the Entry is in an unreferenced sate state ( refCt == -1 ) -
         // we don't want to subtract from this value
-        return keyCt + Math.max(refCt, 0);
+        return keyCt + Math.min(Math.max(refCt, 0), 0);
       }
     }
   }
@@ -2086,7 +2086,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Files.move(path, temp, ATOMIC_MOVE);
     }
 
-    if (Files.isDirectory(path)) {
+    if (Files.isDirectory(temp)) {
       log.log(Level.INFO, "removing existing directory " + path + " for fetch");
       Directories.remove(temp);
     } else {
@@ -2123,7 +2123,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         referenceCount = 0;
       }
       log.log(
-          Level.INFO,
+          Level.FINER,
           "decrementing key references to "
               + key
               + " from "
@@ -2181,7 +2181,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         referenceCount = 0;
       }
       log.log(
-          Level.INFO,
+          Level.FINER,
           "incrementing key references to "
               + key
               + " from "
@@ -2200,15 +2200,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throws IOException {
     Directory directory = directoriesIndex.get(directoryDigest);
 
-    getDirectoryKeys(keys, path, directoryDigest, directoriesIndex, true);
+    getDirectoryKeys(keys, path, directoryDigest, directoriesIndex);
   }
 
   private void getDirectoryKeys(
       ImmutableList.Builder<String> keys,
       Path rootPath,
       Digest digest,
-      Map<Digest, Directory> directoriesIndex,
-      boolean includeSubdirs)
+      Map<Digest, Directory> directoriesIndex)
       throws IOException {
 
     Stack<Map.Entry<Path, Directory>> stack = new Stack<>();
@@ -2221,12 +2220,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path path = pathDirectoryPair.getKey();
       Directory directory = pathDirectoryPair.getValue();
 
-      Iterable<FileNode> files = directory.getFilesList();
-      keysForFiles(keys, files);
-
-      // Skip recurisng through subdirs when !includeSubdirs
-      if (!includeSubdirs) {
-        continue;
+      for (FileNode fileNode : directory.getFilesList()) {
+        keys.add(getKey(fileNode.getDigest(), fileNode.getIsExecutable()));
       }
       for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
         Path subPath = path.resolve(directoryNode.getName());
@@ -2235,13 +2230,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 subPath,
                 getDirectoryFromDigest(directoriesIndex, subPath, directoryNode.getDigest())));
       }
-    }
-  }
-
-  private void keysForFiles(ImmutableList.Builder<String> keys, Iterable<FileNode> files) {
-    for (FileNode fileNode : files) {
-      String key = getKey(fileNode.getDigest(), fileNode.getIsExecutable());
-      keys.add(key);
     }
   }
 
@@ -2798,7 +2786,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private final void createLink(Path a, Path b) throws IOException, FileAlreadyExistsException {
     synchronized (this) {
-      Files.createLink(a, b);
+        Files.createLink(a, b);
+    }
+  }
+
+  private final void renamePath(Path a, Path b) throws IOException, FileAlreadyExistsException {
+    synchronized (this) {
+      if (!Files.exists(b)) {
+          Files.move(a, b, ATOMIC_MOVE);
+      }
     }
   }
 
@@ -3075,16 +3071,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         try {
           log.log(Level.FINEST, "comitting" + key + " from " + writePath);
           Path cachePath = CASFileCache.this.getPath(key);
-          CASFileCache.this.createLink(cachePath, writePath);
+          CASFileCache.this.renamePath(writePath, cachePath);
           existingEntry = storage.putIfAbsent(key, entry);
           inserted = existingEntry == null;
         } catch (FileAlreadyExistsException e) {
           log.log(Level.FINE, "file already exists for " + key + ", nonexistent entry will fail");
         } finally {
-          Files.delete(writePath);
-          if (!inserted) {
-            dischargeAndNotify(blobSizeInBytes);
-          }
+           if (Files.exists(writePath)) {
+             Files.delete(writePath);
+           }
+           if (!inserted) {
+             dischargeAndNotify(blobSizeInBytes);
+           }
         }
 
         int attempts = 10;
