@@ -37,6 +37,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.lang.String.format;
+import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
 import static java.util.concurrent.TimeUnit.HOURS;
@@ -158,6 +159,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final boolean publishTtlMetric;
   private final boolean execRootFallback;
   private final DigestUtil digestUtil;
+  private final ConcurrentMap<String, Integer> keyReferences;
   private final ConcurrentMap<String, Entry> storage;
   private final Consumer<Digest> onPut;
   private final Consumer<Iterable<Digest>> onExpire;
@@ -332,7 +334,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.delegate = delegate;
     this.delegateSkipLoad = delegateSkipLoad;
     this.directoriesIndexDbName = directoriesIndexDbName;
-
+    this.keyReferences = Maps.newConcurrentMap();
     if (publishTtlMetric) {
       casTtl =
           Histogram.build()
@@ -1731,15 +1733,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       for (Map.Entry<String, Entry> pe : storage.entrySet()) {
         String key = pe.getKey();
         Entry e = pe.getValue();
-        if (e.referenceCount > max) {
-          max = e.referenceCount;
+        // From a waiting perspective we must wait until all keys are released.
+        int referenceCount = getKeyReferenceCount(e);
+        if (referenceCount > max) {
+          max = referenceCount;
           maxkey = key;
         }
-        if (min == -1 || e.referenceCount < min) {
-          min = e.referenceCount;
+        if (min == -1 || referenceCount < min) {
+          min = referenceCount;
           minkey = key;
         }
-        if (e.referenceCount == 0) {
+        if (referenceCount == 0) {
           log.log(
               Level.INFO,
               format(
@@ -1749,7 +1753,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                   e.after == null ? null : e.after.hashCode(),
                   e.before == null ? null : e.before.hashCode()));
         }
-        references += e.referenceCount;
+        references += referenceCount;
         keys++;
       }
       if (keys == 0) {
@@ -1866,6 +1870,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return Thread.interrupted()
         || e.getCause() instanceof InterruptedException
         || e instanceof ClosedByInterruptException;
+  }
+
+  private int getKeyReferenceCount(Entry e) {
+    synchronized (this) {
+      Integer keyCt = keyReferences.get(e.key);
+      int refCt = e.referenceCount;
+      if (keyCt == null) {
+        return refCt;
+      } else {
+        // When the Entry is in an unreferenced state ( refCt == -1 ) -
+        // we don't want to subtract from this value
+        return keyCt + Math.min(Math.max(refCt, 0), 0);
+      }
+    }
   }
 
   @SuppressWarnings("NonAtomicOperationOnVolatileField")
@@ -2000,7 +2018,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     // with 'Too many links...`.
 
     try {
-      Files.createLink(filePath, cacheFilePath);
+      createLink(filePath, cacheFilePath);
     } catch (IOException e) {
       // propagate the exception if we do not want to perform the fallback strategy.
       // The client should expect a failed action with an explanation of 'Too many links...`.
@@ -2059,13 +2077,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private void removeFilePath(Path path) throws IOException {
-    if (Files.exists(path)) {
-      if (Files.isDirectory(path)) {
-        log.log(Level.FINE, "removing existing directory " + path + " for fetch");
-        Directories.remove(path);
-      } else {
-        Files.delete(path);
-      }
+    if (!Files.exists(path)) {
+      return;
+    }
+    Path temp =
+        path.resolveSibling("_deleting." + path.getFileName() + "." + UUID.randomUUID().toString());
+    synchronized (this) {
+      Files.move(path, temp, ATOMIC_MOVE);
+    }
+
+    if (Files.isDirectory(temp)) {
+      Directories.remove(temp);
+    } else {
+      Files.delete(temp);
     }
   }
 
@@ -2082,6 +2106,130 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           format("directory not found for %s(%s)", path, DigestUtil.toString(digest)));
     }
     return directory;
+  }
+
+  // Unlocks keys
+  public void unlockKeys(Iterable<String> keys) throws IOException {
+    synchronized (this) {
+      decrementKeysSynchronized(keys);
+    }
+  }
+
+  private void decrementKeysSynchronized(Iterable<String> keys) {
+    for (String key : keys) {
+      Integer referenceCount = keyReferences.get(key);
+      if (referenceCount == null) {
+        referenceCount = 0;
+      }
+      log.log(
+          Level.FINER,
+          "decrementing key references to "
+              + key
+              + " from "
+              + referenceCount
+              + " to "
+              + (referenceCount - 1));
+
+      referenceCount = referenceCount - 1;
+      // Uphold this no matter what
+      if (referenceCount < 0) {
+        throw new IllegalStateException("ERROR invalid CAS accounting for " + key);
+      }
+      if (referenceCount == 0) {
+        keyReferences.remove(key);
+      } else {
+        keyReferences.put(key, referenceCount);
+      }
+    }
+  }
+
+  // Acquire logical references to keys in a directory. Done atomically and
+  // without needing to do i/o.
+  //
+  // By calling this method, the keys are gaureteed to be available when
+  // leveraging the mutex ( currently on this object ). Until you call
+  // decrementKeys. Simply put, the CAS isn't allowed to decrement these keys.
+  //
+  // Because some paths may need to be `fetched` and don't yet exist, any
+  // filesystem operations must use the mutex: i.e. safely create a symlink to
+  // a path inside of this cache it should use the cache as a synchronization
+  // point - after calling `getDirectoryKeys`.
+  public Iterable<String> lockDirectoryKeys(
+      Path path, Digest directoryDigest, Map<Digest, Directory> directoriesIndex)
+      throws IOException {
+    Directory directory = directoriesIndex.get(directoryDigest);
+    if (directory == null) {
+      throw new IOException(
+          "Directory " + DigestUtil.toString(directoryDigest) + " is not in directories index");
+    }
+
+    Iterable<String> keys;
+    synchronized (this) {
+      ImmutableList.Builder<String> keysBuilder = new ImmutableList.Builder<>();
+      getDirectoryKeysSynchronized(keysBuilder, path, directoryDigest, directoriesIndex);
+      keys = keysBuilder.build();
+      incrementKeys(keys);
+    }
+    return keys;
+  }
+
+  private void incrementKeys(Iterable<String> keys) {
+    for (String key : keys) {
+      Integer referenceCount = keyReferences.get(key);
+      if (referenceCount == null) {
+        referenceCount = 0;
+      }
+      log.log(
+          Level.FINER,
+          "incrementing key references to "
+              + key
+              + " from "
+              + referenceCount
+              + " to "
+              + (referenceCount + 1));
+      keyReferences.put(key, referenceCount + 1);
+    }
+  }
+
+  private void getDirectoryKeysSynchronized(
+      ImmutableList.Builder<String> keys,
+      Path path,
+      Digest directoryDigest,
+      Map<Digest, Directory> directoriesIndex)
+      throws IOException {
+    Directory directory = directoriesIndex.get(directoryDigest);
+
+    getDirectoryKeys(keys, path, directoryDigest, directoriesIndex);
+  }
+
+  private void getDirectoryKeys(
+      ImmutableList.Builder<String> keys,
+      Path rootPath,
+      Digest digest,
+      Map<Digest, Directory> directoriesIndex)
+      throws IOException {
+
+    Stack<Map.Entry<Path, Directory>> stack = new Stack<>();
+    stack.push(
+        new AbstractMap.SimpleEntry<>(
+            rootPath, getDirectoryFromDigest(directoriesIndex, rootPath, digest)));
+
+    while (!stack.isEmpty()) {
+      Map.Entry<Path, Directory> pathDirectoryPair = stack.pop();
+      Path path = pathDirectoryPair.getKey();
+      Directory directory = pathDirectoryPair.getValue();
+
+      for (FileNode fileNode : directory.getFilesList()) {
+        keys.add(getKey(fileNode.getDigest(), fileNode.getIsExecutable()));
+      }
+      for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
+        Path subPath = path.resolve(directoryNode.getName());
+        stack.push(
+            new AbstractMap.SimpleEntry<>(
+                subPath,
+                getDirectoryFromDigest(directoriesIndex, subPath, directoryNode.getDigest())));
+      }
+    }
   }
 
   public ListenableFuture<Path> putDirectory(
@@ -2613,6 +2761,42 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  // Atomic file system mutation helpers
+  //
+  // Assuming the the file system has atomic renames.
+  //
+  // When a referenceCount is set to 0 the CASFileCache will delete a file, we
+  // need atomic deletion because anyone may use the presense of a path holding
+  // `final` link to an inode to determine existance of it. Without atomic
+  // deletion there is a brief moment it can gain a reference to a deleting
+  // inode - and this window varies based on disk i/o speed. This uphold
+  // correctness in the most excessive contention for space facing under slow
+  // disk i/o
+  private final void deleteFilePath(Path path) throws IOException {
+    log.log(Level.FINEST, "CASFileCache::deleteFilePath(" + path + ")");
+    // The name of a path has touchy semantics - prefix with _deleting
+    Path temp =
+        path.resolveSibling("_deleting." + path.getFileName() + "." + UUID.randomUUID().toString());
+    synchronized (this) {
+      Files.move(path, temp, ATOMIC_MOVE);
+    }
+    Files.delete(temp);
+  }
+
+  private final void createLink(Path a, Path b) throws IOException, FileAlreadyExistsException {
+    synchronized (this) {
+      Files.createLink(a, b);
+    }
+  }
+
+  private final void renamePath(Path a, Path b) throws IOException, FileAlreadyExistsException {
+    synchronized (this) {
+      if (!Files.exists(b)) {
+        Files.move(a, b, ATOMIC_MOVE);
+      }
+    }
+  }
+
   private void deleteExpiredKey(Path path) throws IOException {
     // We don't want publishing the metric to delay the deletion of the file.
     // We publish the metric only after the file has been deleted.
@@ -2621,7 +2805,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       createdTime = path.toFile().lastModified();
     }
 
-    Files.delete(path);
+    deleteFilePath(path);
 
     if (publishTtlMetric) {
       publishExpirationMetric(createdTime);
@@ -2658,8 +2842,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     (expiredEntry) -> {
                       String expiredKey = expiredEntry.key;
                       try {
-                        Path path = getPath(expiredKey);
-                        deleteExpiredKey(path);
+                        // asnyc and possible to have gotten a key by now
+                        if (keyReferences.get(key) != null) {
+                          log.log(
+                              Level.FINEST,
+                              format(
+                                  "CASFileCache::putImpl ignore deletion for %s expiration due to key reference",
+                                  expiredKey));
+                        } else {
+                          Path path = getPath(expiredKey);
+                          deleteExpiredKey(path);
+                        }
                       } catch (NoSuchFileException eNoEnt) {
                         log.log(
                             Level.SEVERE,
@@ -2835,6 +3028,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         out.close(); // should probably discharge here as well
 
         if (size > blobSizeInBytes) {
+          log.log(Level.FINE, "rejecting mismatched download for " + key);
           String hash = hashSupplier.get().toString();
           try {
             Files.delete(writePath);
@@ -2846,6 +3040,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
 
         if (size != blobSizeInBytes) {
+          log.log(Level.FINE, "rejecting incomplete download for " + key);
           throw new IncompleteBlobException(writePath, key, size, blobSizeInBytes);
         }
 
@@ -2873,13 +3068,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Entry existingEntry = null;
         boolean inserted = false;
         try {
-          Files.createLink(CASFileCache.this.getPath(key), writePath);
+          log.log(Level.FINEST, "comitting" + key + " from " + writePath);
+          Path cachePath = CASFileCache.this.getPath(key);
+          CASFileCache.this.renamePath(writePath, cachePath);
           existingEntry = storage.putIfAbsent(key, entry);
           inserted = existingEntry == null;
         } catch (FileAlreadyExistsException e) {
           log.log(Level.FINE, "file already exists for " + key + ", nonexistent entry will fail");
         } finally {
-          Files.delete(writePath);
+          if (Files.exists(writePath)) {
+            Files.delete(writePath);
+          }
           if (!inserted) {
             dischargeAndNotify(blobSizeInBytes);
           }
@@ -3115,6 +3314,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private void performCopy(Write write, Entry e) throws IOException {
     try (OutputStream out = write.getOutput(1, MINUTES, () -> {});
         InputStream in = Files.newInputStream(getPath(e.key))) {
+      // Note: deletion of `in` is assumed to be guarded by a reference count
+      // in this program.
+      // consider adding assertions in this method to verify this is upheld.
       ByteStreams.copy(in, out);
     } catch (IOException ioEx) {
       boolean interrupted = causedByInterrupted(ioEx);
