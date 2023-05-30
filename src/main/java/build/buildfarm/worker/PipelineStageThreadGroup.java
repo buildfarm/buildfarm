@@ -14,14 +14,13 @@
 package build.buildfarm.worker;
 
 import com.google.common.util.concurrent.SettableFuture;
-import java.util.logging.Level;
-import lombok.extern.java.Log;
-import java.util.Set;
-import java.util.Arrays;
-import java.util.stream.Collectors;
 import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadMXBean;
 import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
+import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
+import lombok.extern.java.Log;
 
 @Log
 public class PipelineStageThreadGroup extends ThreadGroup {
@@ -41,12 +40,10 @@ public class PipelineStageThreadGroup extends ThreadGroup {
     System.err.println("SEVERE: PipelineStageThreadGroup BEGIN uncaught stack trace");
     ThreadMXBean bean = ManagementFactory.getThreadMXBean();
     ThreadInfo[] infos = bean.dumpAllThreads(true, true);
-    String errs = Arrays.stream(infos).map(Object::toString)
-	.collect(Collectors.joining());
+    String errs = Arrays.stream(infos).map(Object::toString).collect(Collectors.joining());
     System.err.println(errs);
     System.err.println("SEVERE: PipelineStageThreadGroup END uncaught stack trace");
   }
-
 
   // If there is an uncaught exception in the thread group, interrupt
   // stage threads and notify the caller to decide how to handle it

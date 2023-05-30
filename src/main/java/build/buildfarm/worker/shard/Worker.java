@@ -550,7 +550,8 @@ public class Worker {
                   }
                 }
               }
-            }, "Worker.registration")
+            },
+            "Worker.registration")
         .start();
   }
 

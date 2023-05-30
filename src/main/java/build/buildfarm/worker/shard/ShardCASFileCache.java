@@ -82,6 +82,7 @@ class ShardCASFileCache extends CASFileCache {
     return new EmptyInputStreamFactory(new FailoverInputStreamFactory(primary, fallback));
   }
 
+  // [jmarino] downloader
   @Override
   protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
       throws IOException {

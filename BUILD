@@ -200,8 +200,8 @@ oss_audit(
 pkg_tar(
     name = "buildfarm-shard-worker-tar",
     srcs = [
+        "//examples:example_configs",
         "//src/main/java/build/buildfarm:buildfarm-shard-worker_deploy.jar",
         "//src/main/java/build/buildfarm:configs",
-        "//examples:example_configs",
     ],
 )
