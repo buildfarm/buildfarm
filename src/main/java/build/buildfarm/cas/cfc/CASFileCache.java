@@ -1734,7 +1734,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         String key = pe.getKey();
         Entry e = pe.getValue();
         // From a waiting perspective we must wait until all keys are released.
-        int referenceCount = getKeyReferenceCount(e);
+        int referenceCount = getLockedReferenceCount(e);
         if (referenceCount > max) {
           max = referenceCount;
           maxkey = key;
@@ -1872,7 +1872,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         || e instanceof ClosedByInterruptException;
   }
 
-  private int getKeyReferenceCount(Entry e) {
+  private int getLockedReferenceCount(Entry e) {
     synchronized (this) {
       Integer keyCt = keyReferences.get(e.key);
       int refCt = e.referenceCount;
@@ -2154,7 +2154,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   // Because some paths may need to be `fetched` and don't yet exist, Any
   // filesystem operations must use the mutex: i.e. safely create a symlink
   // to a path inside of this cache it should use the cache as a
-  // synchronization point - after calling `getDirectoryKeys`.
+  // synchronization point - after calling `lockDirectoryKeys`.
   public Iterable<String> lockDirectoryKeys(
       Path path, Digest directoryDigest, Map<Digest, Directory> directoriesIndex)
       throws IOException {
@@ -2164,17 +2164,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           "Directory " + DigestUtil.toString(directoryDigest) + " is not in directories index");
     }
 
-    Iterable<String> keys;
+    // Assumimg `directoriesIndex` is not going to change, this shouldn't be in
+    // the critical section of the mutex
+    ImmutableList.Builder<String> keysBuilder = new ImmutableList.Builder<>();
+    getDirectoryKeys(keysBuilder, path, directoryDigest, directoriesIndex);
+
+    Iterable<String> keys = keysBuilder.build();
     synchronized (this) {
-      ImmutableList.Builder<String> keysBuilder = new ImmutableList.Builder<>();
-      getDirectoryKeysSynchronized(keysBuilder, path, directoryDigest, directoriesIndex);
-      keys = keysBuilder.build();
-      incrementKeys(keys);
+      incrementKeysSynchronized(keys);
     }
     return keys;
   }
 
-  private void incrementKeys(Iterable<String> keys) {
+  private void incrementKeysSynchronized(Iterable<String> keys) {
     for (String key : keys) {
       Integer referenceCount = keyReferences.get(key);
       if (referenceCount == null) {
@@ -2190,17 +2192,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               + (referenceCount + 1));
       keyReferences.put(key, referenceCount + 1);
     }
-  }
-
-  private void getDirectoryKeysSynchronized(
-      ImmutableList.Builder<String> keys,
-      Path path,
-      Digest directoryDigest,
-      Map<Digest, Directory> directoriesIndex)
-      throws IOException {
-    Directory directory = directoriesIndex.get(directoryDigest);
-
-    getDirectoryKeys(keys, path, directoryDigest, directoriesIndex);
   }
 
   private void getDirectoryKeys(
@@ -2786,14 +2777,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private final void createLink(Path a, Path b) throws IOException, FileAlreadyExistsException {
     synchronized (this) {
-        Files.createLink(a, b);
+      Files.createLink(a, b);
     }
   }
 
   private final void renamePath(Path a, Path b) throws IOException, FileAlreadyExistsException {
     synchronized (this) {
       if (!Files.exists(b)) {
-          Files.move(a, b, ATOMIC_MOVE);
+        Files.move(a, b, ATOMIC_MOVE);
       }
     }
   }
@@ -3069,7 +3060,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Entry existingEntry = null;
         boolean inserted = false;
         try {
-          log.log(Level.FINEST, "comitting" + key + " from " + writePath);
+          log.log(Level.FINEST, "comitting " + key + " from " + writePath);
           Path cachePath = CASFileCache.this.getPath(key);
           CASFileCache.this.renamePath(writePath, cachePath);
           existingEntry = storage.putIfAbsent(key, entry);
@@ -3077,12 +3068,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         } catch (FileAlreadyExistsException e) {
           log.log(Level.FINE, "file already exists for " + key + ", nonexistent entry will fail");
         } finally {
-           if (Files.exists(writePath)) {
-             Files.delete(writePath);
-           }
-           if (!inserted) {
-             dischargeAndNotify(blobSizeInBytes);
-           }
+          if (Files.exists(writePath)) {
+            Files.delete(writePath);
+          }
+          if (!inserted) {
+            dischargeAndNotify(blobSizeInBytes);
+          }
         }
 
         int attempts = 10;
