@@ -1734,7 +1734,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         String key = pe.getKey();
         Entry e = pe.getValue();
         // From a waiting perspective we must wait until all keys are released.
-        int referenceCount = getKeyReferenceCount(e);
+        int referenceCount = getLockedReferenceCount(e);
         if (referenceCount > max) {
           max = referenceCount;
           maxkey = key;
@@ -1872,7 +1872,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         || e instanceof ClosedByInterruptException;
   }
 
-  private int getKeyReferenceCount(Entry e) {
+  private int getLockedReferenceCount(Entry e) {
     synchronized (this) {
       Integer keyCt = keyReferences.get(e.key);
       int refCt = e.referenceCount;
@@ -2150,10 +2150,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   // leveraging the mutex ( currently on this object ). Until you call
   // decrementKeys. Simply put, the CAS isn't allowed to decrement these keys.
   //
-  // Because some paths may need to be `fetched` and don't yet exist, any
-  // filesystem operations must use the mutex: i.e. safely create a symlink to
-  // a path inside of this cache it should use the cache as a synchronization
-  // point - after calling `getDirectoryKeys`.
+  // Because some paths may need to be `fetched` and don't yet exist, Any
+  // filesystem operations must use the mutex: i.e. safely create a symlink
+  // to a path inside of this cache it should use the cache as a
+  // synchronization point - after calling `lockDirectoryKeys`.
   public Iterable<String> lockDirectoryKeys(
       Path path, Digest directoryDigest, Map<Digest, Directory> directoriesIndex)
       throws IOException {
@@ -2163,17 +2163,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           "Directory " + DigestUtil.toString(directoryDigest) + " is not in directories index");
     }
 
-    Iterable<String> keys;
+    // Assumimg `directoriesIndex` is not going to change, this shouldn't be in
+    // the critical section of the mutex
+    ImmutableList.Builder<String> keysBuilder = new ImmutableList.Builder<>();
+    getDirectoryKeys(keysBuilder, path, directoryDigest, directoriesIndex);
+
+    Iterable<String> keys = keysBuilder.build();
     synchronized (this) {
-      ImmutableList.Builder<String> keysBuilder = new ImmutableList.Builder<>();
-      getDirectoryKeysSynchronized(keysBuilder, path, directoryDigest, directoriesIndex);
-      keys = keysBuilder.build();
-      incrementKeys(keys);
+      incrementKeysSynchronized(keys);
     }
     return keys;
   }
 
-  private void incrementKeys(Iterable<String> keys) {
+  private void incrementKeysSynchronized(Iterable<String> keys) {
     for (String key : keys) {
       Integer referenceCount = keyReferences.get(key);
       if (referenceCount == null) {
@@ -2189,17 +2191,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               + (referenceCount + 1));
       keyReferences.put(key, referenceCount + 1);
     }
-  }
-
-  private void getDirectoryKeysSynchronized(
-      ImmutableList.Builder<String> keys,
-      Path path,
-      Digest directoryDigest,
-      Map<Digest, Directory> directoriesIndex)
-      throws IOException {
-    Directory directory = directoriesIndex.get(directoryDigest);
-
-    getDirectoryKeys(keys, path, directoryDigest, directoriesIndex);
   }
 
   private void getDirectoryKeys(
@@ -2770,8 +2761,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   // `final` link to an inode to determine existance of it. Without atomic
   // deletion there is a brief moment it can gain a reference to a deleting
   // inode - and this window varies based on disk i/o speed. This uphold
-  // correctness in the most excessive contention for space facing under slow
-  // disk i/o
+  // correctness in the most excessive contention for space and slow disk i/o
   private final void deleteFilePath(Path path) throws IOException {
     log.log(Level.FINEST, "CASFileCache::deleteFilePath(" + path + ")");
     // The name of a path has touchy semantics - prefix with _deleting
@@ -3068,7 +3058,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Entry existingEntry = null;
         boolean inserted = false;
         try {
-          log.log(Level.FINEST, "comitting" + key + " from " + writePath);
+          log.log(Level.FINEST, "comitting " + key + " from " + writePath);
           Path cachePath = CASFileCache.this.getPath(key);
           CASFileCache.this.renamePath(writePath, cachePath);
           existingEntry = storage.putIfAbsent(key, entry);

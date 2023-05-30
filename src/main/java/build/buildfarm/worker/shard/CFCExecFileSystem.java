@@ -370,9 +370,9 @@ class CFCExecFileSystem implements ExecFileSystem {
     ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
-    // Get lock keys so we can increment them prior to downloading
-    // and no other threads can to create/delete during
-    // eviction or the invocation of fetchInputs
+    // Lock keys prior to downloading.
+    // Expect no other threads can mutate/evict them during _either_
+    // fetch/executue or _this_ invocation of fetchInputs.
     Iterable<String> lockedKeys =
         fileCache.lockDirectoryKeys(execDir, inputRootDigest, directoriesIndex);
 
