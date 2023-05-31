@@ -136,6 +136,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -158,7 +159,6 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
@@ -666,10 +666,12 @@ public class ShardInstance extends AbstractServerInstance {
 
     if (configs.getServer().isFindMissingBlobsViaBackplane()) {
       try {
-        Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(blobDigests);
+        Set<Digest> uniqueDigests = new HashSet<>();
+        nonEmptyDigests.forEach(uniqueDigests::add);
+        Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(uniqueDigests);
         Set<String> workerSet = backplane.getStorageWorkers();
         return immediateFuture(
-            StreamSupport.stream(blobDigests.spliterator(), false)
+            uniqueDigests.stream()
                 .filter( // best effort to present digests only missing on active workers
                     digest ->
                         Sets.intersection(
