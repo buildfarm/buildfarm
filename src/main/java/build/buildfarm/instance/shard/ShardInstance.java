@@ -449,8 +449,7 @@ public class ShardInstance extends AbstractServerInstance {
                 public void run() {
                   log.log(Level.FINE, "OperationQueuer: Running");
                   try {
-                    for (; ; ) {
-                      transformTokensQueue.put(new Object());
+                    while (transformTokensQueue.offer(new Object(), 5, MINUTES)) {
                       stopwatch.start();
                       try {
                         iterate()
@@ -473,6 +472,7 @@ public class ShardInstance extends AbstractServerInstance {
                         stopwatch.reset();
                       }
                     }
+                    log.severe("OperationQueuer: Transform lease token timed out");
                   } catch (InterruptedException e) {
                     // treat with exit
                     operationQueuer = null;
