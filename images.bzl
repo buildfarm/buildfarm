@@ -35,6 +35,14 @@ def buildfarm_images():
     )
 
     container_pull(
+        name = "ubuntu-jammy",
+        digest = "sha256:da847ee259ebe7f00631a2f0146d9add60ff0f94b031a2e522ce94c78b1335c2",
+        registry = "index.docker.io",
+        repository = "bazelbuild/buildfarm-worker-base",
+        tag = "jammy-java11-gcc",
+    )
+
+    container_pull(
         name = "amazon_corretto_java_image_base",
         registry = "index.docker.io",
         repository = "amazoncorretto",
