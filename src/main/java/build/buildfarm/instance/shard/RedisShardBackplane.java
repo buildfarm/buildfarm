@@ -15,6 +15,7 @@
 package build.buildfarm.instance.shard;
 
 import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
@@ -56,6 +57,8 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
 import build.buildfarm.v1test.WorkerType;
+import com.google.common.base.Suppliers;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ListMultimap;
@@ -73,6 +76,7 @@ import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
+import io.grpc.Deadline;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -83,7 +87,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -99,6 +102,7 @@ import redis.clients.jedis.JedisCluster;
 public class RedisShardBackplane implements Backplane {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
+  private static final int workerSetMaxAge = 3; // seconds
   private static final JsonFormat.Parser operationParser =
       JsonFormat.parser()
           .usingTypeRegistry(
@@ -135,8 +139,9 @@ public class RedisShardBackplane implements Backplane {
   private ExecutorService subscriberService = null;
   private @Nullable RedisClient client = null;
 
+  private Deadline storageWorkersDeadline = null;
   private final Set<String> storageWorkerSet = Collections.synchronizedSet(new HashSet<>());
-  private long workerSetExpiresAt = 0;
+  private final Supplier<Set<String>> recentExecuteWorkers;
 
   private DistributedState state = new DistributedState();
 
@@ -157,6 +162,17 @@ public class RedisShardBackplane implements Backplane {
     this.onPublish = onPublish;
     this.onComplete = onComplete;
     this.jedisClusterFactory = jedisClusterFactory;
+    recentExecuteWorkers =
+        Suppliers.memoizeWithExpiration(
+            () -> {
+              try {
+                return client.call(this::fetchAndExpireExecuteWorkers);
+              } catch (IOException e) {
+                throw new RuntimeException(e);
+              }
+            },
+            workerSetMaxAge,
+            SECONDS);
   }
 
   @SuppressWarnings("NullableProblems")
@@ -477,7 +493,7 @@ public class RedisShardBackplane implements Backplane {
             () -> {
               while (!Thread.currentThread().isInterrupted()) {
                 try {
-                  TimeUnit.SECONDS.sleep(10);
+                  SECONDS.sleep(10);
                   client.run(this::updateWatchers);
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
@@ -530,7 +546,7 @@ public class RedisShardBackplane implements Backplane {
     }
     if (subscriberService != null) {
       subscriberService.shutdown();
-      subscriberService.awaitTermination(10, TimeUnit.SECONDS);
+      subscriberService.awaitTermination(10, SECONDS);
       log.log(Level.FINE, "subscriberService has been stopped");
     }
     if (client != null) {
@@ -597,12 +613,14 @@ public class RedisShardBackplane implements Backplane {
     return result;
   }
 
-  private boolean removeWorkerAndPublish(JedisCluster jedis, String name, String changeJson) {
-    if (state.storageWorkers.remove(jedis, name) || state.executeWorkers.remove(jedis, name)) {
+  private boolean removeWorkerAndPublish(
+      JedisCluster jedis, String name, String changeJson, boolean storage) {
+    boolean removedAny = state.executeWorkers.remove(jedis, name);
+    if (storage && state.storageWorkers.remove(jedis, name)) {
       jedis.publish(configs.getBackplane().getWorkerChannel(), changeJson);
       return true;
     }
-    return false;
+    return removedAny;
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -615,7 +633,8 @@ public class RedisShardBackplane implements Backplane {
             .build();
     String workerChangeJson = JsonFormat.printer().print(workerChange);
     return subscriber.removeWorker(name)
-        && client.call(jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson));
+        && client.call(
+            jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson, /* storage=*/ true));
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -665,20 +684,26 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public synchronized Set<String> getStorageWorkers() throws IOException {
-    long now = System.currentTimeMillis();
-    if (now < workerSetExpiresAt) {
-      return new HashSet<>(storageWorkerSet);
+    if (storageWorkersDeadline == null || storageWorkersDeadline.isExpired()) {
+      synchronized (storageWorkerSet) {
+        Set<String> newWorkerSet = client.call(jedis -> fetchAndExpireStorageWorkers(jedis));
+        storageWorkerSet.clear();
+        storageWorkerSet.addAll(newWorkerSet);
+      }
+      storageWorkersDeadline = Deadline.after(workerSetMaxAge, SECONDS);
     }
-
-    synchronized (storageWorkerSet) {
-      Set<String> newWorkerSet = client.call(jedis -> fetchAndExpireStorageWorkers(jedis, now));
-      storageWorkerSet.clear();
-      storageWorkerSet.addAll(newWorkerSet);
-    }
-
-    // fetch every 3 seconds
-    workerSetExpiresAt = now + 3000;
     return new HashSet<>(storageWorkerSet);
+  }
+
+  private synchronized Set<String> getExecuteWorkers() throws IOException {
+    try {
+      return recentExecuteWorkers.get();
+    } catch (RuntimeException e) {
+      // unwrap checked exception mask
+      Throwable cause = e.getCause();
+      Throwables.throwIfInstanceOf(cause, IOException.class);
+      throw e;
+    }
   }
 
   // When performing a graceful scale down of workers, the backplane can provide worker names to the
@@ -701,7 +726,8 @@ public class RedisShardBackplane implements Backplane {
         .collect(Collectors.toList());
   }
 
-  private void removeInvalidWorkers(JedisCluster jedis, long testedAt, List<ShardWorker> workers) {
+  private void removeInvalidWorkers(
+      JedisCluster jedis, long testedAt, List<ShardWorker> workers, boolean storage) {
     if (!workers.isEmpty()) {
       for (ShardWorker worker : workers) {
         String name = worker.getEndpoint();
@@ -716,7 +742,7 @@ public class RedisShardBackplane implements Backplane {
                 .build();
         try {
           String workerChangeJson = JsonFormat.printer().print(workerChange);
-          removeWorkerAndPublish(jedis, name, workerChangeJson);
+          removeWorkerAndPublish(jedis, name, workerChangeJson, storage);
         } catch (InvalidProtocolBufferException e) {
           log.log(Level.SEVERE, "error printing workerChange", e);
         }
@@ -724,10 +750,20 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
-  private Set<String> fetchAndExpireStorageWorkers(JedisCluster jedis, long now) {
+  private Set<String> fetchAndExpireStorageWorkers(JedisCluster jedis) {
+    return fetchAndExpireWorkers(jedis, state.storageWorkers.asMap(jedis), /* storage=*/ true);
+  }
+
+  private Set<String> fetchAndExpireExecuteWorkers(JedisCluster jedis) {
+    return fetchAndExpireWorkers(jedis, state.executeWorkers.asMap(jedis), /* storage=*/ false);
+  }
+
+  private Set<String> fetchAndExpireWorkers(
+      JedisCluster jedis, Map<String, String> workers, boolean publish) {
+    long now = System.currentTimeMillis();
     Set<String> returnWorkers = Sets.newConcurrentHashSet();
     ImmutableList.Builder<ShardWorker> invalidWorkers = ImmutableList.builder();
-    for (Map.Entry<String, String> entry : state.storageWorkers.asMap(jedis).entrySet()) {
+    for (Map.Entry<String, String> entry : workers.entrySet()) {
       String json = entry.getValue();
       String name = entry.getKey();
       try {
@@ -747,7 +783,7 @@ public class RedisShardBackplane implements Backplane {
         invalidWorkers.add(ShardWorker.newBuilder().setEndpoint(name).build());
       }
     }
-    removeInvalidWorkers(jedis, now, invalidWorkers.build());
+    removeInvalidWorkers(jedis, now, invalidWorkers.build(), publish);
     return returnWorkers;
   }
 
@@ -1390,10 +1426,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public BackplaneStatus backplaneStatus() throws IOException {
     BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
-    builder.addAllActiveWorkers(
-        client.call(
-            jedis ->
-                Sets.union(state.executeWorkers.keys(jedis), state.storageWorkers.keys(jedis))));
+    builder.addAllActiveWorkers(Sets.union(getExecuteWorkers(), getStorageWorkers()));
     builder.setDispatchedSize(client.call(jedis -> state.dispatchedOperations.size(jedis)));
     builder.setOperationQueue(state.operationQueue.status(client.call(jedis -> jedis)));
     builder.setPrequeue(state.prequeue.status(client.call(jedis -> jedis)));
