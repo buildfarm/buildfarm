@@ -122,12 +122,6 @@ public class RedisShardBackplane implements Backplane {
                   .add(PreconditionFailure.getDescriptor())
                   .build());
 
-  private static class ActionAmounts {
-    Integer build = 0;
-    Integer test = 0;
-    Integer unknown = 0;
-  }
-
   private final String source; // used in operation change publication
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
