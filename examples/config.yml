@@ -9,8 +9,9 @@ server:
   actionCacheReadOnly: false
   port: 8980
   grpcMetrics:
-    enabled: false
-    provideLatencyHistograms: false
+    enabled: true
+    provideLatencyHistograms: true
+    latencyBuckets: [0.001, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0]
   maxInboundMessageSizeBytes: 0
   maxInboundMetadataSize: 0
   casWriteTimeout: 3600
@@ -93,6 +94,7 @@ worker:
   grpcMetrics:
     enabled: false
     provideLatencyHistograms: false
+    latencyBuckets: [0.001, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0]
   capabilities:
     cas: true
     execution: true
