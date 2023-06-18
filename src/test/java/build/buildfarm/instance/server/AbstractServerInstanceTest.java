@@ -519,9 +519,10 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getDescription()).isEqualTo("working directory is not an input directory");
   }
 
-  /**
-   * / -> valid dir bar/ -> missing dir with digest 'missing' and non-zero size foo/ -> missing dir
-   * with digest 'missing' and non-zero size
+  /*-
+   * / -> valid dir
+   *   bar/ -> missing dir with digest 'missing' and non-zero size
+   *   foo/ -> missing dir with digest 'missing' and non-zero size
    */
   @Test
   public void multipleIdenticalDirectoryMissingAreAllPreconditionFailures() {
@@ -562,6 +563,67 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_MISSING);
     assertThat(violation.getSubject()).isEqualTo(missingSubject);
     assertThat(violation.getDescription()).isEqualTo(String.format(missingFmt, "foo"));
+  }
+
+  /*-
+   * / -> valid dir
+   *   bar/ -> valid dir
+   *     baz/ -> missing dir with digest 'missing-empty' and zero size
+   *     quux/ -> missing dir with digest 'missing' and non-zero size
+   *   foo/ -> valid dir with digest from /bar/, making it a copy of above
+   *
+   * Only duplicated-bar appears in the index
+   * Empty directory needs short circuit in all cases
+   * Result should be 2 missing directory paths, no errors
+   */
+  @Test
+  public void validationRevisitReplicatesPreconditionFailures() {
+    Digest missingEmptyDirectoryDigest = Digest.newBuilder().setHash("missing-empty").build();
+    Digest missingDirectoryDigest = Digest.newBuilder().setHash("missing").setSizeBytes(1).build();
+    Directory foo =
+        Directory.newBuilder()
+            .addAllDirectories(
+                ImmutableList.of(
+                    DirectoryNode.newBuilder()
+                        .setName("baz")
+                        .setDigest(missingEmptyDirectoryDigest)
+                        .build(),
+                    DirectoryNode.newBuilder()
+                        .setName("quux")
+                        .setDigest(missingDirectoryDigest)
+                        .build()))
+            .build();
+    Digest fooDigest = DIGEST_UTIL.compute(foo);
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+    Directory root =
+        Directory.newBuilder()
+            .addAllDirectories(
+                ImmutableList.of(
+                    DirectoryNode.newBuilder().setName("bar").setDigest(fooDigest).build(),
+                    DirectoryNode.newBuilder().setName("foo").setDigest(fooDigest).build()))
+            .build();
+    AbstractServerInstance.validateActionInputDirectory(
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
+        root,
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ ImmutableMap.of(fooDigest, foo),
+        /* onInputFiles=*/ file -> {},
+        /* onInputDirectories=*/ directory -> {},
+        /* onInputDigests=*/ digest -> {},
+        preconditionFailure);
+
+    String missingSubject = "blobs/" + DigestUtil.toString(missingDirectoryDigest);
+    String missingFmt = "The directory `/%s` was not found in the CAS.";
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(2);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_MISSING);
+    assertThat(violation.getSubject()).isEqualTo(missingSubject);
+    assertThat(violation.getDescription()).isEqualTo(String.format(missingFmt, "bar/quux"));
+    violation = preconditionFailure.getViolationsList().get(1);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_MISSING);
+    assertThat(violation.getSubject()).isEqualTo(missingSubject);
+    assertThat(violation.getDescription()).isEqualTo(String.format(missingFmt, "foo/quux"));
   }
 
   @SuppressWarnings("unchecked")
