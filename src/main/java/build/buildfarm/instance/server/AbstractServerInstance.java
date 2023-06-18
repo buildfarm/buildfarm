@@ -739,7 +739,8 @@ public abstract class AbstractServerInstance implements Instance {
       Directory directory,
       Map<Digest, Directory> directoriesIndex,
       Consumer<String> onInputFile,
-      Consumer<String> onInputDirectory) {
+      Consumer<String> onInputDirectory,
+      PreconditionFailure.Builder preconditionFailure) {
     Stack<DirectoryNode> directoriesStack = new Stack<>();
     directoriesStack.addAll(directory.getDirectoriesList());
 
@@ -751,15 +752,29 @@ public abstract class AbstractServerInstance implements Instance {
           directoryPath.isEmpty() ? directoryName : (directoryPath + "/" + directoryName);
       onInputDirectory.accept(subDirectoryPath);
 
-      for (FileNode fileNode : directoriesIndex.get(directoryDigest).getFilesList()) {
-        String fileName = fileNode.getName();
-        String filePath = subDirectoryPath + "/" + fileName;
-        onInputFile.accept(filePath);
+      Directory subDirectory;
+      if (directoryDigest.getSizeBytes() == 0) {
+        subDirectory = Directory.getDefaultInstance();
+      } else {
+        subDirectory = directoriesIndex.get(directoryDigest);
       }
 
-      for (DirectoryNode subDirectoryNode :
-          directoriesIndex.get(directoryDigest).getDirectoriesList()) {
-        directoriesStack.push(subDirectoryNode);
+      if (subDirectory == null) {
+        preconditionFailure
+            .addViolationsBuilder()
+            .setType(VIOLATION_TYPE_MISSING)
+            .setSubject("blobs/" + DigestUtil.toString(directoryDigest))
+            .setDescription("The directory `/" + subDirectoryPath + "` was not found in the CAS.");
+      } else {
+        for (FileNode fileNode : subDirectory.getFilesList()) {
+          String fileName = fileNode.getName();
+          String filePath = subDirectoryPath + "/" + fileName;
+          onInputFile.accept(filePath);
+        }
+
+        for (DirectoryNode subDirectoryNode : subDirectory.getDirectoriesList()) {
+          directoriesStack.push(subDirectoryNode);
+        }
       }
     }
   }
@@ -881,7 +896,12 @@ public abstract class AbstractServerInstance implements Instance {
             subDirectory = directoriesIndex.get(directoryDigest);
           }
           enumerateActionInputDirectory(
-              subDirectoryPath, subDirectory, directoriesIndex, onInputFile, onInputDirectory);
+              subDirectoryPath,
+              subDirectory,
+              directoriesIndex,
+              onInputFile,
+              onInputDirectory,
+              preconditionFailure);
         } else {
           validateActionInputDirectoryDigest(
               subDirectoryPath,
