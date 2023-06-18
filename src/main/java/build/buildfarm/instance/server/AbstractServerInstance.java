@@ -934,7 +934,10 @@ public abstract class AbstractServerInstance implements Instance {
           preconditionFailure);
     }
     pathDigests.pop();
-    visited.add(directoryDigest);
+    if (directory != null) {
+      // missing directories are not visited and will appear in violations list each time
+      visited.add(directoryDigest);
+    }
   }
 
   protected ListenableFuture<Tree> getTreeFuture(
