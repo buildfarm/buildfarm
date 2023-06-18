@@ -483,6 +483,9 @@ class Cat {
     System.out.println("ActionId: " + metadata.getActionId());
     System.out.println("ToolInvocationId: " + metadata.getToolInvocationId());
     System.out.println("CorrelatedInvocationsId: " + metadata.getCorrelatedInvocationsId());
+    System.out.println("ActionMnemonic: " + metadata.getActionMnemonic());
+    System.out.println("TargetId: " + metadata.getTargetId());
+    System.out.println("ConfigurationId: " + metadata.getConfigurationId());
   }
 
   private static void printStatus(com.google.rpc.Status status)
