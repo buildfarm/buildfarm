@@ -14,8 +14,12 @@
 
 package build.buildfarm.common.redis;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import com.google.common.collect.Iterables;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 
@@ -135,5 +139,15 @@ public class RedisHashMap {
    */
   public Map<String, String> asMap(JedisCluster jedis) {
     return jedis.hgetAll(name);
+  }
+
+  /**
+   * @brief Get values associated with the specified fields from the hashmap.
+   * @param jedis Jedis cluster client.
+   * @param fields The name of the fields.
+   * @return Values associated with the specified fields
+   */
+  public List<String> mget(JedisCluster jedis, Iterable<String> fields) {
+    return jedis.hmget(name, Iterables.toArray(fields, String.class));
   }
 }

@@ -72,7 +72,9 @@ import io.prometheus.client.Gauge;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileSystem;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.Arrays;
 import java.util.List;
@@ -448,6 +450,7 @@ public class Worker {
     String endpoint = configs.getWorker().getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
     worker.setWorkerType(configs.getWorker().getWorkerType());
+    worker.setFirstRegisteredAt(loadWorkerStartTime());
     int registrationIntervalMillis = 10000;
     int registrationOffsetMillis = registrationIntervalMillis * 3;
     new Thread(
@@ -510,6 +513,15 @@ public class Worker {
             },
             "Worker.failsafeRegistration")
         .start();
+  }
+
+  private long loadWorkerStartTime() {
+    try {
+      File cache = new File(configs.getWorker().getRoot() + "/cache");
+      return Files.readAttributes(cache.toPath(), BasicFileAttributes.class).creationTime().toMillis();
+    } catch (IOException e) {
+      return System.currentTimeMillis();
+    }
   }
 
   public void start() throws ConfigurationException, InterruptedException, IOException {
@@ -689,6 +701,9 @@ public class Worker {
   }
 
   public static void main(String[] args) throws ConfigurationException {
+    args = new String[] {
+        "/Users/a.mishra/Uber/remotecache/bazel-buildfarm/examples/config.yml"
+    };
     configs = BuildfarmConfigs.loadWorkerConfigs(args);
     SpringApplication.run(Worker.class, args);
   }

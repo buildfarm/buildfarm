@@ -21,6 +21,7 @@ import build.buildfarm.instance.shard.JedisClusterFactory;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.After;
@@ -254,5 +255,19 @@ public class RedisHashMapTest {
     // ASSERT
     Map<String, String> elements = map.asMap(redis);
     assertThat(elements.equals(expected)).isTrue();
+  }
+
+  @Test
+  public void redisMget() {
+    RedisHashMap map = new RedisHashMap("test");
+    map.insert(redis, "key1", "value1");
+    map.insert(redis, "key2", "value2");
+    map.insert(redis, "key3", "value3");
+    map.insert(redis, "key4", "value4");
+
+    Iterable<String> fields = Arrays.asList("key2", "key3");
+    List<String> expected = Arrays.asList("value2", "value3");
+
+    assertThat(map.mget(redis, fields)).containsExactlyElementsIn(expected);
   }
 }
