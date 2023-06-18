@@ -1,5 +1,3 @@
-load("//:jvm_flags.bzl", "ensure_accurate_metadata")
-
 java_test(
     name = "tests",
     srcs = glob(["*Test.java"]),
