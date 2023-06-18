@@ -16,6 +16,7 @@ package build.buildfarm.instance.server;
 
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.server.AbstractServerInstance.ACTION_INPUT_ROOT_DIRECTORY_PATH;
 import static build.buildfarm.instance.server.AbstractServerInstance.DIRECTORY_NOT_SORTED;
 import static build.buildfarm.instance.server.AbstractServerInstance.DUPLICATE_DIRENT;
@@ -366,7 +367,6 @@ public class AbstractServerInstanceTest {
         preconditionFailure);
 
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("/: foo");
@@ -517,6 +517,51 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo(INVALID_COMMAND);
     assertThat(violation.getDescription()).isEqualTo("working directory is not an input directory");
+  }
+
+  /**
+   * / -> valid dir bar/ -> missing dir with digest 'missing' and non-zero size foo/ -> missing dir
+   * with digest 'missing' and non-zero size
+   */
+  @Test
+  public void multipleIdenticalDirectoryMissingAreAllPreconditionFailures() {
+    Digest missingDirectoryDigest = Digest.newBuilder().setHash("missing").setSizeBytes(1).build();
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+    Directory root =
+        Directory.newBuilder()
+            .addAllDirectories(
+                ImmutableList.of(
+                    DirectoryNode.newBuilder()
+                        .setName("bar")
+                        .setDigest(missingDirectoryDigest)
+                        .build(),
+                    DirectoryNode.newBuilder()
+                        .setName("foo")
+                        .setDigest(missingDirectoryDigest)
+                        .build()))
+            .build();
+    AbstractServerInstance.validateActionInputDirectory(
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
+        root,
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ ImmutableMap.of(),
+        /* onInputFiles=*/ file -> {},
+        /* onInputDirectories=*/ directory -> {},
+        /* onInputDigests=*/ digest -> {},
+        preconditionFailure);
+
+    String missingSubject = "blobs/" + DigestUtil.toString(missingDirectoryDigest);
+    String missingFmt = "The directory `/%s` was not found in the CAS.";
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(2);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_MISSING);
+    assertThat(violation.getSubject()).isEqualTo(missingSubject);
+    assertThat(violation.getDescription()).isEqualTo(String.format(missingFmt, "bar"));
+    violation = preconditionFailure.getViolationsList().get(1);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_MISSING);
+    assertThat(violation.getSubject()).isEqualTo(missingSubject);
+    assertThat(violation.getDescription()).isEqualTo(String.format(missingFmt, "foo"));
   }
 
   @SuppressWarnings("unchecked")
