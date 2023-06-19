@@ -108,6 +108,7 @@ public class GrpcCASTest {
     GrpcCAS cas =
         new GrpcCAS(
             instanceName,
+            /* readonly=*/ true,
             InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
             mock(ByteStreamUploader.class),
             onExpirations);
@@ -137,6 +138,7 @@ public class GrpcCASTest {
     GrpcCAS cas =
         new GrpcCAS(
             instanceName,
+            /* readonly=*/ true,
             InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
             mock(ByteStreamUploader.class),
             onExpirations);
@@ -154,7 +156,7 @@ public class GrpcCASTest {
         MultimapBuilder.hashKeys().arrayListValues().build();
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamUploader uploader = mock(ByteStreamUploader.class);
-    GrpcCAS cas = new GrpcCAS(instanceName, channel, uploader, onExpirations);
+    GrpcCAS cas = new GrpcCAS(instanceName, /* readonly=*/ false, channel, uploader, onExpirations);
     Runnable onExpiration = mock(Runnable.class);
     cas.put(new Blob(uploadContent, digest), onExpiration);
     verify(uploader, times(1))
@@ -179,7 +181,9 @@ public class GrpcCASTest {
         new ByteStreamServiceWriter(resourceName, content, (int) digest.getSizeBytes()));
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
-    GrpcCAS cas = new GrpcCAS(instanceName, channel, /* uploader=*/ null, onExpirations);
+    GrpcCAS cas =
+        new GrpcCAS(
+            instanceName, /* readonly=*/ false, channel, /* uploader=*/ null, onExpirations);
     RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
     Write initialWrite = cas.getWrite(Compressor.Value.IDENTITY, digest, uuid, requestMetadata);
     try (OutputStream writeOut = initialWrite.getOutput(1, SECONDS, () -> {})) {
@@ -193,10 +197,29 @@ public class GrpcCASTest {
   }
 
   @Test
+  public void writeIsNullForReadonly() throws Exception {
+    UUID uuid = UUID.randomUUID();
+    ByteString writeContent = ByteString.copyFromUtf8("undesirable");
+    Digest digest = DIGEST_UTIL.compute(writeContent);
+    String instanceName = "test";
+    GrpcCAS cas =
+        new GrpcCAS(
+            instanceName,
+            /* readonly=*/ true,
+            /* channel=*/ null,
+            /* uploader=*/ null,
+            onExpirations);
+
+    RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
+    Write nullWrite = cas.getWrite(Compressor.Value.IDENTITY, digest, uuid, requestMetadata);
+    assertThat(nullWrite).isNull();
+  }
+
+  @Test
   public void findMissingBlobsSwallowsFilteredList() throws Exception {
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     Runnable onExpiration = mock(Runnable.class);
-    GrpcCAS cas = new GrpcCAS("test", channel, null, onExpirations);
+    GrpcCAS cas = new GrpcCAS("test", /* readonly=*/ false, channel, null, onExpirations);
     ContentAddressableStorageImplBase casService = mock(ContentAddressableStorageImplBase.class);
     serviceRegistry.addService(casService);
     Digest emptyDigest = Digest.getDefaultInstance();

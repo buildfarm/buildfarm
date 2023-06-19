@@ -3107,7 +3107,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 fileEntryKey.getDigest(),
                 UUID.randomUUID(),
                 RequestMetadata.getDefaultInstance());
-        performCopy(write, e);
+        if (write != null) {
+          performCopy(write, e);
+        }
       }
     }
   }
