@@ -677,16 +677,20 @@ public class ShardInstance extends AbstractServerInstance {
                 .filter( // best effort to present digests only missing on active workers
                     digest -> {
                       try {
-                        Set<String> probableWorkers =
-                            Sets.intersection(
-                                foundBlobs.getOrDefault(digest, Collections.emptySet()), workerSet);
+                        Set<String> initialWorkers = foundBlobs.getOrDefault(digest, Collections.emptySet());
+                        Set<String> activeWorkers = Sets.intersection(initialWorkers, workerSet);
                         long insertTime = backplane.getDigestInsertTime(digest);
-                        return probableWorkers.stream()
-                            .noneMatch(
-                                worker ->
-                                    workersStartTime.getOrDefault(
-                                            worker, Instant.now().getEpochSecond())
-                                        < insertTime);
+                        Set<String> workersStartedBeforeDigestInsertion = activeWorkers.stream()
+                            .filter(worker ->
+                                workersStartTime.getOrDefault(worker, Instant.now().getEpochSecond()) < insertTime)
+                            .collect(Collectors.toSet());
+                        Set<String> workersToBeRemoved =
+                            Sets.difference(initialWorkers, workersStartedBeforeDigestInsertion).immutableCopy();
+                        if (!workersToBeRemoved.isEmpty()) {
+                          log.log(Level.INFO, format("adjusting locations for the digest %s", digest));
+                          backplane.adjustBlobLocations(digest, Collections.emptySet(), workersToBeRemoved);
+                        }
+                        return workersStartedBeforeDigestInsertion.isEmpty();
                       } catch (IOException e) {
                         // Treat error as missing digest.
                         log.log(
