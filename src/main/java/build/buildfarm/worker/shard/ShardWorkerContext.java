@@ -281,6 +281,8 @@ class ShardWorkerContext implements WorkerContext {
     QueueEntry queueEntry = takeEntryOffOperationQueue(listener);
     if (queueEntry != null) {
       decideWhetherToKeepOperation(queueEntry, listener);
+    } else {
+      listener.onEntry(null);
     }
   }
 
