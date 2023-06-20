@@ -279,7 +279,9 @@ class ShardWorkerContext implements WorkerContext {
   @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     QueueEntry queueEntry = takeEntryOffOperationQueue(listener);
-    decideWhetherToKeepOperation(queueEntry, listener);
+    if (queueEntry != null) {
+      decideWhetherToKeepOperation(queueEntry, listener);
+    }
   }
 
   private QueueEntry takeEntryOffOperationQueue(MatchListener listener)
