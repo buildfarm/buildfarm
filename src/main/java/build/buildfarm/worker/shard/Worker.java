@@ -703,7 +703,6 @@ public class Worker {
   }
 
   public static void main(String[] args) throws ConfigurationException {
-    args = new String[] {"/Users/a.mishra/Uber/remotecache/bazel-buildfarm/examples/config.yml"};
     configs = BuildfarmConfigs.loadWorkerConfigs(args);
     SpringApplication.run(Worker.class, args);
   }
