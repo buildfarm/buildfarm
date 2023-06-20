@@ -518,7 +518,9 @@ public class Worker {
   private long loadWorkerStartTime() {
     try {
       File cache = new File(configs.getWorker().getRoot() + "/cache");
-      return Files.readAttributes(cache.toPath(), BasicFileAttributes.class).creationTime().toMillis();
+      return Files.readAttributes(cache.toPath(), BasicFileAttributes.class)
+          .creationTime()
+          .toMillis();
     } catch (IOException e) {
       return System.currentTimeMillis();
     }
@@ -701,9 +703,7 @@ public class Worker {
   }
 
   public static void main(String[] args) throws ConfigurationException {
-    args = new String[] {
-        "/Users/a.mishra/Uber/remotecache/bazel-buildfarm/examples/config.yml"
-    };
+    args = new String[] {"/Users/a.mishra/Uber/remotecache/bazel-buildfarm/examples/config.yml"};
     configs = BuildfarmConfigs.loadWorkerConfigs(args);
     SpringApplication.run(Worker.class, args);
   }

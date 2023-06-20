@@ -14,12 +14,10 @@
 
 package build.buildfarm.common.redis;
 
-import java.util.Arrays;
+import com.google.common.collect.Iterables;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import com.google.common.collect.Iterables;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 

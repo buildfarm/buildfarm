@@ -701,18 +701,23 @@ public class RedisShardBackplane implements Backplane {
   public Map<String, Long> getWorkersStartTime(Set<String> workerNames) throws IOException {
     List<String> workerSet = client.call(jedis -> state.storageWorkers.mget(jedis, workerNames));
 
-    return workerSet.stream().filter(Objects::nonNull).map(workerJson -> {
-      try {
-        ShardWorker.Builder builder = ShardWorker.newBuilder();
-        JsonFormat.parser().merge(workerJson, builder);
-        ShardWorker worker = builder.build();
-        return new AbstractMap.SimpleEntry<>(worker.getEndpoint(), worker.getFirstRegisteredAt());
-      } catch (InvalidProtocolBufferException e) {
-        return null;
-      }
-    })
+    return workerSet.stream()
         .filter(Objects::nonNull)
-        .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue));
+        .map(
+            workerJson -> {
+              try {
+                ShardWorker.Builder builder = ShardWorker.newBuilder();
+                JsonFormat.parser().merge(workerJson, builder);
+                ShardWorker worker = builder.build();
+                return new AbstractMap.SimpleEntry<>(
+                    worker.getEndpoint(), worker.getFirstRegisteredAt());
+              } catch (InvalidProtocolBufferException e) {
+                return null;
+              }
+            })
+        .filter(Objects::nonNull)
+        .collect(
+            Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue));
   }
 
   @Override

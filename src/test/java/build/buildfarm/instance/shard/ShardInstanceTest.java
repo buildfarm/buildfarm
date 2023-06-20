@@ -76,7 +76,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -1110,7 +1109,8 @@ public class ShardInstanceTest {
 
     BuildfarmConfigs buildfarmConfigs = instance.getBuildFarmConfigs();
     buildfarmConfigs.getServer().setFindMissingBlobsViaBackplane(true);
-    Set<String> activeAndImposterWorkers = Sets.newHashSet(Iterables.concat(activeWorkers, imposterWorkers));
+    Set<String> activeAndImposterWorkers =
+        Sets.newHashSet(Iterables.concat(activeWorkers, imposterWorkers));
     when(mockBackplane.getStorageWorkers()).thenReturn(activeAndImposterWorkers);
     when(mockBackplane.getBlobDigestsWorkers(any(Iterable.class))).thenReturn(digestAndWorkersMap);
 
@@ -1121,16 +1121,17 @@ public class ShardInstanceTest {
     }
     when(mockBackplane.getWorkersStartTime(activeAndImposterWorkers)).thenReturn(workersStartTime);
     long oneDay = 86400L;
-    for (Digest digest: availableDigests) {
+    for (Digest digest : availableDigests) {
       when(mockBackplane.getDigestInsertTime(digest)).thenReturn(serverStartTime + oneDay);
     }
-    for (Digest digest: digestAvailableOnImposters) {
+    for (Digest digest : digestAvailableOnImposters) {
       when(mockBackplane.getDigestInsertTime(digest)).thenReturn(serverStartTime - oneDay);
     }
 
     Iterable<Digest> actualMissingDigests =
         instance.findMissingBlobs(allDigests, RequestMetadata.getDefaultInstance()).get();
-    Iterable<Digest> expectedMissingDigests = Iterables.concat(missingDigests, digestAvailableOnImposters);
+    Iterable<Digest> expectedMissingDigests =
+        Iterables.concat(missingDigests, digestAvailableOnImposters);
 
     assertThat(actualMissingDigests).containsExactlyElementsIn(expectedMissingDigests);
 

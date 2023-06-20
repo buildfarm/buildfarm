@@ -677,15 +677,21 @@ public class ShardInstance extends AbstractServerInstance {
                 .filter( // best effort to present digests only missing on active workers
                     digest -> {
                       try {
-                        Set<String> probableWorkers = Sets.intersection(
-                            foundBlobs.getOrDefault(digest, Collections.emptySet()), workerSet);
+                        Set<String> probableWorkers =
+                            Sets.intersection(
+                                foundBlobs.getOrDefault(digest, Collections.emptySet()), workerSet);
                         long insertTime = backplane.getDigestInsertTime(digest);
                         return probableWorkers.stream()
-                            .noneMatch(worker ->
-                                workersStartTime.getOrDefault(worker, Instant.now().getEpochSecond()) < insertTime);
+                            .noneMatch(
+                                worker ->
+                                    workersStartTime.getOrDefault(
+                                            worker, Instant.now().getEpochSecond())
+                                        < insertTime);
                       } catch (IOException e) {
                         // Treat error as missing digest.
-                        log.log(Level.WARNING, format("failed to get digest (%s) insertion time", digest));
+                        log.log(
+                            Level.WARNING,
+                            format("failed to get digest (%s) insertion time", digest));
                         return true;
                       }
                     })

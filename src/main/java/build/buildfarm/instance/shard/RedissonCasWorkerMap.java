@@ -18,8 +18,6 @@ import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.redis.RedisClient;
 import com.google.common.collect.ImmutableMap;
-
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Random;
