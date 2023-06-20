@@ -218,11 +218,10 @@ public class BuildFarmServer {
     springConfig.put("server.port", configs.getUi().getPort());
     app.setDefaultProperties(springConfig);
 
-    System.out.println("Starting Application");
     try {
       app.run(args);
     } catch (Throwable t) {
-      t.printStackTrace();
+      log.log(SEVERE, "Error running application", t);
     }
   }
 }
