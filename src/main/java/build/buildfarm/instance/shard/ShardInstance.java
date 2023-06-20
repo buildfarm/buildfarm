@@ -885,7 +885,8 @@ public class ShardInstance extends AbstractServerInstance {
                 } else if (status.getCode() == Code.NOT_FOUND) {
                   casMissCounter.inc();
                   log.log(
-                      Level.FINE, worker + " did not contain " + DigestUtil.toString(blobDigest));
+                      configs.getServer().isEnsureOutputsPresent() ? Level.SEVERE : Level.FINE,
+                      worker + " did not contain " + DigestUtil.toString(blobDigest));
                   // ignore this, the worker will update the backplane eventually
                 } else if (status.getCode() != Code.DEADLINE_EXCEEDED
                     && SHARD_IS_RETRIABLE.test(status)) {
