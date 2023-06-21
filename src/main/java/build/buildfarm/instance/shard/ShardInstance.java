@@ -709,8 +709,7 @@ public class ShardInstance extends AbstractServerInstance {
                     })
                 .collect(Collectors.toList()));
       } catch (Exception e) {
-        log.log(Level.SEVERE,
-            "find missing blob via backplane failed", e);
+        log.log(Level.SEVERE, "find missing blob via backplane failed", e);
         return immediateFailedFuture(Status.fromThrowable(e).asException());
       }
     }

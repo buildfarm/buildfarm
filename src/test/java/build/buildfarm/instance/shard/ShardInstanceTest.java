@@ -1119,7 +1119,8 @@ public class ShardInstanceTest {
     for (String worker : activeAndImposterWorkers) {
       workersStartTime.put(worker, serverStartTime);
     }
-    when(mockBackplane.getWorkersStartTimeInEpochSecs(activeAndImposterWorkers)).thenReturn(workersStartTime);
+    when(mockBackplane.getWorkersStartTimeInEpochSecs(activeAndImposterWorkers))
+        .thenReturn(workersStartTime);
     long oneDay = 86400L;
     for (Digest digest : availableDigests) {
       when(mockBackplane.getDigestInsertTime(digest)).thenReturn(serverStartTime + oneDay);

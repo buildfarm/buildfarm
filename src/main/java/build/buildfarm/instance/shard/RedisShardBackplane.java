@@ -698,7 +698,8 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames) throws IOException {
+  public Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames)
+      throws IOException {
     if (workerNames.isEmpty()) {
       return Collections.emptyMap();
     }
