@@ -654,12 +654,12 @@ public class ShardInstance extends AbstractServerInstance {
     // This is a faster strategy to check missing blobs which does not require querying the CAS.
     // With hundreds of worker machines, it may be too expensive to query all of them for "find
     // missing blobs".
-    // Workers register themselves with the backplane for a 10-second window, and if they fail to
+    // Workers register themselves with the backplane for a 30-second window, and if they fail to
     // re-register within this time frame, they are automatically removed from the backplane. While
     // this alternative strategy for finding missing blobs is faster and more cost-effective than
     // the exhaustive approach of querying each worker to find the digest, it comes with a higher
     // risk of returning expired workers despite filtering by active workers below. This is because
-    // the strategy may return workers that have expired in the last 10 seconds. However, checking
+    // the strategy may return workers that have expired in the last 30 seconds. However, checking
     // workers directly is not a guarantee either since workers could leave the cluster after being
     // queried. Ultimately, it will come down to the client's resiliency if the backplane is
     // out-of-date and the server lies about which blobs are actually present. We provide this
