@@ -698,7 +698,10 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public Map<String, Long> getWorkersStartTime(Set<String> workerNames) throws IOException {
+  public Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames) throws IOException {
+    if (workerNames.isEmpty()) {
+      return Collections.emptyMap();
+    }
     List<String> workerSet = client.call(jedis -> state.storageWorkers.mget(jedis, workerNames));
 
     return workerSet.stream()
@@ -710,7 +713,7 @@ public class RedisShardBackplane implements Backplane {
                 JsonFormat.parser().merge(workerJson, builder);
                 ShardWorker worker = builder.build();
                 return new AbstractMap.SimpleEntry<>(
-                    worker.getEndpoint(), worker.getFirstRegisteredAt());
+                    worker.getEndpoint(), worker.getFirstRegisteredAt() / 1000L);
               } catch (InvalidProtocolBufferException e) {
                 return null;
               }

@@ -374,10 +374,10 @@ public class RedisShardBackplaneTest {
             "{\"endpoint\": \"worker2\", \"expireAt\": \"1686981022917\", \"workerType\": 3, \"firstRegisteredAt\": \"1685282624000\"}");
     when(jedisCluster.hmget(storageWorkerKey, "worker1", "worker2", "missing_worker"))
         .thenReturn(workersJson);
-    Map<String, Long> workersStartTime = backplane.getWorkersStartTime(workerNames);
+    Map<String, Long> workersStartTime = backplane.getWorkersStartTimeInEpochSecs(workerNames);
     assertThat(workersStartTime.size()).isEqualTo(2);
-    assertThat(workersStartTime.get("worker1")).isEqualTo(1685292624000L);
-    assertThat(workersStartTime.get("worker2")).isEqualTo(1685282624000L);
+    assertThat(workersStartTime.get("worker1")).isEqualTo(1685292624L);
+    assertThat(workersStartTime.get("worker2")).isEqualTo(1685282624L);
     assertThat(workersStartTime.get("missing_worker")).isNull();
   }
 

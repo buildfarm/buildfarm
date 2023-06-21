@@ -76,12 +76,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipal;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
@@ -450,7 +452,7 @@ public class Worker {
     String endpoint = configs.getWorker().getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
     worker.setWorkerType(configs.getWorker().getWorkerType());
-    worker.setFirstRegisteredAt(loadWorkerStartTime());
+    worker.setFirstRegisteredAt(loadWorkerStartTimeInMillis());
     int registrationIntervalMillis = 10000;
     int registrationOffsetMillis = registrationIntervalMillis * 3;
     new Thread(
@@ -515,7 +517,7 @@ public class Worker {
         .start();
   }
 
-  private long loadWorkerStartTime() {
+  private long loadWorkerStartTimeInMillis() {
     try {
       File cache = new File(configs.getWorker().getRoot() + "/cache");
       return Files.readAttributes(cache.toPath(), BasicFileAttributes.class)

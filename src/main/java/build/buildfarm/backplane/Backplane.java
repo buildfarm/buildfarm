@@ -99,7 +99,7 @@ public interface Backplane {
   Iterable<Map.Entry<String, String>> getOperations(Set<String> operationIds) throws IOException;
 
   /** Returns a map of the worker name and its start time for given workers. */
-  Map<String, Long> getWorkersStartTime(Set<String> workerNames) throws IOException;
+  Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames) throws IOException;
 
   /** Returns the insert time epoch in seconds for the digest. */
   long getDigestInsertTime(Digest blobDigest) throws IOException;

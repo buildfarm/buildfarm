@@ -671,7 +671,7 @@ public class ShardInstance extends AbstractServerInstance {
         nonEmptyDigests.forEach(uniqueDigests::add);
         Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(uniqueDigests);
         Set<String> workerSet = backplane.getStorageWorkers();
-        Map<String, Long> workersStartTime = backplane.getWorkersStartTime(workerSet);
+        Map<String, Long> workersStartTime = backplane.getWorkersStartTimeInEpochSecs(workerSet);
         return immediateFuture(
             uniqueDigests.stream()
                 .filter( // best effort to present digests only missing on active workers
@@ -709,6 +709,8 @@ public class ShardInstance extends AbstractServerInstance {
                     })
                 .collect(Collectors.toList()));
       } catch (Exception e) {
+        log.log(Level.SEVERE,
+            "find missing blob via backplane failed", e);
         return immediateFailedFuture(Status.fromThrowable(e).asException());
       }
     }
