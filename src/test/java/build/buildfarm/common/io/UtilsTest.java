@@ -47,7 +47,8 @@ public class UtilsTest {
 
   @After
   public void tearDown() throws IOException {
-    Directories.remove(root);
+    fileStore = Files.getFileStore(root);
+    Directories.remove(root, fileStore);
   }
 
   @Test
