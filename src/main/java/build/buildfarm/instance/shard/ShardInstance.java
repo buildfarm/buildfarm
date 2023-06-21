@@ -894,6 +894,11 @@ public class ShardInstance extends AbstractServerInstance {
                   // why not, always
                   workers.addLast(worker);
                 } else {
+                  log.log(
+                      configs.getServer().isEnsureOutputsPresent() ? Level.SEVERE : Level.WARNING,
+                      format(
+                          "DEADLINE_EXCEEDED: read(%s) on worker %s after %d bytes of content",
+                          blobDigest, worker, received));
                   blobObserver.onError(t);
                   return;
                 }

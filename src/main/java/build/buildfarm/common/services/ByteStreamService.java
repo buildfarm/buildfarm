@@ -184,7 +184,7 @@ public class ByteStreamService extends ByteStreamImplBase {
           java.util.logging.Level level = Level.SEVERE;
           if (responseCount > 0 && status.getCode() == Code.DEADLINE_EXCEEDED
               || status.getCode() == Code.CANCELLED) {
-            level = Level.WARNING;
+            level = configs.getServer().isEnsureOutputsPresent() ? Level.SEVERE : Level.WARNING;
           }
           String message = format("error reading %s at offset %d", name, offset);
           if (responseCount > 0) {
