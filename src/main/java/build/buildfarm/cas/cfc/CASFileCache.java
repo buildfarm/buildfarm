@@ -2275,7 +2275,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                         try {
                           putFutures.get(i).get();
                           // should never get here
+                        } catch (ExecutionException e) {
+                          failures.add(e.getCause());
                         } catch (Throwable t) {
+                          // cancelled or interrupted during get
                           failures.add(t);
                         }
                       }
