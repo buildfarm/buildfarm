@@ -175,10 +175,11 @@ class CASFileCacheTest {
 
   @After
   public void tearDown() throws IOException, InterruptedException {
+    FileStore fileStore = Files.getFileStore(root);
     // bazel appears to have a problem with us creating directories under
     // windows that are marked as no-delete. clean up after ourselves with
     // our utils
-    Directories.remove(root);
+    Directories.remove(root, fileStore);
     if (!shutdownAndAwaitTermination(putService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down put service");
     }
