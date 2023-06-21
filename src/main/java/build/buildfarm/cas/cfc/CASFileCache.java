@@ -63,6 +63,8 @@ import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.common.ZstdDecompressingOutputStream;
 import build.buildfarm.common.config.Cas;
+import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.common.io.CountingOutputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -87,6 +89,8 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
+import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
@@ -2425,11 +2429,40 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return getPath(key);
   }
 
+  private void copyExternalInputProgressive(Digest digest, CancellableOutputStream out)
+      throws IOException, InterruptedException {
+    try (InputStream in = newExternalInput(Compressor.Value.IDENTITY, digest, out.getWritten())) {
+      ByteStreams.copy(in, out);
+    }
+  }
+
+  private static Exception extractStatusException(IOException e) {
+    for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
+      if (cause instanceof StatusException) {
+        return (StatusException) cause;
+      } else if (cause instanceof StatusRuntimeException) {
+        return (StatusRuntimeException) cause;
+      }
+    }
+    return e;
+  }
+
   private void copyExternalInput(Digest digest, CancellableOutputStream out)
       throws IOException, InterruptedException {
+    Retrier retrier = new Retrier(Backoff.sequential(5), Retrier.DEFAULT_IS_RETRIABLE);
     log.log(Level.FINE, format("downloading %s", DigestUtil.toString(digest)));
-    try (InputStream in = newExternalInput(Compressor.Value.IDENTITY, digest)) {
-      ByteStreams.copy(in, out);
+    try {
+      retrier.execute(
+          () -> {
+            while (out.getWritten() < digest.getSizeBytes()) {
+              try {
+                copyExternalInputProgressive(digest, out);
+              } catch (IOException e) {
+                throw extractStatusException(e);
+              }
+            }
+            return null;
+          });
     } catch (IOException e) {
       out.cancel();
       log.log(
@@ -3070,8 +3103,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  protected abstract InputStream newExternalInput(Compressor.Value compressor, Digest digest)
-      throws IOException;
+  protected abstract InputStream newExternalInput(
+      Compressor.Value compressor, Digest digest, long offset) throws IOException;
 
   // CAS fallback methods
 

@@ -98,6 +98,15 @@ public class Retrier {
               }
             };
 
+    static Supplier<Backoff> sequential(int maxAttempts) {
+      return exponential(
+          /* initial=*/ Duration.ZERO,
+          /* max=*/ Duration.ZERO,
+          /* multiplier=*/ 1.1,
+          /* jitter=*/ 0.0,
+          maxAttempts);
+    }
+
     /**
      * Creates a Backoff supplier for an optionally jittered exponential backoff. The supplier is
      * ThreadSafe (non-synchronized calls to get() are fine), but the returned Backoff is not.
