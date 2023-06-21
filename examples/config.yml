@@ -11,7 +11,7 @@ server:
   grpcMetrics:
     enabled: true
     provideLatencyHistograms: true
-    latencyBuckets: [0.001, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0]
+    latencyBuckets: [0.001, 0.01, 0.1, 1, 5, 10, 20, 40, 60, +Infinity]
   maxInboundMessageSizeBytes: 0
   maxInboundMetadataSize: 0
   casWriteTimeout: 3600
