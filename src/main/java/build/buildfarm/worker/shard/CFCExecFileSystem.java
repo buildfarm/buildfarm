@@ -49,6 +49,7 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
@@ -80,6 +81,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   private final ExecutorService fetchService = BuildfarmExecutors.getFetchServicePool();
   private final ExecutorService removeDirectoryService;
   private final ExecutorService accessRecorder;
+  private FileStore fileStore; // initialized with start
 
   CFCExecFileSystem(
       Path root,
@@ -102,9 +104,10 @@ class CFCExecFileSystem implements ExecFileSystem {
   @Override
   public void start(Consumer<List<Digest>> onDigests, boolean skipLoad)
       throws IOException, InterruptedException {
+    fileStore = Files.getFileStore(root);
     List<Dirent> dirents = null;
     try {
-      dirents = readdir(root, /* followSymlinks= */ false, Files.getFileStore(root));
+      dirents = readdir(root, /* followSymlinks= */ false, fileStore);
     } catch (IOException e) {
       log.log(Level.SEVERE, "error reading directory " + root.toString(), e);
     }
@@ -116,7 +119,8 @@ class CFCExecFileSystem implements ExecFileSystem {
       String name = dirent.getName();
       Path child = root.resolve(name);
       if (!child.equals(fileCache.getRoot())) {
-        removeDirectoryFutures.add(Directories.remove(root.resolve(name), removeDirectoryService));
+        removeDirectoryFutures.add(
+            Directories.remove(root.resolve(name), fileStore, removeDirectoryService));
       }
     }
 
@@ -365,7 +369,7 @@ class CFCExecFileSystem implements ExecFileSystem {
 
     Path execDir = root.resolve(operationName);
     if (Files.exists(execDir)) {
-      Directories.remove(execDir);
+      Directories.remove(execDir, fileStore);
     }
     Files.createDirectories(execDir);
 
@@ -417,7 +421,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     } finally {
       if (!success) {
         fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
-        Directories.remove(execDir);
+        Directories.remove(execDir, fileStore);
       }
     }
 
@@ -452,7 +456,7 @@ class CFCExecFileSystem implements ExecFileSystem {
           inputDirectories == null ? ImmutableList.of() : inputDirectories);
     }
     if (Files.exists(execDir)) {
-      Directories.remove(execDir);
+      Directories.remove(execDir, fileStore);
     }
   }
 }

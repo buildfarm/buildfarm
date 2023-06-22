@@ -22,26 +22,35 @@ import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 class DirectoriesTest {
   protected final Path root;
+  protected FileStore fileStore;
 
   protected DirectoriesTest(Path root) {
     this.root = root;
+  }
+
+  @Before
+  public void setUp() throws IOException {
+    fileStore = Files.getFileStore(root);
   }
 
   @After
   public void tearDown() throws IOException {
     // restore write permissions
     if (Files.exists(root)) {
-      Directories.enableAllWriteAccess(root);
+      Directories.enableAllWriteAccess(root, fileStore);
     }
+    fileStore = null;
   }
 
   @Test
@@ -56,7 +65,7 @@ class DirectoriesTest {
         ImmutableList.of("A file in a subdirectory"),
         StandardCharsets.UTF_8);
 
-    Directories.remove(tree);
+    Directories.remove(tree, fileStore);
 
     assertThat(Files.exists(tree)).isFalse();
   }
@@ -75,11 +84,11 @@ class DirectoriesTest {
         StandardCharsets.UTF_8);
 
     // remove write permissions
-    Directories.disableAllWriteAccess(tree);
+    Directories.disableAllWriteAccess(tree, fileStore);
 
     // directories are able to be removed, because the algorithm
     // changes the write permissions before performing the delete.
-    Directories.remove(tree);
+    Directories.remove(tree, fileStore);
     assertThat(Files.exists(tree)).isFalse();
   }
 
@@ -114,7 +123,7 @@ class DirectoriesTest {
       assertThat(Files.isWritable(subdir)).isTrue();
 
       // remove write permissions
-      Directories.disableAllWriteAccess(tree);
+      Directories.disableAllWriteAccess(tree, fileStore);
 
       // check that write conditions have changed
       // If the unit tests were run as root,

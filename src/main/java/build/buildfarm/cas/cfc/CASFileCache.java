@@ -1284,7 +1284,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       loadResults = loadCache(onStartPut, removeDirectoryService);
     } else {
       // Skip loading the cache and ensure it is empty
-      Directories.remove(root, removeDirectoryService);
+      Directories.remove(root, fileStore, removeDirectoryService);
       initializeRootDirectory();
     }
 
@@ -1351,7 +1351,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     try {
       for (Path path : files) {
         if (Files.isDirectory(path)) {
-          Directories.remove(path, removeDirectoryService);
+          Directories.remove(path, fileStore, removeDirectoryService);
         } else {
           Files.delete(path);
         }
@@ -2004,7 +2004,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return immediateFuture(null);
     }
 
-    return Directories.remove(getDirectoryPath(digest), service);
+    return Directories.remove(getDirectoryPath(digest), fileStore, service);
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -2130,7 +2130,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     if (Files.exists(path)) {
       if (Files.isDirectory(path)) {
         log.log(Level.FINE, "removing existing directory " + path + " for fetch");
-        Directories.remove(path);
+        Directories.remove(path, fileStore);
       } else {
         Files.delete(path);
       }
@@ -2343,7 +2343,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                         try {
                           putFutures.get(i).get();
                           // should never get here
+                        } catch (ExecutionException e) {
+                          failures.add(e.getCause());
                         } catch (Throwable t) {
+                          // cancelled or interrupted during get
                           failures.add(t);
                         }
                       }
@@ -2363,7 +2366,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             fetchFuture,
             (result) -> {
               try {
-                disableAllWriteAccess(path);
+                disableAllWriteAccess(path, fileStore);
               } catch (IOException e) {
                 log.log(Level.SEVERE, "error while disabling write permissions on " + path, e);
                 return immediateFailedFuture(e);
@@ -2394,7 +2397,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               }
               try {
                 log.log(Level.FINE, "removing directory to roll back " + path);
-                Directories.remove(path);
+                Directories.remove(path, fileStore);
               } catch (IOException removeException) {
                 log.log(
                     Level.SEVERE,
