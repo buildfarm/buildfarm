@@ -2152,7 +2152,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return directory;
   }
 
-  public ListenableFuture<Path> putDirectory(
+  public ListenableFuture<PathResult> putDirectory(
       Digest digest, Map<Digest, Directory> directoriesIndex, ExecutorService service) {
     // Claim lock.
     // Claim the directory path so no other threads try to create/delete it.
@@ -2168,7 +2168,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     log.log(Level.FINE, format("locked directory %s", path.getFileName()));
 
     // Now that a lock has been claimed, we can proceed to create the directory.
-    ListenableFuture<Path> putFuture;
+    ListenableFuture<PathResult> putFuture;
     try {
       putFuture = putDirectorySynchronized(path, digest, directoriesIndex, service);
     } catch (IOException e) {
@@ -2256,8 +2256,26 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return String.format("%s: %d %s: %s", path, exceptions.size(), "exceptions", exceptions);
   }
 
+  public static class PathResult {
+    private final Path path;
+    private final boolean missed;
+
+    public PathResult(Path path, boolean missed) {
+      this.path = path;
+      this.missed = missed;
+    }
+
+    public Path getPath() {
+      return path;
+    }
+
+    public boolean getMissed() {
+      return missed;
+    }
+  }
+
   @SuppressWarnings("ConstantConditions")
-  private ListenableFuture<Path> putDirectorySynchronized(
+  private ListenableFuture<PathResult> putDirectorySynchronized(
       Path path, Digest digest, Map<Digest, Directory> directoriesByDigest, ExecutorService service)
       throws IOException {
     log.log(Level.FINE, format("directory %s has been locked", path.getFileName()));
@@ -2289,7 +2307,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         if (e != null) {
           log.log(Level.FINE, format("found existing entry for %s", path.getFileName()));
           if (directoryEntryExists(path, e, directoriesByDigest)) {
-            return immediateFuture(path);
+            return immediateFuture(new PathResult(path, /* missed=*/ false));
           }
           log.log(
               Level.SEVERE,
@@ -2421,7 +2439,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                       : directoriesByDigest.get(digest),
                   Deadline.after(10, SECONDS));
           directoryStorage.put(digest, e);
-          return path;
+          return new PathResult(path, /* missed=*/ true);
         },
         service);
   }
