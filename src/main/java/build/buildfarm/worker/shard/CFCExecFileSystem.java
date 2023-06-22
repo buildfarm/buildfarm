@@ -265,6 +265,7 @@ class CFCExecFileSystem implements ExecFileSystem {
                 .map(symlinkNode -> putSymlink(path, symlinkNode))
                 .collect(ImmutableList.toImmutableList()));
 
+    ImmutableList.Builder<ListenableFuture<Void>> linkedDirectories = ImmutableList.builder();
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       Digest digest = directoryNode.getDigest();
       String name = directoryNode.getName();
@@ -285,26 +286,23 @@ class CFCExecFileSystem implements ExecFileSystem {
                     onKey,
                     inputDirectories));
       } else {
-        downloads =
-            concat(
-                downloads,
-                ImmutableList.of(
-                    transform(
-                        linkDirectory(dirPath, digest, directoriesIndex),
-                        (result) -> {
-                          // we saw null entries in the built immutable list without synchronization
-                          synchronized (inputDirectories) {
-                            inputDirectories.add(digest);
-                          }
-                          return null;
-                        },
-                        fetchService)));
+        linkedDirectories.add(
+            transform(
+                linkDirectory(dirPath, digest, directoriesIndex),
+                (result) -> {
+                  // we saw null entries in the built immutable list without synchronization
+                  synchronized (inputDirectories) {
+                    inputDirectories.add(digest);
+                  }
+                  return null;
+                },
+                fetchService));
       }
       if (Thread.currentThread().isInterrupted()) {
         break;
       }
     }
-    return downloads;
+    return concat(downloads, linkedDirectories.build());
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -312,8 +310,13 @@ class CFCExecFileSystem implements ExecFileSystem {
       Path execPath, Digest digest, Map<Digest, Directory> directoriesIndex) {
     return transformAsync(
         fileCache.putDirectory(digest, directoriesIndex, fetchService),
-        (cachePath) -> {
-          Files.createSymbolicLink(execPath, cachePath);
+        pathResult -> {
+          Path path = pathResult.getPath();
+          if (pathResult.getMissed()) {
+            log.fine(
+                String.format("putDirectory(%s, %s) created", path, DigestUtil.toString(digest)));
+          }
+          Files.createSymbolicLink(execPath, path);
           return immediateFuture(null);
         },
         fetchService);
