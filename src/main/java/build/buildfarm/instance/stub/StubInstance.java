@@ -18,6 +18,7 @@ import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static build.buildfarm.common.grpc.TracingMetadataUtils.attachMetadataInterceptor;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -105,6 +106,7 @@ import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Functions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
@@ -163,6 +165,8 @@ public class StubInstance implements Instance {
   private final @Nullable ListeningScheduledExecutorService retryService;
   private boolean isStopped = false;
   private final long maxBatchUpdateBlobsSize = Size.mbToBytes(3);
+
+  @VisibleForTesting long maxRequestSize = Size.mbToBytes(4);
 
   public StubInstance(String name, DigestUtil digestUtil, ManagedChannel channel) {
     this(name, "no-identifier", digestUtil, channel, Durations.fromDays(DEFAULT_DEADLINE_DAYS));
@@ -412,11 +416,16 @@ public class StubInstance implements Instance {
             .setInstanceName(getName())
             .addAllBlobDigests(digests)
             .build();
-    if (request.getSerializedSize() > Size.mbToBytes(4)) {
-      throw new IllegalStateException(
-          String.format(
-              "FINDMISSINGBLOBS IS TOO LARGE: %d digests are required in one request!",
-              request.getBlobDigestsCount()));
+    if (request.getSerializedSize() > maxRequestSize) {
+      // log2n partition for size reduction as needed
+      int partitionSize = (request.getBlobDigestsCount() + 1) / 2;
+      return transform(
+          allAsList(
+              Iterables.transform(
+                  Iterables.partition(digests, partitionSize),
+                  subDigests -> findMissingBlobs(subDigests, requestMetadata))),
+          subMissings -> Iterables.concat(subMissings),
+          directExecutor());
     }
     return transform(
         deadlined(casFutureStub)
@@ -586,7 +595,6 @@ public class StubInstance implements Instance {
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
     throwIfStopped();
-    checkNotNull(io.grpc.Context.current().getDeadline());
     bsStub
         .get()
         .withInterceptors(attachMetadataInterceptor(requestMetadata))
@@ -887,7 +895,6 @@ public class StubInstance implements Instance {
 
   @Override
   public WorkerListMessage getWorkerList() {
-    checkNotNull(io.grpc.Context.current().getDeadline());
     return workerProfileBlockingStub.get().getWorkerList(WorkerListRequest.newBuilder().build());
   }
 
@@ -899,7 +906,6 @@ public class StubInstance implements Instance {
   @Override
   public CasIndexResults reindexCas() {
     throwIfStopped();
-    checkNotNull(io.grpc.Context.current().getDeadline());
     ReindexCasRequestResults proto =
         adminBlockingStub.get().reindexCas(ReindexCasRequest.newBuilder().build());
     CasIndexResults results = new CasIndexResults();
@@ -913,7 +919,6 @@ public class StubInstance implements Instance {
   @Override
   public void deregisterWorker(String workerName) {
     throwIfStopped();
-    checkNotNull(io.grpc.Context.current().getDeadline());
     adminBlockingStub
         .get()
         .shutDownWorkerGracefully(
@@ -923,7 +928,6 @@ public class StubInstance implements Instance {
   @Override
   public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
     throwIfStopped();
-    checkNotNull(io.grpc.Context.current().getDeadline());
     return shutDownWorkerBlockingStub
         .get()
         .prepareWorkerForGracefulShutdown(

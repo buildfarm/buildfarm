@@ -64,6 +64,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -98,7 +99,7 @@ public class StubInstanceTest {
     fakeServer.awaitTermination();
   }
 
-  private Instance newStubInstance(String instanceName) {
+  private StubInstance newStubInstance(String instanceName) {
     return new StubInstance(
         instanceName,
         DIGEST_UTIL,
@@ -194,6 +195,38 @@ public class StubInstanceTest {
         ImmutableList.of(Digest.newBuilder().setHash("present").setSizeBytes(1).build());
     assertThat(instance.findMissingBlobs(digests, RequestMetadata.getDefaultInstance()).get())
         .isEmpty();
+    instance.stop();
+  }
+
+  @Test
+  public void findMissingBlobsOverSizeLimitRecombines()
+      throws ExecutionException, InterruptedException {
+    AtomicReference<FindMissingBlobsRequest> reference = new AtomicReference<>();
+    serviceRegistry.addService(
+        new ContentAddressableStorageImplBase() {
+          @Override
+          public void findMissingBlobs(
+              FindMissingBlobsRequest request,
+              StreamObserver<FindMissingBlobsResponse> responseObserver) {
+            reference.set(request);
+            responseObserver.onNext(
+                FindMissingBlobsResponse.newBuilder()
+                    .addAllMissingBlobDigests(request.getBlobDigestsList())
+                    .build());
+            responseObserver.onCompleted();
+          }
+        });
+    StubInstance instance = newStubInstance("findMissingBlobs-test");
+    instance.maxRequestSize = 1024;
+    ImmutableList.Builder<Digest> builder = ImmutableList.builder();
+    // generates digest size * 1024 serialized size at least
+    for (int i = 0; i < 1024; i++) {
+      ByteString content = ByteString.copyFromUtf8("Hello, World! " + UUID.randomUUID());
+      builder.add(DIGEST_UTIL.compute(content));
+    }
+    ImmutableList<Digest> digests = builder.build();
+    assertThat(instance.findMissingBlobs(digests, RequestMetadata.getDefaultInstance()).get())
+        .containsExactlyElementsIn(digests);
     instance.stop();
   }
 
