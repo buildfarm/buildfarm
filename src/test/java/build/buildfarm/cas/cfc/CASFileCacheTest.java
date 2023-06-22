@@ -64,6 +64,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
+import io.grpc.Status;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -159,14 +160,14 @@ class CASFileCacheTest {
             delegate,
             /* delegateSkipLoad=*/ false) {
           @Override
-          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
-              throws IOException {
+          protected InputStream newExternalInput(
+              Compressor.Value compressor, Digest digest, long offset) throws IOException {
             ByteString content = blobs.get(digest);
             if (content == null) {
-              return fileCache.newTransparentInput(compressor, digest, 0);
+              return fileCache.newTransparentInput(compressor, digest, offset);
             }
             checkArgument(compressor == Compressor.Value.IDENTITY);
-            return content.substring((int) (long) 0).newInput();
+            return content.substring((int) offset).newInput();
           }
         };
     // do this so that we can remove the cache root dir
@@ -1102,6 +1103,70 @@ class CASFileCacheTest {
   }
 
   @Test
+  public void copyExternalInputRetries() throws Exception {
+    CASFileCache flakyExternalCAS =
+        new CASFileCache(
+            root,
+            /* maxSizeInBytes=*/ 1024,
+            /* maxEntrySizeInBytes=*/ 1024,
+            /* hexBucketLevels=*/ 1,
+            storeFileDirsIndexInMemory,
+            /* publishTtlMetric=*/ false,
+            /* execRootFallback=*/ false,
+            DIGEST_UTIL,
+            expireService,
+            /* accessRecorder=*/ directExecutor(),
+            storage,
+            /* directoriesIndexDbName=*/ ":memory:",
+            /* onPut=*/ digest -> {},
+            /* onExpire=*/ digests -> {},
+            /* delegate=*/ null,
+            /* delegateSkipLoad=*/ false) {
+          boolean throwUnavailable = true;
+
+          @Override
+          protected InputStream newExternalInput(
+              Compressor.Value compressor, Digest digest, long offset) throws IOException {
+            ByteString content = blobs.get(digest);
+            if (throwUnavailable) {
+              throwUnavailable = false;
+              return new InputStream() {
+                int count = 0;
+
+                @Override
+                public int read(byte[] buf) throws IOException {
+                  return read(buf, 0, buf.length);
+                }
+
+                @Override
+                public int read() {
+                  throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public int read(byte[] buf, int offset, int len) throws IOException {
+                  if (count >= digest.getSizeBytes() / 2) {
+                    throw new IOException(Status.UNAVAILABLE.asRuntimeException());
+                  }
+                  len = Math.min((int) digest.getSizeBytes() / 2 - count, len);
+                  content.substring(count, count + len).copyTo(buf, offset);
+                  count += len;
+                  return len;
+                }
+              };
+            }
+            return content.substring((int) offset).newInput();
+          }
+        };
+    flakyExternalCAS.initializeRootDirectory();
+    ByteString blob = ByteString.copyFromUtf8("Flaky Entry");
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
+    blobs.put(blobDigest, blob);
+    Path path = flakyExternalCAS.put(blobDigest, false);
+    assertThat(Files.exists(path)).isTrue(); // would not have been created if not valid
+  }
+
+  @Test
   public void newInputThrowsNoSuchFileExceptionWithoutDelegate() throws Exception {
     ContentAddressableStorage undelegatedCAS =
         new CASFileCache(
@@ -1122,14 +1187,14 @@ class CASFileCacheTest {
             /* delegate=*/ null,
             /* delegateSkipLoad=*/ false) {
           @Override
-          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
-              throws IOException {
+          protected InputStream newExternalInput(
+              Compressor.Value compressor, Digest digest, long offset) throws IOException {
             ByteString content = blobs.get(digest);
             if (content == null) {
-              return fileCache.newTransparentInput(compressor, digest, 0);
+              return fileCache.newTransparentInput(compressor, digest, offset);
             }
             checkArgument(compressor == Compressor.Value.IDENTITY);
-            return content.substring((int) (long) 0).newInput();
+            return content.substring((int) offset).newInput();
           }
         };
     ByteString blob = ByteString.copyFromUtf8("Missing Entry");
