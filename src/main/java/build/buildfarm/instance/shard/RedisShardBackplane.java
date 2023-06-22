@@ -703,9 +703,9 @@ public class RedisShardBackplane implements Backplane {
     if (workerNames.isEmpty()) {
       return Collections.emptyMap();
     }
-    List<String> workerSet = client.call(jedis -> state.storageWorkers.mget(jedis, workerNames));
+    List<String> workerList = client.call(jedis -> state.storageWorkers.mget(jedis, workerNames));
 
-    return workerSet.stream()
+    return workerList.stream()
         .filter(Objects::nonNull)
         .map(
             workerJson -> {
