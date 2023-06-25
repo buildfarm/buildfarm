@@ -1275,6 +1275,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       loadResults = loadCache(onStartPut, removeDirectoryService);
     } else {
       // Skip loading the cache and ensure it is empty
+      fileStore = Files.getFileStore(root);
       Directories.remove(root, fileStore, removeDirectoryService);
       initializeRootDirectory();
     }
