@@ -595,7 +595,6 @@ public class StubInstance implements Instance {
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
     throwIfStopped();
-    checkNotNull(io.grpc.Context.current().getDeadline());
     bsStub
         .get()
         .withInterceptors(attachMetadataInterceptor(requestMetadata))
@@ -896,7 +895,6 @@ public class StubInstance implements Instance {
 
   @Override
   public WorkerListMessage getWorkerList() {
-    checkNotNull(io.grpc.Context.current().getDeadline());
     return workerProfileBlockingStub.get().getWorkerList(WorkerListRequest.newBuilder().build());
   }
 
@@ -908,7 +906,6 @@ public class StubInstance implements Instance {
   @Override
   public CasIndexResults reindexCas() {
     throwIfStopped();
-    checkNotNull(io.grpc.Context.current().getDeadline());
     ReindexCasRequestResults proto =
         adminBlockingStub.get().reindexCas(ReindexCasRequest.newBuilder().build());
     CasIndexResults results = new CasIndexResults();
@@ -922,7 +919,6 @@ public class StubInstance implements Instance {
   @Override
   public void deregisterWorker(String workerName) {
     throwIfStopped();
-    checkNotNull(io.grpc.Context.current().getDeadline());
     adminBlockingStub
         .get()
         .shutDownWorkerGracefully(
@@ -932,7 +928,6 @@ public class StubInstance implements Instance {
   @Override
   public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
     throwIfStopped();
-    checkNotNull(io.grpc.Context.current().getDeadline());
     return shutDownWorkerBlockingStub
         .get()
         .prepareWorkerForGracefulShutdown(

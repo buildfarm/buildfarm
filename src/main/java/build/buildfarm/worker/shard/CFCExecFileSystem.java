@@ -21,10 +21,12 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -35,7 +37,6 @@ import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
-import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.SymlinkNode;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
@@ -43,6 +44,8 @@ import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.Dirent;
+import build.buildfarm.worker.ExecDirException;
+import build.buildfarm.worker.ExecDirException.ViolationException;
 import build.buildfarm.worker.OutputDirectory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -182,30 +185,26 @@ class CFCExecFileSystem implements ExecFileSystem {
 
   @SuppressWarnings("ConstantConditions")
   private ListenableFuture<Void> put(
-      Path path, FileNode fileNode, ImmutableList.Builder<String> inputFiles) {
-    Path filePath = path.resolve(fileNode.getName());
-    Digest digest = fileNode.getDigest();
+      Digest digest, Path path, boolean isExecutable, Consumer<String> onKey) {
     if (digest.getSizeBytes() == 0) {
       return listeningDecorator(fetchService)
           .submit(
               () -> {
-                Files.createFile(filePath);
+                Files.createFile(path);
                 // ignore executable
                 return null;
               });
     }
-    String key = fileCache.getKey(digest, fileNode.getIsExecutable());
+    String key = fileCache.getKey(digest, isExecutable);
     return transformAsync(
-        fileCache.put(digest, fileNode.getIsExecutable(), fetchService),
+        fileCache.put(digest, isExecutable, fetchService),
         (fileCachePath) -> {
           checkNotNull(key);
           // we saw null entries in the built immutable list without synchronization
-          synchronized (inputFiles) {
-            inputFiles.add(key);
-          }
-          if (fileNode.getDigest().getSizeBytes() != 0) {
+          onKey.accept(key);
+          if (digest.getSizeBytes() != 0) {
             try {
-              Files.createLink(filePath, fileCachePath);
+              Files.createLink(path, fileCachePath);
             } catch (IOException e) {
               return immediateFailedFuture(e);
             }
@@ -215,12 +214,29 @@ class CFCExecFileSystem implements ExecFileSystem {
         fetchService);
   }
 
+  private ListenableFuture<Void> catchingPut(
+      Digest digest, Path root, Path path, boolean isExecutable, Consumer<String> onKey) {
+    return catchingAsync(
+        put(digest, path, isExecutable, onKey),
+        Throwable.class, // required per docs
+        t -> {
+          if (t instanceof IOException) {
+            return immediateFailedFuture(
+                new ViolationException(
+                    digest, root.relativize(path), isExecutable, (IOException) t));
+          }
+          return immediateFailedFuture(t);
+        },
+        directExecutor());
+  }
+
   private Iterable<ListenableFuture<Void>> fetchInputs(
+      Path root,
       Path path,
       Digest directoryDigest,
       Map<Digest, Directory> directoriesIndex,
       OutputDirectory outputDirectory,
-      ImmutableList.Builder<String> inputFiles,
+      Consumer<String> onKey,
       ImmutableList.Builder<Digest> inputDirectories)
       throws IOException {
     Directory directory = directoriesIndex.get(directoryDigest);
@@ -232,7 +248,14 @@ class CFCExecFileSystem implements ExecFileSystem {
 
     Iterable<ListenableFuture<Void>> downloads =
         directory.getFilesList().stream()
-            .map(fileNode -> put(path, fileNode, inputFiles))
+            .map(
+                fileNode ->
+                    catchingPut(
+                        fileNode.getDigest(),
+                        root,
+                        path.resolve(fileNode.getName()),
+                        fileNode.getIsExecutable(),
+                        onKey))
             .collect(ImmutableList.toImmutableList());
 
     downloads =
@@ -255,11 +278,12 @@ class CFCExecFileSystem implements ExecFileSystem {
             concat(
                 downloads,
                 fetchInputs(
+                    root,
                     dirPath,
                     digest,
                     directoriesIndex,
                     childOutputDirectory,
-                    inputFiles,
+                    onKey,
                     inputDirectories));
       } else {
         linkedDirectories.add(
@@ -294,33 +318,6 @@ class CFCExecFileSystem implements ExecFileSystem {
           return immediateFuture(null);
         },
         fetchService);
-  }
-
-  private static class ExecDirException extends IOException {
-    private final Path path;
-    private final List<Throwable> exceptions;
-
-    ExecDirException(Path path, List<Throwable> exceptions) {
-      // When printing the exception, show the captured sub-exceptions.
-      super(getErrorMessage(path, exceptions));
-      this.path = path;
-      this.exceptions = exceptions;
-      for (Throwable exception : exceptions) {
-        addSuppressed(exception);
-      }
-    }
-
-    Path getPath() {
-      return path;
-    }
-
-    List<Throwable> getExceptions() {
-      return exceptions;
-    }
-  }
-
-  private static String getErrorMessage(Path path, List<Throwable> exceptions) {
-    return String.format("%s: %d %s: %s", path, exceptions.size(), "exceptions", exceptions);
   }
 
   private static void checkExecErrors(Path path, List<Throwable> errors) throws ExecDirException {
@@ -381,10 +378,15 @@ class CFCExecFileSystem implements ExecFileSystem {
     Iterable<ListenableFuture<Void>> fetchedFutures =
         fetchInputs(
             execDir,
+            execDir,
             inputRootDigest,
             directoriesIndex,
             outputDirectory,
-            inputFiles,
+            key -> {
+              synchronized (inputFiles) {
+                inputFiles.add(key);
+              }
+            },
             inputDirectories);
     boolean success = false;
     try {
