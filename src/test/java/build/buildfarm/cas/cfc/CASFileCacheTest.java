@@ -43,7 +43,6 @@ import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.cas.cfc.CASFileCache.CancellableOutputStream;
 import build.buildfarm.cas.cfc.CASFileCache.Entry;
-import build.buildfarm.cas.cfc.CASFileCache.PutDirectoryException;
 import build.buildfarm.cas.cfc.CASFileCache.StartupCacheResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;

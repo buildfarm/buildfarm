@@ -2159,39 +2159,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return false;
   }
 
-  static class PutDirectoryException extends IOException {
-    private final Path path;
-    private final Digest digest;
-    private final List<Throwable> exceptions;
-
-    PutDirectoryException(Path path, Digest digest, List<Throwable> exceptions) {
-      // When printing the exception, show the captured sub-exceptions.
-      super(getErrorMessage(path, exceptions));
-      this.path = path;
-      this.digest = digest;
-      this.exceptions = exceptions;
-      for (Throwable exception : exceptions) {
-        addSuppressed(exception);
-      }
-    }
-
-    Path getPath() {
-      return path;
-    }
-
-    Digest getDigest() {
-      return digest;
-    }
-
-    List<Throwable> getExceptions() {
-      return exceptions;
-    }
-  }
-
-  private static String getErrorMessage(Path path, List<Throwable> exceptions) {
-    return String.format("%s: %d %s: %s", path, exceptions.size(), "exceptions", exceptions);
-  }
-
   @SuppressWarnings("ConstantConditions")
   private ListenableFuture<Path> putDirectorySynchronized(
       Path path, Digest digest, Map<Digest, Directory> directoriesByDigest, ExecutorService service)
