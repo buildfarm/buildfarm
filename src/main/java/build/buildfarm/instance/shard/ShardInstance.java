@@ -886,7 +886,7 @@ public class ShardInstance extends AbstractServerInstance {
                 } else if (status.getCode() == Code.NOT_FOUND) {
                   casMissCounter.inc();
                   log.log(
-                      configs.getServer().isEnsureOutputsPresent() ? Level.SEVERE : Level.FINE,
+                      configs.getServer().isEnsureOutputsPresent() ? Level.WARNING : Level.FINE,
                       worker + " did not contain " + DigestUtil.toString(blobDigest));
                   // ignore this, the worker will update the backplane eventually
                 } else if (status.getCode() != Code.DEADLINE_EXCEEDED
@@ -895,7 +895,7 @@ public class ShardInstance extends AbstractServerInstance {
                   workers.addLast(worker);
                 } else {
                   log.log(
-                      configs.getServer().isEnsureOutputsPresent() ? Level.SEVERE : Level.WARNING,
+                      Level.WARNING,
                       format(
                           "DEADLINE_EXCEEDED: read(%s) on worker %s after %d bytes of content",
                           DigestUtil.toString(blobDigest), worker, received));
