@@ -1074,7 +1074,8 @@ public class ShardInstance extends AbstractServerInstance {
                     @Override
                     public void onQueue(Deque<String> workers) {
                       ctx.run(
-                          () ->
+                          () -> {
+                            try {
                               fetchBlobFromWorker(
                                   compressor,
                                   blobDigest,
@@ -1082,7 +1083,11 @@ public class ShardInstance extends AbstractServerInstance {
                                   offset,
                                   count,
                                   checkedChunkObserver,
-                                  requestMetadata));
+                                  requestMetadata);
+                            } catch (Exception e) {
+                              onFailure(e);
+                            }
+                          });
                     }
 
                     @Override
@@ -1107,7 +1112,8 @@ public class ShardInstance extends AbstractServerInstance {
           @Override
           public void onQueue(Deque<String> workers) {
             ctx.run(
-                () ->
+                () -> {
+                  try {
                     fetchBlobFromWorker(
                         compressor,
                         blobDigest,
@@ -1115,7 +1121,11 @@ public class ShardInstance extends AbstractServerInstance {
                         offset,
                         count,
                         chunkObserver,
-                        requestMetadata));
+                        requestMetadata);
+                  } catch (Exception e) {
+                    onFailure(e);
+                  }
+                });
           }
 
           @Override

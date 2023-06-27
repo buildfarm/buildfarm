@@ -16,6 +16,7 @@ package build.buildfarm.instance.server;
 
 import static build.buildfarm.common.Actions.asExecutionStatus;
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
+import static build.buildfarm.common.Errors.MISSING_INPUT;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.common.Trees.enumerateTreeFileDigests;
@@ -176,9 +177,6 @@ public abstract class AbstractServerInstance implements Instance {
 
   public static final String ENVIRONMENT_VARIABLES_NOT_SORTED =
       "The `Command`'s `environment_variables` are not correctly sorted by `name`.";
-
-  public static final String MISSING_INPUT =
-      "A requested input (or the `Action` or its `Command`) was not found in the CAS.";
 
   public static final String MISSING_ACTION = "The action was not found in the CAS.";
 

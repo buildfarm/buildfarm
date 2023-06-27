@@ -20,8 +20,7 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.v1test.ExecuteEntry;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
-import com.google.rpc.PreconditionFailure;
-import io.grpc.Status.Code;
+import com.google.rpc.Status;
 
 /**
  * @class OperationFailer
@@ -30,20 +29,14 @@ import io.grpc.Status.Code;
  *     finished and failed.
  */
 public class OperationFailer {
-  public static Operation get(
-      Operation operation,
-      ExecuteEntry executeEntry,
-      String failureType,
-      String failureMessage,
-      String failureDetails) {
+  public static Operation get(Operation operation, ExecuteEntry executeEntry, Status status) {
     return operation
         .toBuilder()
-        .setName(executeEntry.getOperationName())
         .setDone(true)
+        .setName(executeEntry.getOperationName())
         .setMetadata(
             Any.pack(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED)))
-        .setResponse(
-            Any.pack(failResponse(executeEntry, failureType, failureMessage, failureDetails)))
+        .setResponse(Any.pack(ExecuteResponse.newBuilder().setStatus(status).build()))
         .build();
   }
 
@@ -54,26 +47,6 @@ public class OperationFailer {
         .setStdoutStreamName(executeEntry.getStdoutStreamName())
         .setStderrStreamName(executeEntry.getStderrStreamName())
         .setStage(stage)
-        .build();
-  }
-
-  private static ExecuteResponse failResponse(
-      ExecuteEntry executeEntry, String failureType, String failureMessage, String failureDetails) {
-    PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
-    preconditionFailureBuilder
-        .addViolationsBuilder()
-        .setType(failureType)
-        .setSubject("blobs/" + DigestUtil.toString(executeEntry.getActionDigest()))
-        .setDescription(failureDetails);
-    PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
-
-    return ExecuteResponse.newBuilder()
-        .setStatus(
-            com.google.rpc.Status.newBuilder()
-                .setCode(Code.FAILED_PRECONDITION.value())
-                .setMessage(failureMessage)
-                .addDetails(Any.pack(preconditionFailure))
-                .build())
         .build();
   }
 }
