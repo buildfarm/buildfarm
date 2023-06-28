@@ -132,6 +132,7 @@ import io.prometheus.client.Histogram;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -660,7 +661,7 @@ public class ShardInstance extends AbstractServerInstance {
     // risk of returning expired workers despite filtering by active workers below. This is because
     // the strategy may return workers that have expired in the last 30 seconds. However, checking
     // workers directly is not a guarantee either since workers could leave the cluster after being
-    // queried. Ultimitely, it will come down to the client's resiliency if the backplane is
+    // queried. Ultimately, it will come down to the client's resiliency if the backplane is
     // out-of-date and the server lies about which blobs are actually present. We provide this
     // alternative strategy for calculating missing blobs.
 
@@ -670,15 +671,45 @@ public class ShardInstance extends AbstractServerInstance {
         nonEmptyDigests.forEach(uniqueDigests::add);
         Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(uniqueDigests);
         Set<String> workerSet = backplane.getStorageWorkers();
+        Map<String, Long> workersStartTime = backplane.getWorkersStartTimeInEpochSecs(workerSet);
         return immediateFuture(
             uniqueDigests.stream()
                 .filter( // best effort to present digests only missing on active workers
-                    digest ->
-                        Sets.intersection(
-                                foundBlobs.getOrDefault(digest, Collections.emptySet()), workerSet)
-                            .isEmpty())
+                    digest -> {
+                      try {
+                        Set<String> initialWorkers =
+                            foundBlobs.getOrDefault(digest, Collections.emptySet());
+                        Set<String> activeWorkers = Sets.intersection(initialWorkers, workerSet);
+                        long insertTime = backplane.getDigestInsertTime(digest);
+                        Set<String> workersStartedBeforeDigestInsertion =
+                            activeWorkers.stream()
+                                .filter(
+                                    worker ->
+                                        workersStartTime.getOrDefault(
+                                                worker, Instant.now().getEpochSecond())
+                                            < insertTime)
+                                .collect(Collectors.toSet());
+                        Set<String> workersToBeRemoved =
+                            Sets.difference(initialWorkers, workersStartedBeforeDigestInsertion)
+                                .immutableCopy();
+                        if (!workersToBeRemoved.isEmpty()) {
+                          log.log(
+                              Level.INFO, format("adjusting locations for the digest %s", digest));
+                          backplane.adjustBlobLocations(
+                              digest, Collections.emptySet(), workersToBeRemoved);
+                        }
+                        return workersStartedBeforeDigestInsertion.isEmpty();
+                      } catch (IOException e) {
+                        // Treat error as missing digest.
+                        log.log(
+                            Level.WARNING,
+                            format("failed to get digest (%s) insertion time", digest));
+                        return true;
+                      }
+                    })
                 .collect(Collectors.toList()));
       } catch (Exception e) {
+        log.log(Level.SEVERE, "find missing blob via backplane failed", e);
         return immediateFailedFuture(Status.fromThrowable(e).asException());
       }
     }
@@ -855,13 +886,19 @@ public class ShardInstance extends AbstractServerInstance {
                 } else if (status.getCode() == Code.NOT_FOUND) {
                   casMissCounter.inc();
                   log.log(
-                      Level.FINE, worker + " did not contain " + DigestUtil.toString(blobDigest));
+                      configs.getServer().isEnsureOutputsPresent() ? Level.WARNING : Level.FINE,
+                      worker + " did not contain " + DigestUtil.toString(blobDigest));
                   // ignore this, the worker will update the backplane eventually
                 } else if (status.getCode() != Code.DEADLINE_EXCEEDED
                     && SHARD_IS_RETRIABLE.test(status)) {
                   // why not, always
                   workers.addLast(worker);
                 } else {
+                  log.log(
+                      Level.WARNING,
+                      format(
+                          "DEADLINE_EXCEEDED: read(%s) on worker %s after %d bytes of content",
+                          DigestUtil.toString(blobDigest), worker, received));
                   blobObserver.onError(t);
                   return;
                 }

@@ -20,6 +20,7 @@ import build.buildfarm.common.ScanCount;
 import build.buildfarm.common.redis.RedisClient;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import redis.clients.jedis.JedisClusterPipeline;
@@ -187,6 +188,12 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   public Set<String> get(RedisClient client, Digest blobDigest) throws IOException {
     String key = redisCasKey(blobDigest);
     return client.call(jedis -> jedis.smembers(key));
+  }
+
+  @Override
+  public long insertTime(RedisClient client, Digest blobDigest) throws IOException {
+    String key = redisCasKey(blobDigest);
+    return Instant.now().getEpochSecond() - keyExpiration_s + client.call(jedis -> jedis.ttl(key));
   }
 
   /**
