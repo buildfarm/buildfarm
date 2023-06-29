@@ -643,105 +643,19 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFailedFuture(Status.fromThrowable(e).asException());
     }
 
-    // Empty blobs are an exceptional case.  Filter them out.
-    // If the user only requested empty blobs we can immedaitely tell them we already have it.
+    // Empty blobs are an exceptional case. Filter them out.
+    // If the user only requested empty blobs we can immediately tell them we already have it.
     Iterable<Digest> nonEmptyDigests =
         Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() != 0);
     if (Iterables.isEmpty(nonEmptyDigests)) {
       return immediateFuture(ImmutableList.of());
     }
 
-    // This is a faster strategy to check missing blobs which does not require querying the CAS.
-    // With hundreds of worker machines, it may be too expensive to query all of them for "find
-    // missing blobs".
-    // Workers register themselves with the backplane for a 30-second window, and if they fail to
-    // re-register within this time frame, they are automatically removed from the backplane. While
-    // this alternative strategy for finding missing blobs is faster and more cost-effective than
-    // the exhaustive approach of querying each worker to find the digest, it comes with a higher
-    // risk of returning expired workers despite filtering by active workers below. This is because
-    // the strategy may return workers that have expired in the last 30 seconds. However, checking
-    // workers directly is not a guarantee either since workers could leave the cluster after being
-    // queried. Ultimately, it will come down to the client's resiliency if the backplane is
-    // out-of-date and the server lies about which blobs are actually present. We provide this
-    // alternative strategy for calculating missing blobs.
-
     if (configs.getServer().isFindMissingBlobsViaBackplane()) {
-      try {
-        Set<Digest> uniqueDigests = new HashSet<>();
-        nonEmptyDigests.forEach(uniqueDigests::add);
-        Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(uniqueDigests);
-        Set<String> workerSet = backplane.getStorageWorkers();
-        Map<String, Long> workersStartTime = backplane.getWorkersStartTimeInEpochSecs(workerSet);
-        return immediateFuture(
-            uniqueDigests.stream()
-                .filter( // best effort to present digests only missing on active workers
-                    digest -> {
-                      try {
-                        Set<String> initialWorkers =
-                            foundBlobs.getOrDefault(digest, Collections.emptySet());
-                        Set<String> activeWorkers = Sets.intersection(initialWorkers, workerSet);
-                        long insertTime = backplane.getDigestInsertTime(digest);
-                        Set<String> workersStartedBeforeDigestInsertion =
-                            activeWorkers.stream()
-                                .filter(
-                                    worker ->
-                                        workersStartTime.getOrDefault(
-                                                worker, Instant.now().getEpochSecond())
-                                            < insertTime)
-                                .collect(Collectors.toSet());
-                        Set<String> workersToBeRemoved =
-                            Sets.difference(initialWorkers, workersStartedBeforeDigestInsertion)
-                                .immutableCopy();
-                        if (!workersToBeRemoved.isEmpty()) {
-                          log.log(
-                              Level.INFO, format("adjusting locations for the digest %s", digest));
-                          backplane.adjustBlobLocations(
-                              digest, Collections.emptySet(), workersToBeRemoved);
-                        }
-                        return workersStartedBeforeDigestInsertion.isEmpty();
-                      } catch (IOException e) {
-                        // Treat error as missing digest.
-                        log.log(
-                            Level.WARNING,
-                            format("failed to get digest (%s) insertion time", digest));
-                        return true;
-                      }
-                    })
-                .collect(Collectors.toList()));
-      } catch (Exception e) {
-        log.log(Level.SEVERE, "find missing blob via backplane failed", e);
-        return immediateFailedFuture(Status.fromThrowable(e).asException());
-      }
+      return findMissingBlobsViaBackplane(nonEmptyDigests);
     }
 
-    // A more accurate way to verify missing blobs is to ask the CAS participants directly if they
-    // have the blobs.  To do this, we get all of the worker nodes that are particpating in the CAS
-    // as a random list to begin our search.  If there are no workers avaiable, tell the client all
-    // blobs are missing.
-    Deque<String> workers;
-    try {
-      List<String> workersList = new ArrayList<>(backplane.getStorageWorkers());
-      Collections.shuffle(workersList, rand);
-      workers = new ArrayDeque<>(workersList);
-    } catch (IOException e) {
-      return immediateFailedFuture(Status.fromThrowable(e).asException());
-    }
-    if (workers.isEmpty()) {
-      return immediateFuture(nonEmptyDigests);
-    }
-
-    // Search through all of the workers to decide how many CAS blobs are missing.
-    SettableFuture<Iterable<Digest>> missingDigestsFuture = SettableFuture.create();
-    findMissingBlobsOnWorker(
-        UUID.randomUUID().toString(),
-        nonEmptyDigests,
-        workers,
-        ImmutableList.builder(),
-        Iterables.size(nonEmptyDigests),
-        Context.current().fixedContextExecutor(directExecutor()),
-        missingDigestsFuture,
-        requestMetadata);
-    return missingDigestsFuture;
+    return findMissingBlobsQueryingEachWorker(nonEmptyDigests, requestMetadata);
   }
 
   class FindMissingResponseEntry {
@@ -757,6 +671,114 @@ public class ShardInstance extends AbstractServerInstance {
       this.exception = exception;
       this.stillMissingAfter = stillMissingAfter;
     }
+  }
+
+  // A more accurate way to verify missing blobs is to ask the CAS participants directly if they
+  // have the blobs.  To do this, we get all the worker nodes that are participating in the CAS
+  // as a random list to begin our search.  If there are no workers available, tell the client all
+  // blobs are missing.
+  private ListenableFuture<Iterable<Digest>> findMissingBlobsQueryingEachWorker(
+      Iterable<Digest> nonEmptyDigests, RequestMetadata requestMetadata) {
+    Deque<String> workers;
+    try {
+      List<String> workersList = new ArrayList<>(backplane.getStorageWorkers());
+      Collections.shuffle(workersList, rand);
+      workers = new ArrayDeque<>(workersList);
+    } catch (IOException e) {
+      return immediateFailedFuture(Status.fromThrowable(e).asException());
+    }
+    if (workers.isEmpty()) {
+      return immediateFuture(nonEmptyDigests);
+    }
+
+    // Search through all the workers to decide which CAS blobs are missing.
+    SettableFuture<Iterable<Digest>> missingDigestsFuture = SettableFuture.create();
+    findMissingBlobsOnWorker(
+        UUID.randomUUID().toString(),
+        nonEmptyDigests,
+        workers,
+        ImmutableList.builder(),
+        Iterables.size(nonEmptyDigests),
+        Context.current().fixedContextExecutor(directExecutor()),
+        missingDigestsFuture,
+        requestMetadata);
+    return missingDigestsFuture;
+  }
+
+  // This is a faster strategy to check missing blobs which does not require querying the CAS.
+  // With hundreds of worker machines, it may be too expensive to query all of them for "find
+  // missing blobs".
+  // Workers register themselves with the backplane for a 30-second window, and if they fail to
+  // re-register within this time frame, they are automatically removed from the backplane. While
+  // this alternative strategy for finding missing blobs is faster and more cost-effective than
+  // the exhaustive approach of querying each worker to find the digest, it comes with a higher
+  // risk of returning expired workers despite filtering by active workers below. This is because
+  // the strategy may return workers that have expired in the last 30 seconds. However, checking
+  // workers directly is not a guarantee either since workers could leave the cluster after being
+  // queried. Ultimately, it will come down to the client's resiliency if the backplane is
+  // out-of-date and the server lies about which blobs are actually present. We provide this
+  // alternative strategy for calculating missing blobs.
+  private ListenableFuture<Iterable<Digest>> findMissingBlobsViaBackplane(
+      Iterable<Digest> nonEmptyDigests) {
+    try {
+      Set<Digest> uniqueDigests = new HashSet<>();
+      nonEmptyDigests.forEach(uniqueDigests::add);
+      Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(uniqueDigests);
+      Set<String> workerSet = backplane.getStorageWorkers();
+      Map<String, Long> workersStartTime = backplane.getWorkersStartTimeInEpochSecs(workerSet);
+      return immediateFuture(
+          uniqueDigests.stream()
+              .filter( // best effort to present digests only missing on active workers
+                  digest -> {
+                    Set<String> initialWorkers =
+                        foundBlobs.getOrDefault(digest, Collections.emptySet());
+                    return filterAndAdjustWorkersForDigest(
+                            digest, initialWorkers, workerSet, workersStartTime)
+                        .isEmpty();
+                  })
+              .collect(Collectors.toList()));
+    } catch (Exception e) {
+      log.log(Level.SEVERE, "find missing blob via backplane failed", e);
+      return immediateFailedFuture(Status.fromThrowable(e).asException());
+    }
+  }
+
+  private Set<String> filterAndAdjustWorkersForDigest(
+      Digest digest,
+      Set<String> originalWorkerSetWithDigest,
+      Set<String> activeWorkers,
+      Map<String, Long> workersStartTime) {
+    long insertTime;
+    try {
+      insertTime = backplane.getDigestInsertTime(digest);
+    } catch (IOException e) {
+      log.log(Level.WARNING, format("failed to get digest (%s) insertion time", digest));
+      return Collections.emptySet();
+    }
+    Set<String> activeWorkersWithDigest =
+        Sets.intersection(originalWorkerSetWithDigest, activeWorkers);
+    Set<String> workersStartedBeforeDigestInsertion =
+        activeWorkersWithDigest.stream()
+            .filter(
+                worker ->
+                    workersStartTime.getOrDefault(worker, Instant.now().getEpochSecond())
+                        < insertTime)
+            .collect(Collectors.toSet());
+    Set<String> workersToBeRemoved =
+        Sets.difference(originalWorkerSetWithDigest, workersStartedBeforeDigestInsertion)
+            .immutableCopy();
+    if (!workersToBeRemoved.isEmpty()) {
+      try {
+        log.log(Level.INFO, format("adjusting locations for the digest %s", digest));
+        backplane.adjustBlobLocations(digest, Collections.emptySet(), workersToBeRemoved);
+      } catch (IOException e) {
+        log.log(
+            Level.WARNING,
+            format("error adjusting blob location for %s", DigestUtil.toString(digest)),
+            e);
+      }
+    }
+    return workersStartedBeforeDigestInsertion;
   }
 
   private void findMissingBlobsOnWorker(
