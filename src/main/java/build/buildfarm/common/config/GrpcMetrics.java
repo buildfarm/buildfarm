@@ -27,7 +27,7 @@ public class GrpcMetrics {
 
       // provide custom latency buckets
       if (grpcMetrics.getLatencyBuckets() != null) {
-        grpcConfig.withLatencyBuckets(grpcMetrics.getLatencyBuckets());
+        grpcConfig = grpcConfig.withLatencyBuckets(grpcMetrics.getLatencyBuckets());
       }
 
       // Apply config to create an interceptor and apply it to the GRPC server.
