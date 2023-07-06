@@ -691,7 +691,7 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFuture(nonEmptyDigests);
     }
 
-    // Search through all the workers to decide which CAS blobs are missing.
+    // Search through all of the workers to decide which CAS blobs are missing.
     SettableFuture<Iterable<Digest>> missingDigestsFuture = SettableFuture.create();
     findMissingBlobsOnWorker(
         UUID.randomUUID().toString(),
