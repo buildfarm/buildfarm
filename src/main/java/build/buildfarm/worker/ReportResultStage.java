@@ -35,6 +35,7 @@ import com.google.rpc.Code;
 import com.google.rpc.Status;
 import io.grpc.Deadline;
 import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
 import java.io.IOException;
 import java.nio.channels.ClosedByInterruptException;
@@ -99,7 +100,7 @@ public class ReportResultStage extends PipelineStage {
           resultBuilder,
           operationContext.execDir,
           operationContext.command);
-    } catch (StatusException e) {
+    } catch (StatusException | StatusRuntimeException e) {
       ExecuteResponse executeResponse = operationContext.executeResponse.build();
       if (executeResponse.getStatus().getCode() == Code.OK.getNumber()
           && executeResponse.getResult().getExitCode() == 0) {
