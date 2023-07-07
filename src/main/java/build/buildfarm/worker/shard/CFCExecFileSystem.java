@@ -19,7 +19,6 @@ import static build.buildfarm.common.io.Utils.readdir;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.concat;
-import static com.google.common.collect.Iterables.filter;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
@@ -48,7 +47,7 @@ import build.buildfarm.worker.ExecDirException;
 import build.buildfarm.worker.ExecDirException.ViolationException;
 import build.buildfarm.worker.OutputDirectory;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
 import java.io.InputStream;
@@ -56,14 +55,16 @@ import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
-import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
@@ -77,7 +78,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   private final boolean linkInputDirectories;
 
   // override the symlinking above for a set of matching paths
-  private final Iterable<String> realInputDirectories;
+  private final Iterable<Pattern> realInputDirectories;
 
   private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
@@ -98,7 +99,9 @@ class CFCExecFileSystem implements ExecFileSystem {
     this.fileCache = fileCache;
     this.owner = owner;
     this.linkInputDirectories = linkInputDirectories;
-    this.realInputDirectories = realInputDirectories;
+    this.realInputDirectories =
+        Iterables.transform(
+            realInputDirectories, realInputDirectory -> Pattern.compile(realInputDirectory));
     this.removeDirectoryService = removeDirectoryService;
     this.accessRecorder = accessRecorder;
   }
@@ -326,28 +329,61 @@ class CFCExecFileSystem implements ExecFileSystem {
     }
   }
 
-  private static boolean treeContainsPath(
-      String directoryPath, Map<Digest, Directory> directoriesIndex, Digest rootDigest) {
-    Directory directory = directoriesIndex.get(rootDigest);
-    for (String name : directoryPath.split("/")) {
-      List<DirectoryNode> subdirs = directory.getDirectoriesList();
-      int index = Collections.binarySearch(Lists.transform(subdirs, DirectoryNode::getName), name);
-      if (index < 0) {
-        return false;
+  private static Iterator<String> directoriesIterator(
+      Digest digest, Map<Digest, Directory> directoriesIndex) {
+    Directory root = directoriesIndex.get(digest);
+    return new Iterator<String>() {
+      boolean atEnd = root.getDirectoriesCount() == 0;
+      Stack<String> path = new Stack<>();
+      Stack<Iterator<DirectoryNode>> route = new Stack<>();
+      Iterator<DirectoryNode> current = root.getDirectoriesList().iterator();
+
+      @Override
+      public boolean hasNext() {
+        return !atEnd;
       }
-      directory = directoriesIndex.get(subdirs.get(index).getDigest());
-    }
-    return true;
+
+      @Override
+      public String next() {
+        String nextPath;
+        DirectoryNode next = current.next();
+        String name = next.getName();
+        path.push(name);
+        nextPath = String.join("/", path);
+        Digest digest = next.getDigest();
+        if (digest.getSizeBytes() != 0) {
+          route.push(current);
+          current = directoriesIndex.get(digest).getDirectoriesList().iterator();
+        } else {
+          path.pop();
+        }
+        while (!current.hasNext() && !route.isEmpty()) {
+          current = route.pop();
+          path.pop();
+        }
+        atEnd = !current.hasNext();
+        return nextPath;
+      }
+    };
   }
 
   private Iterable<String> realDirectories(
       Map<Digest, Directory> directoriesIndex, Digest rootDigest) {
     // skip this search if all the directories are real
     if (linkInputDirectories) {
-      // somewhat inefficient, but would need many overrides to be painful
-      return filter(
-          realInputDirectories,
-          realInputDirectory -> treeContainsPath(realInputDirectory, directoriesIndex, rootDigest));
+      ImmutableList.Builder<String> builder = ImmutableList.builder();
+
+      Iterator<String> dirs = directoriesIterator(rootDigest, directoriesIndex);
+      while (dirs.hasNext()) {
+        String dir = dirs.next();
+        for (Pattern pattern : realInputDirectories) {
+          if (pattern.matcher(dir).matches()) {
+            builder.add(dir);
+          }
+        }
+      }
+
+      return builder.build();
     }
     return ImmutableList.of();
   }
@@ -359,10 +395,9 @@ class CFCExecFileSystem implements ExecFileSystem {
     Digest inputRootDigest = action.getInputRootDigest();
     OutputDirectory outputDirectory =
         OutputDirectory.parse(
-            command.getOutputFilesList(),
             concat(
-                command.getOutputDirectoriesList(),
-                realDirectories(directoriesIndex, inputRootDigest)),
+                command.getOutputFilesList(), realDirectories(directoriesIndex, inputRootDigest)),
+            command.getOutputDirectoriesList(),
             command.getEnvironmentVariablesList());
 
     Path execDir = root.resolve(operationName);
