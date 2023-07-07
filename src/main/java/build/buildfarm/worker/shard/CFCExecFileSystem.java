@@ -380,7 +380,7 @@ class CFCExecFileSystem implements ExecFileSystem {
         String dir = dirs.next();
         for (Pattern pattern : realInputDirectories) {
           if (pattern.matcher(dir).matches()) {
-            builder.add(dir);
+            builder.add(dir + "/");
             break; // avoid adding the same directory twice
           }
         }
