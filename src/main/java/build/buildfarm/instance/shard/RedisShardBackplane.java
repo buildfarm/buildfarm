@@ -79,12 +79,14 @@ import com.google.rpc.Status;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
@@ -690,13 +692,45 @@ public class RedisShardBackplane implements Backplane {
   public synchronized Set<String> getStorageWorkers() throws IOException {
     if (storageWorkersDeadline == null || storageWorkersDeadline.isExpired()) {
       synchronized (storageWorkerSet) {
-        Set<String> newWorkerSet = client.call(jedis -> fetchAndExpireStorageWorkers(jedis));
+        Set<String> newWorkerSet = client.call(this::fetchAndExpireStorageWorkers);
         storageWorkerSet.clear();
         storageWorkerSet.addAll(newWorkerSet);
       }
       storageWorkersDeadline = Deadline.after(workerSetMaxAge, SECONDS);
     }
     return new HashSet<>(storageWorkerSet);
+  }
+
+  @Override
+  public Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames)
+      throws IOException {
+    if (workerNames.isEmpty()) {
+      return Collections.emptyMap();
+    }
+    List<String> workerList = client.call(jedis -> state.storageWorkers.mget(jedis, workerNames));
+
+    return workerList.stream()
+        .filter(Objects::nonNull)
+        .map(
+            workerJson -> {
+              try {
+                ShardWorker.Builder builder = ShardWorker.newBuilder();
+                JsonFormat.parser().merge(workerJson, builder);
+                ShardWorker worker = builder.build();
+                return new AbstractMap.SimpleEntry<>(
+                    worker.getEndpoint(), worker.getFirstRegisteredAt() / 1000L);
+              } catch (InvalidProtocolBufferException e) {
+                return null;
+              }
+            })
+        .filter(Objects::nonNull)
+        .collect(
+            Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue));
+  }
+
+  @Override
+  public long getDigestInsertTime(Digest blobDigest) throws IOException {
+    return state.casWorkerMap.insertTime(client, blobDigest);
   }
 
   private synchronized Set<String> getExecuteWorkers() throws IOException {
