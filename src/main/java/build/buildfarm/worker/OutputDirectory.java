@@ -161,10 +161,15 @@ public class OutputDirectory {
     Iterables.addAll(sortedOutputDirs, outputDirs);
     Collections.sort(sortedOutputDirs);
 
+    String currentOutputDir = "";
     Builder currentBuilder = builder;
     String prefix = "/";
     for (OutputDirectoryEntry entry : sortedOutputDirs) {
       String outputDir = entry.outputDirectory;
+      if (outputDir == currentOutputDir) {
+        continue;
+      }
+      currentOutputDir = outputDir;
       while (!outputDir.startsWith(prefix)) {
         currentBuilder = stack.pop();
         int upPathSeparatorIndex = prefix.lastIndexOf('/', prefix.length() - 2);
