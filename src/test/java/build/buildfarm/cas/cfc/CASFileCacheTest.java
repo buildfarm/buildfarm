@@ -241,7 +241,8 @@ class CASFileCacheTest {
             subdirDigest, subDirectory);
     Path dirPath =
         getInterruptiblyOrIOException(
-            fileCache.putDirectory(dirDigest, directoriesIndex, putService)).getPath();
+                fileCache.putDirectory(dirDigest, directoriesIndex, putService))
+            .getPath();
     assertThat(Files.isDirectory(dirPath)).isTrue();
     assertThat(Files.exists(dirPath.resolve("file"))).isTrue();
     assertThat(Files.isDirectory(dirPath.resolve("subdir"))).isTrue();

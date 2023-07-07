@@ -315,7 +315,9 @@ class CFCExecFileSystem implements ExecFileSystem {
         fileCache.putDirectory(digest, directoriesIndex, fetchService),
         (pathResult) -> {
           if (pathResult.getMissed()) {
-            log.info(String.format("putDirectory(%s, %s) created", pathResult.getPath(), DigestUtil.toString(digest)));
+            log.info(
+                String.format(
+                    "putDirectory(%s, %s) created", execPath, DigestUtil.toString(digest)));
           }
           Files.createSymbolicLink(execPath, pathResult.getPath());
           return immediateFuture(null);
