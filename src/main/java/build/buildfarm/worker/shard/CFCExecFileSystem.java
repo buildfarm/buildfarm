@@ -317,7 +317,8 @@ class CFCExecFileSystem implements ExecFileSystem {
           Path path = pathResult.getPath();
           if (pathResult.getMissed()) {
             log.fine(
-                String.format("putDirectory(%s, %s) created", path, DigestUtil.toString(digest)));
+                String.format(
+                    "putDirectory(%s, %s) created", execPath, DigestUtil.toString(digest)));
           }
           Files.createSymbolicLink(execPath, path);
           return immediateFuture(null);
