@@ -39,6 +39,8 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.config.GrpcMetrics;
+import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
@@ -579,7 +581,8 @@ public class Worker {
     // Create the appropriate writer for the context
     CasWriter writer;
     if (!configs.getWorker().getCapabilities().isCas()) {
-      writer = new RemoteCasWriter(backplane.getStorageWorkers(), workerStubs);
+      Retrier retrier = new Retrier(Backoff.sequential(5), Retrier.DEFAULT_IS_RETRIABLE);
+      writer = new RemoteCasWriter(backplane.getStorageWorkers(), workerStubs, retrier);
     } else {
       writer = new LocalCasWriter(execFileSystem);
     }
