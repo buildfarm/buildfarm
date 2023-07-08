@@ -28,7 +28,7 @@ public class Worker {
   private int inputFetchStageWidth = 0;
   private int inputFetchDeadline = 60;
   private boolean linkInputDirectories = true;
-  private List<String> realInputDirectories = Arrays.asList("external");
+  private List<String> linkedInputDirectories = Arrays.asList("(?!external)[^/]+");
   private String execOwner;
   private int defaultMaxCores = 0;
   private boolean limitGlobalExecution = false;
