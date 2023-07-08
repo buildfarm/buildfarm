@@ -117,8 +117,8 @@ worker:
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
   linkInputDirectories: true
-  realInputDirectories:
-    - "external"
+  linkedInputDirectories:
+    - "(?!external)[^/]+"
   execOwner:
   defaultMaxCores: 0
   limitGlobalExecution: false
