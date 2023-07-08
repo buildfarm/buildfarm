@@ -47,6 +47,7 @@ import build.buildfarm.worker.ExecDirException;
 import build.buildfarm.worker.ExecDirException.ViolationException;
 import build.buildfarm.worker.OutputDirectory;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
@@ -58,6 +59,7 @@ import java.nio.file.attribute.UserPrincipal;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -77,8 +79,8 @@ class CFCExecFileSystem implements ExecFileSystem {
   // perform first-available non-output symlinking and retain directories in cache
   private final boolean linkInputDirectories;
 
-  // override the symlinking above for a set of matching paths
-  private final Iterable<Pattern> realInputDirectories;
+  // indicate symlinking above for a set of matching paths
+  private final Iterable<Pattern> linkedInputDirectories;
 
   private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
@@ -92,16 +94,16 @@ class CFCExecFileSystem implements ExecFileSystem {
       CASFileCache fileCache,
       @Nullable UserPrincipal owner,
       boolean linkInputDirectories,
-      Iterable<String> realInputDirectories,
+      Iterable<String> linkedInputDirectories,
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder) {
     this.root = root;
     this.fileCache = fileCache;
     this.owner = owner;
     this.linkInputDirectories = linkInputDirectories;
-    this.realInputDirectories =
+    this.linkedInputDirectories =
         Iterables.transform(
-            realInputDirectories, realInputDirectory -> Pattern.compile(realInputDirectory));
+            linkedInputDirectories, realInputDirectory -> Pattern.compile(realInputDirectory));
     this.removeDirectoryService = removeDirectoryService;
     this.accessRecorder = accessRecorder;
   }
@@ -239,6 +241,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       Digest directoryDigest,
       Map<Digest, Directory> directoriesIndex,
       OutputDirectory outputDirectory,
+      Set<Path> linkedInputDirectories,
       Consumer<String> onKey,
       ImmutableList.Builder<Digest> inputDirectories)
       throws IOException {
@@ -275,7 +278,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       OutputDirectory childOutputDirectory =
           outputDirectory != null ? outputDirectory.getChild(name) : null;
       Path dirPath = path.resolve(name);
-      if (childOutputDirectory != null || !linkInputDirectories) {
+      if (childOutputDirectory != null || !linkInputDirectories || !linkedInputDirectories.contains(dirPath)) {
         Files.createDirectories(dirPath);
         downloads =
             concat(
@@ -286,6 +289,7 @@ class CFCExecFileSystem implements ExecFileSystem {
                     digest,
                     directoriesIndex,
                     childOutputDirectory,
+                    linkedInputDirectories,
                     onKey,
                     inputDirectories));
       } else {
@@ -369,26 +373,25 @@ class CFCExecFileSystem implements ExecFileSystem {
     };
   }
 
-  private Iterable<String> realDirectories(
+  private Set<String> linkedDirectories(
       Map<Digest, Directory> directoriesIndex, Digest rootDigest) {
     // skip this search if all the directories are real
     if (linkInputDirectories) {
-      ImmutableList.Builder<String> builder = ImmutableList.builder();
+      ImmutableSet.Builder<String> builder = ImmutableSet.builder();
 
       Iterator<String> dirs = directoriesIterator(rootDigest, directoriesIndex);
       while (dirs.hasNext()) {
         String dir = dirs.next();
-        for (Pattern pattern : realInputDirectories) {
+        for (Pattern pattern : linkedInputDirectories) {
           if (pattern.matcher(dir).matches()) {
-            builder.add(dir + "/");
+            builder.add(dir);
             break; // avoid adding the same directory twice
           }
         }
       }
-
       return builder.build();
     }
-    return ImmutableList.of();
+    return ImmutableSet.of();
   }
 
   @Override
@@ -398,8 +401,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     Digest inputRootDigest = action.getInputRootDigest();
     OutputDirectory outputDirectory =
         OutputDirectory.parse(
-            concat(
-                command.getOutputFilesList(), realDirectories(directoriesIndex, inputRootDigest)),
+            command.getOutputFilesList(),
             command.getOutputDirectoriesList(),
             command.getEnvironmentVariablesList());
 
@@ -412,6 +414,11 @@ class CFCExecFileSystem implements ExecFileSystem {
     ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
+    Set<Path> linkedInputDirectories = ImmutableSet.copyOf(
+        Iterables.transform(
+            linkedDirectories(directoriesIndex, inputRootDigest),
+            path -> execDir.resolve(path))); // does this work on windows with / separators?
+
     log.log(Level.FINE, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
     Iterable<ListenableFuture<Void>> fetchedFutures =
         fetchInputs(
@@ -420,6 +427,7 @@ class CFCExecFileSystem implements ExecFileSystem {
             inputRootDigest,
             directoriesIndex,
             outputDirectory,
+            linkedInputDirectories,
             key -> {
               synchronized (inputFiles) {
                 inputFiles.add(key);

@@ -376,7 +376,7 @@ public class Worker {
         fileCache,
         owner,
         configs.getWorker().isLinkInputDirectories(),
-        configs.getWorker().getRealInputDirectories(),
+        configs.getWorker().getLinkedInputDirectories(),
         removeDirectoryService,
         accessRecorder
         /* deadlineAfter=*/
