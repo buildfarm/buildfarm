@@ -14,6 +14,8 @@
 
 package build.buildfarm.server.services;
 
+import static build.buildfarm.common.grpc.Channels.createChannel;
+
 import build.buildfarm.admin.Admin;
 import build.buildfarm.admin.aws.AwsAdmin;
 import build.buildfarm.admin.gcp.GcpAdmin;
@@ -39,8 +41,6 @@ import build.buildfarm.v1test.TerminateHostRequest;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
 import io.grpc.ManagedChannel;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
@@ -191,9 +191,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   private void informWorkerToPrepareForShutdown(String host) {
     ManagedChannel channel = null;
     try {
-      NettyChannelBuilder builder =
-          NettyChannelBuilder.forTarget(host).negotiationType(NegotiationType.PLAINTEXT);
-      channel = builder.build();
+      channel = createChannel(host);
       ShutDownWorkerGrpc.ShutDownWorkerBlockingStub shutDownWorkerBlockingStub =
           ShutDownWorkerGrpc.newBlockingStub(channel);
       shutDownWorkerBlockingStub.prepareWorkerForGracefulShutdown(

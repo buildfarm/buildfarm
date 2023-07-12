@@ -14,6 +14,8 @@
 
 package build.buildfarm.admin.aws;
 
+import static build.buildfarm.common.grpc.Channels.createChannel;
+
 import build.buildfarm.admin.Admin;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.v1test.AdminGrpc;
@@ -41,8 +43,6 @@ import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
 import com.amazonaws.services.simplesystemsmanagement.model.SendCommandRequest;
 import com.google.protobuf.util.Timestamps;
 import io.grpc.ManagedChannel;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -206,9 +206,7 @@ public class AwsAdmin implements Admin {
   public void disableHostScaleInProtection(String clusterEndpoint, String instanceIp) {
     ManagedChannel channel = null;
     try {
-      NettyChannelBuilder builder =
-          NettyChannelBuilder.forTarget(clusterEndpoint).negotiationType(NegotiationType.PLAINTEXT);
-      channel = builder.build();
+      channel = createChannel(clusterEndpoint);
       AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
       adminBlockingStub.disableScaleInProtection(
           DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
