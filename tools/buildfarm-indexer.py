@@ -1,5 +1,5 @@
 from redis.client import Pipeline
-from rediscluster import StrictRedisCluster
+from rediscluster import RedisCluster
 import sys
 
 def get_cas_page(r, cursor, count):
@@ -15,7 +15,7 @@ if not redis_host:
     print ("usage: buildfarm-indexer.py <redis_host>")
     sys.exit(1)
 
-r = StrictRedisCluster(startup_nodes=[{"host": redis_host, "port": 6379}], skip_full_coverage_check=True)
+r = RedisCluster(startup_nodes=[{"host": redis_host, "port": 6379}], skip_full_coverage_check=True)
 
 nodes = r.connection_pool.nodes
 
@@ -30,14 +30,15 @@ while slots:
         slots.remove(slot)
         node_keys[slot] = str(node_key)
 
-workers = r.hkeys("Workers")
+# config f"{backplane.workersHashName}_storage"
+workers = r.hkeys("Workers_storage")
 
 worker_count = len(workers)
 
 print ("%d workers" % worker_count)
 
 p = r.pipeline()
-for node_key in node_keys.viewvalues():
+for node_key in node_keys.values():
     p.delete("{%s}:intersecting-workers" % node_key)
     p.sadd("{%s}:intersecting-workers" % node_key, *workers)
 p.execute()
@@ -101,8 +102,9 @@ class Indexer:
         count = len(cas_names)
         p = self.pipeline(conn)
         for i in range(count):
-            name = cas_names[i]
-            node_key = node_keys[nodes.keyslot(str(name))]
+            name = cas_names[i].decode()
+            keyslot = nodes.keyslot(name)
+            node_key = node_keys[keyslot]
             set_key = "{%s}:intersecting-workers" % node_key
             p.sinterstore(name, set_key, name)
         p.execute()
@@ -116,7 +118,7 @@ indexer = Indexer(r)
 map_cas_page(r, 10000, indexer.process)
 
 p = r.pipeline()
-for node_key in node_keys.viewvalues():
+for node_key in node_keys.values():
     p.delete("{%s}:intersecting-workers" % node_key)
 p.execute()
 
