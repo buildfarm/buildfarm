@@ -6,6 +6,7 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/admin",
         "//src/main/java/build/buildfarm/common/config",
+        "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
@@ -19,7 +20,6 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java_util",
         "@maven//:io_grpc_grpc_api",
-        "@maven//:io_grpc_grpc_netty",
         "@maven//:org_projectlombok_lombok",
         "@maven//:org_springframework_spring_beans",
         "@maven//:org_springframework_spring_context",
