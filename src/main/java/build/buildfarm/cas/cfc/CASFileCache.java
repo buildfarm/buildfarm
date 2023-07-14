@@ -1917,7 +1917,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       lock = keyLocks.get(key);
     } catch (ExecutionException e) {
       // impossible without exception instantiating lock
-      throw new RuntimeException(e);
+      throw new RuntimeException(e.getCause());
     }
 
     lock.lock();
