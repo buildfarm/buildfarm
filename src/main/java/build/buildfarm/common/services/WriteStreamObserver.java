@@ -291,6 +291,13 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
                 requestMetadata.getToolInvocationId(),
                 requestMetadata.getActionId(),
                 name));
+      } else {
+        log.log(
+            Level.WARNING,
+            format(
+                "error %s after %d requests and %d bytes at offset %d",
+                name, requestCount, requestBytes, earliestOffset),
+            t);
       }
       return true;
     }
