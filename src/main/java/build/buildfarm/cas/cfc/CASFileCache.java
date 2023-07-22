@@ -639,7 +639,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             log.log(Level.SEVERE, "error closing input stream on cancel", e);
           } finally {
             if (!blobObserver.isCancelled()) {
-              blobObserver.onError(Status.CANCELLED.withDescription("client cancelled").asRuntimeException());
+              blobObserver.onError(
+                  Status.CANCELLED.withDescription("client cancelled").asRuntimeException());
             }
           }
         });

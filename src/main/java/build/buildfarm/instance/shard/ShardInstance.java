@@ -920,7 +920,10 @@ public class ShardInstance extends AbstractServerInstance {
                       Level.WARNING,
                       format(
                           "%s: read(%s) on worker %s after %d bytes of content",
-                          status.getCode().name(), DigestUtil.toString(blobDigest), worker, received));
+                          status.getCode().name(),
+                          DigestUtil.toString(blobDigest),
+                          worker,
+                          received));
                   blobObserver.onError(t);
                   return;
                 }
