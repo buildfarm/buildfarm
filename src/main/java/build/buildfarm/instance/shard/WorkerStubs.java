@@ -57,6 +57,7 @@ public final class WorkerStubs {
         worker,
         digestUtil,
         createChannel(worker),
+        createChannel(worker), // seperate write channel
         timeout,
         newStubRetrier(),
         newStubRetryService());

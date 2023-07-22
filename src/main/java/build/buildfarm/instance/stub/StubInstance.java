@@ -160,6 +160,7 @@ public class StubInstance implements Instance {
   private final String identifier;
   private final DigestUtil digestUtil;
   private final ManagedChannel channel;
+  private final ManagedChannel writeChannel;
   private final @Nullable Duration grpcTimeout;
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
@@ -186,7 +187,6 @@ public class StubInstance implements Instance {
     this(name, identifier, digestUtil, channel, grpcTimeout, NO_RETRIES, /* retryService=*/ null);
   }
 
-  @SuppressWarnings("NullableProblems")
   public StubInstance(
       String name,
       String identifier,
@@ -195,10 +195,24 @@ public class StubInstance implements Instance {
       Duration grpcTimeout,
       Retrier retrier,
       @Nullable ListeningScheduledExecutorService retryService) {
+    this(name, identifier, digestUtil, channel, channel, grpcTimeout, retrier, retryService);
+  }
+
+  @SuppressWarnings("NullableProblems")
+  public StubInstance(
+      String name,
+      String identifier,
+      DigestUtil digestUtil,
+      ManagedChannel channel,
+      ManagedChannel writeChannel,
+      Duration grpcTimeout,
+      Retrier retrier,
+      @Nullable ListeningScheduledExecutorService retryService) {
     this.name = name;
     this.identifier = identifier;
     this.digestUtil = digestUtil;
     this.channel = channel;
+    this.writeChannel = writeChannel;
     this.grpcTimeout = grpcTimeout;
     this.retrier = retrier;
     this.retryService = retryService;
@@ -595,8 +609,7 @@ public class StubInstance implements Instance {
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
     throwIfStopped();
-    bsStub
-        .get()
+    deadlined(bsStub)
         .withInterceptors(attachMetadataInterceptor(requestMetadata))
         .read(
             ReadRequest.newBuilder()
@@ -661,7 +674,7 @@ public class StubInstance implements Instance {
             deadlined(bsBlockingStub).withInterceptors(attachMetadataInterceptor(requestMetadata)),
         Suppliers.memoize(
             () ->
-                ByteStreamGrpc.newStub(channel)
+                ByteStreamGrpc.newStub(writeChannel)
                     .withInterceptors(attachMetadataInterceptor(requestMetadata))),
         resourceName,
         exceptionTranslator,
