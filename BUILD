@@ -40,9 +40,9 @@ java_library(
     data = [
         ":as-nobody",
         ":delay",
-        ":linux-sandbox.binary",
+        #":linux-sandbox.binary", # Darwin build is broken
         ":macos-wrapper",
-        ":process-wrapper.binary",
+        #":process-wrapper.binary", # Darwin build is broken
         ":skip_sleep.binary",
         ":skip_sleep.preload",
         ":tini.binary",
