@@ -168,7 +168,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Consumer<Iterable<Digest>> onExpire;
   private final Executor accessRecorder;
   private final ExecutorService expireService;
-  private Thread prometheusMetricsThread; // TODO make this final, stop on shutdown
+  private Thread prometheusMetricsThread;
 
   private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newConcurrentMap();
   private final DirectoriesIndex directoriesIndex;
@@ -1256,6 +1256,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Files.createDirectories(dir);
     }
     fileStore = Files.getFileStore(root);
+  }
+
+  public void stop() throws InterruptedException {
+    if (prometheusMetricsThread != null) {
+      prometheusMetricsThread.interrupt();
+      prometheusMetricsThread.join();
+    }
   }
 
   public StartupCacheResults start(boolean skipLoad) throws IOException, InterruptedException {
