@@ -135,6 +135,8 @@ worker:
       executionWrapper:
         path: "/"
         arguments:
+  maxConnectionAge: 3600
+  maxConnectionAgeGrace: 60
 executionWrappers:
   cgroups: /usr/bin/cgexec
   unshare: /usr/bin/unshare

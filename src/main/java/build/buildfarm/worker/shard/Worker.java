@@ -84,6 +84,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
@@ -531,6 +532,10 @@ public class Worker {
   public void start() throws ConfigurationException, InterruptedException, IOException {
     String session = UUID.randomUUID().toString();
     ServerBuilder<?> serverBuilder = ServerBuilder.forPort(configs.getWorker().getPort());
+    if (configs.getWorker().getMaxConnectionAge() > 0) {
+      serverBuilder.maxConnectionAge(configs.getWorker().getMaxConnectionAge(), SECONDS);
+      serverBuilder.maxConnectionAgeGrace(configs.getWorker().getMaxConnectionAgeGrace(), SECONDS);
+    }
     String identifier = "buildfarm-worker-" + configs.getWorker().getPublicName() + "-" + session;
     root = configs.getWorker().getValidRoot();
     if (configs.getWorker().getPublicName().isEmpty()) {

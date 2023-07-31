@@ -37,6 +37,8 @@ public class Worker {
   private boolean errorOperationRemainingResources = false;
   private ExecutionPolicy[] executionPolicies = {};
   private SandboxSettings sandboxSettings = new SandboxSettings();
+  private long maxConnectionAge;
+  private long maxConnectionAgeGrace;
 
   public ExecutionPolicy[] getExecutionPolicies() {
     if (executionPolicies != null) {
