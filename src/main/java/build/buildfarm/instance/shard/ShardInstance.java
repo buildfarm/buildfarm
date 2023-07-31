@@ -919,8 +919,11 @@ public class ShardInstance extends AbstractServerInstance {
                   log.log(
                       Level.WARNING,
                       format(
-                          "DEADLINE_EXCEEDED: read(%s) on worker %s after %d bytes of content",
-                          DigestUtil.toString(blobDigest), worker, received));
+                          "%s: read(%s) on worker %s after %d bytes of content",
+                          status.getCode().name(),
+                          DigestUtil.toString(blobDigest),
+                          worker,
+                          received));
                   blobObserver.onError(t);
                   return;
                 }
