@@ -134,7 +134,7 @@ public class Pipeline {
             }
           }
           if (stageToClose != null && !stageToClose.isClosed()) {
-            log.log(Level.FINE, "Closing stage at priority " + maxPriority);
+            log.log(Level.FINER, "Closing stage at priority " + maxPriority);
             stageToClose.close();
           }
         }
@@ -157,7 +157,7 @@ public class Pipeline {
 
           if (!thread.isAlive()) {
             log.log(
-                Level.FINE,
+                Level.FINER,
                 "Stage "
                     + stage.name()
                     + " has exited at priority "

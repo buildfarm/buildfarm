@@ -199,7 +199,7 @@ class Executor {
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
-    log.log(Level.FINE, "Executor: Operation " + operation.getName() + " Executing command");
+    log.log(Level.FINER, "Executor: Operation " + operation.getName() + " Executing command");
 
     ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
     resultBuilder
@@ -291,7 +291,7 @@ class Executor {
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
     log.log(
-        Level.FINE,
+        Level.FINER,
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
             operationName, resultBuilder.getExitCode()));
@@ -309,7 +309,7 @@ class Executor {
         throw e;
       }
     } else {
-      log.log(Level.FINE, "Executor: Operation " + operationName + " Failed to claim output");
+      log.log(Level.FINER, "Executor: Operation " + operationName + " Failed to claim output");
       boolean wasInterrupted = Thread.interrupted();
       try {
         putError();
