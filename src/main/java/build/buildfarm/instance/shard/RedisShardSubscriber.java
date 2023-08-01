@@ -137,7 +137,7 @@ class RedisShardSubscriber extends JedisPubSub {
         new TimedWatchFuture(watcher) {
           @Override
           public void unwatch() {
-            log.log(Level.FINE, format("unwatching %s", channel));
+            log.log(Level.FINER, format("unwatching %s", channel));
             RedisShardSubscriber.this.unwatch(channel, this);
           }
         };
@@ -199,7 +199,7 @@ class RedisShardSubscriber extends JedisPubSub {
       @Nullable Instant expiresAt) {
     List<TimedWatchFuture> operationWatchers = watchers.get(channel);
     boolean observe = operation == null || operation.hasMetadata() || operation.getDone();
-    log.log(Level.FINE, format("onOperation %s: %s", channel, operation));
+    log.log(Level.FINER, format("onOperation %s: %s", channel, operation));
     synchronized (watchers) {
       ImmutableList.Builder<Consumer<Operation>> observers = ImmutableList.builder();
       for (TimedWatchFuture watchFuture : operationWatchers) {
@@ -215,7 +215,7 @@ class RedisShardSubscriber extends JedisPubSub {
         executor.execute(
             () -> {
               if (observe) {
-                log.log(Level.FINE, "observing " + operation);
+                log.log(Level.FINER, "observing " + operation);
                 observer.accept(operation);
               }
             });

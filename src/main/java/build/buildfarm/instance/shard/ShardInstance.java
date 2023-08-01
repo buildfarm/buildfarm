@@ -412,14 +412,14 @@ public class ShardInstance extends AbstractServerInstance {
                       () -> {},
                       Deadline.after(5, MINUTES));
                   try {
-                    log.log(Level.FINE, "queueing " + operationName);
+                    log.log(Level.FINER, "queueing " + operationName);
                     ListenableFuture<Void> queueFuture = queue(executeEntry, poller, queueTimeout);
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {
                           @Override
                           public void onSuccess(Void result) {
-                            log.log(Level.FINE, "successfully queued " + operationName);
+                            log.log(Level.FINER, "successfully queued " + operationName);
                             // nothing
                           }
 
@@ -433,7 +433,7 @@ public class ShardInstance extends AbstractServerInstance {
                     long operationTransformDispatchUSecs =
                         stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
                     log.log(
-                        Level.FINE,
+                        Level.FINER,
                         format(
                             "OperationQueuer: Dispatched To Transform %s: %dus in canQueue, %dus in transform dispatch",
                             operationName, canQueueUSecs, operationTransformDispatchUSecs));
@@ -448,7 +448,7 @@ public class ShardInstance extends AbstractServerInstance {
 
                 @Override
                 public void run() {
-                  log.log(Level.FINE, "OperationQueuer: Running");
+                  log.log(Level.FINER, "OperationQueuer: Running");
                   try {
                     while (transformTokensQueue.offer(new Object(), 5, MINUTES)) {
                       stopwatch.start();
@@ -481,7 +481,7 @@ public class ShardInstance extends AbstractServerInstance {
                   } catch (Exception t) {
                     log.log(Level.SEVERE, "OperationQueuer: fatal exception during iteration", t);
                   } finally {
-                    log.log(Level.FINE, "OperationQueuer: Exiting");
+                    log.log(Level.FINER, "OperationQueuer: Exiting");
                   }
                   operationQueuer = null;
                   try {
@@ -566,7 +566,7 @@ public class ShardInstance extends AbstractServerInstance {
       return;
     }
     stopping = true;
-    log.log(Level.FINE, format("Instance %s is stopping", getName()));
+    log.log(Level.FINER, format("Instance %s is stopping", getName()));
     if (operationQueuer != null) {
       operationQueuer.stop();
     }
@@ -602,7 +602,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
     actionCacheFetchService.shutdownNow();
     workerStubs.invalidateAll();
-    log.log(Level.FINE, format("Instance %s has been stopped", getName()));
+    log.log(Level.FINER, format("Instance %s has been stopped", getName()));
     stopping = false;
     stopped = true;
   }
@@ -908,7 +908,7 @@ public class ShardInstance extends AbstractServerInstance {
                 } else if (status.getCode() == Code.NOT_FOUND) {
                   casMissCounter.inc();
                   log.log(
-                      configs.getServer().isEnsureOutputsPresent() ? Level.WARNING : Level.FINE,
+                      configs.getServer().isEnsureOutputsPresent() ? Level.WARNING : Level.FINER,
                       worker + " did not contain " + DigestUtil.toString(blobDigest));
                   // ignore this, the worker will update the backplane eventually
                 } else if (status.getCode() != Code.DEADLINE_EXCEEDED
@@ -1019,7 +1019,7 @@ public class ShardInstance extends AbstractServerInstance {
     final ListenableFuture<List<String>> populatedWorkerListFuture;
     if (emptyWorkerList) {
       log.log(
-          Level.FINE,
+          Level.FINER,
           format(
               "worker list was initially empty for %s, attempting to correct",
               DigestUtil.toString(blobDigest)));
@@ -1035,7 +1035,7 @@ public class ShardInstance extends AbstractServerInstance {
                   RequestMetadata.getDefaultInstance()),
               (foundOnWorkers) -> {
                 log.log(
-                    Level.FINE,
+                    Level.FINER,
                     format(
                         "worker list was corrected for %s to be %s",
                         DigestUtil.toString(blobDigest), foundOnWorkers.toString()));
@@ -1065,7 +1065,7 @@ public class ShardInstance extends AbstractServerInstance {
               workersList.clear();
               final ListenableFuture<List<String>> workersListFuture;
               log.log(
-                  Level.FINE,
+                  Level.FINER,
                   format(
                       "worker list was depleted for %s, attempting to correct",
                       DigestUtil.toString(blobDigest)));
@@ -1081,7 +1081,7 @@ public class ShardInstance extends AbstractServerInstance {
                           RequestMetadata.getDefaultInstance()),
                       (foundOnWorkers) -> {
                         log.log(
-                            Level.FINE,
+                            Level.FINER,
                             format(
                                 "worker list was corrected after depletion for %s to be %s",
                                 DigestUtil.toString(blobDigest), foundOnWorkers.toString()));
@@ -1380,7 +1380,7 @@ public class ShardInstance extends AbstractServerInstance {
           @Override
           public CompletableFuture<Directory> apply(Digest digest, Executor executor) {
             log.log(
-                Level.FINE,
+                Level.FINER,
                 format(
                     "transformQueuedOperation(%s): fetching directory %s",
                     reason, DigestUtil.toString(directoryBlobDigest)));
@@ -1515,7 +1515,7 @@ public class ShardInstance extends AbstractServerInstance {
                 expectCommand(commandDigest, requestMetadata),
                 (command) -> {
                   log.log(
-                      Level.FINE,
+                      Level.FINER,
                       format("transformQueuedOperation(%s): fetched command", operationName));
                   if (command != null) {
                     queuedOperationBuilder.setCommand(command);
@@ -2000,7 +2000,7 @@ public class ShardInstance extends AbstractServerInstance {
 
       executionSuccess.inc();
       log.log(
-          Level.FINE,
+          Level.FINER,
           new StringBuilder()
               .append("ExecutionSuccess: ")
               .append(requestMetadata.getToolInvocationId())
@@ -2013,7 +2013,7 @@ public class ShardInstance extends AbstractServerInstance {
       actionCache.invalidate(DigestUtil.asActionKey(actionDigest));
       if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
         log.log(
-            Level.FINE,
+            Level.FINER,
             format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
         skipCacheLookup = true;
       }
@@ -2238,7 +2238,7 @@ public class ShardInstance extends AbstractServerInstance {
             poller.pause();
             long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
             log.log(
-                Level.FINE,
+                Level.FINER,
                 format(
                     "ShardInstance(%s): checkCache(%s): %sus elapsed",
                     getName(), operation.getName(), checkCacheUSecs));
@@ -2265,7 +2265,7 @@ public class ShardInstance extends AbstractServerInstance {
     Digest actionDigest = metadata.getActionDigest();
     SettableFuture<Void> queueFuture = SettableFuture.create();
     log.log(
-        Level.FINE,
+        Level.FINER,
         format(
             "ShardInstance(%s): queue(%s): fetching action %s",
             getName(), operation.getName(), actionDigest.getHash()));
@@ -2308,7 +2308,7 @@ public class ShardInstance extends AbstractServerInstance {
             actionFuture,
             (action) -> {
               log.log(
-                  Level.FINE,
+                  Level.FINER,
                   format(
                       "ShardInstance(%s): queue(%s): fetched action %s transforming queuedOperation",
                       getName(), operation.getName(), actionDigest.getHash()));
@@ -2338,7 +2338,7 @@ public class ShardInstance extends AbstractServerInstance {
             queuedFuture,
             (profiledQueuedMetadata) -> {
               log.log(
-                  Level.FINE,
+                  Level.FINER,
                   format(
                       "ShardInstance(%s): queue(%s): queuedOperation %s transformed, validating",
                       getName(),
@@ -2360,7 +2360,7 @@ public class ShardInstance extends AbstractServerInstance {
             validatedFuture,
             (profiledQueuedMetadata) -> {
               log.log(
-                  Level.FINE,
+                  Level.FINER,
                   format(
                       "ShardInstance(%s): queue(%s): queuedOperation %s validated, uploading",
                       getName(),
@@ -2412,7 +2412,7 @@ public class ShardInstance extends AbstractServerInstance {
               long elapsedUSecs = stopwatch.elapsed(MICROSECONDS);
               long queueUSecs = elapsedUSecs - startQueueUSecs;
               log.log(
-                  Level.FINE,
+                  Level.FINER,
                   format(
                       "ShardInstance(%s): queue(%s): %dus checkCache, %dus transform, %dus validate, %dus upload, %dus queue, %dus elapsed",
                       getName(),

@@ -145,7 +145,7 @@ public abstract class PipelineStage implements Runnable {
   }
 
   protected void logStart(String operationName, String message) {
-    getLogger().log(Level.FINE, String.format("%s: %s", logIterateId(operationName), message));
+    getLogger().log(Level.FINER, String.format("%s: %s", logIterateId(operationName), message));
   }
 
   protected void logComplete(String operationName, long usecs, long stallUSecs, boolean success) {
@@ -155,7 +155,7 @@ public abstract class PipelineStage implements Runnable {
   protected void logComplete(String operationName, long usecs, long stallUSecs, String status) {
     getLogger()
         .log(
-            Level.FINE,
+            Level.FINER,
             String.format(
                 "%s: %g ms (%g ms stalled) %s",
                 logIterateId(operationName), usecs / 1000.0f, stallUSecs / 1000.0f, status));
