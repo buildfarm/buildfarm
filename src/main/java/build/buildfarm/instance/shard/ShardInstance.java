@@ -895,7 +895,7 @@ public class ShardInstance extends AbstractServerInstance {
               public void onNext(ByteString nextChunk) {
                 blobObserver.onNext(nextChunk);
                 received += nextChunk.size();
-                ioMetric.observe(received);
+                ioMetric.observe(nextChunk.size());
               }
 
               @Override
