@@ -89,6 +89,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
+import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
@@ -636,6 +637,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             in.close();
           } catch (IOException e) {
             log.log(Level.SEVERE, "error closing input stream on cancel", e);
+          } finally {
+            blobObserver.onError(
+                Status.CANCELLED.withDescription("client cancelled").asRuntimeException());
           }
         });
     byte[] buffer = new byte[CHUNK_SIZE];
