@@ -64,10 +64,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import io.prometheus.client.Counter;
 import lombok.extern.java.Log;
 
 @Log
 public class ShardWorkerInstance extends AbstractServerInstance {
+  private static final Counter ioMetric =
+      Counter.build()
+          .name("io_bytes_read")
+          .help("Read I/O (bytes)")
+          .register();
+
   private final Backplane backplane;
 
   public ShardWorkerInstance(
@@ -132,6 +140,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
           @Override
           public void onNext(ByteString data) {
             blobObserver.onNext(data);
+            ioMetric.inc(data.size());
           }
 
           void removeBlobLocation() {
