@@ -56,6 +56,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.prometheus.client.Counter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -64,17 +65,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import io.prometheus.client.Counter;
 import lombok.extern.java.Log;
 
 @Log
 public class ShardWorkerInstance extends AbstractServerInstance {
   private static final Counter ioMetric =
-      Counter.build()
-          .name("io_bytes_read")
-          .help("Read I/O (bytes)")
-          .register();
+      Counter.build().name("io_bytes_read").help("Read I/O (bytes)").register();
 
   private final Backplane backplane;
 
