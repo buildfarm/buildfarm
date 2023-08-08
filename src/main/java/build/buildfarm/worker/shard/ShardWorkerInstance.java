@@ -69,7 +69,7 @@ import lombok.extern.java.Log;
 
 @Log
 public class ShardWorkerInstance extends AbstractServerInstance {
-  private final Counter ioMetric =
+  private static final Counter IO_METRIC =
       Counter.build().name("io_bytes_read").help("Read I/O (bytes)").register();
 
   private final Backplane backplane;
@@ -136,7 +136,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
           @Override
           public void onNext(ByteString data) {
             blobObserver.onNext(data);
-            ioMetric.inc(data.size());
+            IO_METRIC.inc(data.size());
           }
 
           void removeBlobLocation() {
