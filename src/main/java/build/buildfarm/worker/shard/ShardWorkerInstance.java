@@ -69,7 +69,7 @@ import lombok.extern.java.Log;
 
 @Log
 public class ShardWorkerInstance extends AbstractServerInstance {
-  private static final Counter ioMetric =
+  private final Counter ioMetric =
       Counter.build().name("io_bytes_read").help("Read I/O (bytes)").register();
 
   private final Backplane backplane;
