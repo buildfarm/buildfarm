@@ -373,7 +373,8 @@ class CFCExecFileSystem implements ExecFileSystem {
     ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
-    log.log(Level.FINE, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
+    log.log(
+        Level.FINER, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
     Iterable<ListenableFuture<Void>> fetchedFutures =
         fetchInputs(
             execDir,
@@ -431,7 +432,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     rootInputDirectories.put(execDir, inputDirectories.build());
 
     log.log(
-        Level.FINE,
+        Level.FINER,
         "ExecFileSystem::createExecDir(" + operationName + ") stamping output directories");
     boolean stamped = false;
     try {

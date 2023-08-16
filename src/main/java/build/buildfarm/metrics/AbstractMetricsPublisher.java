@@ -172,7 +172,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
             .usingTypeRegistry(typeRegistry)
             .omittingInsignificantWhitespace()
             .print(operationRequestMetadata);
-    log.log(Level.FINE, "{}", formattedRequestMetadata);
+    log.log(Level.FINER, "{}", formattedRequestMetadata);
     return formattedRequestMetadata;
   }
 }
