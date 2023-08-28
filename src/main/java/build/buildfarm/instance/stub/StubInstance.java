@@ -372,8 +372,14 @@ public class StubInstance implements Instance {
   @Override
   public void stop() throws InterruptedException {
     isStopped = true;
-    channel.shutdownNow();
-    channel.awaitTermination(0, TimeUnit.SECONDS);
+    if (!channel.isShutdown()) {
+      channel.shutdownNow();
+      channel.awaitTermination(0, TimeUnit.SECONDS);
+    }
+    if (!writeChannel.isShutdown()) {
+      writeChannel.shutdownNow();
+      writeChannel.awaitTermination(0, TimeUnit.SECONDS);
+    }
     if (retryService != null && !shutdownAndAwaitTermination(retryService, 10, TimeUnit.SECONDS)) {
       log.log(Level.SEVERE, format("Could not shut down retry service for %s", identifier));
     }
