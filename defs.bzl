@@ -138,8 +138,8 @@ def buildfarm_init(name = "buildfarm"):
                     ],
         generate_compat_repositories = True,
         repositories = [
-            "https://repo.maven.apache.org/maven2",
-            "https://jcenter.bintray.com",
+            "https://repo1.maven.org/maven2",
+            "https://mirrors.ibiblio.org/pub/mirrors/maven2",
         ],
     )
 
