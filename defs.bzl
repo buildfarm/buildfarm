@@ -108,7 +108,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.openjdk.jmh:jmh-core:1.23",
                         "org.openjdk.jmh:jmh-generator-annprocess:1.23",
                         "org.redisson:redisson:3.23.4",
-                        "org.threeten:threetenbp:1.3.3",
+                        "org.threeten:threetenbp:1.6.8",
                         "org.xerial:sqlite-jdbc:3.34.0",
                         "org.jetbrains:annotations:16.0.2",
                         "org.yaml:snakeyaml:2.0",
