@@ -72,7 +72,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.github.oshi:oshi-core:6.4.5",
                         "com.google.auth:google-auth-library-credentials:1.19.0",
                         "com.google.auth:google-auth-library-oauth2-http:1.19.0",
-                        "com.google.code.findbugs:jsr305:3.0.1",
+                        "com.google.code.findbugs:jsr305:3.0.2",
                         "com.google.code.gson:gson:2.9.0",
                         "com.google.errorprone:error_prone_annotations:2.22.0",
                         "com.google.errorprone:error_prone_core:2.22.0",
