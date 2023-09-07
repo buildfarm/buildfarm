@@ -332,20 +332,21 @@ Example:
 
 ```
 worker:
-  cas:
-    type: FILESYSTEM
-    path: "cache"
-    maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
-    maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
-    target:
+  storages:
+    - type: FILESYSTEM
+      path: "cache"
+      maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+      maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+      target:
 ```
 
 ```
 worker:
-  cas:
-    type: GRPC
-    instanceName: external-cas
-    target: "cas.external.com:1234"
+  storages:
+    - type: FILESYSTEM
+      path: "cache"
+    - type: GRPC
+      target: "cas.external.com:1234"
 ```
 
 ### Execution Policies
