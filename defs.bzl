@@ -67,7 +67,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.github.jnr:jnr-ffi:2.2.14",
                         "com.github.jnr:jnr-posix:3.1.17",
                         "com.github.pcj:google-options:1.0.0",
-                        "com.github.serceman:jnr-fuse:0.5.5",
+                        "com.github.serceman:jnr-fuse:0.5.7",
                         "com.github.luben:zstd-jni:1.5.5-7",
                         "com.github.oshi:oshi-core:6.4.0",
                         "com.google.auth:google-auth-library-credentials:0.9.1",
