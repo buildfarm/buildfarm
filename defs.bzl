@@ -101,7 +101,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.apache.commons:commons-pool2:2.11.1",
                         "org.apache.commons:commons-lang3:3.13.0",
                         "commons-io:commons-io:2.13.0",
-                        "me.dinowernli:java-grpc-prometheus:0.5.0",
+                        "me.dinowernli:java-grpc-prometheus:0.6.0",
                         "org.apache.tomcat:annotations-api:6.0.53",
                         "org.checkerframework:checker-qual:2.5.2",
                         "org.mockito:mockito-core:2.25.0",
