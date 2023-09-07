@@ -78,7 +78,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.errorprone:error_prone_core:2.22.0",
                         "com.google.guava:failureaccess:1.0.1",
                         "com.google.guava:guava:32.1.1-jre",
-                        "com.google.j2objc:j2objc-annotations:1.1",
+                        "com.google.j2objc:j2objc-annotations:2.8",
                         "com.google.jimfs:jimfs:1.1",
                         "com.google.protobuf:protobuf-java-util:3.19.1",
                         "com.google.protobuf:protobuf-java:3.19.1",
