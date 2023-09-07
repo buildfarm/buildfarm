@@ -85,7 +85,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.truth:truth:0.44",
                         "org.slf4j:slf4j-simple:2.0.9",
                         "com.googlecode.json-simple:json-simple:1.1.1",
-                        "com.jayway.jsonpath:json-path:2.4.0",
+                        "com.jayway.jsonpath:json-path:2.8.0",
                         "org.bouncycastle:bcprov-jdk15on:1.70",
                         "net.jcip:jcip-annotations:1.0",
                     ] + ["io.netty:netty-%s:4.1.94.Final" % module for module in IO_NETTY_MODULES] +
