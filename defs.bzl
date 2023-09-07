@@ -99,7 +99,7 @@ def buildfarm_init(name = "buildfarm"):
                         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
                         "org.apache.commons:commons-compress:1.23.0",
                         "org.apache.commons:commons-pool2:2.11.1",
-                        "org.apache.commons:commons-lang3:3.12.0",
+                        "org.apache.commons:commons-lang3:3.13.0",
                         "commons-io:commons-io:2.11.0",
                         "me.dinowernli:java-grpc-prometheus:0.5.0",
                         "org.apache.tomcat:annotations-api:6.0.53",
