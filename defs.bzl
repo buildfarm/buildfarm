@@ -83,7 +83,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.protobuf:protobuf-java-util:3.19.1",
                         "com.google.protobuf:protobuf-java:3.19.1",
                         "com.google.truth:truth:0.44",
-                        "org.slf4j:slf4j-simple:1.7.35",
+                        "org.slf4j:slf4j-simple:2.0.9",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
                         "org.bouncycastle:bcprov-jdk15on:1.70",
