@@ -152,7 +152,7 @@ public class RedisShardBackplane implements Backplane {
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete)
       throws ConfigurationException {
-    this(source, onPublish, onComplete, JedisClusterFactory.create());
+    this(source, onPublish, onComplete, JedisClusterFactory.create(source));
   }
 
   public RedisShardBackplane(
