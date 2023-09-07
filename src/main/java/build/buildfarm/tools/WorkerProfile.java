@@ -109,7 +109,7 @@ class WorkerProfile {
     } catch (IOException e) {
       System.out.println("Could not parse yml configuration file." + e);
     }
-    RedisClient client = new RedisClient(JedisClusterFactory.create().get());
+    RedisClient client = new RedisClient(JedisClusterFactory.create("worker-profile").get());
     return client.call(jedis -> fetchWorkers(jedis, System.currentTimeMillis()));
   }
 
