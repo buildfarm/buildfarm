@@ -94,7 +94,7 @@ def buildfarm_init(name = "buildfarm"):
                         "io.prometheus:simpleclient:0.15.0",
                         "io.prometheus:simpleclient_hotspot:0.15.0",
                         "io.prometheus:simpleclient_httpserver:0.15.0",
-                        "junit:junit:4.13.1",
+                        "junit:junit:4.13.2",
                         "javax.annotation:javax.annotation-api:1.3.2",
                         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
                         "org.apache.commons:commons-compress:1.21",
