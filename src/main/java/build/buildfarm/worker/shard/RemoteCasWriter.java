@@ -73,7 +73,7 @@ public class RemoteCasWriter implements CasWriter {
       Throwable cause = e.getCause();
       Throwables.throwIfInstanceOf(cause, IOException.class);
       Throwables.throwIfUnchecked(cause);
-      throw new RuntimeException(cause);
+      throw new IOException(cause);
     }
   }
 
@@ -90,7 +90,7 @@ public class RemoteCasWriter implements CasWriter {
       Throwables.throwIfInstanceOf(cause, IOException.class);
       // prevent a discard of this frame
       Status status = Status.fromThrowable(cause);
-      throw status.asRuntimeException();
+      throw new IOException(status.asException());
     }
   }
 
@@ -103,25 +103,20 @@ public class RemoteCasWriter implements CasWriter {
 
   public void insertBlob(Digest digest, ByteString content)
       throws IOException, InterruptedException {
-    insertBlobToCasMember(digest, content);
-  }
-
-  private void insertBlobToCasMember(Digest digest, ByteString content)
-      throws IOException, InterruptedException {
     try (InputStream in = content.newInput()) {
       retrier.execute(() -> writeToCasMember(digest, in));
     } catch (RetryException e) {
       Throwable cause = e.getCause();
       Throwables.throwIfInstanceOf(cause, IOException.class);
       Throwables.throwIfUnchecked(cause);
-      throw new RuntimeException(cause);
+      throw new IOException(cause);
     }
   }
 
   private String getRandomWorker() throws IOException {
     synchronized (workerSet) {
       if (workerSet.isEmpty()) {
-        throw new RuntimeException("no available workers");
+        throw new IOException("no available workers");
       }
       Random rand = new Random();
       int index = rand.nextInt(workerSet.size());
