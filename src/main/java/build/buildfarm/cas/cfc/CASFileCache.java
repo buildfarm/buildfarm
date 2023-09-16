@@ -963,12 +963,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 while (!closedFuture.isDone()) {
                   wait();
                 }
-                closedFuture.get(deadlineAfter, deadlineAfterUnits);
+                closedFuture.get();
               } catch (ExecutionException e) {
                 throw new IOException(e.getCause());
               } catch (InterruptedException e) {
-                throw new IOException(e);
-              } catch (TimeoutException e) {
                 throw new IOException(e);
               }
             }
