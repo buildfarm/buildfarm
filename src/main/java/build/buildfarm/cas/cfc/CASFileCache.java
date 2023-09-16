@@ -123,6 +123,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -861,8 +862,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Write write =
         new Write() {
           CancellableOutputStream out = null;
+          @GuardedBy("this")
           boolean isReset = false;
+          @GuardedBy("this")
           SettableFuture<Void> closedFuture = null;
+          @GuardedBy("this")
           long fileCommittedSize = -1;
 
           @Override
@@ -943,6 +947,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 directExecutor());
           }
 
+          private synchronized void syncCancelled() {
+            out = null;
+            isReset = true;
+          }
+
           @Override
           public synchronized FeedbackOutputStream getOutput(
               long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
@@ -951,10 +960,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             // will block until it is returned via a close.
             if (closedFuture != null) {
               try {
-                closedFuture.get();
+                while (!closedFuture.isDone()) {
+                  wait();
+                }
+                closedFuture.get(deadlineAfter, deadlineAfterUnits);
               } catch (ExecutionException e) {
                 throw new IOException(e.getCause());
               } catch (InterruptedException e) {
+                throw new IOException(e);
+              } catch (TimeoutException e) {
                 throw new IOException(e);
               }
             }
@@ -967,8 +981,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     UUID.fromString(key.getIdentifier()),
                     cancelled -> {
                       if (cancelled) {
-                        out = null;
-                        isReset = true;
+                        syncCancelled();
                       }
                       outClosedFuture.set(null);
                     },
@@ -978,7 +991,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             return uniqueOut;
           }
 
-          private void commitOpenState(
+          private synchronized void syncNotify() {
+            notify();
+          }
+
+          private synchronized void commitOpenState(
               CancellableOutputStream out, SettableFuture<Void> closedFuture) {
             // transition the Write to an open state, and modify all internal state required
             // atomically
@@ -986,6 +1003,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
             this.out = out;
             this.closedFuture = closedFuture;
+            closedFuture.addListener(this::syncNotify, directExecutor());
             // they will likely write to this, so we can no longer assume isReset.
             // might want to subscribe to a write event on the stream
             isReset = false;
