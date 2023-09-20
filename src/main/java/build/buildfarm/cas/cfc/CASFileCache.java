@@ -123,7 +123,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -862,10 +861,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Write write =
         new Write() {
           CancellableOutputStream out = null;
+
           @GuardedBy("this")
           boolean isReset = false;
+
           @GuardedBy("this")
           SettableFuture<Void> closedFuture = null;
+
           @GuardedBy("this")
           long fileCommittedSize = -1;
 
