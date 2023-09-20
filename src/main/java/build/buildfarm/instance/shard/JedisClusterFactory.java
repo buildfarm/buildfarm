@@ -170,7 +170,7 @@ public class JedisClusterFactory {
             password,
             identifier,
             poolConfig,
-            JedisURIHelper.isRedisSSLScheme(redisUri));
+            /* ssl=*/ JedisURIHelper.isRedisSSLScheme(redisUri));
   }
 
   /**
@@ -200,7 +200,7 @@ public class JedisClusterFactory {
             password,
             identifier,
             poolConfig,
-            false);
+            /* ssl=*/ false);
   }
   /**
    * @brief Create a jedis pool config.
