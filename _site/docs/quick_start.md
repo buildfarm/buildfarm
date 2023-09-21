@@ -64,8 +64,10 @@ A server alone does not itself store the content of action results. It acts as a
 
 From another prompt (i.e. a separate terminal) in the buildfarm repository directory:
 
- * run `bazel run src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/config.minimal.yml`
+ * run `bazel run src/main/java/build/buildfarm:buildfarm-shard-worker -- --prometheus_port=9091 $PWD/examples/config.minimal.yml`
 
+The `--` option is bazel convention to treat all subsequent arguments as parameters to the running app, like our `--prometheus_port`, instead of interpreting them with `run`
+The `--prometheus_port=9091` option allows this worker to run alongside our server, who will have started and logged that it has started a service on port `9090`. You can also turn this option off (with `--` separator), with `--prometheus_option=0` for either server or worker.
 This will also wait while the worker runs, indicating it will be available to store cache content.
 
 From another prompt in your newly created workspace directory from above:
@@ -90,16 +92,16 @@ INFO: 2 processes: 2 remote cache hit.
 
 Now we will use buildfarm for remote execution with a minimal configuration with a worker on the localhost that can execute a single process at a time, via a bazel invocation on our workspace.
 
-First, we should restart the buildfarm server, and delete the worker's cas storage to ensure that we get remote execution (this can also be forced from the client by using `--noremote_accept_cached`). From the buildfarm server prompt and directory:
+First, to clean out the results from the previous cached actions, flush your local redis database:
+
+ * run `redis-cli flushdb`
+
+Next, we should restart the buildfarm server, and delete the worker's cas storage to ensure that we get remote execution (this can also be forced from the client by using `--noremote_accept_cached`). From the buildfarm server prompt and directory:
 
  * interrupt the running `buildfarm-server` (i.e. Ctrl-C)
  * run `bazel run src/main/java/build/buildfarm:buildfarm-server $PWD/examples/config.minimal.yml`
 
-From another prompt in the buildfarm repository directory:
-
- * interrupt the running `buildfarm-shard-worker` (i.e. Ctrl-C)
- * recursively remove the worker root directory: from the config.minimal.yml, this will be `rm -fr /tmp/worker`
- * run `bazel run src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/config.minimal.yml`
+You can leave the worker running from the Remote Caching step, it will not require a restart
 
 From another prompt, in your client workspace:
 

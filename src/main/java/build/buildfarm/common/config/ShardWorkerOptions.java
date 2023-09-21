@@ -15,13 +15,9 @@
 package build.buildfarm.common.config;
 
 import com.google.devtools.common.options.Option;
-import com.google.devtools.common.options.OptionsBase;
 
 /** Command-line options definition for Worker. */
-public class ShardWorkerOptions extends OptionsBase {
-  @Option(name = "help", abbrev = 'h', help = "Prints usage info.", defaultValue = "true")
-  public boolean help;
-
+public class ShardWorkerOptions extends BuildfarmOptions {
   @Option(
       name = "root",
       help = "Root base directory for all work being performed.",
