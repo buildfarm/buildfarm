@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2023 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,12 +15,16 @@
 package build.buildfarm.common.config;
 
 import com.google.devtools.common.options.Option;
+import com.google.devtools.common.options.OptionsBase;
 
-/** Command-line options definition for example server. */
-public class ServerOptions extends BuildfarmOptions {
-  @Option(name = "port", abbrev = 'p', help = "Port to use.", defaultValue = "-1")
-  public int port;
+/** Command-line options definition for Worker. */
+public class BuildfarmOptions extends OptionsBase {
+  @Option(name = "help", abbrev = 'h', help = "Prints usage info.", defaultValue = "true")
+  public boolean help;
 
-  @Option(name = "public_name", abbrev = 'n', help = "Name of this server.", defaultValue = "")
-  public String publicName;
+  @Option(
+      name = "prometheus_port",
+      help = "Port for the prometheus service. '0' will disable prometheus hosting",
+      defaultValue = "-1")
+  public int prometheusPort;
 }

@@ -78,6 +78,9 @@ public final class BuildfarmConfigs {
     if (options.port > 0) {
       buildfarmConfigs.getServer().setPort(options.port);
     }
+    if (options.prometheusPort >= 0) {
+      buildfarmConfigs.setPrometheusPort(options.prometheusPort);
+    }
     adjustServerConfigs(buildfarmConfigs);
     return buildfarmConfigs;
   }
@@ -93,6 +96,9 @@ public final class BuildfarmConfigs {
     }
     if (!Strings.isNullOrEmpty(options.publicName)) {
       buildfarmConfigs.getWorker().setPublicName(options.publicName);
+    }
+    if (options.prometheusPort >= 0) {
+      buildfarmConfigs.setPrometheusPort(options.prometheusPort);
     }
     adjustWorkerConfigs(buildfarmConfigs);
     return buildfarmConfigs;
