@@ -35,6 +35,7 @@ public class Worker {
   private boolean onlyMulticoreTests = false;
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
+  private int gracefulShutdownSeconds = 0;
   private ExecutionPolicy[] executionPolicies = {};
   private SandboxSettings sandboxSettings = new SandboxSettings();
 

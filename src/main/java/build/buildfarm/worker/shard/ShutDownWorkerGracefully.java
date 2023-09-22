@@ -14,9 +14,6 @@
 
 package build.buildfarm.worker.shard;
 
-import static java.util.logging.Level.WARNING;
-
-import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
@@ -26,7 +23,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerImplBase {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final Worker worker;
 
   public ShutDownWorkerGracefully(Worker worker) {
@@ -44,33 +40,6 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
   public void prepareWorkerForGracefulShutdown(
       PrepareWorkerForGracefulShutDownRequest request,
       StreamObserver<PrepareWorkerForGracefulShutDownRequestResults> responseObserver) {
-    String clusterId = configs.getServer().getClusterId();
-    String clusterEndpoint = configs.getServer().getAdmin().getClusterEndpoint();
-    if (clusterId == null
-        || clusterId.equals("")
-        || clusterEndpoint == null
-        || clusterEndpoint.equals("")) {
-      String errorMessage =
-          String.format(
-              "Current AdminConfig doesn't have cluster_id or cluster_endpoint set, "
-                  + "the worker %s won't be shut down.",
-              configs.getWorker().getPublicName());
-      log.log(WARNING, errorMessage);
-      responseObserver.onError(new RuntimeException(errorMessage));
-      return;
-    }
-
-    if (!configs.getServer().getAdmin().isEnableGracefulShutdown()) {
-      String errorMessage =
-          String.format(
-              "Current AdminConfig doesn't support shut down worker gracefully, "
-                  + "the worker %s won't be shut down.",
-              configs.getWorker().getPublicName());
-      log.log(WARNING, errorMessage);
-      responseObserver.onError(new RuntimeException(errorMessage));
-      return;
-    }
-
     try {
       CompletableFuture.runAsync(worker::prepareWorkerForGracefulShutdown);
       responseObserver.onNext(PrepareWorkerForGracefulShutDownRequestResults.newBuilder().build());
