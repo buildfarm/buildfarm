@@ -51,6 +51,13 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
           .labelNames("worker_name")
           .help("Operations per worker.")
           .register();
+
+  private static final Gauge operationExitCode =
+      Gauge.build()
+          .name("operation_exit_code")
+          .labelNames("exit_code")
+          .help("Operation execution exit code.")
+          .register();
   private static final Histogram queuedTime =
       Histogram.build().name("queued_time_ms").help("Queued time in ms.").register();
   private static final Histogram outputUploadTime =
@@ -96,6 +103,11 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
             .labels(
                 Integer.toString(
                     operationRequestMetadata.getExecuteResponse().getStatus().getCode()))
+            .inc();
+        operationExitCode
+            .labels(
+                Integer.toString(
+                    operationRequestMetadata.getExecuteResponse().getResult().getExitCode()))
             .inc();
         if (operationRequestMetadata.getExecuteResponse().hasResult()
             && operationRequestMetadata.getExecuteResponse().getResult().hasExecutionMetadata()) {
