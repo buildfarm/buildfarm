@@ -11,5 +11,4 @@ public class Admin {
 
   private DEPLOYMENT_ENVIRONMENT deploymentEnvironment;
   private String clusterEndpoint;
-  private boolean enableGracefulShutdown;
 }

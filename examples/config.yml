@@ -38,7 +38,6 @@ server:
   admin:
     deploymentEnvironment: AWS
     clusterEndpoint: "grpc://localhost"
-    enableGracefulShutdown: false
   metrics:
     publisher: LOG
     logLevel: FINEST
@@ -126,6 +125,7 @@ worker:
   onlyMulticoreTests: false
   allowBringYourOwnContainer: false
   errorOperationRemainingResources: false
+  gracefulShutdownSeconds: 0
   sandboxSettings:
     alwaysUse: false
     selectForBlockNetwork: false

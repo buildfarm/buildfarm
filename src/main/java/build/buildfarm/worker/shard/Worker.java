@@ -27,7 +27,6 @@ import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.admin.aws.AwsAdmin;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -90,7 +89,6 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
@@ -139,52 +137,34 @@ public class Worker {
   private Pipeline pipeline;
   private Backplane backplane;
   private LoadingCache<String, Instance> workerStubs;
-  @Autowired private AwsAdmin awsAdmin;
 
-  /**
-   * The method will prepare the worker for graceful shutdown and send out grpc request to disable
-   * scale in protection when the worker is ready. If unexpected errors happened, it will cancel the
-   * graceful shutdown progress make the worker available again.
-   */
+  /** The method will prepare the worker for graceful shutdown when the worker is ready. */
   public void prepareWorkerForGracefulShutdown() {
-    inGracefulShutdown = true;
-    log.log(
-        Level.INFO,
-        "The current worker will not be registered again and should be shutdown gracefully!");
-    pipeline.stopMatchingOperations();
-    int scanRate = 30; // check every 30 seconds
-    int timeWaited = 0;
-    int timeOut = 60 * 15; // 15 minutes
-
-    try {
-      while (!pipeline.isEmpty() && timeWaited < timeOut) {
-        SECONDS.sleep(scanRate);
-        timeWaited += scanRate;
-        log.log(INFO, String.format("Pipeline is still not empty after %d seconds.", timeWaited));
-      }
-    } catch (InterruptedException e) {
-      log.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
-    } finally {
-      // make a grpc call to disable scale protection
-      String clusterEndpoint = configs.getServer().getAdmin().getClusterEndpoint();
+    if (configs.getWorker().getGracefulShutdownSeconds() > 0) {
+      inGracefulShutdown = true;
       log.log(
-          INFO,
-          String.format(
-              "It took the worker %d seconds to %s",
-              timeWaited,
-              pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
+          Level.INFO,
+          "The current worker will not be registered again and should be shutdown gracefully!");
+      pipeline.stopMatchingOperations();
+      int scanRate = 30; // check every 30 seconds
+      int timeWaited = 0;
+      int timeOut = configs.getWorker().getGracefulShutdownSeconds();
+
       try {
-        awsAdmin.disableHostScaleInProtection(clusterEndpoint, configs.getWorker().getPublicName());
-      } catch (Exception e) {
+        while (!pipeline.isEmpty() && timeWaited < timeOut) {
+          SECONDS.sleep(scanRate);
+          timeWaited += scanRate;
+          log.log(INFO, String.format("Pipeline is still not empty after %d seconds.", timeWaited));
+        }
+      } catch (InterruptedException e) {
+        log.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
+      } finally {
         log.log(
-            SEVERE,
+            INFO,
             String.format(
-                "gRPC call to AdminService to disable scale in protection failed with exception: %s and stacktrace %s",
-                e.getMessage(), Arrays.toString(e.getStackTrace())));
-        // Gracefully shutdown cannot be performed successfully because of error in
-        // AdminService side. Under this scenario, the worker has to be added back to the worker
-        // pool.
-        inGracefulShutdown = false;
+                "It took the worker %d seconds to %s",
+                timeWaited,
+                pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
       }
     }
   }
@@ -635,6 +615,7 @@ public class Worker {
   @PreDestroy
   public void stop() throws InterruptedException {
     System.err.println("*** shutting down gRPC server since JVM is shutting down");
+    prepareWorkerForGracefulShutdown();
     PrometheusPublisher.stopHttpServer();
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
