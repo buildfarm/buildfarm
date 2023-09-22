@@ -18,6 +18,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static java.lang.String.format;
 import static java.util.logging.Level.WARNING;
+import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -243,6 +244,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
     if (isComplete()) {
+      log.log(SEVERE, format("Writing but seems complete offset: %d len: %d comitted: %d expected: %d", off, len, getCommittedSize(), expectedSize));
       throw new WriteCompleteException();
     }
     if (getCommittedSize() + offset + len > expectedSize) {
