@@ -106,10 +106,29 @@ def archive_dependencies(third_party):
             "patch_args": ["-p1"],
             "patches": ["%s:clang_toolchain.patch" % third_party],
         },
+
+        # Used to build release container images
         {
             "name": "io_bazel_rules_docker",
             "sha256": "b1e80761a8a8243d03ebca8845e9cc1ba6c82ce7c5179ce2b295cd36f7e394bf",
             "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.25.0/rules_docker-v0.25.0.tar.gz"],
+            "patch_args": ["-p0"],
+            "patches": ["%s:docker_go_toolchain.patch" % third_party],
+        },
+
+        # Updated versions of io_bazel_rules_docker dependencies for bazel compatibility
+        {
+            "name": "io_bazel_rules_go",
+            "sha256": "278b7ff5a826f3dc10f04feaf0b70d48b68748ccd512d7f98bf442077f043fe3",
+            "urls": [
+                "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.41.0/rules_go-v0.41.0.zip",
+                "https://github.com/bazelbuild/rules_go/releases/download/v0.41.0/rules_go-v0.41.0.zip",
+            ],
+        },
+        {
+            "name": "bazel_gazelle",
+            "sha256": "d3fa66a39028e97d76f9e2db8f1b0c11c099e8e01bf363a923074784e451f809",
+            "urls": ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.33.0/bazel-gazelle-v0.33.0.tar.gz"],
         },
 
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
