@@ -60,6 +60,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.fasterxml.jackson.core:jackson-databind:2.15.0",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
                         "com.github.docker-java:docker-java:3.2.11",
+                        "com.github.fppt:jedis-mock:1.0.10",
                         "com.github.jnr:jffi:1.2.16",
                         "com.github.jnr:jffi:jar:native:1.2.16",
                         "com.github.jnr:jnr-constants:0.9.9",

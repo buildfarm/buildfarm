@@ -197,6 +197,7 @@ java_test(
         "//src/main/java/build/buildfarm/backplane",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
+        "//src/main/java/build/buildfarm/common/redis",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/server",
         "//src/main/java/build/buildfarm/instance/shard",
@@ -216,6 +217,7 @@ java_test(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
+        "@maven//:com_github_fppt_jedis_mock",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
