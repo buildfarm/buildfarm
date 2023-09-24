@@ -755,8 +755,8 @@ public class ShardInstance extends AbstractServerInstance {
                   })
               .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
 
-      leaseExtensionService
-          .execute(() -> extendLeaseForDigests(digestAndWorkersMap, requestMetadata));
+      leaseExtensionService.execute(
+          () -> extendLeaseForDigests(digestAndWorkersMap, requestMetadata));
 
       return immediateFuture(
           digestAndWorkersMap.entrySet().stream()

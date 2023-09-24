@@ -87,6 +87,6 @@ public class BuildfarmExecutors {
     int nThreads = 24;
     String threadNameFormat = "cas-lease-extend-pool-%d";
     return Executors.newFixedThreadPool(
-            nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
+        nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 }

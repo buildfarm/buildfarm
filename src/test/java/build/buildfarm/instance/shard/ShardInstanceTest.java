@@ -1119,7 +1119,6 @@ public class ShardInstanceTest {
     Set<String> activeAndImposterWorkers =
         Sets.newHashSet(Iterables.concat(activeWorkers, imposterWorkers));
 
-    ListenableFuture<Iterable<Digest>> responseFuture = Futures.immediateFuture(new ArrayList<>());
     when(mockBackplane.getStorageWorkers()).thenReturn(activeAndImposterWorkers);
     when(mockBackplane.getBlobDigestsWorkers(any(Iterable.class))).thenReturn(digestAndWorkersMap);
     when(mockInstanceLoader.load(anyString())).thenReturn(mockWorkerInstance);
@@ -1147,8 +1146,10 @@ public class ShardInstanceTest {
         Iterables.concat(missingDigests, digestAvailableOnImposters);
 
     assertThat(actualMissingDigests).containsExactlyElementsIn(expectedMissingDigests);
-    verify(mockWorkerInstance, atMost(3)).findMissingBlobs(anyIterable(), any(RequestMetadata.class));
-    verify(mockWorkerInstance, atLeast(1)).findMissingBlobs(anyIterable(), any(RequestMetadata.class));
+    verify(mockWorkerInstance, atMost(3))
+        .findMissingBlobs(anyIterable(), any(RequestMetadata.class));
+    verify(mockWorkerInstance, atLeast(1))
+        .findMissingBlobs(anyIterable(), any(RequestMetadata.class));
 
     for (Digest digest : actualMissingDigests) {
       assertThat(digest).isNotIn(availableDigests);
