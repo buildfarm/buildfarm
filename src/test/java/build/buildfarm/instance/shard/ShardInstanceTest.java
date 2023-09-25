@@ -86,7 +86,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -168,7 +167,6 @@ public class ShardInstanceTest {
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
             /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()),
-            /* leaseExtensionService=*/ MoreExecutors.newDirectExecutorService(),
             false);
     instance.start("startTime/test:0000");
   }

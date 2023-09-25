@@ -82,11 +82,4 @@ public class BuildfarmExecutors {
     int nThreads = 128;
     return Executors.newWorkStealingPool(nThreads);
   }
-
-  public static ExecutorService getCasLeaseExtendPool() {
-    int nThreads = 24;
-    String threadNameFormat = "cas-lease-extend-pool-%d";
-    return Executors.newFixedThreadPool(
-        nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
-  }
 }

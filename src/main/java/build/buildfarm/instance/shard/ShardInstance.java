@@ -240,7 +240,6 @@ public class ShardInstance extends AbstractServerInstance {
   private final ListeningExecutorService operationTransformService =
       BuildfarmExecutors.getTransformServicePool();
   private final ListeningExecutorService actionCacheFetchService;
-  private final ExecutorService leaseExtensionService;
   private final ScheduledExecutorService contextDeadlineScheduler =
       newSingleThreadScheduledExecutor();
   private final ExecutorService operationDeletionService = newSingleThreadExecutor();
@@ -276,8 +275,7 @@ public class ShardInstance extends AbstractServerInstance {
         digestUtil,
         createBackplane(identifier),
         onStop,
-        /* actionCacheFetchService=*/ BuildfarmExecutors.getActionCacheFetchServicePool(),
-        /* leaseExtensionService=*/ BuildfarmExecutors.getCasLeaseExtendPool());
+        /* actionCacheFetchService=*/ BuildfarmExecutors.getActionCacheFetchServicePool());
   }
 
   private ShardInstance(
@@ -285,8 +283,7 @@ public class ShardInstance extends AbstractServerInstance {
       DigestUtil digestUtil,
       Backplane backplane,
       Runnable onStop,
-      ListeningExecutorService actionCacheFetchService,
-      ExecutorService leaseExtensionService)
+      ListeningExecutorService actionCacheFetchService)
       throws InterruptedException {
     this(
         name,
@@ -307,7 +304,6 @@ public class ShardInstance extends AbstractServerInstance {
             digestUtil,
             Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build()),
         actionCacheFetchService,
-        leaseExtensionService,
         configs.getServer().isEnsureOutputsPresent());
   }
 
@@ -350,7 +346,6 @@ public class ShardInstance extends AbstractServerInstance {
       Runnable onStop,
       LoadingCache<String, Instance> workerStubs,
       ListeningExecutorService actionCacheFetchService,
-      ExecutorService leaseExtensionService,
       boolean ensureOutputsPresent) {
     super(
         name,
@@ -371,7 +366,6 @@ public class ShardInstance extends AbstractServerInstance {
     this.maxActionTimeout = maxActionTimeout;
     this.useDenyList = useDenyList;
     this.actionCacheFetchService = actionCacheFetchService;
-    this.leaseExtensionService = leaseExtensionService;
     backplane.setOnUnsubscribe(this::stop);
 
     initializeCaches();
@@ -755,14 +749,19 @@ public class ShardInstance extends AbstractServerInstance {
                   })
               .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
 
-      leaseExtensionService.execute(
-          () -> extendLeaseForDigests(digestAndWorkersMap, requestMetadata));
-
-      return immediateFuture(
-          digestAndWorkersMap.entrySet().stream()
-              .filter(entry -> entry.getValue().isEmpty())
-              .map(Map.Entry::getKey)
-              .collect(Collectors.toList()));
+      ListenableFuture<Iterable<Digest>> missingDigestFuture =
+          immediateFuture(
+              digestAndWorkersMap.entrySet().stream()
+                  .filter(entry -> entry.getValue().isEmpty())
+                  .map(Map.Entry::getKey)
+                  .collect(Collectors.toList()));
+      return transformAsync(
+          missingDigestFuture,
+          (missingDigest) -> {
+            extendLeaseForDigests(digestAndWorkersMap, requestMetadata);
+            return immediateFuture(missingDigest);
+          },
+          Context.currentContextExecutor(directExecutor()));
     } catch (Exception e) {
       log.log(Level.SEVERE, "find missing blob via backplane failed", e);
       return immediateFailedFuture(Status.fromThrowable(e).asException());
@@ -817,16 +816,7 @@ public class ShardInstance extends AbstractServerInstance {
                     workerAndDigestMap.computeIfAbsent(worker, w -> new HashSet<>()).add(digest)));
 
     workerAndDigestMap.forEach(
-        (worker, digests) -> {
-          try {
-            workerStub(worker).findMissingBlobs(digests, requestMetadata).get();
-          } catch (ExecutionException | InterruptedException e) {
-            log.log(
-                Level.WARNING,
-                format("Failed to extend lease for %s on worker %s", digests, worker),
-                e);
-          }
-        });
+        (worker, digests) -> workerStub(worker).findMissingBlobs(digests, requestMetadata));
 
     try {
       backplane.updateDigestsExpiry(digestAndWorkersMap.keySet());
