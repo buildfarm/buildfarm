@@ -20,9 +20,9 @@ import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
 import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static io.grpc.Status.Code.ALREADY_EXISTS;
 import static io.grpc.Status.ABORTED;
 import static io.grpc.Status.CANCELLED;
+import static io.grpc.Status.Code.ALREADY_EXISTS;
 import static io.grpc.Status.INVALID_ARGUMENT;
 import static java.lang.String.format;
 
@@ -32,8 +32,8 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
-import build.buildfarm.common.Write.WriteCompleteException;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.WriteCompleteException;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
@@ -406,10 +406,10 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
     } catch (EntryLimitException e) {
       throw e;
     } catch (WriteCompleteException e) {
-      Status status = Status.fromCode(ALREADY_EXISTS)
-          .withCause(e);
-      log.log(Level.FINE, format("already wrote data for %s", name), e);
-      errorResponse(status.asException());
+      Status status = Status.fromCode(ALREADY_EXISTS).withCause(e);
+      if (errorResponse(status.asException())) {
+        log.log(Level.FINE, format("already wrote data for %s", name), e);
+      }
     } catch (IOException e) {
       if (errorResponse(Status.fromThrowable(e).asException())) {
         log.log(Level.SEVERE, format("error writing data for %s", name), e);
