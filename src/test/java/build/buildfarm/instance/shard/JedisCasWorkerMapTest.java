@@ -9,8 +9,7 @@ import com.github.fppt.jedismock.RedisServer;
 import com.github.fppt.jedismock.server.ServiceOptions;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Collections;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -34,9 +33,11 @@ public class JedisCasWorkerMapTest {
         RedisServer.newRedisServer()
             .setOptions(ServiceOptions.defaultOptions().withClusterModeEnabled())
             .start();
-    Set<HostAndPort> x = new HashSet<>();
-    x.add(new HostAndPort(redisServer.getHost(), redisServer.getBindPort()));
-    redisClient = new RedisClient(new JedisCluster(x));
+    redisClient =
+        new RedisClient(
+            new JedisCluster(
+                Collections.singleton(
+                    new HostAndPort(redisServer.getHost(), redisServer.getBindPort()))));
     jedisCasWorkerMap = new JedisCasWorkerMap(CAS_PREFIX, 60);
   }
 
