@@ -22,7 +22,7 @@ import redis.clients.jedis.JedisCluster;
 @RunWith(JUnit4.class)
 public class JedisCasWorkerMapTest {
 
-  private final String casPrefix = "ContentAddressableStorage";
+  private static final String CAS_PREFIX = "ContentAddressableStorage";
 
   private RedisServer redisServer;
   private RedisClient redisClient;
@@ -37,7 +37,7 @@ public class JedisCasWorkerMapTest {
     Set<HostAndPort> x = new HashSet<>();
     x.add(new HostAndPort(redisServer.getHost(), redisServer.getBindPort()));
     redisClient = new RedisClient(new JedisCluster(x));
-    jedisCasWorkerMap = new JedisCasWorkerMap(casPrefix, 60);
+    jedisCasWorkerMap = new JedisCasWorkerMap(CAS_PREFIX, 60);
   }
 
   @Test
@@ -45,8 +45,8 @@ public class JedisCasWorkerMapTest {
     Digest testDigest1 = Digest.newBuilder().setHash("abc").build();
     Digest testDigest2 = Digest.newBuilder().setHash("xyz").build();
 
-    String casKey1 = casPrefix + ":" + DigestUtil.toString(testDigest1);
-    String casKey2 = casPrefix + ":" + DigestUtil.toString(testDigest2);
+    String casKey1 = CAS_PREFIX + ":" + DigestUtil.toString(testDigest1);
+    String casKey2 = CAS_PREFIX + ":" + DigestUtil.toString(testDigest2);
 
     redisClient.run(jedis -> jedis.sadd(casKey1, "worker1"));
     jedisCasWorkerMap.setExpire(redisClient, Arrays.asList(testDigest1, testDigest2));

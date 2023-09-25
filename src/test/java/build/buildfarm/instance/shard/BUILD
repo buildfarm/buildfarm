@@ -208,6 +208,7 @@ java_test(
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_github_ben_manes_caffeine_caffeine",
+        "@maven//:com_github_fppt_jedis_mock",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_protobuf_protobuf_java_util",
@@ -217,7 +218,6 @@ java_test(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
-        "@maven//:com_github_fppt_jedis_mock",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
