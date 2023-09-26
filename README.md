@@ -31,7 +31,7 @@ Run via
 ```
 bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- <logfile> <configfile>
 
-Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
+Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
 **`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
 **`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
@@ -43,7 +43,7 @@ Run via
 ```
 bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- <logfile> <configfile>
 
-Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
+Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 
 ```
 **`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
@@ -68,13 +68,13 @@ You can use typical Java logging configuration to filter these results and obser
 An example `logging.properties` file has been provided at [examples/logging.properties](examples/logging.properties) for use as follows:
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
+bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
 
 and
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
+bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
 
 To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
