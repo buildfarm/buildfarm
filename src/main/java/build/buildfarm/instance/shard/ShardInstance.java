@@ -254,7 +254,11 @@ public class ShardInstance extends AbstractServerInstance {
   private static Backplane createBackplane(String identifier) throws ConfigurationException {
     if (configs.getBackplane().getType().equals(SHARD)) {
       return new RedisShardBackplane(
-          identifier, ShardInstance::stripOperation, ShardInstance::stripQueuedOperation);
+          identifier,
+          /* subscribeToBackplane=*/ true,
+          configs.getServer().isRunFailsafeOperation(),
+          ShardInstance::stripOperation,
+          ShardInstance::stripQueuedOperation);
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
     }

@@ -24,6 +24,7 @@ public class Server {
   private String sslPrivateKeyPath = null;
   private boolean runDispatchedMonitor = true;
   private int dispatchedMonitorIntervalSeconds = 1;
+  private boolean runFailsafeOperation = true;
   private boolean runOperationQueuer = true;
   private boolean ensureOutputsPresent = false;
   private int maxRequeueAttempts = 5;
