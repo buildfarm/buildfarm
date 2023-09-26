@@ -634,7 +634,7 @@ public class RedisShardBackplane implements Backplane {
             .setRemove(WorkerChange.Remove.newBuilder().setSource(source).setReason(reason).build())
             .build();
     String workerChangeJson = JsonFormat.printer().print(workerChange);
-    return subscriber.removeWorker(name)
+    return storageWorkerSet.remove(name)
         && client.call(
             jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson, /* storage=*/ true));
   }
