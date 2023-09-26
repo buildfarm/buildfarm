@@ -129,6 +129,8 @@ public class RedisShardBackplane implements Backplane {
                   .build());
 
   private final String source; // used in operation change publication
+  private final boolean subscribeToBackplane;
+  private final boolean runFailsafeOperation;
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
   private final Supplier<JedisCluster> jedisClusterFactory;
@@ -149,18 +151,30 @@ public class RedisShardBackplane implements Backplane {
 
   public RedisShardBackplane(
       String source,
+      boolean subscribeToBackplane,
+      boolean runFailsafeOperation,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete)
       throws ConfigurationException {
-    this(source, onPublish, onComplete, JedisClusterFactory.create(source));
+    this(
+        source,
+        subscribeToBackplane,
+        runFailsafeOperation,
+        onPublish,
+        onComplete,
+        JedisClusterFactory.create(source));
   }
 
   public RedisShardBackplane(
       String source,
+      boolean subscribeToBackplane,
+      boolean runFailsafeOperation,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
       Supplier<JedisCluster> jedisClusterFactory) {
     this.source = source;
+    this.subscribeToBackplane = subscribeToBackplane;
+    this.runFailsafeOperation = runFailsafeOperation;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
     this.jedisClusterFactory = jedisClusterFactory;
@@ -519,10 +533,10 @@ public class RedisShardBackplane implements Backplane {
     // Create containers that make up the backplane
     state = DistributedStateCreator.create(client);
 
-    if (configs.getBackplane().isSubscribeToBackplane()) {
+    if (subscribeToBackplane) {
       startSubscriptionThread();
     }
-    if (configs.getBackplane().isRunFailsafeOperation()) {
+    if (runFailsafeOperation) {
       startFailsafeOperationThread();
     }
 

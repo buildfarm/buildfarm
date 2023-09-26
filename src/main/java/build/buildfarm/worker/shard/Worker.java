@@ -546,7 +546,12 @@ public class Worker {
 
     if (SHARD.equals(configs.getBackplane().getType())) {
       backplane =
-          new RedisShardBackplane(identifier, this::stripOperation, this::stripQueuedOperation);
+          new RedisShardBackplane(
+              identifier,
+              /* subscribeToBackplane=*/ false,
+              /* runFailsafeOperation=*/ false,
+              this::stripOperation,
+              this::stripQueuedOperation);
       backplane.start(configs.getWorker().getPublicName());
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
