@@ -51,10 +51,6 @@ public abstract class PipelineStage implements Runnable {
       runInterruptible();
     } catch (InterruptedException e) {
       // ignore
-    } catch (Exception e) {
-      getLogger()
-          .log(
-              Level.SEVERE, String.format("%s::run(): stage terminated due to exception", name), e);
     } finally {
       boolean wasInterrupted = Thread.interrupted();
       try {
