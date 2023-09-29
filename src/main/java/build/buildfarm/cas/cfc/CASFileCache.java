@@ -687,7 +687,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
         if (len < 0) {
           in.close();
-          accessRecorder.execute(() -> recordAccess(ImmutableList.of(getKey(digest, false))));
           blobObserver.onCompleted();
         }
       }
