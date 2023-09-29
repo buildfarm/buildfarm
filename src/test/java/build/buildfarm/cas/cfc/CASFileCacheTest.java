@@ -637,7 +637,6 @@ class CASFileCacheTest {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Digest digest = DIGEST_UTIL.compute(content);
 
-    AtomicBoolean writeClosed = new AtomicBoolean(false);
     Write write = getWrite(digest);
     OutputStream out = write.getOutput(1, SECONDS, () -> {});
 
