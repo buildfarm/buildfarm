@@ -89,6 +89,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
+import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
@@ -958,19 +959,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           public synchronized FeedbackOutputStream getOutput(
               long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
               throws IOException {
-            // caller will be the exclusive owner of this write stream. all other requests
-            // will block until it is returned via a close.
-            if (closedFuture != null) {
-              try {
-                while (!closedFuture.isDone()) {
-                  wait();
-                }
-                closedFuture.get();
-              } catch (ExecutionException e) {
-                throw new IOException(e.getCause());
-              } catch (InterruptedException e) {
-                throw new IOException(e);
-              }
+            // Prevent concurrent writes: if a write operation is already in progress,
+            // throw an exception to indicate that another write cannot be initiated
+            // for the same input.
+            if (closedFuture != null && !closedFuture.isDone()) {
+              throw Status.ABORTED
+                  .withDescription(
+                      "Another write operation is still in progress for the same input")
+                  .asRuntimeException();
             }
             SettableFuture<Void> outClosedFuture = SettableFuture.create();
             UniqueWriteOutputStream uniqueOut =
@@ -991,10 +987,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             return uniqueOut;
           }
 
-          private synchronized void syncNotify() {
-            notify();
-          }
-
           private synchronized void commitOpenState(
               CancellableOutputStream out, SettableFuture<Void> closedFuture) {
             // transition the Write to an open state, and modify all internal state required
@@ -1003,7 +995,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
             this.out = out;
             this.closedFuture = closedFuture;
-            closedFuture.addListener(this::syncNotify, directExecutor());
             // they will likely write to this, so we can no longer assume isReset.
             // might want to subscribe to a write event on the stream
             isReset = false;
