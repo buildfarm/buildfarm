@@ -29,6 +29,8 @@ java_library(
         "@maven//:io_netty_netty_common",
         "@maven//:io_netty_netty_handler",
         "@maven//:io_netty_netty_transport",
+        "@maven//:io_netty_netty_transport_classes_epoll",
+        "@maven//:io_netty_netty_transport_classes_kqueue",
         "@maven//:io_netty_netty_transport_native_epoll",
         "@maven//:io_netty_netty_transport_native_kqueue",
         "@maven//:io_netty_netty_transport_native_unix_common",

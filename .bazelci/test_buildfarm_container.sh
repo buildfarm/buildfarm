@@ -11,8 +11,8 @@ BUILDFARM_SERVER_TARGET="//src/main/java/build/buildfarm:buildfarm-server"
 BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-shard-worker"
 
 #The configs used by the targets
-BUILDFARM_SERVER_CONFIG="/buildfarm/examples/config.minimal.yml"
-BUILDFARM_WORKER_CONFIG="/buildfarm/examples/config.minimal.yml"
+BUILDFARM_SERVER_CONFIG=$BUILDFARM_CONFIG
+BUILDFARM_WORKER_CONFIG=$BUILDFARM_CONFIG
 
 GRPC_LOGS1="/tmp/parsed-grpc.log"
 GRPC_LOGS2="/tmp/parsed-grpc2.log"

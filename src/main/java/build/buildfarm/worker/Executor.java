@@ -199,7 +199,7 @@ class Executor {
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
-    log.log(Level.FINE, "Executor: Operation " + operation.getName() + " Executing command");
+    log.log(Level.FINER, "Executor: Operation " + operation.getName() + " Executing command");
 
     ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
     resultBuilder
@@ -291,7 +291,7 @@ class Executor {
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
     log.log(
-        Level.FINE,
+        Level.FINER,
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
             operationName, resultBuilder.getExitCode()));
@@ -309,7 +309,7 @@ class Executor {
         throw e;
       }
     } else {
-      log.log(Level.FINE, "Executor: Operation " + operationName + " Failed to claim output");
+      log.log(Level.FINER, "Executor: Operation " + operationName + " Failed to claim output");
       boolean wasInterrupted = Thread.interrupted();
       try {
         putError();
@@ -380,25 +380,29 @@ class Executor {
         uniqueIndex(operationContext.command.getPlatform().getPropertiesList(), Property::getName);
 
     arguments.add(wrapper.getPath());
-    for (String argument : wrapper.getArguments()) {
-      // If the argument is of the form <propertyName>, substitute the value of
-      // the property from the platform specification.
-      if (!argument.equals("<>")
-          && argument.charAt(0) == '<'
-          && argument.charAt(argument.length() - 1) == '>') {
-        // substitute with matching platform property content
-        // if this property is not present, the wrapper is ignored
-        String propertyName = argument.substring(1, argument.length() - 1);
-        Property property = properties.get(propertyName);
-        if (property == null) {
-          return ImmutableList.of();
+
+    if (wrapper.getArguments() != null) {
+      for (String argument : wrapper.getArguments()) {
+        // If the argument is of the form <propertyName>, substitute the value of
+        // the property from the platform specification.
+        if (!argument.equals("<>")
+            && argument.charAt(0) == '<'
+            && argument.charAt(argument.length() - 1) == '>') {
+          // substitute with matching platform property content
+          // if this property is not present, the wrapper is ignored
+          String propertyName = argument.substring(1, argument.length() - 1);
+          Property property = properties.get(propertyName);
+          if (property == null) {
+            return ImmutableList.of();
+          }
+          arguments.add(property.getValue());
+        } else {
+          // If the argument isn't of the form <propertyName>, add the argument directly:
+          arguments.add(argument);
         }
-        arguments.add(property.getValue());
-      } else {
-        // If the argument isn't of the form <propertyName>, add the argument directly:
-        arguments.add(argument);
       }
     }
+
     return arguments.build();
   }
 
@@ -482,8 +486,8 @@ class Executor {
         new ByteStringWriteReader(
             process.getErrorStream(), stderrWrite, (int) workerContext.getStandardErrorLimit());
 
-    Thread stdoutReaderThread = new Thread(stdoutReader);
-    Thread stderrReaderThread = new Thread(stderrReader);
+    Thread stdoutReaderThread = new Thread(stdoutReader, "Executor.stdoutReader");
+    Thread stderrReaderThread = new Thread(stderrReader, "Executor.stderrReader");
     stdoutReaderThread.start();
     stderrReaderThread.start();
 

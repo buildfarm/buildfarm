@@ -13,10 +13,10 @@ def archive_dependencies(third_party):
         {
             "name": "platforms",
             "urls": [
-                "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.6/platforms-0.0.6.tar.gz",
-                "https://github.com/bazelbuild/platforms/releases/download/0.0.6/platforms-0.0.6.tar.gz",
+                "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.7/platforms-0.0.7.tar.gz",
+                "https://github.com/bazelbuild/platforms/releases/download/0.0.7/platforms-0.0.7.tar.gz",
             ],
-            "sha256": "5308fc1d8865406a49427ba24a9ab53087f17f5266a7aabbfc28823f3916e1ca",
+            "sha256": "3a561c99e7bdbe9173aa653fd579fe849f1d8d67395780ab4770b1f381431d51",
         },
         {
             "name": "rules_jvm_external",
@@ -50,9 +50,25 @@ def archive_dependencies(third_party):
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "sha256": "101b21af120901e9bf342384988f57af3332b59d997f64d5f41a1e24ffb96f19",
-            "strip_prefix": "grpc-java-1.42.0",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.42.0.zip"],
+            "sha256": "b8fb7ae4824fb5a5ae6e6fa26ffe2ad7ab48406fdeee54e8965a3b5948dd957e",
+            "strip_prefix": "grpc-java-1.56.1",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.56.1.zip"],
+        },
+        {
+            "name": "rules_pkg",
+            "sha256": "335632735e625d408870ec3e361e192e99ef7462315caa887417f4d88c4c8fb8",
+            "urls": [
+                "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.9.0/rules_pkg-0.9.0.tar.gz",
+                "https://github.com/bazelbuild/rules_pkg/releases/download/0.9.0/rules_pkg-0.9.0.tar.gz",
+            ],
+        },
+        {
+            "name": "rules_license",
+            "sha256": "6157e1e68378532d0241ecd15d3c45f6e5cfd98fc10846045509fb2a7cc9e381",
+            "urls": [
+                "https://github.com/bazelbuild/rules_license/releases/download/0.0.4/rules_license-0.0.4.tar.gz",
+                "https://mirror.bazel.build/github.com/bazelbuild/rules_license/releases/download/0.0.4/rules_license-0.0.4.tar.gz",
+            ],
         },
 
         # The APIs that we implement.
@@ -76,9 +92,9 @@ def archive_dependencies(third_party):
         },
         {
             "name": "rules_cc",
-            "sha256": "34b2ebd4f4289ebbc27c7a0d854dcd510160109bb0194c0ba331c9656ffcb556",
-            "strip_prefix": "rules_cc-daf6ace7cfeacd6a83e9ff2ed659f416537b6c74",
-            "url": "https://github.com/bazelbuild/rules_cc/archive/daf6ace7cfeacd6a83e9ff2ed659f416537b6c74.tar.gz",
+            "sha256": "3d9e271e2876ba42e114c9b9bc51454e379cbf0ec9ef9d40e2ae4cec61a31b40",
+            "strip_prefix": "rules_cc-0.0.6",
+            "url": "https://github.com/bazelbuild/rules_cc/releases/download/0.0.6/rules_cc-0.0.6.tar.gz",
         },
 
         # Used to format proto files
@@ -90,19 +106,37 @@ def archive_dependencies(third_party):
             "patch_args": ["-p1"],
             "patches": ["%s:clang_toolchain.patch" % third_party],
         },
+
+        # Used to build release container images
         {
             "name": "io_bazel_rules_docker",
-            "sha256": "59536e6ae64359b716ba9c46c39183403b01eabfbd57578e84398b4829ca499a",
-            "strip_prefix": "rules_docker-0.22.0",
-            "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.22.0/rules_docker-v0.22.0.tar.gz"],
+            "sha256": "b1e80761a8a8243d03ebca8845e9cc1ba6c82ce7c5179ce2b295cd36f7e394bf",
+            "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.25.0/rules_docker-v0.25.0.tar.gz"],
+            "patch_args": ["-p0"],
+            "patches": ["%s:docker_go_toolchain.patch" % third_party],
+        },
+
+        # Updated versions of io_bazel_rules_docker dependencies for bazel compatibility
+        {
+            "name": "io_bazel_rules_go",
+            "sha256": "278b7ff5a826f3dc10f04feaf0b70d48b68748ccd512d7f98bf442077f043fe3",
+            "urls": [
+                "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.41.0/rules_go-v0.41.0.zip",
+                "https://github.com/bazelbuild/rules_go/releases/download/v0.41.0/rules_go-v0.41.0.zip",
+            ],
+        },
+        {
+            "name": "bazel_gazelle",
+            "sha256": "d3fa66a39028e97d76f9e2db8f1b0c11c099e8e01bf363a923074784e451f809",
+            "urls": ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.33.0/bazel-gazelle-v0.33.0.tar.gz"],
         },
 
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
         {
             "name": "bazel",
-            "sha256": "bca2303a43c696053317a8c7ac09a5e6d90a62fec4726e55357108bb60d7a807",
-            "strip_prefix": "bazel-3.7.2",
-            "urls": ["https://github.com/bazelbuild/bazel/archive/3.7.2.tar.gz"],
+            "sha256": "06d3dbcba2286d45fc6479a87ccc649055821fc6da0c3c6801e73da780068397",
+            "strip_prefix": "bazel-6.0.0",
+            "urls": ["https://github.com/bazelbuild/bazel/archive/refs/tags/6.0.0.tar.gz"],
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
         },
@@ -114,6 +148,12 @@ def archive_dependencies(third_party):
             "sha256": "03980702e8e9b757df68aa26493ca4e8573770f15dd8a6684de728b9cb8549f1",
             "strip_prefix": "TARDIS-f54fa4743e67763bb1ad77039b3d15be64e2e564",
             "url": "https://github.com/Unilang/TARDIS/archive/f54fa4743e67763bb1ad77039b3d15be64e2e564.zip",
+        },
+        {
+            "name": "rules_oss_audit",
+            "sha256": "02962810bcf82d0c66f929ccc163423f53773b8b154574ca956345523243e70d",
+            "strip_prefix": "rules_oss_audit-1b2690cefd5a960c181e0d89bf3c076294a0e6f4",
+            "url": "https://github.com/vmware/rules_oss_audit/archive/1b2690cefd5a960c181e0d89bf3c076294a0e6f4.zip",
         },
     ]
 
@@ -155,9 +195,9 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
     maybe(
         http_jar,
         "opentelemetry",
-        sha256 = "0523287984978c091be0d22a5c61f0bce8267eeafbbae58c98abaf99c9396832",
+        sha256 = "eccd069da36031667e5698705a6838d173d527a5affce6cc514a14da9dbf57d7",
         urls = [
-            "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.11.0/opentelemetry-javaagent.jar",
+            "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.28.0/opentelemetry-javaagent.jar",
         ],
     )
 

@@ -29,6 +29,7 @@ import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
+import build.buildfarm.server.controllers.WebController;
 import build.buildfarm.server.services.ActionCacheService;
 import build.buildfarm.server.services.AdminService;
 import build.buildfarm.server.services.CapabilitiesService;
@@ -48,6 +49,8 @@ import io.prometheus.client.Counter;
 import java.io.File;
 import java.io.IOException;
 import java.security.Security;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.PostConstruct;
@@ -80,19 +83,24 @@ public class BuildFarmServer {
   private boolean stopping = false;
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
+  private ShardInstance createInstance()
+      throws IOException, ConfigurationException, InterruptedException {
+    return new ShardInstance(
+        configs.getServer().getName(),
+        configs.getServer().getSession() + "-" + configs.getServer().getName(),
+        new DigestUtil(configs.getDigestFunction()),
+        this::stop);
+  }
+
   public synchronized void start(ServerBuilder<?> serverBuilder, String publicName)
       throws IOException, ConfigurationException, InterruptedException {
-    instance =
-        new ShardInstance(
-            configs.getServer().getName(),
-            configs.getServer().getSession() + "-" + configs.getServer().getName(),
-            new DigestUtil(configs.getDigestFunction()),
-            this::stop);
+    instance = createInstance();
 
     healthStatusManager = new HealthStatusManager();
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-    if (configs.getServer().getSslCertificatePath() != null) {
+    if (configs.getServer().getSslCertificatePath() != null
+        && configs.getServer().getSslPrivateKeyPath() != null) {
       // There are different Public Key Cryptography Standards (PKCS) that users may format their
       // certificate files in.  By default, the JDK cannot parse all of them.  In particular, it
       // cannot parse PKCS #1 (RSA Cryptography Standard).  When enabling TLS for GRPC, java's
@@ -101,8 +109,9 @@ public class BuildFarmServer {
       // is a library that will parse additional formats and allow users to provide certificates in
       // an otherwise unsupported format.
       Security.addProvider(new BouncyCastleProvider());
-      File ssl_certificate_path = new File(configs.getServer().getSslCertificatePath());
-      serverBuilder.useTransportSecurity(ssl_certificate_path, ssl_certificate_path);
+      File ssl_certificate = new File(configs.getServer().getSslCertificatePath());
+      File ssl_private_key = new File(configs.getServer().getSslPrivateKeyPath());
+      serverBuilder.useTransportSecurity(ssl_certificate, ssl_private_key);
     }
 
     serverBuilder
@@ -121,13 +130,22 @@ public class BuildFarmServer {
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .intercept(headersInterceptor);
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getServer().getGrpcMetrics());
+
+    if (configs.getServer().getMaxInboundMessageSizeBytes() != 0) {
+      serverBuilder.maxInboundMessageSize(configs.getServer().getMaxInboundMessageSizeBytes());
+    }
+    if (configs.getServer().getMaxInboundMetadataSize() != 0) {
+      serverBuilder.maxInboundMetadataSize(configs.getServer().getMaxInboundMetadataSize());
+    }
     server = serverBuilder.build();
 
     log.info(String.format("%s initialized", configs.getServer().getSession()));
 
     checkState(!stopping, "must not call start after stop");
     instance.start(publicName);
+    WebController.setInstance((ShardInstance) instance);
     server.start();
+
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
     PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
@@ -188,6 +206,22 @@ public class BuildFarmServer {
 
   public static void main(String[] args) throws ConfigurationException {
     configs = BuildfarmConfigs.loadServerConfigs(args);
-    SpringApplication.run(BuildFarmServer.class, args);
+
+    // Configure Spring
+    SpringApplication app = new SpringApplication(BuildFarmServer.class);
+    Map<String, Object> springConfig = new HashMap<>();
+
+    // Disable Logback
+    System.setProperty("org.springframework.boot.logging.LoggingSystem", "none");
+
+    springConfig.put("ui.frontend.enable", configs.getUi().isEnable());
+    springConfig.put("server.port", configs.getUi().getPort());
+    app.setDefaultProperties(springConfig);
+
+    try {
+      app.run(args);
+    } catch (Throwable t) {
+      log.log(SEVERE, "Error running application", t);
+    }
   }
 }

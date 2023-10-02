@@ -16,6 +16,7 @@ package build.buildfarm.instance.server;
 
 import static build.buildfarm.common.Actions.asExecutionStatus;
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
+import static build.buildfarm.common.Errors.MISSING_INPUT;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.common.Trees.enumerateTreeFileDigests;
@@ -74,6 +75,7 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.net.URL;
 import build.buildfarm.common.resources.BlobInformation;
 import build.buildfarm.common.resources.DownloadBlobRequest;
 import build.buildfarm.common.resources.ResourceParser;
@@ -122,7 +124,6 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.file.NoSuchFileException;
 import java.util.HashSet;
 import java.util.List;
@@ -176,9 +177,6 @@ public abstract class AbstractServerInstance implements Instance {
 
   public static final String ENVIRONMENT_VARIABLES_NOT_SORTED =
       "The `Command`'s `environment_variables` are not correctly sorted by `name`.";
-
-  public static final String MISSING_INPUT =
-      "A requested input (or the `Action` or its `Command`) was not found in the CAS.";
 
   public static final String MISSING_ACTION = "The action was not found in the CAS.";
 
@@ -521,8 +519,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public boolean containsBlob(
-      Digest digest, Digest.Builder result, RequestMetadata requestMetadata) {
+  public boolean containsBlob(Digest digest, Digest.Builder result, RequestMetadata requestMetadata)
+      throws InterruptedException {
     return contentAddressableStorage.contains(digest, result);
   }
 
@@ -615,16 +613,15 @@ public abstract class AbstractServerInstance implements Instance {
     OutputStream create(long contentLength) throws IOException;
   }
 
-  private static void downloadUri(String uri, ContentOutputStreamFactory getContentOutputStream)
+  private static void downloadUrl(URL url, ContentOutputStreamFactory getContentOutputStream)
       throws IOException {
-    URL url = new URL(uri);
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
     // connect timeout?
     // proxy?
     // authenticator?
     connection.setInstanceFollowRedirects(true);
     // request timeout?
-    long contentLength = connection.getContentLength();
+    long contentLength = connection.getContentLengthLong();
     int status = connection.getResponseCode();
 
     if (status != HttpURLConnection.HTTP_OK) {
@@ -634,7 +631,7 @@ public abstract class AbstractServerInstance implements Instance {
       if (message == null) {
         message = "Invalid HTTP Response";
       }
-      message = "Download Failed: " + message + " from " + uri;
+      message = "Download Failed: " + message + " from " + url;
       throw new IOException(message);
     }
 
@@ -647,12 +644,26 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public ListenableFuture<Digest> fetchBlob(
       Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata) {
+    ImmutableList.Builder<URL> urls = ImmutableList.builder();
     for (String uri : uris) {
       try {
+        urls.add(new URL(new java.net.URL(uri)));
+      } catch (Exception e) {
+        return immediateFailedFuture(e);
+      }
+    }
+    return fetchBlobUrls(urls.build(), expectedDigest, requestMetadata);
+  }
+
+  @VisibleForTesting
+  ListenableFuture<Digest> fetchBlobUrls(
+      Iterable<URL> urls, Digest expectedDigest, RequestMetadata requestMetadata) {
+    for (URL url : urls) {
+      Digest.Builder actualDigestBuilder = expectedDigest.toBuilder();
+      try {
         // some minor abuse here, we want the download to set our built digest size as side effect
-        Digest.Builder actualDigestBuilder = expectedDigest.toBuilder();
-        downloadUri(
-            uri,
+        downloadUrl(
+            url,
             contentLength -> {
               Digest actualDigest = actualDigestBuilder.setSizeBytes(contentLength).build();
               if (expectedDigest.getSizeBytes() >= 0
@@ -663,6 +674,8 @@ public abstract class AbstractServerInstance implements Instance {
                       Compressor.Value.IDENTITY, actualDigest, UUID.randomUUID(), requestMetadata)
                   .getOutput(1, DAYS, () -> {});
             });
+        return immediateFuture(actualDigestBuilder.build());
+      } catch (Write.WriteCompleteException e) {
         return immediateFuture(actualDigestBuilder.build());
       } catch (Exception e) {
         log.log(Level.WARNING, "download attempt failed", e);
@@ -724,25 +737,43 @@ public abstract class AbstractServerInstance implements Instance {
       Directory directory,
       Map<Digest, Directory> directoriesIndex,
       Consumer<String> onInputFile,
-      Consumer<String> onInputDirectory) {
-    for (FileNode fileNode : directory.getFilesList()) {
-      String fileName = fileNode.getName();
-      String filePath = directoryPath.isEmpty() ? fileName : (directoryPath + "/" + fileName);
-      onInputFile.accept(filePath);
-    }
-    for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
-      String directoryName = directoryNode.getName();
+      Consumer<String> onInputDirectory,
+      PreconditionFailure.Builder preconditionFailure) {
+    Stack<DirectoryNode> directoriesStack = new Stack<>();
+    directoriesStack.addAll(directory.getDirectoriesList());
 
+    while (!directoriesStack.isEmpty()) {
+      DirectoryNode directoryNode = directoriesStack.pop();
+      String directoryName = directoryNode.getName();
       Digest directoryDigest = directoryNode.getDigest();
       String subDirectoryPath =
           directoryPath.isEmpty() ? directoryName : (directoryPath + "/" + directoryName);
       onInputDirectory.accept(subDirectoryPath);
-      enumerateActionInputDirectory(
-          subDirectoryPath,
-          directoriesIndex.get(directoryDigest),
-          directoriesIndex,
-          onInputFile,
-          onInputDirectory);
+
+      Directory subDirectory;
+      if (directoryDigest.getSizeBytes() == 0) {
+        subDirectory = Directory.getDefaultInstance();
+      } else {
+        subDirectory = directoriesIndex.get(directoryDigest);
+      }
+
+      if (subDirectory == null) {
+        preconditionFailure
+            .addViolationsBuilder()
+            .setType(VIOLATION_TYPE_MISSING)
+            .setSubject("blobs/" + DigestUtil.toString(directoryDigest))
+            .setDescription("The directory `/" + subDirectoryPath + "` was not found in the CAS.");
+      } else {
+        for (FileNode fileNode : subDirectory.getFilesList()) {
+          String fileName = fileNode.getName();
+          String filePath = subDirectoryPath + "/" + fileName;
+          onInputFile.accept(filePath);
+        }
+
+        for (DirectoryNode subDirectoryNode : subDirectory.getDirectoriesList()) {
+          directoriesStack.push(subDirectoryNode);
+        }
+      }
     }
   }
 
@@ -863,7 +894,12 @@ public abstract class AbstractServerInstance implements Instance {
             subDirectory = directoriesIndex.get(directoryDigest);
           }
           enumerateActionInputDirectory(
-              subDirectoryPath, subDirectory, directoriesIndex, onInputFile, onInputDirectory);
+              subDirectoryPath,
+              subDirectory,
+              directoriesIndex,
+              onInputFile,
+              onInputDirectory,
+              preconditionFailure);
         } else {
           validateActionInputDirectoryDigest(
               subDirectoryPath,
@@ -916,7 +952,10 @@ public abstract class AbstractServerInstance implements Instance {
           preconditionFailure);
     }
     pathDigests.pop();
-    visited.add(directoryDigest);
+    if (directory != null) {
+      // missing directories are not visited and will appear in violations list each time
+      visited.add(directoryDigest);
+    }
   }
 
   protected ListenableFuture<Tree> getTreeFuture(
@@ -1129,6 +1168,9 @@ public abstract class AbstractServerInstance implements Instance {
       } else {
         Directory directory = directoriesIndex.get(inputRootDigest);
         for (String segment : workingDirectory.split("/")) {
+          if (segment.equals(".")) {
+            continue;
+          }
           Directory nextDirectory = directory;
           // linear for now
           for (DirectoryNode dirNode : directory.getDirectoriesList()) {
@@ -1684,7 +1726,7 @@ public abstract class AbstractServerInstance implements Instance {
   public String listOperations(
       int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
     // todo(luxe): add proper pagination
-    FindOperationsResults results = findOperations(filter);
+    FindOperationsResults results = findEnrichedOperations(filter);
     if (results != null) {
       for (Map.Entry<String, EnrichedOperation> entry : results.operations.entrySet()) {
         operations.add(entry.getValue().operation);
@@ -1879,8 +1921,20 @@ public abstract class AbstractServerInstance implements Instance {
         .setExecEnabled(true)
         .setExecutionPriorityCapabilities(
             PriorityCapabilities.newBuilder()
+
+                // The priority (relative importance) of this action. Generally, a lower value
+                // means that the action should be run sooner than actions having a greater
+                // priority value, but the interpretation of a given value is server-
+                // dependent. A priority of 0 means the *default* priority. Priorities may be
+                // positive or negative, and such actions should run later or sooner than
+                // actions having the default priority, respectively. The particular semantics
+                // of this field is up to the server. In particular, every server will have
+                // their own supported range of priorities, and will decide how these map into
+                // scheduling policy.
                 .addPriorities(
-                    PriorityRange.newBuilder().setMinPriority(0).setMaxPriority(Integer.MAX_VALUE)))
+                    PriorityRange.newBuilder()
+                        .setMinPriority(Integer.MIN_VALUE)
+                        .setMaxPriority(Integer.MAX_VALUE)))
         .build();
   }
 
@@ -1916,7 +1970,15 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public abstract CasIndexResults reindexCas();
 
-  public abstract FindOperationsResults findOperations(String filterPredicate);
+  public abstract FindOperationsResults findEnrichedOperations(String filterPredicate);
+
+  public abstract EnrichedOperation findEnrichedOperation(String operationId);
+
+  public abstract List<Operation> findOperations(String filterPredicate);
+
+  public abstract Set<String> findOperationsByInvocationId(String invocationId);
+
+  public abstract Iterable<Map.Entry<String, String>> getOperations(Set<String> operationIds);
 
   @Override
   public abstract void deregisterWorker(String workerName);

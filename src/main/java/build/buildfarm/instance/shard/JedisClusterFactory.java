@@ -30,6 +30,7 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.util.JedisURIHelper;
 
 /**
  * @class JedisClusterFactory
@@ -43,15 +44,17 @@ public class JedisClusterFactory {
    * @brief Create a jedis cluster instance.
    * @details Use proto configuration to connect to a redis cluster server and provide a jedis
    *     client.
-   * @param config Configuration for connecting to a redis cluster server.
+   * @param identifier Redis Client name.
    * @return An established jedis client used to operate on the redis cluster.
    * @note Suggested return identifier: jedis.
+   * @link <a href="https://redis.io/commands/client-setname/">Redis Client name</a>
    */
-  public static Supplier<JedisCluster> create() throws ConfigurationException {
+  public static Supplier<JedisCluster> create(String identifier) throws ConfigurationException {
     // null password is required to elicit no auth in jedis
     String[] redisNodes = configs.getBackplane().getRedisNodes();
     if (redisNodes != null && redisNodes.length > 0) {
       return createJedisClusterFactory(
+          identifier,
           list2Set(redisNodes),
           configs.getBackplane().getTimeout(),
           configs.getBackplane().getMaxAttempts(),
@@ -63,6 +66,7 @@ public class JedisClusterFactory {
 
     // support "" as redis password.
     return createJedisClusterFactory(
+        identifier,
         parseUri(configs.getBackplane().getRedisUri()),
         configs.getBackplane().getTimeout(),
         configs.getBackplane().getMaxAttempts(),
@@ -80,7 +84,7 @@ public class JedisClusterFactory {
    * @note Suggested return identifier: jedis.
    */
   public static JedisCluster createTest() throws Exception {
-    JedisCluster redis = JedisClusterFactory.create().get();
+    JedisCluster redis = JedisClusterFactory.create("test").get();
 
     // use the client to create an empty redis cluster
     // this will prevent any persistent data across test runs
@@ -151,7 +155,12 @@ public class JedisClusterFactory {
    * @note Suggested return identifier: jedis.
    */
   private static Supplier<JedisCluster> createJedisClusterFactory(
-      URI redisUri, int timeout, int maxAttempts, String password, JedisPoolConfig poolConfig) {
+      String identifier,
+      URI redisUri,
+      int timeout,
+      int maxAttempts,
+      String password,
+      JedisPoolConfig poolConfig) {
     return () ->
         new JedisCluster(
             new HostAndPort(redisUri.getHost(), redisUri.getPort()),
@@ -159,7 +168,9 @@ public class JedisClusterFactory {
             /* soTimeout=*/ Integer.max(2000, timeout),
             Integer.max(5, maxAttempts),
             password,
-            poolConfig);
+            identifier,
+            poolConfig,
+            /* ssl=*/ JedisURIHelper.isRedisSSLScheme(redisUri));
   }
 
   /**
@@ -174,6 +185,7 @@ public class JedisClusterFactory {
    * @note Suggested return identifier: jedis.
    */
   private static Supplier<JedisCluster> createJedisClusterFactory(
+      String identifier,
       Set<HostAndPort> redisUrisNodes,
       int timeout,
       int maxAttempts,
@@ -186,12 +198,13 @@ public class JedisClusterFactory {
             /* soTimeout=*/ Integer.max(2000, timeout),
             Integer.max(5, maxAttempts),
             password,
-            poolConfig);
+            identifier,
+            poolConfig,
+            /* ssl=*/ false);
   }
   /**
    * @brief Create a jedis pool config.
    * @details Use configuration to build the appropriate jedis pool configuration.
-   * @param config Configuration for connecting to a redis cluster server.
    * @return A created jedis pool config.
    * @note Suggested return identifier: poolConfig.
    */

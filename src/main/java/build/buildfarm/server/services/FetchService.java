@@ -33,13 +33,18 @@ public class FetchService extends FetchImplBase {
   @Override
   public void fetchBlob(
       FetchBlobRequest request, StreamObserver<FetchBlobResponse> responseObserver) {
-    fetchBlob(instance, request, responseObserver);
+    try {
+      fetchBlob(instance, request, responseObserver);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private void fetchBlob(
       Instance instance,
       FetchBlobRequest request,
-      StreamObserver<FetchBlobResponse> responseObserver) {
+      StreamObserver<FetchBlobResponse> responseObserver)
+      throws InterruptedException {
     Digest expectedDigest = null;
     RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
     if (request.getQualifiersCount() == 0) {
@@ -53,14 +58,23 @@ public class FetchService extends FetchImplBase {
         if (instance.containsBlob(expectedDigest, result, requestMetadata)) {
           responseObserver.onNext(
               FetchBlobResponse.newBuilder().setBlobDigest(result.build()).build());
+          responseObserver.onCompleted();
+          return;
         }
       } else {
-        throw Status.INVALID_ARGUMENT
-            .withDescription(format("Invalid qualifier '%s'", name))
-            .asRuntimeException();
+        responseObserver.onError(
+            Status.INVALID_ARGUMENT
+                .withDescription(format("Invalid qualifier '%s'", name))
+                .asException());
+        return;
       }
     }
-    if (request.getUrisCount() != 0) {
+    if (expectedDigest == null) {
+      responseObserver.onError(
+          Status.INVALID_ARGUMENT
+              .withDescription(format("Missing qualifier 'checksum.sri'"))
+              .asException());
+    } else if (request.getUrisCount() != 0) {
       addCallback(
           instance.fetchBlob(request.getUrisList(), expectedDigest, requestMetadata),
           new FutureCallback<Digest>() {

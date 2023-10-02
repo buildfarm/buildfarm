@@ -16,6 +16,7 @@ docker run \
     -v /tmp:/tmp \
     --network host  \
     --env CACHE_TEST=$CACHE_TEST \
+    --env BUILDFARM_CONFIG=$BUILDFARM_CONFIG \
     --env RUN_TEST=$RUN_TEST \
     --env TEST_ARG1=$TEST_ARG1 \
     --env TEST_ARG2=$TEST_ARG2 \

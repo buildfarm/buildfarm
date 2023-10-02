@@ -19,6 +19,8 @@ import static com.google.common.truth.Truth.assertThat;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.shard.JedisClusterFactory;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.After;
@@ -252,6 +254,60 @@ public class RedisPriorityQueueTest {
     val = queue.dequeue(redis, 1);
     assertThat(val).isEqualTo("baz");
     assertThat(queue.size(redis)).isEqualTo(0);
+  }
+
+  // Function under test: dequeue
+  // Reason for testing: Test dequeue times out correctly
+  // Failure explanation: dequeue does not spend the full time waiting for response
+  @Test
+  public void checkDequeueTimeout() throws Exception {
+    // ARRANGE
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+
+    Instant start = Instant.now();
+    String val = queue.dequeue(redis, 1);
+    Instant finish = Instant.now();
+
+    long timeElapsed = Duration.between(start, finish).toMillis();
+    assertThat(timeElapsed).isGreaterThan(1000L);
+    assertThat(val).isEqualTo(null);
+  }
+
+  // Function under test: dequeue
+  // Reason for testing: The queue supports negative priorities.
+  // Failure explanation: negative prioritizes are not handled in the correct order.
+  @Test
+  public void checkNegativesInPriority() throws Exception {
+    // ARRANGE
+    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    String val;
+
+    // ACT / ASSERT
+    queue.push(redis, "foo-6", 6);
+    queue.push(redis, "foo-5", 5);
+    queue.push(redis, "foo-3", 3);
+    queue.push(redis, "negative-50", -50);
+    queue.push(redis, "negative-1", -1);
+    queue.push(redis, "foo-1", 1);
+    queue.push(redis, "baz-2", 2);
+    queue.push(redis, "foo-4", 4);
+
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("negative-50");
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("negative-1");
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("foo-1");
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("baz-2");
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("foo-3");
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("foo-4");
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("foo-5");
+    val = queue.dequeue(redis, 1);
+    assertThat(val).isEqualTo("foo-6");
   }
 
   // Function under test: visit

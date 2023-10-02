@@ -23,6 +23,7 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.server.AbstractServerInstance.INVALID_PLATFORM;
 import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_ACTION;
 import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_COMMAND;
+import static com.google.common.base.Predicates.notNull;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
@@ -64,6 +65,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write.NullWrite;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -76,6 +78,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
@@ -92,7 +95,12 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -121,7 +129,7 @@ public class ShardInstanceTest {
       Command.newBuilder().addAllArguments(ImmutableList.of("true")).build();
 
   private ShardInstance instance;
-  private Set<Digest> blobDigests;
+  private Map<String, Long> blobDigests;
 
   @Mock private Backplane mockBackplane;
 
@@ -134,7 +142,7 @@ public class ShardInstanceTest {
   @Before
   public void setUp() throws InterruptedException {
     MockitoAnnotations.initMocks(this);
-    blobDigests = Sets.newHashSet();
+    blobDigests = Maps.newHashMap();
     ActionCache actionCache = new ShardActionCache(10, mockBackplane, newDirectExecutorService());
     instance =
         new ShardInstance(
@@ -192,7 +200,7 @@ public class ShardInstanceTest {
     when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
 
     ImmutableSet<String> workers = ImmutableSet.of(workerName);
-    when(mockBackplane.getWorkers()).thenReturn(workers);
+    when(mockBackplane.getStorageWorkers()).thenReturn(workers);
 
     ByteString commandBlob = command.toByteString();
     Digest commandDigest = DIGEST_UTIL.compute(commandBlob);
@@ -207,7 +215,7 @@ public class ShardInstanceTest {
                   Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
                   return immediateFuture(
                       StreamSupport.stream(digests.spliterator(), false)
-                          .filter((digest) -> !blobDigests.contains(digest))
+                          .filter((digest) -> !blobDigests.containsKey(digest.getHash()))
                           .collect(Collectors.toList()));
                 })
         .when(mockWorkerInstance)
@@ -765,7 +773,7 @@ public class ShardInstanceTest {
 
   @SuppressWarnings("unchecked")
   private void provideBlob(Digest digest, ByteString content) {
-    blobDigests.add(digest);
+    blobDigests.put(digest.getHash(), digest.getSizeBytes());
     // FIXME use better answer definitions, without indexes
     doAnswer(
             (Answer<Void>)
@@ -815,7 +823,7 @@ public class ShardInstanceTest {
 
   @Test
   public void blobsAreMissingWhenWorkersIsEmpty() throws Exception {
-    when(mockBackplane.getWorkers()).thenReturn(ImmutableSet.of());
+    when(mockBackplane.getStorageWorkers()).thenReturn(ImmutableSet.of());
     Digest digest = Digest.newBuilder().setHash("hash").setSizeBytes(1).build();
     Iterable<Digest> missingDigests =
         instance
@@ -830,7 +838,7 @@ public class ShardInstanceTest {
     when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
 
     ImmutableSet<String> workers = ImmutableSet.of(workerName);
-    when(mockBackplane.getWorkers()).thenReturn(workers);
+    when(mockBackplane.getStorageWorkers()).thenReturn(workers);
 
     Digest digest = Digest.newBuilder().setHash("hash").setSizeBytes(1).build();
     List<Digest> queryDigests = ImmutableList.of(digest);
@@ -977,5 +985,171 @@ public class ShardInstanceTest {
     // check that result is null (i.e. no exceptions thrown)
     CompletableFuture<String> result = cache.get("missing", getCallback);
     assertThat(result.get()).isNull();
+  }
+
+  private static Digest findMissingWithUnknown(Digest digest, Map<String, Long> digests) {
+    Long size = digests.get(digest.getHash());
+    if (digest.getSizeBytes() != -1) {
+      if (size != null && size.equals(digest.getSizeBytes())) {
+        return null;
+      }
+    } else if (size != null) {
+      return Digest.newBuilder().setHash(digest.getHash()).setSizeBytes(size).build();
+    }
+    return digest;
+  }
+
+  @Test
+  public void containsBlobReflectsWorkerWithUnknownSize() throws Exception {
+    String workerName = "worker";
+    when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
+
+    ImmutableSet<String> workers = ImmutableSet.of(workerName);
+    when(mockBackplane.getStorageWorkers()).thenReturn(workers);
+
+    ByteString blob = ByteString.copyFromUtf8("blobOnWorker");
+    Digest actualDigest = DIGEST_UTIL.compute(blob);
+    Digest searchDigest = DIGEST_UTIL.build(actualDigest.getHash(), -1);
+    Iterable<Digest> searchDigests = ImmutableList.of(searchDigest);
+
+    doAnswer(
+            (Answer<ListenableFuture<Iterable<Digest>>>)
+                invocation -> {
+                  Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
+                  return immediateFuture(
+                      StreamSupport.stream(digests.spliterator(), false)
+                          .map(digest -> findMissingWithUnknown(digest, blobDigests))
+                          .filter(notNull())
+                          .collect(Collectors.toList()));
+                })
+        .when(mockWorkerInstance)
+        .findMissingBlobs(any(Iterable.class), any(RequestMetadata.class));
+
+    ArgumentMatcher<Iterable<Digest>> searchMatcher =
+        (digests) -> Iterables.elementsEqual(digests, searchDigests);
+
+    Digest.Builder result = Digest.newBuilder();
+    boolean containsBeforeAdding =
+        instance.containsBlob(searchDigest, result, RequestMetadata.getDefaultInstance());
+    verify(mockWorkerInstance, times(1))
+        .findMissingBlobs(argThat(searchMatcher), any(RequestMetadata.class));
+    assertThat(containsBeforeAdding).isFalse();
+
+    blobDigests.put(actualDigest.getHash(), actualDigest.getSizeBytes());
+
+    result = Digest.newBuilder();
+    boolean containsAfterAdding =
+        instance.containsBlob(searchDigest, result, RequestMetadata.getDefaultInstance());
+    verify(mockWorkerInstance, times(2))
+        .findMissingBlobs(argThat(searchMatcher), any(RequestMetadata.class));
+
+    assertThat(containsAfterAdding).isTrue();
+    assertThat(result.build()).isEqualTo(actualDigest);
+
+    verify(mockBackplane, atLeastOnce()).getStorageWorkers();
+    verify(mockInstanceLoader, atLeastOnce()).load(eq(workerName));
+  }
+
+  @Test
+  public void findMissingBlobsTest_ViaBackPlane() throws Exception {
+
+    Set<String> activeWorkers = ImmutableSet.of("worker1", "worker2", "worker3");
+    Set<String> expiredWorkers = ImmutableSet.of("workerX", "workerY", "workerZ");
+    Set<String> imposterWorkers = ImmutableSet.of("imposter1", "imposter2", "imposter3");
+
+    Set<Digest> availableDigests =
+        ImmutableSet.of(
+            Digest.newBuilder().setHash("toBeFound1").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("toBeFound2").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("toBeFound3").setSizeBytes(1).build(),
+            // a copy is added in final digest list
+            Digest.newBuilder().setHash("toBeFoundDuplicate").setSizeBytes(1).build());
+
+    Set<Digest> missingDigests =
+        ImmutableSet.of(
+            Digest.newBuilder().setHash("missing1").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("missing2").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("missing3").setSizeBytes(1).build(),
+            // a copy is added in final digest list
+            Digest.newBuilder().setHash("missingDuplicate").setSizeBytes(1).build());
+
+    Set<Digest> digestAvailableOnImposters =
+        ImmutableSet.of(
+            Digest.newBuilder().setHash("toBeFoundOnImposter1").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("toBeFoundOnImposter2").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("toBeFoundOnImposter3").setSizeBytes(1).build());
+
+    Set<Digest> emptyDigests =
+        new HashSet<>(
+            Arrays.asList(
+                Digest.newBuilder().setHash("empty1").build(),
+                Digest.newBuilder().setHash("empty2").build()));
+
+    Iterable<Digest> allDigests =
+        Iterables.concat(
+            availableDigests,
+            missingDigests,
+            emptyDigests,
+            digestAvailableOnImposters,
+            Arrays.asList(
+                Digest.newBuilder().setHash("toBeFoundDuplicate").setSizeBytes(1).build(),
+                Digest.newBuilder().setHash("missingDuplicate").setSizeBytes(1).build()));
+
+    Map<Digest, Set<String>> digestAndWorkersMap = new HashMap<>();
+
+    for (Digest digest : availableDigests) {
+      digestAndWorkersMap.put(digest, getRandomSubset(activeWorkers));
+    }
+    for (Digest digest : missingDigests) {
+      digestAndWorkersMap.put(digest, getRandomSubset(expiredWorkers));
+    }
+    for (Digest digest : digestAvailableOnImposters) {
+      digestAndWorkersMap.put(digest, getRandomSubset(imposterWorkers));
+    }
+
+    BuildfarmConfigs buildfarmConfigs = instance.getBuildFarmConfigs();
+    buildfarmConfigs.getServer().setFindMissingBlobsViaBackplane(true);
+    Set<String> activeAndImposterWorkers =
+        Sets.newHashSet(Iterables.concat(activeWorkers, imposterWorkers));
+    when(mockBackplane.getStorageWorkers()).thenReturn(activeAndImposterWorkers);
+    when(mockBackplane.getBlobDigestsWorkers(any(Iterable.class))).thenReturn(digestAndWorkersMap);
+
+    long serverStartTime = 1686951033L; // june 15th, 2023
+    Map<String, Long> workersStartTime = new HashMap<>();
+    for (String worker : activeAndImposterWorkers) {
+      workersStartTime.put(worker, serverStartTime);
+    }
+    when(mockBackplane.getWorkersStartTimeInEpochSecs(activeAndImposterWorkers))
+        .thenReturn(workersStartTime);
+    long oneDay = 86400L;
+    for (Digest digest : availableDigests) {
+      when(mockBackplane.getDigestInsertTime(digest)).thenReturn(serverStartTime + oneDay);
+    }
+    for (Digest digest : digestAvailableOnImposters) {
+      when(mockBackplane.getDigestInsertTime(digest)).thenReturn(serverStartTime - oneDay);
+    }
+
+    Iterable<Digest> actualMissingDigests =
+        instance.findMissingBlobs(allDigests, RequestMetadata.getDefaultInstance()).get();
+    Iterable<Digest> expectedMissingDigests =
+        Iterables.concat(missingDigests, digestAvailableOnImposters);
+
+    assertThat(actualMissingDigests).containsExactlyElementsIn(expectedMissingDigests);
+
+    for (Digest digest : actualMissingDigests) {
+      assertThat(digest).isNotIn(availableDigests);
+      assertThat(digest).isNotIn(emptyDigests);
+      assertThat(digest).isIn(expectedMissingDigests);
+    }
+
+    // reset BuildfarmConfigs
+    buildfarmConfigs.getServer().setFindMissingBlobsViaBackplane(false);
+  }
+
+  private Set<String> getRandomSubset(Set<String> input) {
+    Random random = new Random();
+    int end = random.nextInt(input.size()) + 1;
+    int start = random.nextInt(end);
+    return input.stream().skip(start).limit(end - start).collect(Collectors.toSet());
   }
 }

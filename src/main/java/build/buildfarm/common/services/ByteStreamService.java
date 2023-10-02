@@ -306,7 +306,12 @@ public class ByteStreamService extends ByteStreamImplBase {
           limit,
           onErrorLogReadObserver(resourceName, Compressor.Value.IDENTITY, offset, target));
     } catch (NoSuchFileException e) {
-      responseObserver.onError(NOT_FOUND.asException());
+      responseObserver.onError(
+          NOT_FOUND
+              .withDescription(
+                  String.format(
+                      "Resource not found: %s, offset: %d, limit: %d", resourceName, offset, limit))
+              .asException());
     } catch (IOException e) {
       responseObserver.onError(Status.fromThrowable(e).asException());
     }
@@ -337,7 +342,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     long offset = request.getReadOffset();
     long limit = request.getReadLimit();
     log.log(
-        Level.FINER,
+        Level.FINEST,
         format("read resource_name=%s offset=%d limit=%d", resourceName, offset, limit));
 
     try {
@@ -352,7 +357,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       QueryWriteStatusRequest request, StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
     try {
-      log.log(Level.FINE, format("queryWriteStatus(%s)", resourceName));
+      log.log(Level.FINER, format("queryWriteStatus(%s)", resourceName));
       Write write = getWrite(resourceName);
       responseObserver.onNext(
           QueryWriteStatusResponse.newBuilder()
@@ -361,7 +366,7 @@ public class ByteStreamService extends ByteStreamImplBase {
               .build());
       responseObserver.onCompleted();
       log.log(
-          Level.FINE,
+          Level.FINER,
           format(
               "queryWriteStatus(%s) => committed_size = %d, complete = %s",
               resourceName, write.getCommittedSize(), write.isComplete()));
@@ -387,8 +392,12 @@ public class ByteStreamService extends ByteStreamImplBase {
 
       @Override
       public boolean isComplete() {
-        return instance.containsBlob(
-            digest, Digest.newBuilder(), TracingMetadataUtils.fromCurrentContext());
+        try {
+          return instance.containsBlob(
+              digest, Digest.newBuilder(), TracingMetadataUtils.fromCurrentContext());
+        } catch (InterruptedException e) {
+          throw new RuntimeException("interrupted checking for completion", e);
+        }
       }
 
       @Override

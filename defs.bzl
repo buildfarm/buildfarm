@@ -39,6 +39,7 @@ IO_GRPC_MODULES = [
     "protobuf",
     "testing",
     "services",
+    "netty-shaded",
 ]
 
 COM_AWS_MODULES = [
@@ -55,11 +56,14 @@ ORG_SPRING_MODULES = [
     "spring-beans",
     "spring-core",
     "spring-context",
+    "spring-web",
 ]
 
 ORG_SPRING_BOOT_MODULES = [
     "spring-boot-autoconfigure",
     "spring-boot",
+    "spring-boot-starter-web",
+    "spring-boot-starter-thymeleaf",
 ]
 
 def buildfarm_init(name = "buildfarm"):
@@ -72,7 +76,7 @@ def buildfarm_init(name = "buildfarm"):
     maven_install(
         artifacts = ["com.amazonaws:aws-java-sdk-%s:1.11.729" % module for module in COM_AWS_MODULES] +
                     [
-                        "com.fasterxml.jackson.core:jackson-databind:2.13.3",
+                        "com.fasterxml.jackson.core:jackson-databind:2.15.0",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
                         "com.github.docker-java:docker-java:3.2.11",
                         "com.github.jnr:jffi:1.2.16",
@@ -83,6 +87,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.github.pcj:google-options:1.0.0",
                         "com.github.serceman:jnr-fuse:0.5.5",
                         "com.github.luben:zstd-jni:1.5.2-1",
+                        "com.github.oshi:oshi-core:6.4.0",
                         "com.google.auth:google-auth-library-credentials:0.9.1",
                         "com.google.auth:google-auth-library-oauth2-http:0.9.1",
                         "com.google.code.findbugs:jsr305:3.0.1",
@@ -90,7 +95,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.errorprone:error_prone_annotations:2.9.0",
                         "com.google.errorprone:error_prone_core:0.92",
                         "com.google.guava:failureaccess:1.0.1",
-                        "com.google.guava:guava:30.1.1-jre",
+                        "com.google.guava:guava:32.1.1-jre",
                         "com.google.j2objc:j2objc-annotations:1.1",
                         "com.google.jimfs:jimfs:1.1",
                         "com.google.protobuf:protobuf-java-util:3.10.0",
@@ -102,8 +107,8 @@ def buildfarm_init(name = "buildfarm"):
                         "io.github.lognet:grpc-spring-boot-starter:4.5.4",
                         "org.bouncycastle:bcprov-jdk15on:1.70",
                         "net.jcip:jcip-annotations:1.0",
-                    ] + ["io.netty:netty-%s:4.1.68.Final" % module for module in IO_NETTY_MODULES] +
-                    ["io.grpc:grpc-%s:1.38.0" % module for module in IO_GRPC_MODULES] +
+                    ] + ["io.netty:netty-%s:4.1.94.Final" % module for module in IO_NETTY_MODULES] +
+                    ["io.grpc:grpc-%s:1.56.1" % module for module in IO_GRPC_MODULES] +
                     [
                         "io.prometheus:simpleclient:0.10.0",
                         "io.prometheus:simpleclient_hotspot:0.10.0",
@@ -128,13 +133,13 @@ def buildfarm_init(name = "buildfarm"):
                         "org.threeten:threetenbp:1.3.3",
                         "org.xerial:sqlite-jdbc:3.34.0",
                         "org.jetbrains:annotations:16.0.2",
-                        "org.yaml:snakeyaml:1.30",
+                        "org.yaml:snakeyaml:2.0",
                         "org.projectlombok:lombok:1.18.24",
                     ],
         generate_compat_repositories = True,
         repositories = [
-            "https://repo.maven.apache.org/maven2",
-            "https://jcenter.bintray.com",
+            "https://repo1.maven.org/maven2",
+            "https://mirrors.ibiblio.org/pub/mirrors/maven2",
         ],
     )
 
@@ -160,9 +165,3 @@ def buildfarm_init(name = "buildfarm"):
         name = "llvm_toolchain",
         llvm_version = "10.0.0",
     )
-
-def ensure_accurate_metadata():
-    return select({
-        "//conditions:default": [],
-        "//config:windows": ["-Dsun.nio.fs.ensureAccurateMetadata=true"],
-    })

@@ -68,7 +68,8 @@ public interface Instance {
   ListenableFuture<Iterable<Digest>> findMissingBlobs(
       Iterable<Digest> digests, RequestMetadata requestMetadata);
 
-  boolean containsBlob(Digest digest, Digest.Builder result, RequestMetadata requestMetadata);
+  boolean containsBlob(Digest digest, Digest.Builder result, RequestMetadata requestMetadata)
+      throws InterruptedException;
 
   String readResourceName(Compressor.Value compressor, Digest blobDigest);
 

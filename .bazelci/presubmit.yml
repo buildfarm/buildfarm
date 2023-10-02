@@ -23,6 +23,11 @@ tasks:
     platform: ubuntu1804
     shell_commands:
     - ./.bazelci/static_analyze.sh
+  checkstyle:
+    name: "Check Style"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/run_checkstyle.sh
   code_coverage:
     name: "Code Coverage"
     platform: ubuntu1804
@@ -32,7 +37,7 @@ tasks:
     - ./generate_coverage.sh
 
   # Typical unit tests that run across a variety of operating systems.
-  ubuntu1604:
+  ubuntu1804:
     name: "Unit Tests"
     build_targets:
     - "..."
@@ -40,7 +45,7 @@ tasks:
     - "--test_tag_filters=-integration,-redis"
     test_targets:
     - "..."
-  ubuntu1804:
+  ubuntu2004:
     name: "Unit Tests"
     build_targets:
     - "..."
@@ -61,7 +66,7 @@ tasks:
   windows:
     name: "Unit Tests"
     build_flags:
-    - "--build_tag_filters=-container"
+    - "--build_tag_filters=-container,-audit"
     build_targets:
     - "..."
     test_flags:
@@ -70,7 +75,7 @@ tasks:
     - "..."
   rpm_builds:
     name: "Rpm Builds"
-    platform: centos7
+    platform: centos7_java11_devtoolset10
     shell_commands:
     - bazel build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
 
@@ -108,15 +113,28 @@ tasks:
     platform: ubuntu1804
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
+    - export EXECUTION_STAGE_WIDTH=5
+    - ./.bazelci/integration_test.sh
+  
+  # Test the buildfarm deployment with the full config.
+  # More issues can be caught when using the fully defined configuration file.
+  integration_test_many_full_config:
+    name: "Integration Test (Full Config)"
+    platform: ubuntu1804
+    shell_commands:
+    - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - export BUILDFARM_CONFIG="/buildfarm/examples/config.yml"
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
 
   # Test that buildfarm can work with zstd compression
-  compression_test_many_shard:
+  compression_test_many_compression:
     name: "Integration Test (Shard/Compression)"
     platform: ubuntu1804
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
+    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
     - export TEST_ARG1=--experimental_remote_cache_compression
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
@@ -130,9 +148,10 @@ tasks:
     shell_commands:
     - export CACHE_TEST=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_double_test.sh
+    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
     - export TEST_ARG1=--experimental_remote_grpc_log='./grpc.log'
     - export TEST_ARG2=--experimental_remote_grpc_log='./grpc2.log'
-    - export SHA1_TOOLS_REMOTE=9969ed6911aea04f7e896cd3958ea933547f933c
+    - export SHA1_TOOLS_REMOTE=eeddeff416118c86856fd76c95733307256dc855
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/cache_test.sh
 
@@ -141,6 +160,7 @@ tasks:
     platform: ubuntu1804
     shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
+    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
     - export EXECUTION_STAGE_WIDTH=10
     - ./.bazelci/integration_test.sh
   integration_test_abseil_shard_compression:
@@ -148,6 +168,7 @@ tasks:
     platform: ubuntu1804
     shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
+    - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
     - export EXECUTION_STAGE_WIDTH=10
     - export TEST_ARG1=--experimental_remote_cache_compression
     - ./.bazelci/integration_test.sh

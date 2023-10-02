@@ -27,13 +27,19 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.FileNode;
+import build.buildfarm.common.OperationFailer;
 import build.buildfarm.common.ProxyDirectoriesIndex;
+import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
+import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
+import com.google.rpc.Code;
+import com.google.rpc.Status;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -159,9 +165,10 @@ public class InputFetcher implements Runnable {
     return null;
   }
 
-  private long fetchPolled(Stopwatch stopwatch) throws InterruptedException {
+  @VisibleForTesting
+  long fetchPolled(Stopwatch stopwatch) throws InterruptedException {
     String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
-    log.log(Level.FINE, format("fetching inputs: %s", operationName));
+    log.log(Level.FINER, format("fetching inputs: %s", operationName));
 
     ExecutedActionMetadata.Builder executedAction =
         operationContext
@@ -193,8 +200,15 @@ public class InputFetcher implements Runnable {
               queuedOperation.getAction(),
               queuedOperation.getCommand());
     } catch (IOException e) {
-      log.log(Level.SEVERE, format("error creating exec dir for %s", operationName), e);
-      owner.error().put(operationContext);
+      Status.Builder status = Status.newBuilder().setMessage("Error creating exec dir");
+      if (e instanceof ExecDirException) {
+        ExecDirException execDirEx = (ExecDirException) e;
+        execDirEx.toStatus(status);
+      } else {
+        status.setCode(Code.INTERNAL.getNumber());
+        log.log(Level.SEVERE, format("error creating exec dir for %s", operationName), e);
+      }
+      failOperation(status.build());
       return 0;
     }
     success = true;
@@ -264,7 +278,7 @@ public class InputFetcher implements Runnable {
       }
     } else {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
-      log.log(Level.FINE, "InputFetcher: Operation " + operationName + " Failed to claim output");
+      log.log(Level.FINER, "InputFetcher: Operation " + operationName + " Failed to claim output");
 
       owner.error().put(operationContext);
     }
@@ -305,6 +319,22 @@ public class InputFetcher implements Runnable {
           Thread.currentThread().interrupt();
         }
       }
+    }
+  }
+
+  private void failOperation(Status status) throws InterruptedException {
+    ExecuteEntry executeEntry = operationContext.queueEntry.getExecuteEntry();
+    Operation failedOperation =
+        OperationFailer.get(operationContext.operation, executeEntry, status);
+
+    try {
+      workerContext.putOperation(failedOperation);
+      OperationContext newOperationContext =
+          operationContext.toBuilder().setOperation(failedOperation).build();
+      owner.error().put(newOperationContext);
+    } catch (Exception e) {
+      String operationName = executeEntry.getOperationName();
+      log.log(Level.SEVERE, format("Cannot report failed operation %s", operationName), e);
     }
   }
 }

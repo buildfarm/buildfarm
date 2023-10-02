@@ -1,10 +1,11 @@
 package build.buildfarm.common.config;
 
-import com.google.common.base.Strings;
 import java.util.UUID;
 import lombok.Data;
+import lombok.extern.java.Log;
 
 @Data
+@Log
 public class Server {
   public enum INSTANCE_TYPE {
     SHARD
@@ -20,6 +21,7 @@ public class Server {
   private int casWriteTimeout = 3600;
   private int bytestreamTimeout = 3600;
   private String sslCertificatePath = null;
+  private String sslPrivateKeyPath = null;
   private boolean runDispatchedMonitor = true;
   private int dispatchedMonitorIntervalSeconds = 1;
   private boolean runOperationQueuer = true;
@@ -35,14 +37,10 @@ public class Server {
   private String clusterId = "";
   private String cloudRegion;
   private String publicName;
-
-  public String getPublicName() {
-    if (!Strings.isNullOrEmpty(publicName)) {
-      return publicName;
-    } else {
-      return System.getenv("INSTANCE_NAME");
-    }
-  }
+  private int maxInboundMessageSizeBytes = 0;
+  private int maxInboundMetadataSize = 0;
+  private ServerCacheConfigs caches = new ServerCacheConfigs();
+  private boolean findMissingBlobsViaBackplane = false;
 
   public String getSession() {
     return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);

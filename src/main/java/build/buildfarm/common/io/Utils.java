@@ -291,7 +291,8 @@ public class Utils {
     boolean isReadOnlyExecutable;
     try {
       attributes = Files.readAttributes(path, BasicFileAttributes.class, linkOpts(followSymlinks));
-      isReadOnlyExecutable = EvenMoreFiles.isReadOnlyExecutable(path, fileStore);
+      isReadOnlyExecutable =
+          !attributes.isSymbolicLink() && EvenMoreFiles.isReadOnlyExecutable(path, fileStore);
     } catch (java.nio.file.FileSystemException e) {
       throw new NoSuchFileException(path + ERR_NO_SUCH_FILE_OR_DIR);
     }

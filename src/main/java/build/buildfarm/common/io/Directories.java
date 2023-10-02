@@ -48,8 +48,8 @@ public class Directories {
 
   private Directories() {}
 
-  private static void makeWritable(Path dir, boolean writable) throws IOException {
-    FileStore fileStore = Files.getFileStore(dir);
+  private static void makeWritable(Path dir, boolean writable, FileStore fileStore)
+      throws IOException {
     if (fileStore.supportsFileAttributeView("posix")) {
       if (writable) {
         Files.setPosixFilePermissions(dir, writablePerms);
@@ -82,14 +82,15 @@ public class Directories {
     }
   }
 
-  public static ListenableFuture<Void> remove(Path path, ExecutorService service) {
+  public static ListenableFuture<Void> remove(
+      Path path, FileStore fileStore, ExecutorService service) {
     String suffix = UUID.randomUUID().toString();
     Path filename = path.getFileName();
     String tmpFilename = filename + ".tmp." + suffix;
     Path tmpPath = path.resolveSibling(tmpFilename);
     try {
       // MacOS does not permit renames unless the directory is permissioned appropriately
-      makeWritable(path, true);
+      makeWritable(path, true, fileStore);
       // rename must be synchronous to call
       Files.move(path, tmpPath);
     } catch (IOException e) {
@@ -99,7 +100,7 @@ public class Directories {
         .submit(
             () -> {
               try {
-                remove(tmpPath);
+                remove(tmpPath, fileStore);
               } catch (IOException e) {
                 log.log(Level.SEVERE, "error removing directory " + tmpPath, e);
               }
@@ -107,14 +108,14 @@ public class Directories {
             null);
   }
 
-  public static void remove(Path directory) throws IOException {
+  public static void remove(Path directory, FileStore fileStore) throws IOException {
     Files.walkFileTree(
         directory,
         new SimpleFileVisitor<Path>() {
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
               throws IOException {
-            makeWritable(dir, true);
+            makeWritable(dir, true, fileStore);
             return FileVisitResult.CONTINUE;
           }
 
@@ -158,12 +159,12 @@ public class Directories {
         });
   }
 
-  public static void disableAllWriteAccess(Path directory) throws IOException {
-    forAllPostDirs(directory, dir -> makeWritable(dir, false));
+  public static void disableAllWriteAccess(Path directory, FileStore fileStore) throws IOException {
+    forAllPostDirs(directory, dir -> makeWritable(dir, false, fileStore));
   }
 
-  public static void enableAllWriteAccess(Path directory) throws IOException {
-    forAllPostDirs(directory, dir -> makeWritable(dir, true));
+  public static void enableAllWriteAccess(Path directory, FileStore fileStore) throws IOException {
+    forAllPostDirs(directory, dir -> makeWritable(dir, true, fileStore));
   }
 
   public static void setAllOwner(Path directory, UserPrincipal owner) throws IOException {

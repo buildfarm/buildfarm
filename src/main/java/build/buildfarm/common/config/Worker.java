@@ -9,8 +9,10 @@ import java.util.Arrays;
 import java.util.List;
 import javax.naming.ConfigurationException;
 import lombok.Data;
+import lombok.extern.java.Log;
 
 @Data
+@Log
 public class Worker {
   private int port = 8981;
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
@@ -33,33 +35,9 @@ public class Worker {
   private boolean onlyMulticoreTests = false;
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
+  private int gracefulShutdownSeconds = 0;
   private ExecutionPolicy[] executionPolicies = {};
-
-  public String getPublicName() {
-    if (!Strings.isNullOrEmpty(publicName)) {
-      return publicName;
-    } else {
-      return System.getenv("INSTANCE_NAME");
-    }
-  }
-
-  public int getExecuteStageWidth() {
-    if (executeStageWidth > 0) {
-      return executeStageWidth;
-    } else if (!Strings.isNullOrEmpty(System.getenv("EXECUTION_STAGE_WIDTH"))) {
-      return Integer.parseInt(System.getenv("EXECUTION_STAGE_WIDTH"));
-    } else {
-      return Math.max(1, Runtime.getRuntime().availableProcessors() - executeStageWidthOffset);
-    }
-  }
-
-  public int getInputFetchStageWidth() {
-    if (inputFetchStageWidth > 0) {
-      return inputFetchStageWidth;
-    } else {
-      return Math.max(1, getExecuteStageWidth() / 5);
-    }
-  }
+  private SandboxSettings sandboxSettings = new SandboxSettings();
 
   public ExecutionPolicy[] getExecutionPolicies() {
     if (executionPolicies != null) {
@@ -69,14 +47,15 @@ public class Worker {
     }
   }
 
-  public WorkerType getWorkerType() {
-    if (getCapabilities().isCas() && getCapabilities().isExecution()) {
-      return WorkerType.EXECUTE_AND_STORAGE;
-    }
+  public int getWorkerType() {
+    int workerType = 0;
     if (getCapabilities().isCas()) {
-      return WorkerType.STORAGE;
+      workerType |= WorkerType.STORAGE.getNumber();
     }
-    return WorkerType.EXECUTE;
+    if (getCapabilities().isExecution()) {
+      workerType |= WorkerType.EXECUTE.getNumber();
+    }
+    return workerType;
   }
 
   public Path getValidRoot() throws ConfigurationException {

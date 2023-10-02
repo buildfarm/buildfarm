@@ -111,7 +111,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
       WorkerListRequest request, StreamObserver<WorkerListMessage> responseObserver) {
     WorkerListMessage.Builder replyBuilder = WorkerListMessage.newBuilder();
     try {
-      replyBuilder.addAllWorkers(backplane.getWorkers());
+      replyBuilder.addAllWorkers(backplane.getStorageWorkers());
     } catch (IOException e) {
       responseObserver.onError(e);
     }

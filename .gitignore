@@ -14,6 +14,7 @@ bazel-*
 
 #Static Analysis
 /pmd
+/checkstyle
 
 #CI tools
 unused_deps

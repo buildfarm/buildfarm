@@ -43,12 +43,15 @@ public class Backplane {
   private String[] redisNodes = {};
   private int maxAttempts = 20;
   private boolean cacheCas = false;
+  private long priorityPollIntervalMillis = 100;
 
   public String getRedisUri() {
-    if (!Strings.isNullOrEmpty(redisUri)) {
-      return redisUri;
-    } else {
+    // use environment override (useful for containerized deployment)
+    if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
       return System.getenv("REDIS_URI");
     }
+
+    // use configured value
+    return redisUri;
   }
 }

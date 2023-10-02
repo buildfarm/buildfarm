@@ -17,6 +17,7 @@ package build.buildfarm.common.redis;
 import build.buildfarm.common.distributed.DistributedMap;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import com.google.common.collect.Iterables;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -206,5 +207,14 @@ public class RedisHashMap implements DistributedMap<JedisCluster> {
       resolved.add(new AbstractMap.SimpleEntry<>(val.getKey(), val.getValue().get()));
     }
     return resolved;
+  }
+  /**
+   * @brief Get values associated with the specified fields from the hashmap.
+   * @param jedis Jedis cluster client.
+   * @param fields The name of the fields.
+   * @return Values associated with the specified fields
+   */
+  public List<String> mget(JedisCluster jedis, Iterable<String> fields) {
+    return jedis.hmget(name, Iterables.toArray(fields, String.class));
   }
 }

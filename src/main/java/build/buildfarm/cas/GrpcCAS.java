@@ -62,19 +62,23 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+import javax.annotation.Nullable;
 
 public class GrpcCAS implements ContentAddressableStorage {
   private final String instanceName;
+  private final boolean readonly;
   private final Channel channel;
   private final ByteStreamUploader uploader;
   private final ListMultimap<Digest, Runnable> onExpirations;
 
   GrpcCAS(
       String instanceName,
+      boolean readonly,
       Channel channel,
       ByteStreamUploader uploader,
       ListMultimap<Digest, Runnable> onExpirations) {
     this.instanceName = instanceName;
+    this.readonly = readonly;
     this.channel = channel;
     this.uploader = uploader;
     this.onExpirations = onExpirations;
@@ -282,8 +286,12 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
+  @Nullable
   public Write getWrite(
       Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+    if (readonly) {
+      return null;
+    }
     return newWrite(channel, instanceName, compressor, digest, uuid, requestMetadata);
   }
 

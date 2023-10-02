@@ -14,25 +14,19 @@
 
 package build.buildfarm.tools;
 
+import static build.buildfarm.common.grpc.Channels.createChannel;
+
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import io.grpc.ManagedChannel;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 
 // This tool can be used to remove worker entries from the CAS.
 // This is usually done via the admin service when a worker is departing from the cluster.
 // ./tool <URL> shard SHA256 <worker instance name>
 // The results of the removal are printed after the CAS entries have been removed.
 class IndexWorker {
-  private static ManagedChannel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
-    return builder.build();
-  }
-
   public static void main(String[] args) throws Exception {
     String host = args[0];
     String instanceName = args[1];

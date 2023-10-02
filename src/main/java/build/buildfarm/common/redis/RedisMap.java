@@ -64,6 +64,7 @@ public class RedisMap implements DistributedMap<JedisCluster> {
    * @brief Constructor.
    * @details Construct a named redis map with an established redis cluster.
    * @param name The global name of the map.
+   * @param timeout_s When to expire entries.
    */
   public RedisMap(String name, int expiration_s) {
     this.name = name;

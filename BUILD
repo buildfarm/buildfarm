@@ -3,6 +3,8 @@ load("@io_bazel_rules_docker//java:image.bzl", "java_image")
 load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "download_pkgs")
 load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+load("@rules_oss_audit//oss_audit:java/oss_audit.bzl", "oss_audit")
+load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -126,18 +128,7 @@ java_image(
         "//examples:example_configs",
         "//src/main/java/build/buildfarm:configs",
     ],
-    jvm_flags = [
-        "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-
-        # Flags related to OpenTelemetry
-        "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-        "-Dotel.resource.attributes=service.name=server",
-        "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-        "-Dotel.instrumentation.http.capture-headers.client.request",
-        "-Dotel.instrumentation.http.capture-headers.client.response",
-        "-Dotel.instrumentation.http.capture-headers.server.request",
-        "-Dotel.instrumentation.http.capture-headers.server.response",
-    ],
+    jvm_flags = server_jvm_flags(),
     main_class = "build.buildfarm.server.BuildFarmServer",
     tags = ["container"],
     runtime_deps = [
@@ -146,19 +137,25 @@ java_image(
     ],
 )
 
+oss_audit(
+    name = "buildfarm-server-audit",
+    src = "//src/main/java/build/buildfarm:buildfarm-server",
+    tags = ["audit"],
+)
+
 # A worker image may need additional packages installed that are not in the base image.
 # We use download/install rules to extend an upstream image.
 # Download cgroup-tools so that the worker is able to restrict actions via control groups.
 download_pkgs(
     name = "worker_pkgs",
-    image_tar = "@ubuntu-bionic//image",
+    image_tar = "@ubuntu-jammy//image",
     packages = ["cgroup-tools"],
     tags = ["container"],
 )
 
 install_pkgs(
     name = "worker_pkgs_image",
-    image_tar = "@ubuntu-bionic//image",
+    image_tar = "@ubuntu-jammy//image",
     installables_tar = ":worker_pkgs.tar",
     installation_cleanup_commands = "rm -rf /var/lib/apt/lists/*",
     output_image_name = "worker_pkgs_image",
@@ -183,18 +180,7 @@ java_image(
         "//examples:example_configs",
         "//src/main/java/build/buildfarm:configs",
     ],
-    jvm_flags = [
-        "-Dlogging.config=file:/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties",
-
-        # Flags related to OpenTelemetry
-        "-javaagent:/app/build_buildfarm/opentelemetry-javaagent.jar",
-        "-Dotel.resource.attributes=service.name=worker",
-        "-Dotel.exporter.otlp.traces.endpoint=http://otel-collector:4317",
-        "-Dotel.instrumentation.http.capture-headers.client.request",
-        "-Dotel.instrumentation.http.capture-headers.client.response",
-        "-Dotel.instrumentation.http.capture-headers.server.request",
-        "-Dotel.instrumentation.http.capture-headers.server.response",
-    ],
+    jvm_flags = worker_jvm_flags(),
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
     runtime_deps = [
@@ -202,4 +188,10 @@ java_image(
         ":telemetry_tools",
         "//src/main/java/build/buildfarm/worker/shard",
     ],
+)
+
+oss_audit(
+    name = "buildfarm-shard-worker-audit",
+    src = "//src/main/java/build/buildfarm:buildfarm-shard-worker",
+    tags = ["audit"],
 )

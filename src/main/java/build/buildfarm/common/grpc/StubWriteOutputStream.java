@@ -112,8 +112,6 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private TimeUnit deadlineAfterUnits = null;
   private Runnable onReadyHandler = null;
 
-  static class WriteCompleteException extends IOException {}
-
   @SuppressWarnings("Guava")
   public StubWriteOutputStream(
       Supplier<ByteStreamBlockingStub> bsBlockingStub,

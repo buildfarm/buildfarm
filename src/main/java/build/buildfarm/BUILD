@@ -1,5 +1,4 @@
-load("@io_bazel_rules_docker//container:container.bzl", "container_image")
-load("//:defs.bzl", "ensure_accurate_metadata")
+load("//:jvm_flags.bzl", "ensure_accurate_metadata")
 
 package(
     default_visibility = ["//src:__subpackages__"],
@@ -9,13 +8,6 @@ filegroup(
     name = "configs",
     srcs = ["logging.properties"],
     visibility = ["//visibility:public"],
-)
-
-genrule(
-    name = "tini.binary",
-    srcs = ["@tini//file"],
-    outs = ["tini"],
-    cmd = "cp $< $@ && chmod +x $@",
 )
 
 java_binary(
@@ -32,26 +24,6 @@ java_binary(
     ],
 )
 
-container_image(
-    name = "server.container",
-    base = "@java_image_base//image",
-    cmd = [
-        "buildfarm-server_deploy.jar",
-        "/config/server.config",
-        "--port",
-        "8980",
-    ],
-    # leverage the implicit target of the buildfarm-server to get a fat jar.
-    # this is simply a workaround for the fact that we have so many dependencies,
-    # so we'd want some wrappy script. This seemed more straightforward.
-    # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
-    files = [
-        ":buildfarm-server_deploy.jar",
-    ],
-    tags = ["container"],
-    visibility = ["//visibility:public"],
-)
-
 java_binary(
     name = "buildfarm-shard-worker",
     classpath_resources = [
@@ -64,18 +36,4 @@ java_binary(
         "//src/main/java/build/buildfarm/worker/shard",
         "@maven//:org_slf4j_slf4j_simple",
     ],
-)
-
-container_image(
-    name = "buildfarm-shard-worker.container",
-    base = "@java_image_base//image",
-    # leverage the implicit target of the buildfarm-shard-worker to get a fat jar.
-    # this is simply a workaround for the fact that we have so many dependencies,
-    # so we'd want some wrappy script. This seemed more straightforward.
-    # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
-    files = [
-        ":buildfarm-shard-worker_deploy.jar",
-    ],
-    tags = ["container"],
-    visibility = ["//visibility:public"],
 )

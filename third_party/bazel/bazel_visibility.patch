@@ -1,10 +1,8 @@
 diff --git a/src/main/tools/BUILD b/src/main/tools/BUILD
-index 9f64e09..e7679d3 100644
+index 7e2d2a1461..a10ebef005 100644
 --- a/src/main/tools/BUILD
 +++ b/src/main/tools/BUILD
-@@ -1,6 +1,6 @@
- load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
-
+@@ -1,4 +1,4 @@
 -package(default_visibility = ["//src:__subpackages__"])
 +package(default_visibility = ["//visibility:public"])
 

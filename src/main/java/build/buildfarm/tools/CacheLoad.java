@@ -24,6 +24,8 @@ import build.buildfarm.cas.cfc.CASFileCache.StartupCacheResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Size;
+import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Cas;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -37,23 +39,16 @@ class CacheLoad {
   private static class LocalCASFileCache extends CASFileCache {
     LocalCASFileCache(
         Path root,
+        Cas config,
         long maxSizeInBytes,
         DigestUtil digestUtil,
         ExecutorService expireService,
         Executor accessRecorder) {
-      super(
-          root,
-          maxSizeInBytes,
-          maxSizeInBytes,
-          /* hexBucketLevels=*/ 0,
-          /* storeFileDirsIndexInMemory=*/ true,
-          digestUtil,
-          expireService,
-          accessRecorder);
+      super(root, config, maxSizeInBytes, digestUtil, expireService, accessRecorder);
     }
 
     @Override
-    protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+    protected InputStream newExternalInput(Compressor.Value compressor, Digest digest, long offset)
         throws IOException {
       throw new IOException();
     }
@@ -67,9 +62,11 @@ class CacheLoad {
   */
   public static void main(String[] args) throws Exception {
     Path root = Paths.get(args[0]);
+    BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
     CASFileCache fileCache =
         new LocalCASFileCache(
             root,
+            configs.getWorker().getStorages().get(0),
             /* maxSizeInBytes=*/ Size.gbToBytes(500),
             new DigestUtil(HashFunction.SHA1),
             /* expireService=*/ newDirectExecutorService(),

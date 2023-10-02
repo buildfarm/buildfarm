@@ -109,7 +109,7 @@ public class ContentAddressableStorageService
               long elapsedMicros = stopwatch.elapsed(MICROSECONDS);
               missingBlobs.observe(request.getBlobDigestsList().size());
               log.log(
-                  Level.FINE,
+                  Level.FINER,
                   "FindMissingBlobs("
                       + instance.getName()
                       + ") for "

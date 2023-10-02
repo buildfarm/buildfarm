@@ -37,12 +37,12 @@ import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
-import build.buildfarm.common.ExecutionWrappers;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LinuxSandboxOptions;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ProtoUtils;
 import build.buildfarm.common.Size;
+import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ExecutionPolicy;
@@ -134,7 +134,7 @@ class ShardWorkerContext implements WorkerContext {
     ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
     Platform matchPlatform =
         ExecutionPolicies.getMatchPlatform(
-            configs.getBackplane().getQueues()[0].getPlatform(), policies);
+            configs.getWorker().getDequeueMatchSettings().getPlatform(), policies);
     for (Platform.Property property : matchPlatform.getPropertiesList()) {
       provisions.put(property.getName(), property.getValue());
     }
@@ -239,12 +239,12 @@ class ShardWorkerContext implements WorkerContext {
           } else {
             operationPollerCounter.inc();
             log.log(
-                Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
+                Level.FINE, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
         () -> {
-          log.log(Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
+          log.log(Level.FINE, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);
@@ -277,7 +277,7 @@ class ShardWorkerContext implements WorkerContext {
     try {
       queueEntry =
           backplane.dispatchOperation(
-              configs.getBackplane().getQueues()[0].getPlatform().getPropertiesList());
+              configs.getWorker().getDequeueMatchSettings().getPlatform().getPropertiesList());
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {
@@ -483,7 +483,7 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     String outputFile = actionRoot.relativize(outputPath).toString();
     if (!Files.exists(outputPath)) {
-      log.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
+      log.log(Level.FINER, "ReportResultStage: " + outputFile + " does not exist...");
       return;
     }
 
@@ -491,7 +491,7 @@ class ShardWorkerContext implements WorkerContext {
       String message =
           String.format(
               "ReportResultStage: %s is a directory but it should have been a file", outputPath);
-      log.log(Level.FINE, message);
+      log.log(Level.FINER, message);
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -572,12 +572,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     String outputDir = actionRoot.relativize(outputDirPath).toString();
     if (!Files.exists(outputDirPath)) {
-      log.log(Level.FINE, "ReportResultStage: " + outputDir + " does not exist...");
+      log.log(Level.FINER, "ReportResultStage: " + outputDir + " does not exist...");
       return;
     }
 
     if (!Files.isDirectory(outputDirPath)) {
-      log.log(Level.FINE, "ReportResultStage: " + outputDir + " is not a directory...");
+      log.log(Level.FINER, "ReportResultStage: " + outputDir + " is not a directory...");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -700,7 +700,7 @@ class ShardWorkerContext implements WorkerContext {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
       completedOperations.inc();
-      log.log(Level.FINE, "CompletedOperation: " + operation.getName());
+      log.log(Level.FINER, "CompletedOperation: " + operation.getName());
     }
     return success;
   }
@@ -755,16 +755,20 @@ class ShardWorkerContext implements WorkerContext {
     return Size.mbToBytes(100);
   }
 
+  boolean shouldLimitCoreUsage() {
+    return limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0;
+  }
+
   @Override
   public void createExecutionLimits() {
-    if (limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0) {
+    if (shouldLimitCoreUsage()) {
       createOperationExecutionLimits();
     }
   }
 
   void createOperationExecutionLimits() {
     try {
-      int availableProcessors = Runtime.getRuntime().availableProcessors();
+      int availableProcessors = SystemProcessors.get();
       Preconditions.checkState(availableProcessors >= executeStageWidth);
       int executionsShares =
           Group.getRoot().getCpu().getShares() * executeStageWidth / availableProcessors;
@@ -817,7 +821,8 @@ class ShardWorkerContext implements WorkerContext {
         onlyMulticoreTests,
         limitGlobalExecution,
         getExecuteStageWidth(),
-        allowBringYourOwnContainer);
+        allowBringYourOwnContainer,
+        configs.getWorker().getSandboxSettings());
   }
 
   @Override
@@ -826,7 +831,7 @@ class ShardWorkerContext implements WorkerContext {
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory) {
-    if (limitGlobalExecution || onlyMulticoreTests || defaultMaxCores > 0) {
+    if (shouldLimitCoreUsage()) {
       ResourceLimits limits = commandExecutionSettings(command);
       return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
     }
@@ -869,7 +874,7 @@ class ShardWorkerContext implements WorkerContext {
     // Decide the CLI for running under cgroups
     if (!usedGroups.isEmpty()) {
       arguments.add(
-          ExecutionWrappers.CGROUPS,
+          configs.getExecutionWrappers().getCgroups(),
           "-g",
           String.join(",", usedGroups) + ":" + group.getHierarchy());
     }
@@ -878,7 +883,7 @@ class ShardWorkerContext implements WorkerContext {
     // This is not the ideal implementation of block-network.
     // For now, without the linux-sandbox, we will unshare the network namespace.
     if (limits.network.blockNetwork && !limits.useLinuxSandbox) {
-      arguments.add(ExecutionWrappers.UNSHARE, "-n", "-r");
+      arguments.add(configs.getExecutionWrappers().getUnshare(), "-n", "-r");
     }
 
     // Decide the CLI for running the sandbox
@@ -890,15 +895,15 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     if (limits.time.skipSleep) {
-      arguments.add(ExecutionWrappers.SKIP_SLEEP);
+      arguments.add(configs.getExecutionWrappers().getSkipSleep());
 
       // we set these values very high because we want sleep calls to return immediately.
       arguments.add("90000000"); // delay factor
       arguments.add("90000000"); // time factor
-      arguments.add(ExecutionWrappers.SKIP_SLEEP_PRELOAD);
+      arguments.add(configs.getExecutionWrappers().getSkipSleepPreload());
 
       if (limits.time.timeShift != 0) {
-        arguments.add(ExecutionWrappers.DELAY);
+        arguments.add(configs.getExecutionWrappers().getDelay());
         arguments.add(String.valueOf(limits.time.timeShift));
       }
     }
@@ -953,10 +958,10 @@ class ShardWorkerContext implements WorkerContext {
 
   private void addLinuxSandboxCli(
       ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
-    arguments.add(ExecutionWrappers.AS_NOBODY);
+    arguments.add(configs.getExecutionWrappers().getAsNobody());
 
     // Choose the sandbox which is built and deployed with the worker image.
-    arguments.add(ExecutionWrappers.LINUX_SANDBOX);
+    arguments.add(configs.getExecutionWrappers().getLinuxSandbox());
 
     // Pass flags based on the sandbox CLI options.
     if (options.createNetns) {
