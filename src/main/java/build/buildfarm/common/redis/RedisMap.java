@@ -34,7 +34,7 @@ import redis.clients.jedis.Response;
  *     before and after the map data structure is created (since it exists in redis). Therefore, two
  *     redis maps with the same name, would in fact be the same underlying redis map.
  */
-public class RedisMap implements DistributedMap<JedisCluster> {
+public class RedisMap implements Map<String, String> {
   /**
    * @field name
    * @brief The unique name of the map.
@@ -42,6 +42,12 @@ public class RedisMap implements DistributedMap<JedisCluster> {
    *     the same name, they would be instances of the same underlying redis map.
    */
   private final String name;
+
+  /**
+   * @field jedis
+   * @brief The jedis cluster used by the container.
+   */
+  private final JedisCluster jedis;
 
   /**
    * @field expiration_s
@@ -54,19 +60,22 @@ public class RedisMap implements DistributedMap<JedisCluster> {
   /**
    * @brief Constructor.
    * @details Construct a named redis map with an established redis cluster.
+   * @param jedis The jedis cluster used by the container.
    * @param name The global name of the map.
    */
-  public RedisMap(String name) {
-    this(name, 86400);
+  public RedisMap(JedisCluster jedis, String name) {
+    this(jedis, name, 86400);
   }
 
   /**
    * @brief Constructor.
    * @details Construct a named redis map with an established redis cluster.
+   * @param jedis The jedis cluster used by the container.
    * @param name The global name of the map.
    * @param timeout_s When to expire entries.
    */
-  public RedisMap(String name, int expiration_s) {
+  public RedisMap(JedisCluster jedis, String name, int expiration_s) {
+    this.jedis = jedis;
     this.name = name;
     this.expiration_s = expiration_s;
   }
@@ -74,7 +83,6 @@ public class RedisMap implements DistributedMap<JedisCluster> {
   /**
    * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
    * @details If the key already exists, then the value is replaced.
-   * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @param value The value for the key.
    * @param expiration_s Timeout to expire the entry. (units: seconds (s))
@@ -83,14 +91,13 @@ public class RedisMap implements DistributedMap<JedisCluster> {
    * @note Overloaded.
    */
   @Override
-  public boolean insert(JedisCluster jedis, String key, String value, int expiration_s) {
+  public boolean insert(String key, String value, int expiration_s) {
     return jedis.setex(createKeyName(key), expiration_s, value) == "OK";
   }
 
   /**
    * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
    * @details If the key already exists, then the value is replaced.
-   * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @param value The value for the key.
    * @return Whether a new key was inserted. If a key is overwritten with a new value, this would be
@@ -98,7 +105,7 @@ public class RedisMap implements DistributedMap<JedisCluster> {
    * @note Overloaded.
    */
   @Override
-  public boolean insert(JedisCluster jedis, String key, String value) {
+  public boolean insert(String key, String value) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
     return jedis.setex(createKeyName(key), expiration_s, value) == "OK";
@@ -107,39 +114,36 @@ public class RedisMap implements DistributedMap<JedisCluster> {
   /**
    * @brief Add key/value only if key doesn't exist.
    * @details If the key already exists, this operation has no effect.
-   * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @param value The value for the key.
    * @return Whether a new key was inserted. If a key already exists, this would be false.
    */
   @Override
-  public boolean insertIfMissing(JedisCluster jedis, String key, String value) {
+  public boolean insertIfMissing(String key, String value) {
     return jedis.setnx(createKeyName(key), value) == 1;
   }
 
   /**
    * @brief Remove a key from the map.
    * @details Deletes the key/value pair.
-   * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @return Whether the key was removed.
    * @note Overloaded.
    * @note Suggested return identifier: success.
    */
   @Override
-  public boolean remove(JedisCluster jedis, String key) {
+  public boolean remove(String key) {
     return jedis.del(createKeyName(key)) == 1;
   }
 
   /**
    * @brief Remove multiple keys from the map.
    * @details Done via pipeline.
-   * @param jedis Jedis cluster client.
    * @param keys The name of the keys.
    * @note Overloaded.
    */
   @Override
-  public void remove(JedisCluster jedis, Iterable<String> keys) {
+  public void remove(Iterable<String> keys) {
     JedisClusterPipeline p = jedis.pipelined();
     for (String key : keys) {
       p.del(createKeyName(key));
@@ -150,75 +154,69 @@ public class RedisMap implements DistributedMap<JedisCluster> {
   /**
    * @brief whether the key exists
    * @details True if key exists. False if key does not exist.
-   * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @return Whether the key exists or not.
    * @note Suggested return identifier: exists.
    */
   @Override
-  public boolean exists(JedisCluster jedis, String key) {
+  public boolean exists(String key) {
     return jedis.exists(createKeyName(key));
   }
 
   /**
    * @brief Get the size of the map.
    * @details May be inefficient to due scanning into memory and deduplicating.
-   * @param jedis Jedis cluster client.
    * @return The size of the map.
    * @note Suggested return identifier: size.
    */
   @Override
-  public int size(JedisCluster jedis) {
+  public int size() {
     return ScanCount.get(jedis, name + ":*", 1000);
   }
 
   /**
    * @brief Get all of the keys from the hashmap.
    * @details No order guarantee
-   * @param jedis Jedis cluster client.
    * @return The redis hashmap keys represented as a set.
    */
   @Override
-  public Set<String> keys(JedisCluster jedis) {
+  public Set<String> keys() {
     return jedis.keys(name);
   }
 
   /**
    * @brief Convert the redis map to a java map.
    * @details This would not be efficient if the map is large.
-   * @param jedis Jedis cluster client.
    * @return The redis map represented as a java map.
    */
   @Override
-  public Map<String, String> asMap(JedisCluster jedis) {
+  public Map<String, String> asMap() {
     throw new UnsupportedOperationException();
   }
 
   /**
    * @brief Get the value of the key.
    * @details If the key does not exist, null is returned.
-   * @param jedis Jedis cluster client.
    * @param key The name of the key.
    * @return The value of the key. null if key does not exist.
    * @note Overloaded.
    * @note Suggested return identifier: value.
    */
   @Override
-  public String get(JedisCluster jedis, String key) {
+  public String get(String key) {
     return jedis.get(createKeyName(key));
   }
 
   /**
    * @brief Get the values of the keys.
    * @details If the key does not exist, null is returned.
-   * @param jedis Jedis cluster client.
    * @param keys The name of the keys.
    * @return The values of the keys. null if key does not exist.
    * @note Overloaded.
    * @note Suggested return identifier: values.
    */
   @Override
-  public Iterable<Map.Entry<String, String>> get(JedisCluster jedis, Iterable<String> keys) {
+  public Iterable<Map.Entry<String, String>> get(Iterable<String> keys) {
     // Fetch items via pipeline
     JedisClusterPipeline p = jedis.pipelined();
     List<Map.Entry<String, Response<String>>> values = new ArrayList<>();
