@@ -313,7 +313,7 @@ class ShardWorkerContext implements WorkerContext {
 
           @Override
           public boolean getMatched() {
-            return !matched;
+            return matched;
           }
 
           @Override
@@ -351,7 +351,7 @@ class ShardWorkerContext implements WorkerContext {
             throw new RuntimeException(t);
           }
         };
-    while (dedupMatchListener.getMatched()) {
+    while (!dedupMatchListener.getMatched()) {
       try {
         matchInterruptible(dedupMatchListener);
       } catch (IOException e) {
