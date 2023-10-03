@@ -185,9 +185,9 @@ java_binary(
 )
 
 java_binary(
-    name = "GracefulShutdownTest",
-    srcs = ["GracefulShutdownTest.java"],
-    main_class = "build.buildfarm.tools.GracefulShutdownTest",
+    name = "GracefulShutdown",
+    srcs = ["GracefulShutdown.java"],
+    main_class = "build.buildfarm.tools.GracefulShutdown",
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common/grpc",
