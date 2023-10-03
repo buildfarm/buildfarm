@@ -14,7 +14,6 @@ java_library(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/java/build/buildfarm/metrics/prometheus",
-        "//src/main/java/build/buildfarm/server/controllers:WebController",
         "//src/main/java/build/buildfarm/server/services",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@maven//:com_github_pcj_google_options",
@@ -29,10 +28,8 @@ java_library(
         "@maven//:org_springframework_boot_spring_boot",
         "@maven//:org_springframework_boot_spring_boot_autoconfigure",
         "@maven//:org_springframework_boot_spring_boot_starter_thymeleaf",
-        "@maven//:org_springframework_boot_spring_boot_starter_web",
         "@maven//:org_springframework_spring_beans",
         "@maven//:org_springframework_spring_context",
         "@maven//:org_springframework_spring_core",
-        "@maven//:org_springframework_spring_web",
     ],
 )
