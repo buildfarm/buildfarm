@@ -92,6 +92,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.logging.Level;
+import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 @Log
@@ -327,20 +328,28 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
+          public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
             if (queueEntry == null) {
               matched = true;
               return listener.onEntry(null);
             }
+            return onValidEntry(queueEntry);
+          }
+
+          private boolean onValidEntry(QueueEntry queueEntry) throws InterruptedException {
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
               log.log(Level.WARNING, "matched duplicate operation " + operationName);
               return false;
             }
+            return onUniqueEntry(queueEntry);
+          }
+
+          private boolean onUniqueEntry(QueueEntry queueEntry) throws InterruptedException {
             matched = true;
             boolean success = listener.onEntry(queueEntry);
             if (!success) {
-              requeue(operationName);
+              requeue(queueEntry.getExecuteEntry().getOperationName());
             }
             return success;
           }
