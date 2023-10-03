@@ -39,7 +39,6 @@ public final class BuildfarmConfigs {
   private Server server = new Server();
   private Backplane backplane = new Backplane();
   private Worker worker = new Worker();
-  private WebUI ui = new WebUI();
   private ExecutionWrappers executionWrappers = new ExecutionWrappers();
 
   private BuildfarmConfigs() {}

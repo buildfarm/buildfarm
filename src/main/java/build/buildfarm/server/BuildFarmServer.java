@@ -29,7 +29,6 @@ import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
-import build.buildfarm.server.controllers.WebController;
 import build.buildfarm.server.services.ActionCacheService;
 import build.buildfarm.server.services.AdminService;
 import build.buildfarm.server.services.CapabilitiesService;
@@ -143,7 +142,6 @@ public class BuildFarmServer {
 
     checkState(!stopping, "must not call start after stop");
     instance.start(publicName);
-    WebController.setInstance((ShardInstance) instance);
     server.start();
 
     healthStatusManager.setStatus(
@@ -214,8 +212,6 @@ public class BuildFarmServer {
     // Disable Logback
     System.setProperty("org.springframework.boot.logging.LoggingSystem", "none");
 
-    springConfig.put("ui.frontend.enable", configs.getUi().isEnable());
-    springConfig.put("server.port", configs.getUi().getPort());
     app.setDefaultProperties(springConfig);
 
     try {
