@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import com.google.common.base.Stopwatch;
@@ -63,8 +64,7 @@ public abstract class PipelineStage implements Runnable {
       // ignore
     } catch (Exception e) {
       getLogger()
-          .log(
-              Level.SEVERE, String.format("%s::run(): stage terminated due to exception", name), e);
+          .log(Level.SEVERE, format("%s::run(): stage terminated due to exception", name), e);
     } finally {
       boolean wasInterrupted = Thread.interrupted();
       try {
@@ -143,7 +143,7 @@ public abstract class PipelineStage implements Runnable {
   }
 
   private String logIterateId(String operationName) {
-    return String.format("%s::iterate(%s)", name, operationName);
+    return format("%s::iterate(%s)", name, operationName);
   }
 
   protected void start() {
@@ -157,7 +157,7 @@ public abstract class PipelineStage implements Runnable {
   protected void start(String operationName, String message) {
     // TODO to unary stage
     this.operationName = operationName;
-    getLogger().log(Level.FINER, String.format("%s: %s", logIterateId(operationName), message));
+    getLogger().log(Level.FINER, format("%s: %s", logIterateId(operationName), message));
   }
 
   protected void complete(String operationName, long usecs, long stallUSecs, boolean success) {
@@ -169,7 +169,7 @@ public abstract class PipelineStage implements Runnable {
     getLogger()
         .log(
             Level.FINER,
-            String.format(
+            format(
                 "%s: %g ms (%g ms stalled) %s",
                 logIterateId(operationName), usecs / 1000.0f, stallUSecs / 1000.0f, status));
   }
