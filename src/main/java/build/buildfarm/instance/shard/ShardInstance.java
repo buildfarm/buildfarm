@@ -568,10 +568,12 @@ public class ShardInstance extends AbstractServerInstance {
     stopping = true;
     log.log(Level.FINER, format("Instance %s is stopping", getName()));
     if (operationQueuer != null) {
-      operationQueuer.stop();
+      operationQueuer.interrupt();
+      operationQueuer.join();
     }
     if (dispatchedMonitor != null) {
       dispatchedMonitor.interrupt();
+      dispatchedMonitor.join();
     }
     if (prometheusMetricsThread != null) {
       prometheusMetricsThread.interrupt();
