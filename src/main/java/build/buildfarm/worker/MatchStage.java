@@ -95,11 +95,6 @@ public class MatchStage extends PipelineStage {
       throw new RuntimeException(t);
     }
 
-    @Override
-    public void setOnCancelHandler(Runnable onCancelHandler) {
-      // never called, only blocking stub used
-    }
-
     @SuppressWarnings("SameReturnValue")
     private boolean onOperationPolled() throws InterruptedException {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();

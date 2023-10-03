@@ -28,9 +28,7 @@ import com.google.longrunning.Operation;
 import com.google.rpc.Code;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
-import java.util.function.Consumer;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
   private final Instance instance;
@@ -43,14 +41,11 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     @SuppressWarnings("rawtypes")
     private final InterruptingPredicate onMatch;
 
-    private final Consumer<Runnable> setOnCancelHandler;
     private static final QueueEntry queueEntry = null;
 
     @SuppressWarnings("rawtypes")
-    OperationQueueMatchListener(
-        InterruptingPredicate onMatch, Consumer<Runnable> setOnCancelHandler) {
+    OperationQueueMatchListener(InterruptingPredicate onMatch) {
       this.onMatch = onMatch;
-      this.setOnCancelHandler = setOnCancelHandler;
     }
 
     @Override
@@ -69,11 +64,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     public void onError(Throwable t) {
       Throwables.throwIfUnchecked(t);
       throw new RuntimeException(t);
-    }
-
-    @Override
-    public void setOnCancelHandler(Runnable onCancelHandler) {
-      setOnCancelHandler.accept(onCancelHandler);
     }
   }
 
@@ -97,14 +87,10 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
   @Override
   public void take(TakeOperationRequest request, StreamObserver<QueueEntry> responseObserver) {
-    ServerCallStreamObserver<QueueEntry> callObserver =
-        (ServerCallStreamObserver<QueueEntry>) responseObserver;
-
     try {
       instance.match(
           request.getPlatform(),
-          new OperationQueueMatchListener(
-              createOnMatch(instance, responseObserver), callObserver::setOnCancelHandler));
+          new OperationQueueMatchListener(createOnMatch(instance, responseObserver)));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
