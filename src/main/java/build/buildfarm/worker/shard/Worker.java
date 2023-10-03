@@ -57,6 +57,7 @@ import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
+import build.buildfarm.worker.SuperscalarPipelineStage;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.devtools.common.options.OptionsParsingException;
@@ -197,7 +198,7 @@ public class Worker {
 
   private Server createServer(
       ServerBuilder<?> serverBuilder,
-      ContentAddressableStorage storage,
+      @Nullable CASFileCache storage,
       Instance instance,
       Pipeline pipeline,
       ShardWorkerContext context) {
@@ -211,13 +212,13 @@ public class Worker {
     // It will use various execution phases for it's profile service.
     // On the other hand, a worker that is only capable of CAS storage does not need a pipeline.
     if (configs.getWorker().getCapabilities().isExecution()) {
-      PipelineStage completeStage =
-          new PutOperationStage((operation) -> context.deactivate(operation.getName()));
+      PutOperationStage completeStage =
+          new PutOperationStage(operation -> context.deactivate(operation.getName()));
       PipelineStage errorStage = completeStage; /* new ErrorStage(); */
       PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
-      PipelineStage executeActionStage =
+      SuperscalarPipelineStage executeActionStage =
           new ExecuteActionStage(context, reportResultStage, errorStage);
-      PipelineStage inputFetchStage =
+      SuperscalarPipelineStage inputFetchStage =
           new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
       PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
 
@@ -228,7 +229,13 @@ public class Worker {
 
       serverBuilder.addService(
           new WorkerProfileService(
-              storage, inputFetchStage, executeActionStage, context, completeStage, backplane));
+              storage,
+              matchStage,
+              inputFetchStage,
+              executeActionStage,
+              reportResultStage,
+              completeStage,
+              backplane));
     }
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getWorker().getGrpcMetrics());
     serverBuilder.intercept(new ServerHeadersInterceptor());
@@ -608,7 +615,7 @@ public class Worker {
             writer);
 
     pipeline = new Pipeline();
-    server = createServer(serverBuilder, storage, instance, pipeline, context);
+    server = createServer(serverBuilder, (CASFileCache) storage, instance, pipeline, context);
 
     removeWorker(configs.getWorker().getPublicName());
 

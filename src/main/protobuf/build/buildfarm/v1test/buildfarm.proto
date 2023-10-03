@@ -602,6 +602,8 @@ message StageInformation {
 
   // number of slots used for this stage
   int32 slots_used = 3;
+
+  repeated string operation_names = 4;
 }
 
 message WorkerProfileMessage {

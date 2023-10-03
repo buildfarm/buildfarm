@@ -650,6 +650,9 @@ class Cat {
   private static void printStageInformation(StageInformation stage) {
     System.out.printf("%s slots configured: %d%n", stage.getName(), stage.getSlotsConfigured());
     System.out.printf("%s slots used %d%n", stage.getName(), stage.getSlotsUsed());
+    for (String operationName : stage.getOperationNamesList()) {
+      System.out.printf("%s operation %s\n", stage.getName(), operationName);
+    }
   }
 
   private static void printOperationTime(OperationTimesBetweenStages time) {

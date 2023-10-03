@@ -72,6 +72,11 @@ public class SuperscalarPipelineStageTest {
     boolean isFull() {
       return claims.size() == width;
     }
+
+    @Override
+    public int getSlotUsage() {
+      return 0;
+    }
   }
 
   @Test
