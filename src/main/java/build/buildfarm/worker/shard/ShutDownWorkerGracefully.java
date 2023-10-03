@@ -18,7 +18,6 @@ import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import io.grpc.stub.StreamObserver;
-import java.util.concurrent.CompletableFuture;
 import lombok.extern.java.Log;
 
 @Log
@@ -41,7 +40,7 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
       PrepareWorkerForGracefulShutDownRequest request,
       StreamObserver<PrepareWorkerForGracefulShutDownRequestResults> responseObserver) {
     try {
-      CompletableFuture.runAsync(worker::prepareWorkerForGracefulShutdown);
+      worker.initiateShutdown();
       responseObserver.onNext(PrepareWorkerForGracefulShutDownRequestResults.newBuilder().build());
       responseObserver.onCompleted();
     } catch (Exception e) {
