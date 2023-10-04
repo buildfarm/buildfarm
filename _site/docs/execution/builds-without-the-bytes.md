@@ -7,7 +7,7 @@ nav_order: 4
 
 # Builds Without The Bytes
 
-tl;dr: add `--build_request_id=https://host?ENSURE_OUTPUTS_PRESENT=true#$(uuidgen)` to your BWOB bazel invocations.
+tl;dr: add `--build_request_id=https://host?ENSURE_OUTPUTS_PRESENT=true#$(uuidgen)`, to your BWOB bazel invocations, or enable `ensureOutputsPresent` in your config to set it globally.
 
 As proposed in this [issue](https://github.com/bazelbuild/bazel/issues/6862) and the accompanying document, bazel endeavors to provide a mechanism to be 'content-light' for remote execution, using only content reference addresses to request action execution and construct successively dependent action definitions.
 
