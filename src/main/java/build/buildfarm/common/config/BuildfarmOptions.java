@@ -27,4 +27,10 @@ public class BuildfarmOptions extends OptionsBase {
       help = "Port for the prometheus service. '0' will disable prometheus hosting",
       defaultValue = "-1")
   public int prometheusPort;
+
+  @Option(
+      name = "redis_uri",
+      help = "URI for Redis connection. Use 'redis://' or 'rediss://' for the scheme",
+      defaultValue = "")
+  public String redisUri;
 }
