@@ -222,6 +222,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
       name = resourceName;
       try {
         write = getWrite(resourceName);
+        getOutput(); // establish ownership for this output
         if (log.isLoggable(Level.FINEST)) {
           log.log(
               Level.FINEST,
@@ -316,7 +317,6 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
   @GuardedBy("this")
   private long getCommittedSizeForWrite() throws IOException {
-    getOutput(); // establish ownership for this output
     return write.getCommittedSize();
   }
 
