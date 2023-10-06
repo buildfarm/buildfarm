@@ -1,3 +1,10 @@
+server:
+  metrics:
+    publisher: LOG
+    logLevel: FINEST
+    topic: test
+    topicMaxConnections: 1000
+    secretName: test
 backplane:
   redisUri: "redis://localhost:6379"
   queues:
