@@ -36,7 +36,7 @@ public class ProtoUtils {
 
     if (queuedOperationBlob == null) {
       log.log(
-          Level.WARNING,
+          Level.SEVERE,
           String.format(
               "missing queued operation: %s(%s)",
               operationName, DigestUtil.toString(queuedOperationDigest)));
@@ -46,7 +46,7 @@ public class ProtoUtils {
       return QueuedOperation.parseFrom(queuedOperationBlob);
     } catch (InvalidProtocolBufferException e) {
       log.log(
-          Level.WARNING,
+          Level.SEVERE,
           String.format(
               "invalid queued operation: %s(%s).  Cannot parse operation blob: %s",
               operationName, DigestUtil.toString(queuedOperationDigest), e));

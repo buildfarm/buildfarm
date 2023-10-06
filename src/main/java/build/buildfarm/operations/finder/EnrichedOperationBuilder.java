@@ -110,7 +110,7 @@ public class EnrichedOperationBuilder {
             .ignoringUnknownFields();
 
     if (json == null) {
-      log.log(Level.WARNING, "Operation Json is empty");
+      log.log(Level.SEVERE, "Operation Json is empty");
       return null;
     }
     try {
@@ -118,7 +118,7 @@ public class EnrichedOperationBuilder {
       operationParser.merge(json, operationBuilder);
       return operationBuilder.build();
     } catch (InvalidProtocolBufferException e) {
-      log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+      log.log(Level.SEVERE, "InvalidProtocolBufferException while building an operation.", e);
       return null;
     }
   }
@@ -152,7 +152,7 @@ public class EnrichedOperationBuilder {
       }
 
     } catch (InvalidProtocolBufferException e) {
-      log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+      log.log(Level.SEVERE, "InvalidProtocolBufferException while building an operation.", e);
       metadata = null;
     }
 
@@ -177,11 +177,11 @@ public class EnrichedOperationBuilder {
         action = Action.parseFrom(blob);
         return action;
       } catch (InvalidProtocolBufferException e) {
-        log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+        log.log(Level.SEVERE, "InvalidProtocolBufferException while building an operation.", e);
         return null;
       }
     } catch (Exception e) {
-      log.log(Level.WARNING, e.getMessage());
+      log.log(Level.SEVERE, e.getMessage());
       return null;
     }
   }
@@ -204,11 +204,11 @@ public class EnrichedOperationBuilder {
         command = Command.parseFrom(blob);
         return command;
       } catch (InvalidProtocolBufferException e) {
-        log.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
+        log.log(Level.SEVERE, "InvalidProtocolBufferException while building an operation.", e);
         return null;
       }
     } catch (Exception e) {
-      log.log(Level.WARNING, e.getMessage());
+      log.log(Level.SEVERE, e.getMessage());
       return null;
     }
   }

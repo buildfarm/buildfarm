@@ -136,7 +136,7 @@ public class BuildFarmServer {
     }
     server = serverBuilder.build();
 
-    log.info(String.format("%s initialized", configs.getServer().getSession()));
+    log.severe(String.format("%s initialized", configs.getServer().getSession()));
 
     checkState(!stopping, "must not call start after stop");
     instance.start(publicName);
@@ -173,7 +173,7 @@ public class BuildFarmServer {
       }
     }
     if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
-      log.warning("could not shut down keepalive scheduler");
+      log.severe("could not shut down keepalive scheduler");
     }
     System.err.println("*** server shut down");
   }

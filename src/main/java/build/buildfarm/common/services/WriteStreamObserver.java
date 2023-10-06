@@ -110,7 +110,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
         Status status = Status.fromThrowable(e);
         if (errorResponse(status.asException())) {
           log.log(
-              status.getCode() == Status.Code.CANCELLED ? Level.FINER : Level.SEVERE,
+              status.getCode() == Status.Code.CANCELLED ? Level.SEVERE : Level.SEVERE,
               format("error writing %s", (name == null ? request.getResourceName() : name)),
               e);
         }
@@ -160,7 +160,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
     if (Context.current().isCancelled()) {
       log.log(
-          Level.FINEST,
+          Level.SEVERE,
           format("skipped delivering committed_size to %s for cancelled context", name));
     } else {
       try {
@@ -169,7 +169,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
           committedSize = -1;
         } else if (expectedCommittedSize >= 0 && expectedCommittedSize != committedSize) {
           log.log(
-              Level.WARNING,
+              Level.SEVERE,
               format(
                   "committed size %d did not match expectation for %s "
                       + " after %d requests and %d bytes at offset %d, ignoring it",
@@ -182,7 +182,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
         Status status = Status.fromThrowable(e);
         if (errorResponse(status.asException())) {
           log.log(
-              status.getCode() == Status.Code.CANCELLED ? Level.FINER : Level.SEVERE,
+              status.getCode() == Status.Code.CANCELLED ? Level.SEVERE : Level.SEVERE,
               format(
                   "%s-%s: %s -> %s -> %s: error committing %s",
                   requestMetadata.getToolDetails().getToolName(),
@@ -203,7 +203,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
     if (exception.compareAndSet(null, null)) {
       try {
         log.log(
-            Level.FINEST, format("delivering committed_size for %s of %d", name, committedSize));
+            Level.SEVERE, format("delivering committed_size for %s of %d", name, committedSize));
         responseObserver.onNext(response);
         responseObserver.onCompleted();
       } catch (Exception e) {
@@ -222,9 +222,9 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
       name = resourceName;
       try {
         write = getWrite(resourceName);
-        if (log.isLoggable(Level.FINEST)) {
+        if (log.isLoggable(Level.SEVERE)) {
           log.log(
-              Level.FINEST,
+              Level.SEVERE,
               format(
                   "registering callback for %s: committed_size = %d (transient), complete = %s",
                   resourceName, write.getCommittedSize(), write.isComplete()));
@@ -260,7 +260,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
   private void logWriteRequest(WriteRequest request, Exception e) {
     log.log(
-        Level.WARNING,
+        Level.SEVERE,
         format(
             "write: %s, %d bytes%s",
             request.getResourceName(),
@@ -282,7 +282,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
       if (isEntryLimitException) {
         RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
         log.log(
-            Level.WARNING,
+            Level.SEVERE,
             format(
                 "%s-%s: %s -> %s -> %s: exceeded entry limit for %s",
                 requestMetadata.getToolDetails().getToolName(),
@@ -293,7 +293,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
                 name));
       } else {
         log.log(
-            Level.WARNING,
+            Level.SEVERE,
             format(
                 "error %s after %d requests and %d bytes at offset %d",
                 name, requestCount, requestBytes, earliestOffset),
@@ -373,7 +373,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
           data = data.substring(skipBytes);
         }
         log.log(
-            Level.FINEST,
+            Level.SEVERE,
             format(
                 "writing %d to %s at %d%s",
                 bytesToWrite, name, offset, finishWrite ? " with finish_write" : ""));
@@ -389,7 +389,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
   @GuardedBy("this")
   private void close() {
-    log.log(Level.FINEST, format("closing stream due to finishWrite for %s", name));
+    log.log(Level.SEVERE, format("closing stream due to finishWrite for %s", name));
     try {
       getOutput().close();
     } catch (DigestMismatchException e) {
@@ -472,11 +472,11 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
   @Override
   public void onError(Throwable t) {
-    log.log(Level.FINER, format("write error for %s", name), t);
+    log.log(Level.SEVERE, format("write error for %s", name), t);
   }
 
   @Override
   public void onCompleted() {
-    log.log(Level.FINER, format("write completed for %s", name));
+    log.log(Level.SEVERE, format("write completed for %s", name));
   }
 }

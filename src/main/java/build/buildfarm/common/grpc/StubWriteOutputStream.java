@@ -17,7 +17,7 @@ package build.buildfarm.common.grpc;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static java.lang.String.format;
-import static java.util.logging.Level.WARNING;
+import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -216,7 +216,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
                       if (expectedSize != UNLIMITED_EXPECTED_SIZE
                           && committedSize != expectedSize) {
                         log.log(
-                            WARNING,
+                            SEVERE,
                             format(
                                 "received WriteResponse with unexpected committedSize: %d != %d",
                                 committedSize, expectedSize));

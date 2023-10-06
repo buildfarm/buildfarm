@@ -103,7 +103,7 @@ public final class Group {
       // TODO check arg limits, exit status, etc
       Runtime.getRuntime()
           .exec("kill -SIGKILL " + pids.stream().map(Object::toString).collect(joining(" ")));
-      log.warning("Killed processes with PIDs: " + pids);
+      log.severe("Killed processes with PIDs: " + pids);
       return false;
     }
     return true;

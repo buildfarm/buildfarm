@@ -83,7 +83,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
           @Override
           public void onFailure(Throwable t) {
             log.log(
-                Level.WARNING,
+                Level.SEVERE,
                 String.format(
                     "getActionResult(%s): %s",
                     request.getInstanceName(), DigestUtil.toString(request.getActionDigest())),

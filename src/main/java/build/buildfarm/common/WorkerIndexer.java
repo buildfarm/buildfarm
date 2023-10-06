@@ -88,7 +88,7 @@ public class WorkerIndexer {
     Long removedKeys = 0L;
     Long removedHosts = 0L;
     Set<String> activeWorkers = cluster.hkeys("Workers");
-    log.info(
+    log.severe(
         String.format(
             "Initializing CAS Indexer for Node %s with %d active workers.",
             node.getClient().getHost(), activeWorkers.size()));

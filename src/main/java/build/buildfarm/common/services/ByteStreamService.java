@@ -115,7 +115,7 @@ public class ByteStreamService extends ByteStreamImplBase {
         }
 
         if (readBytes > remaining) {
-          log.log(Level.WARNING, format("read %d bytes, expected %d", readBytes, remaining));
+          log.log(Level.SEVERE, format("read %d bytes, expected %d", readBytes, remaining));
           readBytes = (int) remaining;
         }
         remaining -= readBytes;
@@ -184,7 +184,7 @@ public class ByteStreamService extends ByteStreamImplBase {
           java.util.logging.Level level = Level.SEVERE;
           if (responseCount > 0 && status.getCode() == Code.DEADLINE_EXCEEDED
               || status.getCode() == Code.CANCELLED) {
-            level = Level.WARNING;
+            level = Level.SEVERE;
           }
           String message = format("error reading %s at offset %d", name, offset);
           if (responseCount > 0) {
@@ -342,7 +342,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     long offset = request.getReadOffset();
     long limit = request.getReadLimit();
     log.log(
-        Level.FINEST,
+        Level.SEVERE,
         format("read resource_name=%s offset=%d limit=%d", resourceName, offset, limit));
 
     try {
@@ -357,7 +357,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       QueryWriteStatusRequest request, StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
     try {
-      log.log(Level.FINER, format("queryWriteStatus(%s)", resourceName));
+      log.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName));
       Write write = getWrite(resourceName);
       responseObserver.onNext(
           QueryWriteStatusResponse.newBuilder()
@@ -366,7 +366,7 @@ public class ByteStreamService extends ByteStreamImplBase {
               .build());
       responseObserver.onCompleted();
       log.log(
-          Level.FINER,
+          Level.SEVERE,
           format(
               "queryWriteStatus(%s) => committed_size = %d, complete = %s",
               resourceName, write.getCommittedSize(), write.isComplete()));
@@ -374,7 +374,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       log.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     } catch (EntryLimitException e) {
-      log.log(Level.WARNING, format("queryWriteStatus(%s): %s", resourceName, e.getMessage()));
+      log.log(Level.SEVERE, format("queryWriteStatus(%s): %s", resourceName, e.getMessage()));
       responseObserver.onNext(QueryWriteStatusResponse.getDefaultInstance());
       responseObserver.onCompleted();
     } catch (RuntimeException e) {

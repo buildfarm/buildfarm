@@ -22,10 +22,11 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Compressor;
+import java.util.logging.Logger;  
+
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -419,7 +420,7 @@ public class Worker {
       if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
         throw status.asRuntimeException();
       }
-      log.log(INFO, "backplane was unavailable or overloaded, deferring removeWorker");
+      log.log(SEVERE, "backplane was unavailable or overloaded, deferring removeWorker");
     }
   }
 
@@ -477,12 +478,12 @@ public class Worker {
                   File pausedFile = new File(configs.getWorker().getRoot() + "/.paused");
                   if (pausedFile.exists() && !isPaused) {
                     isPaused = true;
-                    log.log(Level.INFO, "The current worker is paused from taking on new work!");
+                    log.log(Level.SEVERE, "The current worker is paused from taking on new work!");
                     pipeline.stopMatchingOperations();
                     workerPausedMetric.inc();
                   }
                 } catch (Exception e) {
-                  log.log(Level.WARNING, "Could not open .paused file.", e);
+                  log.log(Level.SEVERE, "Could not open .paused file.", e);
                 }
                 return isPaused;
               }
@@ -639,7 +640,7 @@ public class Worker {
     executionSlotsTotal.set(configs.getWorker().getExecuteStageWidth());
     inputFetchSlotsTotal.set(configs.getWorker().getInputFetchStageWidth());
 
-    log.log(INFO, String.format("%s initialized", identifier));
+    log.log(SEVERE, String.format("%s initialized", identifier));
   }
 
   @PreDestroy
@@ -649,7 +650,7 @@ public class Worker {
     PrometheusPublisher.stopHttpServer();
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
-      log.log(INFO, "Closing the pipeline");
+      log.log(SEVERE, "Closing the pipeline");
       try {
         pipeline.close();
       } catch (InterruptedException e) {
@@ -663,11 +664,11 @@ public class Worker {
     executionSlotsTotal.set(0);
     inputFetchSlotsTotal.set(0);
     if (execFileSystem != null) {
-      log.log(INFO, "Stopping exec filesystem");
+      log.log(SEVERE, "Stopping exec filesystem");
       execFileSystem.stop();
     }
     if (server != null) {
-      log.log(INFO, "Shutting down the server");
+      log.log(SEVERE, "Shutting down the server");
       server.shutdown();
 
       try {
@@ -717,6 +718,21 @@ public class Worker {
   }
 
   public static void main(String[] args) throws ConfigurationException {
+    java.util.logging.Logger rootLoger = java.util.logging.Logger.getLogger("");
+    java.util.logging.Handler[] handlers = rootLoger.getHandlers(); 
+    for (java.util.logging.Handler h : handlers) {
+        h.setLevel(Level.ALL);
+    }
+    rootLoger.setLevel(Level.ALL);
+    // java.util.logging.Logger[] loggers = java.util.logging.Logger.getLogger("").getLoggerContext().getLoggerList();  
+  
+    // // Set the logging level for all the loggers and their child loggers  
+    // for (java.util.logging.Logger logger : loggers) {  
+    //     logger.setLevel(Level.ALL);  
+    // }
+    log.severe("severe - In Worker.java");
+    log.severe("finest - In Worker.java");
+
     configs = BuildfarmConfigs.loadWorkerConfigs(args);
     SpringApplication.run(Worker.class, args);
   }

@@ -233,18 +233,18 @@ class ShardWorkerContext implements WorkerContext {
           }
           if (!success) {
             log.log(
-                Level.INFO,
+                Level.SEVERE,
                 format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
           } else {
             operationPollerCounter.inc();
             log.log(
-                Level.FINE, format("%s: poller: Completed Poll for %s: OK", name, operationName));
+                Level.SEVERE, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
         () -> {
-          log.log(Level.FINE, format("%s: poller: Deadline expired for %s", name, operationName));
+          log.log(Level.SEVERE, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);
@@ -282,10 +282,10 @@ class ShardWorkerContext implements WorkerContext {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {
         case DEADLINE_EXCEEDED:
-          log.log(Level.WARNING, "backplane timed out for match during bookkeeping");
+          log.log(Level.SEVERE, "backplane timed out for match during bookkeeping");
           break;
         case UNAVAILABLE:
-          log.log(Level.WARNING, "backplane was unavailable for match");
+          log.log(Level.SEVERE, "backplane was unavailable for match");
           break;
         default:
           throw e;
@@ -334,7 +334,7 @@ class ShardWorkerContext implements WorkerContext {
             }
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
-              log.log(Level.WARNING, "matched duplicate operation " + operationName);
+              log.log(Level.SEVERE, "matched duplicate operation " + operationName);
               return false;
             }
             matched = true;
@@ -483,7 +483,7 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     String outputFile = actionRoot.relativize(outputPath).toString();
     if (!Files.exists(outputPath)) {
-      log.log(Level.FINER, "ReportResultStage: " + outputFile + " does not exist...");
+      log.log(Level.SEVERE, "ReportResultStage: " + outputFile + " does not exist...");
       return;
     }
 
@@ -491,7 +491,7 @@ class ShardWorkerContext implements WorkerContext {
       String message =
           String.format(
               "ReportResultStage: %s is a directory but it should have been a file", outputPath);
-      log.log(Level.FINER, message);
+      log.log(Level.SEVERE, message);
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -572,12 +572,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     String outputDir = actionRoot.relativize(outputDirPath).toString();
     if (!Files.exists(outputDirPath)) {
-      log.log(Level.FINER, "ReportResultStage: " + outputDir + " does not exist...");
+      log.log(Level.SEVERE, "ReportResultStage: " + outputDir + " does not exist...");
       return;
     }
 
     if (!Files.isDirectory(outputDirPath)) {
-      log.log(Level.FINER, "ReportResultStage: " + outputDir + " is not a directory...");
+      log.log(Level.SEVERE, "ReportResultStage: " + outputDir + " is not a directory...");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -700,7 +700,7 @@ class ShardWorkerContext implements WorkerContext {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
       completedOperations.inc();
-      log.log(Level.FINER, "CompletedOperation: " + operation.getName());
+      log.log(Level.SEVERE, "CompletedOperation: " + operation.getName());
     }
     return success;
   }

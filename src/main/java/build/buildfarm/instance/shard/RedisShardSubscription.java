@@ -68,7 +68,7 @@ class RedisShardSubscription implements Runnable {
       switch (status.getCode()) {
         case DEADLINE_EXCEEDED:
         case UNAVAILABLE:
-          log.log(Level.WARNING, "failed to subscribe", e);
+          log.log(Level.SEVERE, "failed to subscribe", e);
           /* ignore */
           break;
         default:

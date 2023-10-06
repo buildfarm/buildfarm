@@ -55,7 +55,7 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
 
     Set<Path> workerFiles = ImmutableSet.copyOf(key.getWorkerFilesWithHashes().keySet());
     logger.log(
-        Level.FINE,
+        Level.SEVERE,
         "Starting Worker[" + key.getMnemonic() + "]<" + execRoot + ">("
             + initCmd + ") with files: \n"
             + workerFiles
@@ -124,7 +124,7 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
 
   private void logRequest(WorkRequest request) {
     logger.log(
-        Level.FINE,
+        Level.SEVERE,
         "doWork()------<" +
             "Got request with args: " + request.getArgumentsList() +
             "------>"

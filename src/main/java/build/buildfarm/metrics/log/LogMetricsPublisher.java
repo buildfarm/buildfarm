@@ -33,7 +33,7 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
     if (configs.getServer().getMetrics().getLogLevel() != null) {
       logLevel = Level.parse(configs.getServer().getMetrics().getLogLevel().name());
     } else {
-      logLevel = Level.FINEST;
+      logLevel = Level.SEVERE;
     }
   }
 
@@ -46,7 +46,7 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
       }
     } catch (Exception e) {
       log.log(
-          Level.WARNING,
+          Level.SEVERE,
           String.format("Could not publish request metadata to LOG for %s.", operation.getName()),
           e);
     }
@@ -54,6 +54,6 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
 
   @Override
   public void publishMetric(String metricName, Object metricValue) {
-    log.log(Level.INFO, String.format("%s: %s", metricName, metricValue.toString()));
+    log.log(Level.SEVERE, String.format("%s: %s", metricName, metricValue.toString()));
   }
 }

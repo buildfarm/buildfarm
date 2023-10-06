@@ -81,7 +81,7 @@ public class FetchService extends FetchImplBase {
             @Override
             public void onSuccess(Digest actualDigest) {
               log.log(
-                  Level.INFO,
+                  Level.SEVERE,
                   format(
                       "fetch blob succeeded: %s inserted into CAS",
                       DigestUtil.toString(actualDigest)));

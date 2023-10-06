@@ -678,7 +678,7 @@ public abstract class AbstractServerInstance implements Instance {
       } catch (Write.WriteCompleteException e) {
         return immediateFuture(actualDigestBuilder.build());
       } catch (Exception e) {
-        log.log(Level.WARNING, "download attempt failed", e);
+        log.log(Level.SEVERE, "download attempt failed", e);
         // ignore?
       }
     }
@@ -1011,7 +1011,7 @@ public abstract class AbstractServerInstance implements Instance {
         status = asExecutionStatus(cause);
       } else if (Code.forNumber(status.getCode()) == Code.DEADLINE_EXCEEDED) {
         log.log(
-            Level.WARNING, "an rpc status was thrown with DEADLINE_EXCEEDED, discarding it", cause);
+            Level.SEVERE, "an rpc status was thrown with DEADLINE_EXCEEDED, discarding it", cause);
         status =
             com.google.rpc.Status.newBuilder()
                 .setCode(com.google.rpc.Code.UNAVAILABLE.getNumber())
@@ -1460,7 +1460,7 @@ public abstract class AbstractServerInstance implements Instance {
           @Override
           public void onFailure(Throwable t) {
             log.log(
-                Level.WARNING,
+                Level.SEVERE,
                 format("action cache check of %s failed", DigestUtil.toString(actionDigest)),
                 t);
             onCompleted(null);
@@ -1565,7 +1565,7 @@ public abstract class AbstractServerInstance implements Instance {
               future.set(parser.parseFrom(blob));
             } catch (InvalidProtocolBufferException e) {
               log.log(
-                  Level.WARNING,
+                  Level.SEVERE,
                   format("expect parse for %s failed", DigestUtil.toString(digest)),
                   e);
               future.setException(e);
@@ -1579,7 +1579,7 @@ public abstract class AbstractServerInstance implements Instance {
             // NOT_FOUNDs are not notable enough to log independently
             if (status.getCode() != io.grpc.Status.Code.NOT_FOUND) {
               log.log(
-                  Level.WARNING, format("expect for %s failed", DigestUtil.toString(digest)), t);
+                  Level.SEVERE, format("expect for %s failed", DigestUtil.toString(digest)), t);
             }
             future.setException(t);
           }

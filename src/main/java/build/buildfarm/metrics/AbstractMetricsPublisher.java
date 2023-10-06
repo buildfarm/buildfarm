@@ -163,7 +163,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
       return operationRequestMetadata;
     } catch (Exception e) {
       log.log(
-          Level.WARNING,
+          Level.SEVERE,
           String.format("Could not populate request metadata for %s.", operation.getName()),
           e);
       return null;
@@ -184,7 +184,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
             .usingTypeRegistry(typeRegistry)
             .omittingInsignificantWhitespace()
             .print(operationRequestMetadata);
-    log.log(Level.FINER, "{}", formattedRequestMetadata);
+    log.log(Level.SEVERE, "{}", formattedRequestMetadata);
     return formattedRequestMetadata;
   }
 }

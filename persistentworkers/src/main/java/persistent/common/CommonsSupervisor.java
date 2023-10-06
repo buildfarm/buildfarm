@@ -50,7 +50,7 @@ public abstract class CommonsSupervisor<K, V extends Destructable>
       msgBuilder.append(e);
     }
 
-    getLogger().log(Level.FINE, msgBuilder.toString());
+    getLogger().log(Level.SEVERE, msgBuilder.toString());
 
     obj.destroy();
   }

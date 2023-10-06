@@ -396,7 +396,7 @@ public class FuseCAS extends FuseStubFS {
         unmounter.stop();
       }
       if (!mounted) {
-        log.log(Level.INFO, "Mounting FuseCAS");
+        log.log(Level.SEVERE, "Mounting FuseCAS");
         String[] fuseOpts = {"-o", "max_write=131072", "-o", "big_writes"};
         try {
           mount(mountPath, /* blocking=*/ false, /* debug=*/ false, /* fuseOpts=*/ fuseOpts);
@@ -410,12 +410,12 @@ public class FuseCAS extends FuseStubFS {
 
   private synchronized void decMounts() {
     if (--mounts == 0 && mountPath != null) {
-      log.log(Level.INFO, "Scheduling FuseCAS unmount in 10s");
+      log.log(Level.SEVERE, "Scheduling FuseCAS unmount in 10s");
       unmounter =
           new Watchdog(
               Duration.newBuilder().setSeconds(10).setNanos(0).build(),
               () -> {
-                log.log(Level.INFO, "Unmounting FuseCAS");
+                log.log(Level.SEVERE, "Unmounting FuseCAS");
                 umount();
                 mounted = false;
               });
@@ -749,7 +749,7 @@ public class FuseCAS extends FuseStubFS {
 
   @Override
   public int getxattr(String path, String name, Pointer value, @size_t long size) {
-    // log.log(Level.INFO, "GETXATTR: " + name);
+    // log.log(Level.SEVERE, "GETXATTR: " + name);
     // seen security.capability so far...
     return -ErrorCodes.EOPNOTSUPP();
   }

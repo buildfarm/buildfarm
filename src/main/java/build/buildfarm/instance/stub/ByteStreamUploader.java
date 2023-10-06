@@ -401,7 +401,7 @@ public class ByteStreamUploader {
                 // This exception indicates that closing the underlying input stream failed.
                 // We don't expect this to ever happen, but don't want to swallow the exception
                 // completely.
-                log.log(Level.WARNING, "Chunker failed closing data source", e);
+                log.log(Level.SEVERE, "Chunker failed closing data source", e);
               }
 
               if (status.isOk() || Code.ALREADY_EXISTS.equals(status.getCode())) {
@@ -448,7 +448,7 @@ public class ByteStreamUploader {
                     // This exception indicates that closing the underlying input stream failed.
                     // We don't expect this to ever happen, but don't want to swallow the exception
                     // completely.
-                    log.log(Level.WARNING, format("Chunker failed closing data source: %s", e1));
+                    log.log(Level.SEVERE, format("Chunker failed closing data source: %s", e1));
                   } finally {
                     call.cancel("Failed to read next chunk.", e);
                   }

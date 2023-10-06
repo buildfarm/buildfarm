@@ -59,11 +59,11 @@ public class ProcessWrapper implements Closeable {
 
     this.errorFile = this.workRoot.resolve(this.uuid + ".stderr");
 
-    logger.log(Level.FINE, "Starting Process:");
-    logger.log(Level.FINE, "\tcmd: " + this.args);
-    logger.log(Level.FINE, "\tdir: " + this.workRoot);
-    logger.log(Level.FINE, "\tenv: " + ImmutableMap.copyOf(env));
-    logger.log(Level.FINE, "\tenv: " + errorFile);
+    logger.log(Level.SEVERE, "Starting Process:");
+    logger.log(Level.SEVERE, "\tcmd: " + this.args);
+    logger.log(Level.SEVERE, "\tdir: " + this.workRoot);
+    logger.log(Level.SEVERE, "\tenv: " + ImmutableMap.copyOf(env));
+    logger.log(Level.SEVERE, "\tenv: " + errorFile);
 
     ProcessBuilder pb = new ProcessBuilder()
         .command(this.args)

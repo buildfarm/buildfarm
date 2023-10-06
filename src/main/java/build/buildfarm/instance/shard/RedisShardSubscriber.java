@@ -137,7 +137,7 @@ class RedisShardSubscriber extends JedisPubSub {
         new TimedWatchFuture(watcher) {
           @Override
           public void unwatch() {
-            log.log(Level.FINER, format("unwatching %s", channel));
+            log.log(Level.SEVERE, format("unwatching %s", channel));
             RedisShardSubscriber.this.unwatch(channel, this);
           }
         };
@@ -199,7 +199,7 @@ class RedisShardSubscriber extends JedisPubSub {
       @Nullable Instant expiresAt) {
     List<TimedWatchFuture> operationWatchers = watchers.get(channel);
     boolean observe = operation == null || operation.hasMetadata() || operation.getDone();
-    log.log(Level.FINER, format("onOperation %s: %s", channel, operation));
+    log.log(Level.SEVERE, format("onOperation %s: %s", channel, operation));
     synchronized (watchers) {
       ImmutableList.Builder<Consumer<Operation>> observers = ImmutableList.builder();
       for (TimedWatchFuture watchFuture : operationWatchers) {
@@ -215,7 +215,7 @@ class RedisShardSubscriber extends JedisPubSub {
         executor.execute(
             () -> {
               if (observe) {
-                log.log(Level.FINER, "observing " + operation);
+                log.log(Level.SEVERE, "observing " + operation);
                 observer.accept(operation);
               }
             });
@@ -236,7 +236,7 @@ class RedisShardSubscriber extends JedisPubSub {
     try {
       onWorkerChange(parseWorkerChange(message));
     } catch (InvalidProtocolBufferException e) {
-      log.log(Level.INFO, format("invalid worker change message: %s", message), e);
+      log.log(Level.SEVERE, format("invalid worker change message: %s", message), e);
     }
   }
 
@@ -275,7 +275,7 @@ class RedisShardSubscriber extends JedisPubSub {
       onOperationChange(channel, parseOperationChange(message));
     } catch (InvalidProtocolBufferException e) {
       log.log(
-          Level.INFO, format("invalid operation change message for %s: %s", channel, message), e);
+          Level.SEVERE, format("invalid operation change message for %s: %s", channel, message), e);
     }
   }
 

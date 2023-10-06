@@ -220,7 +220,7 @@ public class RedisShardBackplane implements Backplane {
         JsonFormat.parser().merge(entry, executeEntry);
         visit(executeEntry.build(), entry);
       } catch (InvalidProtocolBufferException e) {
-        log.log(Level.FINER, "invalid ExecuteEntry json: " + entry, e);
+        log.log(Level.SEVERE, "invalid ExecuteEntry json: " + entry, e);
       }
     }
   }
@@ -344,10 +344,10 @@ public class RedisShardBackplane implements Backplane {
 
     if (!expiringChannels.isEmpty()) {
       log.log(
-          Level.FINER,
+          Level.SEVERE,
           format("Scan %d watches, %s, expiresAt: %s", expiringChannels.size(), now, expiresAt));
 
-      log.log(Level.FINER, "Scan prequeue");
+      log.log(Level.SEVERE, "Scan prequeue");
       // scan prequeue, pet watches
       scanPrequeue(jedis, resetChannel);
     }
@@ -356,7 +356,7 @@ public class RedisShardBackplane implements Backplane {
     scanProcessing(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      log.log(Level.FINER, "Scan queue");
+      log.log(Level.SEVERE, "Scan queue");
       // scan queue, pet watches
       scanQueue(jedis, resetChannel);
     }
@@ -365,7 +365,7 @@ public class RedisShardBackplane implements Backplane {
     scanDispatching(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      log.log(Level.FINER, "Scan dispatched");
+      log.log(Level.SEVERE, "Scan dispatched");
       // scan dispatched pet watches
       scanDispatched(jedis, resetChannel);
     }
@@ -459,7 +459,7 @@ public class RedisShardBackplane implements Backplane {
         }
         subscriber.onOperation(operationChannel(operationName), operation, nextExpiresAt(now));
         log.log(
-            Level.FINER,
+            Level.SEVERE,
             format(
                 "operation %s done due to %s",
                 operationName, operation == null ? "null" : "completed"));
@@ -551,24 +551,24 @@ public class RedisShardBackplane implements Backplane {
     if (failsafeOperationThread != null) {
       failsafeOperationThread.interrupt();
       failsafeOperationThread.join();
-      log.log(Level.FINER, "failsafeOperationThread has been stopped");
+      log.log(Level.SEVERE, "failsafeOperationThread has been stopped");
     }
     if (operationSubscription != null) {
       operationSubscription.stop();
       if (subscriptionThread != null) {
         subscriptionThread.join();
       }
-      log.log(Level.FINER, "subscriptionThread has been stopped");
+      log.log(Level.SEVERE, "subscriptionThread has been stopped");
     }
     if (subscriberService != null) {
       subscriberService.shutdown();
       subscriberService.awaitTermination(10, SECONDS);
-      log.log(Level.FINER, "subscriberService has been stopped");
+      log.log(Level.SEVERE, "subscriberService has been stopped");
     }
     if (client != null) {
       client.close();
       client = null;
-      log.log(Level.FINER, "client has been closed");
+      log.log(Level.SEVERE, "client has been closed");
     }
   }
 
@@ -1043,7 +1043,7 @@ public class RedisShardBackplane implements Backplane {
       String queueEntryJson,
       int priority) {
     if (state.dispatchedOperations.remove(jedis, operationName)) {
-      log.log(Level.WARNING, format("removed dispatched operation %s", operationName));
+      log.log(Level.SEVERE, format("removed dispatched operation %s", operationName));
     }
     state.operationQueue.push(jedis, provisions, queueEntryJson, priority);
   }
@@ -1265,7 +1265,7 @@ public class RedisShardBackplane implements Backplane {
     if (success) {
       if (!state.operationQueue.removeFromDequeue(jedis, queueEntryJson)) {
         log.log(
-            Level.WARNING,
+            Level.SEVERE,
             format(
                 "operation %s was missing in %s, may be orphaned",
                 operationName, state.operationQueue.getDequeueName()));
@@ -1496,7 +1496,7 @@ public class RedisShardBackplane implements Backplane {
                         .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(key))))
                         .build()));
       } catch (NumberFormatException nfe) {
-        log.warning("Could not obtain start time for " + key);
+        log.severe("Could not obtain start time for " + key);
       }
     }
     return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();

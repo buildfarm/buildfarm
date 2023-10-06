@@ -182,7 +182,7 @@ public class RemoteCasWriter implements CasWriter {
                 long committedSize = write.getCommittedSize();
                 if (committedSize != digest.getSizeBytes()) {
                   log.log(
-                      Level.WARNING,
+                      Level.SEVERE,
                       format(
                           "committed size %d did not match expectation for digestUtil",
                           committedSize));

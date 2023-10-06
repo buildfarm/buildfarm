@@ -83,7 +83,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
           @Override
           public void onFailure(Throwable t) {
             if (!isCancelled() && !(t instanceof CancellationException)) {
-              log.log(Level.WARNING, "error occurred during execution", t);
+              log.log(Level.SEVERE, "error occurred during execution", t);
               serverCallStreamObserver.onError(Status.fromThrowable(t).asException());
             }
           }

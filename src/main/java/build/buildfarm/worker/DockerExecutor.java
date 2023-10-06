@@ -312,7 +312,7 @@ public class DockerExecutor {
     // run container creation and log any warnings
     CreateContainerResponse response = createContainerCmd.exec();
     if (response.getWarnings().length != 0) {
-      log.log(Level.WARNING, Arrays.toString(response.getWarnings()));
+      log.log(Level.SEVERE, Arrays.toString(response.getWarnings()));
     }
     // container is ready and started
     return response.getId();
@@ -369,7 +369,7 @@ public class DockerExecutor {
         Utils.unTar(tarStream, new File(path.toString()));
       }
     } catch (Exception e) {
-      log.log(Level.WARNING, "Could not extract file from container: ", e);
+      log.log(Level.SEVERE, "Could not extract file from container: ", e);
     }
   }
 }

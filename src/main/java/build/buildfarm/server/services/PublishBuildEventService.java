@@ -69,7 +69,7 @@ public class PublishBuildEventService extends PublishBuildEventImplBase {
 
   private void recordEvent(PublishBuildToolEventStreamRequest in) {
     if (configs.getServer().isRecordBesEvents() && in.hasOrderedBuildEvent()) {
-      log.log(Level.INFO, TextFormat.shortDebugString(in.getOrderedBuildEvent()));
+      log.log(Level.SEVERE, TextFormat.shortDebugString(in.getOrderedBuildEvent()));
     }
   }
 }

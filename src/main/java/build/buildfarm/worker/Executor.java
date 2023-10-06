@@ -24,6 +24,9 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
+
+import java.util.Arrays;
+
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
@@ -134,7 +137,7 @@ class Executor {
 
     if (!operationUpdateSuccess) {
       log.log(
-          Level.WARNING,
+          Level.SEVERE,
           String.format(
               "Executor::run(%s): could not transition to EXECUTING", operation.getName()));
       putError();
@@ -199,7 +202,7 @@ class Executor {
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
-    log.log(Level.FINER, "Executor: Operation " + operation.getName() + " Executing command");
+    log.log(Level.SEVERE, "Executor: Operation " + operation.getName() + " Executing command");
 
     ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
     resultBuilder
@@ -290,11 +293,21 @@ class Executor {
         .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
+    System.out.println("I am here");
+    System.out.println(Arrays.toString(Thread.currentThread().getStackTrace()));
+    log.severe("executor finest");
+    log.severe("executor log.severe");
+    log.severe("executor fine");
+    log.severe("executor info");
+    log.severe("executor warning");
+    log.severe("executor log.severe");
+    log.log(Level.SEVERE, "executor Level.SEVERE");
     log.log(
-        Level.FINER,
+        Level.SEVERE,
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
             operationName, resultBuilder.getExitCode()));
+    System.out.println("I am there");
 
     operationContext.executeResponse.getStatusBuilder().setCode(statusCode.getNumber());
     OperationContext reportOperationContext =
@@ -309,7 +322,7 @@ class Executor {
         throw e;
       }
     } else {
-      log.log(Level.FINER, "Executor: Operation " + operationName + " Failed to claim output");
+      log.log(Level.SEVERE, "Executor: Operation " + operationName + " Failed to claim output");
       boolean wasInterrupted = Thread.interrupted();
       try {
         putError();
@@ -505,7 +518,7 @@ class Executor {
           processCompleted = true;
         } else {
           log.log(
-              Level.INFO,
+              Level.SEVERE,
               format("process timed out for %s after %ds", operationName, timeout.getSeconds()));
           statusCode = Code.DEADLINE_EXCEEDED;
         }
@@ -516,7 +529,7 @@ class Executor {
         int waitMillis = 1000;
         while (!process.waitFor(waitMillis, TimeUnit.MILLISECONDS)) {
           log.log(
-              Level.INFO,
+              Level.SEVERE,
               format("process did not respond to termination for %s, killing it", operationName));
           process.destroyForcibly();
           waitMillis = 100;

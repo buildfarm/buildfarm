@@ -60,7 +60,7 @@ class DispatchedMonitor implements Runnable {
           long endTime = System.nanoTime();
           float ms = (endTime - startTime) / 1000000.0f;
           log.log(
-              Level.INFO, format("DispatchedMonitor::run: requeue(%s) %gms", operationName, ms));
+              Level.SEVERE, format("DispatchedMonitor::run: requeue(%s) %gms", operationName, ms));
         },
         directExecutor());
     return requeuedFuture;
@@ -74,7 +74,7 @@ class DispatchedMonitor implements Runnable {
         String.format(
             "DispatchedMonitor: Testing %s because %dms overdue (%d >= %d)",
             operationName, overdue_amount, now, o.getRequeueAt());
-    log.log(Level.INFO, message);
+    log.log(Level.SEVERE, message);
   }
 
   private void testDispatchedOperations(
@@ -135,13 +135,13 @@ class DispatchedMonitor implements Runnable {
 
   @Override
   public synchronized void run() {
-    log.log(Level.INFO, "DispatchedMonitor: Running");
+    log.log(Level.SEVERE, "DispatchedMonitor: Running");
     try {
       runInterruptibly();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } finally {
-      log.log(Level.INFO, "DispatchedMonitor: Exiting");
+      log.log(Level.SEVERE, "DispatchedMonitor: Exiting");
     }
   }
 }

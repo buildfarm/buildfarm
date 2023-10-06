@@ -279,7 +279,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
     if (sizeInBytes > maxSizeInBytes) {
       log.log(
-          Level.WARNING,
+          Level.SEVERE,
           String.format(
               "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
               sizeInBytes, maxSizeInBytes, storage.size(), size()));
@@ -309,7 +309,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   @GuardedBy("this")
   private void expireEntry(Entry e) {
     Digest digest = DigestUtil.buildDigest(e.key, e.value.size());
-    log.log(Level.INFO, "MemoryLRUCAS: expiring " + DigestUtil.toString(digest));
+    log.log(Level.SEVERE, "MemoryLRUCAS: expiring " + DigestUtil.toString(digest));
     if (delegate != null) {
       try {
         Write write =

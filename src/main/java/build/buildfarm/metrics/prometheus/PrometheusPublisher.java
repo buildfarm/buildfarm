@@ -28,9 +28,9 @@ public class PrometheusPublisher {
       if (port > 0) {
         DefaultExports.initialize();
         server = new HTTPServer(port);
-        log.info("Started Prometheus HTTP Server on port " + port);
+        log.severe("Started Prometheus HTTP Server on port " + port);
       } else {
-        log.info("Prometheus port is not configured. HTTP Server will not be started");
+        log.severe("Prometheus port is not configured. HTTP Server will not be started");
       }
     } catch (IOException e) {
       log.severe("Could not start Prometheus HTTP Server on port " + port);

@@ -81,19 +81,19 @@ public class Pipeline {
         int slotUsage = ((InputFetchStage) stage).getSlotUsage();
         if (slotUsage != 0) {
           log.log(
-              Level.INFO,
+              Level.SEVERE,
               String.format("InputFetchStage is not empty with slot usage: %d!", slotUsage));
           return false;
         }
       } else if (stage instanceof ExecuteActionStage) { // ExecuteActionStage
         int slotUsage = ((ExecuteActionStage) stage).getSlotUsage();
         if (slotUsage != 0) {
-          log.log(Level.INFO, String.format("ExecuteActionStage slot usage: %d!", slotUsage));
+          log.log(Level.SEVERE, String.format("ExecuteActionStage slot usage: %d!", slotUsage));
           return false;
         }
       } else { // not SuperScalar stage
         if (stage.claimed) {
-          log.log(Level.INFO, "NonSuperScalarPipelineStage is not empty yet!");
+          log.log(Level.SEVERE, "NonSuperScalarPipelineStage is not empty yet!");
           return false;
         }
       }
@@ -134,7 +134,7 @@ public class Pipeline {
             }
           }
           if (stageToClose != null && !stageToClose.isClosed()) {
-            log.log(Level.FINER, "Closing stage at priority " + maxPriority);
+            log.log(Level.SEVERE, "Closing stage at priority " + maxPriority);
             stageToClose.close();
           }
         }
@@ -157,7 +157,7 @@ public class Pipeline {
 
           if (!thread.isAlive()) {
             log.log(
-                Level.FINER,
+                Level.SEVERE,
                 "Stage "
                     + stage.name()
                     + " has exited at priority "
@@ -165,7 +165,7 @@ public class Pipeline {
             inactiveStages.add(stage);
           } else if (stage.isClosed()) {
             log.log(
-                Level.INFO,
+                Level.SEVERE,
                 "Interrupting unterminated closed thread in stage "
                     + stage.name()
                     + " at priority "

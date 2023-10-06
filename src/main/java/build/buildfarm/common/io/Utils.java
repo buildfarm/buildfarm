@@ -490,12 +490,12 @@ public class Utils {
                     Path reference = Files.readSymbolicLink(path);
                     paths.add(reference);
                   } catch (IOException e) {
-                    log.log(Level.WARNING, "Could not derive symbolic link: ", e);
+                    log.log(Level.SEVERE, "Could not derive symbolic link: ", e);
                   }
                 }
               });
     } catch (Exception e) {
-      log.log(Level.WARNING, "Could not traverse dir: ", e);
+      log.log(Level.SEVERE, "Could not traverse dir: ", e);
     }
 
     return paths;

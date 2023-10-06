@@ -57,7 +57,7 @@ public final class BuildfarmConfigs {
       if (buildfarmConfigs == null) {
         throw new RuntimeException("Could not load configs from path: " + configLocation);
       }
-      log.info(buildfarmConfigs.toString());
+      log.severe(buildfarmConfigs.toString());
       return buildfarmConfigs;
     }
   }
@@ -125,8 +125,8 @@ public final class BuildfarmConfigs {
     // source config from cli
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
-      log.info("Usage: CONFIG_PATH");
-      log.info(parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+      log.severe("Usage: CONFIG_PATH");
+      log.severe(parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
       throw new ConfigurationException("A valid path to a configuration file must be provided.");
     }
 
@@ -165,7 +165,7 @@ public final class BuildfarmConfigs {
       configs
           .getWorker()
           .setExecuteStageWidth(Integer.parseInt(System.getenv("EXECUTION_STAGE_WIDTH")));
-      log.info(
+      log.severe(
           String.format(
               "executeStageWidth overwritten to %d", configs.getWorker().getExecuteStageWidth()));
       return;
@@ -177,7 +177,7 @@ public final class BuildfarmConfigs {
           .setExecuteStageWidth(
               Math.max(
                   1, SystemProcessors.get() - configs.getWorker().getExecuteStageWidthOffset()));
-      log.info(
+      log.severe(
           String.format(
               "executeStageWidth modified to %d", configs.getWorker().getExecuteStageWidth()));
     }
@@ -188,7 +188,7 @@ public final class BuildfarmConfigs {
       configs
           .getWorker()
           .setInputFetchStageWidth(Math.max(1, configs.getWorker().getExecuteStageWidth() / 5));
-      log.info(
+      log.severe(
           String.format(
               "executeInputFetchWidth modified to %d",
               configs.getWorker().getInputFetchStageWidth()));
@@ -204,7 +204,7 @@ public final class BuildfarmConfigs {
     // use environment override (useful for containerized deployment)
     if (!Strings.isNullOrEmpty(System.getenv("INSTANCE_NAME"))) {
       publicName = System.getenv("INSTANCE_NAME");
-      log.info(String.format("publicName overwritten to %s", publicName));
+      log.severe(String.format("publicName overwritten to %s", publicName));
       return publicName;
     }
 
@@ -212,7 +212,7 @@ public final class BuildfarmConfigs {
     if (Strings.isNullOrEmpty(publicName)) {
       try {
         publicName = InetAddress.getLocalHost().getHostAddress() + ":" + port;
-        log.info(String.format("publicName derived to %s", publicName));
+        log.severe(String.format("publicName derived to %s", publicName));
         return publicName;
       } catch (Exception e) {
         log.severe("publicName could not be derived:" + e);
@@ -226,7 +226,7 @@ public final class BuildfarmConfigs {
     // use environment override (useful for containerized deployment)
     if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
       configs.getBackplane().setRedisUri(System.getenv("REDIS_URI"));
-      log.info(String.format("RedisUri modified to %s", configs.getBackplane().getRedisUri()));
+      log.severe(String.format("RedisUri modified to %s", configs.getBackplane().getRedisUri()));
     }
   }
 
@@ -240,7 +240,7 @@ public final class BuildfarmConfigs {
       } catch (Exception e) {
         storage.setMaxSizeBytes(DEFAULT_CAS_SIZE);
       }
-      log.info(String.format("CAS size changed to %d", storage.getMaxSizeBytes()));
+      log.severe(String.format("CAS size changed to %d", storage.getMaxSizeBytes()));
     }
   }
 
@@ -300,7 +300,11 @@ public final class BuildfarmConfigs {
                         String.format(
                             "the execution wrapper %s is missing and therefore the following features will not be available: %s",
                             tool, String.join(", ", features));
-                    log.warning(message);
+                    log.severe(message);
+                    log.severe("info");
+                    log.severe("fine");
+                    log.severe("finer");
+                    log.severe("finest");
                   }
                 }));
   }
