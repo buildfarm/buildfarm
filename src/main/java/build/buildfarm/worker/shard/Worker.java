@@ -25,6 +25,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
+import java.util.logging.Logger;  
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.backplane.Backplane;
@@ -717,6 +718,21 @@ public class Worker {
   }
 
   public static void main(String[] args) throws ConfigurationException {
+    java.util.logging.Logger rootLoger = java.util.logging.Logger.getLogger("");
+    java.util.logging.Handler[] handlers = rootLoger.getHandlers(); 
+    for (java.util.logging.Handler h : handlers) {
+        h.setLevel(Level.ALL);
+    }
+    rootLoger.setLevel(Level.ALL);
+    // java.util.logging.Logger[] loggers = java.util.logging.Logger.getLogger("").getLoggerContext().getLoggerList();  
+
+    // // Set the logging level for all the loggers and their child loggers  
+    // for (java.util.logging.Logger logger : loggers) {  
+    //     logger.setLevel(Level.ALL);  
+    // }
+    log.severe("severe - In Worker.java");
+    log.severe("finest - In Worker.java");
+
     configs = BuildfarmConfigs.loadWorkerConfigs(args);
     SpringApplication.run(Worker.class, args);
   }

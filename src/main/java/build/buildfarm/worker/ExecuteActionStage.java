@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import java.util.Arrays;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.collect.Sets;
 import io.prometheus.client.Gauge;
@@ -73,6 +74,9 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
 
   @Override
   protected Logger getLogger() {
+    log.severe("severe - In ExecuteActionStage.java ~~~~~~~~~");
+    System.out.println(Arrays.toString(Thread.currentThread().getStackTrace()));
+    log.severe("finest - In ExecuteActionStage.java ~~~~~~~~~");
     return log;
   }
 

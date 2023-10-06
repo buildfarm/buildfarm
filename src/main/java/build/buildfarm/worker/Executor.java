@@ -24,6 +24,9 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
+
+import java.util.Arrays;
+
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
@@ -290,11 +293,21 @@ class Executor {
         .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
+    System.out.println("I am here");
+    System.out.println(Arrays.toString(Thread.currentThread().getStackTrace()));
+    log.severe("executor finest");
+    log.severe("executor log.severe");
+    log.severe("executor fine");
+    log.severe("executor info");
+    log.severe("executor warning");
+    log.severe("executor log.severe");
+    log.log(Level.SEVERE, "executor Level.SEVERE");
     log.log(
         Level.FINER,
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
             operationName, resultBuilder.getExitCode()));
+    System.out.println("I am there");
 
     operationContext.executeResponse.getStatusBuilder().setCode(statusCode.getNumber());
     OperationContext reportOperationContext =

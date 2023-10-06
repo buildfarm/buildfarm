@@ -301,6 +301,11 @@ public final class BuildfarmConfigs {
                             "the execution wrapper %s is missing and therefore the following features will not be available: %s",
                             tool, String.join(", ", features));
                     log.warning(message);
+                    log.severe(message);
+                    log.severe("info");
+                    log.severe("fine");
+                    log.severe("finer");
+                    log.severe("finest");
                   }
                 }));
   }
