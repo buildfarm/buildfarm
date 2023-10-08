@@ -17,6 +17,7 @@ package build.buildfarm.server;
 import static build.buildfarm.common.io.Utils.formatIOError;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 import static java.util.logging.Level.WARNING;
 
@@ -76,6 +77,36 @@ public class BuildFarmServer extends LoggingMain {
 
   BuildFarmServer() {
     super("BuildFarmServer");
+  }
+
+  /**
+   * The method will prepare the server for graceful shutdown when the server is ready. Current
+   * implementation waits specified period of time. Future improvements could be to keep track of
+   * open connections and shutdown when there are not left. Note on using stderr here instead of
+   * log. By the time this is called in PreDestroy, the log is no longer available and is not
+   * logging messages.
+   */
+  public void prepareServerForGracefulShutdown() {
+    if (configs.getServer().getGracefulShutdownSeconds() == 0) {
+      System.err.println(
+          String.format("Graceful Shutdown is not enabled. Server is shutting down immediately."));
+    } else {
+      try {
+        System.err.println(
+            String.format(
+                "Graceful Shutdown - Waiting %d to allow connections to drain.",
+                configs.getServer().getGracefulShutdownSeconds()));
+        SECONDS.sleep(configs.getServer().getGracefulShutdownSeconds());
+      } catch (InterruptedException e) {
+        System.err.println(
+            "Graceful Shutdown - The server graceful shutdown is interrupted: " + e.getMessage());
+      } finally {
+        System.err.println(
+            String.format(
+                "Graceful Shutdown - It took the server %d seconds to shutdown",
+                configs.getServer().getGracefulShutdownSeconds()));
+      }
+    }
   }
 
   private ShardInstance createInstance()
@@ -163,6 +194,7 @@ public class BuildFarmServer extends LoggingMain {
 
   private void shutdown() throws InterruptedException {
     log.info("*** shutting down gRPC server since JVM is shutting down");
+    prepareServerForGracefulShutdown();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     PrometheusPublisher.stopHttpServer();
