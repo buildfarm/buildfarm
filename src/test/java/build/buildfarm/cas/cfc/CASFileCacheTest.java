@@ -19,8 +19,13 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
+import static java.lang.Thread.State.BLOCKED;
+import static java.lang.Thread.State.RUNNABLE;
+import static java.lang.Thread.State.TERMINATED;
+import static java.lang.Thread.State.WAITING;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
@@ -58,10 +63,12 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
+import io.grpc.Context;
 import io.grpc.Deadline;
 import io.grpc.Status;
 import java.io.IOException;
@@ -77,6 +84,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -1205,6 +1213,160 @@ class CASFileCacheTest {
       expected = e;
     }
     assertThat(expected).isNotNull();
+  }
+
+  @Test
+  public void testConcurrentWrites_Blocked() {
+    ByteString blob = ByteString.copyFromUtf8("blocked concurrent write");
+    Digest digest = DIGEST_UTIL.compute(blob);
+    UUID uuid = UUID.randomUUID();
+
+    CyclicBarrier barrier = new CyclicBarrier(2);
+    AtomicInteger sync = new AtomicInteger(0);
+
+    Thread write1 = new Thread(() -> {
+      try {
+        ConcurrentWriteStreamObserver writeStreamObserver = new ConcurrentWriteStreamObserver(digest, uuid);
+        writeStreamObserver.registerCallback();
+        barrier.await(); // let both the threads get same write stream.
+        while (true) { // let other thread get the ownership of stream
+          if (sync.compareAndSet(2, 3)) {
+            writeStreamObserver.ownStream();
+            break;
+          }
+        }
+        writeStreamObserver.write(blob);
+        writeStreamObserver.close();
+      } catch (Exception e) {
+        // do nothing
+      }
+    }, "FirstRequest");
+    Thread write2 = new Thread(() -> {
+      try {
+        ConcurrentWriteStreamObserver writeStreamObserver = new ConcurrentWriteStreamObserver(digest, uuid);
+        writeStreamObserver.registerCallback();
+        barrier.await(); // let both the threads get same write stream.
+        while (true) { // this thread will get the ownership of stream
+          if (sync.compareAndSet(0, 1)) {
+            writeStreamObserver.ownStream();
+            sync.compareAndSet(1, 2);
+            break;
+          }
+        }
+        while (write1.getState() == RUNNABLE); // wait for first request to go in wait state
+        writeStreamObserver.write(blob);
+        sync.compareAndSet(3, 4);
+        writeStreamObserver.close();
+      } catch (Exception e) {
+        // do nothing
+      }
+    }, "SecondRequest");
+    write1.start();
+    write2.start();
+    while (sync.get() != 4 || write2.getState() == RUNNABLE);
+    assertThat(write1.getState()).isEqualTo(WAITING);
+    assertThat(write2.getState()).isEqualTo(BLOCKED);
+    write1.interrupt();
+    write2.interrupt();
+  }
+
+  @Test
+  public void testConcurrentWrites_Success() {
+    ByteString blob = ByteString.copyFromUtf8("success concurrent write");
+    Digest digest = DIGEST_UTIL.compute(blob);
+    UUID uuid = UUID.randomUUID();
+
+    CyclicBarrier barrier = new CyclicBarrier(2);
+    AtomicInteger sync = new AtomicInteger(0);
+
+    Thread write1 = new Thread(() -> {
+      try {
+        ConcurrentWriteStreamObserver writeStreamObserver = new ConcurrentWriteStreamObserver(digest, uuid);
+        barrier.await(); // let both the threads get same write stream.
+        while (true) { // let other thread get the ownership of stream
+          if (sync.compareAndSet(2, 3)) {
+            writeStreamObserver.ownStream();
+            break;
+          }
+        }
+        writeStreamObserver.registerCallback();
+        writeStreamObserver.write(blob);
+        writeStreamObserver.close();
+      } catch (Exception e) {
+        // do nothing
+      }
+    }, "FirstRequest");
+    Thread write2 = new Thread(() -> {
+      try {
+        ConcurrentWriteStreamObserver writeStreamObserver = new ConcurrentWriteStreamObserver(digest, uuid);
+        barrier.await(); // let both the threads get same write stream.
+        while (true) { // this thread will get the ownership of stream
+          if (sync.compareAndSet(0, 1)) {
+            writeStreamObserver.ownStream();
+            sync.compareAndSet(1, 2);
+            break;
+          }
+        }
+        writeStreamObserver.registerCallback();
+        while (write1.getState() == RUNNABLE); // wait for first request to go in wait state
+        writeStreamObserver.write(blob);
+        writeStreamObserver.close();
+        sync.compareAndSet(3, 4);
+      } catch (Exception e) {
+        // do nothing
+      }
+    }, "SecondRequest");
+    write1.start();
+    write2.start();
+    while (sync.get() != 4 || write1.getState() == RUNNABLE || write2.getState() == RUNNABLE);
+    assertThat(write1.getState()).isEqualTo(TERMINATED);
+    assertThat(write2.getState()).isEqualTo(TERMINATED);
+    write1.interrupt();
+    write2.interrupt();
+  }
+
+  class ConcurrentWriteStreamObserver {
+    Digest digest;
+    UUID uuid;
+    Write write;
+    FeedbackOutputStream out;
+    Context.CancellableContext withCancellation = Context.current().withCancellation();
+    ConcurrentWriteStreamObserver(Digest digest, UUID uuid) throws Exception {
+      this.digest = digest;
+      this.uuid = uuid;
+      this.write = fileCache.getWrite(
+          Compressor.Value.IDENTITY, digest, uuid, RequestMetadata.getDefaultInstance());
+    }
+
+    void registerCallback() {
+      Futures.addCallback(
+          write.getFuture(),
+          new FutureCallback<Long>() {
+            @Override
+            public void onSuccess(Long committedSize) {
+              commit(committedSize);
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+              // do nothing
+            }
+          },
+          withCancellation.fixedContextExecutor(directExecutor()));
+    }
+    synchronized void ownStream() throws Exception {
+      this.out = write.getOutput(10, MILLISECONDS, () -> {});
+    }
+    synchronized void commit(long committedSize) {
+      // critical section
+      assertThat(committedSize).isEqualTo(digest.getSizeBytes());
+    }
+    void write(ByteString data) throws IOException {
+      data.writeTo(out);
+    }
+    void close() throws IOException {
+      out.close();
+    }
   }
 
   @RunWith(JUnit4.class)
