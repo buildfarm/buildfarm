@@ -1259,6 +1259,7 @@ class CASFileCacheTest {
     write2.start();
     barrier.await(); // let both the requests reach the critical section
     while (write1.getState() == RUNNABLE || write2.getState() == RUNNABLE) ;
+    MILLISECONDS.sleep(1); // to overcome any intermediate thread state
     assertThat(write1.getState()).isEqualTo(TERMINATED);
     assertThat(write2.getState()).isEqualTo(TERMINATED);
     write1.interrupt();
