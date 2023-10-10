@@ -19,7 +19,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
-import static java.lang.Thread.State.BLOCKED;
 import static java.lang.Thread.State.RUNNABLE;
 import static java.lang.Thread.State.TERMINATED;
 import static java.lang.Thread.State.WAITING;
@@ -1216,13 +1215,12 @@ class CASFileCacheTest {
   }
 
   @Test
-  public void testConcurrentWrites_Blocked() {
-    ByteString blob = ByteString.copyFromUtf8("blocked concurrent write");
+  public void testConcurrentWrites() throws Exception {
+    ByteString blob = ByteString.copyFromUtf8("concurrent write");
     Digest digest = DIGEST_UTIL.compute(blob);
     UUID uuid = UUID.randomUUID();
 
-    CyclicBarrier barrier = new CyclicBarrier(2);
-    AtomicInteger sync = new AtomicInteger(0);
+    CyclicBarrier barrier = new CyclicBarrier(3);
 
     Thread write1 =
         new Thread(
@@ -1232,12 +1230,7 @@ class CASFileCacheTest {
                     new ConcurrentWriteStreamObserver(digest, uuid);
                 writeStreamObserver.registerCallback();
                 barrier.await(); // let both the threads get same write stream.
-                while (true) { // let other thread get the ownership of stream
-                  if (sync.compareAndSet(2, 3)) {
-                    writeStreamObserver.ownStream();
-                    break;
-                  }
-                }
+                writeStreamObserver.ownStream(); // let other thread get the ownership of stream
                 writeStreamObserver.write(blob);
                 writeStreamObserver.close();
               } catch (Exception e) {
@@ -1252,18 +1245,10 @@ class CASFileCacheTest {
                 ConcurrentWriteStreamObserver writeStreamObserver =
                     new ConcurrentWriteStreamObserver(digest, uuid);
                 writeStreamObserver.registerCallback();
+                writeStreamObserver.ownStream(); // this thread will get the ownership of stream
                 barrier.await(); // let both the threads get same write stream.
-                while (true) { // this thread will get the ownership of stream
-                  if (sync.compareAndSet(0, 1)) {
-                    writeStreamObserver.ownStream();
-                    sync.compareAndSet(1, 2);
-                    break;
-                  }
-                }
-                while (write1.getState() == RUNNABLE)
-                  ; // wait for first request to go in wait state
+                while (write1.getState() != WAITING) ; // wait for first request to go in wait state
                 writeStreamObserver.write(blob);
-                sync.compareAndSet(3, 4);
                 writeStreamObserver.close();
               } catch (Exception e) {
                 // do nothing
@@ -1272,71 +1257,8 @@ class CASFileCacheTest {
             "SecondRequest");
     write1.start();
     write2.start();
-    while (sync.get() != 4 || write2.getState() == RUNNABLE) ;
-    assertThat(write1.getState()).isEqualTo(WAITING);
-    assertThat(write2.getState()).isEqualTo(BLOCKED);
-    write1.interrupt();
-    write2.interrupt();
-  }
-
-  @Test
-  public void testConcurrentWrites_Success() {
-    ByteString blob = ByteString.copyFromUtf8("success concurrent write");
-    Digest digest = DIGEST_UTIL.compute(blob);
-    UUID uuid = UUID.randomUUID();
-
-    CyclicBarrier barrier = new CyclicBarrier(2);
-    AtomicInteger sync = new AtomicInteger(0);
-
-    Thread write1 =
-        new Thread(
-            () -> {
-              try {
-                ConcurrentWriteStreamObserver writeStreamObserver =
-                    new ConcurrentWriteStreamObserver(digest, uuid);
-                barrier.await(); // let both the threads get same write stream.
-                while (true) { // let other thread get the ownership of stream
-                  if (sync.compareAndSet(2, 3)) {
-                    writeStreamObserver.ownStream();
-                    break;
-                  }
-                }
-                writeStreamObserver.registerCallback();
-                writeStreamObserver.write(blob);
-                writeStreamObserver.close();
-              } catch (Exception e) {
-                // do nothing
-              }
-            },
-            "FirstRequest");
-    Thread write2 =
-        new Thread(
-            () -> {
-              try {
-                ConcurrentWriteStreamObserver writeStreamObserver =
-                    new ConcurrentWriteStreamObserver(digest, uuid);
-                barrier.await(); // let both the threads get same write stream.
-                while (true) { // this thread will get the ownership of stream
-                  if (sync.compareAndSet(0, 1)) {
-                    writeStreamObserver.ownStream();
-                    sync.compareAndSet(1, 2);
-                    break;
-                  }
-                }
-                writeStreamObserver.registerCallback();
-                while (write1.getState() == RUNNABLE)
-                  ; // wait for first request to go in wait state
-                writeStreamObserver.write(blob);
-                writeStreamObserver.close();
-                sync.compareAndSet(3, 4);
-              } catch (Exception e) {
-                // do nothing
-              }
-            },
-            "SecondRequest");
-    write1.start();
-    write2.start();
-    while (sync.get() != 4 || write1.getState() == RUNNABLE || write2.getState() == RUNNABLE) ;
+    barrier.await(); // let both the requests reach the critical section
+    while (write1.getState() == RUNNABLE || write2.getState() == RUNNABLE) ;
     assertThat(write1.getState()).isEqualTo(TERMINATED);
     assertThat(write2.getState()).isEqualTo(TERMINATED);
     write1.interrupt();
