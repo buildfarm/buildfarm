@@ -116,7 +116,7 @@ Next we will create a BUILD file to create our target image. We will use the sha
 ```
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 
-java_image(
+container_image(
     name = "buildfarm-shard-worker-ubuntu20-java14",
     base = "@ubuntu20_java14_image_base//image",
     files = [
