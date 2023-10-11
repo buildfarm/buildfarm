@@ -663,6 +663,16 @@ public class RedisShardBackplane implements Backplane {
     return workerSet;
   }
 
+  @Override
+  public String getWriteInstance(String key) throws IOException {
+    return client.call(jedis -> jedis.get("write-instance/" + key));
+  }
+
+  @Override
+  public void setWriteInstance(String key, String instance) throws IOException {
+    client.call(jedis -> jedis.setex("write-instance/" + key, 1800, instance));
+  }
+
   // When performing a graceful scale down of workers, the backplane can provide worker names to the
   // scale-down service. The algorithm in which the backplane chooses these workers can be made more
   // sophisticated in the future. But for now, we'll give back n random workers.

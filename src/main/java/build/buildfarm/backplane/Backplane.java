@@ -92,6 +92,10 @@ public interface Backplane {
   /** Returns a set of the names of all active workers. */
   Set<String> getWorkers() throws IOException;
 
+  String getWriteInstance(String key) throws IOException;
+
+  void setWriteInstance(String instance, String key) throws IOException;
+
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the digest of the action
    * result and the value is the actual ActionResult object.

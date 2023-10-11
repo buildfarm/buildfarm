@@ -82,6 +82,7 @@ import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.BlobWriteKey;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -97,6 +98,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
+import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -227,7 +229,7 @@ public class ShardInstance extends AbstractServerInstance {
   private Cache<RequestMetadata, Boolean> recentCacheServedExecutions;
 
   private final Random rand = new Random();
-  private final Writes writes = new Writes(this::writeInstanceSupplier);
+  private final Writes writes;
   private final int maxCpu;
   private final int maxRequeueAttempts;
 
@@ -358,6 +360,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.actionCacheFetchService = actionCacheFetchService;
     backplane.setOnUnsubscribe(this::stop);
 
+    this.writes = new Writes(writeInstanceCacheLoader());
     initializeCaches();
 
     remoteInputStreamFactory =
@@ -1103,9 +1106,35 @@ public class ShardInstance extends AbstractServerInstance {
     protected abstract void onQueue(Deque<String> workers);
   }
 
-  private Instance writeInstanceSupplier() {
-    String worker = getRandomWorker();
-    return workerStub(worker);
+  private CacheLoader<BlobWriteKey, Instance> writeInstanceCacheLoader() {
+    return new CacheLoader<BlobWriteKey, Instance>() {
+      @SuppressWarnings("NullableProblems")
+      @Override
+      public Instance load(BlobWriteKey key) {
+        String instance = null;
+        // Per the REAPI the identifier should end up as a unique UUID per a
+        // client level - adding bytes to further mitigate collisions and not
+        // store the entire BlobWriteKey.
+        String blobKey = key.getIdentifier() + "." + key.getDigest().getSizeBytes();
+        try {
+          instance = backplane.getWriteInstance(blobKey);
+          if (instance != null) {
+            return workerStub(instance);
+          }
+        } catch (IOException e) {
+          log.log(Level.WARNING, "error getting write instance for " + instance, e);
+        }
+
+        instance = getRandomWorker();
+        try {
+          backplane.setWriteInstance(blobKey, instance);
+          log.log(Level.INFO, "set write-instance: " + blobKey + " -> " + instance); // TODO: [jmarino]: remove
+        } catch (IOException e) {
+          log.log(Level.WARNING, "error getting write instance for " + instance, e);
+        }
+        return workerStub(instance);
+      }
+    };
   }
 
   String getRandomWorker() {

@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 
 class Writes {
   private final LoadingCache<BlobWriteKey, Instance> blobWriteInstances;
@@ -116,22 +115,15 @@ class Writes {
     }
   }
 
-  Writes(Supplier<Instance> instanceSupplier) {
+  Writes(CacheLoader<BlobWriteKey, Instance> instanceSupplier) {
     this(instanceSupplier, /* writeExpiresAfter=*/ 1);
   }
 
-  Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter) {
+  Writes(CacheLoader<BlobWriteKey, Instance> instanceSupplier, long writeExpiresAfter) {
     blobWriteInstances =
         CacheBuilder.newBuilder()
             .expireAfterWrite(writeExpiresAfter, TimeUnit.HOURS)
-            .build(
-                new CacheLoader<BlobWriteKey, Instance>() {
-                  @SuppressWarnings("NullableProblems")
-                  @Override
-                  public Instance load(BlobWriteKey key) {
-                    return instanceSupplier.get();
-                  }
-                });
+            .build(instanceSupplier);
   }
 
   public Write get(
