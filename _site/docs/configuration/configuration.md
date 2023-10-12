@@ -28,13 +28,13 @@ For an example config containing all of the configuration values, see `examples/
 
 ### Common
 
-| Configuration        | Accepted and _Default_ Values | Description                                       |
-|----------------------|-------------------------------|---------------------------------------------------|
-| digestFunction       | _SHA256_, SHA1                | Digest function for this implementation           |
-| defaultActionTimeout | Integer, _600_                | Default timeout value for an action (seconds)     |
-| maximumActionTimeout | Integer, _3600_               | Maximum allowed action timeout (seconds)          |
-| maxEntrySizeBytes    | Long, _2147483648_            | Maximum size of a single blob accepted (bytes)    |
-| prometheusPort       | Integer, _9090_               | Listening port of the Prometheus metrics endpoint |
+| Configuration        | Accepted and _Default_ Values | Command Line Argument | Description                                       |
+|----------------------|-------------------------------|-----------------------|---------------------------------------------------|
+| digestFunction       | _SHA256_, SHA1                |                       | Digest function for this implementation           |
+| defaultActionTimeout | Integer, _600_                |                       | Default timeout value for an action (seconds)     |
+| maximumActionTimeout | Integer, _3600_               |                       | Maximum allowed action timeout (seconds)          |
+| maxEntrySizeBytes    | Long, _2147483648_            |                       | Maximum size of a single blob accepted (bytes)    |
+| prometheusPort       | Integer, _9090_               | --prometheus_port     | Listening port of the Prometheus metrics endpoint |
 
 Example:
 
