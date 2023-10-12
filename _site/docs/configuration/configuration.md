@@ -21,8 +21,8 @@ worker:
   publicName: "localhost:8981"
 ```
 
-The configuration can be provided to the server and worker as a CLI argument or through the env variable `CONFIG_PATH`
-For an example config containing all of the configuration values, see `examples/config.yml`.
+The configuration can be provided to the server and worker as a CLI argument or through the environment variable `CONFIG_PATH`
+For an example configuration containing all of the configuration values, see `examples/config.yml`.
 
 ## All Configurations
 
@@ -64,7 +64,7 @@ worker:
 | sslPrivateKeyPath                | String, _null_                |                 | Absolute path of the SSL private key (if TLS used)                                                                          |
 | runDispatchedMonitor             | boolean, _true_               |                 | Enable an agent to monitor the operation store to ensure that dispatched operations with expired worker leases are requeued |
 | dispatchedMonitorIntervalSeconds | Integer, _1_                  |                 | Dispatched monitor's lease expiration check interval (seconds)                                                              |
-| runOperationQueuer               | boolean, _true_               |                 | Aquire execute request entries cooperatively from an arrival queue on the backplane                                         |
+| runOperationQueuer               | boolean, _true_               |                 | Acquire execute request entries cooperatively from an arrival queue on the backplane                                         |
 | ensureOutputsPresent             | boolean, _false_              |                 | Decide if all outputs are also present in the CAS. If any outputs are missing a cache miss is returned                      |
 | maxCpu                           | Integer, _0_                  |                 | Maximum number of CPU cores that any min/max-cores property may request (0 = unlimited)                                     |
 | maxRequeueAttempts               | Integer, _5_                  |                 | Maximum number of requeue attempts for an operation                                                                         |
