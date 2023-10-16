@@ -20,6 +20,7 @@ import java.util.List;
 import javax.naming.ConfigurationException;
 import lombok.Data;
 import lombok.extern.java.Log;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
@@ -51,7 +52,7 @@ public final class BuildfarmConfigs {
 
   public static BuildfarmConfigs loadConfigs(Path configLocation) throws IOException {
     try (InputStream inputStream = Files.newInputStream(configLocation)) {
-      Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
+      Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass(), new LoaderOptions()));
       buildfarmConfigs = yaml.load(inputStream);
       if (buildfarmConfigs == null) {
         throw new RuntimeException("Could not load configs from path: " + configLocation);
@@ -66,7 +67,6 @@ public final class BuildfarmConfigs {
     ServerOptions options = parser.getOptions(ServerOptions.class);
     try {
       buildfarmConfigs = loadConfigs(getConfigurationPath(parser));
-      adjustServerConfigs(buildfarmConfigs);
     } catch (IOException e) {
       log.severe("Could not parse yml configuration file." + e);
       throw new RuntimeException(e);
@@ -77,6 +77,13 @@ public final class BuildfarmConfigs {
     if (options.port > 0) {
       buildfarmConfigs.getServer().setPort(options.port);
     }
+    if (options.prometheusPort >= 0) {
+      buildfarmConfigs.setPrometheusPort(options.prometheusPort);
+    }
+    if (!Strings.isNullOrEmpty(options.redisUri)) {
+      buildfarmConfigs.getBackplane().setRedisUri(options.redisUri);
+    }
+    adjustServerConfigs(buildfarmConfigs);
     return buildfarmConfigs;
   }
 
@@ -85,7 +92,6 @@ public final class BuildfarmConfigs {
     ShardWorkerOptions options = parser.getOptions(ShardWorkerOptions.class);
     try {
       buildfarmConfigs = loadConfigs(getConfigurationPath(parser));
-      adjustWorkerConfigs(buildfarmConfigs);
     } catch (IOException e) {
       log.severe("Could not parse yml configuration file." + e);
       throw new RuntimeException(e);
@@ -93,6 +99,13 @@ public final class BuildfarmConfigs {
     if (!Strings.isNullOrEmpty(options.publicName)) {
       buildfarmConfigs.getWorker().setPublicName(options.publicName);
     }
+    if (options.prometheusPort >= 0) {
+      buildfarmConfigs.setPrometheusPort(options.prometheusPort);
+    }
+    if (!Strings.isNullOrEmpty(options.redisUri)) {
+      buildfarmConfigs.getBackplane().setRedisUri(options.redisUri);
+    }
+    adjustWorkerConfigs(buildfarmConfigs);
     return buildfarmConfigs;
   }
 

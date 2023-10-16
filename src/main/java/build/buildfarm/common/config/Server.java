@@ -24,6 +24,7 @@ public class Server {
   private String sslPrivateKeyPath = null;
   private boolean runDispatchedMonitor = true;
   private int dispatchedMonitorIntervalSeconds = 1;
+  private boolean runFailsafeOperation = true;
   private boolean runOperationQueuer = true;
   private boolean ensureOutputsPresent = false;
   private int maxRequeueAttempts = 5;
@@ -40,6 +41,8 @@ public class Server {
   private int maxInboundMessageSizeBytes = 0;
   private int maxInboundMetadataSize = 0;
   private ServerCacheConfigs caches = new ServerCacheConfigs();
+  private boolean findMissingBlobsViaBackplane = false;
+  private int gracefulShutdownSeconds = 0;
 
   public String getSession() {
     return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);

@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -142,10 +143,8 @@ class StubWorkerContext implements WorkerContext {
 
   @Override
   public Path createExecDir(
-      String operationName,
-      Map<Digest, Directory> directoriesIndex,
-      Action action,
-      Command command) {
+      String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
+      throws IOException, InterruptedException {
     throw new UnsupportedOperationException();
   }
 

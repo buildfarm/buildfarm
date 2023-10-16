@@ -9,8 +9,9 @@ server:
   actionCacheReadOnly: false
   port: 8980
   grpcMetrics:
-    enabled: false
-    provideLatencyHistograms: false
+    enabled: true
+    provideLatencyHistograms: true
+    latencyBuckets: [0.001, 0.01, 0.1, 1, 5, 10, 20, 40, 60, +Infinity]
   maxInboundMessageSizeBytes: 0
   maxInboundMetadataSize: 0
   casWriteTimeout: 3600
@@ -21,6 +22,7 @@ server:
   dispatchedMonitorIntervalSeconds: 1
   runOperationQueuer: true
   ensureOutputsPresent: false
+  runFailsafeOperation: true
   maxCpu: 0
   maxRequeueAttempts: 5
   useDenyList: true
@@ -29,6 +31,7 @@ server:
   recordBesEvents: false
   clusterId: local
   cloudRegion: us-east-1
+  gracefulShutdownSeconds: 0
   caches:
     directoryCacheMaxEntries: 10000
     commandCacheMaxEntries: 10000
@@ -37,7 +40,6 @@ server:
   admin:
     deploymentEnvironment: AWS
     clusterEndpoint: "grpc://localhost"
-    enableGracefulShutdown: false
   metrics:
     publisher: LOG
     logLevel: FINEST
@@ -70,8 +72,6 @@ backplane:
   operationChannelPrefix: "OperationChannel"
   casPrefix: "ContentAddressableStorage"
   casExpire: 604800 # 1 week
-  subscribeToBackplane: true
-  runFailsafeOperation: true
   maxQueueDepth: 100000
   maxPreQueueDepth: 1000000
   priorityQueue: false
@@ -93,6 +93,7 @@ worker:
   grpcMetrics:
     enabled: false
     provideLatencyHistograms: false
+    latencyBuckets: [0.001, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0]
   capabilities:
     cas: true
     execution: true
@@ -110,19 +111,21 @@ worker:
       skipLoad: false
       hexBucketLevels: 0
       execRootCopyFallback: false
-      target:
+    #- type: GRPC
+    #  target: "grpc://host:port"
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
   linkInputDirectories: true
-  realInputDirectories:
-    - "external"
+  linkedInputDirectories:
+    - "(?!external)[^/]+"
   execOwner:
   defaultMaxCores: 0
   limitGlobalExecution: false
   onlyMulticoreTests: false
   allowBringYourOwnContainer: false
   errorOperationRemainingResources: false
+  gracefulShutdownSeconds: 0
   sandboxSettings:
     alwaysUse: false
     selectForBlockNetwork: false

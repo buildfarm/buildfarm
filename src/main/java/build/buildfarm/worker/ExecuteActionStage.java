@@ -107,7 +107,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
     int slotUsage = removeAndRelease(operationName, claims);
     executionTime.observe(usecs / 1000.0);
     executionStallTime.observe(stallUSecs / 1000.0);
-    logComplete(
+    complete(
         operationName,
         usecs,
         stallUSecs,
@@ -135,13 +135,13 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
     OperationContext operationContext = take();
     ResourceLimits limits = workerContext.commandExecutionSettings(operationContext.command);
     Executor executor = new Executor(workerContext, operationContext, this);
-    Thread executorThread = new Thread(() -> executor.run(limits));
+    Thread executorThread = new Thread(() -> executor.run(limits), "ExecuteActionStage.executor");
 
     synchronized (this) {
       executors.add(executorThread);
       int slotUsage = executorClaims.addAndGet(limits.cpu.claimed);
       executionSlotUsage.set(slotUsage);
-      logStart(operationContext.operation.getName(), getUsage(slotUsage));
+      start(operationContext.operation.getName(), getUsage(slotUsage));
       executorThread.start();
     }
   }

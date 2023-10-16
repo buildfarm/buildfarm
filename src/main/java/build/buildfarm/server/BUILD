@@ -1,7 +1,8 @@
 java_library(
     name = "server",
-    srcs = glob(["*.java"]),
+    srcs = ["BuildFarmServer.java"],
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
+    resources = ["//src/main/resources:ui_resources"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
@@ -24,10 +25,5 @@ java_library(
         "@maven//:javax_annotation_javax_annotation_api",
         "@maven//:org_bouncycastle_bcprov_jdk15on",
         "@maven//:org_projectlombok_lombok",
-        "@maven//:org_springframework_boot_spring_boot",
-        "@maven//:org_springframework_boot_spring_boot_autoconfigure",
-        "@maven//:org_springframework_spring_beans",
-        "@maven//:org_springframework_spring_context",
-        "@maven//:org_springframework_spring_core",
     ],
 )

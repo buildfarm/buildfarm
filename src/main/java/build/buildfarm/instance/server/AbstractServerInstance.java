@@ -16,6 +16,7 @@ package build.buildfarm.instance.server;
 
 import static build.buildfarm.common.Actions.asExecutionStatus;
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
+import static build.buildfarm.common.Errors.MISSING_INPUT;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.common.Trees.enumerateTreeFileDigests;
@@ -176,9 +177,6 @@ public abstract class AbstractServerInstance implements Instance {
 
   public static final String ENVIRONMENT_VARIABLES_NOT_SORTED =
       "The `Command`'s `environment_variables` are not correctly sorted by `name`.";
-
-  public static final String MISSING_INPUT =
-      "A requested input (or the `Action` or its `Command`) was not found in the CAS.";
 
   public static final String MISSING_ACTION = "The action was not found in the CAS.";
 
@@ -739,7 +737,8 @@ public abstract class AbstractServerInstance implements Instance {
       Directory directory,
       Map<Digest, Directory> directoriesIndex,
       Consumer<String> onInputFile,
-      Consumer<String> onInputDirectory) {
+      Consumer<String> onInputDirectory,
+      PreconditionFailure.Builder preconditionFailure) {
     Stack<DirectoryNode> directoriesStack = new Stack<>();
     directoriesStack.addAll(directory.getDirectoriesList());
 
@@ -751,15 +750,29 @@ public abstract class AbstractServerInstance implements Instance {
           directoryPath.isEmpty() ? directoryName : (directoryPath + "/" + directoryName);
       onInputDirectory.accept(subDirectoryPath);
 
-      for (FileNode fileNode : directoriesIndex.get(directoryDigest).getFilesList()) {
-        String fileName = fileNode.getName();
-        String filePath = subDirectoryPath + "/" + fileName;
-        onInputFile.accept(filePath);
+      Directory subDirectory;
+      if (directoryDigest.getSizeBytes() == 0) {
+        subDirectory = Directory.getDefaultInstance();
+      } else {
+        subDirectory = directoriesIndex.get(directoryDigest);
       }
 
-      for (DirectoryNode subDirectoryNode :
-          directoriesIndex.get(directoryDigest).getDirectoriesList()) {
-        directoriesStack.push(subDirectoryNode);
+      if (subDirectory == null) {
+        preconditionFailure
+            .addViolationsBuilder()
+            .setType(VIOLATION_TYPE_MISSING)
+            .setSubject("blobs/" + DigestUtil.toString(directoryDigest))
+            .setDescription("The directory `/" + subDirectoryPath + "` was not found in the CAS.");
+      } else {
+        for (FileNode fileNode : subDirectory.getFilesList()) {
+          String fileName = fileNode.getName();
+          String filePath = subDirectoryPath + "/" + fileName;
+          onInputFile.accept(filePath);
+        }
+
+        for (DirectoryNode subDirectoryNode : subDirectory.getDirectoriesList()) {
+          directoriesStack.push(subDirectoryNode);
+        }
       }
     }
   }
@@ -881,7 +894,12 @@ public abstract class AbstractServerInstance implements Instance {
             subDirectory = directoriesIndex.get(directoryDigest);
           }
           enumerateActionInputDirectory(
-              subDirectoryPath, subDirectory, directoriesIndex, onInputFile, onInputDirectory);
+              subDirectoryPath,
+              subDirectory,
+              directoriesIndex,
+              onInputFile,
+              onInputDirectory,
+              preconditionFailure);
         } else {
           validateActionInputDirectoryDigest(
               subDirectoryPath,
@@ -934,7 +952,10 @@ public abstract class AbstractServerInstance implements Instance {
           preconditionFailure);
     }
     pathDigests.pop();
-    visited.add(directoryDigest);
+    if (directory != null) {
+      // missing directories are not visited and will appear in violations list each time
+      visited.add(directoryDigest);
+    }
   }
 
   protected ListenableFuture<Tree> getTreeFuture(
@@ -1147,6 +1168,9 @@ public abstract class AbstractServerInstance implements Instance {
       } else {
         Directory directory = directoriesIndex.get(inputRootDigest);
         for (String segment : workingDirectory.split("/")) {
+          if (segment.equals(".")) {
+            continue;
+          }
           Directory nextDirectory = directory;
           // linear for now
           for (DirectoryNode dirNode : directory.getDirectoriesList()) {
@@ -1702,7 +1726,7 @@ public abstract class AbstractServerInstance implements Instance {
   public String listOperations(
       int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
     // todo(luxe): add proper pagination
-    FindOperationsResults results = findOperations(filter);
+    FindOperationsResults results = findEnrichedOperations(filter);
     if (results != null) {
       for (Map.Entry<String, EnrichedOperation> entry : results.operations.entrySet()) {
         operations.add(entry.getValue().operation);
@@ -1946,7 +1970,15 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public abstract CasIndexResults reindexCas();
 
-  public abstract FindOperationsResults findOperations(String filterPredicate);
+  public abstract FindOperationsResults findEnrichedOperations(String filterPredicate);
+
+  public abstract EnrichedOperation findEnrichedOperation(String operationId);
+
+  public abstract List<Operation> findOperations(String filterPredicate);
+
+  public abstract Set<String> findOperationsByInvocationId(String invocationId);
+
+  public abstract Iterable<Map.Entry<String, String>> getOperations(Set<String> operationIds);
 
   @Override
   public abstract void deregisterWorker(String workerName);

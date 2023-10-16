@@ -5,7 +5,7 @@ java_library(
     deps = [
         "//persistentworkers/src/main/java/persistent/bazel:bazel-persistent-workers",
         "//persistentworkers/src/main/java/persistent/common:persistent-common",
-        "@bazel_tools//src/main/protobuf:worker_protocol_java_proto",
+        "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_truth_truth",

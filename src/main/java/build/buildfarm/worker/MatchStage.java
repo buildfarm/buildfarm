@@ -95,20 +95,15 @@ public class MatchStage extends PipelineStage {
       throw new RuntimeException(t);
     }
 
-    @Override
-    public void setOnCancelHandler(Runnable onCancelHandler) {
-      // never called, only blocking stub used
-    }
-
     @SuppressWarnings("SameReturnValue")
     private boolean onOperationPolled() throws InterruptedException {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
-      logStart(operationName);
+      start(operationName);
 
       long matchingAtUSecs = stopwatch.elapsed(MICROSECONDS);
       OperationContext matchedOperationContext = match(operationContext);
       long matchedInUSecs = stopwatch.elapsed(MICROSECONDS) - matchingAtUSecs;
-      logComplete(operationName, matchedInUSecs, waitDuration, true);
+      complete(operationName, matchedInUSecs, waitDuration, true);
       matchedOperationContext.poller.pause();
       try {
         output.put(matchedOperationContext);
@@ -139,7 +134,7 @@ public class MatchStage extends PipelineStage {
     }
     MatchOperationListener listener = new MatchOperationListener(operationContext, stopwatch);
     try {
-      logStart();
+      start();
       workerContext.match(listener);
     } finally {
       if (!listener.wasMatched()) {

@@ -24,6 +24,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.DispatchedOperation;
@@ -86,11 +87,25 @@ public interface Backplane {
 
   void deregisterWorker(String hostName) throws IOException;
 
-  FindOperationsResults findOperations(Instance instance, String filterPredicate)
+  FindOperationsResults findEnrichedOperations(Instance instance, String filterPredicate)
       throws IOException;
 
-  /** Returns a set of the names of all active workers. */
-  Set<String> getWorkers() throws IOException;
+  EnrichedOperation findEnrichedOperation(Instance instance, String operationId) throws IOException;
+
+  List<Operation> findOperations(String filterPredicate) throws IOException;
+
+  Set<String> findOperationsByInvocationId(String invocationId) throws IOException;
+
+  Iterable<Map.Entry<String, String>> getOperations(Set<String> operationIds) throws IOException;
+
+  /** Returns a map of the worker name and its start time for given workers. */
+  Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames) throws IOException;
+
+  /** Returns the insert time epoch in seconds for the digest. */
+  long getDigestInsertTime(Digest blobDigest) throws IOException;
+
+  /** Returns a set of the names of all active storage workers. */
+  Set<String> getStorageWorkers() throws IOException;
 
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the digest of the action

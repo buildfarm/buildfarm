@@ -28,8 +28,6 @@ import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.MetricsPublisher;
-import build.buildfarm.metrics.aws.AwsMetricsPublisher;
-import build.buildfarm.metrics.gcp.GcpMetricsPublisher;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -122,7 +120,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     public final synchronized void observe(Operation operation) {
       cancel();
       if (operation == null) {
-        throw Status.NOT_FOUND.asRuntimeException();
+        throw Status.NOT_FOUND.withDescription("Operation not found.").asRuntimeException();
       }
       deliver(operation);
       keepaliveFuture = scheduleKeepalive(operation.getName());
@@ -205,13 +203,6 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   }
 
   private static MetricsPublisher getMetricsPublisher() {
-    switch (configs.getServer().getMetrics().getPublisher()) {
-      default:
-        return new LogMetricsPublisher();
-      case AWS:
-        return new AwsMetricsPublisher();
-      case GCP:
-        return new GcpMetricsPublisher();
-    }
+    return new LogMetricsPublisher();
   }
 }

@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-config
+data:
+  config.yml: |-
+    {{- range $key, $value := .Values.config }}
+    {{- if kindIs "map" $value }}
+    {{- else }}
+    {{ $key }}: {{ $value }}{{- end }}
+    {{- end }}
+    backplane:
+      {{- if .Values.redis.enabled }}
+      redisUri: "{{ .Values.redis.scheme }}://{{ printf "%s-redis-master.%s" (include "redis.fullname" .) (.Release.Namespace) }}:{{ "6379" }}"
+      {{- else }}
+      redisUri: "{{ .Values.externalRedis.uri }}"
+      {{- end }}
+      {{- with .Values.config.backplane }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- with .Values.config.server }}
+    server:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.config.worker }}
+    worker:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}

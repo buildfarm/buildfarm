@@ -38,6 +38,7 @@ class ShardCASFileCache extends CASFileCache {
       long maxEntrySizeInBytes,
       int maxBucketLevels,
       boolean storeFileDirsIndexInMemory,
+      boolean execRootFallback,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder,
@@ -51,6 +52,7 @@ class ShardCASFileCache extends CASFileCache {
         maxEntrySizeInBytes,
         maxBucketLevels,
         storeFileDirsIndexInMemory,
+        execRootFallback,
         digestUtil,
         expireService,
         accessRecorder,
@@ -79,8 +81,8 @@ class ShardCASFileCache extends CASFileCache {
   }
 
   @Override
-  protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+  protected InputStream newExternalInput(Compressor.Value compressor, Digest digest, long offset)
       throws IOException {
-    return inputStreamFactory.newInput(compressor, digest, 0);
+    return inputStreamFactory.newInput(compressor, digest, offset);
   }
 }

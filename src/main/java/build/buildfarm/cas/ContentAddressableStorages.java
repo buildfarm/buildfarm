@@ -14,6 +14,7 @@
 
 package build.buildfarm.cas;
 
+import static build.buildfarm.common.grpc.Channels.createChannel;
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.collect.Multimaps.synchronizedListMultimap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -29,8 +30,6 @@ import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import io.grpc.Channel;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
@@ -40,12 +39,6 @@ import javax.naming.ConfigurationException;
 public final class ContentAddressableStorages {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  private static Channel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
-    return builder.build();
-  }
-
   public static ContentAddressableStorage createGrpcCAS(Cas cas) {
     Channel channel = createChannel(cas.getTarget());
     ByteStreamUploader byteStreamUploader =
@@ -53,7 +46,12 @@ public final class ContentAddressableStorages {
     ListMultimap<Digest, Runnable> onExpirations =
         synchronizedListMultimap(MultimapBuilder.hashKeys().arrayListValues().build());
 
-    return new GrpcCAS(configs.getServer().getName(), channel, byteStreamUploader, onExpirations);
+    return new GrpcCAS(
+        configs.getServer().getName(),
+        cas.isReadonly(),
+        channel,
+        byteStreamUploader,
+        onExpirations);
   }
 
   public static ContentAddressableStorage createFilesystemCAS(Cas config)
@@ -62,35 +60,29 @@ public final class ContentAddressableStorages {
     if (path.isEmpty()) {
       throw new ConfigurationException("filesystem cas path is empty");
     }
-    long maxSizeBytes = config.getMaxSizeBytes();
-    long maxEntrySizeBytes = configs.getMaxEntrySizeBytes();
-    int hexBucketLevels = config.getHexBucketLevels();
-    boolean storeFileDirsIndexInMemory = config.isFileDirectoriesIndexInMemory();
-    if (maxSizeBytes <= 0) {
+    if (config.getMaxSizeBytes() <= 0) {
       throw new ConfigurationException("filesystem cas max_size_bytes <= 0");
     }
-    if (maxEntrySizeBytes <= 0) {
+    if (configs.getMaxEntrySizeBytes() <= 0) {
       throw new ConfigurationException("filesystem cas max_entry_size_bytes <= 0");
     }
-    if (maxEntrySizeBytes > maxSizeBytes) {
+    if (configs.getMaxEntrySizeBytes() > config.getMaxSizeBytes()) {
       throw new ConfigurationException("filesystem cas max_entry_size_bytes > maxSizeBytes");
     }
-    if (hexBucketLevels < 0) {
+    if (config.getHexBucketLevels() < 0) {
       throw new ConfigurationException("filesystem cas hex_bucket_levels <= 0");
     }
     CASFileCache cas =
         new CASFileCache(
             Paths.get(path),
-            maxSizeBytes,
-            maxEntrySizeBytes,
-            hexBucketLevels,
-            storeFileDirsIndexInMemory,
+            config,
+            configs.getMaxEntrySizeBytes(),
             DigestUtil.forHash("SHA256"),
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor()) {
           @Override
-          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
-              throws IOException {
+          protected InputStream newExternalInput(
+              Compressor.Value compressor, Digest digest, long offset) throws IOException {
             throw new NoSuchFileException(digest.getHash());
           }
         };

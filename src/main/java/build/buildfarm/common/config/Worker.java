@@ -29,13 +29,14 @@ public class Worker {
   private int inputFetchStageWidth = 0;
   private int inputFetchDeadline = 60;
   private boolean linkInputDirectories = true;
-  private List<String> realInputDirectories = Arrays.asList("external");
+  private List<String> linkedInputDirectories = Arrays.asList("(?!external)[^/]+");
   private String execOwner;
   private int defaultMaxCores = 0;
   private boolean limitGlobalExecution = false;
   private boolean onlyMulticoreTests = false;
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
+  private int gracefulShutdownSeconds = 0;
   private ExecutionPolicy[] executionPolicies = {};
   private SandboxSettings sandboxSettings = new SandboxSettings();
 
@@ -52,14 +53,15 @@ public class Worker {
     }
   }
 
-  public WorkerType getWorkerType() {
-    if (getCapabilities().isCas() && getCapabilities().isExecution()) {
-      return WorkerType.EXECUTE_AND_STORAGE;
-    }
+  public int getWorkerType() {
+    int workerType = 0;
     if (getCapabilities().isCas()) {
-      return WorkerType.STORAGE;
+      workerType |= WorkerType.STORAGE.getNumber();
     }
-    return WorkerType.EXECUTE;
+    if (getCapabilities().isExecution()) {
+      workerType |= WorkerType.EXECUTE.getNumber();
+    }
+    return workerType;
   }
 
   public Path getValidRoot() throws ConfigurationException {

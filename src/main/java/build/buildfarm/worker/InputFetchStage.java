@@ -72,13 +72,14 @@ public class InputFetchStage extends SuperscalarPipelineStage {
     int size = removeAndRelease(operationName);
     inputFetchTime.observe(usecs / 1000.0);
     inputFetchStallTime.observe(stallUSecs / 1000.0);
-    logComplete(
+    complete(
         operationName,
         usecs,
         stallUSecs,
         String.format("%s, %s", success ? "Success" : "Failure", getUsage(size)));
   }
 
+  @Override
   public int getSlotUsage() {
     return fetchers.size();
   }
@@ -98,14 +99,15 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   @Override
   protected void iterate() throws InterruptedException {
     OperationContext operationContext = take();
-    Thread fetcher = new Thread(new InputFetcher(workerContext, operationContext, this));
+    Thread fetcher =
+        new Thread(
+            new InputFetcher(workerContext, operationContext, this), "InputFetchStage.fetcher");
 
     synchronized (this) {
       fetchers.add(fetcher);
       int slotUsage = fetchers.size();
       inputFetchSlotUsage.set(slotUsage);
-      logStart(
-          operationContext.queueEntry.getExecuteEntry().getOperationName(), getUsage(slotUsage));
+      start(operationContext.queueEntry.getExecuteEntry().getOperationName(), getUsage(slotUsage));
       fetcher.start();
     }
   }

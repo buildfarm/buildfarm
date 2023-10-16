@@ -124,6 +124,10 @@ Gauge for the number of operations in each stage (using a stage_name for each in
 
 Gauge for the completed operations status (using a status_code label for each individual GRPC code)
 
+**operation_exit_code**
+
+Gauge for the completed operations exit code (using a exit_code label for each individual execution exit code)
+
 **operation_worker**
 
 Gauge for the number of operations executed on each worker (using a worker_name label for each individual worker)
@@ -187,6 +191,10 @@ Counter showing service restarts
 **cas_size**
 
 Total size of the worker's CAS in bytes
+
+**cas_ttl_s**
+
+Histogram for amount of time CAS entries live on L1 storage before expiration (seconds)
 
 **cas_entry_count**
 

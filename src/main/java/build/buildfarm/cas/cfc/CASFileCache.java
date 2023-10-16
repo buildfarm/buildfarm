@@ -57,11 +57,14 @@ import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.common.ZstdDecompressingOutputStream;
-import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.config.Cas;
+import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.common.io.CountingOutputStream;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -86,9 +89,12 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
+import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
+import io.prometheus.client.Histogram;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -105,6 +111,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -119,6 +126,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -137,6 +145,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Gauge.build().name("cas_size").help("CAS size.").register();
   private static final Gauge casEntryCountMetric =
       Gauge.build().name("cas_entry_count").help("Number of entries in the CAS.").register();
+  private static Histogram casTtl =
+      Histogram.build()
+          .name("cas_ttl_s")
+          .buckets(
+              3600, // 1 hour
+              21600, // 6 hours
+              86400, // 1 day
+              345600, // 4 days
+              604800, // 1 week
+              1210000 // 2 weeks
+              )
+          .help("The amount of time CAS entries live on L1 storage before expiration (seconds)")
+          .register();
 
   private static final Gauge casCopyFallbackMetric =
       Gauge.build()
@@ -147,18 +168,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
-  private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private final Path root;
   private final EntryPathStrategy entryPathStrategy;
   private final long maxSizeInBytes;
   private final long maxEntrySizeInBytes;
+  private final boolean execRootFallback;
   private final DigestUtil digestUtil;
   private final ConcurrentMap<String, Entry> storage;
   private final Consumer<Digest> onPut;
   private final Consumer<Iterable<Digest>> onExpire;
   private final Executor accessRecorder;
   private final ExecutorService expireService;
-  private Thread prometheusMetricsThread; // TODO make this final, stop on shutdown
+  private Thread prometheusMetricsThread;
 
   private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newConcurrentMap();
   private final DirectoriesIndex directoriesIndex;
@@ -166,6 +187,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final LockMap locks = new LockMap();
   @Nullable private final ContentAddressableStorage delegate;
   private final boolean delegateSkipLoad;
+  private final LoadingCache<String, Lock> keyLocks =
+      CacheBuilder.newBuilder()
+          .expireAfterAccess(
+              1, MINUTES) // hopefully long enough for any of our file ops to take place and prevent
+          // collision
+          .build(
+              new CacheLoader<String, Lock>() {
+                @Override
+                public Lock load(String key) {
+                  // should be sufficient for what we're doing
+                  return new ReentrantLock();
+                }
+              });
   private final LoadingCache<BlobWriteKey, Write> writes =
       CacheBuilder.newBuilder()
           .expireAfterAccess(1, HOURS)
@@ -272,19 +306,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   public CASFileCache(
       Path root,
-      long maxSizeInBytes,
+      Cas config,
       long maxEntrySizeInBytes,
-      int hexBucketLevels,
-      boolean storeFileDirsIndexInMemory,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder) {
     this(
         root,
-        maxSizeInBytes,
+        config.getMaxSizeBytes(),
         maxEntrySizeInBytes,
-        hexBucketLevels,
-        storeFileDirsIndexInMemory,
+        config.getHexBucketLevels(),
+        config.isFileDirectoriesIndexInMemory(),
+        config.isExecRootCopyFallback(),
         digestUtil,
         expireService,
         accessRecorder,
@@ -302,6 +335,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       long maxEntrySizeInBytes,
       int hexBucketLevels,
       boolean storeFileDirsIndexInMemory,
+      boolean execRootFallback,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder,
@@ -314,6 +348,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.root = root;
     this.maxSizeInBytes = maxSizeInBytes;
     this.maxEntrySizeInBytes = maxEntrySizeInBytes;
+    this.execRootFallback = execRootFallback;
     this.digestUtil = digestUtil;
     this.expireService = expireService;
     this.accessRecorder = accessRecorder;
@@ -507,7 +542,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   @SuppressWarnings("ResultOfMethodCallIgnored")
   InputStream newLocalInput(Compressor.Value compressor, Digest digest, long offset)
       throws IOException {
-    log.log(Level.FINE, format("getting input stream for %s", DigestUtil.toString(digest)));
+    log.log(Level.FINER, format("getting input stream for %s", DigestUtil.toString(digest)));
     boolean isExecutable = false;
     do {
       String key = getKey(digest, isExecutable);
@@ -681,7 +716,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   public void put(Blob blob, Runnable onExpiration) throws InterruptedException {
     String key = getKey(blob.getDigest(), false);
     try {
-      log.log(Level.FINE, format("put: %s", key));
+      log.log(Level.FINER, format("put: %s", key));
       OutputStream out =
           putImpl(
               Compressor.Value.IDENTITY,
@@ -818,8 +853,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Write write =
         new Write() {
           CancellableOutputStream out = null;
+
+          @GuardedBy("this")
           boolean isReset = false;
+
+          @GuardedBy("this")
           SettableFuture<Void> closedFuture = null;
+
+          @GuardedBy("this")
           long fileCommittedSize = -1;
 
           @Override
@@ -900,6 +941,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 directExecutor());
           }
 
+          private synchronized void syncCancelled() {
+            out = null;
+            isReset = true;
+          }
+
           @Override
           public synchronized FeedbackOutputStream getOutput(
               long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
@@ -908,6 +954,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             // will block until it is returned via a close.
             if (closedFuture != null) {
               try {
+                while (!closedFuture.isDone()) {
+                  wait();
+                }
                 closedFuture.get();
               } catch (ExecutionException e) {
                 throw new IOException(e.getCause());
@@ -924,8 +973,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     UUID.fromString(key.getIdentifier()),
                     cancelled -> {
                       if (cancelled) {
-                        out = null;
-                        isReset = true;
+                        syncCancelled();
                       }
                       outClosedFuture.set(null);
                     },
@@ -935,7 +983,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             return uniqueOut;
           }
 
-          private void commitOpenState(
+          private synchronized void syncNotify() {
+            notify();
+          }
+
+          private synchronized void commitOpenState(
               CancellableOutputStream out, SettableFuture<Void> closedFuture) {
             // transition the Write to an open state, and modify all internal state required
             // atomically
@@ -943,6 +995,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
             this.out = out;
             this.closedFuture = closedFuture;
+            closedFuture.addListener(this::syncNotify, directExecutor());
             // they will likely write to this, so we can no longer assume isReset.
             // might want to subscribe to a write event on the stream
             isReset = false;
@@ -1007,7 +1060,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     String key = getKey(digest, false);
     final CancellableOutputStream cancellableOut;
     try {
-      log.log(Level.FINE, format("getWrite: %s", key));
+      log.log(Level.FINER, format("getWrite: %s", key));
       cancellableOut =
           putImpl(
               compressor,
@@ -1215,6 +1268,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     fileStore = Files.getFileStore(root);
   }
 
+  public void stop() throws InterruptedException {
+    if (prometheusMetricsThread != null) {
+      prometheusMetricsThread.interrupt();
+      prometheusMetricsThread.join();
+    }
+  }
+
   public StartupCacheResults start(boolean skipLoad) throws IOException, InterruptedException {
     return start(newDirectExecutorService(), skipLoad);
   }
@@ -1246,7 +1306,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       loadResults = loadCache(onStartPut, removeDirectoryService);
     } else {
       // Skip loading the cache and ensure it is empty
-      Directories.remove(root, removeDirectoryService);
+      fileStore = Files.getFileStore(root);
+      Directories.remove(root, fileStore, removeDirectoryService);
       initializeRootDirectory();
     }
 
@@ -1267,7 +1328,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 try {
                   casSizeMetric.set(size());
                   casEntryCountMetric.set(entryCount());
-                  TimeUnit.MINUTES.sleep(5);
+                  MINUTES.sleep(5);
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
@@ -1311,7 +1372,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     try {
       for (Path path : files) {
         if (Files.isDirectory(path)) {
-          Directories.remove(path, removeDirectoryService);
+          Directories.remove(path, fileStore, removeDirectoryService);
         } else {
           Files.delete(path);
         }
@@ -1575,7 +1636,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     pool.shutdown();
     while (!pool.isTerminated()) {
       log.log(Level.INFO, message);
-      pool.awaitTermination(1, TimeUnit.MINUTES);
+      pool.awaitTermination(1, MINUTES);
     }
   }
 
@@ -1655,6 +1716,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   public Path getPath(String filename) {
     return entryPathStrategy.getPath(filename);
+  }
+
+  public Path getRemovingPath(String filename) {
+    return entryPathStrategy.getPath(filename + "_removed");
   }
 
   private synchronized void dischargeAndNotify(long size) {
@@ -1843,6 +1908,55 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         || e instanceof ClosedByInterruptException;
   }
 
+  private Entry safeStorageInsertion(String key, Entry entry) {
+    Lock lock;
+    try {
+      lock = keyLocks.get(key);
+    } catch (ExecutionException e) {
+      // impossible without exception instantiating lock
+      throw new RuntimeException(e);
+    }
+
+    lock.lock();
+    try {
+      return storage.putIfAbsent(key, entry);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private Entry safeStorageRemoval(String key) throws IOException {
+    Path path = getPath(key);
+    Path expiredPath = getRemovingPath(key);
+    boolean deleteExpiredPath = false;
+
+    Lock lock;
+    try {
+      lock = keyLocks.get(key);
+    } catch (ExecutionException e) {
+      // impossible without exception instantiating lock
+      throw new IOException(e);
+    }
+
+    lock.lock();
+    try {
+      Files.createLink(expiredPath, path);
+      deleteExpiredPath = true;
+      Files.delete(path);
+      deleteExpiredPath = false;
+      return storage.remove(key);
+    } finally {
+      if (deleteExpiredPath) {
+        try {
+          Files.delete(expiredPath);
+        } catch (IOException e) {
+          log.log(Level.SEVERE, "error cleaning up after failed safeStorageRemoval", e);
+        }
+      }
+      lock.unlock();
+    }
+  }
+
   @SuppressWarnings("NonAtomicOperationOnVolatileField")
   @GuardedBy("this")
   private ListenableFuture<Entry> expireEntry(long blobSizeInBytes, ExecutorService service)
@@ -1864,7 +1978,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       } catch (IOException ioEx) {
         interrupted = causedByInterrupted(ioEx);
       }
-      Entry removedEntry = storage.remove(e.key);
+      Entry removedEntry = safeStorageRemoval(e.key);
       // reference compare on purpose
       if (removedEntry == e) {
         ListenableFuture<Entry> entryFuture = dischargeEntryFuture(e, service);
@@ -1911,7 +2025,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return immediateFuture(null);
     }
 
-    return Directories.remove(getDirectoryPath(digest), service);
+    return Directories.remove(getDirectoryPath(digest), fileStore, service);
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -1979,7 +2093,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     } catch (IOException e) {
       // propagate the exception if we do not want to perform the fallback strategy.
       // The client should expect a failed action with an explanation of 'Too many links...`.
-      if (!configs.getWorker().getStorages().get(0).isExecRootCopyFallback()) {
+      if (!execRootFallback) {
         throw e;
       }
 
@@ -2036,8 +2150,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private void removeFilePath(Path path) throws IOException {
     if (Files.exists(path)) {
       if (Files.isDirectory(path)) {
-        log.log(Level.FINE, "removing existing directory " + path + " for fetch");
-        Directories.remove(path);
+        log.log(Level.FINER, "removing existing directory " + path + " for fetch");
+        Directories.remove(path, fileStore);
       } else {
         Files.delete(path);
       }
@@ -2059,28 +2173,34 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return directory;
   }
 
-  public ListenableFuture<Path> putDirectory(
+  public ListenableFuture<PathResult> putDirectory(
       Digest digest, Map<Digest, Directory> directoriesIndex, ExecutorService service) {
+    // Claim lock.
+    // Claim the directory path so no other threads try to create/delete it.
     Path path = getDirectoryPath(digest);
     Lock l = locks.acquire(path);
-    log.log(Level.FINE, format("locking directory %s", path.getFileName()));
+    log.log(Level.FINER, format("locking directory %s", path.getFileName()));
     try {
       l.lockInterruptibly();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       return immediateFailedFuture(e);
     }
-    log.log(Level.FINE, format("locked directory %s", path.getFileName()));
-    ListenableFuture<Path> putFuture;
+    log.log(Level.FINER, format("locked directory %s", path.getFileName()));
+
+    // Now that a lock has been claimed, we can proceed to create the directory.
+    ListenableFuture<PathResult> putFuture;
     try {
       putFuture = putDirectorySynchronized(path, digest, directoriesIndex, service);
     } catch (IOException e) {
       putFuture = immediateFailedFuture(e);
     }
+
+    // Release lock.
     putFuture.addListener(
         () -> {
           l.unlock();
-          log.log(Level.FINE, format("directory %s has been unlocked", path.getFileName()));
+          log.log(Level.FINER, format("directory %s has been unlocked", path.getFileName()));
         },
         service);
     return putFuture;
@@ -2124,39 +2244,29 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return false;
   }
 
-  static class PutDirectoryException extends IOException {
+  public static class PathResult {
     private final Path path;
-    private final Digest digest;
-    private final List<Throwable> exceptions;
+    private final boolean missed;
 
-    PutDirectoryException(Path path, Digest digest, List<Throwable> exceptions) {
-      super(String.format("%s: %d exceptions", path, exceptions.size()));
+    public PathResult(Path path, boolean missed) {
       this.path = path;
-      this.digest = digest;
-      this.exceptions = exceptions;
-      for (Throwable exception : exceptions) {
-        addSuppressed(exception);
-      }
+      this.missed = missed;
     }
 
-    Path getPath() {
+    public Path getPath() {
       return path;
     }
 
-    Digest getDigest() {
-      return digest;
-    }
-
-    List<Throwable> getExceptions() {
-      return exceptions;
+    public boolean getMissed() {
+      return missed;
     }
   }
 
   @SuppressWarnings("ConstantConditions")
-  private ListenableFuture<Path> putDirectorySynchronized(
+  private ListenableFuture<PathResult> putDirectorySynchronized(
       Path path, Digest digest, Map<Digest, Directory> directoriesByDigest, ExecutorService service)
       throws IOException {
-    log.log(Level.FINE, format("directory %s has been locked", path.getFileName()));
+    log.log(Level.FINER, format("directory %s has been locked", path.getFileName()));
     ListenableFuture<Void> expireFuture;
     synchronized (this) {
       DirectoryEntry e = directoryStorage.get(digest);
@@ -2183,9 +2293,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
 
         if (e != null) {
-          log.log(Level.FINE, format("found existing entry for %s", path.getFileName()));
+          log.log(Level.FINER, format("found existing entry for %s", path.getFileName()));
           if (directoryEntryExists(path, e, directoriesByDigest)) {
-            return immediateFuture(path);
+            return immediateFuture(new PathResult(path, /* missed=*/ false));
           }
           log.log(
               Level.SEVERE,
@@ -2196,7 +2306,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
         decrementReferencesSynchronized(inputsBuilder.build(), ImmutableList.of());
         expireFuture = expireDirectory(digest, service);
-        log.log(Level.FINE, format("expiring existing entry for %s", path.getFileName()));
+        log.log(Level.FINER, format("expiring existing entry for %s", path.getFileName()));
       }
     }
 
@@ -2218,7 +2328,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         transformAsync(
             deindexFuture,
             result -> {
-              log.log(Level.FINE, format("expiry complete, fetching %s", path.getFileName()));
+              log.log(Level.FINER, format("expiry complete, fetching %s", path.getFileName()));
               ImmutableList.Builder<ListenableFuture<Path>> putFuturesBuilder =
                   ImmutableList.builder();
               fetchDirectory(
@@ -2239,7 +2349,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                         try {
                           putFutures.get(i).get();
                           // should never get here
+                        } catch (ExecutionException e) {
+                          failures.add(e.getCause());
                         } catch (Throwable t) {
+                          // cancelled or interrupted during get
                           failures.add(t);
                         }
                       }
@@ -2259,7 +2372,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             fetchFuture,
             (result) -> {
               try {
-                disableAllWriteAccess(path);
+                disableAllWriteAccess(path, fileStore);
               } catch (IOException e) {
                 log.log(Level.SEVERE, "error while disabling write permissions on " + path, e);
                 return immediateFailedFuture(e);
@@ -2289,8 +2402,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 }
               }
               try {
-                log.log(Level.FINE, "removing directory to roll back " + path);
-                Directories.remove(path);
+                log.log(Level.FINER, "removing directory to roll back " + path);
+                Directories.remove(path, fileStore);
               } catch (IOException removeException) {
                 log.log(
                     Level.SEVERE,
@@ -2305,7 +2418,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return transform(
         rollbackFuture,
         (results) -> {
-          log.log(Level.FINE, format("directory fetch complete, inserting %s", path.getFileName()));
+          log.log(
+              Level.FINER, format("directory fetch complete, inserting %s", path.getFileName()));
           DirectoryEntry e =
               new DirectoryEntry(
                   // might want to have this treatment ahead of this
@@ -2314,7 +2428,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                       : directoriesByDigest.get(digest),
                   Deadline.after(10, SECONDS));
           directoryStorage.put(digest, e);
-          return path;
+          return new PathResult(path, /* missed=*/ true);
         },
         service);
   }
@@ -2357,13 +2471,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         complete = true;
       } finally {
         try {
-          log.log(Level.FINE, format("closing output stream for %s", DigestUtil.toString(digest)));
+          log.log(Level.FINER, format("closing output stream for %s", DigestUtil.toString(digest)));
           if (complete) {
             out.close();
           } else {
             out.cancel();
           }
-          log.log(Level.FINE, format("output stream closed for %s", DigestUtil.toString(digest)));
+          log.log(Level.FINER, format("output stream closed for %s", DigestUtil.toString(digest)));
         } catch (IOException e) {
           if (Thread.interrupted()) {
             log.log(
@@ -2375,7 +2489,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             throw new InterruptedException();
           } else {
             log.log(
-                Level.FINE,
+                Level.FINER,
                 format("failed output stream close for %s", DigestUtil.toString(digest)),
                 e);
           }
@@ -2386,11 +2500,40 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return getPath(key);
   }
 
+  private void copyExternalInputProgressive(Digest digest, CancellableOutputStream out)
+      throws IOException, InterruptedException {
+    try (InputStream in = newExternalInput(Compressor.Value.IDENTITY, digest, out.getWritten())) {
+      ByteStreams.copy(in, out);
+    }
+  }
+
+  private static Exception extractStatusException(IOException e) {
+    for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
+      if (cause instanceof StatusException) {
+        return (StatusException) cause;
+      } else if (cause instanceof StatusRuntimeException) {
+        return (StatusRuntimeException) cause;
+      }
+    }
+    return e;
+  }
+
   private void copyExternalInput(Digest digest, CancellableOutputStream out)
       throws IOException, InterruptedException {
-    log.log(Level.FINE, format("downloading %s", DigestUtil.toString(digest)));
-    try (InputStream in = newExternalInput(Compressor.Value.IDENTITY, digest)) {
-      ByteStreams.copy(in, out);
+    Retrier retrier = new Retrier(Backoff.sequential(5), Retrier.DEFAULT_IS_RETRIABLE);
+    log.log(Level.FINER, format("downloading %s", DigestUtil.toString(digest)));
+    try {
+      retrier.execute(
+          () -> {
+            while (out.getWritten() < digest.getSizeBytes()) {
+              try {
+                copyExternalInputProgressive(digest, out);
+              } catch (IOException e) {
+                throw extractStatusException(e);
+              }
+            }
+            return null;
+          });
     } catch (IOException e) {
       out.cancel();
       log.log(
@@ -2399,7 +2542,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           e); // prevent burial by early end of stream during close
       throw e;
     }
-    log.log(Level.FINE, format("download of %s complete", DigestUtil.toString(digest)));
+    log.log(Level.FINER, format("download of %s complete", DigestUtil.toString(digest)));
   }
 
   @FunctionalInterface
@@ -2453,7 +2596,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     if (out == DUPLICATE_OUTPUT_STREAM) {
       return null;
     }
-    log.log(Level.FINE, format("entry %s is missing, downloading and populating", key));
+    log.log(Level.FINER, format("entry %s is missing, downloading and populating", key));
     return newCancellableOutputStream(out);
   }
 
@@ -2576,6 +2719,22 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  private void deleteExpiredKey(String key) throws IOException {
+    Path path = getRemovingPath(key);
+    long createdTimeMs = Files.getLastModifiedTime(path).to(MILLISECONDS);
+
+    Files.delete(path);
+
+    publishExpirationMetric(createdTimeMs);
+  }
+
+  private void publishExpirationMetric(long createdTimeMs) {
+    // TODO introduce ttl clock
+    long currentTimeMs = new Date().getTime();
+    long ttlMs = currentTimeMs - createdTimeMs;
+    casTtl.observe(Time.millisecondsToSeconds(ttlMs));
+  }
+
   @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored"})
   private boolean charge(String key, long blobSizeInBytes, AtomicBoolean requiresDischarge)
       throws IOException, InterruptedException {
@@ -2600,7 +2759,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     (expiredEntry) -> {
                       String expiredKey = expiredEntry.key;
                       try {
-                        Files.delete(getPath(expiredKey));
+                        deleteExpiredKey(expiredKey);
                       } catch (NoSuchFileException eNoEnt) {
                         log.log(
                             Level.SEVERE,
@@ -2616,7 +2775,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                         return immediateFuture(null);
                       }
                       expiredKeyCounter.inc();
-                      log.log(Level.INFO, format("expired key %s", expiredKey));
+                      log.log(Level.FINE, format("expired key %s", expiredKey));
                       return immediateFuture(fileEntryKey.getDigest());
                     },
                     expireService));
@@ -2814,11 +2973,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Entry existingEntry = null;
         boolean inserted = false;
         try {
+          // acquire the key lock
           Files.createLink(CASFileCache.this.getPath(key), writePath);
-          existingEntry = storage.putIfAbsent(key, entry);
+          existingEntry = safeStorageInsertion(key, entry);
           inserted = existingEntry == null;
         } catch (FileAlreadyExistsException e) {
-          log.log(Level.FINE, "file already exists for " + key + ", nonexistent entry will fail");
+          log.log(Level.FINER, "file already exists for " + key + ", nonexistent entry will fail");
         } finally {
           Files.delete(writePath);
           if (!inserted) {
@@ -2843,20 +3003,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
 
         if (existingEntry != null) {
-          log.log(Level.FINE, "lost the race to insert " + key);
+          log.log(Level.FINER, "lost the race to insert " + key);
           if (!referenceIfExists(key)) {
             // we would lose our accountability and have a presumed reference if we returned
             throw new IllegalStateException("storage conflict with existing key for " + key);
           }
         } else if (writeWinner.get()) {
-          log.log(Level.FINE, "won the race to insert " + key);
+          log.log(Level.FINER, "won the race to insert " + key);
           try {
             onInsert.run();
           } catch (RuntimeException e) {
             throw new IOException(e);
           }
         } else {
-          log.log(Level.FINE, "did not win the race to insert " + key);
+          log.log(Level.FINER, "did not win the race to insert " + key);
         }
       }
     };
@@ -2910,7 +3070,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             "entry " + key + " has " + referenceCount + " references and is being incremented...");
       }
       log.log(
-          Level.FINER,
+          Level.FINEST,
           "incrementing references to "
               + key
               + " from "
@@ -2940,7 +3100,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             "entry " + key + " has 0 references and is being decremented...");
       }
       log.log(
-          Level.FINER,
+          Level.FINEST,
           "decrementing references to "
               + key
               + " from "
@@ -3009,8 +3169,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  protected abstract InputStream newExternalInput(Compressor.Value compressor, Digest digest)
-      throws IOException;
+  protected abstract InputStream newExternalInput(
+      Compressor.Value compressor, Digest digest, long offset) throws IOException;
 
   // CAS fallback methods
 
@@ -3048,7 +3208,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 fileEntryKey.getDigest(),
                 UUID.randomUUID(),
                 RequestMetadata.getDefaultInstance());
-        performCopy(write, e);
+        if (write != null) {
+          performCopy(write, e);
+        }
       }
     }
   }
