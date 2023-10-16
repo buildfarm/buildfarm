@@ -1052,7 +1052,6 @@ public class ShardInstanceTest {
 
   @Test
   public void findMissingBlobsTest_ViaBackPlane() throws Exception {
-
     Set<String> activeWorkers = ImmutableSet.of("worker1", "worker2", "worker3");
     Set<String> expiredWorkers = ImmutableSet.of("workerX", "workerY", "workerZ");
     Set<String> imposterWorkers = ImmutableSet.of("imposter1", "imposter2", "imposter3");

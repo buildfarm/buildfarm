@@ -2,7 +2,6 @@ package build.buildfarm.common.config;
 
 import java.util.ArrayList;
 import java.util.List;
-import com.google.common.base.Strings;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
