@@ -19,7 +19,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
-import static java.lang.Thread.State.RUNNABLE;
 import static java.lang.Thread.State.TERMINATED;
 import static java.lang.Thread.State.WAITING;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -1258,12 +1257,17 @@ class CASFileCacheTest {
     write1.start();
     write2.start();
     barrier.await(); // let both the requests reach the critical section
-    while (write1.getState() == RUNNABLE || write2.getState() == RUNNABLE) ;
-    MILLISECONDS.sleep(1); // to overcome any intermediate thread state
+
+    // Wait for each write operation to complete, allowing a maximum of 100ms per write.
+    // Note: A 100ms wait time allowed 1000 * 8 successful test runs.
+    // In certain scenario, even this wait time may not be enough and test still be called flaky.
+    // But setting wait time 0 may cause test to wait forever (if there is issue in code) and the
+    // build might fail with timeout error.
+    write1.join(100);
+    write2.join(100);
+
     assertThat(write1.getState()).isEqualTo(TERMINATED);
     assertThat(write2.getState()).isEqualTo(TERMINATED);
-    write1.interrupt();
-    write2.interrupt();
   }
 
   class ConcurrentWriteStreamObserver {
