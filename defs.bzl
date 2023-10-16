@@ -8,7 +8,7 @@ load(
     "@io_bazel_rules_docker//repositories:repositories.bzl",
     container_repositories = "repositories",
 )
-load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
+load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories", "IO_GRPC_GRPC_JAVA_OVERRIDE_TARGETS")
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 load("@io_bazel_rules_k8s//k8s:k8s.bzl", "k8s_repositories")
@@ -114,6 +114,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.projectlombok:lombok:1.18.24",
                     ],
         generate_compat_repositories = True,
+        override_targets = IO_GRPC_GRPC_JAVA_OVERRIDE_TARGETS,
         repositories = [
             "https://repo1.maven.org/maven2",
             "https://mirrors.ibiblio.org/pub/mirrors/maven2",
