@@ -69,6 +69,7 @@ import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
@@ -157,6 +158,7 @@ public final class Worker extends LoggingMain {
     serverBuilder.addService(new ContentAddressableStorageService(instance));
     serverBuilder.addService(new ByteStreamService(instance));
     serverBuilder.addService(new ShutDownWorkerGracefully(this));
+    serverBuilder.addService(ProtoReflectionService.newInstance());
 
     // We will build a worker's server based on it's capabilities.
     // A worker that is capable of execution will construct an execution pipeline.
