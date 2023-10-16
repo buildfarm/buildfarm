@@ -333,7 +333,7 @@ public final class Worker extends LoggingMain {
         fileCache,
         owner,
         configs.getWorker().isLinkInputDirectories(),
-        configs.getWorker().getRealInputDirectories(),
+        configs.getWorker().getLinkedInputDirectories(),
         removeDirectoryService,
         accessRecorder
         /* deadlineAfter=*/

@@ -80,6 +80,9 @@ public final class BuildfarmConfigs {
     if (options.prometheusPort >= 0) {
       buildfarmConfigs.setPrometheusPort(options.prometheusPort);
     }
+    if (!Strings.isNullOrEmpty(options.redisUri)) {
+      buildfarmConfigs.getBackplane().setRedisUri(options.redisUri);
+    }
     adjustServerConfigs(buildfarmConfigs);
     return buildfarmConfigs;
   }
@@ -98,6 +101,9 @@ public final class BuildfarmConfigs {
     }
     if (options.prometheusPort >= 0) {
       buildfarmConfigs.setPrometheusPort(options.prometheusPort);
+    }
+    if (!Strings.isNullOrEmpty(options.redisUri)) {
+      buildfarmConfigs.getBackplane().setRedisUri(options.redisUri);
     }
     adjustWorkerConfigs(buildfarmConfigs);
     return buildfarmConfigs;

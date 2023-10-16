@@ -5,8 +5,8 @@ buildfarm dependencies that can be imported into other WORKSPACE files
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
-RULES_JVM_EXTERNAL_TAG = "4.2"
-RULES_JVM_EXTERNAL_SHA = "cd1a77b7b02e8e008439ca76fd34f5b07aecb8c752961f9640dea15e9e5ba1ca"
+RULES_JVM_EXTERNAL_TAG = "5.3"
+RULES_JVM_EXTERNAL_SHA = "d31e369b854322ca5098ea12c69d7175ded971435e55c18dd9dd5f29cc5249ac"
 
 def archive_dependencies(third_party):
     return [
@@ -22,7 +22,7 @@ def archive_dependencies(third_party):
             "name": "rules_jvm_external",
             "strip_prefix": "rules_jvm_external-%s" % RULES_JVM_EXTERNAL_TAG,
             "sha256": RULES_JVM_EXTERNAL_SHA,
-            "url": "https://github.com/bazelbuild/rules_jvm_external/archive/%s.zip" % RULES_JVM_EXTERNAL_TAG,
+            "url": "https://github.com/bazelbuild/rules_jvm_external/releases/download/%s/rules_jvm_external-%s.tar.gz" % (RULES_JVM_EXTERNAL_TAG, RULES_JVM_EXTERNAL_TAG),
         },
 
         # Kubernetes rules.  Useful for local development with tilt.
@@ -92,9 +92,9 @@ def archive_dependencies(third_party):
         },
         {
             "name": "rules_cc",
-            "sha256": "3d9e271e2876ba42e114c9b9bc51454e379cbf0ec9ef9d40e2ae4cec61a31b40",
-            "strip_prefix": "rules_cc-0.0.6",
-            "url": "https://github.com/bazelbuild/rules_cc/releases/download/0.0.6/rules_cc-0.0.6.tar.gz",
+            "sha256": "2037875b9a4456dce4a79d112a8ae885bbc4aad968e6587dca6e64f3a0900cdf",
+            "strip_prefix": "rules_cc-0.0.9",
+            "url": "https://github.com/bazelbuild/rules_cc/releases/download/0.0.9/rules_cc-0.0.9.tar.gz",
         },
 
         # Used to format proto files

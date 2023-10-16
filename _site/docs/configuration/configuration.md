@@ -21,20 +21,20 @@ worker:
   publicName: "localhost:8981"
 ```
 
-The configuration can be provided to the server and worker as a CLI argument or through the env variable `CONFIG_PATH`
-For an example config containing all of the configuration values, see `examples/config.yml`.
+The configuration can be provided to the server and worker as a CLI argument or through the environment variable `CONFIG_PATH`
+For an example configuration containing all of the configuration values, see `examples/config.yml`.
 
 ## All Configurations
 
 ### Common
 
-| Configuration        | Accepted and _Default_ Values | Description                                       |
-|----------------------|-------------------------------|---------------------------------------------------|
-| digestFunction       | _SHA256_, SHA1                | Digest function for this implementation           |
-| defaultActionTimeout | Integer, _600_                | Default timeout value for an action (seconds)     |
-| maximumActionTimeout | Integer, _3600_               | Maximum allowed action timeout (seconds)          |
-| maxEntrySizeBytes    | Long, _2147483648_            | Maximum size of a single blob accepted (bytes)    |
-| prometheusPort       | Integer, _9090_               | Listening port of the Prometheus metrics endpoint |
+| Configuration        | Accepted and _Default_ Values | Command Line Argument | Description                                       |
+|----------------------|-------------------------------|-----------------------|---------------------------------------------------|
+| digestFunction       | _SHA256_, SHA1                |                       | Digest function for this implementation           |
+| defaultActionTimeout | Integer, _600_                |                       | Default timeout value for an action (seconds)     |
+| maximumActionTimeout | Integer, _3600_               |                       | Maximum allowed action timeout (seconds)          |
+| maxEntrySizeBytes    | Long, _2147483648_            |                       | Maximum size of a single blob accepted (bytes)    |
+| prometheusPort       | Integer, _9090_               | --prometheus_port     | Listening port of the Prometheus metrics endpoint |
 
 Example:
 
@@ -64,7 +64,7 @@ worker:
 | sslPrivateKeyPath                | String, _null_                |                 | Absolute path of the SSL private key (if TLS used)                                                                          |
 | runDispatchedMonitor             | boolean, _true_               |                 | Enable an agent to monitor the operation store to ensure that dispatched operations with expired worker leases are requeued |
 | dispatchedMonitorIntervalSeconds | Integer, _1_                  |                 | Dispatched monitor's lease expiration check interval (seconds)                                                              |
-| runOperationQueuer               | boolean, _true_               |                 | Aquire execute request entries cooperatively from an arrival queue on the backplane                                         |
+| runOperationQueuer               | boolean, _true_               |                 | Acquire execute request entries cooperatively from an arrival queue on the backplane                                         |
 | ensureOutputsPresent             | boolean, _false_              |                 | Decide if all outputs are also present in the CAS. If any outputs are missing a cache miss is returned                      |
 | maxCpu                           | Integer, _0_                  |                 | Maximum number of CPU cores that any min/max-cores property may request (0 = unlimited)                                     |
 | maxRequeueAttempts               | Integer, _5_                  |                 | Maximum number of requeue attempts for an operation                                                                         |
@@ -105,12 +105,12 @@ server:
 
 ### Server Caches
 
-| Configuration            | Accepted and _Default_ Values | Description                                            |
-|--------------------------|-------------------------------|--------------------------------------------------------|
-| directoryCacheMaxEntries                  | Long, _64 * 1024_              | The max number of entries that the directory cache will hold.    |
-| commandCacheMaxEntries                  | Long, _64 * 1024_              | The max number of entries that the command cache will hold.    |
-| digestToActionCacheMaxEntries                  | Long, _64 * 1024_              | The max number of entries that the digest-to-action cache will hold.    |
-| recentServedExecutionsCacheMaxEntries                  | Long, _64 * 1024_              | The max number of entries that the executions cache will hold.    |
+| Configuration                         | Accepted and _Default_ Values | Description                                                          |
+|---------------------------------------|-------------------------------|----------------------------------------------------------------------|
+| directoryCacheMaxEntries              | Long, _64 * 1024_             | The max number of entries that the directory cache will hold.        |
+| commandCacheMaxEntries                | Long, _64 * 1024_             | The max number of entries that the command cache will hold.          |
+| digestToActionCacheMaxEntries         | Long, _64 * 1024_             | The max number of entries that the digest-to-action cache will hold. |
+| recentServedExecutionsCacheMaxEntries | Long, _64 * 1024_             | The max number of entries that the executions cache will hold.       |
 
 Example:
 
@@ -169,41 +169,41 @@ server:
 
 ### Redis Backplane
 
-| Configuration                | Accepted and _Default_ Values            | Environment Var | Description                                                                                                                                                          |
-|------------------------------|------------------------------------------|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| type                         | _SHARD_                                  |                 | Type of backplane. Currently, the only implemntation is SHARD utilizing Redis                                                                                        |
-| redisUri                     | String, redis://localhost:6379           |  REDIS_URI      | Redis cluster endpoint. This must be a single URI                                                                                                                    |
-| redisPassword                | String, _null_                           |                 | Redis password, if applicable                                                                                                                                        |
-| redisNodes                   | List of Strings, _null_                  |                 | List of individual Redis nodes, if applicable                                                                                                                        |
-| jedisPoolMaxTotal            | Integer, _4000_                          |                 | The size of the Redis connection pool                                                                                                                                |
-| workersHashName              | String, _Workers_                        |                 | Redis key used to store a hash of registered workers                                                                                                                 |
-| workerChannel                | String, _WorkerChannel_                  |                 | Redis pubsub channel key where changes of the cluster membership are announced                                                                                       |
-| actionCachePrefix            | String, _ActionCache_                    |                 | Redis key prefix for all ActionCache entries                                                                                                                         |
-| actionCacheExpire            | Integer, _2419200_                       |                 | The TTL maintained for ActionCache entries, not refreshed on getActionResult hit                                                                                     |
-| actionBlacklistPrefix        | String, _ActionBlacklist_                |                 | Redis key prefix for all blacklisted actions, which are rejected                                                                                                     |
-| actionBlacklistExpire        | Integer, _3600_                          |                 | The TTL maintained for action blacklist entries                                                                                                                      |
-| invocationBlacklistPrefix    | String, _InvocationBlacklist_            |                 | Redis key prefix for blacklisted invocations, suffixed with a a tool invocation ID                                                                                   |
-| operationPrefix              | String, _Operation_                      |                 | Redis key prefix for all operations, suffixed wtih the operation's name                                                                                              |
-| operationExpire              | Integer, _604800_                        |                 | The TTL maintained for all operations, updated on each modification                                                                                                  |
-| preQueuedOperationsListName  | String, _{Arrival}:PreQueuedOperations_  |                 | Redis key used to store a list of ExecuteEntry awaiting transformation into QueryEntry                                                                               |
-| processingListName           | String, _{Arrival}:ProcessingOperations_ |                 | Redis key of a list used to ensure reliable processing of arrival queue etries with operation watch monitoring                                                       |
-| processingPrefix             | String, _Processing_                     |                 | Redis key prefix for operations which are being dequeued from the arrival queue                                                                                      |
-| processingTimeoutMillis      | Integer, _20000_                         |                 | Delay (in ms) used to populate processing operation entries                                                                                                          |
-| queuedOperationsListName     | String, _{Execution}:QueuedOperations_   |                 | Redis key used to store a list of QueueEntry awaiting execution by workers                                                                                           |
-| dispatchingPrefix            | String, _Dispatching_                    |                 | Redis key prefix for operations which are being dequeued from the ready to run queue                                                                                 |
-| dispatchingTimeoutMillis     | Integer, _10000_                         |                 | Delay (in ms) used to populate dispatching operation entries                                                                                                         |
-| dispatchedOperationsHashName | String, _DispatchedOperations_           |                 | Redis key of a hash of operation names to the worker lease for its execution, which are monitored by the dispatched monitor                                          |
-| operationChannelPrefix       | String, _OperationChannel_               |                 | Redis pubsub channel prefix suffixed by an operation name                                                                                                            |
-| casPrefix                    | String, _ContentAddressableStorage_      |                 | Redis key prefix suffixed with a blob digest that maps to a set of workers with that blob's availability                                                             |
-| casExpire                    | Integer, _604800_                        |                 | The TTL maintained for CAS entries, which is not refreshed on any read access of the blob                                                                            |
-| subscribeToBackplane         | boolean, _true_                          |                 | Enable an agent of the backplane client which subscribes to worker channel and operation channel events. If disabled, responsiveness of watchers and CAS are reduced |
-| runFailsafeOperation         | boolean, _true_                          |                 | Enable an agent in the backplane client which monitors watched operations and ensures they are in a known maintained, or expirable state                             |
-| maxQueueDepth                | Integer, _100000_                        |                 | Maximum length that the ready to run queue is allowed to reach to control an arrival flow for execution                                                              |
-| maxPreQueueDepth             | Integer, _1000000_                       |                 | Maximum lengh that the arrival queue is allowed to reach to control load on the Redis cluster                                                                        |
-| priorityQueue                | boolean, _false_                         |                 | Priority queue type allows prioritizing operations based on Bazel's --remote_execution_priority=<an integer> flag                                                    |
-| timeout                      | Integer, _10000_                         |                 | Default timeout                                                                                                                                                      |
-| maxAttempts                  | Integer, _20_                            |                 | Maximum number of execution attempts                                                                                                                                 |
-| cacheCas                     | boolean, _false_                         |                 |                                                                                                                                                                |
+| Configuration                | Accepted and _Default_ Values            | Environment Var | Command Line Argument | Description                                                                                                                                                          |
+|------------------------------|------------------------------------------|-----------------|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| type                         | _SHARD_                                  |                 |                       | Type of backplane. Currently, the only implementation is SHARD utilizing Redis                                                                                        |
+| redisUri                     | String, redis://localhost:6379           | REDIS_URI       | --redis_uri           | Redis cluster endpoint. This must be a single URI                                                                                                                    |
+| redisPassword                | String, _null_                           |                 |                       | Redis password, if applicable                                                                                                                                        |
+| redisNodes                   | List of Strings, _null_                  |                 |                       | List of individual Redis nodes, if applicable                                                                                                                        |
+| jedisPoolMaxTotal            | Integer, _4000_                          |                 |                       | The size of the Redis connection pool                                                                                                                                |
+| workersHashName              | String, _Workers_                        |                 |                       | Redis key used to store a hash of registered workers                                                                                                                 |
+| workerChannel                | String, _WorkerChannel_                  |                 |                       | Redis pubsub channel key where changes of the cluster membership are announced                                                                                       |
+| actionCachePrefix            | String, _ActionCache_                    |                 |                       | Redis key prefix for all ActionCache entries                                                                                                                         |
+| actionCacheExpire            | Integer, _2419200_                       |                 |                       | The TTL maintained for ActionCache entries, not refreshed on getActionResult hit                                                                                     |
+| actionBlacklistPrefix        | String, _ActionBlacklist_                |                 |                       | Redis key prefix for all blacklisted actions, which are rejected                                                                                                     |
+| actionBlacklistExpire        | Integer, _3600_                          |                 |                       | The TTL maintained for action blacklist entries                                                                                                                      |
+| invocationBlacklistPrefix    | String, _InvocationBlacklist_            |                 |                       | Redis key prefix for blacklisted invocations, suffixed with a a tool invocation ID                                                                                   |
+| operationPrefix              | String, _Operation_                      |                 |                       | Redis key prefix for all operations, suffixed with the operation's name                                                                                              |
+| operationExpire              | Integer, _604800_                        |                 |                       | The TTL maintained for all operations, updated on each modification                                                                                                  |
+| preQueuedOperationsListName  | String, _{Arrival}:PreQueuedOperations_  |                 |                       | Redis key used to store a list of ExecuteEntry awaiting transformation into QueryEntry                                                                               |
+| processingListName           | String, _{Arrival}:ProcessingOperations_ |                 |                       | Redis key of a list used to ensure reliable processing of arrival queue entries with operation watch monitoring                                                       |
+| processingPrefix             | String, _Processing_                     |                 |                       | Redis key prefix for operations which are being dequeued from the arrival queue                                                                                      |
+| processingTimeoutMillis      | Integer, _20000_                         |                 |                       | Delay (in ms) used to populate processing operation entries                                                                                                          |
+| queuedOperationsListName     | String, _{Execution}:QueuedOperations_   |                 |                       | Redis key used to store a list of QueueEntry awaiting execution by workers                                                                                           |
+| dispatchingPrefix            | String, _Dispatching_                    |                 |                       | Redis key prefix for operations which are being dequeued from the ready to run queue                                                                                 |
+| dispatchingTimeoutMillis     | Integer, _10000_                         |                 |                       | Delay (in ms) used to populate dispatching operation entries                                                                                                         |
+| dispatchedOperationsHashName | String, _DispatchedOperations_           |                 |                       | Redis key of a hash of operation names to the worker lease for its execution, which are monitored by the dispatched monitor                                          |
+| operationChannelPrefix       | String, _OperationChannel_               |                 |                       | Redis pubsub channel prefix suffixed by an operation name                                                                                                            |
+| casPrefix                    | String, _ContentAddressableStorage_      |                 |                       | Redis key prefix suffixed with a blob digest that maps to a set of workers with that blob's availability                                                             |
+| casExpire                    | Integer, _604800_                        |                 |                       | The TTL maintained for CAS entries, which is not refreshed on any read access of the blob                                                                            |
+| subscribeToBackplane         | boolean, _true_                          |                 |                       | Enable an agent of the backplane client which subscribes to worker channel and operation channel events. If disabled, responsiveness of watchers and CAS are reduced |
+| runFailsafeOperation         | boolean, _true_                          |                 |                       | Enable an agent in the backplane client which monitors watched operations and ensures they are in a known maintained, or expirable state                             |
+| maxQueueDepth                | Integer, _100000_                        |                 |                       | Maximum length that the ready to run queue is allowed to reach to control an arrival flow for execution                                                              |
+| maxPreQueueDepth             | Integer, _1000000_                       |                 |                       | Maximum lengh that the arrival queue is allowed to reach to control load on the Redis cluster                                                                        |
+| priorityQueue                | boolean, _false_                         |                 |                       | Priority queue type allows prioritizing operations based on Bazel's --remote_execution_priority=<an integer> flag                                                    |
+| timeout                      | Integer, _10000_                         |                 |                       | Default timeout                                                                                                                                                      |
+| maxAttempts                  | Integer, _20_                            |                 |                       | Maximum number of execution attempts                                                                                                                                 |
+| cacheCas                     | boolean, _false_                         |                 |                       |                                                                                                                                                                      |
 
 Example:
 
