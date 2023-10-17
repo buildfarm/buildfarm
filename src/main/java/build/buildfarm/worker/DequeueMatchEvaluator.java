@@ -14,11 +14,12 @@
 
 package build.buildfarm.worker;
 
-import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.worker.resources.LocalResourceSet;
+import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
 import org.jetbrains.annotations.NotNull;
@@ -45,6 +46,7 @@ public class DequeueMatchEvaluator {
    * @brief Decide whether the worker should keep the operation or put it back on the queue.
    * @details Compares the platform properties of the worker to the operation's platform properties.
    * @param workerProvisions The provisions of the worker.
+   * @param resourceSet The limited resources that the worker has available.
    * @param queueEntry An entry recently removed from the queue.
    * @return Whether or not the worker should accept or reject the queue entry.
    * @note Overloaded.
@@ -53,24 +55,10 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   public static boolean shouldKeepOperation(
-      SetMultimap<String, String> workerProvisions, QueueEntry queueEntry) {
-    return shouldKeepViaPlatform(workerProvisions, queueEntry.getPlatform());
-  }
-
-  /**
-   * @brief Decide whether the worker should keep the operation or put it back on the queue.
-   * @details Compares the platform properties of the worker to the operation's platform properties.
-   * @param workerProvisions The provisions of the worker.
-   * @param command A command to evaluate.
-   * @return Whether or not the worker should accept or reject the queue entry.
-   * @note Overloaded.
-   * @note Suggested return identifier: shouldKeepOperation.
-   */
-  @SuppressWarnings("NullableProblems")
-  @NotNull
-  public static boolean shouldKeepOperation(
-      SetMultimap<String, String> workerProvisions, Command command) {
-    return shouldKeepViaPlatform(workerProvisions, command.getPlatform());
+      SetMultimap<String, String> workerProvisions,
+      LocalResourceSet resourceSet,
+      QueueEntry queueEntry) {
+    return shouldKeepViaPlatform(workerProvisions, resourceSet, queueEntry.getPlatform());
   }
 
   /**
@@ -79,6 +67,7 @@ public class DequeueMatchEvaluator {
    * @details Compares the platform properties of the worker to the platform properties of the
    *     operation.
    * @param workerProvisions The provisions of the worker.
+   * @param resourceSet The limited resources that the worker has available.
    * @param platform The platforms of operation.
    * @return Whether or not the worker should accept or reject the operation.
    * @note Suggested return identifier: shouldKeepOperation.
@@ -86,9 +75,15 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean shouldKeepViaPlatform(
-      SetMultimap<String, String> workerProvisions, Platform platform) {
-    // attempt to execute everything the worker gets off the queue.
+      SetMultimap<String, String> workerProvisions,
+      LocalResourceSet resourceSet,
+      Platform platform) {
+    // attempt to execute everything the worker gets off the queue,
+    // provided there is enough resources to do so.
     // this is a recommended configuration.
+    if (!LocalResourceSetUtils.claimResources(platform, resourceSet)) {
+      return false;
+    }
     if (configs.getWorker().getDequeueMatchSettings().isAcceptEverything()) {
       return true;
     }

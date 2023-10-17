@@ -5,6 +5,7 @@ import com.google.common.base.Strings;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import javax.naming.ConfigurationException;
@@ -38,6 +39,11 @@ public class Worker {
   private int gracefulShutdownSeconds = 0;
   private ExecutionPolicy[] executionPolicies = {};
   private SandboxSettings sandboxSettings = new SandboxSettings();
+
+  // These limited resources are only for the individual worker.
+  // An example would be hardware resources such as GPUs.
+  // If you want GPU actions to run exclusively, define a single GPU resource.
+  private List<LimitedResource> resources = new ArrayList<>();
 
   public ExecutionPolicy[] getExecutionPolicies() {
     if (executionPolicies != null) {
