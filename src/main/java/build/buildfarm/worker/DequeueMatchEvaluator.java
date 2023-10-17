@@ -60,6 +60,12 @@ public class DequeueMatchEvaluator {
       String name,
       LocalResourceSet resourceSet,
       QueueEntry queueEntry) {
+      if (queueEntry == null)
+      {
+          DequeueResults results = new DequeueResults();
+          results.keep = true;
+          return results;
+      }
     return shouldKeepViaPlatform(workerProvisions, name, resourceSet, queueEntry.getPlatform());
   }
 
