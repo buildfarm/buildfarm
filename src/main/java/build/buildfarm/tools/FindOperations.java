@@ -14,14 +14,14 @@
 
 package build.buildfarm.tools;
 
+import static build.buildfarm.common.grpc.Channels.createChannel;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
 import io.grpc.ManagedChannel;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 
 // This tool can be used to find Operations based on their particular properties.
 // For example, it could find all of the operations executed by a particular user or particular
@@ -29,12 +29,6 @@ import io.grpc.netty.NettyChannelBuilder;
 // ./tool <URL> shard SHA256 <user>
 // The operations that match the query will be printed.
 class FindOperations {
-  private static ManagedChannel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
-    return builder.build();
-  }
-
   public static void main(String[] args) throws Exception {
     // get arguments for establishing an instance
     String host = args[0];

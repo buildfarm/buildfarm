@@ -14,3 +14,7 @@ test --test_tag_filters=-redis,-integration
 # Ensure buildfarm is compatible with future versions of bazel.
 # https://buildkite.com/bazel/bazelisk-plus-incompatible-flags
 common --incompatible_disallow_empty_glob
+
+# TODO: migrate all dependencies from WORKSPACE to MODULE.bazel
+# https://github.com/bazelbuild/bazel-buildfarm/issues/1479
+common --noenable_bzlmod

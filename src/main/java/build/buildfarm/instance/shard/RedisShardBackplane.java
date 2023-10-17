@@ -129,6 +129,8 @@ public class RedisShardBackplane implements Backplane {
                   .build());
 
   private final String source; // used in operation change publication
+  private final boolean subscribeToBackplane;
+  private final boolean runFailsafeOperation;
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
   private final Supplier<JedisCluster> jedisClusterFactory;
@@ -149,18 +151,30 @@ public class RedisShardBackplane implements Backplane {
 
   public RedisShardBackplane(
       String source,
+      boolean subscribeToBackplane,
+      boolean runFailsafeOperation,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete)
       throws ConfigurationException {
-    this(source, onPublish, onComplete, JedisClusterFactory.create());
+    this(
+        source,
+        subscribeToBackplane,
+        runFailsafeOperation,
+        onPublish,
+        onComplete,
+        JedisClusterFactory.create(source));
   }
 
   public RedisShardBackplane(
       String source,
+      boolean subscribeToBackplane,
+      boolean runFailsafeOperation,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
       Supplier<JedisCluster> jedisClusterFactory) {
     this.source = source;
+    this.subscribeToBackplane = subscribeToBackplane;
+    this.runFailsafeOperation = runFailsafeOperation;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
     this.jedisClusterFactory = jedisClusterFactory;
@@ -206,7 +220,7 @@ public class RedisShardBackplane implements Backplane {
         JsonFormat.parser().merge(entry, executeEntry);
         visit(executeEntry.build(), entry);
       } catch (InvalidProtocolBufferException e) {
-        log.log(Level.FINE, "invalid ExecuteEntry json: " + entry, e);
+        log.log(Level.FINER, "invalid ExecuteEntry json: " + entry, e);
       }
     }
   }
@@ -330,10 +344,10 @@ public class RedisShardBackplane implements Backplane {
 
     if (!expiringChannels.isEmpty()) {
       log.log(
-          Level.FINE,
+          Level.FINER,
           format("Scan %d watches, %s, expiresAt: %s", expiringChannels.size(), now, expiresAt));
 
-      log.log(Level.FINE, "Scan prequeue");
+      log.log(Level.FINER, "Scan prequeue");
       // scan prequeue, pet watches
       scanPrequeue(jedis, resetChannel);
     }
@@ -342,7 +356,7 @@ public class RedisShardBackplane implements Backplane {
     scanProcessing(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      log.log(Level.FINE, "Scan queue");
+      log.log(Level.FINER, "Scan queue");
       // scan queue, pet watches
       scanQueue(jedis, resetChannel);
     }
@@ -351,7 +365,7 @@ public class RedisShardBackplane implements Backplane {
     scanDispatching(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      log.log(Level.FINE, "Scan dispatched");
+      log.log(Level.FINER, "Scan dispatched");
       // scan dispatched pet watches
       scanDispatched(jedis, resetChannel);
     }
@@ -445,7 +459,7 @@ public class RedisShardBackplane implements Backplane {
         }
         subscriber.onOperation(operationChannel(operationName), operation, nextExpiresAt(now));
         log.log(
-            Level.FINE,
+            Level.FINER,
             format(
                 "operation %s done due to %s",
                 operationName, operation == null ? "null" : "completed"));
@@ -523,10 +537,10 @@ public class RedisShardBackplane implements Backplane {
     // Create containers that make up the backplane
     state = DistributedStateCreator.create(client);
 
-    if (configs.getBackplane().isSubscribeToBackplane()) {
+    if (subscribeToBackplane) {
       startSubscriptionThread();
     }
-    if (configs.getBackplane().isRunFailsafeOperation()) {
+    if (runFailsafeOperation) {
       startFailsafeOperationThread();
     }
 
@@ -541,24 +555,24 @@ public class RedisShardBackplane implements Backplane {
     if (failsafeOperationThread != null) {
       failsafeOperationThread.interrupt();
       failsafeOperationThread.join();
-      log.log(Level.FINE, "failsafeOperationThread has been stopped");
+      log.log(Level.FINER, "failsafeOperationThread has been stopped");
     }
     if (operationSubscription != null) {
       operationSubscription.stop();
       if (subscriptionThread != null) {
         subscriptionThread.join();
       }
-      log.log(Level.FINE, "subscriptionThread has been stopped");
+      log.log(Level.FINER, "subscriptionThread has been stopped");
     }
     if (subscriberService != null) {
       subscriberService.shutdown();
       subscriberService.awaitTermination(10, SECONDS);
-      log.log(Level.FINE, "subscriberService has been stopped");
+      log.log(Level.FINER, "subscriberService has been stopped");
     }
     if (client != null) {
       client.close();
       client = null;
-      log.log(Level.FINE, "client has been closed");
+      log.log(Level.FINER, "client has been closed");
     }
   }
 
@@ -638,7 +652,7 @@ public class RedisShardBackplane implements Backplane {
             .setRemove(WorkerChange.Remove.newBuilder().setSource(source).setReason(reason).build())
             .build();
     String workerChangeJson = JsonFormat.printer().print(workerChange);
-    return subscriber.removeWorker(name)
+    return storageWorkerSet.remove(name)
         && client.call(
             jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson, /* storage=*/ true));
   }

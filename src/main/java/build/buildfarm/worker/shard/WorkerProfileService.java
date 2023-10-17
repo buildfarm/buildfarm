@@ -15,7 +15,6 @@
 package build.buildfarm.worker.shard;
 
 import build.buildfarm.backplane.Backplane;
-import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.StageInformation;
@@ -24,67 +23,90 @@ import build.buildfarm.v1test.WorkerListRequest;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.WorkerProfileRequest;
-import build.buildfarm.worker.ExecuteActionStage;
-import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.PutOperationStage.OperationStageDurations;
-import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.worker.SuperscalarPipelineStage;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import javax.annotation.Nullable;
 
 public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
-  private final CASFileCache storage;
-  private final InputFetchStage inputFetchStage;
-  private final ExecuteActionStage executeActionStage;
-  private final WorkerContext context;
+  private final @Nullable CASFileCache storage;
+  private final PipelineStage matchStage;
+  private final SuperscalarPipelineStage inputFetchStage;
+  private final SuperscalarPipelineStage executeActionStage;
+  private final PipelineStage reportResultStage;
   private final PutOperationStage completeStage;
   private final Backplane backplane;
 
   public WorkerProfileService(
-      ContentAddressableStorage storage,
-      PipelineStage inputFetchStage,
-      PipelineStage executeActionStage,
-      WorkerContext context,
-      PipelineStage completeStage,
+      @Nullable CASFileCache storage,
+      PipelineStage matchStage,
+      SuperscalarPipelineStage inputFetchStage,
+      SuperscalarPipelineStage executeActionStage,
+      PipelineStage reportResultStage,
+      PutOperationStage completeStage,
       Backplane backplane) {
-    this.storage = (CASFileCache) storage;
-    this.inputFetchStage = (InputFetchStage) inputFetchStage;
-    this.executeActionStage = (ExecuteActionStage) executeActionStage;
-    this.context = context;
+    this.storage = storage;
+    this.matchStage = matchStage;
+    this.inputFetchStage = inputFetchStage;
+    this.executeActionStage = executeActionStage;
+    this.reportResultStage = reportResultStage;
     this.completeStage = (PutOperationStage) completeStage;
     this.backplane = backplane;
+  }
+
+  private StageInformation unaryStageInformation(String name, @Nullable String operationName) {
+    StageInformation.Builder builder =
+        StageInformation.newBuilder().setName(name).setSlotsConfigured(1);
+    if (operationName != null) {
+      builder.setSlotsUsed(1).addOperationNames(operationName);
+    }
+    return builder.build();
+  }
+
+  private StageInformation superscalarStageInformation(SuperscalarPipelineStage stage) {
+    return StageInformation.newBuilder()
+        .setName(stage.getName())
+        .setSlotsConfigured(stage.getWidth())
+        .setSlotsUsed(stage.getSlotUsage())
+        .addAllOperationNames(stage.getOperationNames())
+        .build();
   }
 
   @Override
   public void getWorkerProfile(
       WorkerProfileRequest request, StreamObserver<WorkerProfileMessage> responseObserver) {
     // get usage of CASFileCache
-    WorkerProfileMessage.Builder replyBuilder =
-        WorkerProfileMessage.newBuilder()
-            .setCasSize(storage.size())
-            .setCasEntryCount(storage.entryCount())
-            .setCasMaxSize(storage.maxSize())
-            .setCasMaxEntrySize(storage.maxEntrySize())
-            .setCasUnreferencedEntryCount(storage.unreferencedEntryCount())
-            .setCasDirectoryEntryCount(storage.directoryStorageCount())
-            .setCasEvictedEntryCount(storage.getEvictedCount())
-            .setCasEvictedEntrySize(storage.getEvictedSize());
+    WorkerProfileMessage.Builder replyBuilder = WorkerProfileMessage.newBuilder();
+
+    // FIXME deliver full local storage chain
+    if (storage != null) {
+      replyBuilder
+          .setCasSize(storage.size())
+          .setCasEntryCount(storage.entryCount())
+          .setCasMaxSize(storage.maxSize())
+          .setCasMaxEntrySize(storage.maxEntrySize())
+          .setCasUnreferencedEntryCount(storage.unreferencedEntryCount())
+          .setCasDirectoryEntryCount(storage.directoryStorageCount())
+          .setCasEvictedEntryCount(storage.getEvictedCount())
+          .setCasEvictedEntrySize(storage.getEvictedSize());
+    }
 
     // get slots configured and used of superscalar stages
+    // prefer reverse order to avoid double counting if possible
+    // these stats are not consistent across their sampling and will
+    // produce: slots that are not consistent with operations, operations
+    // in multiple stages even in reverse due to claim progress
+    // in short: this is for monitoring, not for guaranteed consistency checks
+    String reportResultOperation = reportResultStage.getOperationName();
+    String matchOperation = matchStage.getOperationName();
     replyBuilder
-        .addStages(
-            StageInformation.newBuilder()
-                .setName("InputFetchStage")
-                .setSlotsConfigured(context.getInputFetchStageWidth())
-                .setSlotsUsed(inputFetchStage.getSlotUsage())
-                .build())
-        .addStages(
-            StageInformation.newBuilder()
-                .setName("ExecuteActionStage")
-                .setSlotsConfigured(context.getExecuteStageWidth())
-                .setSlotsUsed(executeActionStage.getSlotUsage())
-                .build());
+        .addStages(unaryStageInformation(reportResultStage.getName(), reportResultOperation))
+        .addStages(superscalarStageInformation(executeActionStage))
+        .addStages(superscalarStageInformation(inputFetchStage))
+        .addStages(unaryStageInformation(matchStage.getName(), matchOperation));
 
     // get average time costs on each stage
     OperationStageDurations[] durations = completeStage.getAverageTimeCostPerStage();

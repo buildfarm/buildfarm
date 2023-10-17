@@ -14,6 +14,7 @@
 
 package build.buildfarm.tools;
 
+import static build.buildfarm.common.grpc.Channels.createChannel;
 import static build.buildfarm.instance.Utils.getBlob;
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -27,8 +28,6 @@ import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.worker.FuseCAS;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -37,12 +36,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 class Mount {
-  private static ManagedChannel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
-    return builder.build();
-  }
-
   @SuppressWarnings("BusyWait")
   public static void main(String[] args) throws Exception {
     String host = args[0];

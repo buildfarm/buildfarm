@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-server
+  labels:
+    name: {{ include "buildfarm.fullname" . }}-server
+    {{- include "buildfarm.labels" . | nindent 4 }}
+  {{- with .Values.server.service.annotations }}
+  annotations:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.server.service.type }}
+  ports:
+    - port: {{ .Values.server.service.port }}
+      targetPort: server-comm
+      protocol: TCP
+      name: gprc
+    - port: 9090
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    name: {{ include "buildfarm.fullname" . }}-server
+    {{- include "buildfarm.selectorLabels" . | nindent 4 }}

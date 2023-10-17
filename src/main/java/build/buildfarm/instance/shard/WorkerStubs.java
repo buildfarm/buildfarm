@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.common.grpc.Channels.createChannel;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
@@ -28,9 +29,6 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.protobuf.Duration;
-import io.grpc.ManagedChannel;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 import java.util.concurrent.TimeUnit;
 
 public final class WorkerStubs {
@@ -59,15 +57,10 @@ public final class WorkerStubs {
         worker,
         digestUtil,
         createChannel(worker),
+        createChannel(worker), // separate write channel
         timeout,
         newStubRetrier(),
         newStubRetryService());
-  }
-
-  private static ManagedChannel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
-    return builder.build();
   }
 
   private static Retrier newStubRetrier() {

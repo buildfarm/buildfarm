@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-server
+  labels:
+    name: {{ include "buildfarm.fullname" . }}-server
+    {{- include "buildfarm.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.server.replicaCount }}
+  selector:
+    matchLabels:
+      name: {{ include "buildfarm.fullname" . }}-server
+      {{- include "buildfarm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/server-config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      {{- with .Values.podAnnotations }}
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        name: {{ include "buildfarm.fullname" . }}-server
+        {{- include "buildfarm.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "buildfarm.serviceAccountName" . }}
+      containers:
+        - name: buildfarm-server
+          image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          command:
+            - bash
+            - /app/build_buildfarm/buildfarm-server.binary
+          args:
+            - /config/config.yml
+          env:
+            {{- if .Values.server.extraEnv }}
+            {{- toYaml .Values.server.extraEnv | nindent 12 }}
+            {{- end }}
+          ports:
+            - containerPort: 8980
+              name: "server-comm"
+            - containerPort: 9090
+              name: "metrics"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: metrics
+          readinessProbe:
+            httpGet:
+              path: /
+              port: metrics
+          resources:
+            {{- toYaml .Values.server.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /config
+              name: config
+              readOnly: true
+      {{- with .Values.server.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: {{ include "buildfarm.fullname" . }}-config
+          name: config

@@ -22,7 +22,6 @@ import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Metrics;
-import build.buildfarm.metrics.aws.AwsMetricsPublisher;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.v1test.OperationRequestMetadata;
 import com.google.longrunning.Operation;
@@ -69,7 +68,7 @@ public class MetricsPublisherTest {
   public void setUp() throws IOException {
     configs.getServer().setCloudRegion("test");
     configs.getServer().setClusterId("buildfarm-test");
-    configs.getServer().getMetrics().setPublisher(Metrics.PUBLISHER.AWS);
+    configs.getServer().getMetrics().setPublisher(Metrics.PUBLISHER.LOG);
   }
 
   @Test
@@ -81,7 +80,7 @@ public class MetricsPublisherTest {
             .setMetadata(Any.pack(defaultExecuteOperationMetadata))
             .build();
 
-    AwsMetricsPublisher metricsPublisher = new AwsMetricsPublisher();
+    LogMetricsPublisher metricsPublisher = new LogMetricsPublisher();
     assertThat(
             AbstractMetricsPublisher.formatRequestMetadataToJson(
                 metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata)))
@@ -110,7 +109,7 @@ public class MetricsPublisherTest {
     Operation operation =
         defaultOperation.toBuilder().setMetadata(Any.pack(defaultExecuteOperationMetadata)).build();
 
-    assertThat(new AwsMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
+    assertThat(new LogMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 
@@ -119,7 +118,7 @@ public class MetricsPublisherTest {
     Operation operation =
         defaultOperation.toBuilder().setResponse(Any.pack(defaultExecuteResponse)).build();
 
-    assertThat(new AwsMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
+    assertThat(new LogMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 
@@ -135,7 +134,7 @@ public class MetricsPublisherTest {
             .setMetadata(Any.pack(defaultExecuteOperationMetadata))
             .build();
 
-    assertThat(new AwsMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
+    assertThat(new LogMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
 

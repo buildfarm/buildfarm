@@ -148,7 +148,8 @@ class CFCExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public void stop() {
+  public void stop() throws InterruptedException {
+    fileCache.stop();
     if (!shutdownAndAwaitTermination(fetchService, 1, MINUTES)) {
       log.log(Level.SEVERE, "could not terminate fetchService");
     }
@@ -278,7 +279,9 @@ class CFCExecFileSystem implements ExecFileSystem {
       OutputDirectory childOutputDirectory =
           outputDirectory != null ? outputDirectory.getChild(name) : null;
       Path dirPath = path.resolve(name);
-      if (childOutputDirectory != null || !linkInputDirectories || !linkedInputDirectories.contains(dirPath)) {
+      if (childOutputDirectory != null
+          || !linkInputDirectories
+          || !linkedInputDirectories.contains(dirPath)) {
         Files.createDirectories(dirPath);
         downloads =
             concat(
@@ -317,13 +320,14 @@ class CFCExecFileSystem implements ExecFileSystem {
       Path execPath, Digest digest, Map<Digest, Directory> directoriesIndex) {
     return transformAsync(
         fileCache.putDirectory(digest, directoriesIndex, fetchService),
-        (pathResult) -> {
+        pathResult -> {
+          Path path = pathResult.getPath();
           if (pathResult.getMissed()) {
-            log.info(
+            log.fine(
                 String.format(
                     "putDirectory(%s, %s) created", execPath, DigestUtil.toString(digest)));
           }
-          Files.createSymbolicLink(execPath, pathResult.getPath());
+          Files.createSymbolicLink(execPath, path);
           return immediateFuture(null);
         },
         fetchService);
@@ -414,12 +418,14 @@ class CFCExecFileSystem implements ExecFileSystem {
     ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
-    Set<Path> linkedInputDirectories = ImmutableSet.copyOf(
-        Iterables.transform(
-            linkedDirectories(directoriesIndex, inputRootDigest),
-            path -> execDir.resolve(path))); // does this work on windows with / separators?
+    Set<Path> linkedInputDirectories =
+        ImmutableSet.copyOf(
+            Iterables.transform(
+                linkedDirectories(directoriesIndex, inputRootDigest),
+                path -> execDir.resolve(path))); // does this work on windows with / separators?
 
-    log.log(Level.FINE, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
+    log.log(
+        Level.FINER, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
     Iterable<ListenableFuture<Void>> fetchedFutures =
         fetchInputs(
             execDir,
@@ -478,7 +484,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     rootInputDirectories.put(execDir, inputDirectories.build());
 
     log.log(
-        Level.FINE,
+        Level.FINER,
         "ExecFileSystem::createExecDir(" + operationName + ") stamping output directories");
     boolean stamped = false;
     try {

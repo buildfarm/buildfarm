@@ -22,6 +22,7 @@ server:
   dispatchedMonitorIntervalSeconds: 1
   runOperationQueuer: true
   ensureOutputsPresent: false
+  runFailsafeOperation: true
   maxCpu: 0
   maxRequeueAttempts: 5
   useDenyList: true
@@ -30,6 +31,7 @@ server:
   recordBesEvents: false
   clusterId: local
   cloudRegion: us-east-1
+  gracefulShutdownSeconds: 0
   caches:
     directoryCacheMaxEntries: 10000
     commandCacheMaxEntries: 10000
@@ -38,7 +40,6 @@ server:
   admin:
     deploymentEnvironment: AWS
     clusterEndpoint: "grpc://localhost"
-    enableGracefulShutdown: false
   metrics:
     publisher: LOG
     logLevel: FINEST
@@ -71,8 +72,6 @@ backplane:
   operationChannelPrefix: "OperationChannel"
   casPrefix: "ContentAddressableStorage"
   casExpire: 604800 # 1 week
-  subscribeToBackplane: true
-  runFailsafeOperation: true
   maxQueueDepth: 100000
   maxPreQueueDepth: 1000000
   priorityQueue: false
@@ -112,8 +111,8 @@ worker:
       skipLoad: false
       hexBucketLevels: 0
       execRootCopyFallback: false
-      target:
-      publishTtlMetric: false
+    #- type: GRPC
+    #  target: "grpc://host:port"
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
@@ -126,6 +125,7 @@ worker:
   onlyMulticoreTests: false
   allowBringYourOwnContainer: false
   errorOperationRemainingResources: false
+  gracefulShutdownSeconds: 0
   sandboxSettings:
     alwaysUseSandbox: false
     alwaysUseCgroups: false

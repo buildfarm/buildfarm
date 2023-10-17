@@ -40,7 +40,6 @@ public final class BuildfarmConfigs {
   private Server server = new Server();
   private Backplane backplane = new Backplane();
   private Worker worker = new Worker();
-  private WebUI ui = new WebUI();
   private ExecutionWrappers executionWrappers = new ExecutionWrappers();
 
   private BuildfarmConfigs() {}
@@ -79,6 +78,12 @@ public final class BuildfarmConfigs {
     if (options.port > 0) {
       buildfarmConfigs.getServer().setPort(options.port);
     }
+    if (options.prometheusPort >= 0) {
+      buildfarmConfigs.setPrometheusPort(options.prometheusPort);
+    }
+    if (!Strings.isNullOrEmpty(options.redisUri)) {
+      buildfarmConfigs.getBackplane().setRedisUri(options.redisUri);
+    }
     adjustServerConfigs(buildfarmConfigs);
     return buildfarmConfigs;
   }
@@ -94,6 +99,12 @@ public final class BuildfarmConfigs {
     }
     if (!Strings.isNullOrEmpty(options.publicName)) {
       buildfarmConfigs.getWorker().setPublicName(options.publicName);
+    }
+    if (options.prometheusPort >= 0) {
+      buildfarmConfigs.setPrometheusPort(options.prometheusPort);
+    }
+    if (!Strings.isNullOrEmpty(options.redisUri)) {
+      buildfarmConfigs.getBackplane().setRedisUri(options.redisUri);
     }
     adjustWorkerConfigs(buildfarmConfigs);
     return buildfarmConfigs;

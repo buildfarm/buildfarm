@@ -15,13 +15,9 @@
 package build.buildfarm.common.config;
 
 import com.google.devtools.common.options.Option;
-import com.google.devtools.common.options.OptionsBase;
 
 /** Command-line options definition for example server. */
-public class ServerOptions extends OptionsBase {
-  @Option(name = "help", abbrev = 'h', help = "Prints usage info.", defaultValue = "true")
-  public boolean help;
-
+public class ServerOptions extends BuildfarmOptions {
   @Option(name = "port", abbrev = 'p', help = "Port to use.", defaultValue = "-1")
   public int port;
 

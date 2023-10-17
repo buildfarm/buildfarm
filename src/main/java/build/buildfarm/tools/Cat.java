@@ -14,6 +14,7 @@
 
 package build.buildfarm.tools;
 
+import static build.buildfarm.common.grpc.Channels.createChannel;
 import static build.buildfarm.instance.Utils.getBlob;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.lang.String.format;
@@ -68,8 +69,6 @@ import com.google.rpc.RetryInfo;
 import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -86,12 +85,6 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 class Cat {
-  private static ManagedChannel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
-    return builder.build();
-  }
-
   private static void printCapabilities(ServerCapabilities capabilities) {
     System.out.println(capabilities);
   }
@@ -657,6 +650,9 @@ class Cat {
   private static void printStageInformation(StageInformation stage) {
     System.out.printf("%s slots configured: %d%n", stage.getName(), stage.getSlotsConfigured());
     System.out.printf("%s slots used %d%n", stage.getName(), stage.getSlotsUsed());
+    for (String operationName : stage.getOperationNamesList()) {
+      System.out.printf("%s operation %s\n", stage.getName(), operationName);
+    }
   }
 
   private static void printOperationTime(OperationTimesBetweenStages time) {
