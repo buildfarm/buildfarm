@@ -195,8 +195,10 @@ public class BuildFarmServer extends LoggingMain {
   private void shutdown() throws InterruptedException {
     log.info("*** shutting down gRPC server since JVM is shutting down");
     prepareServerForGracefulShutdown();
-    healthStatusManager.setStatus(
-        HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
+    if (healthStatusManager != null) {
+      healthStatusManager.setStatus(
+          HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
+    }
     PrometheusPublisher.stopHttpServer();
     healthCheckMetric.labels("stop").inc();
     try {
