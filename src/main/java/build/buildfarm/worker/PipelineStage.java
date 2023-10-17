@@ -83,6 +83,7 @@ public abstract class PipelineStage implements Runnable {
     }
 
     close();
+    }
   }
 
   /**
@@ -211,7 +212,6 @@ public abstract class PipelineStage implements Runnable {
   }
 
   protected void after(OperationContext operationContext) {}
-
   public synchronized boolean claim(OperationContext operationContext) throws InterruptedException {
     while (!closed && claimed) {
       wait();
@@ -276,7 +276,6 @@ public abstract class PipelineStage implements Runnable {
 
     @Override
     public void release() {}
-
     @Override
     public OperationContext take() {
       throw new UnsupportedOperationException();
@@ -284,13 +283,10 @@ public abstract class PipelineStage implements Runnable {
 
     @Override
     public void put(OperationContext operationContext) throws InterruptedException {}
-
     @Override
     public void run() {}
-
     @Override
     public void close() {}
-
     @Override
     public boolean isClosed() {
       return false;

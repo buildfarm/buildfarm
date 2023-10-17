@@ -228,7 +228,6 @@ public class OperationQueue {
    */
   public String dequeue(JedisCluster jedis, List<Platform.Property> provisions)
       throws InterruptedException {
-    
     // Select all matched queues, and attempt dequeuing via round-robin.
     List<BalancedRedisQueue> queues = chooseEligibleQueues(provisions);
     int index = roundRobinPopIndex(queues);
@@ -332,7 +331,7 @@ public class OperationQueue {
         .map(provisionedQueue -> provisionedQueue.queue())
         .collect(Collectors.toList());
   }
-  
+
   /**
    * @brief Choose an eligible queues based on given properties.
    * @details We use the platform execution properties of a queue entry to determine the appropriate
