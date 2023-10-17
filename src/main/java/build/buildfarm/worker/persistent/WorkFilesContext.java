@@ -1,7 +1,7 @@
 package build.buildfarm.worker.persistent;
 
 import build.buildfarm.v1test.Tree;
-import build.buildfarm.worker.util.TreeWalker;
+import build.buildfarm.worker.util.InputsIndexer;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.worker.WorkerProtocol.Input;
@@ -19,7 +19,7 @@ public class WorkFilesContext {
 
   public final ImmutableList<String> outputDirectories;
 
-  private final TreeWalker treeWalker;
+  private final InputsIndexer inputsIndexer;
 
   private ImmutableMap<Path, Input> pathInputs = null;
 
@@ -37,14 +37,14 @@ public class WorkFilesContext {
     this.outputFiles = outputFiles;
     this.outputDirectories = outputDirectories;
 
-    this.treeWalker = new TreeWalker(execTree);
+    this.inputsIndexer = new InputsIndexer(execTree);
   }
 
   // Paths are absolute paths from the opRoot; same as the Input.getPath();
   public ImmutableMap<Path, Input> getPathInputs() {
     synchronized (this) {
       if (pathInputs == null) {
-        pathInputs = treeWalker.getAllInputs(opRoot);
+        pathInputs = inputsIndexer.getAllInputs(opRoot);
       }
     }
     return pathInputs;
@@ -53,7 +53,7 @@ public class WorkFilesContext {
   public ImmutableMap<Path, Input> getToolInputs() {
     synchronized (this) {
       if (toolInputs == null) {
-        toolInputs = treeWalker.getToolInputs(opRoot);
+        toolInputs = inputsIndexer.getToolInputs(opRoot);
       }
     }
     return toolInputs;

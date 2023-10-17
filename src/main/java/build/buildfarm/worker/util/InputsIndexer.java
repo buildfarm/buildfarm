@@ -15,8 +15,10 @@ import java.util.Map;
 /**
  * Organizes action Inputs into files, extracting their paths, and differentiates tool inputs (e.g.
  * JavaBuilder, Scalac, etc.)
+ *
+ * <p>Indexes (and partitions) Inputs from an action's Merkle Tree.
  */
-public class TreeWalker {
+public class InputsIndexer {
   // See: https://github.com/bazelbuild/bazel/issues/10091
   public static final String BAZEL_TOOL_INPUT_MARKER = "bazel_tool_input";
 
@@ -27,7 +29,7 @@ public class TreeWalker {
   ImmutableMap<Path, Input> absPathInputs = null;
   ImmutableMap<Path, Input> toolInputs = null;
 
-  public TreeWalker(Tree tree) {
+  public InputsIndexer(Tree tree) {
     this.tree = tree;
     this.proxyDirs = new ProxyDirectoriesIndex(tree.getDirectoriesMap());
   }
