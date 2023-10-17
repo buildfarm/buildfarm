@@ -59,6 +59,7 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.SuperscalarPipelineStage;
+import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.longrunning.Operation;
@@ -564,6 +565,7 @@ public final class Worker extends LoggingMain {
             configs.getWorker().isOnlyMulticoreTests(),
             configs.getWorker().isAllowBringYourOwnContainer(),
             configs.getWorker().isErrorOperationRemainingResources(),
+            LocalResourceSetUtils.create(configs.getWorker().getResources()),
             writer);
 
     pipeline = new Pipeline();

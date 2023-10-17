@@ -1,6 +1,7 @@
 package build.buildfarm.common.config;
 
-import com.google.common.base.Strings;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
@@ -52,13 +53,7 @@ public class Backplane {
   private boolean cacheCas = false;
   private long priorityPollIntervalMillis = 100;
 
-  public String getRedisUri() {
-    // use environment override (useful for containerized deployment)
-    if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
-      return System.getenv("REDIS_URI");
-    }
-
-    // use configured value
-    return redisUri;
-  }
+  // These limited resources are shared across all workers.
+  // An example would be a limited number of seats to a license server.
+  private List<LimitedResource> resources = new ArrayList<>();
 }
