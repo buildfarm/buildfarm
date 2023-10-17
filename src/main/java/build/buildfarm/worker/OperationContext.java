@@ -22,7 +22,7 @@ import build.buildfarm.v1test.QueueEntry;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
 
-final class OperationContext {
+public final class OperationContext {
   final ExecuteResponse.Builder executeResponse;
   final Operation operation;
   final Poller poller;

@@ -8,8 +8,8 @@ import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.v1test.Tree;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.worker.WorkerProtocol.Input;
+import java.nio.file.FileSystem;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
 
 /**
@@ -25,22 +25,35 @@ public class InputsIndexer {
   final Tree tree;
   final Map<Digest, Directory> proxyDirs;
 
+  final FileSystem fs;
+
+  final Path opRoot;
+
   ImmutableMap<Path, FileNode> files = null;
   ImmutableMap<Path, Input> absPathInputs = null;
   ImmutableMap<Path, Input> toolInputs = null;
 
-  public InputsIndexer(Tree tree) {
+  public InputsIndexer(Tree tree, Path opRoot) {
     this.tree = tree;
     this.proxyDirs = new ProxyDirectoriesIndex(tree.getDirectoriesMap());
+    this.opRoot = opRoot;
+    this.fs = opRoot.getFileSystem();
   }
 
-  public ImmutableMap<Path, Input> getAllInputs(Path opRoot) {
+  // https://stackoverflow.com/questions/22611919/why-do-i-get-providermismatchexception-when-i-try-to-relativize-a-path-agains
+  public Path pathTransform(final Path path) {
+    Path ret = fs.getPath(path.isAbsolute() ? fs.getSeparator() : "");
+    for (final Path component : path) ret = ret.resolve(component.getFileName().toString());
+    return ret;
+  }
+
+  public ImmutableMap<Path, Input> getAllInputs() {
     if (absPathInputs == null) {
       ImmutableMap<Path, FileNode> relFiles = getAllFiles();
       ImmutableMap.Builder<Path, Input> inputs = ImmutableMap.builder();
 
       for (Map.Entry<Path, FileNode> pf : relFiles.entrySet()) {
-        Path absPath = opRoot.resolve(pf.getKey());
+        Path absPath = this.opRoot.resolve(pf.getKey()).normalize();
         inputs.put(absPath, inputFromFile(absPath, pf.getValue()));
       }
       absPathInputs = inputs.build();
@@ -48,7 +61,7 @@ public class InputsIndexer {
     return absPathInputs;
   }
 
-  public ImmutableMap<Path, Input> getToolInputs(Path opRoot) {
+  public ImmutableMap<Path, Input> getToolInputs() {
     if (toolInputs == null) {
       ImmutableMap<Path, FileNode> relFiles = getAllFiles();
       ImmutableMap.Builder<Path, Input> inputs = ImmutableMap.builder();
@@ -56,7 +69,7 @@ public class InputsIndexer {
       for (Map.Entry<Path, FileNode> pf : relFiles.entrySet()) {
         FileNode fn = pf.getValue();
         if (isToolInput(fn)) {
-          Path absPath = opRoot.resolve(pf.getKey());
+          Path absPath = this.opRoot.resolve(pf.getKey());
           inputs.put(absPath, inputFromFile(absPath, fn));
         }
       }
@@ -69,7 +82,9 @@ public class InputsIndexer {
     if (files == null) {
       ImmutableMap.Builder<Path, FileNode> accumulator = ImmutableMap.builder();
       Directory rootDir = proxyDirs.get(tree.getRootDigest());
-      files = getFilesFromDir(Paths.get("."), rootDir, accumulator).build();
+
+      Path fsRelative = fs.getPath(".");
+      files = getFilesFromDir(fsRelative, rootDir, accumulator).build();
     }
     return files;
   }

@@ -206,7 +206,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
 
   // Make outputs visible to the rest of Worker machinery
   // see DockerExecutor::copyOutputsOutOfContainer
-  private void moveOutputsToOperationRoot(WorkFilesContext context, Path workerExecRoot)
+  void moveOutputsToOperationRoot(WorkFilesContext context, Path workerExecRoot)
       throws IOException {
     Path opRoot = context.opRoot;
 
@@ -216,9 +216,11 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     }
 
     for (String relOutput : context.outputFiles) {
-      Path relPath = Paths.get(relOutput);
-      Path opOutputPath = opRoot.resolve(relPath);
-      Path execOutputPath = workerExecRoot.resolve(relPath);
+      System.out.println(relOutput);
+      Path execOutputPath = workerExecRoot.resolve(relOutput);
+      System.out.println(execOutputPath);
+      Path opOutputPath = opRoot.resolve(relOutput);
+      System.out.println(opOutputPath);
 
       FileAccessUtils.moveFile(execOutputPath, opOutputPath);
     }

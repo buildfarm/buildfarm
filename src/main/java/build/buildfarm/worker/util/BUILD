@@ -3,12 +3,12 @@ java_library(
     srcs = glob(["*.java"]),
     visibility = ["//visibility:public"],
     deps = [
+        "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@bazel_tools//src/main/protobuf:worker_protocol_java_proto",
         "@maven//:com_google_code_gson_gson",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",

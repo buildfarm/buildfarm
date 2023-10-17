@@ -3,7 +3,12 @@ package build.buildfarm.worker.util;
 import static build.buildfarm.worker.util.InputsIndexer.BAZEL_TOOL_INPUT_MARKER;
 import static com.google.common.truth.Truth.assertThat;
 
-import build.bazel.remote.execution.v2.*;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.NodeProperties;
+import build.bazel.remote.execution.v2.NodeProperty;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.v1test.Tree;
 import com.google.common.collect.ImmutableMap;
@@ -16,6 +21,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+// TODO: use WorkerTestUtils.makeTree
 @RunWith(JUnit4.class)
 public class InputsIndexerTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(DigestUtil.HashFunction.SHA256);
@@ -23,7 +29,7 @@ public class InputsIndexerTest {
   @Test
   public void basicEmptyTree() {
     Tree emptyTree = Tree.newBuilder().build();
-    InputsIndexer indexer = new InputsIndexer(emptyTree);
+    InputsIndexer indexer = new InputsIndexer(emptyTree, Paths.get("."));
     assertThat(indexer.tree).isEqualTo(emptyTree);
   }
 
@@ -35,11 +41,11 @@ public class InputsIndexerTest {
     Digest rootDirDigest = addDirToTree(treeBuilder, "my_root_dir", rootDir);
     treeBuilder.setRootDigest(rootDirDigest);
 
-    InputsIndexer indexer = new InputsIndexer(treeBuilder.build());
-    assertThat(indexer.proxyDirs.get(rootDirDigest)).isEqualTo(rootDir);
-
     Path arbitraryOpRoot = Paths.get(".");
-    assertThat(indexer.getAllInputs(arbitraryOpRoot).size()).isEqualTo(0);
+
+    InputsIndexer indexer = new InputsIndexer(treeBuilder.build(), arbitraryOpRoot);
+    assertThat(indexer.proxyDirs.get(rootDirDigest)).isEqualTo(rootDir);
+    assertThat(indexer.getAllInputs().size()).isEqualTo(0);
   }
 
   @Test
@@ -52,16 +58,16 @@ public class InputsIndexerTest {
     Digest rootDirDigest = addDirToTree(treeBuilder, "my_root_dir", rootDir);
     treeBuilder.setRootDigest(rootDirDigest);
 
-    InputsIndexer indexer = new InputsIndexer(treeBuilder.build());
+    Path arbitraryOpRoot = Paths.get("asdf");
+    InputsIndexer indexer = new InputsIndexer(treeBuilder.build(), arbitraryOpRoot);
     assertThat(indexer.proxyDirs.get(rootDirDigest)).isEqualTo(rootDir);
 
-    Path arbitraryOpRoot = Paths.get("asdf");
     Input myfileInput = makeInput(arbitraryOpRoot, myfile);
 
     ImmutableMap<Path, Input> expectedInputs =
         ImmutableMap.of(Paths.get(myfileInput.getPath()), myfileInput);
 
-    assertThat(indexer.getAllInputs(arbitraryOpRoot)).isEqualTo(expectedInputs);
+    assertThat(indexer.getAllInputs()).isEqualTo(expectedInputs);
   }
 
   @Test
@@ -92,11 +98,12 @@ public class InputsIndexerTest {
     Digest rootDirDigest = addDirToTree(treeBuilder, "my_root_dir", rootDir);
     treeBuilder.setRootDigest(rootDirDigest);
 
-    InputsIndexer indexer = new InputsIndexer(treeBuilder.build());
+    Path arbitraryOpRoot = Paths.get("asdf");
+
+    InputsIndexer indexer = new InputsIndexer(treeBuilder.build(), arbitraryOpRoot);
     assertThat(indexer.proxyDirs.get(rootDirDigest)).isEqualTo(rootDir);
     assertThat(indexer.proxyDirs.size()).isEqualTo(2);
 
-    Path arbitraryOpRoot = Paths.get("asdf");
     Input myfileInput = makeInput(arbitraryOpRoot, myfile);
     Input subdirfileInput = makeInput(arbitraryOpRoot.resolve(subDirName), subdirfile);
     Input toolfileInput = makeInput(arbitraryOpRoot, toolfile);
@@ -112,9 +119,9 @@ public class InputsIndexerTest {
     ImmutableMap<Path, Input> allInputs =
         ImmutableMap.<Path, Input>builder().putAll(nonToolInputs).putAll(toolInputs).build();
 
-    assertThat(indexer.getAllInputs(arbitraryOpRoot)).isEqualTo(allInputs);
-    assertThat(indexer.getAllInputs(arbitraryOpRoot).size()).isEqualTo(3);
-    assertThat(indexer.getToolInputs(arbitraryOpRoot)).isEqualTo(toolInputs);
+    assertThat(indexer.getAllInputs()).isEqualTo(allInputs);
+    assertThat(indexer.getAllInputs().size()).isEqualTo(3);
+    assertThat(indexer.getToolInputs()).isEqualTo(toolInputs);
   }
 
   Digest addDirToTree(Tree.Builder treeBuilder, String dirname, Directory dir) {

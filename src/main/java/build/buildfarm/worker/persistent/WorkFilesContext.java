@@ -1,5 +1,6 @@
 package build.buildfarm.worker.persistent;
 
+import build.bazel.remote.execution.v2.Command;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.util.InputsIndexer;
 import com.google.common.collect.ImmutableList;
@@ -37,14 +38,23 @@ public class WorkFilesContext {
     this.outputFiles = outputFiles;
     this.outputDirectories = outputDirectories;
 
-    this.inputsIndexer = new InputsIndexer(execTree);
+    this.inputsIndexer = new InputsIndexer(execTree, this.opRoot);
+  }
+
+  public static WorkFilesContext fromContext(Path opRoot, Tree inputsTree, Command opCommand) {
+    return new WorkFilesContext(
+        opRoot,
+        inputsTree,
+        ImmutableList.copyOf(opCommand.getOutputPathsList()),
+        ImmutableList.copyOf(opCommand.getOutputFilesList()),
+        ImmutableList.copyOf(opCommand.getOutputDirectoriesList()));
   }
 
   // Paths are absolute paths from the opRoot; same as the Input.getPath();
   public ImmutableMap<Path, Input> getPathInputs() {
     synchronized (this) {
       if (pathInputs == null) {
-        pathInputs = inputsIndexer.getAllInputs(opRoot);
+        pathInputs = inputsIndexer.getAllInputs();
       }
     }
     return pathInputs;
@@ -53,7 +63,7 @@ public class WorkFilesContext {
   public ImmutableMap<Path, Input> getToolInputs() {
     synchronized (this) {
       if (toolInputs == null) {
-        toolInputs = inputsIndexer.getToolInputs(opRoot);
+        toolInputs = inputsIndexer.getToolInputs();
       }
     }
     return toolInputs;

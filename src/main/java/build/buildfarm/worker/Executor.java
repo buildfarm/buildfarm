@@ -452,12 +452,7 @@ class Executor {
       Tree execTree = workerContext.getQueuedOperation(operationContext.queueEntry).getTree();
 
       WorkFilesContext filesContext =
-          new WorkFilesContext(
-              execDir,
-              execTree,
-              ImmutableList.copyOf(operationContext.command.getOutputPathsList()),
-              ImmutableList.copyOf(operationContext.command.getOutputFilesList()),
-              ImmutableList.copyOf(operationContext.command.getOutputDirectoriesList()));
+          WorkFilesContext.fromContext(execDir, execTree, operationContext.command);
 
       return PersistentExecutor.runOnPersistentWorker(
           limits.persistentWorkerCommand,
@@ -467,6 +462,7 @@ class Executor {
           ImmutableMap.copyOf(environment),
           limits,
           timeout,
+          PersistentExecutor.defaultWorkRootsDir,
           resultBuilder);
     }
 

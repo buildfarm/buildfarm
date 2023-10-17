@@ -3,23 +3,41 @@ package build.buildfarm.worker.persistent;
 import static java.nio.file.StandardCopyOption.COPY_ATTRIBUTES;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
-// Utility for concurrent move/copy/link of files
+/**
+ * Utility for concurrent move/copy of files Can be extended in the future to (sym)linking if we
+ * need performance
+ */
 public final class FileAccessUtils {
   // singleton class with only static methods
   private FileAccessUtils() {}
 
   private static final Logger logger = Logger.getLogger(FileAccessUtils.class.getName());
 
+  public static Path addPosixOwnerWrite(Path absPath) throws IOException {
+    Set<PosixFilePermission> perms = Files.getPosixFilePermissions(absPath);
+
+    ImmutableSet<PosixFilePermission> permsWithWrite =
+        ImmutableSet.<PosixFilePermission>builder()
+            .addAll(perms)
+            .add(PosixFilePermission.OWNER_WRITE)
+            .build();
+
+    return Files.setAttribute(absPath, "posix:permissions", permsWithWrite);
+  }
+
   private static final ConcurrentHashMap<Path, PathLock> fileLocks = new ConcurrentHashMap<>();
 
-  // Used here for locking "files"
+  // Used here as a simple lock for locking "files" (paths)
   private static class PathLock {
     // Not used elsewhere
     private PathLock() {}
@@ -46,13 +64,10 @@ public final class FileAccessUtils {
             () -> {
               try {
                 Files.copy(from, absTo, REPLACE_EXISTING, COPY_ATTRIBUTES);
-                boolean writeable = absTo.toFile().setWritable(true);
-                if (!writeable) {
-                  return new IOException("copyFile() could not set writeable: " + absTo);
-                }
+                addPosixOwnerWrite(absTo);
                 return null;
               } catch (IOException e) {
-                return e;
+                return new IOException("copyFile() could not set writeable: " + absTo, e);
               }
             });
     if (ioException != null) {
@@ -81,44 +96,10 @@ public final class FileAccessUtils {
             () -> {
               try {
                 Files.move(from, absTo, REPLACE_EXISTING);
-                boolean writeable = absTo.toFile().setWritable(true);
-                if (!writeable) {
-                  return new IOException("moveFile() could not set writeable: " + absTo);
-                }
+                addPosixOwnerWrite(absTo);
                 return null;
               } catch (IOException e) {
-                return e;
-              }
-            });
-    if (ioException != null) {
-      throw ioException;
-    }
-  }
-
-  /**
-   * Creates a symlink, creating necessary directories. Deletes pre-existing files/links which have
-   * the same path as the specified link, effectively overwriting any existing files/links.
-   *
-   * @param from
-   * @param to
-   * @throws IOException
-   */
-  public static void linkFile(Path from, Path to) throws IOException {
-    Path absTo = to.toAbsolutePath();
-    logger.finer("linkFile: " + from + " to " + absTo);
-    if (!Files.exists(from)) {
-      throw new IOException("linkFile: source file doesn't exist: " + from);
-    }
-    IOException ioException =
-        writeFileSafe(
-            absTo,
-            () -> {
-              try {
-                Files.deleteIfExists(absTo);
-                Files.createSymbolicLink(absTo, from);
-                return null;
-              } catch (IOException e) {
-                return e;
+                return new IOException("copyFile() could not set writeable: " + absTo, e);
               }
             });
     if (ioException != null) {

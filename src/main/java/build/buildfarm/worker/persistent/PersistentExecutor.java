@@ -24,23 +24,19 @@ import persistent.bazel.client.WorkerKey;
  * Executes an Action like Executor/DockerExecutor, writing to ActionResult.
  *
  * <p>Currently has special code for discriminating between Javac/Scalac, and other persistent
- * workers.
+ * workers, likely for debugging purposes, but need to revisit. (Can't remember fully since it was
+ * so long ago!)
  */
 public class PersistentExecutor {
   private static final Logger logger = Logger.getLogger(PersistentExecutor.class.getName());
-
-  // How many workers can exist at once for a given WorkerKey
-  // There may be multiple WorkerKeys per mnemonic,
-  //  e.g. if builds are run with different tool fingerprints
-  private static final int defaultMaxWorkersPerKey = 6;
 
   private static final ProtoCoordinator coordinator =
       ProtoCoordinator.ofCommonsPool(getMaxWorkersPerKey());
 
   // TODO load from config (i.e. {worker_root}/persistent)
-  static final Path workRootsDir = Paths.get("/tmp/worker/persistent/");
+  public static final Path defaultWorkRootsDir = Paths.get("/tmp/worker/persistent/");
 
-  static final String PERSISTENT_WORKER_FLAG = "--persistent_worker";
+  public static final String PERSISTENT_WORKER_FLAG = "--persistent_worker";
 
   // TODO Revisit hardcoded actions
   static final String JAVABUILDER_JAR =
@@ -48,6 +44,11 @@ public class PersistentExecutor {
 
   private static final String SCALAC_EXEC_NAME = "Scalac";
   private static final String JAVAC_EXEC_NAME = "JavaBuilder";
+
+  // How many workers can exist at once for a given WorkerKey
+  // There may be multiple WorkerKeys per mnemonic,
+  //  e.g. if builds are run with different tool fingerprints
+  private static final int defaultMaxWorkersPerKey = 6;
 
   private static int getMaxWorkersPerKey() {
     try {
@@ -73,6 +74,7 @@ public class PersistentExecutor {
       ImmutableMap<String, String> envVars,
       ResourceLimits limits,
       Duration timeout,
+      Path workRootsDir,
       ActionResult.Builder resultBuilder)
       throws IOException {
     //// Pull out persistent worker start command from the overall action request
@@ -87,6 +89,7 @@ public class PersistentExecutor {
       return Code.INVALID_ARGUMENT;
     }
 
+    // TODO revisit why this was necessary in the first place
     ImmutableMap<String, String> env;
     if (executionName.equals(JAVAC_EXEC_NAME)) {
       env = ImmutableMap.of();
@@ -112,7 +115,13 @@ public class PersistentExecutor {
 
     WorkerKey key =
         Keymaker.make(
-            context.opRoot, workerExecCmd, workerInitArgs, env, executionName, workerFiles);
+            context.opRoot,
+            workRootsDir,
+            workerExecCmd,
+            workerInitArgs,
+            env,
+            executionName,
+            workerFiles);
 
     coordinator.copyToolInputsIntoWorkerToolRoot(key, workerFiles);
 

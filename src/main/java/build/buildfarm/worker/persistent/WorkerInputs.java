@@ -57,16 +57,6 @@ public class WorkerInputs {
     FileAccessUtils.copyFile(from, to);
   }
 
-  public void moveInputFile(Path from, Path to) throws IOException {
-    checkFileIsInput("moveInputFile()", from);
-    FileAccessUtils.moveFile(from, to);
-  }
-
-  public void linkInputFile(Path from, Path to) throws IOException {
-    checkFileIsInput("linkInputFile()", from);
-    FileAccessUtils.linkFile(from, to);
-  }
-
   public void deleteInputFileIfExists(Path workerExecRoot, Path opPathInput) throws IOException {
     checkFileIsInput("deleteInputFile()", opPathInput);
     Path execPathInput = relativizeInput(workerExecRoot, opPathInput);
@@ -108,6 +98,8 @@ public class WorkerInputs {
             + absToolInputs;
 
     logger.fine(inputsDebugMsg);
+
+    System.out.println(inputsDebugMsg);
 
     return new WorkerInputs(workFilesContext.opRoot, absToolInputs, toolInputs, pathInputs);
   }
