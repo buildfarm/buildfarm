@@ -7,7 +7,7 @@ has_children: true
 
 Minimal required:
 
-```
+```yaml
 backplane:
   redisUri: "redis://localhost:6379"
   queues:
@@ -38,7 +38,7 @@ For an example configuration containing all of the configuration values, see `ex
 
 Example:
 
-```
+```yaml
 digestFunction: SHA1
 defaultActionTimeout: 1800
 maximumActionTimeout: 1800
@@ -79,7 +79,7 @@ worker:
 
 Example:
 
-```
+```yaml
 server:
   instanceType: SHARD
   name: shard
@@ -96,7 +96,7 @@ server:
 
 Example:
 
-```
+```yaml
 server:
   grpcMetrics:
     enabled: false
@@ -114,7 +114,7 @@ server:
 
 Example:
 
-```
+```yaml
 server:
   caches:
     directoryCacheMaxEntries: 10000
@@ -132,7 +132,7 @@ server:
 
 Example:
 
-```
+```yaml
 server:
   admin:
     deploymentEnvironment: AWS
@@ -151,14 +151,14 @@ server:
 
 Example:
 
-```
+```yaml
 server:
   metrics:
     publisher: log
     logLevel: INFO
 ```
 
-```
+```yaml
 server:
   metrics:
     publisher: aws
@@ -207,7 +207,7 @@ server:
 
 Example:
 
-```
+```yaml
 backplane:
   type: SHARD
   redisUri: "redis://localhost:6379"
@@ -224,7 +224,7 @@ backplane:
 
 Example:
 
-```
+```yaml
 backplane:
   type: SHARD
   redisUri: "redis://localhost:6379"
@@ -262,7 +262,7 @@ backplane:
 | realInputDirectories             | List of Strings, _external_   |                       | A list of paths that will not be subject to the effects of linkInputDirectories setting, may also be used to provide writable directories as input roots for actions which expect to be able to write to an input location and will fail if they cannot                                                                  |
 | gracefulShutdownSeconds          | Integer, 0                    |                       | Time in seconds to allow for operations in flight to finish when shutdown signal is received                                                                                                                                                                                                                             |
 
-```
+```yaml
 worker:
   port: 8981
   publicName: "localhost:8981"
@@ -279,7 +279,7 @@ worker:
 
 Example:
 
-```
+```yaml
 worker:
   capabilities:
     cas: true
@@ -296,7 +296,7 @@ worker:
 
 Example:
 
-```
+```yaml
 worker:
   sandboxSettings:
     alwaysUse: true
@@ -313,7 +313,7 @@ worker:
 
 Example:
 
-```
+```yaml
 worker:
   dequeueMatchSettings:
     acceptEverything: true
@@ -333,7 +333,7 @@ worker:
 
 Example:
 
-```
+```yaml
 worker:
   storages:
     - type: FILESYSTEM
@@ -361,7 +361,7 @@ worker:
 
 Example:
 
-```
+```yaml
 worker:
   executionPolicies:
     - name: test

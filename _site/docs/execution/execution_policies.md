@@ -17,7 +17,7 @@ This policy type specifies that a worker should prepend a single path, and a num
 
 This example will use the buildfarm-provided executable `as-nobody`, which will upon execution demote itself to a `nobody` effective process owner uid, and perform an `execvp(2)` with the remaining provided program arguments, which will subsequently execute as a user that no longer matches the worker process.
 
-```
+```yaml
 # default wrapper policy application
 worker:
   executionPolicies:
@@ -50,7 +50,8 @@ These wrappers are used for detecting actions that rely on time.  Below is a dem
 This addresses two problems in regards to an action's dependence on time.  The 1st problem is when an action takes longer than it should because it's sleeping unnecessarily.  The 2nd problem is when an action relies on time which causes it to eventually be broken on master despite the code not changing.  Both problems are expressed below as unit tests.  We demonstrate a time-spoofing mechanism (the re-writing of syscalls) which allows us to detect these problems generically over any action.  The objective is to analyze builds for performance inefficiency and discover future instabilities before they occur.
 
 ### Issue 1 (slow test)
-```
+
+```bash
 #!/bin/bash
 set -euo pipefail
 
@@ -58,16 +59,19 @@ echo -n "testing... "
 sleep 10;
 echo "done"
 ```
+
 The test takes 10 seconds to run on average.
-```
-bazel test --runs_per_test=10 --config=remote //cloud/buildfarm:sleep_test
+
+```shell
+$ bazel test --runs_per_test=10 --config=remote //cloud/buildfarm:sleep_test
 //cloud/buildfarm:sleep_test                                             PASSED in 10.2s
   Stats over 10 runs: max = 10.2s, min = 10.1s, avg = 10.2s, dev = 0.0s
 ```
 
 We can check for performance improvements by using the `skip-sleep` option.
-```
-bazel test --runs_per_test=10 --config=remote --remote_default_exec_properties='skip-sleep=true' //cloud/buildfarm:sleep_test
+
+```shell
+$ bazel test --runs_per_test=10 --config=remote --remote_default_exec_properties='skip-sleep=true' //cloud/buildfarm:sleep_test
 //cloud/buildfarm:sleep_test                                             PASSED in 1.0s
   Stats over 10 runs: max = 1.0s, min = 0.9s, avg = 1.0s, dev = 0.0s
 ```
@@ -75,7 +79,8 @@ bazel test --runs_per_test=10 --config=remote --remote_default_exec_properties='
 Now the test is 10x faster.  If skipping sleep makes an action perform significantly faster without affecting its success rate, that would warrant further investigation into the action's implementation.
 
 ### Issue 2 (future failing test)
-```
+
+```bash
 #!/bin/bash
 set -euo pipefail
 
@@ -89,12 +94,15 @@ echo "Times change."
 date
 exit -1;
 ```
+
 The test passes today, but will it pass tomorrow?  Will it pass a year from now?  We can find out by using the `time-shift` option.
-```
-bazel test --test_output=streamed --remote_default_exec_properties='time-shift=31556952' --config=remote //cloud/buildfarm:future_fail
+
+```shell
+$ bazel test --test_output=streamed --remote_default_exec_properties='time-shift=31556952' --config=remote //cloud/buildfarm:future_fail
 INFO: Found 1 test target...
 Times change.
 Mon Sep 25 18:31:09 UTC 2023
 //cloud/buildfarm:future_fail                                            FAILED in 18.0s
 ```
+
 Time is shifted to the year 2023 and the test now fails.  We can fix the problem before others see it.

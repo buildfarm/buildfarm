@@ -19,8 +19,8 @@ All commandline options override corresponding config settings.
 
 Run via
 
-```
-docker run -d --rm --name buildfarm-redis -p 6379:6379 redis:5.0.9
+```shell
+$ docker run -d --rm --name buildfarm-redis -p 6379:6379 redis:5.0.9
 redis-cli config set stop-writes-on-bgsave-error no
 ```
 
@@ -28,8 +28,8 @@ redis-cli config set stop-writes-on-bgsave-error no
 
 Run via
 
-```
-bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- <logfile> <configfile>
+```shell
+$ bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- <logfile> <configfile>
 
 Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
@@ -40,8 +40,8 @@ Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=
 
 Run via
 
-```
-bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- <logfile> <configfile>
+```shell
+$ bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- <logfile> <configfile>
 
 Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 
@@ -53,9 +53,9 @@ Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm
 
 To use the example configured buildfarm with bazel (version 1.0 or higher), you can configure your `.bazelrc` as follows:
 
-```
+```shell
 $ cat .bazelrc
-build --remote_executor=grpc://localhost:8980
+$ build --remote_executor=grpc://localhost:8980
 ```
 
 Then run your build as you would normally do.
@@ -67,20 +67,20 @@ Buildfarm uses [Java's Logging framework](https://docs.oracle.com/javase/10/core
 You can use typical Java logging configuration to filter these results and observe the flow of executions through your running services.
 An example `logging.properties` file has been provided at [examples/logging.properties](examples/logging.properties) for use as follows:
 
-```
-bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
+```shell
+$ bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
 
 and
 
-```
-bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
+``` shell
+$ bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
 
 To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
 
-```
-bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/examples/config.minimal.yml
+```shell
+$ bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/examples/config.minimal.yml
 ```
 
 
