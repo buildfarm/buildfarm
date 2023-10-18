@@ -25,7 +25,8 @@ Let's start with a bazel workspace with a single file to compile into an executa
 Create a new directory for our workspace and add the following files:
 
 `main.cc`:
-```
+
+```c
 #include <iostream>
 
 int main( int argc, char *argv[] )
@@ -35,7 +36,8 @@ int main( int argc, char *argv[] )
 ```
 
 `BUILD`:
-```
+
+```starlark
 cc_binary(
     name = "main",
     srcs = ["main.cc"],
@@ -118,15 +120,18 @@ That `2 remote` indicates that your compile and link ran remotely. Congratulatio
 ## Container Quick Start
 
 To bring up a minimal buildfarm cluster, you can run:
+
+```shell
+$ ./examples/bf-run start
 ```
-./examples/bf-run start
-```
+
 This will start all of the necessary containers at the latest version.
 Once the containers are up, you can build with `bazel run --remote_executor=grpc://localhost:8980 :main`.
 
 To stop the containers, run:
-```
-./examples/bf-run stop
+
+```shell
+$ ./examples/bf-run stop
 ```
 
 ## Next Steps
@@ -137,8 +142,8 @@ We've started our worker on the same host as our server, and also the same host 
 
 You can now easily launch a new Buildfarm cluster locally or in AWS using an open sourced [Buildfarm Manager](https://github.com/80degreeswest/bfmgr).
 
-```
-wget https://github.com/80degreeswest/bfmgr/releases/download/1.0.7/bfmgr-1.0.7.jar
-java -jar bfmgr-1.0.7.jar
-Navigate to http://localhost
+```shell
+$ wget https://github.com/80degreeswest/bfmgr/releases/download/1.0.7/bfmgr-1.0.7.jar
+$ java -jar bfmgr-1.0.7.jar
+$ open http://localhost
 ```
