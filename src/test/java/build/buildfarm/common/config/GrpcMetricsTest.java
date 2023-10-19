@@ -30,7 +30,6 @@ public class GrpcMetricsTest {
     grpcMetrics.setEnabled(true);
     grpcMetrics.setProvideLatencyHistograms(true);
     grpcMetrics.setLatencyBuckets(new double[] {1, 2, 3});
-
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, grpcMetrics);
     verify(serverBuilder, times(1)).intercept(any(MonitoringServerInterceptor.class));
   }
