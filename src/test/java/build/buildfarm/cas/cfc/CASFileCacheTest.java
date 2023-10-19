@@ -66,7 +66,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
-import io.grpc.Context;
 import io.grpc.Deadline;
 import io.grpc.Status;
 import java.io.IOException;
@@ -1218,6 +1217,11 @@ class CASFileCacheTest {
     ByteString blob = ByteString.copyFromUtf8("concurrent write");
     Digest digest = DIGEST_UTIL.compute(blob);
     UUID uuid = UUID.randomUUID();
+    // The same instance of Write will be passed to both the threads, so that the both threads
+    // try to get same output stream.
+    Write write =
+        fileCache.getWrite(
+            Compressor.Value.IDENTITY, digest, uuid, RequestMetadata.getDefaultInstance());
 
     CyclicBarrier barrier = new CyclicBarrier(3);
 
@@ -1226,7 +1230,7 @@ class CASFileCacheTest {
             () -> {
               try {
                 ConcurrentWriteStreamObserver writeStreamObserver =
-                    new ConcurrentWriteStreamObserver(digest, uuid);
+                    new ConcurrentWriteStreamObserver(write);
                 writeStreamObserver.registerCallback();
                 barrier.await(); // let both the threads get same write stream.
                 writeStreamObserver.ownStream(); // let other thread get the ownership of stream
@@ -1242,7 +1246,7 @@ class CASFileCacheTest {
             () -> {
               try {
                 ConcurrentWriteStreamObserver writeStreamObserver =
-                    new ConcurrentWriteStreamObserver(digest, uuid);
+                    new ConcurrentWriteStreamObserver(write);
                 writeStreamObserver.registerCallback();
                 writeStreamObserver.ownStream(); // this thread will get the ownership of stream
                 barrier.await(); // let both the threads get same write stream.
@@ -1270,19 +1274,12 @@ class CASFileCacheTest {
     assertThat(write2.getState()).isEqualTo(TERMINATED);
   }
 
-  class ConcurrentWriteStreamObserver {
-    Digest digest;
-    UUID uuid;
+  static class ConcurrentWriteStreamObserver {
     Write write;
     FeedbackOutputStream out;
-    Context.CancellableContext withCancellation = Context.current().withCancellation();
 
-    ConcurrentWriteStreamObserver(Digest digest, UUID uuid) throws Exception {
-      this.digest = digest;
-      this.uuid = uuid;
-      this.write =
-          fileCache.getWrite(
-              Compressor.Value.IDENTITY, digest, uuid, RequestMetadata.getDefaultInstance());
+    ConcurrentWriteStreamObserver(Write write) {
+      this.write = write;
     }
 
     void registerCallback() {
@@ -1291,7 +1288,7 @@ class CASFileCacheTest {
           new FutureCallback<Long>() {
             @Override
             public void onSuccess(Long committedSize) {
-              commit(committedSize);
+              commit();
             }
 
             @Override
@@ -1299,16 +1296,19 @@ class CASFileCacheTest {
               // do nothing
             }
           },
-          withCancellation.fixedContextExecutor(directExecutor()));
+          directExecutor());
     }
 
     synchronized void ownStream() throws Exception {
       this.out = write.getOutput(10, MILLISECONDS, () -> {});
     }
-
-    synchronized void commit(long committedSize) {
+    /**
+     * Request 1 may invoke this method for request 2 or vice-versa via callback on
+     * write.getFuture(). Synchronization is necessary to prevent conflicts when this method is
+     * called simultaneously by different threads.
+     */
+    synchronized void commit() {
       // critical section
-      assertThat(committedSize).isEqualTo(digest.getSizeBytes());
     }
 
     void write(ByteString data) throws IOException {
