@@ -291,6 +291,12 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
                 requestMetadata.getToolInvocationId(),
                 requestMetadata.getActionId(),
                 name));
+      } else if ("write cancelled".equals(t.getMessage())) {
+        log.log(
+            Level.FINE,
+            format(
+                "write cancelled for %s after %d requests and %d bytes at offset %d",
+                name, requestCount, requestBytes, earliestOffset));
       } else {
         log.log(
             Level.WARNING,
