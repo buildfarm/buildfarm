@@ -1,10 +1,10 @@
-load("//:jvm_flags.bzl", "ensure_accurate_metadata")
+load("//:jvm_flags.bzl", "add_opens_sun_nio_fs", "ensure_accurate_metadata")
 
 java_test(
     name = "tests",
     size = "small",
     srcs = glob(["*.java"]),
-    jvm_flags = ensure_accurate_metadata(),
+    jvm_flags = ensure_accurate_metadata() + add_opens_sun_nio_fs(),
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",
