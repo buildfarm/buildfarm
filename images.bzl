@@ -33,5 +33,3 @@ def buildfarm_images():
         repository = "bazelbuild/buildfarm-worker-base",
         tag = "mantic-java17-gcc",
     )
-
-
