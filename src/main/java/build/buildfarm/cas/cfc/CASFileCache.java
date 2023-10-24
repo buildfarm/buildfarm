@@ -878,7 +878,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                       + key.getIdentifier(),
                   e);
             } finally {
-              closedFuture.set(null);
+              if (closedFuture != null) {
+                closedFuture.set(null);
+              }
               isReset = true;
             }
           }
