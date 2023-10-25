@@ -397,16 +397,25 @@ class CFCExecFileSystem implements ExecFileSystem {
     return ImmutableSet.of();
   }
 
+  private OutputDirectory createOutputDirectory(Command command) {
+    Iterable<String> files;
+    Iterable<String> dirs;
+    if (command.getOutputPathsCount() != 0) {
+      files = command.getOutputPathsList();
+      dirs = ImmutableList.of(); // output paths require the action to create their own directory
+    } else {
+      files = command.getOutputFilesList();
+      dirs = command.getOutputDirectoriesList();
+    }
+    return OutputDirectory.parse(files, dirs, command.getEnvironmentVariablesList());
+  }
+
   @Override
   public Path createExecDir(
       String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
       throws IOException, InterruptedException {
     Digest inputRootDigest = action.getInputRootDigest();
-    OutputDirectory outputDirectory =
-        OutputDirectory.parse(
-            command.getOutputFilesList(),
-            command.getOutputDirectoriesList(),
-            command.getEnvironmentVariablesList());
+    OutputDirectory outputDirectory = createOutputDirectory(command);
 
     Path execDir = root.resolve(operationName);
     if (Files.exists(execDir)) {
