@@ -24,8 +24,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static redis.clients.jedis.Protocol.Keyword.SUBSCRIBE;
-import static redis.clients.jedis.Protocol.Keyword.UNSUBSCRIBE;
+import static redis.clients.jedis.Protocol.Command.SUBSCRIBE;
+import static redis.clients.jedis.Protocol.Command.UNSUBSCRIBE;
+import static redis.clients.jedis.Protocol.ResponseKeyword;
 
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.OperationChange;
@@ -35,9 +36,11 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
+import com.google.common.truth.Correspondence;
 import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -47,7 +50,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import redis.clients.jedis.Client;
+import redis.clients.jedis.CommandArguments;
+import redis.clients.jedis.Connection;
+import redis.clients.jedis.args.Rawable;
+import redis.clients.jedis.args.RawableFactory;
+import redis.clients.jedis.commands.ProtocolCommand;
 
 @RunWith(JUnit4.class)
 public class RedisShardSubscriberTest {
@@ -63,17 +70,23 @@ public class RedisShardSubscriberTest {
     }
   }
 
-  private static class TestClient extends Client {
-    private final Set<String> subscriptions = Sets.newConcurrentHashSet();
-    private final BlockingQueue<List<Object>> replyQueue = new LinkedBlockingQueue<>();
-    private final BlockingQueue<List<Object>> pendingReplies = new LinkedBlockingQueue<>();
+  private static class TestConnection extends Connection {
+    private final Set<Rawable> subscriptions = Sets.newConcurrentHashSet();
+    private final BlockingQueue<Runnable> pendingRequests = new LinkedBlockingQueue<>();
+    private final BlockingQueue<Object> replyQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<Object> pendingReplies = new LinkedBlockingQueue<>();
 
-    Set<String> getSubscriptions() {
+    Set<Rawable> getSubscriptions() {
       return subscriptions;
     }
 
     @Override
     public List<Object> getUnflushedObjectMultiBulkReply() {
+      throw new UnsupportedOperationException("getUnflushedObjectMultiBulkReply is deprecated");
+    }
+
+    @Override
+    public Object getUnflushedObject() {
       try {
         return replyQueue.take();
       } catch (InterruptedException e) {
@@ -83,40 +96,83 @@ public class RedisShardSubscriberTest {
     }
 
     @Override
-    public void subscribe(String... channels) {
-      for (String channel : channels) {
-        if (subscriptions.add(channel)) {
-          pendingReplies.add(
-              ImmutableList.of(SUBSCRIBE.raw, channel.getBytes(), (long) subscriptions.size()));
+    public void sendCommand(final CommandArguments cargs) {
+      ProtocolCommand command = cargs.getCommand();
+      if (command == SUBSCRIBE) {
+        pendingRequests.add(() -> subscribe(cargs));
+      } else if (command == UNSUBSCRIBE) {
+        if (cargs.size() == 1) {
+          // only includes command
+          pendingRequests.add(() -> unsubscribe());
         } else {
-          throw new IllegalStateException("subscribe to already subscribed channel: " + channel);
+          pendingRequests.add(() -> unsubscribe(cargs));
+        }
+      } else {
+        throw new UnsupportedOperationException(cargs.toString());
+      }
+    }
+
+    @Override
+    public void setTimeoutInfinite() {
+      // ignore
+    }
+
+    private void subscribe(Iterable<Rawable> channels) {
+      boolean isCommand = true;
+      Rawable command = null;
+      for (Rawable channel : channels) {
+        if (isCommand) {
+          isCommand = false;
+        } else {
+          if (subscriptions.add(channel)) {
+            pendingReplies.add(
+                ImmutableList.of(
+                    ResponseKeyword.SUBSCRIBE.getRaw(),
+                    channel.getRaw(),
+                    (long) subscriptions.size()));
+          } else {
+            throw new IllegalStateException("subscribe to already subscribed channel: " + channel);
+          }
         }
       }
     }
 
-    @Override
-    public void unsubscribe() {
+    private void unsubscribe() {
       long counter = subscriptions.size();
-      for (String channel : subscriptions) {
-        pendingReplies.add(ImmutableList.of(UNSUBSCRIBE.raw, channel.getBytes(), --counter));
+      for (Rawable channel : subscriptions) {
+        pendingReplies.add(
+            ImmutableList.of(ResponseKeyword.UNSUBSCRIBE.getRaw(), channel.getRaw(), --counter));
       }
       subscriptions.clear();
     }
 
-    @Override
-    public void unsubscribe(String... channels) {
-      for (String channel : channels) {
-        if (subscriptions.remove(channel)) {
-          pendingReplies.add(
-              ImmutableList.of(UNSUBSCRIBE.raw, channel.getBytes(), (long) subscriptions.size()));
+    private void unsubscribe(Iterable<Rawable> channels) {
+      boolean isCommand = true;
+      Rawable command = null;
+      for (Rawable channel : channels) {
+        if (isCommand) {
+          isCommand = false;
         } else {
-          throw new IllegalStateException("unsubscribe from unknown channel: " + channel);
+          if (subscriptions.remove(channel)) {
+            pendingReplies.add(
+                ImmutableList.of(
+                    ResponseKeyword.UNSUBSCRIBE.getRaw(),
+                    channel.getRaw(),
+                    (long) subscriptions.size()));
+          } else {
+            throw new IllegalStateException("unsubscribe from unknown channel: " + channel);
+          }
         }
       }
     }
 
     @Override
     public void flush() {
+      for (Runnable request = pendingRequests.poll();
+          request != null;
+          request = pendingRequests.poll()) {
+        request.run();
+      }
       pendingReplies.drainTo(replyQueue);
     }
   }
@@ -130,6 +186,16 @@ public class RedisShardSubscriberTest {
     return createSubscriber(watchers, /* executor=*/ null);
   }
 
+  private static final Correspondence<Rawable, Rawable> rawableCorrespondence =
+      Correspondence.from(
+          new Correspondence.BinaryPredicate<Rawable, Rawable>() {
+            @Override
+            public boolean apply(Rawable a, Rawable e) {
+              return Arrays.equals(a.getRaw(), e.getRaw());
+            }
+          },
+          "is rawably equivalent to");
+
   @Test
   public void novelChannelWatcherSubscribes() throws InterruptedException {
     ListMultimap<String, TimedWatchFuture> watchers =
@@ -137,8 +203,8 @@ public class RedisShardSubscriberTest {
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 
-    TestClient testClient = new TestClient();
-    Thread proceedThread = new Thread(() -> operationSubscriber.proceed(testClient));
+    TestConnection testConnection = new TestConnection();
+    Thread proceedThread = new Thread(() -> operationSubscriber.start(testConnection));
     proceedThread.start();
     while (!operationSubscriber.isSubscribed()) {
       MICROSECONDS.sleep(10);
@@ -151,7 +217,9 @@ public class RedisShardSubscriberTest {
         .isEqualTo(novelWatcher);
     String[] channels = new String[1];
     channels[0] = novelChannel;
-    assertThat(testClient.getSubscriptions()).contains(novelChannel);
+    assertThat(testConnection.getSubscriptions())
+        .comparingElementsUsing(rawableCorrespondence)
+        .contains(RawableFactory.from(novelChannel));
     operationSubscriber.unsubscribe();
     proceedThread.join();
   }
@@ -228,8 +296,8 @@ public class RedisShardSubscriberTest {
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 
-    TestClient testClient = new TestClient();
-    Thread proceedThread = new Thread(() -> operationSubscriber.proceed(testClient));
+    TestConnection testConnection = new TestConnection();
+    Thread proceedThread = new Thread(() -> operationSubscriber.start(testConnection));
     proceedThread.start();
     while (!operationSubscriber.isSubscribed()) {
       MICROSECONDS.sleep(10);
@@ -257,7 +325,7 @@ public class RedisShardSubscriberTest {
                         .build())
                 .build()));
     assertThat(observed.get()).isTrue();
-    assertThat(testClient.getSubscriptions()).doesNotContain(doneMessageChannel);
+    assertThat(testConnection.getSubscriptions()).doesNotContain(doneMessageChannel);
     operationSubscriber.unsubscribe();
     proceedThread.join();
   }

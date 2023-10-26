@@ -14,7 +14,8 @@
 
 package build.buildfarm.common.redis;
 
-import static redis.clients.jedis.JedisCluster.HASHSLOTS;
+import static com.google.common.collect.Iterables.any;
+import static redis.clients.jedis.Protocol.CLUSTER_HASHSLOTS;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -43,7 +44,7 @@ public class RedisSlotToHash {
    * @note Suggested return identifier: hashtag.
    */
   public static String correlate(long slotNumber) {
-    Preconditions.checkState(slotNumber >= 0 && slotNumber < HASHSLOTS);
+    Preconditions.checkState(slotNumber >= 0 && slotNumber < CLUSTER_HASHSLOTS);
     return staticLookup(slotNumber);
   }
 
@@ -58,7 +59,7 @@ public class RedisSlotToHash {
    * @note Suggested return identifier: hashtag.
    */
   public static String correlateRange(long start, long end) {
-    Preconditions.checkState(start >= 0 && end < HASHSLOTS);
+    Preconditions.checkState(start >= 0 && end < CLUSTER_HASHSLOTS);
 
     long hashNumber = 0;
     int slotNumber = JedisClusterCRC16.getSlot(Long.toString(hashNumber));
@@ -74,22 +75,26 @@ public class RedisSlotToHash {
    *     range.
    * @details Dynamically generates hashtags and tests them for valid slot number. Slower than
    *     static lookup, but less code.
-   * @param start The starting slot range number to find a hashable string for.
-   * @param end The ending slot range number to find a hashable string for.
+   * @param slotRanges The valid range of slots.
    * @param prefix A string prefix to include as part of the generated hashtag.
    * @return The string value to be used in a key's hashtag.
    * @note Suggested return identifier: hashtag.
    */
-  public static String correlateRangeWithPrefix(long start, long end, String prefix) {
-    Preconditions.checkState(start >= 0 && end < HASHSLOTS);
+  public static String correlateRangesWithPrefix(Iterable<List<Long>> slotRanges, String prefix) {
+    // TODO: Preconditions.checkState(allAreSize2 && areAllSorted && min >= 0 && max <
+    // CLUSTER_HASHSLOTS)
 
     long hashNumber = 0;
-    int slotNumber = JedisClusterCRC16.getSlot(createHashtag(prefix, hashNumber));
-    while (slotNumber < start || slotNumber > end) {
+    int slot = JedisClusterCRC16.getSlot(createHashtag(prefix, hashNumber));
+    while (!slotRangesContainsSlot(slotRanges, slot)) {
       hashNumber++;
-      slotNumber = JedisClusterCRC16.getSlot(createHashtag(prefix, hashNumber));
+      slot = JedisClusterCRC16.getSlot(createHashtag(prefix, hashNumber));
     }
     return createHashtag(prefix, hashNumber);
+  }
+
+  private static boolean slotRangesContainsSlot(Iterable<List<Long>> slotRanges, int slot) {
+    return any(slotRanges, range -> slot >= range.get(0) && slot <= range.get(1));
   }
 
   /**

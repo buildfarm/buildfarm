@@ -15,22 +15,28 @@
 package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static redis.clients.jedis.args.ListDirection.LEFT;
+import static redis.clients.jedis.args.ListDirection.RIGHT;
 
 import build.buildfarm.common.StringVisitor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.Jedis;
 
 /**
  * @class RedisQueueMockTest
@@ -43,7 +49,7 @@ import redis.clients.jedis.JedisCluster;
  */
 @RunWith(JUnit4.class)
 public class RedisQueueMockTest {
-  @Mock private JedisCluster redis;
+  @Mock private Jedis redis;
 
   @Before
   public void setUp() {
@@ -174,15 +180,18 @@ public class RedisQueueMockTest {
   @Test
   public void dequeueElementCanBeDequeuedWithTimeout() throws Exception {
     // ARRANGE
-    when(redis.brpoplpush("test", "test_dequeue", 1)).thenReturn("foo");
+    when(redis.blmove(eq("test"), eq("test_dequeue"), eq(RIGHT), eq(LEFT), any(double.class)))
+        .thenReturn("foo");
     RedisQueue queue = new RedisQueue("test");
+    ExecutorService service = newSingleThreadExecutor();
 
     // ACT
-    queue.push(redis, "foo");
-    String val = queue.dequeue(redis, 1);
+    String val = queue.dequeue(redis, 1, service);
+    service.shutdown();
 
     // ASSERT
     assertThat(val).isEqualTo("foo");
+    assertThat(service.awaitTermination(1, SECONDS)).isTrue();
   }
 
   // Function under test: dequeue
@@ -191,14 +200,18 @@ public class RedisQueueMockTest {
   @Test
   public void dequeueElementIsNotDequeuedIfTimeRunsOut() throws Exception {
     // ARRANGE
-    when(redis.brpoplpush("test", "test_dequeue", 1)).thenReturn(null);
+    when(redis.blmove(eq("test"), eq("test_dequeue"), eq(RIGHT), eq(LEFT), any(double.class)))
+        .thenReturn(null);
     RedisQueue queue = new RedisQueue("test");
+    ExecutorService service = newSingleThreadExecutor();
 
     // ACT
-    queue.push(redis, "foo");
-    String val = queue.dequeue(redis, 5);
+    String val = queue.dequeue(redis, 5, service);
+    service.shutdown();
 
     // ASSERT
+    // future submission may still be completing after interrupt
+    assertThat(service.awaitTermination(1, SECONDS)).isTrue();
     assertThat(val).isEqualTo(null);
   }
 
@@ -208,21 +221,23 @@ public class RedisQueueMockTest {
   @Test
   public void dequeueInterrupt() throws Exception {
     // ARRANGE
-    when(redis.brpoplpush("test", "test_dequeue", 1)).thenReturn(null);
+    when(redis.blmove(eq("test"), eq("test_dequeue"), eq(RIGHT), eq(LEFT), any(double.class)))
+        .thenReturn(null);
     RedisQueue queue = new RedisQueue("test");
+    ExecutorService service = newSingleThreadExecutor();
 
     // ACT
-    queue.push(redis, "foo");
     Thread call =
         new Thread(
             () -> {
               try {
-                queue.dequeue(redis, 100000);
+                queue.dequeue(redis, 100000, service);
               } catch (Exception e) {
               }
             });
     call.start();
     call.interrupt();
+    call.join();
   }
 
   // Function under test: nonBlockingDequeue
@@ -231,11 +246,10 @@ public class RedisQueueMockTest {
   @Test
   public void nonBlockingDequeueElementCanBeDequeued() throws Exception {
     // ARRANGE
-    when(redis.rpoplpush("test", "test_dequeue")).thenReturn("foo");
+    when(redis.lmove("test", "test_dequeue", RIGHT, LEFT)).thenReturn("foo");
     RedisQueue queue = new RedisQueue("test");
 
     // ACT
-    queue.push(redis, "foo");
     String val = queue.nonBlockingDequeue(redis);
 
     // ASSERT
@@ -292,14 +306,6 @@ public class RedisQueueMockTest {
 
     // ARRANGE
     RedisQueue queue = new RedisQueue("test");
-    queue.push(redis, "element 1");
-    queue.push(redis, "element 2");
-    queue.push(redis, "element 3");
-    queue.push(redis, "element 4");
-    queue.push(redis, "element 5");
-    queue.push(redis, "element 6");
-    queue.push(redis, "element 7");
-    queue.push(redis, "element 8");
 
     // ACT
     List<String> visited = new ArrayList<>();

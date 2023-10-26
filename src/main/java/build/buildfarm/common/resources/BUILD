@@ -30,7 +30,6 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "//third_party/jedis",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
@@ -49,6 +48,7 @@ java_library(
         "@maven//:org_apache_commons_commons_compress",
         "@maven//:org_apache_commons_commons_lang3",
         "@maven//:org_threeten_threetenbp",
+        "@maven//:redis_clients_jedis",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )

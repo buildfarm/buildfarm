@@ -20,9 +20,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
-import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisClusterPipeline;
+import redis.clients.jedis.PipelineBase;
 import redis.clients.jedis.Response;
+import redis.clients.jedis.UnifiedJedis;
 
 /**
  * @class RedisMap
@@ -78,7 +78,7 @@ public class RedisMap {
    * @param timeout_s Timeout to expire the entry. (units: seconds (s))
    * @note Overloaded.
    */
-  public void insert(JedisCluster jedis, String key, String value, int timeout_s) {
+  public void insert(UnifiedJedis jedis, String key, String value, int timeout_s) {
     jedis.setex(createKeyName(key), timeout_s, value);
   }
 
@@ -91,7 +91,7 @@ public class RedisMap {
    * @param timeout_s Timeout to expire the entry. (units: seconds (s))
    * @note Overloaded.
    */
-  public void insert(JedisCluster jedis, String key, String value, long timeout_s) {
+  public void insert(UnifiedJedis jedis, String key, String value, long timeout_s) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
     jedis.setex(createKeyName(key), (int) timeout_s, value);
@@ -105,7 +105,7 @@ public class RedisMap {
    * @param value The value for the key.
    * @note Overloaded.
    */
-  public void insert(JedisCluster jedis, String key, String value) {
+  public void insert(UnifiedJedis jedis, String key, String value) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
     jedis.setex(createKeyName(key), expiration_s, value);
@@ -118,7 +118,7 @@ public class RedisMap {
    * @param key The name of the key.
    * @note Overloaded.
    */
-  public void remove(JedisCluster jedis, String key) {
+  public void remove(UnifiedJedis jedis, String key) {
     jedis.del(createKeyName(key));
   }
 
@@ -129,12 +129,12 @@ public class RedisMap {
    * @param keys The name of the keys.
    * @note Overloaded.
    */
-  public void remove(JedisCluster jedis, Iterable<String> keys) {
-    JedisClusterPipeline p = jedis.pipelined();
-    for (String key : keys) {
-      p.del(createKeyName(key));
+  public void remove(UnifiedJedis jedis, Iterable<String> keys) {
+    try (PipelineBase p = jedis.pipelined()) {
+      for (String key : keys) {
+        p.del(createKeyName(key));
+      }
     }
-    p.sync();
   }
 
   /**
@@ -146,7 +146,7 @@ public class RedisMap {
    * @note Overloaded.
    * @note Suggested return identifier: value.
    */
-  public String get(JedisCluster jedis, String key) {
+  public String get(UnifiedJedis jedis, String key) {
     return jedis.get(createKeyName(key));
   }
 
@@ -159,19 +159,21 @@ public class RedisMap {
    * @note Overloaded.
    * @note Suggested return identifier: values.
    */
-  public Iterable<Map.Entry<String, String>> get(JedisCluster jedis, Iterable<String> keys) {
+  public Iterable<Map.Entry<String, String>> get(UnifiedJedis jedis, Iterable<String> keys) {
     // Fetch items via pipeline
-    JedisClusterPipeline p = jedis.pipelined();
-    List<Map.Entry<String, Response<String>>> values = new ArrayList<>();
-    StreamSupport.stream(keys.spliterator(), false)
-        .forEach(key -> values.add(new AbstractMap.SimpleEntry<>(key, p.get(createKeyName(key)))));
-    p.sync();
+    try (PipelineBase p = jedis.pipelined()) {
+      List<Map.Entry<String, Response<String>>> values = new ArrayList<>();
+      StreamSupport.stream(keys.spliterator(), false)
+          .forEach(
+              key -> values.add(new AbstractMap.SimpleEntry<>(key, p.get(createKeyName(key)))));
+      p.sync();
 
-    List<Map.Entry<String, String>> resolved = new ArrayList<>();
-    for (Map.Entry<String, Response<String>> val : values) {
-      resolved.add(new AbstractMap.SimpleEntry<>(val.getKey(), val.getValue().get()));
+      List<Map.Entry<String, String>> resolved = new ArrayList<>();
+      for (Map.Entry<String, Response<String>> val : values) {
+        resolved.add(new AbstractMap.SimpleEntry<>(val.getKey(), val.getValue().get()));
+      }
+      return resolved;
     }
-    return resolved;
   }
 
   /**
@@ -182,7 +184,7 @@ public class RedisMap {
    * @return Whether the key exists or not.
    * @note Suggested return identifier: exists.
    */
-  public boolean exists(JedisCluster jedis, String key) {
+  public boolean exists(UnifiedJedis jedis, String key) {
     return jedis.exists(createKeyName(key));
   }
 
@@ -193,7 +195,7 @@ public class RedisMap {
    * @return The size of the map.
    * @note Suggested return identifier: size.
    */
-  public int size(JedisCluster jedis) {
+  public int size(UnifiedJedis jedis) {
     return ScanCount.get(jedis, name + ":*", 1000);
   }
 

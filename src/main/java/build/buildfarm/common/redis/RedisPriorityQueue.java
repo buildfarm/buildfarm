@@ -17,12 +17,12 @@ package build.buildfarm.common.redis;
 import build.buildfarm.common.StringVisitor;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
-import redis.clients.jedis.JedisCluster;
+import java.util.concurrent.ExecutorService;
+import redis.clients.jedis.Jedis;
 
 /**
- * @class RedisQueue
- * @brief A redis queue.
+ * @class RedisPriorityQueue
+ * @brief A redis priority queue.
  * @details A redis queue is an implementation of a queue data structure which internally uses redis
  *     to store and distribute the data. Its important to know that the lifetime of the queue
  *     persists before and after the queue data structure is created (since it exists in redis).
@@ -97,18 +97,19 @@ public class RedisPriorityQueue extends QueueInterface {
    * @param val The value to push onto the priority queue.
    */
   @Override
-  public void push(JedisCluster jedis, String val) {
+  public void push(Jedis jedis, String val) {
     push(jedis, val, 0);
   }
 
   /**
    * @brief Push a value onto the queue with specified priority.
-   * @details Adds the value into the backend redis ordered set.
+   * @details Adds the value into the backend redis ordered set, with timestamp primary insertion to
+   *     guarantee FIFO within a single priority level
    * @param val The value to push onto the priority queue.
    * @param priority The priority of action 0 means highest
    */
   @Override
-  public void push(JedisCluster jedis, String val, double priority) {
+  public void push(Jedis jedis, String val, double priority) {
     jedis.zadd(name, priority, time.getNanos() + ":" + val);
   }
 
@@ -120,7 +121,7 @@ public class RedisPriorityQueue extends QueueInterface {
    * @note Suggested return identifier: wasRemoved.
    */
   @Override
-  public boolean removeFromDequeue(JedisCluster jedis, String val) {
+  public boolean removeFromDequeue(Jedis jedis, String val) {
     return jedis.lrem(getDequeueName(), -1, val) != 0;
   }
 
@@ -132,7 +133,7 @@ public class RedisPriorityQueue extends QueueInterface {
    * @note Suggested return identifier: wasRemoved.
    */
   @Override
-  public boolean removeAll(JedisCluster jedis, String val) {
+  public boolean removeAll(Jedis jedis, String val) {
     return jedis.zrem(name, val) != 0;
   }
 
@@ -147,7 +148,8 @@ public class RedisPriorityQueue extends QueueInterface {
    * @note Suggested return identifier: val.
    */
   @Override
-  public String dequeue(JedisCluster jedis, int timeout_s) throws InterruptedException {
+  public String dequeue(Jedis jedis, int timeout_s, ExecutorService service)
+      throws InterruptedException {
     int maxAttempts = (int) (timeout_s / (pollIntervalMillis / 1000.0));
     List<String> args = Arrays.asList(name, getDequeueName(), "true");
     String val;
@@ -170,7 +172,7 @@ public class RedisPriorityQueue extends QueueInterface {
    * @note Suggested return identifier: val.
    */
   @Override
-  public String nonBlockingDequeue(JedisCluster jedis) throws InterruptedException {
+  public String nonBlockingDequeue(Jedis jedis) throws InterruptedException {
     List<String> args = Arrays.asList(name, getDequeueName());
     Object obj_val = jedis.eval(script, keys, args);
     String val = String.valueOf(obj_val);
@@ -212,7 +214,7 @@ public class RedisPriorityQueue extends QueueInterface {
    * @note Suggested return identifier: length.
    */
   @Override
-  public long size(JedisCluster jedis) {
+  public long size(Jedis jedis) {
     return jedis.zcard(name);
   }
 
@@ -223,7 +225,7 @@ public class RedisPriorityQueue extends QueueInterface {
    * @note Overloaded.
    */
   @Override
-  public void visit(JedisCluster jedis, StringVisitor visitor) {
+  public void visit(Jedis jedis, StringVisitor visitor) {
     visit(jedis, name, visitor);
   }
 
@@ -233,7 +235,7 @@ public class RedisPriorityQueue extends QueueInterface {
    * @param visitor A visitor for each visited element in the queue.
    */
   @Override
-  public void visitDequeue(JedisCluster jedis, StringVisitor visitor) {
+  public void visitDequeue(Jedis jedis, StringVisitor visitor) {
     int listPageSize = 10000;
     int index = 0;
     int nextIndex = listPageSize;
@@ -256,11 +258,11 @@ public class RedisPriorityQueue extends QueueInterface {
    * @param visitor A visitor for each visited element in the queue.
    * @note Overloaded.
    */
-  private void visit(JedisCluster jedis, String queueName, StringVisitor visitor) {
+  private void visit(Jedis jedis, String queueName, StringVisitor visitor) {
     int listPageSize = 10000;
     int index = 0;
     int nextIndex = listPageSize;
-    Set<String> entries;
+    List<String> entries;
 
     do {
       entries = jedis.zrange(queueName, index, nextIndex - 1);
@@ -290,14 +292,14 @@ public class RedisPriorityQueue extends QueueInterface {
         "end",
         "assert(not isempty(zset), 'ERR1: zset missing')",
         "assert(not isempty(deqName), 'ERR2: dequeue missing')",
-        "  local pped = redis.call('ZRANGE', zset, 0, 0)",
-        "  if next(pped) ~= nil then",
-        "    for _,item in ipairs(pped) do",
-        "      val = item:gsub('^%d*:', '')",
-        "      redis.call('ZREM', zset, item)",
-        "      redis.call('LPUSH', deqName, val)",
-        "    end",
+        "local pped = redis.call('ZRANGE', zset, 0, 0)",
+        "if next(pped) ~= nil then",
+        "  for _,item in ipairs(pped) do",
+        "    val = item.sub('^%d*:', '')",
+        "    redis.call('ZREM', zset, item)",
+        "    redis.call('LPUSH', deqName, val)",
         "  end",
+        "end",
         "return val");
   }
 

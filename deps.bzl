@@ -104,27 +104,6 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
         name = params.pop("name")
         maybe(http_archive, name, **params)
 
-    # Enhanced jedis 3.2.0 containing several convenience, performance, and
-    # robustness changes.
-    # Notable features include:
-    #   Cluster request pipelining, used for batching requests for operation
-    #   monitors and CAS index.
-    #   Blocking request (b* prefix) interruptibility, using client
-    #   connection reset.
-    #   Singleton-redis-as-cluster - support treating a non-clustered redis
-    #   endpoint as a cluster of 1 node.
-    # Other changes are redis version-forward treatment of spop and visibility
-    # into errors in cluster unreachable and cluster retry exhaustion.
-    # Details at https://github.com/werkt/jedis/releases/tag/3.2.0-594c20da20
-    maybe(
-        http_jar,
-        "jedis",
-        sha256 = "72c749c02b775c0371cfc8ebcf713032910b7c6f365d958c3c000838f43f6a65",
-        urls = [
-            "https://github.com/werkt/jedis/releases/download/3.2.0-594c20da20/jedis-3.2.0-594c20da20.jar",
-        ],
-    )
-
     maybe(
         http_jar,
         "opentelemetry",

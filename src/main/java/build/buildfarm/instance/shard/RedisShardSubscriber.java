@@ -38,7 +38,7 @@ import java.util.function.Predicate;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
-import redis.clients.jedis.Client;
+import redis.clients.jedis.Connection;
 import redis.clients.jedis.JedisPubSub;
 
 @Log
@@ -103,35 +103,6 @@ class RedisShardSubscriber extends JedisPubSub {
       }
     }
     return builder.build();
-  }
-
-  // synchronizing on these because the client has been observed to
-  // cause protocol desynchronization for multiple concurrent calls
-  @Override
-  public synchronized void unsubscribe() {
-    if (isSubscribed()) {
-      super.unsubscribe();
-    }
-  }
-
-  @Override
-  public synchronized void unsubscribe(String... channels) {
-    super.unsubscribe(channels);
-  }
-
-  @Override
-  public synchronized void subscribe(String... channels) {
-    super.subscribe(channels);
-  }
-
-  @Override
-  public synchronized void psubscribe(String... patterns) {
-    super.psubscribe(patterns);
-  }
-
-  @Override
-  public synchronized void punsubscribe(String... patterns) {
-    super.punsubscribe(patterns);
   }
 
   public ListenableFuture<Void> watch(String channel, TimedWatcher watcher) {
@@ -337,11 +308,10 @@ class RedisShardSubscriber extends JedisPubSub {
     return channels;
   }
 
-  @Override
-  public void proceed(Client client, String... channels) {
+  public void start(Connection client, String... channels) {
     if (channels.length == 0) {
       channels = placeholderChannel();
     }
-    super.proceed(client, channels);
+    proceed(client, channels);
   }
 }

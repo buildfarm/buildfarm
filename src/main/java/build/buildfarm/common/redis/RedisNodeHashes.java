@@ -14,17 +14,18 @@
 
 package build.buildfarm.common.redis;
 
+import static com.google.common.collect.Iterables.transform;
+
 import com.google.common.collect.ImmutableList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import redis.clients.jedis.ConnectionPool;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.exceptions.JedisClusterOperationException;
 import redis.clients.jedis.exceptions.JedisException;
-import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
-import redis.clients.jedis.util.SafeEncoder;
+import redis.clients.jedis.resps.ClusterShardInfo;
 
 /**
  * @class RedisNodeHashes
@@ -44,12 +45,12 @@ public class RedisNodeHashes {
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static List<String> getEvenlyDistributedHashes(JedisCluster jedis) {
     try {
-      List<List<Long>> slotRanges = getNodeSlotRanges(jedis);
+      Iterable<List<List<Long>>> nodeSlotRanges = getNodeSlotRanges(jedis);
       ImmutableList.Builder hashTags = ImmutableList.builder();
-      for (List<Long> slotRange : slotRanges) {
+      for (List<List<Long>> slotRanges : nodeSlotRanges) {
         // we can use any slot that is in range for the node.
-        // in this case, we will use the first slot.
-        hashTags.add(RedisSlotToHash.correlate(slotRange.get(0)));
+        // in this case, we will use the first slot in the first range.
+        hashTags.add(RedisSlotToHash.correlate(slotRanges.get(0).get(0)));
       }
       return hashTags.build();
     } catch (JedisException e) {
@@ -67,19 +68,23 @@ public class RedisNodeHashes {
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static List<String> getEvenlyDistributedHashesWithPrefix(
-      JedisCluster jedis, String prefix) {
-    try {
-      List<List<Long>> slotRanges = getNodeSlotRanges(jedis);
-      ImmutableList.Builder hashTags = ImmutableList.builder();
-      for (List<Long> slotRange : slotRanges) {
-        // we can use any slot that is in range for the node.
-        // in this case, we will use the first slot.
-        hashTags.add(
-            RedisSlotToHash.correlateRangeWithPrefix(slotRange.get(0), slotRange.get(1), prefix));
+      UnifiedJedis jedis, String prefix) {
+    if (jedis instanceof JedisCluster) {
+      JedisCluster cluster = (JedisCluster) jedis;
+      Iterable<List<List<Long>>> nodeSlotRanges = getNodeSlotRanges(cluster);
+      try {
+        ImmutableList.Builder hashTags = ImmutableList.builder();
+        for (List<List<Long>> slotRanges : nodeSlotRanges) {
+          // we can use any slot that is in range for the node.
+          // in this case, we will use the first slot.
+          hashTags.add(RedisSlotToHash.correlateRangesWithPrefix(slotRanges, prefix));
+        }
+        return hashTags.build();
+      } catch (JedisException e) {
+        return ImmutableList.of();
       }
-      return hashTags.build();
-    } catch (JedisException e) {
-      return ImmutableList.of();
+    } else {
+      return ImmutableList.of(prefix);
     }
   }
 
@@ -88,28 +93,12 @@ public class RedisNodeHashes {
    * @details This information can be found from any of the redis nodes in the cluster.
    * @param jedis An established jedis client.
    * @return Slot ranges for all of the nodes in the cluster.
-   * @note Suggested return identifier: slotRanges.
+   * @note Suggested return identifier: nodeSlotRanges.
    */
   @SuppressWarnings("unchecked")
-  private static List<List<Long>> getNodeSlotRanges(JedisCluster jedis) {
-    // get slot information for each node
-    List<Object> slots = getClusterSlots(jedis);
-    Set<String> nodes = new HashSet<>();
-
-    // convert slot information into a list of slot ranges
-    ImmutableList.Builder<List<Long>> slotRanges = ImmutableList.builder();
-    for (Object slotInfoObj : slots) {
-      List<Object> slotInfo = (List<Object>) slotInfoObj;
-      List<Object> slotRangeNodes = (List<Object>) slotInfo.get(2);
-      // 2 is primary node id
-      String nodeId = (String) SafeEncoder.encode((byte[]) slotRangeNodes.get(2));
-      if (nodes.add(nodeId)) {
-        List<Long> slotNums = slotInfoToSlotRange(slotInfo);
-        slotRanges.add(slotNums);
-      }
-    }
-
-    return slotRanges.build();
+  private static Iterable<List<List<Long>>> getNodeSlotRanges(JedisCluster jedis) {
+    // get slot range information for each shard
+    return transform(getClusterShards(jedis), ClusterShardInfo::getSlots);
   }
 
   /**
@@ -124,18 +113,18 @@ public class RedisNodeHashes {
   }
 
   /**
-   * @brief Query slot information for each redis node.
+   * @brief Query shard information from any redis node.
    * @details Obtains cluster information for understanding slot ranges for balancing.
    * @param jedis An established jedis client.
    * @return Cluster slot information.
-   * @note Suggested return identifier: clusterSlots.
+   * @note Suggested return identifier: clusterShards.
    */
-  private static List<Object> getClusterSlots(JedisCluster jedis) {
+  private static List<ClusterShardInfo> getClusterShards(JedisCluster jedis) {
     JedisException nodeException = null;
-    for (Map.Entry<String, JedisPool> node : jedis.getClusterNodes().entrySet()) {
-      JedisPool pool = node.getValue();
-      try (Jedis resource = pool.getResource()) {
-        return resource.clusterSlots();
+    for (Map.Entry<String, ConnectionPool> node : jedis.getClusterNodes().entrySet()) {
+      ConnectionPool pool = node.getValue();
+      try (Jedis resource = new Jedis(pool.getResource())) {
+        return resource.clusterShards();
       } catch (JedisException e) {
         nodeException = e;
         // log error with node
@@ -144,6 +133,6 @@ public class RedisNodeHashes {
     if (nodeException != null) {
       throw nodeException;
     }
-    throw new JedisNoReachableClusterNodeException("No reachable node in cluster");
+    throw new JedisClusterOperationException("No reachable node in cluster");
   }
 }

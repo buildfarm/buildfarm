@@ -16,22 +16,26 @@ package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.StringVisitor;
-import build.buildfarm.common.config.Queue;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import redis.clients.jedis.Connection;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 
 /**
@@ -46,28 +50,14 @@ import redis.clients.jedis.JedisCluster;
 @RunWith(JUnit4.class)
 public class BalancedRedisQueueMockTest {
   @Mock private JedisCluster redis;
+  @Mock private Connection connection;
+  @Mock QueueInterface subQueue;
 
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
-  }
-
-  // Function under test: removeFromDequeue
-  // Reason for testing: removing returns false because the queue is empty and there is nothing to
-  // remove
-  // Failure explanation: the queue was either not empty, or an error occured while removing from an
-  // empty queue
-  @Test
-  public void removeFromDequeueFalseOnEmpty() throws Exception {
-    // ARRANGE
-    when(redis.lrem(any(String.class), any(Long.class), any(String.class))).thenReturn(0L);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
-
-    // ACT
-    Boolean success = queue.removeFromDequeue(redis, "foo");
-
-    // ASSERT
-    assertThat(success).isFalse();
+    when(redis.getConnectionFromSlot(any(Integer.class))).thenReturn(connection);
+    when(subQueue.getName()).thenReturn("test");
   }
 
   // Function under test: removeFromDequeue
@@ -78,8 +68,8 @@ public class BalancedRedisQueueMockTest {
   @Test
   public void removeFromDequeueFalseWhenValueIsMissing() throws Exception {
     // ARRANGE
-    when(redis.lrem(any(String.class), any(Long.class), any(String.class))).thenReturn(0L);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
+    when(subQueue.removeFromDequeue(any(Jedis.class), any(String.class))).thenReturn(false);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", -1, ImmutableList.of(subQueue));
 
     // ACT
     Boolean success = queue.removeFromDequeue(redis, "baz");
@@ -95,8 +85,8 @@ public class BalancedRedisQueueMockTest {
   @Test
   public void removeFromDequeueTrueWhenValueExists() throws Exception {
     // ARRANGE
-    when(redis.lrem(any(String.class), any(Long.class), any(String.class))).thenReturn(1L);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
+    when(subQueue.removeFromDequeue(any(Jedis.class), any(String.class))).thenReturn(true);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", -1, ImmutableList.of(subQueue));
 
     // ACT
     Boolean success = queue.removeFromDequeue(redis, "bar");
@@ -111,15 +101,17 @@ public class BalancedRedisQueueMockTest {
   @Test
   public void dequeueExponentialBackoffElementDequeuedOnNonBlock() throws Exception {
     // MOCK
-    when(redis.rpoplpush(any(String.class), any(String.class))).thenReturn("foo");
+    when(subQueue.nonBlockingDequeue(any(Jedis.class))).thenReturn("foo");
+    ExecutorService service = mock(ExecutorService.class);
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", -1, ImmutableList.of(subQueue));
 
     // ACT
-    String val = queue.dequeue(redis);
+    String val = queue.dequeue(redis, service);
 
     // ASSERT
+    verifyNoInteractions(service);
     assertThat(val).isEqualTo("foo");
   }
 
@@ -129,16 +121,19 @@ public class BalancedRedisQueueMockTest {
   @Test
   public void dequeueExponentialBackoffElementDequeuedOnBlock() throws Exception {
     // MOCK
-    when(redis.rpoplpush(any(String.class), any(String.class))).thenReturn(null);
-    when(redis.brpoplpush(any(String.class), any(String.class), any(int.class))).thenReturn("foo");
+    when(subQueue.nonBlockingDequeue(any(Jedis.class))).thenReturn(null);
+    when(subQueue.dequeue(any(Jedis.class), any(Integer.class), any(ExecutorService.class)))
+        .thenReturn("foo");
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", -1, ImmutableList.of(subQueue));
+    ExecutorService service = mock(ExecutorService.class);
 
     // ACT
-    String val = queue.dequeue(redis);
+    String val = queue.dequeue(redis, service);
 
     // ASSERT
+    verifyNoInteractions(service);
     assertThat(val).isEqualTo("foo");
   }
 
@@ -214,10 +209,10 @@ public class BalancedRedisQueueMockTest {
   @Test
   public void sizeInitialSizeIsZero() throws Exception {
     // MOCK
-    when(redis.llen(any(String.class))).thenReturn(0L);
+    when(subQueue.size(any(Jedis.class))).thenReturn(0L);
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", -1, ImmutableList.of(subQueue));
 
     // ACT
     long size = queue.size(redis);
@@ -232,28 +227,19 @@ public class BalancedRedisQueueMockTest {
   @Test
   public void visitCheckVisitOfEachElement() throws Exception {
     // MOCK
-    when(redis.lrange(any(String.class), any(Long.class), any(Long.class)))
-        .thenReturn(
-            Arrays.asList(
-                "element 1",
-                "element 2",
-                "element 3",
-                "element 4",
-                "element 5",
-                "element 6",
-                "element 7",
-                "element 8"));
+    doAnswer(
+            invocation -> {
+              StringVisitor visitor = invocation.getArgument(1);
+              for (int i = 1; i <= 8; i++) {
+                visitor.visit("element " + i);
+              }
+              return null;
+            })
+        .when(subQueue)
+        .visit(any(Jedis.class), any(StringVisitor.class));
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
-    queue.push(redis, "element 1");
-    queue.push(redis, "element 2");
-    queue.push(redis, "element 3");
-    queue.push(redis, "element 4");
-    queue.push(redis, "element 5");
-    queue.push(redis, "element 6");
-    queue.push(redis, "element 7");
-    queue.push(redis, "element 8");
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", -1, ImmutableList.of(subQueue));
 
     // ACT
     List<String> visited = new ArrayList<>();
@@ -266,15 +252,16 @@ public class BalancedRedisQueueMockTest {
     queue.visit(redis, visitor);
 
     // ASSERT
-    assertThat(visited.size()).isEqualTo(8);
-    assertThat(visited.contains("element 1")).isTrue();
-    assertThat(visited.contains("element 2")).isTrue();
-    assertThat(visited.contains("element 3")).isTrue();
-    assertThat(visited.contains("element 4")).isTrue();
-    assertThat(visited.contains("element 5")).isTrue();
-    assertThat(visited.contains("element 6")).isTrue();
-    assertThat(visited.contains("element 7")).isTrue();
-    assertThat(visited.contains("element 8")).isTrue();
+    assertThat(visited)
+        .containsExactly(
+            "element 1",
+            "element 2",
+            "element 3",
+            "element 4",
+            "element 5",
+            "element 6",
+            "element 7",
+            "element 8");
   }
 
   // Function under test: visitDequeue
@@ -283,20 +270,19 @@ public class BalancedRedisQueueMockTest {
   @Test
   public void visitDequeueCheckVisitOfEachElement() throws Exception {
     // MOCK
-    when(redis.lrange(any(String.class), any(Long.class), any(Long.class)))
-        .thenReturn(
-            Arrays.asList(
-                "element 1",
-                "element 2",
-                "element 3",
-                "element 4",
-                "element 5",
-                "element 6",
-                "element 7",
-                "element 8"));
+    doAnswer(
+            invocation -> {
+              StringVisitor visitor = invocation.getArgument(1);
+              for (int i = 1; i <= 8; i++) {
+                visitor.visit("element " + i);
+              }
+              return null;
+            })
+        .when(subQueue)
+        .visitDequeue(any(Jedis.class), any(StringVisitor.class));
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", -1, ImmutableList.of(subQueue));
 
     // ACT
     List<String> visited = new ArrayList<>();
@@ -309,53 +295,34 @@ public class BalancedRedisQueueMockTest {
     queue.visitDequeue(redis, visitor);
 
     // ASSERT
-    assertThat(visited.size()).isEqualTo(8);
-    assertThat(visited.contains("element 1")).isTrue();
-    assertThat(visited.contains("element 2")).isTrue();
-    assertThat(visited.contains("element 3")).isTrue();
-    assertThat(visited.contains("element 4")).isTrue();
-    assertThat(visited.contains("element 5")).isTrue();
-    assertThat(visited.contains("element 6")).isTrue();
-    assertThat(visited.contains("element 7")).isTrue();
-    assertThat(visited.contains("element 8")).isTrue();
+    assertThat(visited)
+        .containsExactly(
+            "element 1",
+            "element 2",
+            "element 3",
+            "element 4",
+            "element 5",
+            "element 6",
+            "element 7",
+            "element 8");
   }
 
   // Function under test: isEvenlyDistributed
   // Reason for testing: an empty queue is always already evenly distributed
   // Failure explanation: evenly distributed is not working on the empty queue
   @Test
-  public void isEvenlyDistributedEmptyIsEvenlyDistributed() throws Exception {
+  public void emptyIsEvenlyDistributed() throws Exception {
     // MOCK
-    when(redis.llen(any(String.class))).thenReturn(0L);
+    when(subQueue.size(any(Jedis.class))).thenReturn(0L);
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", -1, ImmutableList.of(subQueue));
 
     // ACT
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);
 
     // ASSERT
-    verify(redis, times(2)).llen(any(String.class));
-    assertThat(isEvenlyDistributed).isTrue();
-  }
-
-  // Function under test: isEvenlyDistributed for priority
-  // Reason for testing: an empty queue is always already evenly distributed
-  // Failure explanation: evenly distributed is not working on the empty queue
-  @Test
-  public void isEvenlyDistributedEmptyIsEvenlyDistributedPriority() throws Exception {
-    // MOCK
-    when(redis.zcard(any(String.class))).thenReturn(0L);
-
-    // ARRANGE
-    BalancedRedisQueue queue =
-        new BalancedRedisQueue("test", ImmutableList.of(), Queue.QUEUE_TYPE.priority);
-
-    // ACT
-    Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);
-
-    // ASSERT
-    verify(redis, times(2)).zcard(any(String.class));
+    verify(subQueue, times(1)).size(any(Jedis.class));
     assertThat(isEvenlyDistributed).isTrue();
   }
 
@@ -363,74 +330,34 @@ public class BalancedRedisQueueMockTest {
   // Reason for testing: infinite queues allow queuing
   // Failure explanation: the queue is not accepting queuing when it should
   @Test
-  public void canQueueIfiniteQueueAllowsQueuing() throws Exception {
-    // MOCK
-    when(redis.llen(any(String.class))).thenReturn(999L);
-
+  public void canQueueInfiniteQueueAllowsQueuing() throws Exception {
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), -1);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", -1, ImmutableList.of(subQueue));
 
     // ACT
     boolean canQueue = queue.canQueue(redis);
 
     // ASSERT
+    verifyNoInteractions(subQueue);
     assertThat(canQueue).isTrue();
-  }
-
-  // Function under test: canQueue
-  // Reason for testing: infinite queues allow queuing for priority
-  // Failure explanation: the queue is not accepting queuing when it should
-  @Test
-  public void canQueueIfinitePriorityQueueAllowsQueuing() throws Exception {
-    // MOCK
-    when(redis.zcard(any(String.class))).thenReturn(999L);
-
-    // ARRANGE
-    BalancedRedisQueue queue =
-        new BalancedRedisQueue("test", ImmutableList.of(), -1, Queue.QUEUE_TYPE.priority);
-
-    // ACT
-    boolean canQueue = queue.canQueue(redis);
-
-    // ASSERT
-    assertThat(canQueue).isTrue();
-  }
-
-  // Function under test: canQueue for regular
-  // Reason for testing: Full queues do not allow queuing
-  // Failure explanation: the queue is still allowing queuing despite being full
-  @Test
-  public void canQueueFullQueueNotAllowsQueuing() throws Exception {
-    // MOCK
-    when(redis.llen(any(String.class))).thenReturn(123L);
-
-    // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 123);
-
-    // ACT
-    boolean canQueue = queue.canQueue(redis);
-
-    // ASSERT
-    assertThat(canQueue).isFalse();
   }
 
   // Function under test: canQueue for priority
   // Reason for testing: Full queues do not allow queuing
-  // Failure explanation: the queue is still allowing queuing despite being full
+  // Failure explanation: the queue is still allows queueing despite being full
   @Test
-  public void canQueueFullPriorityQueueNotAllowsQueuing() throws Exception {
+  public void canQueueFullQueueNotAllowsQueueing() throws Exception {
     // MOCK
-    when(redis.zcard(any(String.class))).thenReturn(123L);
+    when(subQueue.size(any(Jedis.class))).thenReturn(123L);
 
     // ARRANGE
-    BalancedRedisQueue queue =
-        new BalancedRedisQueue("test", ImmutableList.of(), 123, Queue.QUEUE_TYPE.priority);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", 123, ImmutableList.of(subQueue));
 
     // ACT
     boolean canQueue = queue.canQueue(redis);
 
     // ASSERT
-    verify(redis).zcard(any(String.class));
+    verify(subQueue, times(1)).size(any(Jedis.class));
     assertThat(canQueue).isFalse();
   }
 }

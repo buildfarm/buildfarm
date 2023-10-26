@@ -23,24 +23,23 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.exceptions.JedisClusterMaxAttemptsException;
+import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.exceptions.JedisClusterOperationException;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
-import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
 
 public class RedisClient implements Closeable {
   private static final String MISCONF_RESPONSE = "MISCONF";
 
   @FunctionalInterface
   public interface JedisContext<T> {
-    T run(JedisCluster jedis) throws JedisException;
+    T run(UnifiedJedis jedis) throws JedisException;
   }
 
   @FunctionalInterface
   public interface JedisInterruptibleContext<T> {
-    T run(JedisCluster jedis) throws InterruptedException, JedisException;
+    T run(UnifiedJedis jedis) throws InterruptedException, JedisException;
   }
 
   private static class JedisMisconfigurationException extends JedisDataException {
@@ -57,11 +56,11 @@ public class RedisClient implements Closeable {
     }
   }
 
-  private final JedisCluster jedis;
+  private final UnifiedJedis jedis;
 
   private boolean closed = false;
 
-  public RedisClient(JedisCluster jedis) {
+  public RedisClient(UnifiedJedis jedis) {
     this.jedis = jedis;
   }
 
@@ -81,7 +80,7 @@ public class RedisClient implements Closeable {
     }
   }
 
-  public void run(Consumer<JedisCluster> withJedis) throws IOException {
+  public void run(Consumer<UnifiedJedis> withJedis) throws IOException {
     call(
         (JedisContext<Void>)
             jedis -> {
@@ -122,7 +121,7 @@ public class RedisClient implements Closeable {
         }
         throw e;
       }
-    } catch (JedisMisconfigurationException | JedisNoReachableClusterNodeException e) {
+    } catch (JedisMisconfigurationException | JedisClusterOperationException e) {
       // In regards to a Jedis misconfiguration,
       // the backplane is configured not to accept writes currently
       // as a result of an error. The error is meant to indicate
@@ -154,8 +153,6 @@ public class RedisClient implements Closeable {
         }
       }
       throw new IOException(status.withCause(cause == null ? e : cause).asRuntimeException());
-    } catch (JedisClusterMaxAttemptsException e) {
-      throw new IOException(Status.UNAVAILABLE.withCause(e.getCause()).asRuntimeException());
     }
   }
 }

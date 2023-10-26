@@ -15,24 +15,24 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.common.config.Queue;
+import build.buildfarm.common.config.Queue.QUEUE_TYPE;
 
 /**
- * @class RedisQueueFactory
- * @brief A redis queue factory.
+ * @class RedisQueues
+ * @brief Managed redis queue creation.
  */
-public class RedisQueueFactory {
+public final class RedisQueues {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  public QueueInterface getQueue(Queue.QUEUE_TYPE queueType, String name) {
-    if (queueType == null) {
-      return null;
-    }
-    if (queueType.equals(Queue.QUEUE_TYPE.standard)) {
+  private RedisQueues() {}
+
+  public static QueueInterface create(QUEUE_TYPE queueType, String name) {
+    if (queueType == QUEUE_TYPE.standard) {
       return new RedisQueue(name);
-    } else if (queueType.equals(Queue.QUEUE_TYPE.priority)) {
+    }
+    if (queueType == QUEUE_TYPE.priority) {
       return new RedisPriorityQueue(name, configs.getBackplane().getPriorityPollIntervalMillis());
     }
-    return null;
+    throw new IllegalArgumentException("Unknown queueType " + queueType);
   }
 }

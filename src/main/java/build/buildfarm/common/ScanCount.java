@@ -16,10 +16,10 @@ package build.buildfarm.common;
 
 import com.google.common.collect.Sets;
 import java.util.Set;
-import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class ScanCount
@@ -39,21 +39,26 @@ public class ScanCount {
    * @return Total number of query results.
    * @note Suggested return identifier: count.
    */
-  public static int get(JedisCluster cluster, String query, int scanCount) {
+  public static int get(UnifiedJedis jedis, String query, int scanCount) {
     Set<String> keys = Sets.newHashSet();
 
-    // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
-    // This prevents us from using the cluster's SCAN to traverse all existing keys.
-    // That's why we choose to scan each of the jedisNode's individually.
-    cluster
-        .getClusterNodes()
-        .values()
-        .forEach(
-            pool -> {
-              try (Jedis node = pool.getResource()) {
-                addKeys(node, keys, query, scanCount);
-              }
-            });
+    if (jedis instanceof JedisCluster) {
+      JedisCluster cluster = (JedisCluster) jedis;
+      // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
+      // This prevents us from using the cluster's SCAN to traverse all existing keys.
+      // That's why we choose to scan each of the jedisNode's individually.
+      cluster
+          .getClusterNodes()
+          .values()
+          .forEach(
+              pool -> {
+                try (UnifiedJedis node = new UnifiedJedis(pool.getResource())) {
+                  addKeys(node, keys, query, scanCount);
+                }
+              });
+    } else {
+      addKeys(jedis, keys, query, scanCount);
+    }
 
     return keys.size();
   }
@@ -67,7 +72,7 @@ public class ScanCount {
    * @param scanCount The count per scan.
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
-  private static void addKeys(Jedis node, Set<String> keys, String query, int scanCount) {
+  private static void addKeys(UnifiedJedis node, Set<String> keys, String query, int scanCount) {
     // construct query
     ScanParams params = new ScanParams();
     params.match(query);

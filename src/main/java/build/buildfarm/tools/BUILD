@@ -143,7 +143,6 @@ java_binary(
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/worker/shard",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "//third_party/jedis",
         "@maven//:com_github_pcj_google_options",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
@@ -153,6 +152,7 @@ java_binary(
         "@maven//:io_grpc_grpc_core",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
+        "@maven//:redis_clients_jedis",
     ],
 )
 
@@ -304,7 +304,6 @@ java_library(
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/worker/shard",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "//third_party/jedis",
         "@maven//:com_github_pcj_google_options",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
@@ -314,5 +313,6 @@ java_library(
         "@maven//:io_grpc_grpc_core",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
+        "@maven//:redis_clients_jedis",
     ],
 )

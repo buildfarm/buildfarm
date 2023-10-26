@@ -24,14 +24,14 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
-import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPubSub;
+import redis.clients.jedis.UnifiedJedis;
 
 @Log
 class RedisShardSubscription implements Runnable {
   private final JedisPubSub subscriber;
   private final InterruptingRunnable onUnsubscribe;
-  private final Consumer<JedisCluster> onReset;
+  private final Consumer<UnifiedJedis> onReset;
   private final Supplier<List<String>> subscriptions;
   private final RedisClient client;
   private final AtomicBoolean stopped = new AtomicBoolean(false);
@@ -39,7 +39,7 @@ class RedisShardSubscription implements Runnable {
   RedisShardSubscription(
       JedisPubSub subscriber,
       InterruptingRunnable onUnsubscribe,
-      Consumer<JedisCluster> onReset,
+      Consumer<UnifiedJedis> onReset,
       Supplier<List<String>> subscriptions,
       RedisClient client) {
     this.subscriber = subscriber;
@@ -53,7 +53,7 @@ class RedisShardSubscription implements Runnable {
     return subscriber;
   }
 
-  private void subscribe(JedisCluster jedis, boolean isReset) {
+  private void subscribe(UnifiedJedis jedis, boolean isReset) {
     if (isReset) {
       onReset.accept(jedis);
     }
