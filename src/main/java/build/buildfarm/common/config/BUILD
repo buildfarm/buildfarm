@@ -10,7 +10,6 @@ java_library(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
-        "@jedis//jar",
         "@maven//:com_github_oshi_oshi_core",
         "@maven//:com_github_pcj_google_options",
         "@maven//:com_google_code_findbugs_jsr305",
@@ -22,5 +21,6 @@ java_library(
         "@maven//:org_projectlombok_lombok",
         "@maven//:org_redisson_redisson",
         "@maven//:org_yaml_snakeyaml",
+        "@maven//:redis_clients_jedis",
     ],
 )

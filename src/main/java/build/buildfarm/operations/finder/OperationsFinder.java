@@ -34,10 +34,10 @@ import java.util.Map;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class OperationsFinder
@@ -57,24 +57,29 @@ public class OperationsFinder {
    * @note Suggested return identifier: results.
    */
   public static FindOperationsResults findEnrichedOperations(
-      JedisCluster cluster, Instance instance, FindOperationsSettings settings) {
+      UnifiedJedis jedis, Instance instance, FindOperationsSettings settings) {
     FindOperationsResults results = new FindOperationsResults();
     results.operations = new HashMap<>();
 
     adjustFilter(settings);
 
-    // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
-    // This prevents us from using the cluster's SCAN to traverse all of the CAS.
-    // That's why we choose to scan each of the jedisNode's individually.
-    cluster
-        .getClusterNodes()
-        .values()
-        .forEach(
-            pool -> {
-              try (Jedis node = pool.getResource()) {
-                findEnrichedOperationOnNode(cluster, node, instance, settings, results);
-              }
-            });
+    if (jedis instanceof JedisCluster) {
+      JedisCluster cluster = (JedisCluster) jedis;
+      // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
+      // This prevents us from using the cluster's SCAN to traverse all of the CAS.
+      // That's why we choose to scan each of the jedisNode's individually.
+      cluster
+          .getClusterNodes()
+          .values()
+          .forEach(
+              pool -> {
+                try (UnifiedJedis node = new UnifiedJedis(pool.getResource())) {
+                  findEnrichedOperationOnNode(cluster, node, instance, settings, results);
+                }
+              });
+    } else {
+      findEnrichedOperationOnNode(jedis, jedis, instance, settings, results);
+    }
 
     return results;
   }
@@ -89,23 +94,28 @@ public class OperationsFinder {
    * @note Suggested return identifier: results.
    */
   public static List<Operation> findOperations(
-      JedisCluster cluster, FindOperationsSettings settings) {
+      UnifiedJedis jedis, FindOperationsSettings settings) {
     List<Operation> results = new ArrayList<>();
 
     adjustFilter(settings);
 
-    // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
-    // This prevents us from using the cluster's SCAN to traverse all of the CAS.
-    // That's why we choose to scan each of the jedisNode's individually.
-    cluster
-        .getClusterNodes()
-        .values()
-        .forEach(
-            pool -> {
-              try (Jedis node = pool.getResource()) {
-                findOperationOnNode(cluster, node, settings, results);
-              }
-            });
+    if (jedis instanceof JedisCluster) {
+      JedisCluster cluster = (JedisCluster) jedis;
+      // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
+      // This prevents us from using the cluster's SCAN to traverse all of the CAS.
+      // That's why we choose to scan each of the jedisNode's individually.
+      cluster
+          .getClusterNodes()
+          .values()
+          .forEach(
+              pool -> {
+                try (UnifiedJedis node = new UnifiedJedis(pool.getResource())) {
+                  findOperationOnNode(cluster, node, settings, results);
+                }
+              });
+    } else {
+      findOperationOnNode(jedis, jedis, settings, results);
+    }
 
     return results;
   }
@@ -135,8 +145,8 @@ public class OperationsFinder {
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static void findEnrichedOperationOnNode(
-      JedisCluster cluster,
-      Jedis node,
+      UnifiedJedis cluster,
+      UnifiedJedis node,
       Instance instance,
       FindOperationsSettings settings,
       FindOperationsResults results) {
@@ -169,7 +179,10 @@ public class OperationsFinder {
    * @param results Accumulating results from performing a search.
    */
   private static void findOperationOnNode(
-      JedisCluster cluster, Jedis node, FindOperationsSettings settings, List<Operation> results) {
+      UnifiedJedis cluster,
+      UnifiedJedis node,
+      FindOperationsSettings settings,
+      List<Operation> results) {
     // iterate over all operation entries via scanning
 
     // construct query
@@ -198,7 +211,7 @@ public class OperationsFinder {
    * @param results Accumulating results from finding operations.
    */
   private static void collectOperations(
-      JedisCluster cluster,
+      UnifiedJedis cluster,
       Instance instance,
       List<String> operationKeys,
       String filterPredicate,
@@ -220,7 +233,7 @@ public class OperationsFinder {
    * @param results Accumulating results from finding operations.
    */
   private static void collectOperations(
-      JedisCluster cluster,
+      UnifiedJedis cluster,
       List<String> operationKeys,
       String filterPredicate,
       List<Operation> results) {

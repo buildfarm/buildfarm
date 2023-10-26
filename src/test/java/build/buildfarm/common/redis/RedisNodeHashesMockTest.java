@@ -15,20 +15,28 @@
 package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static redis.clients.jedis.Protocol.ClusterKeyword.SHARDS;
+import static redis.clients.jedis.Protocol.Command.CLUSTER;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Connection;
+import redis.clients.jedis.ConnectionPool;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.resps.ClusterShardInfo;
 import redis.clients.jedis.util.SafeEncoder;
 
 /**
@@ -47,17 +55,23 @@ public class RedisNodeHashesMockTest {
   @Test
   public void getEvenlyDistributedHashesCanRetrieveDistributedHashes() throws Exception {
     // ARRANGE
-    Jedis node = mock(Jedis.class);
-    when(node.clusterSlots())
-        .thenReturn(
-            Collections.singletonList(
-                Arrays.asList(0L, 100L, Arrays.asList(null, null, SafeEncoder.encode("nodeId")))));
+    Connection connection = spy(Connection.class);
+    doNothing().when(connection).connect();
+    doNothing().when(connection).sendCommand(CLUSTER, SHARDS);
+    doReturn(
+            Arrays.asList(
+                Arrays.asList(
+                    SafeEncoder.encode(ClusterShardInfo.SLOTS), Arrays.asList(0L, 100L),
+                    SafeEncoder.encode(ClusterShardInfo.NODES), Arrays.asList())))
+        .when(connection)
+        .getObjectMultiBulkReply();
 
-    JedisPool pool = mock(JedisPool.class);
-    when(pool.getResource()).thenReturn(node);
+    ConnectionPool pool = mock(ConnectionPool.class);
+    when(pool.getResource()).thenReturn(connection);
+    connection.setHandlingPool(pool);
 
     JedisCluster redis = mock(JedisCluster.class);
-    Map<String, JedisPool> poolMap = new HashMap<>();
+    Map<String, ConnectionPool> poolMap = new HashMap<>();
     poolMap.put("key1", pool);
     when(redis.getClusterNodes()).thenReturn(poolMap);
 
@@ -66,6 +80,9 @@ public class RedisNodeHashesMockTest {
 
     // ASSERT
     assertThat(hashtags.isEmpty()).isFalse();
+    verify(pool, times(1)).getResource();
+    verify(pool, times(1)).returnResource(connection);
+    verifyNoMoreInteractions(pool);
   }
 
   // Function under test: getEvenlyDistributedHashes
@@ -99,19 +116,27 @@ public class RedisNodeHashesMockTest {
   @Test
   public void getEvenlyDistributedHashesWithPrefixExpectedPrefixHashes() throws Exception {
     // ARRANGE
-    Jedis node = mock(Jedis.class);
-    when(node.clusterSlots())
-        .thenReturn(
+    Connection connection = spy(Connection.class);
+    doNothing().when(connection).connect();
+    doNothing().when(connection).sendCommand(CLUSTER, SHARDS);
+    doReturn(
             Arrays.asList(
-                Arrays.asList(0L, 100L, Arrays.asList(null, null, SafeEncoder.encode("nodeId1"))),
                 Arrays.asList(
-                    101L, 200L, Arrays.asList(null, null, SafeEncoder.encode("nodeId2")))));
+                    SafeEncoder.encode(ClusterShardInfo.SLOTS), Arrays.asList(0L, 100L),
+                    SafeEncoder.encode(ClusterShardInfo.NODES), Arrays.asList()),
+                Arrays.asList(
+                    SafeEncoder.encode(ClusterShardInfo.SLOTS), Arrays.asList(101L, 200L),
+                    SafeEncoder.encode(ClusterShardInfo.NODES), Arrays.asList())))
+        .when(connection)
+        .getObjectMultiBulkReply();
+    doReturn(false).when(connection).isBroken();
 
-    JedisPool pool = mock(JedisPool.class);
-    when(pool.getResource()).thenReturn(node);
+    ConnectionPool pool = mock(ConnectionPool.class);
+    when(pool.getResource()).thenReturn(connection);
+    connection.setHandlingPool(pool);
 
     JedisCluster redis = mock(JedisCluster.class);
-    Map<String, JedisPool> poolMap = new HashMap<>();
+    Map<String, ConnectionPool> poolMap = new HashMap<>();
     poolMap.put("key1", pool);
     when(redis.getClusterNodes()).thenReturn(poolMap);
 
@@ -120,8 +145,17 @@ public class RedisNodeHashesMockTest {
         RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(redis, "Execution");
 
     // ASSERT
+    verify(connection, times(1)).sendCommand(CLUSTER, SHARDS);
+    verify(connection, times(1)).getObjectMultiBulkReply();
+    verify(connection, times(1)).close();
+    verify(connection, times(1)).isBroken();
+    verify(connection, times(1)).setHandlingPool(pool);
+    verifyNoMoreInteractions(connection);
     assertThat(hashtags.size()).isEqualTo(2);
     assertThat(hashtags.get(0)).isEqualTo("Execution:97");
     assertThat(hashtags.get(1)).isEqualTo("Execution:66");
+    verify(pool, times(1)).getResource();
+    verify(pool, times(1)).returnResource(connection);
+    verifyNoMoreInteractions(pool);
   }
 }

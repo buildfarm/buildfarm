@@ -59,6 +59,12 @@ public class BuildfarmExecutors {
         nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
+  public static ExecutorService getDequeuePool() {
+    String threadNameFormat = "dequeue-pool-%d";
+    return Executors.newCachedThreadPool(
+        new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
+  }
+
   public static ListeningExecutorService getTransformServicePool() {
     int nThreads = 24;
     String threadNameFormat = "transform-service-pool-%d";

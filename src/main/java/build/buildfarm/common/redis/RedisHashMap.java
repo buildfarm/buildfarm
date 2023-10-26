@@ -18,8 +18,8 @@ import com.google.common.collect.Iterables;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisClusterPipeline;
+import redis.clients.jedis.PipelineBase;
+import redis.clients.jedis.UnifiedJedis;
 
 /**
  * @class RedisHashMap
@@ -57,7 +57,7 @@ public class RedisHashMap {
    * @return Whether a new key was inserted. If a key is overwritten with a new value, this would be
    *     false.
    */
-  public boolean insert(JedisCluster jedis, String key, String value) {
+  public boolean insert(UnifiedJedis jedis, String key, String value) {
     return jedis.hset(name, key, value) == 1;
   }
 
@@ -69,7 +69,7 @@ public class RedisHashMap {
    * @param value The value for the key.
    * @return Whether a new key was inserted. If a key already exists, this would be false.
    */
-  public boolean insertIfMissing(JedisCluster jedis, String key, String value) {
+  public boolean insertIfMissing(UnifiedJedis jedis, String key, String value) {
     return jedis.hsetnx(name, key, value) == 1;
   }
 
@@ -80,7 +80,7 @@ public class RedisHashMap {
    * @param key The name of the key.
    * @return Whether the key exists or not in the map.
    */
-  public boolean exists(JedisCluster jedis, String key) {
+  public boolean exists(UnifiedJedis jedis, String key) {
     return jedis.hexists(name, key);
   }
 
@@ -91,7 +91,7 @@ public class RedisHashMap {
    * @param key The name of the key.
    * @return Whether the key was removed.
    */
-  public boolean remove(JedisCluster jedis, String key) {
+  public boolean remove(UnifiedJedis jedis, String key) {
     return jedis.hdel(name, key) == 1;
   }
 
@@ -101,12 +101,12 @@ public class RedisHashMap {
    * @param jedis Jedis cluster client.
    * @param key The names of the keys.
    */
-  public void remove(JedisCluster jedis, Iterable<String> keys) {
-    JedisClusterPipeline p = jedis.pipelined();
-    for (String key : keys) {
-      p.hdel(name, key);
+  public void remove(UnifiedJedis jedis, Iterable<String> keys) {
+    try (PipelineBase p = jedis.pipelined()) {
+      for (String key : keys) {
+        p.hdel(name, key);
+      }
     }
-    p.sync();
   }
 
   /**
@@ -115,7 +115,7 @@ public class RedisHashMap {
    * @return The size of the map.
    * @note Suggested return identifier: size.
    */
-  public long size(JedisCluster jedis) {
+  public long size(UnifiedJedis jedis) {
     return jedis.hlen(name);
   }
 
@@ -125,7 +125,7 @@ public class RedisHashMap {
    * @param jedis Jedis cluster client.
    * @return The redis hashmap keys represented as a set.
    */
-  public Set<String> keys(JedisCluster jedis) {
+  public Set<String> keys(UnifiedJedis jedis) {
     return jedis.hkeys(name);
   }
 
@@ -135,7 +135,7 @@ public class RedisHashMap {
    * @param jedis Jedis cluster client.
    * @return The redis hashmap represented as a java map.
    */
-  public Map<String, String> asMap(JedisCluster jedis) {
+  public Map<String, String> asMap(UnifiedJedis jedis) {
     return jedis.hgetAll(name);
   }
 
@@ -145,7 +145,7 @@ public class RedisHashMap {
    * @param fields The name of the fields.
    * @return Values associated with the specified fields
    */
-  public List<String> mget(JedisCluster jedis, Iterable<String> fields) {
+  public List<String> mget(UnifiedJedis jedis, Iterable<String> fields) {
     return jedis.hmget(name, Iterables.toArray(fields, String.class));
   }
 }

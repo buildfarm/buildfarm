@@ -40,7 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.naming.ConfigurationException;
-import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.UnifiedJedis;
 
 class WorkerProfile {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
@@ -113,7 +113,7 @@ class WorkerProfile {
     return client.call(jedis -> fetchWorkers(jedis, System.currentTimeMillis()));
   }
 
-  private static Set<String> fetchWorkers(JedisCluster jedis, long now) {
+  private static Set<String> fetchWorkers(UnifiedJedis jedis, long now) {
     Set<String> workers = Sets.newConcurrentHashSet();
     for (Map.Entry<String, String> entry :
         jedis.hgetAll(configs.getBackplane().getWorkersHashName() + "_storage").entrySet()) {

@@ -16,6 +16,8 @@ package build.buildfarm.instance.shard;
 
 import build.buildfarm.common.config.BuildfarmConfigs;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashSet;
@@ -23,13 +25,16 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 import javax.naming.ConfigurationException;
+import redis.clients.jedis.ConnectionPool;
+import redis.clients.jedis.ConnectionPoolConfig;
+import redis.clients.jedis.DefaultJedisClientConfig;
 import redis.clients.jedis.HostAndPort;
-import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.exceptions.JedisClusterOperationException;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 import redis.clients.jedis.util.JedisURIHelper;
 
 /**
@@ -49,7 +54,7 @@ public class JedisClusterFactory {
    * @note Suggested return identifier: jedis.
    * @link <a href="https://redis.io/commands/client-setname/">Redis Client name</a>
    */
-  public static Supplier<JedisCluster> create(String identifier) throws ConfigurationException {
+  public static Supplier<UnifiedJedis> create(String identifier) throws ConfigurationException {
     // null password is required to elicit no auth in jedis
     String[] redisNodes = configs.getBackplane().getRedisNodes();
     if (redisNodes != null && redisNodes.length > 0) {
@@ -59,7 +64,7 @@ public class JedisClusterFactory {
           configs.getBackplane().getTimeout(),
           configs.getBackplane().getMaxAttempts(),
           Strings.emptyToNull(configs.getBackplane().getRedisPassword()),
-          createJedisPoolConfig());
+          createConnectionPoolConfig());
     }
 
     // support "" as redis password.
@@ -69,7 +74,7 @@ public class JedisClusterFactory {
         configs.getBackplane().getTimeout(),
         configs.getBackplane().getMaxAttempts(),
         Strings.emptyToNull(configs.getBackplane().getRedisPassword()),
-        createJedisPoolConfig());
+        createConnectionPoolConfig());
   }
 
   /**
@@ -79,8 +84,8 @@ public class JedisClusterFactory {
    * @return An established test jedis client used to operate on a redis cluster.
    * @note Suggested return identifier: jedis.
    */
-  public static JedisCluster createTest() throws Exception {
-    JedisCluster redis = JedisClusterFactory.create("test").get();
+  public static UnifiedJedis createTest() throws Exception {
+    UnifiedJedis redis = JedisClusterFactory.create("test").get();
 
     // use the client to create an empty redis cluster
     // this will prevent any persistent data across test runs
@@ -96,10 +101,15 @@ public class JedisClusterFactory {
    * @param cluster An established jedis client to operate on a redis cluster.
    * @note Overloaded.
    */
-  private static void deleteExistingKeys(JedisCluster cluster) throws Exception {
-    for (JedisPool pool : cluster.getClusterNodes().values()) {
-      Jedis node = pool.getResource();
-      deleteExistingKeys(node);
+  private static void deleteExistingKeys(UnifiedJedis jedis) throws Exception {
+    if (jedis instanceof JedisCluster) {
+      JedisCluster cluster = (JedisCluster) jedis;
+      for (ConnectionPool pool : cluster.getClusterNodes().values()) {
+        UnifiedJedis node = new UnifiedJedis(pool.getResource());
+        deleteNodeExistingKeys(node);
+      }
+    } else {
+      deleteNodeExistingKeys(jedis);
     }
   }
 
@@ -111,7 +121,7 @@ public class JedisClusterFactory {
    * @note Overloaded.
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
-  private static void deleteExistingKeys(Jedis node) {
+  private static void deleteNodeExistingKeys(UnifiedJedis node) {
     String nextCursor = "0";
     Set<String> matchingKeys = new HashSet<>();
     ScanParams params = new ScanParams();
@@ -139,6 +149,40 @@ public class JedisClusterFactory {
     }
   }
 
+  private static UnifiedJedis createJedis(
+      Set<HostAndPort> hostAndPorts,
+      int connectionTimeout,
+      int soTimeout,
+      int maxAttempts,
+      String password,
+      String identifier,
+      ConnectionPoolConfig poolConfig,
+      boolean ssl) {
+    try {
+      return new JedisCluster(
+          hostAndPorts,
+          connectionTimeout,
+          soTimeout,
+          maxAttempts,
+          password,
+          identifier,
+          poolConfig,
+          ssl);
+    } catch (JedisClusterOperationException e) {
+      // probably not a cluster
+      return new JedisPooled(
+          poolConfig,
+          Iterables.getOnlyElement(hostAndPorts),
+          DefaultJedisClientConfig.builder()
+              .connectionTimeoutMillis(connectionTimeout)
+              .socketTimeoutMillis(soTimeout)
+              .password(password)
+              .clientName(identifier)
+              .ssl(ssl)
+              .build());
+    }
+  }
+
   /**
    * @brief Create a jedis cluster instance with connection settings.
    * @details Use the URI, pool and connection information to connect to a redis cluster server and
@@ -150,16 +194,16 @@ public class JedisClusterFactory {
    * @return An established jedis client used to operate on the redis cluster.
    * @note Suggested return identifier: jedis.
    */
-  private static Supplier<JedisCluster> createJedisClusterFactory(
+  private static Supplier<UnifiedJedis> createJedisClusterFactory(
       String identifier,
       URI redisUri,
       int timeout,
       int maxAttempts,
       String password,
-      JedisPoolConfig poolConfig) {
+      ConnectionPoolConfig poolConfig) {
     return () ->
-        new JedisCluster(
-            new HostAndPort(redisUri.getHost(), redisUri.getPort()),
+        createJedis(
+            ImmutableSet.of(new HostAndPort(redisUri.getHost(), redisUri.getPort())),
             /* connectionTimeout= */ Integer.max(2000, timeout),
             /* soTimeout= */ Integer.max(2000, timeout),
             Integer.max(5, maxAttempts),
@@ -180,15 +224,15 @@ public class JedisClusterFactory {
    * @return An established jedis client used to operate on the redis cluster.
    * @note Suggested return identifier: jedis.
    */
-  private static Supplier<JedisCluster> createJedisClusterFactory(
+  private static Supplier<UnifiedJedis> createJedisClusterFactory(
       String identifier,
       Set<HostAndPort> redisUrisNodes,
       int timeout,
       int maxAttempts,
       String password,
-      JedisPoolConfig poolConfig) {
+      ConnectionPoolConfig poolConfig) {
     return () ->
-        new JedisCluster(
+        createJedis(
             redisUrisNodes,
             /* connectionTimeout= */ Integer.max(2000, timeout),
             /* soTimeout= */ Integer.max(2000, timeout),
@@ -200,15 +244,15 @@ public class JedisClusterFactory {
   }
 
   /**
-   * @brief Create a jedis pool config.
+   * @brief Create a connection pool config.
    * @details Use configuration to build the appropriate jedis pool configuration.
    * @return A created jedis pool config.
    * @note Suggested return identifier: poolConfig.
    */
-  private static JedisPoolConfig createJedisPoolConfig() {
-    JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
-    jedisPoolConfig.setMaxTotal(configs.getBackplane().getJedisPoolMaxTotal());
-    return jedisPoolConfig;
+  private static ConnectionPoolConfig createConnectionPoolConfig() {
+    ConnectionPoolConfig connectionPoolConfig = new ConnectionPoolConfig();
+    connectionPoolConfig.setMaxTotal(configs.getBackplane().getJedisPoolMaxTotal());
+    return connectionPoolConfig;
   }
 
   /**
