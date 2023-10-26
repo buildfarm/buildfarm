@@ -23,6 +23,7 @@ import static build.buildfarm.instance.server.AbstractServerInstance.DUPLICATE_D
 import static build.buildfarm.instance.server.AbstractServerInstance.INVALID_COMMAND;
 import static build.buildfarm.instance.server.AbstractServerInstance.OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR;
 import static build.buildfarm.instance.server.AbstractServerInstance.OUTPUT_FILE_IS_OUTPUT_ANCESTOR;
+import static build.buildfarm.instance.server.AbstractServerInstance.SYMLINK_TARGET_ABSOLUTE;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static org.mockito.Mockito.any;
@@ -43,6 +44,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.SymlinkNode;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -270,6 +272,7 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFile=*/ file -> {},
         /* onInputDirectorie=*/ directory -> {},
         /* onInputDigest=*/ digest -> {},
@@ -304,6 +307,7 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ ImmutableMap.of(Digest.getDefaultInstance(), emptyDirectory),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFiles=*/ file -> {},
         /* onInputDirectories=*/ directory -> {},
         /* onInputDigests=*/ digest -> {},
@@ -327,6 +331,7 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFiles=*/ file -> {},
         /* onInputDirectories=*/ directory -> {},
         /* onInputDigests=*/ digest -> {},
@@ -361,6 +366,7 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ ImmutableMap.of(emptyDirectoryDigest, emptyDirectory),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFiles=*/ file -> {},
         /* onInputDirectories=*/ directory -> {},
         /* onInputDigests=*/ digest -> {},
@@ -395,6 +401,7 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ ImmutableMap.of(emptyDirectoryDigest, emptyDirectory),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFiles=*/ file -> {},
         /* onInputDirectories=*/ directory -> {},
         /* onInputDigests=*/ digest -> {},
@@ -405,6 +412,48 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("/: foo > bar");
     assertThat(violation.getDescription()).isEqualTo(DIRECTORY_NOT_SORTED);
+  }
+
+  @Test
+  public void shouldValidateIfSymlinkTargetAbsolute() {
+    // invalid for disallowed
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+    Directory absoluteSymlinkDirectory =
+        Directory.newBuilder()
+            .addSymlinks(SymlinkNode.newBuilder().setName("foo").setTarget("/root/secret").build())
+            .build();
+    AbstractServerInstance.validateActionInputDirectory(
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
+        absoluteSymlinkDirectory,
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute=*/ false,
+        /* onInputFile=*/ file -> {},
+        /* onInputDirectorie=*/ directory -> {},
+        /* onInputDigest=*/ digest -> {},
+        preconditionFailure);
+
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
+    assertThat(violation.getSubject()).isEqualTo("/: foo -> /root/secret");
+    assertThat(violation.getDescription()).isEqualTo(SYMLINK_TARGET_ABSOLUTE);
+
+    // valid for allowed
+    preconditionFailure = PreconditionFailure.newBuilder();
+    AbstractServerInstance.validateActionInputDirectory(
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
+        absoluteSymlinkDirectory,
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute=*/ true,
+        /* onInputFile=*/ file -> {},
+        /* onInputDirectorie=*/ directory -> {},
+        /* onInputDigest=*/ digest -> {},
+        preconditionFailure);
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(0);
   }
 
   @Test
@@ -547,6 +596,7 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ ImmutableMap.of(),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFiles=*/ file -> {},
         /* onInputDirectories=*/ directory -> {},
         /* onInputDigests=*/ digest -> {},
@@ -608,6 +658,7 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ ImmutableMap.of(fooDigest, foo),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFiles=*/ file -> {},
         /* onInputDirectories=*/ directory -> {},
         /* onInputDigests=*/ digest -> {},

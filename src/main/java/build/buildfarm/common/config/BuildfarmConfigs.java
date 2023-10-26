@@ -36,6 +36,7 @@ public final class BuildfarmConfigs {
   private long maximumActionTimeout = 3600;
   private long maxEntrySizeBytes = 2147483648L; // 2 * 1024 * 1024 * 1024
   private int prometheusPort = 9090;
+  private boolean allowSymlinkTargetAbsolute = false;
   private Server server = new Server();
   private Backplane backplane = new Backplane();
   private Worker worker = new Worker();

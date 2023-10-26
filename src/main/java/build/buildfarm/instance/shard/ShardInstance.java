@@ -47,6 +47,7 @@ import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListen
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.CacheCapabilities;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
@@ -60,6 +61,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
 import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.actioncache.ShardActionCache;
 import build.buildfarm.backplane.Backplane;
@@ -2725,5 +2727,17 @@ public class ShardInstance extends AbstractServerInstance {
       return false;
     }
     return backplane.isBlacklisted(requestMetadata);
+  }
+
+  @Override
+  protected CacheCapabilities getCacheCapabilities() {
+    SymlinkAbsolutePathStrategy.Value symlinkAbsolutePathStrategy =
+        configs.isAllowSymlinkTargetAbsolute()
+            ? SymlinkAbsolutePathStrategy.Value.ALLOWED
+            : SymlinkAbsolutePathStrategy.Value.DISALLOWED;
+    return super.getCacheCapabilities()
+        .toBuilder()
+        .setSymlinkAbsolutePathStrategy(symlinkAbsolutePathStrategy)
+        .build();
   }
 }

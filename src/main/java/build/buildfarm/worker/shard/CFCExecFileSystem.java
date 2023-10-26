@@ -82,6 +82,9 @@ class CFCExecFileSystem implements ExecFileSystem {
   // indicate symlinking above for a set of matching paths
   private final Iterable<Pattern> linkedInputDirectories;
 
+  // permit symlinks to point to absolute paths in inputs
+  private final boolean allowSymlinkTargetAbsolute;
+
   private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
   private final ExecutorService fetchService = BuildfarmExecutors.getFetchServicePool();
@@ -95,6 +98,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       @Nullable UserPrincipal owner,
       boolean linkInputDirectories,
       Iterable<String> linkedInputDirectories,
+      boolean allowSymlinkTargetAbsolute,
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder) {
     this.root = root;
@@ -104,6 +108,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     this.linkedInputDirectories =
         Iterables.transform(
             linkedInputDirectories, realInputDirectory -> Pattern.compile(realInputDirectory));
+    this.allowSymlinkTargetAbsolute = allowSymlinkTargetAbsolute;
     this.removeDirectoryService = removeDirectoryService;
     this.accessRecorder = accessRecorder;
   }
@@ -179,7 +184,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   private ListenableFuture<Void> putSymlink(Path path, SymlinkNode symlinkNode) {
     Path symlinkPath = path.resolve(symlinkNode.getName());
     Path relativeTargetPath = path.getFileSystem().getPath(symlinkNode.getTarget());
-    checkState(!relativeTargetPath.isAbsolute());
+    checkState(allowSymlinkTargetAbsolute || !relativeTargetPath.isAbsolute());
     return listeningDecorator(fetchService)
         .submit(
             () -> {
