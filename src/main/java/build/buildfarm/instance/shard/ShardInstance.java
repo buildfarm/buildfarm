@@ -761,7 +761,8 @@ public class ShardInstance extends AbstractServerInstance {
             extendLeaseForDigests(digestAndWorkersMap, requestMetadata);
             return immediateFuture(missingDigest);
           },
-          Context.currentContextExecutor(directExecutor()));
+          // Propagate context values but don't cascade its cancellation for downstream calls.
+          Context.current().fork().fixedContextExecutor(directExecutor()));
     } catch (Exception e) {
       log.log(Level.SEVERE, "find missing blob via backplane failed", e);
       return immediateFailedFuture(Status.fromThrowable(e).asException());
