@@ -178,6 +178,8 @@ public abstract class AbstractServerInstance implements Instance {
   public static final String ENVIRONMENT_VARIABLES_NOT_SORTED =
       "The `Command`'s `environment_variables` are not correctly sorted by `name`.";
 
+  public static final String SYMLINK_TARGET_ABSOLUTE = "A symlink target is absolute.";
+
   public static final String MISSING_ACTION = "The action was not found in the CAS.";
 
   public static final String MISSING_COMMAND = "The command was not found in the CAS.";
@@ -790,6 +792,7 @@ public abstract class AbstractServerInstance implements Instance {
       Stack<Digest> pathDigests,
       Set<Digest> visited,
       Map<Digest, Directory> directoriesIndex,
+      boolean allowSymlinkTargetAbsolute,
       Consumer<String> onInputFile,
       Consumer<String> onInputDirectory,
       Consumer<Digest> onInputDigest,
@@ -837,6 +840,14 @@ public abstract class AbstractServerInstance implements Instance {
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject("/" + directoryPath + ": " + lastSymlinkName + " > " + symlinkName)
             .setDescription(DIRECTORY_NOT_SORTED);
+      }
+      String symlinkTarget = symlinkNode.getTarget();
+      if (!allowSymlinkTargetAbsolute && symlinkTarget.charAt(0) == '/') {
+        preconditionFailure
+            .addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject("/" + directoryPath + ": " + symlinkName + " -> " + symlinkTarget)
+            .setDescription(SYMLINK_TARGET_ABSOLUTE);
       }
       /* FIXME serverside validity check? regex?
       Preconditions.checkState(
@@ -907,6 +918,7 @@ public abstract class AbstractServerInstance implements Instance {
               pathDigests,
               visited,
               directoriesIndex,
+              allowSymlinkTargetAbsolute,
               onInputFile,
               onInputDirectory,
               onInputDigest,
@@ -922,6 +934,7 @@ public abstract class AbstractServerInstance implements Instance {
       Stack<Digest> pathDigests,
       Set<Digest> visited,
       Map<Digest, Directory> directoriesIndex,
+      boolean allowSymlinkTargetAbsolute,
       Consumer<String> onInputFile,
       Consumer<String> onInputDirectory,
       Consumer<Digest> onInputDigest,
@@ -946,6 +959,7 @@ public abstract class AbstractServerInstance implements Instance {
           pathDigests,
           visited,
           directoriesIndex,
+          allowSymlinkTargetAbsolute,
           onInputFile,
           onInputDirectory,
           onInputDigest,
@@ -1203,12 +1217,16 @@ public abstract class AbstractServerInstance implements Instance {
     ImmutableSet.Builder<String> inputFilesBuilder = ImmutableSet.builder();
 
     inputDirectoriesBuilder.add(ACTION_INPUT_ROOT_DIRECTORY_PATH);
+    boolean allowSymlinkTargetAbsolute =
+        getCacheCapabilities().getSymlinkAbsolutePathStrategy()
+            == SymlinkAbsolutePathStrategy.Value.ALLOWED;
     validateActionInputDirectoryDigest(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         action.getInputRootDigest(),
         new Stack<>(),
         new HashSet<>(),
         directoriesIndex,
+        allowSymlinkTargetAbsolute,
         inputFilesBuilder::add,
         inputDirectoriesBuilder::add,
         onInputDigest,

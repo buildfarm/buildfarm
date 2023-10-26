@@ -337,6 +337,7 @@ public final class Worker extends LoggingMain {
         owner,
         configs.getWorker().isLinkInputDirectories(),
         configs.getWorker().getLinkedInputDirectories(),
+        configs.isAllowSymlinkTargetAbsolute(),
         removeDirectoryService,
         accessRecorder
         /* deadlineAfter=*/

@@ -3,6 +3,7 @@ defaultActionTimeout: 600
 maximumActionTimeout: 3600
 maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
 prometheusPort: 9090
+allowSymlinkTargetAbsolute: false
 server:
   instanceType: SHARD
   name: shard
