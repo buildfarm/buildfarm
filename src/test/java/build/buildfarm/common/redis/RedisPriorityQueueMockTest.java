@@ -16,14 +16,17 @@ package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.StringVisitor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.Before;
@@ -32,7 +35,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.Jedis;
 
 /**
  * @class RedisPriorityQueueMockTest
@@ -45,7 +48,7 @@ import redis.clients.jedis.JedisCluster;
  */
 @RunWith(JUnit4.class)
 public class RedisPriorityQueueMockTest {
-  @Mock private JedisCluster redis;
+  @Mock private Jedis redis;
   @Mock private Timestamp time;
 
   @Before
@@ -199,12 +202,14 @@ public class RedisPriorityQueueMockTest {
     // ARRANGE
     when(redis.eval(any(String.class), any(List.class), any(List.class))).thenReturn("foo");
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    ExecutorService service = mock(ExecutorService.class);
 
     // ACT
     queue.push(redis, "foo");
-    String val = queue.dequeue(redis, 1);
+    String val = queue.dequeue(redis, 1, service);
 
     // ASSERT
+    verifyNoInteractions(service);
     assertThat(val).isEqualTo("foo");
   }
 
@@ -216,12 +221,14 @@ public class RedisPriorityQueueMockTest {
     // ARRANGE
     when(redis.eval(any(String.class), any(List.class), any(List.class))).thenReturn(null);
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    ExecutorService service = mock(ExecutorService.class);
 
     // ACT
     queue.push(redis, "foo");
-    String val = queue.dequeue(redis, 5);
+    String val = queue.dequeue(redis, 5, service);
 
     // ASSERT
+    verifyNoInteractions(service);
     assertThat(val).isEqualTo(null);
   }
 
@@ -233,6 +240,7 @@ public class RedisPriorityQueueMockTest {
     // ARRANGE
     when(redis.eval(any(String.class), any(List.class), any(List.class))).thenReturn(null);
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    ExecutorService service = mock(ExecutorService.class);
 
     // ACT
     queue.push(redis, "foo");
@@ -240,12 +248,14 @@ public class RedisPriorityQueueMockTest {
         new Thread(
             () -> {
               try {
-                queue.dequeue(redis, 100000);
+                queue.dequeue(redis, 100000, service);
               } catch (Exception e) {
               }
             });
     call.start();
     call.interrupt();
+    call.join();
+    verifyNoInteractions(service);
   }
 
   // Function under test: nonBlockingDequeue
@@ -312,7 +322,7 @@ public class RedisPriorityQueueMockTest {
                     "element 6",
                     "element 7",
                     "element 8")
-                .collect(Collectors.toSet()));
+                .collect(Collectors.toList()));
 
     // ARRANGE
     RedisPriorityQueue queue = new RedisPriorityQueue("test");

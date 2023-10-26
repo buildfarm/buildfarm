@@ -18,7 +18,6 @@ java_library(
         "//src/main/java/build/buildfarm/operations",
         "//src/main/java/build/buildfarm/operations/finder",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "//third_party/jedis",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_github_ben_manes_caffeine_caffeine",
@@ -36,6 +35,7 @@ java_library(
         "@maven//:org_apache_commons_commons_pool2",
         "@maven//:org_projectlombok_lombok",
         "@maven//:org_redisson_redisson",
+        "@maven//:redis_clients_jedis",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )

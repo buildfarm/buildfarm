@@ -33,7 +33,7 @@ import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
-import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.UnifiedJedis;
 
 /**
  * @class EnrichedOperationBuilder
@@ -55,9 +55,9 @@ public class EnrichedOperationBuilder {
    * @note Suggested return identifier: operation.
    */
   public static EnrichedOperation build(
-      JedisCluster cluster, Instance instance, String operationKey) {
+      UnifiedJedis jedis, Instance instance, String operationKey) {
     EnrichedOperation operationWithMetadata = new EnrichedOperation();
-    operationWithMetadata.operation = operationKeyToOperation(cluster, operationKey);
+    operationWithMetadata.operation = operationKeyToOperation(jedis, operationKey);
     // the operation could not be fetched so there is nothing further to derive
     if (operationWithMetadata.operation == null) {
       return operationWithMetadata;
@@ -83,8 +83,8 @@ public class EnrichedOperationBuilder {
    * @return The looked up operation.
    * @note Suggested return identifier: operation.
    */
-  public static Operation operationKeyToOperation(JedisCluster cluster, String operationKey) {
-    String json = cluster.get(operationKey);
+  public static Operation operationKeyToOperation(UnifiedJedis jedis, String operationKey) {
+    String json = jedis.get(operationKey);
     return jsonToOperation(json);
   }
 

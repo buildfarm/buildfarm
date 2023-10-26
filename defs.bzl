@@ -55,7 +55,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.fasterxml.jackson.core:jackson-databind:2.15.0",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
                         "com.github.docker-java:docker-java:3.3.3",
-                        "com.github.fppt:jedis-mock:1.0.10",
+                        "com.github.fppt:jedis-mock:1.0.13",
                         "com.github.jnr:jffi:1.3.11",
                         "com.github.jnr:jffi:jar:native:1.3.11",
                         "com.github.jnr:jnr-constants:0.10.4",
@@ -78,7 +78,6 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.protobuf:protobuf-java-util:3.19.1",
                         "com.google.protobuf:protobuf-java:3.19.1",
                         "com.google.truth:truth:1.1.5",
-                        "org.slf4j:slf4j-simple:2.0.9",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.8.0",
                         "org.bouncycastle:bcprov-jdk15on:1.70",
@@ -89,15 +88,16 @@ def buildfarm_init(name = "buildfarm"):
                         "io.prometheus:simpleclient:0.15.0",
                         "io.prometheus:simpleclient_hotspot:0.15.0",
                         "io.prometheus:simpleclient_httpserver:0.15.0",
-                        "junit:junit:4.13.2",
                         "javax.annotation:javax.annotation-api:1.3.2",
+                        "junit:junit:4.13.2",
                         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
+                        "net.jcip:jcip-annotations:1.0",
                         "org.apache.commons:commons-compress:1.23.0",
                         "org.apache.commons:commons-pool2:2.11.1",
                         "org.apache.commons:commons-lang3:3.13.0",
-                        "commons-io:commons-io:2.13.0",
                         "me.dinowernli:java-grpc-prometheus:0.6.0",
                         "org.apache.tomcat:annotations-api:6.0.53",
+                        "org.bouncycastle:bcprov-jdk15on:1.70",
                         "org.checkerframework:checker-qual:3.38.0",
                         "org.mockito:mockito-core:5.10.0",
                         "org.openjdk.jmh:jmh-core:1.37",
@@ -108,6 +108,8 @@ def buildfarm_init(name = "buildfarm"):
                         "org.jetbrains:annotations:16.0.2",
                         "org.yaml:snakeyaml:2.2",
                         "org.projectlombok:lombok:1.18.30",
+                        "org.slf4j:slf4j-simple:2.0.9",
+                        "redis.clients:jedis:5.1.0",
                     ],
         generate_compat_repositories = True,
         override_targets = IO_GRPC_GRPC_JAVA_OVERRIDE_TARGETS,
@@ -125,11 +127,6 @@ def buildfarm_init(name = "buildfarm"):
     protobuf_deps()
 
     grpc_java_repositories()
-
-    native.bind(
-        name = "jar/redis/clients/jedis",
-        actual = "@jedis//jar",
-    )
 
     llvm_toolchain(
         name = "llvm_toolchain",

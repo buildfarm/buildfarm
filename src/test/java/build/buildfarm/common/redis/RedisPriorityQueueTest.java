@@ -15,6 +15,8 @@
 package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.config.BuildfarmConfigs;
@@ -23,12 +25,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.UnifiedJedis;
 
 /**
  * @class RedisPriorityQueueTest
@@ -42,17 +47,22 @@ import redis.clients.jedis.JedisCluster;
 @RunWith(JUnit4.class)
 public class RedisPriorityQueueTest {
   private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-  private JedisCluster redis;
+  private JedisPooled pooled;
+  private Jedis redis;
 
   @Before
   public void setUp() throws Exception {
     configs.getBackplane().setRedisUri("redis://localhost:6379");
-    redis = JedisClusterFactory.createTest();
+    UnifiedJedis unified = JedisClusterFactory.createTest();
+    assertThat(unified).isInstanceOf(JedisPooled.class);
+    pooled = (JedisPooled) unified;
+    redis = new Jedis(pooled.getPool().getResource());
   }
 
   @After
   public void tearDown() {
     redis.close();
+    pooled.close();
   }
 
   // Function under test: RedisPriorityQueue
@@ -185,6 +195,7 @@ public class RedisPriorityQueueTest {
   public void sizeAdjustPushDequeue() throws Exception {
     // ARRANGE
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    ExecutorService service = mock(ExecutorService.class);
 
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
@@ -200,18 +211,19 @@ public class RedisPriorityQueueTest {
     assertThat(queue.size(redis)).isEqualTo(5);
     queue.push(redis, "baz4");
     assertThat(queue.size(redis)).isEqualTo(6);
-    queue.dequeue(redis, 1);
+    queue.dequeue(redis, 1, service);
     assertThat(queue.size(redis)).isEqualTo(5);
-    queue.dequeue(redis, 1);
+    queue.dequeue(redis, 1, service);
     assertThat(queue.size(redis)).isEqualTo(4);
-    queue.dequeue(redis, 1);
+    queue.dequeue(redis, 1, service);
     assertThat(queue.size(redis)).isEqualTo(3);
-    queue.dequeue(redis, 1);
+    queue.dequeue(redis, 1, service);
     assertThat(queue.size(redis)).isEqualTo(2);
-    queue.dequeue(redis, 1);
+    queue.dequeue(redis, 1, service);
     assertThat(queue.size(redis)).isEqualTo(1);
-    queue.dequeue(redis, 1);
+    queue.dequeue(redis, 1, service);
     assertThat(queue.size(redis)).isEqualTo(0);
+    verifyNoInteractions(service);
   }
 
   // Function under test: size
@@ -221,6 +233,7 @@ public class RedisPriorityQueueTest {
   public void checkPriorityOnDequeue() throws Exception {
     // ARRANGE
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    ExecutorService service = mock(ExecutorService.class);
     String val;
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
@@ -236,24 +249,25 @@ public class RedisPriorityQueueTest {
     assertThat(queue.size(redis)).isEqualTo(5);
     queue.push(redis, "baz4", 1);
     assertThat(queue.size(redis)).isEqualTo(6);
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("bar");
     assertThat(queue.size(redis)).isEqualTo(5);
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("baz2");
     assertThat(queue.size(redis)).isEqualTo(4);
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("baz4");
     assertThat(queue.size(redis)).isEqualTo(3);
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("foo");
     assertThat(queue.size(redis)).isEqualTo(2);
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("baz3");
     assertThat(queue.size(redis)).isEqualTo(1);
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("baz");
     assertThat(queue.size(redis)).isEqualTo(0);
+    verifyNoInteractions(service);
   }
 
   // Function under test: dequeue
@@ -263,14 +277,16 @@ public class RedisPriorityQueueTest {
   public void checkDequeueTimeout() throws Exception {
     // ARRANGE
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    ExecutorService service = mock(ExecutorService.class);
 
     Instant start = Instant.now();
-    String val = queue.dequeue(redis, 1);
+    String val = queue.dequeue(redis, 1, service);
     Instant finish = Instant.now();
 
     long timeElapsed = Duration.between(start, finish).toMillis();
     assertThat(timeElapsed).isGreaterThan(1000L);
     assertThat(val).isEqualTo(null);
+    verifyNoInteractions(service);
   }
 
   // Function under test: dequeue
@@ -280,6 +296,7 @@ public class RedisPriorityQueueTest {
   public void checkNegativesInPriority() throws Exception {
     // ARRANGE
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    ExecutorService service = mock(ExecutorService.class);
     String val;
 
     // ACT / ASSERT
@@ -292,22 +309,23 @@ public class RedisPriorityQueueTest {
     queue.push(redis, "baz-2", 2);
     queue.push(redis, "foo-4", 4);
 
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("negative-50");
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("negative-1");
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("foo-1");
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("baz-2");
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("foo-3");
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("foo-4");
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("foo-5");
-    val = queue.dequeue(redis, 1);
+    val = queue.dequeue(redis, 1, service);
     assertThat(val).isEqualTo("foo-6");
+    verifyNoInteractions(service);
   }
 
   // Function under test: visit

@@ -25,7 +25,7 @@ import com.google.common.collect.SetMultimap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.UnifiedJedis;
 
 /**
  * @class OperationQueue
@@ -84,7 +84,7 @@ public class OperationQueue {
    * @param jedis Jedis cluster client.
    * @param visitor A visitor for each visited element in the queue.
    */
-  public void visitDequeue(JedisCluster jedis, StringVisitor visitor) {
+  public void visitDequeue(UnifiedJedis jedis, StringVisitor visitor) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
       provisionedQueue.queue().visitDequeue(jedis, visitor);
     }
@@ -98,7 +98,7 @@ public class OperationQueue {
    * @return Whether or not the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
-  public boolean removeFromDequeue(JedisCluster jedis, String val) {
+  public boolean removeFromDequeue(UnifiedJedis jedis, String val) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
       if (provisionedQueue.queue().removeFromDequeue(jedis, val)) {
         return true;
@@ -113,7 +113,7 @@ public class OperationQueue {
    * @param jedis Jedis cluster client.
    * @param visitor A visitor for each visited element in the queue.
    */
-  public void visit(JedisCluster jedis, StringVisitor visitor) {
+  public void visit(UnifiedJedis jedis, StringVisitor visitor) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
       provisionedQueue.queue().visit(jedis, visitor);
     }
@@ -126,7 +126,7 @@ public class OperationQueue {
    * @return The current length of the queue.
    * @note Suggested return identifier: length.
    */
-  public long size(JedisCluster jedis) {
+  public long size(UnifiedJedis jedis) {
     // the accumulated size of all of the queues
     return queues.stream().mapToInt(i -> (int) i.queue().size(jedis)).sum();
   }
@@ -178,7 +178,7 @@ public class OperationQueue {
    * @param val The value to push onto the queue.
    */
   public void push(
-      JedisCluster jedis, List<Platform.Property> provisions, String val, int priority) {
+      UnifiedJedis jedis, List<Platform.Property> provisions, String val, int priority) {
     BalancedRedisQueue queue = chooseEligibleQueue(provisions);
     queue.push(jedis, val, (double) priority);
   }
@@ -193,7 +193,7 @@ public class OperationQueue {
    * @return The value of the transfered element. null if the thread was interrupted.
    * @note Suggested return identifier: val.
    */
-  public String dequeue(JedisCluster jedis, List<Platform.Property> provisions)
+  public String dequeue(UnifiedJedis jedis, List<Platform.Property> provisions)
       throws InterruptedException {
     // Select all matched queues, and attempt dequeuing via round-robin.
     List<BalancedRedisQueue> queues = chooseEligibleQueues(provisions);
@@ -217,7 +217,7 @@ public class OperationQueue {
    * @note Overloaded.
    * @note Suggested return identifier: status.
    */
-  public OperationQueueStatus status(JedisCluster jedis) {
+  public OperationQueueStatus status(UnifiedJedis jedis) {
     // get properties
     List<QueueStatus> provisions = new ArrayList<>();
     for (ProvisionedRedisQueue provisionedQueue : queues) {
@@ -240,7 +240,7 @@ public class OperationQueue {
    * @note Overloaded.
    * @note Suggested return identifier: status.
    */
-  public QueueStatus status(JedisCluster jedis, List<Platform.Property> provisions) {
+  public QueueStatus status(UnifiedJedis jedis, List<Platform.Property> provisions) {
     BalancedRedisQueue queue = chooseEligibleQueue(provisions);
     return queue.status(jedis);
   }
@@ -270,7 +270,7 @@ public class OperationQueue {
    * @param jedis Jedis cluster client.
    * @return Whether are not a new element can be added to the queue based on its current size.
    */
-  public boolean canQueue(JedisCluster jedis) {
+  public boolean canQueue(UnifiedJedis jedis) {
     return maxQueueSize < 0 || size(jedis) < maxQueueSize;
   }
 

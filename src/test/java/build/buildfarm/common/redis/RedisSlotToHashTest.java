@@ -15,8 +15,9 @@
 package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
-import static redis.clients.jedis.JedisCluster.HASHSLOTS;
+import static redis.clients.jedis.Protocol.CLUSTER_HASHSLOTS;
 
+import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -41,7 +42,7 @@ public class RedisSlotToHashTest {
   // slot numbers to strings is incorrect
   @Test
   public void correlateCorrectForEverySlot() throws Exception {
-    for (int i = 0; i < HASHSLOTS; ++i) {
+    for (int i = 0; i < CLUSTER_HASHSLOTS; ++i) {
       // convert to hashtag
       String hashtag = RedisSlotToHash.correlate(i);
 
@@ -82,7 +83,9 @@ public class RedisSlotToHashTest {
   @Test
   public void correlateRangeWithPrefixCorrectHashtagFoundForSlotRange() throws Exception {
     // convert to hashtag
-    String hashtag = RedisSlotToHash.correlateRangeWithPrefix(100, 200, "Execution");
+    String hashtag =
+        RedisSlotToHash.correlateRangesWithPrefix(
+            ImmutableList.of(ImmutableList.of(100l, 200l)), "Execution");
 
     // convert hashtag back to slot
     int slotNumber = JedisClusterCRC16.getSlot(hashtag);

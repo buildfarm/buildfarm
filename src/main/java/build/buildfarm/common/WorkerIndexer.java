@@ -19,10 +19,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.java.Log;
-import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class WorkerIndexer
@@ -55,21 +55,26 @@ public class WorkerIndexer {
    * @note Suggested return identifier: indexResults.
    */
   public static CasIndexResults removeWorkerIndexesFromCas(
-      JedisCluster cluster, CasIndexSettings settings) {
+      UnifiedJedis jedis, CasIndexSettings settings) {
     CasIndexResults results = new CasIndexResults();
 
-    // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
-    // This prevents us from using the cluster's SCAN to traverse all of the CAS.
-    // That's why we choose to scan each of the jedisNode's individually.
-    cluster
-        .getClusterNodes()
-        .values()
-        .forEach(
-            pool -> {
-              try (Jedis node = pool.getResource()) {
-                reindexNode(cluster, node, settings, results);
-              }
-            });
+    if (jedis instanceof JedisCluster) {
+      JedisCluster cluster = (JedisCluster) jedis;
+      // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
+      // This prevents us from using the cluster's SCAN to traverse all of the CAS.
+      // That's why we choose to scan each of the jedisNode's individually.
+      cluster
+          .getClusterNodes()
+          .values()
+          .forEach(
+              pool -> {
+                try (UnifiedJedis node = new UnifiedJedis(pool.getResource())) {
+                  reindexNode(cluster, node, settings, results);
+                }
+              });
+    } else {
+      reindexNode(jedis, jedis, settings, results);
+    }
     return results;
   }
 
@@ -83,7 +88,7 @@ public class WorkerIndexer {
    */
   @SuppressWarnings({"unchecked", "rawtypes"})
   private static void reindexNode(
-      JedisCluster cluster, Jedis node, CasIndexSettings settings, CasIndexResults results) {
+      UnifiedJedis cluster, UnifiedJedis node, CasIndexSettings settings, CasIndexResults results) {
     Long totalKeys = 0L;
     Long removedKeys = 0L;
     Long removedHosts = 0L;
@@ -91,7 +96,7 @@ public class WorkerIndexer {
     log.info(
         String.format(
             "Initializing CAS Indexer for Node %s with %d active workers.",
-            node.getClient().getHost(), activeWorkers.size()));
+            node.toString(), activeWorkers.size()));
 
     // iterate over all CAS entries via scanning
     // and remove worker from the CAS keys.
@@ -128,7 +133,7 @@ public class WorkerIndexer {
     results.totalKeys += totalKeys;
     results.removedKeys += removedKeys;
     results.removedHosts += removedHosts;
-    indexerHostsRemovedGauge.labels(node.getClient().getHost()).set(removedHosts);
-    indexerKeysRemovedGauge.labels(node.getClient().getHost()).set(removedKeys);
+    indexerHostsRemovedGauge.labels(node.toString()).set(removedHosts);
+    indexerKeysRemovedGauge.labels(node.toString()).set(removedKeys);
   }
 }

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Start redis container
-docker run -d --rm --name buildfarm-redis --network host redis:5.0.9 --bind localhost
+docker run -d --rm --name buildfarm-redis --network host redis:7.2.4 --bind localhost
 
 # Build worker and server targets
 bazel build //src/main/java/build/buildfarm:buildfarm-shard-worker
