@@ -36,12 +36,16 @@ import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.common.config.ExecutionWrapper;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.WorkerContext.IOResource;
+import build.buildfarm.worker.persistent.PersistentExecutor;
+import build.buildfarm.worker.persistent.WorkFilesContext;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DockerClientBuilder;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -61,10 +65,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import lombok.extern.java.Log;
 
 @Log
 class Executor {
+
+  private static final Logger logger = Logger.getLogger(Executor.class.getName());
+
   private static final int INCOMPLETE_EXIT_CODE = -1;
 
   private final WorkerContext workerContext;
@@ -432,9 +440,40 @@ class Executor {
       environment.put(environmentVariable.getKey(), environmentVariable.getValue());
     }
 
+    environment.putAll(limits.extraEnvironmentVariables);
+
     // allow debugging before an execution
     if (limits.debugBeforeExecution) {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
+    }
+
+    boolean usePersistentWorker =
+        !limits.persistentWorkerKey.isEmpty() && !limits.persistentWorkerCommand.isEmpty();
+
+    if (usePersistentWorker) {
+      logger.fine(
+          "usePersistentWorker; got persistentWorkerCommand of : "
+              + limits.persistentWorkerCommand);
+
+      Tree execTree = workerContext.getQueuedOperation(operationContext.queueEntry).getTree();
+
+      WorkFilesContext filesContext =
+          new WorkFilesContext(
+              execDir,
+              execTree,
+              ImmutableList.copyOf(operationContext.command.getOutputPathsList()),
+              ImmutableList.copyOf(operationContext.command.getOutputFilesList()),
+              ImmutableList.copyOf(operationContext.command.getOutputDirectoriesList()));
+
+      return PersistentExecutor.runOnPersistentWorker(
+          limits.persistentWorkerCommand,
+          filesContext,
+          operationName,
+          ImmutableList.copyOf(arguments),
+          ImmutableMap.copyOf(environment),
+          limits,
+          timeout,
+          resultBuilder);
     }
 
     // run the action under docker

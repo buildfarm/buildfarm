@@ -68,6 +68,13 @@ public class ExecutionPropertiesParser {
         ExecutionProperties.DEBUG_TESTS_ONLY, ExecutionPropertiesParser::storeDebugTestsOnly);
     parser.put(ExecutionProperties.DEBUG_TARGET, ExecutionPropertiesParser::storeDebugTarget);
 
+    parser.put(
+        ExecutionProperties.PERSISTENT_WORKER_KEY,
+        ExecutionPropertiesParser::storePersistentWorkerKey);
+    parser.put(
+        ExecutionProperties.PERSISTENT_WORKER_COMMAND,
+        ExecutionPropertiesParser::storePersistentWorkerCommand);
+
     ResourceLimits limits = new ResourceLimits();
     command
         .getPlatform()
@@ -325,6 +332,32 @@ public class ExecutionPropertiesParser {
   private static void storeDebugTarget(ResourceLimits limits, Property property) {
     limits.debugTarget = property.getValue();
     describeChange(limits.description, "debug target", property.getValue(), property);
+  }
+
+  /**
+   * @brief Stores persistentWorkerKey
+   * @details Parses and stores a String.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storePersistentWorkerKey(ResourceLimits limits, Property property) {
+    limits.persistentWorkerKey = property.getValue();
+    ArrayList<String> xs = new ArrayList<>();
+    xs.add("Hash of tool inputs for remote persistent workers");
+    describeChange(xs, "persistentWorkerKey(hash of tool inputs)", property.getValue(), property);
+  }
+
+  /**
+   * @brief Stores persistentWorkerCommand
+   * @details Parses and stores a String.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storePersistentWorkerCommand(ResourceLimits limits, Property property) {
+    limits.persistentWorkerCommand = property.getValue();
+    ArrayList<String> xs = new ArrayList<>();
+    xs.add("persistentWorkerCommand");
+    describeChange(xs, "persistentWorkerCommand", property.getValue(), property);
   }
 
   /**
