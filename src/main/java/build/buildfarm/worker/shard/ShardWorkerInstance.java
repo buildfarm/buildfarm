@@ -133,6 +133,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
         offset,
         count,
         new UniformDelegateServerCallStreamObserver<ByteString>(blobObserver) {
+          boolean callClosed = false;
+
           @Override
           public void onNext(ByteString data) {
             blobObserver.onNext(data);
@@ -151,18 +153,26 @@ public class ShardWorkerInstance extends AbstractServerInstance {
           }
 
           @Override
-          public void onError(Throwable t) {
+          public synchronized void onError(Throwable t) {
+            if (callClosed) {
+              return;
+            }
             if (t instanceof IOException) {
               blobObserver.onError(Status.NOT_FOUND.withCause(t).asException());
               removeBlobLocation();
             } else {
               blobObserver.onError(t);
             }
+            callClosed = true;
           }
 
           @Override
-          public void onCompleted() {
+          public synchronized void onCompleted() {
+            if (callClosed) {
+              return;
+            }
             blobObserver.onCompleted();
+            callClosed = true;
           }
         },
         requestMetadata);
