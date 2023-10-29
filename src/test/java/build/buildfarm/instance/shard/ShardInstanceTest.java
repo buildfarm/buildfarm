@@ -1051,7 +1051,6 @@ public class ShardInstanceTest {
 
   @Test
   public void findMissingBlobsTest_ViaBackPlane() throws Exception {
-
     Set<String> activeWorkers = new HashSet<>(Arrays.asList("worker1", "worker2", "worker3"));
     Set<String> expiredWorker = new HashSet<>(Arrays.asList("workerX", "workerY", "workerZ"));
 
