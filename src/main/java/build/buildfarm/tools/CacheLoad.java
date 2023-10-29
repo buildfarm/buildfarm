@@ -48,7 +48,7 @@ class CacheLoad {
     }
 
     @Override
-    protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
+    protected InputStream newExternalInput(Compressor.Value compressor, Digest digest, long offset)
         throws IOException {
       throw new IOException();
     }

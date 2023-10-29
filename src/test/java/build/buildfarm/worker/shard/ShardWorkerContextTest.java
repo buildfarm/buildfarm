@@ -17,6 +17,7 @@ package build.buildfarm.worker.shard;
 import static build.buildfarm.common.config.Server.INSTANCE_TYPE.SHARD;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,6 +35,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Duration;
 import java.util.ArrayList;
@@ -78,10 +80,10 @@ public class ShardWorkerContextTest {
   }
 
   WorkerContext createTestContext() {
-    return createTestContext(Platform.getDefaultInstance(), /* policies=*/ ImmutableList.of());
+    return createTestContext(/* policies=*/ ImmutableList.of());
   }
 
-  WorkerContext createTestContext(Platform platform, Iterable<ExecutionPolicy> policies) {
+  WorkerContext createTestContext(Iterable<ExecutionPolicy> policies) {
     return new ShardWorkerContext(
         "test",
         /* operationPollPeriod=*/ Duration.getDefaultInstance(),
@@ -104,21 +106,57 @@ public class ShardWorkerContextTest {
         /* onlyMulticoreTests=*/ false,
         /* allowBringYourOwnContainer=*/ false,
         /* errorOperationRemainingResources=*/ false,
+        /* resourceSet=*/ new LocalResourceSet(),
         writer);
   }
 
   @SuppressWarnings("unchecked")
   @Test
   public void queueEntryWithExecutionPolicyPlatformMatches() throws Exception {
-    WorkerContext context =
-        createTestContext(
-            Platform.getDefaultInstance(), ImmutableList.of(new ExecutionPolicy("foo")));
+    WorkerContext context = createTestContext(ImmutableList.of(new ExecutionPolicy("foo")));
     Platform matchPlatform =
         Platform.newBuilder()
             .addProperties(
                 Property.newBuilder().setName("execution-policy").setValue("foo").build())
             .build();
     QueueEntry queueEntry = QueueEntry.newBuilder().setPlatform(matchPlatform).build();
+    when(backplane.dispatchOperation(any(List.class)))
+        .thenReturn(queueEntry)
+        .thenReturn(null); // provide a match completion in failure case
+    MatchListener listener = mock(MatchListener.class);
+    context.match(listener);
+    verify(listener, times(1)).onEntry(queueEntry);
+  }
+
+  @Test
+  public void dequeueMatchSettingsPlatformRejectsInvalidQueueEntry() throws Exception {
+    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
+    WorkerContext context = createTestContext();
+    Platform matchPlatform =
+        Platform.newBuilder()
+            .addProperties(Property.newBuilder().setName("os").setValue("randos").build())
+            .build();
+    QueueEntry queueEntry = QueueEntry.newBuilder().setPlatform(matchPlatform).build();
+    when(backplane.dispatchOperation(any(List.class)))
+        .thenReturn(queueEntry)
+        .thenReturn(null); // provide a match completion in failure case
+    MatchListener listener = mock(MatchListener.class);
+    context.match(listener);
+    verify(listener, never()).onEntry(queueEntry);
+  }
+
+  @Test
+  public void dequeueMatchSettingsPlatformAcceptsValidQueueEntry() throws Exception {
+    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
+    Platform testOSPlatform =
+        Platform.newBuilder()
+            .addProperties(Property.newBuilder().setName("os").setValue("test").build())
+            .build();
+    configs.getWorker().getDequeueMatchSettings().setPlatform(testOSPlatform);
+    WorkerContext context = createTestContext();
+    QueueEntry queueEntry = QueueEntry.newBuilder().setPlatform(testOSPlatform).build();
     when(backplane.dispatchOperation(any(List.class)))
         .thenReturn(queueEntry)
         .thenReturn(null); // provide a match completion in failure case

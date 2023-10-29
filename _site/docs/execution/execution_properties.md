@@ -76,37 +76,42 @@ Despite being given 1 core, they see all of the cpus and decide to spawn that ma
 
 **Standard Example:**
 This test will succeed when env var TESTVAR is foobar, and fail otherwise.
-```
+
+```shell
 #!/bin/bash
 [ "$TESTVAR" = "foobar" ]
 ```
-```
-./bazel test  \
+
+```shell
+$ ./bazel test  \
 --remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
 //env_test:main
 FAIL
 ```
 
-```
-./bazel test --remote_default_exec_properties='env-vars={"TESTVAR": "foobar"}' \
+```shell
+$ ./bazel test --remote_default_exec_properties='env-vars={"TESTVAR": "foobar"}' \
  --remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
 //env_test:main
 PASS
 ```
+
 **Template Example:**
 If you give a range of cores, buildfarm has the authority to decide how many your operation actually claims.  You can let buildfarm resolve this value for you (via [mustache](https://mustache.github.io/)).
-```
+```bash
 #!/bin/bash
 [ "$MKL_NUM_THREADS" = "1" ]
 ```
-```
-./bazel test  \
+
+```shell
+$ ./bazel test  \
 --remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
 //env_test:main
 FAIL
 ```
-```
-./bazel test  \
+
+```shell
+$ ./bazel test  \
 --remote_default_exec_properties='env-vars="MKL_NUM_THREADS": "{{limits.cpu.claimed}}"' \
 --remote_executor=grpc://127.0.0.1:8980 --noremote_accept_cached  --nocache_test_results \
 //env_test:main

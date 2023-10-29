@@ -23,6 +23,8 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import com.google.common.base.Throwables;
@@ -46,12 +48,15 @@ import lombok.extern.java.Log;
 
 @Log
 public class RemoteCasWriter implements CasWriter {
-  private Set<String> workerSet;
-  private LoadingCache<String, Instance> workerStubs;
+  private final Set<String> workerSet;
+  private final LoadingCache<String, Instance> workerStubs;
+  private final Retrier retrier;
 
-  public RemoteCasWriter(Set<String> workerSet, LoadingCache<String, Instance> workerStubs) {
+  public RemoteCasWriter(
+      Set<String> workerSet, LoadingCache<String, Instance> workerStubs, Retrier retrier) {
     this.workerSet = workerSet;
     this.workerStubs = workerStubs;
+    this.retrier = retrier;
   }
 
   public void write(Digest digest, Path file) throws IOException, InterruptedException {
@@ -63,19 +68,30 @@ public class RemoteCasWriter implements CasWriter {
   private void insertFileToCasMember(Digest digest, Path file)
       throws IOException, InterruptedException {
     try (InputStream in = Files.newInputStream(file)) {
-      writeToCasMember(digest, in);
-    } catch (ExecutionException e) {
-      throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
+      retrier.execute(() -> writeToCasMember(digest, in));
+    } catch (RetryException e) {
+      Throwable cause = e.getCause();
+      Throwables.throwIfInstanceOf(cause, IOException.class);
+      Throwables.throwIfUnchecked(cause);
+      throw new IOException(cause);
     }
   }
 
-  private void writeToCasMember(Digest digest, InputStream in)
-      throws IOException, InterruptedException, ExecutionException {
+  private long writeToCasMember(Digest digest, InputStream in)
+      throws IOException, InterruptedException {
     // create a write for inserting into another CAS member.
     String workerName = getRandomWorker();
     Write write = getCasMemberWrite(digest, workerName);
 
-    streamIntoWriteFuture(in, write, digest).get();
+    try {
+      return streamIntoWriteFuture(in, write, digest).get();
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      Throwables.throwIfInstanceOf(cause, IOException.class);
+      // prevent a discard of this frame
+      Status status = Status.fromThrowable(cause);
+      throw new IOException(status.asException());
+    }
   }
 
   private Write getCasMemberWrite(Digest digest, String workerName) throws IOException {
@@ -87,26 +103,20 @@ public class RemoteCasWriter implements CasWriter {
 
   public void insertBlob(Digest digest, ByteString content)
       throws IOException, InterruptedException {
-    insertBlobToCasMember(digest, content);
-  }
-
-  private void insertBlobToCasMember(Digest digest, ByteString content)
-      throws IOException, InterruptedException {
     try (InputStream in = content.newInput()) {
-      writeToCasMember(digest, in);
-    } catch (ExecutionException e) {
+      retrier.execute(() -> writeToCasMember(digest, in));
+    } catch (RetryException e) {
       Throwable cause = e.getCause();
-      Throwables.throwIfUnchecked(cause);
       Throwables.throwIfInstanceOf(cause, IOException.class);
-      Status status = Status.fromThrowable(cause);
-      throw new IOException(status.asException());
+      Throwables.throwIfUnchecked(cause);
+      throw new IOException(cause);
     }
   }
 
   private String getRandomWorker() throws IOException {
     synchronized (workerSet) {
       if (workerSet.isEmpty()) {
-        throw new RuntimeException("no available workers");
+        throw new IOException("no available workers");
       }
       Random rand = new Random();
       int index = rand.nextInt(workerSet.size());

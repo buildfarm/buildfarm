@@ -1,7 +1,10 @@
 package build.buildfarm.common.config;
 
-import com.google.common.base.Strings;
+import java.util.ArrayList;
+import java.util.List;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
 
 @Data
 public class Backplane {
@@ -32,8 +35,13 @@ public class Backplane {
   private String operationChannelPrefix = "OperationChannel";
   private String casPrefix = "ContentAddressableStorage";
   private int casExpire = 604800; // 1 Week
-  private boolean subscribeToBackplane = true;
-  private boolean runFailsafeOperation = true;
+
+  @Getter(AccessLevel.NONE)
+  private boolean subscribeToBackplane = true; // deprecated
+
+  @Getter(AccessLevel.NONE)
+  private boolean runFailsafeOperation = true; // deprecated
+
   private int maxQueueDepth = 100000;
   private int maxPreQueueDepth = 1000000;
   private boolean priorityQueue = false;
@@ -45,13 +53,7 @@ public class Backplane {
   private boolean cacheCas = false;
   private long priorityPollIntervalMillis = 100;
 
-  public String getRedisUri() {
-    // use environment override (useful for containerized deployment)
-    if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
-      return System.getenv("REDIS_URI");
-    }
-
-    // use configured value
-    return redisUri;
-  }
+  // These limited resources are shared across all workers.
+  // An example would be a limited number of seats to a license server.
+  private List<LimitedResource> resources = new ArrayList<>();
 }

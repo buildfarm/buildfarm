@@ -14,6 +14,7 @@
 
 package build.buildfarm.cas;
 
+import static build.buildfarm.common.grpc.Channels.createChannel;
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.collect.Multimaps.synchronizedListMultimap;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -29,8 +30,6 @@ import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import io.grpc.Channel;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
@@ -39,12 +38,6 @@ import javax.naming.ConfigurationException;
 
 public final class ContentAddressableStorages {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
-  private static Channel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
-    return builder.build();
-  }
 
   public static ContentAddressableStorage createGrpcCAS(Cas cas) {
     Channel channel = createChannel(cas.getTarget());
@@ -88,8 +81,8 @@ public final class ContentAddressableStorages {
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor()) {
           @Override
-          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
-              throws IOException {
+          protected InputStream newExternalInput(
+              Compressor.Value compressor, Digest digest, long offset) throws IOException {
             throw new NoSuchFileException(digest.getHash());
           }
         };

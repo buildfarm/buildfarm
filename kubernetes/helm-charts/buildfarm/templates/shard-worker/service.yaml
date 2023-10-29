@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-shard-worker
+  labels:
+    name: {{ include "buildfarm.fullname" . }}-shard-worker
+    {{- include "buildfarm.labels" . | nindent 4 }}
+  {{- with .Values.shardWorker.service.annotations }}
+  annotations:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.shardWorker.service.type }}
+  ports:
+    - port: {{ .Values.shardWorker.service.port }}
+      targetPort: worker-comm
+      protocol: TCP
+      name: gprc
+    - port: 9090
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    name: {{ include "buildfarm.fullname" . }}-shard-worker
+    {{- include "buildfarm.selectorLabels" . | nindent 4 }}

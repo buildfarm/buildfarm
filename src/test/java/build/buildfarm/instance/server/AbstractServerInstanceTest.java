@@ -16,12 +16,14 @@ package build.buildfarm.instance.server;
 
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.server.AbstractServerInstance.ACTION_INPUT_ROOT_DIRECTORY_PATH;
 import static build.buildfarm.instance.server.AbstractServerInstance.DIRECTORY_NOT_SORTED;
 import static build.buildfarm.instance.server.AbstractServerInstance.DUPLICATE_DIRENT;
 import static build.buildfarm.instance.server.AbstractServerInstance.INVALID_COMMAND;
 import static build.buildfarm.instance.server.AbstractServerInstance.OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR;
 import static build.buildfarm.instance.server.AbstractServerInstance.OUTPUT_FILE_IS_OUTPUT_ANCESTOR;
+import static build.buildfarm.instance.server.AbstractServerInstance.SYMLINK_TARGET_ABSOLUTE;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static org.mockito.Mockito.any;
@@ -42,6 +44,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.SymlinkNode;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -269,6 +272,7 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFile=*/ file -> {},
         /* onInputDirectorie=*/ directory -> {},
         /* onInputDigest=*/ digest -> {},
@@ -303,6 +307,7 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ ImmutableMap.of(Digest.getDefaultInstance(), emptyDirectory),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFiles=*/ file -> {},
         /* onInputDirectories=*/ directory -> {},
         /* onInputDigests=*/ digest -> {},
@@ -326,6 +331,7 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFiles=*/ file -> {},
         /* onInputDirectories=*/ directory -> {},
         /* onInputDigests=*/ digest -> {},
@@ -360,12 +366,12 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ ImmutableMap.of(emptyDirectoryDigest, emptyDirectory),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFiles=*/ file -> {},
         /* onInputDirectories=*/ directory -> {},
         /* onInputDigests=*/ digest -> {},
         preconditionFailure);
 
-    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
@@ -395,6 +401,7 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ ImmutableMap.of(emptyDirectoryDigest, emptyDirectory),
+        /* allowSymlinkTargetAbsolute=*/ false,
         /* onInputFiles=*/ file -> {},
         /* onInputDirectories=*/ directory -> {},
         /* onInputDigests=*/ digest -> {},
@@ -405,6 +412,48 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("/: foo > bar");
     assertThat(violation.getDescription()).isEqualTo(DIRECTORY_NOT_SORTED);
+  }
+
+  @Test
+  public void shouldValidateIfSymlinkTargetAbsolute() {
+    // invalid for disallowed
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+    Directory absoluteSymlinkDirectory =
+        Directory.newBuilder()
+            .addSymlinks(SymlinkNode.newBuilder().setName("foo").setTarget("/root/secret").build())
+            .build();
+    AbstractServerInstance.validateActionInputDirectory(
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
+        absoluteSymlinkDirectory,
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute=*/ false,
+        /* onInputFile=*/ file -> {},
+        /* onInputDirectorie=*/ directory -> {},
+        /* onInputDigest=*/ digest -> {},
+        preconditionFailure);
+
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
+    assertThat(violation.getSubject()).isEqualTo("/: foo -> /root/secret");
+    assertThat(violation.getDescription()).isEqualTo(SYMLINK_TARGET_ABSOLUTE);
+
+    // valid for allowed
+    preconditionFailure = PreconditionFailure.newBuilder();
+    AbstractServerInstance.validateActionInputDirectory(
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
+        absoluteSymlinkDirectory,
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute=*/ true,
+        /* onInputFile=*/ file -> {},
+        /* onInputDirectorie=*/ directory -> {},
+        /* onInputDigest=*/ digest -> {},
+        preconditionFailure);
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(0);
   }
 
   @Test
@@ -517,6 +566,115 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo(INVALID_COMMAND);
     assertThat(violation.getDescription()).isEqualTo("working directory is not an input directory");
+  }
+
+  /*-
+   * / -> valid dir
+   *   bar/ -> missing dir with digest 'missing' and non-zero size
+   *   foo/ -> missing dir with digest 'missing' and non-zero size
+   */
+  @Test
+  public void multipleIdenticalDirectoryMissingAreAllPreconditionFailures() {
+    Digest missingDirectoryDigest = Digest.newBuilder().setHash("missing").setSizeBytes(1).build();
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+    Directory root =
+        Directory.newBuilder()
+            .addAllDirectories(
+                ImmutableList.of(
+                    DirectoryNode.newBuilder()
+                        .setName("bar")
+                        .setDigest(missingDirectoryDigest)
+                        .build(),
+                    DirectoryNode.newBuilder()
+                        .setName("foo")
+                        .setDigest(missingDirectoryDigest)
+                        .build()))
+            .build();
+    AbstractServerInstance.validateActionInputDirectory(
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
+        root,
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ ImmutableMap.of(),
+        /* allowSymlinkTargetAbsolute=*/ false,
+        /* onInputFiles=*/ file -> {},
+        /* onInputDirectories=*/ directory -> {},
+        /* onInputDigests=*/ digest -> {},
+        preconditionFailure);
+
+    String missingSubject = "blobs/" + DigestUtil.toString(missingDirectoryDigest);
+    String missingFmt = "The directory `/%s` was not found in the CAS.";
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(2);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_MISSING);
+    assertThat(violation.getSubject()).isEqualTo(missingSubject);
+    assertThat(violation.getDescription()).isEqualTo(String.format(missingFmt, "bar"));
+    violation = preconditionFailure.getViolationsList().get(1);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_MISSING);
+    assertThat(violation.getSubject()).isEqualTo(missingSubject);
+    assertThat(violation.getDescription()).isEqualTo(String.format(missingFmt, "foo"));
+  }
+
+  /*-
+   * / -> valid dir
+   *   bar/ -> valid dir
+   *     baz/ -> missing dir with digest 'missing-empty' and zero size
+   *     quux/ -> missing dir with digest 'missing' and non-zero size
+   *   foo/ -> valid dir with digest from /bar/, making it a copy of above
+   *
+   * Only duplicated-bar appears in the index
+   * Empty directory needs short circuit in all cases
+   * Result should be 2 missing directory paths, no errors
+   */
+  @Test
+  public void validationRevisitReplicatesPreconditionFailures() {
+    Digest missingEmptyDirectoryDigest = Digest.newBuilder().setHash("missing-empty").build();
+    Digest missingDirectoryDigest = Digest.newBuilder().setHash("missing").setSizeBytes(1).build();
+    Directory foo =
+        Directory.newBuilder()
+            .addAllDirectories(
+                ImmutableList.of(
+                    DirectoryNode.newBuilder()
+                        .setName("baz")
+                        .setDigest(missingEmptyDirectoryDigest)
+                        .build(),
+                    DirectoryNode.newBuilder()
+                        .setName("quux")
+                        .setDigest(missingDirectoryDigest)
+                        .build()))
+            .build();
+    Digest fooDigest = DIGEST_UTIL.compute(foo);
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+    Directory root =
+        Directory.newBuilder()
+            .addAllDirectories(
+                ImmutableList.of(
+                    DirectoryNode.newBuilder().setName("bar").setDigest(fooDigest).build(),
+                    DirectoryNode.newBuilder().setName("foo").setDigest(fooDigest).build()))
+            .build();
+    AbstractServerInstance.validateActionInputDirectory(
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
+        root,
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ ImmutableMap.of(fooDigest, foo),
+        /* allowSymlinkTargetAbsolute=*/ false,
+        /* onInputFiles=*/ file -> {},
+        /* onInputDirectories=*/ directory -> {},
+        /* onInputDigests=*/ digest -> {},
+        preconditionFailure);
+
+    String missingSubject = "blobs/" + DigestUtil.toString(missingDirectoryDigest);
+    String missingFmt = "The directory `/%s` was not found in the CAS.";
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(2);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_MISSING);
+    assertThat(violation.getSubject()).isEqualTo(missingSubject);
+    assertThat(violation.getDescription()).isEqualTo(String.format(missingFmt, "bar/quux"));
+    violation = preconditionFailure.getViolationsList().get(1);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_MISSING);
+    assertThat(violation.getSubject()).isEqualTo(missingSubject);
+    assertThat(violation.getDescription()).isEqualTo(String.format(missingFmt, "foo/quux"));
   }
 
   @SuppressWarnings("unchecked")

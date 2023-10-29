@@ -14,24 +14,18 @@
 
 package build.buildfarm.tools;
 
+import static build.buildfarm.common.grpc.Channels.createChannel;
+
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import io.grpc.ManagedChannel;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 
-class GracefulShutdownTest {
-  private static ManagedChannel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
-    return builder.build();
-  }
-
+class GracefulShutdown {
   /**
-   * Example command: GracefulShutdownTest ShutDown workerIp buildfarm-endpoint
+   * Example command: GracefulShutdown ShutDown workerIp buildfarm-endpoint
    *
    * @param args
    */
@@ -54,7 +48,7 @@ class GracefulShutdownTest {
   }
 
   /**
-   * Example command: GracefulShutdownTest PrepareWorker WorkerIp:port
+   * Example command: GracefulShutdown PrepareWorker WorkerIp:port
    *
    * @param args
    */
@@ -71,7 +65,7 @@ class GracefulShutdownTest {
   }
 
   /**
-   * Example command: GracefulShutdownTest DisableProtection WorkerIp buildfarm_endpoint
+   * Example command: GracefulShutdown DisableProtection WorkerIp buildfarm_endpoint
    *
    * @param args
    */

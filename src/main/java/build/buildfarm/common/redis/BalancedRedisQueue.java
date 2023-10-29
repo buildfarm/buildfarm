@@ -237,6 +237,17 @@ public class BalancedRedisQueue {
   }
 
   /**
+   * @brief Pop element into internal dequeue and return value.
+   * @details Null is returned if the queue is empty.
+   * @return The value of the transfered element. null if queue is empty or thread was interrupted.
+   * @note Suggested return identifier: val.
+   */
+  public String nonBlockingDequeue(JedisCluster jedis) throws InterruptedException {
+    QueueInterface queue = queues.get(roundRobinPopIndex());
+    return queue.nonBlockingDequeue(jedis);
+  }
+
+  /**
    * @brief Get the current pop queue.
    * @details Get the queue that the balanced queue intends to pop from next.
    * @return The queue that the balanced queue intends to pop from next.

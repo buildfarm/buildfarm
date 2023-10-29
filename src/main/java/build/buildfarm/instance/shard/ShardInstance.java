@@ -47,6 +47,7 @@ import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListen
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.CacheCapabilities;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
@@ -60,6 +61,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
 import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.actioncache.ShardActionCache;
 import build.buildfarm.backplane.Backplane;
@@ -132,6 +134,7 @@ import io.prometheus.client.Histogram;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -253,7 +256,11 @@ public class ShardInstance extends AbstractServerInstance {
   private static Backplane createBackplane(String identifier) throws ConfigurationException {
     if (configs.getBackplane().getType().equals(SHARD)) {
       return new RedisShardBackplane(
-          identifier, ShardInstance::stripOperation, ShardInstance::stripQueuedOperation);
+          identifier,
+          /* subscribeToBackplane=*/ true,
+          configs.getServer().isRunFailsafeOperation(),
+          ShardInstance::stripOperation,
+          ShardInstance::stripQueuedOperation);
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
     }
@@ -411,14 +418,14 @@ public class ShardInstance extends AbstractServerInstance {
                       () -> {},
                       Deadline.after(5, MINUTES));
                   try {
-                    log.log(Level.FINE, "queueing " + operationName);
+                    log.log(Level.FINER, "queueing " + operationName);
                     ListenableFuture<Void> queueFuture = queue(executeEntry, poller, queueTimeout);
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {
                           @Override
                           public void onSuccess(Void result) {
-                            log.log(Level.FINE, "successfully queued " + operationName);
+                            log.log(Level.FINER, "successfully queued " + operationName);
                             // nothing
                           }
 
@@ -432,7 +439,7 @@ public class ShardInstance extends AbstractServerInstance {
                     long operationTransformDispatchUSecs =
                         stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
                     log.log(
-                        Level.FINE,
+                        Level.FINER,
                         format(
                             "OperationQueuer: Dispatched To Transform %s: %dus in canQueue, %dus in transform dispatch",
                             operationName, canQueueUSecs, operationTransformDispatchUSecs));
@@ -447,10 +454,9 @@ public class ShardInstance extends AbstractServerInstance {
 
                 @Override
                 public void run() {
-                  log.log(Level.FINE, "OperationQueuer: Running");
+                  log.log(Level.FINER, "OperationQueuer: Running");
                   try {
-                    for (; ; ) {
-                      transformTokensQueue.put(new Object());
+                    while (transformTokensQueue.offer(new Object(), 5, MINUTES)) {
                       stopwatch.start();
                       try {
                         iterate()
@@ -473,6 +479,7 @@ public class ShardInstance extends AbstractServerInstance {
                         stopwatch.reset();
                       }
                     }
+                    log.severe("OperationQueuer: Transform lease token timed out");
                   } catch (InterruptedException e) {
                     // treat with exit
                     operationQueuer = null;
@@ -480,7 +487,7 @@ public class ShardInstance extends AbstractServerInstance {
                   } catch (Exception t) {
                     log.log(Level.SEVERE, "OperationQueuer: fatal exception during iteration", t);
                   } finally {
-                    log.log(Level.FINE, "OperationQueuer: Exiting");
+                    log.log(Level.FINER, "OperationQueuer: Exiting");
                   }
                   operationQueuer = null;
                   try {
@@ -565,12 +572,14 @@ public class ShardInstance extends AbstractServerInstance {
       return;
     }
     stopping = true;
-    log.log(Level.FINE, format("Instance %s is stopping", getName()));
+    log.log(Level.FINER, format("Instance %s is stopping", getName()));
     if (operationQueuer != null) {
-      operationQueuer.stop();
+      operationQueuer.interrupt();
+      operationQueuer.join();
     }
     if (dispatchedMonitor != null) {
       dispatchedMonitor.interrupt();
+      dispatchedMonitor.join();
     }
     if (prometheusMetricsThread != null) {
       prometheusMetricsThread.interrupt();
@@ -601,7 +610,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
     actionCacheFetchService.shutdownNow();
     workerStubs.invalidateAll();
-    log.log(Level.FINE, format("Instance %s has been stopped", getName()));
+    log.log(Level.FINER, format("Instance %s has been stopped", getName()));
     stopping = false;
     stopped = true;
   }
@@ -642,75 +651,19 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFailedFuture(Status.fromThrowable(e).asException());
     }
 
-    // Empty blobs are an exceptional case.  Filter them out.
-    // If the user only requested empty blobs we can immedaitely tell them we already have it.
+    // Empty blobs are an exceptional case. Filter them out.
+    // If the user only requested empty blobs we can immediately tell them we already have it.
     Iterable<Digest> nonEmptyDigests =
         Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() != 0);
     if (Iterables.isEmpty(nonEmptyDigests)) {
       return immediateFuture(ImmutableList.of());
     }
 
-    // This is a faster strategy to check missing blobs which does not require querying the CAS.
-    // With hundreds of worker machines, it may be too expensive to query all of them for "find
-    // missing blobs".
-    // Workers register themselves with the backplane for a 30-second window, and if they fail to
-    // re-register within this time frame, they are automatically removed from the backplane. While
-    // this alternative strategy for finding missing blobs is faster and more cost-effective than
-    // the exhaustive approach of querying each worker to find the digest, it comes with a higher
-    // risk of returning expired workers despite filtering by active workers below. This is because
-    // the strategy may return workers that have expired in the last 30 seconds. However, checking
-    // workers directly is not a guarantee either since workers could leave the cluster after being
-    // queried. Ultimitely, it will come down to the client's resiliency if the backplane is
-    // out-of-date and the server lies about which blobs are actually present. We provide this
-    // alternative strategy for calculating missing blobs.
-
     if (configs.getServer().isFindMissingBlobsViaBackplane()) {
-      try {
-        Set<Digest> uniqueDigests = new HashSet<>();
-        nonEmptyDigests.forEach(uniqueDigests::add);
-        Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(uniqueDigests);
-        Set<String> workerSet = backplane.getStorageWorkers();
-        return immediateFuture(
-            uniqueDigests.stream()
-                .filter( // best effort to present digests only missing on active workers
-                    digest ->
-                        Sets.intersection(
-                                foundBlobs.getOrDefault(digest, Collections.emptySet()), workerSet)
-                            .isEmpty())
-                .collect(Collectors.toList()));
-      } catch (Exception e) {
-        return immediateFailedFuture(Status.fromThrowable(e).asException());
-      }
+      return findMissingBlobsViaBackplane(nonEmptyDigests);
     }
 
-    // A more accurate way to verify missing blobs is to ask the CAS participants directly if they
-    // have the blobs.  To do this, we get all of the worker nodes that are particpating in the CAS
-    // as a random list to begin our search.  If there are no workers avaiable, tell the client all
-    // blobs are missing.
-    Deque<String> workers;
-    try {
-      List<String> workersList = new ArrayList<>(backplane.getStorageWorkers());
-      Collections.shuffle(workersList, rand);
-      workers = new ArrayDeque<>(workersList);
-    } catch (IOException e) {
-      return immediateFailedFuture(Status.fromThrowable(e).asException());
-    }
-    if (workers.isEmpty()) {
-      return immediateFuture(nonEmptyDigests);
-    }
-
-    // Search through all of the workers to decide how many CAS blobs are missing.
-    SettableFuture<Iterable<Digest>> missingDigestsFuture = SettableFuture.create();
-    findMissingBlobsOnWorker(
-        UUID.randomUUID().toString(),
-        nonEmptyDigests,
-        workers,
-        ImmutableList.builder(),
-        Iterables.size(nonEmptyDigests),
-        Context.current().fixedContextExecutor(directExecutor()),
-        missingDigestsFuture,
-        requestMetadata);
-    return missingDigestsFuture;
+    return findMissingBlobsQueryingEachWorker(nonEmptyDigests, requestMetadata);
   }
 
   class FindMissingResponseEntry {
@@ -726,6 +679,114 @@ public class ShardInstance extends AbstractServerInstance {
       this.exception = exception;
       this.stillMissingAfter = stillMissingAfter;
     }
+  }
+
+  // A more accurate way to verify missing blobs is to ask the CAS participants directly if they
+  // have the blobs.  To do this, we get all the worker nodes that are participating in the CAS
+  // as a random list to begin our search.  If there are no workers available, tell the client all
+  // blobs are missing.
+  private ListenableFuture<Iterable<Digest>> findMissingBlobsQueryingEachWorker(
+      Iterable<Digest> nonEmptyDigests, RequestMetadata requestMetadata) {
+    Deque<String> workers;
+    try {
+      List<String> workersList = new ArrayList<>(backplane.getStorageWorkers());
+      Collections.shuffle(workersList, rand);
+      workers = new ArrayDeque<>(workersList);
+    } catch (IOException e) {
+      return immediateFailedFuture(Status.fromThrowable(e).asException());
+    }
+    if (workers.isEmpty()) {
+      return immediateFuture(nonEmptyDigests);
+    }
+
+    // Search through all of the workers to decide which CAS blobs are missing.
+    SettableFuture<Iterable<Digest>> missingDigestsFuture = SettableFuture.create();
+    findMissingBlobsOnWorker(
+        UUID.randomUUID().toString(),
+        nonEmptyDigests,
+        workers,
+        ImmutableList.builder(),
+        Iterables.size(nonEmptyDigests),
+        Context.current().fixedContextExecutor(directExecutor()),
+        missingDigestsFuture,
+        requestMetadata);
+    return missingDigestsFuture;
+  }
+
+  // This is a faster strategy to check missing blobs which does not require querying the CAS.
+  // With hundreds of worker machines, it may be too expensive to query all of them for "find
+  // missing blobs".
+  // Workers register themselves with the backplane for a 30-second window, and if they fail to
+  // re-register within this time frame, they are automatically removed from the backplane. While
+  // this alternative strategy for finding missing blobs is faster and more cost-effective than
+  // the exhaustive approach of querying each worker to find the digest, it comes with a higher
+  // risk of returning expired workers despite filtering by active workers below. This is because
+  // the strategy may return workers that have expired in the last 30 seconds. However, checking
+  // workers directly is not a guarantee either since workers could leave the cluster after being
+  // queried. Ultimately, it will come down to the client's resiliency if the backplane is
+  // out-of-date and the server lies about which blobs are actually present. We provide this
+  // alternative strategy for calculating missing blobs.
+  private ListenableFuture<Iterable<Digest>> findMissingBlobsViaBackplane(
+      Iterable<Digest> nonEmptyDigests) {
+    try {
+      Set<Digest> uniqueDigests = new HashSet<>();
+      nonEmptyDigests.forEach(uniqueDigests::add);
+      Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(uniqueDigests);
+      Set<String> workerSet = backplane.getStorageWorkers();
+      Map<String, Long> workersStartTime = backplane.getWorkersStartTimeInEpochSecs(workerSet);
+      return immediateFuture(
+          uniqueDigests.stream()
+              .filter( // best effort to present digests only missing on active workers
+                  digest -> {
+                    Set<String> initialWorkers =
+                        foundBlobs.getOrDefault(digest, Collections.emptySet());
+                    return filterAndAdjustWorkersForDigest(
+                            digest, initialWorkers, workerSet, workersStartTime)
+                        .isEmpty();
+                  })
+              .collect(Collectors.toList()));
+    } catch (Exception e) {
+      log.log(Level.SEVERE, "find missing blob via backplane failed", e);
+      return immediateFailedFuture(Status.fromThrowable(e).asException());
+    }
+  }
+
+  private Set<String> filterAndAdjustWorkersForDigest(
+      Digest digest,
+      Set<String> originalWorkerSetWithDigest,
+      Set<String> activeWorkers,
+      Map<String, Long> workersStartTime) {
+    long insertTime;
+    try {
+      insertTime = backplane.getDigestInsertTime(digest);
+    } catch (IOException e) {
+      log.log(Level.WARNING, format("failed to get digest (%s) insertion time", digest));
+      return Collections.emptySet();
+    }
+    Set<String> activeWorkersWithDigest =
+        Sets.intersection(originalWorkerSetWithDigest, activeWorkers);
+    Set<String> workersStartedBeforeDigestInsertion =
+        activeWorkersWithDigest.stream()
+            .filter(
+                worker ->
+                    workersStartTime.getOrDefault(worker, Instant.now().getEpochSecond())
+                        < insertTime)
+            .collect(Collectors.toSet());
+    Set<String> workersToBeRemoved =
+        Sets.difference(originalWorkerSetWithDigest, workersStartedBeforeDigestInsertion)
+            .immutableCopy();
+    if (!workersToBeRemoved.isEmpty()) {
+      try {
+        log.log(Level.INFO, format("adjusting locations for the digest %s", digest));
+        backplane.adjustBlobLocations(digest, Collections.emptySet(), workersToBeRemoved);
+      } catch (IOException e) {
+        log.log(
+            Level.WARNING,
+            format("error adjusting blob location for %s", DigestUtil.toString(digest)),
+            e);
+      }
+    }
+    return workersStartedBeforeDigestInsertion;
   }
 
   private void findMissingBlobsOnWorker(
@@ -842,7 +903,7 @@ public class ShardInstance extends AbstractServerInstance {
               public void onNext(ByteString nextChunk) {
                 blobObserver.onNext(nextChunk);
                 received += nextChunk.size();
-                ioMetric.observe(received);
+                ioMetric.observe(nextChunk.size());
               }
 
               @Override
@@ -855,13 +916,22 @@ public class ShardInstance extends AbstractServerInstance {
                 } else if (status.getCode() == Code.NOT_FOUND) {
                   casMissCounter.inc();
                   log.log(
-                      Level.FINE, worker + " did not contain " + DigestUtil.toString(blobDigest));
+                      configs.getServer().isEnsureOutputsPresent() ? Level.WARNING : Level.FINER,
+                      worker + " did not contain " + DigestUtil.toString(blobDigest));
                   // ignore this, the worker will update the backplane eventually
                 } else if (status.getCode() != Code.DEADLINE_EXCEEDED
                     && SHARD_IS_RETRIABLE.test(status)) {
                   // why not, always
                   workers.addLast(worker);
                 } else {
+                  log.log(
+                      Level.WARNING,
+                      format(
+                          "%s: read(%s) on worker %s after %d bytes of content",
+                          status.getCode().name(),
+                          DigestUtil.toString(blobDigest),
+                          worker,
+                          received));
                   blobObserver.onError(t);
                   return;
                 }
@@ -960,7 +1030,7 @@ public class ShardInstance extends AbstractServerInstance {
     final ListenableFuture<List<String>> populatedWorkerListFuture;
     if (emptyWorkerList) {
       log.log(
-          Level.FINE,
+          Level.FINER,
           format(
               "worker list was initially empty for %s, attempting to correct",
               DigestUtil.toString(blobDigest)));
@@ -976,7 +1046,7 @@ public class ShardInstance extends AbstractServerInstance {
                   RequestMetadata.getDefaultInstance()),
               (foundOnWorkers) -> {
                 log.log(
-                    Level.FINE,
+                    Level.FINER,
                     format(
                         "worker list was corrected for %s to be %s",
                         DigestUtil.toString(blobDigest), foundOnWorkers.toString()));
@@ -1006,7 +1076,7 @@ public class ShardInstance extends AbstractServerInstance {
               workersList.clear();
               final ListenableFuture<List<String>> workersListFuture;
               log.log(
-                  Level.FINE,
+                  Level.FINER,
                   format(
                       "worker list was depleted for %s, attempting to correct",
                       DigestUtil.toString(blobDigest)));
@@ -1022,7 +1092,7 @@ public class ShardInstance extends AbstractServerInstance {
                           RequestMetadata.getDefaultInstance()),
                       (foundOnWorkers) -> {
                         log.log(
-                            Level.FINE,
+                            Level.FINER,
                             format(
                                 "worker list was corrected after depletion for %s to be %s",
                                 DigestUtil.toString(blobDigest), foundOnWorkers.toString()));
@@ -1037,7 +1107,8 @@ public class ShardInstance extends AbstractServerInstance {
                     @Override
                     public void onQueue(Deque<String> workers) {
                       ctx.run(
-                          () ->
+                          () -> {
+                            try {
                               fetchBlobFromWorker(
                                   compressor,
                                   blobDigest,
@@ -1045,7 +1116,11 @@ public class ShardInstance extends AbstractServerInstance {
                                   offset,
                                   count,
                                   checkedChunkObserver,
-                                  requestMetadata));
+                                  requestMetadata);
+                            } catch (Exception e) {
+                              onFailure(e);
+                            }
+                          });
                     }
 
                     @Override
@@ -1070,7 +1145,8 @@ public class ShardInstance extends AbstractServerInstance {
           @Override
           public void onQueue(Deque<String> workers) {
             ctx.run(
-                () ->
+                () -> {
+                  try {
                     fetchBlobFromWorker(
                         compressor,
                         blobDigest,
@@ -1078,7 +1154,11 @@ public class ShardInstance extends AbstractServerInstance {
                         offset,
                         count,
                         chunkObserver,
-                        requestMetadata));
+                        requestMetadata);
+                  } catch (Exception e) {
+                    onFailure(e);
+                  }
+                });
           }
 
           @Override
@@ -1311,7 +1391,7 @@ public class ShardInstance extends AbstractServerInstance {
           @Override
           public CompletableFuture<Directory> apply(Digest digest, Executor executor) {
             log.log(
-                Level.FINE,
+                Level.FINER,
                 format(
                     "transformQueuedOperation(%s): fetching directory %s",
                     reason, DigestUtil.toString(directoryBlobDigest)));
@@ -1446,7 +1526,7 @@ public class ShardInstance extends AbstractServerInstance {
                 expectCommand(commandDigest, requestMetadata),
                 (command) -> {
                   log.log(
-                      Level.FINE,
+                      Level.FINER,
                       format("transformQueuedOperation(%s): fetched command", operationName));
                   if (command != null) {
                     queuedOperationBuilder.setCommand(command);
@@ -1931,7 +2011,7 @@ public class ShardInstance extends AbstractServerInstance {
 
       executionSuccess.inc();
       log.log(
-          Level.FINE,
+          Level.FINER,
           new StringBuilder()
               .append("ExecutionSuccess: ")
               .append(requestMetadata.getToolInvocationId())
@@ -1944,7 +2024,7 @@ public class ShardInstance extends AbstractServerInstance {
       actionCache.invalidate(DigestUtil.asActionKey(actionDigest));
       if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
         log.log(
-            Level.FINE,
+            Level.FINER,
             format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
         skipCacheLookup = true;
       }
@@ -2169,7 +2249,7 @@ public class ShardInstance extends AbstractServerInstance {
             poller.pause();
             long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
             log.log(
-                Level.FINE,
+                Level.FINER,
                 format(
                     "ShardInstance(%s): checkCache(%s): %sus elapsed",
                     getName(), operation.getName(), checkCacheUSecs));
@@ -2196,7 +2276,7 @@ public class ShardInstance extends AbstractServerInstance {
     Digest actionDigest = metadata.getActionDigest();
     SettableFuture<Void> queueFuture = SettableFuture.create();
     log.log(
-        Level.FINE,
+        Level.FINER,
         format(
             "ShardInstance(%s): queue(%s): fetching action %s",
             getName(), operation.getName(), actionDigest.getHash()));
@@ -2239,7 +2319,7 @@ public class ShardInstance extends AbstractServerInstance {
             actionFuture,
             (action) -> {
               log.log(
-                  Level.FINE,
+                  Level.FINER,
                   format(
                       "ShardInstance(%s): queue(%s): fetched action %s transforming queuedOperation",
                       getName(), operation.getName(), actionDigest.getHash()));
@@ -2269,7 +2349,7 @@ public class ShardInstance extends AbstractServerInstance {
             queuedFuture,
             (profiledQueuedMetadata) -> {
               log.log(
-                  Level.FINE,
+                  Level.FINER,
                   format(
                       "ShardInstance(%s): queue(%s): queuedOperation %s transformed, validating",
                       getName(),
@@ -2291,7 +2371,7 @@ public class ShardInstance extends AbstractServerInstance {
             validatedFuture,
             (profiledQueuedMetadata) -> {
               log.log(
-                  Level.FINE,
+                  Level.FINER,
                   format(
                       "ShardInstance(%s): queue(%s): queuedOperation %s validated, uploading",
                       getName(),
@@ -2343,7 +2423,7 @@ public class ShardInstance extends AbstractServerInstance {
               long elapsedUSecs = stopwatch.elapsed(MICROSECONDS);
               long queueUSecs = elapsedUSecs - startQueueUSecs;
               log.log(
-                  Level.FINE,
+                  Level.FINER,
                   format(
                       "ShardInstance(%s): queue(%s): %dus checkCache, %dus transform, %dus validate, %dus upload, %dus queue, %dus elapsed",
                       getName(),
@@ -2647,5 +2727,17 @@ public class ShardInstance extends AbstractServerInstance {
       return false;
     }
     return backplane.isBlacklisted(requestMetadata);
+  }
+
+  @Override
+  protected CacheCapabilities getCacheCapabilities() {
+    SymlinkAbsolutePathStrategy.Value symlinkAbsolutePathStrategy =
+        configs.isAllowSymlinkTargetAbsolute()
+            ? SymlinkAbsolutePathStrategy.Value.ALLOWED
+            : SymlinkAbsolutePathStrategy.Value.DISALLOWED;
+    return super.getCacheCapabilities()
+        .toBuilder()
+        .setSymlinkAbsolutePathStrategy(symlinkAbsolutePathStrategy)
+        .build();
   }
 }

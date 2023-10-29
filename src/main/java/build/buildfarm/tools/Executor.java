@@ -15,6 +15,7 @@
 package build.buildfarm.tools;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
+import static build.buildfarm.common.grpc.Channels.createChannel;
 import static build.buildfarm.common.io.Utils.stat;
 import static build.buildfarm.instance.stub.ByteStreamUploader.uploadResourceName;
 import static com.google.common.base.Preconditions.checkState;
@@ -53,8 +54,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
@@ -221,12 +220,6 @@ class Executor {
     }
 
     shutdownAndAwaitTermination(service, 1, SECONDS);
-  }
-
-  private static ManagedChannel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
-    return builder.build();
   }
 
   private static void loadFilesIntoCAS(String instanceName, Channel channel, Path blobsDir)

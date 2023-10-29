@@ -60,6 +60,8 @@ import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
+import build.buildfarm.worker.resources.LocalResourceSet;
+import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import build.buildfarm.worker.resources.ResourceDecider;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.annotations.VisibleForTesting;
@@ -92,6 +94,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.logging.Level;
+import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 @Log
@@ -128,13 +131,14 @@ class ShardWorkerContext implements WorkerContext {
   private final Group operationsGroup = executionsGroup.getChild("operations");
   private final CasWriter writer;
   private final boolean errorOperationRemainingResources;
+  private final LocalResourceSet resourceSet;
 
   static SetMultimap<String, String> getMatchProvisions(
       Iterable<ExecutionPolicy> policies, int executeStageWidth) {
     ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
     Platform matchPlatform =
         ExecutionPolicies.getMatchPlatform(
-            configs.getBackplane().getQueues()[0].getPlatform(), policies);
+            configs.getWorker().getDequeueMatchSettings().getPlatform(), policies);
     for (Platform.Property property : matchPlatform.getPropertiesList()) {
       provisions.put(property.getName(), property.getValue());
     }
@@ -161,6 +165,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean onlyMulticoreTests,
       boolean allowBringYourOwnContainer,
       boolean errorOperationRemainingResources,
+      LocalResourceSet resourceSet,
       CasWriter writer) {
     this.name = name;
     this.matchProvisions = getMatchProvisions(policies, executeStageWidth);
@@ -181,6 +186,7 @@ class ShardWorkerContext implements WorkerContext {
     this.onlyMulticoreTests = onlyMulticoreTests;
     this.allowBringYourOwnContainer = allowBringYourOwnContainer;
     this.errorOperationRemainingResources = errorOperationRemainingResources;
+    this.resourceSet = resourceSet;
     this.writer = writer;
   }
 
@@ -239,12 +245,12 @@ class ShardWorkerContext implements WorkerContext {
           } else {
             operationPollerCounter.inc();
             log.log(
-                Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
+                Level.FINE, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
         () -> {
-          log.log(Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
+          log.log(Level.FINE, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);
@@ -272,12 +278,18 @@ class ShardWorkerContext implements WorkerContext {
 
   @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
+    QueueEntry queueEntry = takeEntryOffOperationQueue(listener);
+    decideWhetherToKeepOperation(queueEntry, listener);
+  }
+
+  private QueueEntry takeEntryOffOperationQueue(MatchListener listener)
+      throws IOException, InterruptedException {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
     try {
       queueEntry =
           backplane.dispatchOperation(
-              configs.getBackplane().getQueues()[0].getPlatform().getPropertiesList());
+              configs.getWorker().getDequeueMatchSettings().getPlatform().getPropertiesList());
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {
@@ -293,9 +305,13 @@ class ShardWorkerContext implements WorkerContext {
       // transient backplane errors will propagate a null queueEntry
     }
     listener.onWaitEnd();
+    return queueEntry;
+  }
 
+  private void decideWhetherToKeepOperation(QueueEntry queueEntry, MatchListener listener)
+      throws IOException, InterruptedException {
     if (queueEntry == null
-        || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, queueEntry)) {
+        || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, resourceSet, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -306,6 +322,11 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  public void returnLocalResources(QueueEntry queueEntry) {
+    LocalResourceSetUtils.releaseClaims(queueEntry.getPlatform(), resourceSet);
+  }
+
+  @Override
   public void match(MatchListener listener) throws InterruptedException {
     RetryingMatchListener dedupMatchListener =
         new RetryingMatchListener() {
@@ -313,7 +334,7 @@ class ShardWorkerContext implements WorkerContext {
 
           @Override
           public boolean getMatched() {
-            return !matched;
+            return matched;
           }
 
           @Override
@@ -327,20 +348,28 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
+          public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
             if (queueEntry == null) {
               matched = true;
               return listener.onEntry(null);
             }
+            return onValidEntry(queueEntry);
+          }
+
+          private boolean onValidEntry(QueueEntry queueEntry) throws InterruptedException {
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
               log.log(Level.WARNING, "matched duplicate operation " + operationName);
               return false;
             }
+            return onUniqueEntry(queueEntry);
+          }
+
+          private boolean onUniqueEntry(QueueEntry queueEntry) throws InterruptedException {
             matched = true;
             boolean success = listener.onEntry(queueEntry);
             if (!success) {
-              requeue(operationName);
+              requeue(queueEntry.getExecuteEntry().getOperationName());
             }
             return success;
           }
@@ -350,13 +379,8 @@ class ShardWorkerContext implements WorkerContext {
             Throwables.throwIfUnchecked(t);
             throw new RuntimeException(t);
           }
-
-          @Override
-          public void setOnCancelHandler(Runnable onCancelHandler) {
-            listener.setOnCancelHandler(onCancelHandler);
-          }
         };
-    while (dedupMatchListener.getMatched()) {
+    while (!dedupMatchListener.getMatched()) {
       try {
         matchInterruptible(dedupMatchListener);
       } catch (IOException e) {
@@ -483,7 +507,7 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     String outputFile = actionRoot.relativize(outputPath).toString();
     if (!Files.exists(outputPath)) {
-      log.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
+      log.log(Level.FINER, "ReportResultStage: " + outputFile + " does not exist...");
       return;
     }
 
@@ -491,7 +515,7 @@ class ShardWorkerContext implements WorkerContext {
       String message =
           String.format(
               "ReportResultStage: %s is a directory but it should have been a file", outputPath);
-      log.log(Level.FINE, message);
+      log.log(Level.FINER, message);
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -572,12 +596,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     String outputDir = actionRoot.relativize(outputDirPath).toString();
     if (!Files.exists(outputDirPath)) {
-      log.log(Level.FINE, "ReportResultStage: " + outputDir + " does not exist...");
+      log.log(Level.FINER, "ReportResultStage: " + outputDir + " does not exist...");
       return;
     }
 
     if (!Files.isDirectory(outputDirPath)) {
-      log.log(Level.FINE, "ReportResultStage: " + outputDir + " is not a directory...");
+      log.log(Level.FINER, "ReportResultStage: " + outputDir + " is not a directory...");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -700,7 +724,7 @@ class ShardWorkerContext implements WorkerContext {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
       completedOperations.inc();
-      log.log(Level.FINE, "CompletedOperation: " + operation.getName());
+      log.log(Level.FINER, "CompletedOperation: " + operation.getName());
     }
     return success;
   }

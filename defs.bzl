@@ -8,7 +8,7 @@ load(
     "@io_bazel_rules_docker//repositories:repositories.bzl",
     container_repositories = "repositories",
 )
-load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
+load("@io_grpc_grpc_java//:repositories.bzl", "IO_GRPC_GRPC_JAVA_OVERRIDE_TARGETS", "grpc_java_repositories")
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 load("@io_bazel_rules_k8s//k8s:k8s.bzl", "k8s_repositories")
@@ -43,27 +43,8 @@ IO_GRPC_MODULES = [
 ]
 
 COM_AWS_MODULES = [
-    "autoscaling",
-    "core",
-    "ec2",
-    "secretsmanager",
-    "sns",
-    "ssm",
     "s3",
-]
-
-ORG_SPRING_MODULES = [
-    "spring-beans",
-    "spring-core",
-    "spring-context",
-    "spring-web",
-]
-
-ORG_SPRING_BOOT_MODULES = [
-    "spring-boot-autoconfigure",
-    "spring-boot",
-    "spring-boot-starter-web",
-    "spring-boot-starter-thymeleaf",
+    "secretsmanager",
 ]
 
 def buildfarm_init(name = "buildfarm"):
@@ -95,20 +76,19 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.errorprone:error_prone_annotations:2.9.0",
                         "com.google.errorprone:error_prone_core:0.92",
                         "com.google.guava:failureaccess:1.0.1",
-                        "com.google.guava:guava:31.1-jre",
+                        "com.google.guava:guava:32.1.1-jre",
                         "com.google.j2objc:j2objc-annotations:1.1",
                         "com.google.jimfs:jimfs:1.1",
-                        "com.google.protobuf:protobuf-java-util:3.10.0",
-                        "com.google.protobuf:protobuf-java:3.10.0",
+                        "com.google.protobuf:protobuf-java-util:3.19.1",
+                        "com.google.protobuf:protobuf-java:3.19.1",
                         "com.google.truth:truth:0.44",
                         "org.slf4j:slf4j-simple:1.7.35",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
-                        "io.github.lognet:grpc-spring-boot-starter:4.5.4",
                         "org.bouncycastle:bcprov-jdk15on:1.70",
                         "net.jcip:jcip-annotations:1.0",
-                    ] + ["io.netty:netty-%s:4.1.90.Final" % module for module in IO_NETTY_MODULES] +
-                    ["io.grpc:grpc-%s:1.53.0" % module for module in IO_GRPC_MODULES] +
+                    ] + ["io.netty:netty-%s:4.1.94.Final" % module for module in IO_NETTY_MODULES] +
+                    ["io.grpc:grpc-%s:1.56.1" % module for module in IO_GRPC_MODULES] +
                     [
                         "io.prometheus:simpleclient:0.10.0",
                         "io.prometheus:simpleclient_hotspot:0.10.0",
@@ -127,9 +107,6 @@ def buildfarm_init(name = "buildfarm"):
                         "org.openjdk.jmh:jmh-core:1.23",
                         "org.openjdk.jmh:jmh-generator-annprocess:1.23",
                         "org.redisson:redisson:3.13.1",
-                    ] + ["org.springframework.boot:%s:2.7.4" % module for module in ORG_SPRING_BOOT_MODULES] +
-                    ["org.springframework:%s:5.3.23" % module for module in ORG_SPRING_MODULES] +
-                    [
                         "org.threeten:threetenbp:1.3.3",
                         "org.xerial:sqlite-jdbc:3.34.0",
                         "org.jetbrains:annotations:16.0.2",
@@ -137,9 +114,10 @@ def buildfarm_init(name = "buildfarm"):
                         "org.projectlombok:lombok:1.18.24",
                     ],
         generate_compat_repositories = True,
+        override_targets = IO_GRPC_GRPC_JAVA_OVERRIDE_TARGETS,
         repositories = [
-            "https://repo.maven.apache.org/maven2",
-            "https://jcenter.bintray.com",
+            "https://repo1.maven.org/maven2",
+            "https://mirrors.ibiblio.org/pub/mirrors/maven2",
         ],
     )
 

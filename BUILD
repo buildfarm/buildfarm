@@ -38,7 +38,7 @@ java_library(
 java_image(
     name = "buildfarm-server",
     args = ["/app/build_buildfarm/examples/config.minimal.yml"],
-    base = "@amazon_corretto_java_image_base//image",
+    base = "@ubuntu-mantic//image",
     classpath_resources = [
         "//src/main/java/build/buildfarm:configs",
     ],
@@ -66,14 +66,14 @@ oss_audit(
 # Download cgroup-tools so that the worker is able to restrict actions via control groups.
 download_pkgs(
     name = "worker_pkgs",
-    image_tar = "@ubuntu-bionic//image",
+    image_tar = "@ubuntu-mantic//image",
     packages = ["cgroup-tools"],
     tags = ["container"],
 )
 
 install_pkgs(
     name = "worker_pkgs_image",
-    image_tar = "@ubuntu-bionic//image",
+    image_tar = "@ubuntu-mantic//image",
     installables_tar = ":worker_pkgs.tar",
     installation_cleanup_commands = "rm -rf /var/lib/apt/lists/*",
     output_image_name = "worker_pkgs_image",

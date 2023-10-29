@@ -19,8 +19,11 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
+import static java.lang.Thread.State.TERMINATED;
+import static java.lang.Thread.State.WAITING;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
@@ -43,7 +46,6 @@ import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.cas.cfc.CASFileCache.CancellableOutputStream;
 import build.buildfarm.cas.cfc.CASFileCache.Entry;
-import build.buildfarm.cas.cfc.CASFileCache.PutDirectoryException;
 import build.buildfarm.cas.cfc.CASFileCache.StartupCacheResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -59,11 +61,13 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
+import io.grpc.Status;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -77,6 +81,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -147,7 +152,6 @@ class CASFileCacheTest {
             /* maxEntrySizeInBytes=*/ 1024,
             /* hexBucketLevels=*/ 1,
             storeFileDirsIndexInMemory,
-            /* publishTtlMetric=*/ false,
             /* execRootFallback=*/ false,
             DIGEST_UTIL,
             expireService,
@@ -159,14 +163,14 @@ class CASFileCacheTest {
             delegate,
             /* delegateSkipLoad=*/ false) {
           @Override
-          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
-              throws IOException {
+          protected InputStream newExternalInput(
+              Compressor.Value compressor, Digest digest, long offset) throws IOException {
             ByteString content = blobs.get(digest);
             if (content == null) {
-              return fileCache.newTransparentInput(compressor, digest, 0);
+              return fileCache.newTransparentInput(compressor, digest, offset);
             }
             checkArgument(compressor == Compressor.Value.IDENTITY);
-            return content.substring((int) (long) 0).newInput();
+            return content.substring((int) offset).newInput();
           }
         };
     // do this so that we can remove the cache root dir
@@ -175,10 +179,11 @@ class CASFileCacheTest {
 
   @After
   public void tearDown() throws IOException, InterruptedException {
+    FileStore fileStore = Files.getFileStore(root);
     // bazel appears to have a problem with us creating directories under
     // windows that are marked as no-delete. clean up after ourselves with
     // our utils
-    Directories.remove(root);
+    Directories.remove(root, fileStore);
     if (!shutdownAndAwaitTermination(putService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down put service");
     }
@@ -240,7 +245,8 @@ class CASFileCacheTest {
             subdirDigest, subDirectory);
     Path dirPath =
         getInterruptiblyOrIOException(
-            fileCache.putDirectory(dirDigest, directoriesIndex, putService));
+                fileCache.putDirectory(dirDigest, directoriesIndex, putService))
+            .getPath();
     assertThat(Files.isDirectory(dirPath)).isTrue();
     assertThat(Files.exists(dirPath.resolve("file"))).isTrue();
     assertThat(Files.isDirectory(dirPath.resolve("subdir"))).isTrue();
@@ -1102,6 +1108,69 @@ class CASFileCacheTest {
   }
 
   @Test
+  public void copyExternalInputRetries() throws Exception {
+    CASFileCache flakyExternalCAS =
+        new CASFileCache(
+            root,
+            /* maxSizeInBytes=*/ 1024,
+            /* maxEntrySizeInBytes=*/ 1024,
+            /* hexBucketLevels=*/ 1,
+            storeFileDirsIndexInMemory,
+            /* execRootFallback=*/ false,
+            DIGEST_UTIL,
+            expireService,
+            /* accessRecorder=*/ directExecutor(),
+            storage,
+            /* directoriesIndexDbName=*/ ":memory:",
+            /* onPut=*/ digest -> {},
+            /* onExpire=*/ digests -> {},
+            /* delegate=*/ null,
+            /* delegateSkipLoad=*/ false) {
+          boolean throwUnavailable = true;
+
+          @Override
+          protected InputStream newExternalInput(
+              Compressor.Value compressor, Digest digest, long offset) throws IOException {
+            ByteString content = blobs.get(digest);
+            if (throwUnavailable) {
+              throwUnavailable = false;
+              return new InputStream() {
+                int count = 0;
+
+                @Override
+                public int read(byte[] buf) throws IOException {
+                  return read(buf, 0, buf.length);
+                }
+
+                @Override
+                public int read() {
+                  throw new UnsupportedOperationException();
+                }
+
+                @Override
+                public int read(byte[] buf, int offset, int len) throws IOException {
+                  if (count >= digest.getSizeBytes() / 2) {
+                    throw new IOException(Status.UNAVAILABLE.asRuntimeException());
+                  }
+                  len = Math.min((int) digest.getSizeBytes() / 2 - count, len);
+                  content.substring(count, count + len).copyTo(buf, offset);
+                  count += len;
+                  return len;
+                }
+              };
+            }
+            return content.substring((int) offset).newInput();
+          }
+        };
+    flakyExternalCAS.initializeRootDirectory();
+    ByteString blob = ByteString.copyFromUtf8("Flaky Entry");
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
+    blobs.put(blobDigest, blob);
+    Path path = flakyExternalCAS.put(blobDigest, false);
+    assertThat(Files.exists(path)).isTrue(); // would not have been created if not valid
+  }
+
+  @Test
   public void newInputThrowsNoSuchFileExceptionWithoutDelegate() throws Exception {
     ContentAddressableStorage undelegatedCAS =
         new CASFileCache(
@@ -1110,7 +1179,6 @@ class CASFileCacheTest {
             /* maxEntrySizeInBytes=*/ 1024,
             /* hexBucketLevels=*/ 1,
             storeFileDirsIndexInMemory,
-            /* publishTtlMetric=*/ false,
             /* execRootFallback=*/ false,
             DIGEST_UTIL,
             expireService,
@@ -1122,14 +1190,14 @@ class CASFileCacheTest {
             /* delegate=*/ null,
             /* delegateSkipLoad=*/ false) {
           @Override
-          protected InputStream newExternalInput(Compressor.Value compressor, Digest digest)
-              throws IOException {
+          protected InputStream newExternalInput(
+              Compressor.Value compressor, Digest digest, long offset) throws IOException {
             ByteString content = blobs.get(digest);
             if (content == null) {
-              return fileCache.newTransparentInput(compressor, digest, 0);
+              return fileCache.newTransparentInput(compressor, digest, offset);
             }
             checkArgument(compressor == Compressor.Value.IDENTITY);
-            return content.substring((int) (long) 0).newInput();
+            return content.substring((int) offset).newInput();
           }
         };
     ByteString blob = ByteString.copyFromUtf8("Missing Entry");
@@ -1142,6 +1210,114 @@ class CASFileCacheTest {
       expected = e;
     }
     assertThat(expected).isNotNull();
+  }
+
+  @Test
+  public void testConcurrentWrites() throws Exception {
+    ByteString blob = ByteString.copyFromUtf8("concurrent write");
+    Digest digest = DIGEST_UTIL.compute(blob);
+    UUID uuid = UUID.randomUUID();
+    // The same instance of Write will be passed to both the threads, so that the both threads
+    // try to get same output stream.
+    Write write =
+        fileCache.getWrite(
+            Compressor.Value.IDENTITY, digest, uuid, RequestMetadata.getDefaultInstance());
+
+    CyclicBarrier barrier = new CyclicBarrier(3);
+
+    Thread write1 =
+        new Thread(
+            () -> {
+              try {
+                ConcurrentWriteStreamObserver writeStreamObserver =
+                    new ConcurrentWriteStreamObserver(write);
+                writeStreamObserver.registerCallback();
+                barrier.await(); // let both the threads get same write stream.
+                writeStreamObserver.ownStream(); // let other thread get the ownership of stream
+                writeStreamObserver.write(blob);
+                writeStreamObserver.close();
+              } catch (Exception e) {
+                // do nothing
+              }
+            },
+            "FirstRequest");
+    Thread write2 =
+        new Thread(
+            () -> {
+              try {
+                ConcurrentWriteStreamObserver writeStreamObserver =
+                    new ConcurrentWriteStreamObserver(write);
+                writeStreamObserver.registerCallback();
+                writeStreamObserver.ownStream(); // this thread will get the ownership of stream
+                barrier.await(); // let both the threads get same write stream.
+                while (write1.getState() != WAITING) ; // wait for first request to go in wait state
+                writeStreamObserver.write(blob);
+                writeStreamObserver.close();
+              } catch (Exception e) {
+                // do nothing
+              }
+            },
+            "SecondRequest");
+    write1.start();
+    write2.start();
+    barrier.await(); // let both the requests reach the critical section
+
+    // Wait for each write operation to complete, allowing a maximum of 100ms per write.
+    // Note: A 100ms wait time allowed 1000 * 8 successful test runs.
+    // In certain scenario, even this wait time may not be enough and test still be called flaky.
+    // But setting wait time 0 may cause test to wait forever (if there is issue in code) and the
+    // build might fail with timeout error.
+    write1.join(100);
+    write2.join(100);
+
+    assertThat(write1.getState()).isEqualTo(TERMINATED);
+    assertThat(write2.getState()).isEqualTo(TERMINATED);
+  }
+
+  static class ConcurrentWriteStreamObserver {
+    Write write;
+    FeedbackOutputStream out;
+
+    ConcurrentWriteStreamObserver(Write write) {
+      this.write = write;
+    }
+
+    void registerCallback() {
+      Futures.addCallback(
+          write.getFuture(),
+          new FutureCallback<Long>() {
+            @Override
+            public void onSuccess(Long committedSize) {
+              commit();
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+              // do nothing
+            }
+          },
+          directExecutor());
+    }
+
+    synchronized void ownStream() throws Exception {
+      this.out = write.getOutput(10, MILLISECONDS, () -> {});
+    }
+    /**
+     * Request 1 may invoke this method for request 2 or vice-versa via callback on
+     * write.getFuture(). Synchronization is necessary to prevent conflicts when this method is
+     * called simultaneously by different threads.
+     */
+    synchronized void commit() {
+      // critical section
+    }
+
+    void write(ByteString data) throws IOException {
+      data.writeTo(out);
+    }
+
+    void close() throws IOException {
+      out.close();
+    }
   }
 
   @RunWith(JUnit4.class)

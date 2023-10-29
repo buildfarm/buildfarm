@@ -74,11 +74,6 @@ final class OperationContext {
       this.queueEntry = queueEntry;
     }
 
-    public Builder setExecuteResponseBuilder(ExecuteResponse.Builder executeResponse) {
-      this.executeResponse = executeResponse;
-      return this;
-    }
-
     public Builder setOperation(Operation operation) {
       this.operation = operation;
       return this;

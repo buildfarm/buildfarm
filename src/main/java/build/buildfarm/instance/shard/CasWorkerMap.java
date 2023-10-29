@@ -95,6 +95,14 @@ public interface CasWorkerMap {
   Set<String> get(RedisClient client, Digest blobDigest) throws IOException;
 
   /**
+   * @brief Get insert time for the digest.
+   * @param client Client used for interacting with redis when not using cacheMap.
+   * @param blobDigest The blob digest to lookup for insert time.
+   * @return insert time of the digest.
+   */
+  long insertTime(RedisClient client, Digest blobDigest) throws IOException;
+
+  /**
    * @brief Get all of the key values as a map from the digests given.
    * @details If there are no workers for the digest, the key is left out of the returned map.
    * @param client Client used for interacting with redis when not using cacheMap.

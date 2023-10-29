@@ -270,6 +270,8 @@ message ShardWorker {
   int64 expire_at = 2;
 
   int32 worker_type = 3;
+
+  int64 first_registered_at = 4;
 }
 
 message WorkerChange {
@@ -600,6 +602,8 @@ message StageInformation {
 
   // number of slots used for this stage
   int32 slots_used = 3;
+
+  repeated string operation_names = 4;
 }
 
 message WorkerProfileMessage {
