@@ -31,7 +31,6 @@ import java.util.concurrent.Executors;
  *     single per-process pool.
  */
 public class BuildfarmExecutors {
-
   public static ExecutorService getScanCachePool() {
     int nThreads = SystemProcessors.get();
     String threadNameFormat = "scan-cache-pool-%d";

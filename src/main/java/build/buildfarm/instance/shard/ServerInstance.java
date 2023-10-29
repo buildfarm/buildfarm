@@ -81,7 +81,7 @@ import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
-import build.buildfarm.instance.server.AbstractServerInstance;
+import build.buildfarm.instance.server.NodeInstance;
 import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
@@ -169,7 +169,7 @@ import lombok.extern.java.Log;
 import org.apache.commons.lang3.tuple.Pair;
 
 @Log
-public class ShardInstance extends AbstractServerInstance {
+public class ServerInstance extends NodeInstance {
   private static final ListenableFuture<Void> IMMEDIATE_VOID_FUTURE = Futures.immediateFuture(null);
 
   private static final String TIMEOUT_OUT_OF_BOUNDS =
@@ -261,14 +261,14 @@ public class ShardInstance extends AbstractServerInstance {
           identifier,
           /* subscribeToBackplane=*/ true,
           configs.getServer().isRunFailsafeOperation(),
-          ShardInstance::stripOperation,
-          ShardInstance::stripQueuedOperation);
+          ServerInstance::stripOperation,
+          ServerInstance::stripQueuedOperation);
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
     }
   }
 
-  public ShardInstance(String name, String identifier, DigestUtil digestUtil, Runnable onStop)
+  public ServerInstance(String name, String identifier, DigestUtil digestUtil, Runnable onStop)
       throws InterruptedException, ConfigurationException {
     this(
         name,
@@ -278,7 +278,7 @@ public class ShardInstance extends AbstractServerInstance {
         /* actionCacheFetchService=*/ BuildfarmExecutors.getActionCacheFetchServicePool());
   }
 
-  private ShardInstance(
+  private ServerInstance(
       String name,
       DigestUtil digestUtil,
       Backplane backplane,
@@ -330,7 +330,7 @@ public class ShardInstance extends AbstractServerInstance {
             .build();
   }
 
-  public ShardInstance(
+  public ServerInstance(
       String name,
       DigestUtil digestUtil,
       Backplane backplane,
@@ -1127,7 +1127,7 @@ public class ShardInstance extends AbstractServerInstance {
                           backplane,
                           workerSet,
                           locationSet,
-                          ShardInstance.this::workerStub,
+                          ServerInstance.this::workerStub,
                           blobDigest,
                           directExecutor(),
                           RequestMetadata.getDefaultInstance()),
@@ -2292,7 +2292,7 @@ public class ShardInstance extends AbstractServerInstance {
             log.log(
                 Level.FINER,
                 format(
-                    "ShardInstance(%s): checkCache(%s): %sus elapsed",
+                    "ServerInstance(%s): checkCache(%s): %sus elapsed",
                     getName(), operation.getName(), checkCacheUSecs));
             return IMMEDIATE_VOID_FUTURE;
           }
@@ -2319,7 +2319,7 @@ public class ShardInstance extends AbstractServerInstance {
     log.log(
         Level.FINER,
         format(
-            "ShardInstance(%s): queue(%s): fetching action %s",
+            "ServerInstance(%s): queue(%s): fetching action %s",
             getName(), operation.getName(), actionDigest.getHash()));
     RequestMetadata requestMetadata = executeEntry.getRequestMetadata();
     ListenableFuture<Action> actionFuture =
@@ -2362,7 +2362,7 @@ public class ShardInstance extends AbstractServerInstance {
               log.log(
                   Level.FINER,
                   format(
-                      "ShardInstance(%s): queue(%s): fetched action %s transforming queuedOperation",
+                      "ServerInstance(%s): queue(%s): fetched action %s transforming queuedOperation",
                       getName(), operation.getName(), actionDigest.getHash()));
               Stopwatch transformStopwatch = Stopwatch.createStarted();
               return transform(
@@ -2392,7 +2392,7 @@ public class ShardInstance extends AbstractServerInstance {
               log.log(
                   Level.FINER,
                   format(
-                      "ShardInstance(%s): queue(%s): queuedOperation %s transformed, validating",
+                      "ServerInstance(%s): queue(%s): queuedOperation %s transformed, validating",
                       getName(),
                       operation.getName(),
                       DigestUtil.toString(
@@ -2414,7 +2414,7 @@ public class ShardInstance extends AbstractServerInstance {
               log.log(
                   Level.FINER,
                   format(
-                      "ShardInstance(%s): queue(%s): queuedOperation %s validated, uploading",
+                      "ServerInstance(%s): queue(%s): queuedOperation %s validated, uploading",
                       getName(),
                       operation.getName(),
                       DigestUtil.toString(
@@ -2466,7 +2466,7 @@ public class ShardInstance extends AbstractServerInstance {
               log.log(
                   Level.FINER,
                   format(
-                      "ShardInstance(%s): queue(%s): %dus checkCache, %dus transform, %dus validate, %dus upload, %dus queue, %dus elapsed",
+                      "ServerInstance(%s): queue(%s): %dus checkCache, %dus transform, %dus validate, %dus upload, %dus queue, %dus elapsed",
                       getName(),
                       queueOperation.getName(),
                       checkCacheUSecs,

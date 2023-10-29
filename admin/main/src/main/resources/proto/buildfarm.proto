@@ -520,7 +520,7 @@ message RedisShardBackplaneConfig {
   int32 max_attempts = 33;
 }
 
-message ShardInstanceConfig {
+message ServerInstanceConfig {
   bool run_dispatched_monitor = 1;
 
   int32 dispatched_monitor_interval_seconds = 2;
@@ -544,7 +544,7 @@ message ShardInstanceConfig {
   google.protobuf.Duration grpc_timeout = 8;
 }
 
-message ShardWorkerInstanceConfig {
+message WorkerInstanceConfig {
   // whether to stream stdout from processes
   bool stream_stdout = 6;
 
@@ -568,7 +568,7 @@ message ShardWorkerInstanceConfig {
 }
 
 message ShardWorkerConfig {
-  ShardWorkerInstanceConfig shard_worker_instance_config = 1;
+  WorkerInstanceConfig shard_worker_instance_config = 1;
 
   int32 port = 2;
 
@@ -836,7 +836,7 @@ message InstanceConfig {
 
   oneof type {
     MemoryInstanceConfig memory_instance_config = 3;
-    ShardInstanceConfig shard_instance_config = 4;
+    ServerInstanceConfig shard_instance_config = 4;
   }
 }
 

@@ -50,19 +50,19 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
-public class ShardWorkerInstanceTest {
+public class WorkerInstanceTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   @Mock private Backplane backplane;
 
   @Mock private ContentAddressableStorage storage;
 
-  private ShardWorkerInstance instance;
+  private WorkerInstance instance;
 
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    instance = new ShardWorkerInstance("test", DIGEST_UTIL, backplane, storage);
+    instance = new WorkerInstance("test", DIGEST_UTIL, backplane, storage);
   }
 
   @SuppressWarnings("unchecked")

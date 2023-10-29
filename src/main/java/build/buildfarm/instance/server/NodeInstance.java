@@ -144,7 +144,7 @@ import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 @Log
-public abstract class AbstractServerInstance implements Instance {
+public abstract class NodeInstance implements Instance {
   private final String name;
   protected final ContentAddressableStorage contentAddressableStorage;
   protected final ActionCache actionCache;
@@ -229,7 +229,7 @@ public abstract class AbstractServerInstance implements Instance {
   public static final String NO_REQUEUE_COMPLETE_MESSAGE =
       "Operation %s not requeued.  Operation has already completed.";
 
-  public AbstractServerInstance(
+  public NodeInstance(
       String name,
       DigestUtil digestUtil,
       ContentAddressableStorage contentAddressableStorage,
@@ -1967,19 +1967,18 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public WorkerProfileMessage getWorkerProfile() {
     throw new UnsupportedOperationException(
-        "AbstractServerInstance doesn't support getWorkerProfile() method.");
+        "NodeInstance doesn't support getWorkerProfile() method.");
   }
 
   @Override
   public WorkerListMessage getWorkerList() {
-    throw new UnsupportedOperationException(
-        "AbstractServerInstance doesn't support getWorkerList() method.");
+    throw new UnsupportedOperationException("NodeInstance doesn't support getWorkerList() method.");
   }
 
   @Override
   public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
     throw new UnsupportedOperationException(
-        "AbstractServerInstance doesn't support drainWorkerPipeline() method.");
+        "NodeInstance doesn't support drainWorkerPipeline() method.");
   }
 
   @Override
