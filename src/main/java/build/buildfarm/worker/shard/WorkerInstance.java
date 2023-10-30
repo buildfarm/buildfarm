@@ -36,7 +36,7 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.MatchListener;
-import build.buildfarm.instance.server.AbstractServerInstance;
+import build.buildfarm.instance.server.NodeInstance;
 import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
@@ -68,13 +68,13 @@ import java.util.logging.Logger;
 import lombok.extern.java.Log;
 
 @Log
-public class ShardWorkerInstance extends AbstractServerInstance {
+public class WorkerInstance extends NodeInstance {
   private static final Counter IO_METRIC =
       Counter.build().name("io_bytes_read").help("Read I/O (bytes)").register();
 
   private final Backplane backplane;
 
-  public ShardWorkerInstance(
+  public WorkerInstance(
       String name,
       DigestUtil digestUtil,
       Backplane backplane,
@@ -346,7 +346,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
         return null;
       }
     } else {
-      return AbstractServerInstance.expectExecuteOperationMetadata(operation);
+      return NodeInstance.expectExecuteOperationMetadata(operation);
     }
   }
 
