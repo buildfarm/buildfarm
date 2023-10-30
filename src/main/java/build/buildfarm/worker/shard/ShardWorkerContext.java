@@ -31,6 +31,7 @@ import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.SymlinkNode;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CommandUtils;
@@ -572,6 +573,7 @@ class ShardWorkerContext implements WorkerContext {
   static class OutputDirectoryContext {
     private final List<FileNode> files = new ArrayList<>();
     private final List<DirectoryNode> directories = new ArrayList<>();
+    private final List<SymlinkNode> symlinks = new ArrayList<>();
 
     void addFile(FileNode fileNode) {
       files.add(fileNode);
@@ -581,10 +583,19 @@ class ShardWorkerContext implements WorkerContext {
       directories.add(directoryNode);
     }
 
+    void addSymlink(SymlinkNode symlinkNode) {
+      symlinks.add(symlinkNode);
+    }
+
     Directory toDirectory() {
       files.sort(Comparator.comparing(FileNode::getName));
       directories.sort(Comparator.comparing(DirectoryNode::getName));
-      return Directory.newBuilder().addAllFiles(files).addAllDirectories(directories).build();
+      symlinks.sort(Comparator.comparing(SymlinkNode::getName));
+      return Directory.newBuilder()
+          .addAllFiles(files)
+          .addAllDirectories(directories)
+          .addAllSymlinks(symlinks)
+          .build();
     }
   }
 
@@ -621,8 +632,30 @@ class ShardWorkerContext implements WorkerContext {
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
+            if (configs.getWorker().isCreateSymlinkOutputs() && attrs.isSymbolicLink()) {
+              visitSymbolicLink(file);
+            } else {
+              visitRegularFile(file, attrs);
+            }
+            return FileVisitResult.CONTINUE;
+          }
+
+          private void visitSymbolicLink(Path file) throws IOException {
+            // TODO convert symlinks with absolute targets within execution root to relative ones
+            currentDirectory.addSymlink(
+                SymlinkNode.newBuilder()
+                    .setName(file.getFileName().toString())
+                    .setTarget(Files.readSymbolicLink(file).toString())
+                    .build());
+          }
+
+          private void visitRegularFile(Path file, BasicFileAttributes attrs) throws IOException {
             Digest digest;
             try {
+              // should we create symlink nodes in output?
+              // is buildstream trying to execute in a specific container??
+              // can get to NSFE for nonexistent symlinks
+              // can fail outright for a symlink to a directory
               digest = getDigestUtil().compute(file);
             } catch (NoSuchFileException e) {
               log.log(
@@ -631,7 +664,7 @@ class ShardWorkerContext implements WorkerContext {
                       "error visiting file %s under output dir %s",
                       outputDirPath.relativize(file), outputDirPath.toAbsolutePath()),
                   e);
-              return FileVisitResult.CONTINUE;
+              return;
             }
 
             // should we cast to PosixFilePermissions and do gymnastics there for executable?
@@ -655,7 +688,6 @@ class ShardWorkerContext implements WorkerContext {
                   .setDescription(
                       "An output could not be uploaded because it exceeded the maximum size of an entry");
             }
-            return FileVisitResult.CONTINUE;
           }
 
           @Override
