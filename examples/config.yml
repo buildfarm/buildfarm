@@ -131,6 +131,7 @@ worker:
     alwaysUse: false
     selectForBlockNetwork: false
     selectForTmpFs: false
+  createSymlinkOutputs: false
   executionPolicies:
     - name: test
       executionWrapper:
