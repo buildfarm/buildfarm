@@ -135,6 +135,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Instant;
+import java.util.AbstractMap;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -166,7 +167,6 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
-import org.apache.commons.lang3.tuple.Pair;
 
 @Log
 public class ServerInstance extends NodeInstance {
@@ -742,12 +742,12 @@ public class ServerInstance extends NodeInstance {
                   digest -> {
                     Set<String> initialWorkers =
                         foundBlobs.getOrDefault(digest, Collections.emptySet());
-                    return Pair.of(
+                    return new AbstractMap.SimpleEntry<>(
                         digest,
                         filterAndAdjustWorkersForDigest(
                             digest, initialWorkers, workerSet, workersStartTime));
                   })
-              .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
       ListenableFuture<Iterable<Digest>> missingDigestFuture =
           immediateFuture(
