@@ -721,8 +721,7 @@ public class NodeInstanceTest {
             .build();
     ContentAddressableStorage contentAddressableStorage = mock(ContentAddressableStorage.class);
     ActionCache actionCache = mock(ActionCache.class);
-    NodeInstance instance =
-        new DummyServerInstance(contentAddressableStorage, actionCache);
+    NodeInstance instance = new DummyServerInstance(contentAddressableStorage, actionCache);
 
     Tree tree =
         Tree.newBuilder()

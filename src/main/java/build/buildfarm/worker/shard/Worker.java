@@ -532,8 +532,7 @@ public final class Worker extends LoggingMain {
             remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
 
     instance =
-        new WorkerInstance(
-            configs.getWorker().getPublicName(), digestUtil, backplane, storage);
+        new WorkerInstance(configs.getWorker().getPublicName(), digestUtil, backplane, storage);
 
     // Create the appropriate writer for the context
     CasWriter writer;

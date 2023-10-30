@@ -1972,8 +1972,7 @@ public abstract class NodeInstance implements Instance {
 
   @Override
   public WorkerListMessage getWorkerList() {
-    throw new UnsupportedOperationException(
-        "NodeInstance doesn't support getWorkerList() method.");
+    throw new UnsupportedOperationException("NodeInstance doesn't support getWorkerList() method.");
   }
 
   @Override
