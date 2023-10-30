@@ -1,7 +1,7 @@
 java_library(
     name = "server",
     srcs = [
-        "AbstractServerInstance.java",
+        "NodeInstance.java",
         "GetDirectoryFunction.java",
         "OperationsMap.java",
         "WatchFuture.java",

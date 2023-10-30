@@ -110,10 +110,10 @@ java_test(
 )
 
 java_test(
-    name = "ShardInstanceTest",
+    name = "ServerInstanceTest",
     size = "small",
     srcs = [
-        "ShardInstanceTest.java",
+        "ServerInstanceTest.java",
         "UnobservableWatcher.java",
     ],
     data = ["//examples:example_configs"],

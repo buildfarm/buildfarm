@@ -20,9 +20,9 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.instance.server.AbstractServerInstance.INVALID_PLATFORM;
-import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_ACTION;
-import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_COMMAND;
+import static build.buildfarm.instance.server.NodeInstance.INVALID_PLATFORM;
+import static build.buildfarm.instance.server.NodeInstance.MISSING_ACTION;
+import static build.buildfarm.instance.server.NodeInstance.MISSING_COMMAND;
 import static com.google.common.base.Predicates.notNull;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -121,14 +121,14 @@ import org.mockito.MockitoAnnotations;
 import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
-public class ShardInstanceTest {
+public class ServerInstanceTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
   private static final long QUEUE_TEST_TIMEOUT_SECONDS = 3;
   private static final Duration DEFAULT_TIMEOUT = Durations.fromSeconds(60);
   private static final Command SIMPLE_COMMAND =
       Command.newBuilder().addAllArguments(ImmutableList.of("true")).build();
 
-  private ShardInstance instance;
+  private ServerInstance instance;
   private Map<String, Long> blobDigests;
 
   @Mock private Backplane mockBackplane;
@@ -145,7 +145,7 @@ public class ShardInstanceTest {
     blobDigests = Maps.newHashMap();
     ActionCache actionCache = new ShardActionCache(10, mockBackplane, newDirectExecutorService());
     instance =
-        new ShardInstance(
+        new ServerInstance(
             "shard",
             DIGEST_UTIL,
             mockBackplane,

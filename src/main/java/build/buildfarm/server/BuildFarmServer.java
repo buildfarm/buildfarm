@@ -29,7 +29,7 @@ import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor
 import build.buildfarm.common.services.ByteStreamService;
 import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.shard.ShardInstance;
+import build.buildfarm.instance.shard.ServerInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.services.ActionCacheService;
 import build.buildfarm.server.services.CapabilitiesService;
@@ -109,9 +109,9 @@ public class BuildFarmServer extends LoggingMain {
     }
   }
 
-  private ShardInstance createInstance()
+  private ServerInstance createInstance()
       throws IOException, ConfigurationException, InterruptedException {
-    return new ShardInstance(
+    return new ServerInstance(
         configs.getServer().getName(),
         configs.getServer().getSession() + "-" + configs.getServer().getName(),
         new DigestUtil(configs.getDigestFunction()),

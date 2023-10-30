@@ -123,7 +123,7 @@ public final class Worker extends LoggingMain {
   private boolean inGracefulShutdown = false;
   private boolean isPaused = false;
 
-  private ShardWorkerInstance instance;
+  private WorkerInstance instance;
 
   @SuppressWarnings("deprecation")
   private final HealthStatusManager healthStatusManager = new HealthStatusManager();
@@ -532,7 +532,7 @@ public final class Worker extends LoggingMain {
             remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
 
     instance =
-        new ShardWorkerInstance(
+        new WorkerInstance(
             configs.getWorker().getPublicName(), digestUtil, backplane, storage);
 
     // Create the appropriate writer for the context
