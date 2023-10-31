@@ -234,6 +234,17 @@ public class JedisCasWorkerMap implements CasWorkerMap {
     return client.call(jedis -> ScanCount.get(jedis, name + ":*", 1000));
   }
 
+  @Override
+  public void setExpire(RedisClient client, Iterable<Digest> blobDigests) throws IOException {
+    client.run(
+        jedis -> {
+          for (Digest blobDigest : blobDigests) {
+            String key = redisCasKey(blobDigest);
+            jedis.expire(key, keyExpiration_s);
+          }
+        });
+  }
+
   /**
    * @brief Get the redis key name.
    * @details This is to be used for the direct redis implementation.

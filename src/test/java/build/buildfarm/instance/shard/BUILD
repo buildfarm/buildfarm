@@ -219,3 +219,22 @@ java_test(
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
+
+java_test(
+    name = "JedisCasWorkerMapTest",
+    size = "small",
+    srcs = [
+        "JedisCasWorkerMapTest.java",
+    ],
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/redis",
+        "//src/main/java/build/buildfarm/instance/shard",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/test/java/build/buildfarm:test_runner",
+        "//third_party/jedis",
+        "@maven//:com_github_fppt_jedis_mock",
+        "@maven//:com_google_truth_truth",
+    ],
+)

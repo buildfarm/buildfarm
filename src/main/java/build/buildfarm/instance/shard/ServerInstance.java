@@ -135,10 +135,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Instant;
+import java.util.AbstractMap;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -660,7 +662,7 @@ public class ServerInstance extends NodeInstance {
     }
 
     if (configs.getServer().isFindMissingBlobsViaBackplane()) {
-      return findMissingBlobsViaBackplane(nonEmptyDigests);
+      return findMissingBlobsViaBackplane(nonEmptyDigests, requestMetadata);
     }
 
     return findMissingBlobsQueryingEachWorker(nonEmptyDigests, requestMetadata);
@@ -727,24 +729,40 @@ public class ServerInstance extends NodeInstance {
   // out-of-date and the server lies about which blobs are actually present. We provide this
   // alternative strategy for calculating missing blobs.
   private ListenableFuture<Iterable<Digest>> findMissingBlobsViaBackplane(
-      Iterable<Digest> nonEmptyDigests) {
+      Iterable<Digest> nonEmptyDigests, RequestMetadata requestMetadata) {
     try {
       Set<Digest> uniqueDigests = new HashSet<>();
       nonEmptyDigests.forEach(uniqueDigests::add);
       Map<Digest, Set<String>> foundBlobs = backplane.getBlobDigestsWorkers(uniqueDigests);
       Set<String> workerSet = backplane.getStorageWorkers();
       Map<String, Long> workersStartTime = backplane.getWorkersStartTimeInEpochSecs(workerSet);
-      return immediateFuture(
+      Map<Digest, Set<String>> digestAndWorkersMap =
           uniqueDigests.stream()
-              .filter( // best effort to present digests only missing on active workers
+              .map(
                   digest -> {
                     Set<String> initialWorkers =
                         foundBlobs.getOrDefault(digest, Collections.emptySet());
-                    return filterAndAdjustWorkersForDigest(
-                            digest, initialWorkers, workerSet, workersStartTime)
-                        .isEmpty();
+                    return new AbstractMap.SimpleEntry<>(
+                        digest,
+                        filterAndAdjustWorkersForDigest(
+                            digest, initialWorkers, workerSet, workersStartTime));
                   })
-              .collect(Collectors.toList()));
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+      ListenableFuture<Iterable<Digest>> missingDigestFuture =
+          immediateFuture(
+              digestAndWorkersMap.entrySet().stream()
+                  .filter(entry -> entry.getValue().isEmpty())
+                  .map(Map.Entry::getKey)
+                  .collect(Collectors.toList()));
+      return transformAsync(
+          missingDigestFuture,
+          (missingDigest) -> {
+            extendLeaseForDigests(digestAndWorkersMap, requestMetadata);
+            return immediateFuture(missingDigest);
+          },
+          // Propagate context values but don't cascade its cancellation for downstream calls.
+          Context.current().fork().fixedContextExecutor(directExecutor()));
     } catch (Exception e) {
       log.log(Level.SEVERE, "find missing blob via backplane failed", e);
       return immediateFailedFuture(Status.fromThrowable(e).asException());
@@ -787,6 +805,29 @@ public class ServerInstance extends NodeInstance {
       }
     }
     return workersStartedBeforeDigestInsertion;
+  }
+
+  private void extendLeaseForDigests(
+      Map<Digest, Set<String>> digestAndWorkersMap, RequestMetadata requestMetadata) {
+    Map<String, Set<Digest>> workerAndDigestMap = new HashMap<>();
+    digestAndWorkersMap.forEach(
+        (digest, workers) ->
+            workers.forEach(
+                worker ->
+                    workerAndDigestMap.computeIfAbsent(worker, w -> new HashSet<>()).add(digest)));
+
+    workerAndDigestMap.forEach(
+        (worker, digests) -> workerStub(worker).findMissingBlobs(digests, requestMetadata));
+
+    try {
+      backplane.updateDigestsExpiry(digestAndWorkersMap.keySet());
+    } catch (IOException e) {
+      log.log(
+          Level.WARNING,
+          format(
+              "Failed to update expiry duration for digests (%s) insertion time",
+              digestAndWorkersMap.keySet()));
+    }
   }
 
   private void findMissingBlobsOnWorker(
