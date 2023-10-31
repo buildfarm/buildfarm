@@ -183,7 +183,7 @@ public final class BuildfarmConfigs {
           .getWorker()
           .setExecuteStageWidth(
               Math.max(
-                  1, SystemProcessors.get() - configs.getWorker().getExecuteStageWidthOffset()));
+                  0, SystemProcessors.get() - configs.getWorker().getExecuteStageWidthOffset()));
       log.info(
           String.format(
               "executeStageWidth modified to %d", configs.getWorker().getExecuteStageWidth()));
