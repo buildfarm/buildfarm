@@ -72,7 +72,7 @@ public final class BuildfarmConfigs {
       log.severe("Could not parse yml configuration file." + e);
       throw new RuntimeException(e);
     }
-    if (!options.publicName.isEmpty()) {
+    if (!Strings.isNullOrEmpty(options.publicName)) {
       buildfarmConfigs.getServer().setPublicName(options.publicName);
     }
     if (options.port > 0) {
