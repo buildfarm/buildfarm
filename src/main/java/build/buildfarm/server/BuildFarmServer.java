@@ -88,20 +88,20 @@ public class BuildFarmServer extends LoggingMain {
    */
   public void prepareServerForGracefulShutdown() {
     if (configs.getServer().getGracefulShutdownSeconds() == 0) {
-      System.err.println(
+      log.info(
           String.format("Graceful Shutdown is not enabled. Server is shutting down immediately."));
     } else {
       try {
-        System.err.println(
+        log.info(
             String.format(
                 "Graceful Shutdown - Waiting %d to allow connections to drain.",
                 configs.getServer().getGracefulShutdownSeconds()));
         SECONDS.sleep(configs.getServer().getGracefulShutdownSeconds());
       } catch (InterruptedException e) {
-        System.err.println(
+        log.info(
             "Graceful Shutdown - The server graceful shutdown is interrupted: " + e.getMessage());
       } finally {
-        System.err.println(
+        log.info(
             String.format(
                 "Graceful Shutdown - It took the server %d seconds to shutdown",
                 configs.getServer().getGracefulShutdownSeconds()));
@@ -195,8 +195,10 @@ public class BuildFarmServer extends LoggingMain {
   private void shutdown() throws InterruptedException {
     log.info("*** shutting down gRPC server since JVM is shutting down");
     prepareServerForGracefulShutdown();
-    healthStatusManager.setStatus(
-        HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
+    if (healthStatusManager != null) {
+      healthStatusManager.setStatus(
+          HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
+    }
     PrometheusPublisher.stopHttpServer();
     healthCheckMetric.labels("stop").inc();
     try {

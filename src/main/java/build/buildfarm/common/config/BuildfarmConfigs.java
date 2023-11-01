@@ -72,7 +72,7 @@ public final class BuildfarmConfigs {
       log.severe("Could not parse yml configuration file." + e);
       throw new RuntimeException(e);
     }
-    if (!options.publicName.isEmpty()) {
+    if (!Strings.isNullOrEmpty(options.publicName)) {
       buildfarmConfigs.getServer().setPublicName(options.publicName);
     }
     if (options.port > 0) {
@@ -100,11 +100,17 @@ public final class BuildfarmConfigs {
     if (!Strings.isNullOrEmpty(options.publicName)) {
       buildfarmConfigs.getWorker().setPublicName(options.publicName);
     }
+    if (options.port >= 0) {
+      buildfarmConfigs.getWorker().setPort(options.port);
+    }
     if (options.prometheusPort >= 0) {
       buildfarmConfigs.setPrometheusPort(options.prometheusPort);
     }
     if (!Strings.isNullOrEmpty(options.redisUri)) {
       buildfarmConfigs.getBackplane().setRedisUri(options.redisUri);
+    }
+    if (!Strings.isNullOrEmpty(options.root)) {
+      buildfarmConfigs.getWorker().setRoot(options.root);
     }
     adjustWorkerConfigs(buildfarmConfigs);
     return buildfarmConfigs;
