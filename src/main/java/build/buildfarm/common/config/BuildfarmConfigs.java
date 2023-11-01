@@ -100,6 +100,9 @@ public final class BuildfarmConfigs {
     if (!Strings.isNullOrEmpty(options.publicName)) {
       buildfarmConfigs.getWorker().setPublicName(options.publicName);
     }
+    if (options.port >= 0) {
+      buildfarmConfigs.getWorker().setPort(options.port);
+    }
     if (options.prometheusPort >= 0) {
       buildfarmConfigs.setPrometheusPort(options.prometheusPort);
     }

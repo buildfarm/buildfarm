@@ -33,4 +33,7 @@ public class BuildfarmOptions extends OptionsBase {
       help = "URI for Redis connection. Use 'redis://' or 'rediss://' for the scheme",
       defaultValue = "")
   public String redisUri;
+
+  @Option(name = "port", help = "Port for the buildfarm service.", defaultValue = "-1")
+  public int port;
 }
