@@ -137,6 +137,52 @@ public final class Worker extends LoggingMain {
   private LoadingCache<String, Instance> workerStubs;
   private AtomicBoolean released = new AtomicBoolean(true);
 
+  /**
+   * The method will prepare the worker for graceful shutdown when the worker is ready. Note on
+   * using stderr here instead of log. By the time this is called in PreDestroy, the log is no
+   * longer available and is not logging messages.
+   */
+  public void prepareWorkerForGracefulShutdown() {
+    if (configs.getWorker().getGracefulShutdownSeconds() == 0) {
+      log.info(
+          String.format(
+              "Graceful Shutdown is not enabled. Worker is shutting down without finishing executions in progress."));
+    } else {
+      inGracefulShutdown = true;
+      log.info(
+          "Graceful Shutdown - The current worker will not be registered again and should be shutdown gracefully!");
+      pipeline.stopMatchingOperations();
+      int scanRate = 30; // check every 30 seconds
+      int timeWaited = 0;
+      int timeOut = configs.getWorker().getGracefulShutdownSeconds();
+      try {
+        if (pipeline.isEmpty()) {
+          log.info("Graceful Shutdown - no work in the pipeline.");
+        } else {
+          log.info(String.format("Graceful Shutdown - waiting for executions to finish."));
+        }
+        while (!pipeline.isEmpty() && timeWaited < timeOut) {
+          SECONDS.sleep(scanRate);
+          timeWaited += scanRate;
+          log.info(
+              String.format(
+                  "Graceful Shutdown - Pipeline is still not empty after %d seconds.", timeWaited));
+        }
+      } catch (InterruptedException e) {
+        log.info(
+            "Graceful Shutdown - The worker gracefully shutdown is interrupted: " + e.getMessage());
+      } finally {
+        log.info(
+            String.format(
+                "Graceful Shutdown - It took the worker %d seconds to %s",
+                timeWaited,
+                pipeline.isEmpty()
+                    ? "finish all actions"
+                    : "gracefully shutdown but still cannot finish all actions"));
+      }
+    }
+  }
+
   private Worker() {
     super("BuildFarmShardWorker");
   }
@@ -626,6 +672,7 @@ public final class Worker extends LoggingMain {
 
   private void shutdown() throws InterruptedException {
     log.info("*** shutting down gRPC server since JVM is shutting down");
+    prepareWorkerForGracefulShutdown();
     PrometheusPublisher.stopHttpServer();
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
