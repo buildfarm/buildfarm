@@ -109,6 +109,9 @@ public final class BuildfarmConfigs {
     if (!Strings.isNullOrEmpty(options.redisUri)) {
       buildfarmConfigs.getBackplane().setRedisUri(options.redisUri);
     }
+    if (!Strings.isNullOrEmpty(options.root)) {
+      buildfarmConfigs.getWorker().setRoot(options.root);
+    }
     adjustWorkerConfigs(buildfarmConfigs);
     return buildfarmConfigs;
   }
