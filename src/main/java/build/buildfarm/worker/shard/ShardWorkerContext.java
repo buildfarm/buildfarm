@@ -133,6 +133,7 @@ class ShardWorkerContext implements WorkerContext {
   private final CasWriter writer;
   private final boolean errorOperationRemainingResources;
   private final LocalResourceSet resourceSet;
+  private final boolean errorOperationOutputSizeExceeded;
 
   static SetMultimap<String, String> getMatchProvisions(
       Iterable<ExecutionPolicy> policies, int executeStageWidth) {
@@ -166,6 +167,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean onlyMulticoreTests,
       boolean allowBringYourOwnContainer,
       boolean errorOperationRemainingResources,
+      boolean errorOperationOutputSizeExceeded,
       LocalResourceSet resourceSet,
       CasWriter writer) {
     this.name = name;
@@ -187,6 +189,7 @@ class ShardWorkerContext implements WorkerContext {
     this.onlyMulticoreTests = onlyMulticoreTests;
     this.allowBringYourOwnContainer = allowBringYourOwnContainer;
     this.errorOperationRemainingResources = errorOperationRemainingResources;
+    this.errorOperationOutputSizeExceeded = errorOperationOutputSizeExceeded;
     this.resourceSet = resourceSet;
     this.writer = writer;
   }
@@ -504,6 +507,7 @@ class ShardWorkerContext implements WorkerContext {
       ActionResult.Builder resultBuilder,
       Path outputPath,
       Path actionRoot,
+      String entrySizeViolationType,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
     String outputFile = actionRoot.relativize(outputPath).toString();
@@ -534,7 +538,7 @@ class ShardWorkerContext implements WorkerContext {
               outputPath, size, maxEntrySize);
       preconditionFailure
           .addViolationsBuilder()
-          .setType(VIOLATION_TYPE_MISSING)
+          .setType(entrySizeViolationType)
           .setSubject(outputFile + ": " + size)
           .setDescription(message);
       return;
@@ -562,7 +566,7 @@ class ShardWorkerContext implements WorkerContext {
     } catch (EntryLimitException e) {
       preconditionFailure
           .addViolationsBuilder()
-          .setType(VIOLATION_TYPE_MISSING)
+          .setType(entrySizeViolationType)
           .setSubject("blobs/" + DigestUtil.toString(digest))
           .setDescription(
               "An output could not be uploaded because it exceeded the maximum size of an entry");
@@ -603,6 +607,7 @@ class ShardWorkerContext implements WorkerContext {
       ActionResult.Builder resultBuilder,
       Path outputDirPath,
       Path actionRoot,
+      String entrySizeViolationType,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
     String outputDir = actionRoot.relativize(outputDirPath).toString();
@@ -683,7 +688,7 @@ class ShardWorkerContext implements WorkerContext {
             } catch (EntryLimitException e) {
               preconditionFailure
                   .addViolationsBuilder()
-                  .setType(VIOLATION_TYPE_MISSING)
+                  .setType(entrySizeViolationType)
                   .setSubject("blobs/" + DigestUtil.toString(digest))
                   .setDescription(
                       "An output could not be uploaded because it exceeded the maximum size of an entry");
@@ -730,14 +735,19 @@ class ShardWorkerContext implements WorkerContext {
   public void uploadOutputs(
       Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Command command)
       throws IOException, InterruptedException, StatusException {
+    String entrySizeViolationType =
+        errorOperationOutputSizeExceeded ? VIOLATION_TYPE_INVALID : VIOLATION_TYPE_MISSING;
+
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
 
     List<Path> outputPaths = CommandUtils.getResolvedOutputPaths(command, actionRoot);
     for (Path outputPath : outputPaths) {
       if (Files.isDirectory(outputPath)) {
-        uploadOutputDirectory(resultBuilder, outputPath, actionRoot, preconditionFailure);
+        uploadOutputDirectory(
+            resultBuilder, outputPath, actionRoot, entrySizeViolationType, preconditionFailure);
       } else {
-        uploadOutputFile(resultBuilder, outputPath, actionRoot, preconditionFailure);
+        uploadOutputFile(
+            resultBuilder, outputPath, actionRoot, entrySizeViolationType, preconditionFailure);
       }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());

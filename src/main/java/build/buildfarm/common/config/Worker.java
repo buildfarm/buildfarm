@@ -46,6 +46,8 @@ public class Worker {
   // If you want GPU actions to run exclusively, define a single GPU resource.
   private List<LimitedResource> resources = new ArrayList<>();
 
+  private boolean errorOperationOutputSizeExceeded = false;
+
   public ExecutionPolicy[] getExecutionPolicies() {
     if (executionPolicies != null) {
       return executionPolicies;
