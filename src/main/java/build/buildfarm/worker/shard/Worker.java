@@ -611,6 +611,7 @@ public final class Worker extends LoggingMain {
             configs.getWorker().isOnlyMulticoreTests(),
             configs.getWorker().isAllowBringYourOwnContainer(),
             configs.getWorker().isErrorOperationRemainingResources(),
+            configs.getWorker().isErrorOperationOutputSizeExceeded(),
             LocalResourceSetUtils.create(configs.getWorker().getResources()),
             writer);
 

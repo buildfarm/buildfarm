@@ -126,6 +126,7 @@ worker:
   onlyMulticoreTests: false
   allowBringYourOwnContainer: false
   errorOperationRemainingResources: false
+  errorOperationOutputSizeExceeded: false
   gracefulShutdownSeconds: 0
   sandboxSettings:
     alwaysUse: false
