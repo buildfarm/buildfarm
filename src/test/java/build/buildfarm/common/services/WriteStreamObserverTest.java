@@ -115,11 +115,11 @@ public class WriteStreamObserverTest {
     WriteStreamObserver observer =
             context.call(
                     () -> new WriteStreamObserver(instance, 1, SECONDS, () -> {}, responseObserver));
-    observer.onNext(
+    context.run(() -> observer.onNext(
             WriteRequest.newBuilder()
                     .setResourceName(uploadResourceName(uploadBlobRequest))
                     .setData(cancelled)
-                    .build());
+                    .build()));
     verify(instance, times(1))
             .getBlobWrite(
                     eq(Compressor.Value.IDENTITY),
