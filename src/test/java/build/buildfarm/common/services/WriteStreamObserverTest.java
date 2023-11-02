@@ -24,16 +24,20 @@ import build.buildfarm.common.resources.UploadBlobRequest;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.stub.StreamObserver;
+
+import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
@@ -105,12 +109,16 @@ public class WriteStreamObserverTest {
                     .setBlob(BlobInformation.newBuilder().setDigest(cancelledDigest))
                     .setUuid(uuid.toString())
                     .build();
+    SettableFuture<Long> future = SettableFuture.create();
+    future.setException(new IOException("test cancel"));
+    Write write = mock(Write.class);
+    when(write.getFuture()).thenReturn(future);
     when(instance.getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
             eq(uuid),
             any(RequestMetadata.class)))
-            .thenThrow(new EntryLimitException("test"));
+            .thenReturn(write);
 
     WriteStreamObserver observer =
             context.call(
