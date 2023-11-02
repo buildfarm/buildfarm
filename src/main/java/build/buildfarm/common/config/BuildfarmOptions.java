@@ -34,6 +34,10 @@ public class BuildfarmOptions extends OptionsBase {
       defaultValue = "")
   public String redisUri;
 
-  @Option(name = "port", help = "Port for the buildfarm service.", defaultValue = "-1")
+  @Option(
+      name = "port",
+      abbrev = 'p',
+      help = "Port for the buildfarm service.",
+      defaultValue = "-1")
   public int port;
 }
