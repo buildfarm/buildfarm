@@ -584,7 +584,7 @@ public final class Worker extends LoggingMain {
     CasWriter writer;
     if (!configs.getWorker().getCapabilities().isCas()) {
       Retrier retrier = new Retrier(Backoff.sequential(5), Retrier.DEFAULT_IS_RETRIABLE);
-      writer = new RemoteCasWriter(backplane.getStorageWorkers(), workerStubs, retrier);
+      writer = new RemoteCasWriter(backplane, workerStubs, retrier);
     } else {
       writer = new LocalCasWriter(execFileSystem);
     }
