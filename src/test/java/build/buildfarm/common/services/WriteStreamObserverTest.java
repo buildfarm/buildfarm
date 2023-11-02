@@ -28,7 +28,6 @@ import com.google.protobuf.ByteString;
 import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.stub.StreamObserver;
-
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -92,6 +91,7 @@ public class WriteStreamObserverTest {
     verify(out, times(1)).close();
     verifyZeroInteractions(responseObserver);
   }
+
   @Test
   public void noErrorWhenContextCancelled() throws Exception {
     CancellableContext context = Context.current().withCancellation();
@@ -102,10 +102,10 @@ public class WriteStreamObserverTest {
     Digest cancelledDigest = DIGEST_UTIL.compute(cancelled);
     UUID uuid = UUID.randomUUID();
     UploadBlobRequest uploadBlobRequest =
-            UploadBlobRequest.newBuilder()
-                    .setBlob(BlobInformation.newBuilder().setDigest(cancelledDigest))
-                    .setUuid(uuid.toString())
-                    .build();
+        UploadBlobRequest.newBuilder()
+            .setBlob(BlobInformation.newBuilder().setDigest(cancelledDigest))
+            .setUuid(uuid.toString())
+            .build();
     SettableFuture<Long> future = SettableFuture.create();
     future.setException(new IOException("test cancel"));
     Write write = mock(Write.class);
@@ -115,22 +115,24 @@ public class WriteStreamObserverTest {
             eq(cancelledDigest),
             eq(uuid),
             any(RequestMetadata.class)))
-            .thenReturn(write);
+        .thenReturn(write);
 
     WriteStreamObserver observer =
-            context.call(
-                    () -> new WriteStreamObserver(instance, 1, SECONDS, () -> {}, responseObserver));
-    context.run(() -> observer.onNext(
-            WriteRequest.newBuilder()
+        context.call(
+            () -> new WriteStreamObserver(instance, 1, SECONDS, () -> {}, responseObserver));
+    context.run(
+        () ->
+            observer.onNext(
+                WriteRequest.newBuilder()
                     .setResourceName(uploadResourceName(uploadBlobRequest))
                     .setData(cancelled)
                     .build()));
     verify(instance, times(1))
-            .getBlobWrite(
-                    eq(Compressor.Value.IDENTITY),
-                    eq(cancelledDigest),
-                    eq(uuid),
-                    any(RequestMetadata.class));
+        .getBlobWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(cancelledDigest),
+            eq(uuid),
+            any(RequestMetadata.class));
     verifyZeroInteractions(responseObserver);
   }
 }
