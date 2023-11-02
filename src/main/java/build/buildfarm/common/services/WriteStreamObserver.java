@@ -271,7 +271,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
   private boolean errorResponse(Throwable t) {
     if (exception.compareAndSet(null, t)) {
-      if (Status.fromThrowable(t).getCode() == Status.Code.CANCELLED) {
+      if (Status.fromThrowable(t).getCode() == Status.Code.CANCELLED || withCancellation.isCancelled()) {
         return false;
       }
       boolean isEntryLimitException = t instanceof EntryLimitException;

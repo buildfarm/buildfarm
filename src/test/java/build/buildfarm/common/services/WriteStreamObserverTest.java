@@ -16,6 +16,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.resources.BlobInformation;
@@ -88,6 +89,43 @@ public class WriteStreamObserverTest {
             any(RequestMetadata.class));
     verify(write, times(1)).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(out, times(1)).close();
+    verifyZeroInteractions(responseObserver);
+  }
+  @Test
+  public void noErrorWhenContextCancelled() throws Exception {
+    CancellableContext context = Context.current().withCancellation();
+    context.cancel(new RuntimeException("Cancelled by test"));
+    Instance instance = mock(Instance.class);
+    StreamObserver<WriteResponse> responseObserver = mock(StreamObserver.class);
+    ByteString cancelled = ByteString.copyFromUtf8("cancelled data");
+    Digest cancelledDigest = DIGEST_UTIL.compute(cancelled);
+    UUID uuid = UUID.randomUUID();
+    UploadBlobRequest uploadBlobRequest =
+            UploadBlobRequest.newBuilder()
+                    .setBlob(BlobInformation.newBuilder().setDigest(cancelledDigest))
+                    .setUuid(uuid.toString())
+                    .build();
+    when(instance.getBlobWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(cancelledDigest),
+            eq(uuid),
+            any(RequestMetadata.class)))
+            .thenThrow(new EntryLimitException("test"));
+
+    WriteStreamObserver observer =
+            context.call(
+                    () -> new WriteStreamObserver(instance, 1, SECONDS, () -> {}, responseObserver));
+    observer.onNext(
+            WriteRequest.newBuilder()
+                    .setResourceName(uploadResourceName(uploadBlobRequest))
+                    .setData(cancelled)
+                    .build());
+    verify(instance, times(1))
+            .getBlobWrite(
+                    eq(Compressor.Value.IDENTITY),
+                    eq(cancelledDigest),
+                    eq(uuid),
+                    any(RequestMetadata.class));
     verifyZeroInteractions(responseObserver);
   }
 }
