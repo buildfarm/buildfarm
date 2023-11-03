@@ -2,14 +2,7 @@ package build.buildfarm.common.services;
 
 import static build.buildfarm.common.resources.ResourceParser.uploadResourceName;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
@@ -95,7 +88,6 @@ public class WriteStreamObserverTest {
   @Test
   public void noErrorWhenContextCancelled() throws Exception {
     CancellableContext context = Context.current().withCancellation();
-    context.cancel(new RuntimeException("Cancelled by test"));
     Instance instance = mock(Instance.class);
     StreamObserver<WriteResponse> responseObserver = mock(StreamObserver.class);
     ByteString cancelled = ByteString.copyFromUtf8("cancelled data");
@@ -107,9 +99,9 @@ public class WriteStreamObserverTest {
             .setUuid(uuid.toString())
             .build();
     SettableFuture<Long> future = SettableFuture.create();
-    future.setException(new IOException("test cancel"));
     Write write = mock(Write.class);
     when(write.getFuture()).thenReturn(future);
+    when(write.isComplete()).thenReturn(Boolean.TRUE);
     when(instance.getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
@@ -127,6 +119,10 @@ public class WriteStreamObserverTest {
                     .setResourceName(uploadResourceName(uploadBlobRequest))
                     .setData(cancelled)
                     .build()));
+    context.cancel(new RuntimeException("Cancelled by test"));
+    future.setException(new IOException("test cancel"));
+
+    verify(write, times(1)).isComplete();
     verify(instance, times(1))
         .getBlobWrite(
             eq(Compressor.Value.IDENTITY),
