@@ -70,6 +70,7 @@ tasks:
     build_targets:
     - "..."
     test_flags:
+    - "--@rules_jvm_external//settings:stamp_manifest=False"
     - "--test_tag_filters=-integration,-redis"
     test_targets:
     - "..."
