@@ -7,20 +7,21 @@ nav_order: 2
 
 # Workers
 
-Workers of all types throughout buildfarm are responsible for presenting execution roots to operations that they are matched with, fetching content from a CAS, executing those processes, and reporting the outputs and results of executions. Additionally, buildfarm supports some common behaviors across worker types:
+Workers have two major roles in Buildfarm: Execution and CAS Shard. Either of these options can be disabled, though a worker with both disabled provides no value.
 
-* ExecutionPolicies, which allow for explicit and implicit behaviors to control execution.
+Regardless of role, a worker must have a local FILESYSTEM type [storage](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration/configuration/#worker-cas) to retain content. This storage serves both as a resident LRU cache for Execution I/O, and the local storage for a CAS Shard. Workers can delegate to successive storage declarations (FILESYSTEM or GRPC), with read-through or expiration waterfall if configured, but only the first storage entry will be used for Executions.
+
+## Execution
+
+Execution Workers are responsible for matching their environments against operations, presenting execution roots to those operations, fetching content from a CAS, executing processes required to complete the operations, and reporting the outputs and results of executions. Control and delivery of these behaviors is accomplished with several mechanisms:
+
 * A CAS FileCache, which is capable of reading through content for Digests of files or directories, and efficiently presenting those contents based on usage and reference counting, as well as support for cascading into delegate CASs.
+* ExecutionPolicies, which allow for explicit and implicit behaviors to control execution.
+* Execution Resources to limit concurrent execution in installation-defined resource traunches.
 * Concurrent pipelined execution of operations, with support for superscalar stages at input fetch and execution.
 * Operation exclusivity, preventing the same operation from running through the worker pipeline concurrently.
 
-# Worker Types
-
-## Operation Queue
-
-Operation Queue workers are responsible for taking operations from the Memory OperationQueue service and reporting their contents via external CAS and AC services. Executions are the only driving force for their CAS FileCache. For more details on configuring the operation queue, [see here](https://github.com/bazelbuild/bazel-buildfarm/wiki/Operation-Queue).
-
-## Shard
+## CAS Shard
 
 Sharded workers interact with the shard backplane for both execution and CAS presentation. Their CAS FileCache serves a CAS gRPC interface as well as the execution root factory.
 
@@ -56,18 +57,20 @@ The Report Result stage injects any outputs from the operation into the CAS, and
 
 # Exec Filesystem
 
-Workers must present Exec Filesystems for actions, and manage their existence for the lifetime of an operation's presence within the pipeline. The realization of an operation's execution root with the execution filesystem constitutes a transaction that the operating directory for an action will appear, be writable for outputs, and released and be made unavailable as it proceeds and exits the pipeline.
+Workers use ExecFileSystems to present content to actions, and manage their existence for the lifetime of an operation's presence within the pipeline. The realization of an operation's execution root with the execution filesystem constitutes a transaction that the operating directory for an action will appear, be writable for outputs, and released and be made unavailable as it proceeds and exits the pipeline.
 
 This means that an action's entire input directory must be available on a filesystem from a unique location per operation - the _Operation Action Input Root_, or just _Root_. Each input file within the Root must contain the content of the inputs, its requested executability via FileNode, and each directory must contain at the outset, child input files and directories. The filesystem is free to handle unspecified outputs as it sees fit, but the directory hierarchy of output files from the Root must be created before execution, and writable during it. When execution and observation of the outputs is completed, the exec filesystem will be asked to destroy the Root and release any associated resources from its retention.
 
-There are two implementations of Execution Filesystem in Buildfarm. Choosing either a `filesystem` or `fuse` `cas` type in the worker config as the first `cas` entry will choose the _CASFileCache_ or _FuseCAS_ implementations, respectively.
+Choosing a `filesystem` `storage` type in the worker config as the first `storage` entry will select the _CASFileCache_ _CFCExecFileSystem_. Choosing any other `storage` type will create a _FuseCAS_ _FuseExecFilesystem_.
+
+***We strongly recommend the use of `filesystem` `storage` as the ExecFileSystem-selecting `storage` entry, the _FuseCAS_ is experimental and may not function reliably over long hauls/with substantial load***
 
 ## CASFileCache/CFCExecFilesystem
 
 The CASFileCache provides an Exec Filesystem via CFCExecFilesystem. The (CASFileCache)'s retention of paths is used to reflect individual files, with these paths hard-linked in CFCExecFilesystem under representative directories of the input root to signify usage. The CASFileCache directory retention system is also used to provide a configurable utilization of entire directory trees as a symlink, which was a heuristic optimization applied when substantial cost was observed setting up static trees of input links for operations compared to their execution time. `link_input_directories` in the common Worker configuration will enable this heuristic.
 Outputs of actions are physically streamed into CAS writes when they are observed after an action execution.
 
-The CASFileCache's persistence in the filesystem and the availability of common POSIX features like symlinks and inode-based reference counts on almost any filesystem implementation have made it a solid choice for extremely large CAS installations - it scales to multi-TB host attached storages with millions of entries with relative ease.
+The CASFileCache's persistence in the filesystem and the availability of common POSIX features like symlinks and inode-based reference counts on almost any filesystem implementation have made it a solid choice for extremely large CAS installations - it scales to multi-TB host attached storages containing millions of entries with relative ease.
 
 There are plans to improve CASFileCache that will be reflected in improved performance and memory footprint for the features used by CFCExecFilesystem.
 
