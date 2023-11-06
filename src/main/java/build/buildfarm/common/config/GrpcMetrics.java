@@ -33,7 +33,7 @@ public class GrpcMetrics {
       }
 
       // report custom metric labels
-      if (grpcMetrics.getLabelsToReport() != null) {
+      if (grpcMetrics.getLabelsToReport() != null && !grpcMetrics.getLabelsToReport().isEmpty()) {
         grpcConfig = grpcConfig.withLabelHeaders(grpcMetrics.getLabelsToReport());
       }
 
