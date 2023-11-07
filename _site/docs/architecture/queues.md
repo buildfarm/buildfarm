@@ -44,11 +44,9 @@ If no provision queues can be matched, the operation queue will provide an analy
 When taking elements off of the operation queue, the matching algorithm behaves a similar way.
 The worker's `DequeueMatchSettings` also have an `allow_unmatched` property.
 Workers also have the ability to reject an operation after matching with a provision queue and dequeuing a value.
-To avoid any of these rejections by the worker, you can use `accept_everything: true`.
 
 When configuring your worker, consider the following decisions:
-First, if the accept_everything setting is true, the job is accepted.
-Otherwise, if any execution property for the queue has a wildcard key, the job is accepted.
+First, if any execution property for the queue has a wildcard key, the job is accepted.
 Otherwise, if the allow_unmatched setting is true, each key present in the queue's properties must be a wildcard or exist in the execution request's properties with an equal value.
 Otherwise, the execution request's properties must have exactly the same set of keys as the queue's execution properties, and the request's value for each property must equal the queue's if the queue's value for this property is not a wildcard.
 
