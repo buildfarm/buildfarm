@@ -828,10 +828,8 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public void createExecutionLimits() {
-    if (shouldLimitCoreUsage()) {
-      if (configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
+   if (shouldLimitCoreUsage() && configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
         createOperationExecutionLimits();
-      }
     }
   }
 
