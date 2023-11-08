@@ -59,7 +59,8 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
@@ -87,7 +88,8 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     // the worker accepts because it has more cores than the min-cores requested
@@ -117,7 +119,8 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     // the worker rejects because it has less cores than the min-cores requested
@@ -146,7 +149,8 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     // the worker accepts because it has the same cores as the min-cores requested
@@ -175,7 +179,8 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     assertThat(shouldKeep).isFalse();
@@ -184,7 +189,9 @@ public class DequeueMatchEvaluatorTest {
     configs.getWorker().getDequeueMatchSettings().setAcceptEverything(true);
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+    shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
@@ -193,7 +200,9 @@ public class DequeueMatchEvaluatorTest {
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+    shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
@@ -224,7 +233,8 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     // the worker accepts because the resource is available.
@@ -232,7 +242,9 @@ public class DequeueMatchEvaluatorTest {
     assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+    shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     // the worker rejects because there are no resources left.
@@ -269,7 +281,8 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     // the worker accepts because the resource is available.
@@ -278,7 +291,9 @@ public class DequeueMatchEvaluatorTest {
     assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(2);
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+    shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     // the worker accepts because the resource is available.
@@ -287,7 +302,9 @@ public class DequeueMatchEvaluatorTest {
     assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(0);
 
     // ACT
-    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+    shouldKeep =
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     // the worker rejects because there are no resources left.
@@ -330,7 +347,8 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, resourceSet, entry);
+        DequeueMatchEvaluator.shouldKeepOperation(
+            workerProvisions, "worker-name", resourceSet, entry);
 
     // ASSERT
     // the worker rejects because there are no resources left.

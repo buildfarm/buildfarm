@@ -315,7 +315,8 @@ class ShardWorkerContext implements WorkerContext {
   private void decideWhetherToKeepOperation(QueueEntry queueEntry, MatchListener listener)
       throws IOException, InterruptedException {
     if (queueEntry == null
-        || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, resourceSet, queueEntry)) {
+        || DequeueMatchEvaluator.shouldKeepOperation(
+            matchProvisions, name, resourceSet, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);

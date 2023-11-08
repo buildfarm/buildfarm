@@ -293,4 +293,11 @@ public class ExecutionProperties {
    *     operation queue).
    */
   public static final String POOL = "Pool";
+
+  /**
+   * @field WORKER
+   * @brief The exec_property to ensure that the action only runs on the worker name given.
+   * @details Useful for diagnosing woker issues by targeting builds to a specific worker.
+   */
+  public static final String WORKER = "Worker";
 }
