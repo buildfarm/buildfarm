@@ -1,0 +1,28 @@
+name: Build and push base Buildfarm worker image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - tools/base-worker-image/Dockerfile
+jobs:
+  build:
+    name: Build Base Buildfarm Worker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build Docker Image
+        id: buildAndPushImage
+        uses: MaximilianoBz/dockerhub-buildpush@v1.0
+        with:
+          registry_url: 'docker.io'
+          repository_name: 'bazelbuild'
+          user_name: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
+          password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
+          image_version: 'buildfarm-worker-base:jammy'
+          docker_file: './tools/base-worker-image'
+      - name: Get pre step result output image_pull_url
+        run: echo "The time was ${{ steps.buildAndPushImage.outputs.image_pull_url }}"
