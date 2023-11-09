@@ -55,6 +55,7 @@ import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.worker.DequeueMatchEvaluator;
+import build.buildfarm.worker.DequeueResults;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
@@ -283,10 +284,14 @@ class ShardWorkerContext implements WorkerContext {
   @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     QueueEntry queueEntry = takeEntryOffOperationQueue(listener);
-    decideWhetherToKeepOperation(queueEntry, listener);
+    if (queueEntry == null) {
+      listener.onEntry(null);
+    } else {
+      decideWhetherToKeepOperation(queueEntry, listener);
+    }
   }
 
-  private QueueEntry takeEntryOffOperationQueue(MatchListener listener)
+  private @Nullable QueueEntry takeEntryOffOperationQueue(MatchListener listener)
       throws IOException, InterruptedException {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
@@ -314,11 +319,14 @@ class ShardWorkerContext implements WorkerContext {
 
   private void decideWhetherToKeepOperation(QueueEntry queueEntry, MatchListener listener)
       throws IOException, InterruptedException {
-    if (queueEntry == null
-        || DequeueMatchEvaluator.shouldKeepOperation(
-            matchProvisions, name, resourceSet, queueEntry)) {
+    DequeueResults results =
+        DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, name, resourceSet, queueEntry);
+    if (results.keep) {
       listener.onEntry(queueEntry);
     } else {
+      if (results.resourcesClaimed) {
+        returnLocalResources(queueEntry);
+      }
       backplane.rejectOperation(queueEntry);
     }
     if (Thread.interrupted()) {

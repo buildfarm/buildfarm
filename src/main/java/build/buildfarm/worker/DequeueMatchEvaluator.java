@@ -55,7 +55,7 @@ public class DequeueMatchEvaluator {
    */
   @SuppressWarnings("NullableProblems")
   @NotNull
-  public static boolean shouldKeepOperation(
+  public static DequeueResults shouldKeepOperation(
       SetMultimap<String, String> workerProvisions,
       String name,
       LocalResourceSet resourceSet,
@@ -77,28 +77,32 @@ public class DequeueMatchEvaluator {
    */
   @SuppressWarnings("NullableProblems")
   @NotNull
-  private static boolean shouldKeepViaPlatform(
+  private static DequeueResults shouldKeepViaPlatform(
       SetMultimap<String, String> workerProvisions,
       String name,
       LocalResourceSet resourceSet,
       Platform platform) {
     // attempt to execute everything the worker gets off the queue,
     // provided there is enough resources to do so.
-    // this is a recommended configuration.
+    DequeueResults results = new DequeueResults();
+
     if (!LocalResourceSetUtils.claimResources(platform, resourceSet)) {
-      return false;
+      return results;
     }
+    results.resourcesClaimed = true;
 
     // The action might be requesting to run on a particular action
     if (!keepForThisWorker(platform, name)) {
-      return false;
+      return results;
     }
 
     if (configs.getWorker().getDequeueMatchSettings().isAcceptEverything()) {
-      return true;
+      results.keep = true;
+      return results;
     }
 
-    return satisfiesProperties(workerProvisions, platform);
+    results.keep = satisfiesProperties(workerProvisions, platform);
+    return results;
   }
 
   private static boolean keepForThisWorker(Platform platform, String name) {
