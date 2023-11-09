@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - tools/base-worker-image/Dockerfile
+      - ci/base-worker-image/jammy/Dockerfile
 jobs:
   build:
     name: Build Base Buildfarm Worker Image
@@ -23,6 +23,6 @@ jobs:
           user_name: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
           password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
           image_version: 'buildfarm-worker-base:jammy'
-          docker_file: './tools/base-worker-image'
+          docker_file: './ci/base-worker-image/jammy'
       - name: Get pre step result output image_pull_url
         run: echo "The time was ${{ steps.buildAndPushImage.outputs.image_pull_url }}"
