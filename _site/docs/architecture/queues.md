@@ -25,32 +25,37 @@ If your configuration file does not specify any provisioned queues, buildfarm wi
 This will ensure the expected behavior for the paradigm in which all work is put on the same queue.
 
 ###  Matching Algorithm
-The matching algorithm is performed by the operation queue when the caller is requesting to push or pop elements.
+The matching algorithm is performed by the operation queue when the server or worker is requesting to push or pop elements, respectively.
 The matching algorithm is designed to find the appropriate queue to perform these actions on.
 On the scheduler side, the action's platform properties are used for matching.
 On the worker side, the `dequeue_match_settings` are used.
 ![Operation Queue Matching]({{site.url}}{{site.baseurl}}/assets/images/Operation-Queue-Matching1.png)
 
-This is how the matching algorithm works:
+The matching algorithm works as follows:
 Each provision queue is checked in the order that it is configured.
 The first provision queue that is deemed eligible is chosen and used.
 When deciding if an action is eligible for the provision queue, each platform property is checked individually.
 By default, there must be a perfect match on each key/value.
 Wildcards ("*") can be used to avoid the need of a perfect match.
 Additionally, if the action contains any platform properties is not mentioned by the provision queue, it will be deemed ineligible.
-setting `allow_unmatched: true` can be used to allow a superset of action properties as long as a subset matches the provision queue.
+setting `allowUnmatched: true` can be used to allow a superset of action properties as long as a subset matches the provision queue.
 If no provision queues can be matched, the operation queue will provide an analysis on why none of the queues were eligible.
 
-When taking elements off of the operation queue, the matching algorithm behaves a similar way.
-The worker's `DequeueMatchSettings` also have an `allow_unmatched` property.
+When taking elements off of the operation queue, the worker's matching algorithm behaves in a similar manner:
+The worker's `DequeueMatchSettings` also have an `allowUnmatched` property.
 Workers also have the ability to reject an operation after matching with a provision queue and dequeuing a value.
-To avoid any of these rejections by the worker, you can use `accept_everything: true`.
+To avoid any of these rejections by the worker, you can use `acceptEverything: true`.
 
 When configuring your worker, consider the following decisions:
-First, if the accept_everything setting is true, the job is accepted.
+First, if the `allowEverything` setting is `true`, the job is accepted.
 Otherwise, if any execution property for the queue has a wildcard key, the job is accepted.
-Otherwise, if the allow_unmatched setting is true, each key present in the queue's properties must be a wildcard or exist in the execution request's properties with an equal value.
+Otherwise, if the `allowUnmatched` setting is `true`, each key present in the queue's properties must be a wildcard or exist in the execution request's properties with an equal value.
 Otherwise, the execution request's properties must have exactly the same set of keys as the queue's execution properties, and the request's value for each property must equal the queue's if the queue's value for this property is not a wildcard.
+
+There are special predefined execution property names which resolve to dynamic configuration for the worker to match against:
+`Worker`: The worker's `publicName` with no wildcard resolution
+`min-cores`: Less than or equal to the `executeStageWidth`
+`process-wrapper`: The set of named `process-wrappers` present in configuration
 
 ### Server Example
 
