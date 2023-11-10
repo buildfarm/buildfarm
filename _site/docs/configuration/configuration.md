@@ -94,6 +94,7 @@ server:
 |--------------------------|-------------------------------|--------------------------------------------------------|
 | enabled                  | boolean, _false_              | Publish basic GRPC metrics to a Prometheus endpoint    |
 | provideLatencyHistograms | boolean, _false_              | Publish detailed, more expensive to calculate, metrics |
+| labelsToReport           | List of Strings, _[]_         | Include custom metrics labels in Prometheus metrics    |
 
 Example:
 
@@ -102,6 +103,7 @@ server:
   grpcMetrics:
     enabled: false
     provideLatencyHistograms: false
+    labelsToReport: []
 ```
 
 ### Server Caches

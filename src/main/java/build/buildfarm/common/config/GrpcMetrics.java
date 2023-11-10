@@ -1,6 +1,7 @@
 package build.buildfarm.common.config;
 
 import io.grpc.ServerBuilder;
+import java.util.List;
 import lombok.Data;
 import me.dinowernli.grpc.prometheus.Configuration;
 import me.dinowernli.grpc.prometheus.MonitoringServerInterceptor;
@@ -10,6 +11,7 @@ public class GrpcMetrics {
   private boolean enabled = false;
   private boolean provideLatencyHistograms = false;
   private double[] latencyBuckets;
+  private List<String> labelsToReport;
 
   public static void handleGrpcMetricIntercepts(
       ServerBuilder<?> serverBuilder, GrpcMetrics grpcMetrics) {
@@ -28,6 +30,11 @@ public class GrpcMetrics {
       // provide custom latency buckets
       if (grpcMetrics.getLatencyBuckets() != null) {
         grpcConfig = grpcConfig.withLatencyBuckets(grpcMetrics.getLatencyBuckets());
+      }
+
+      // report custom metric labels
+      if (grpcMetrics.getLabelsToReport() != null) {
+        grpcConfig = grpcConfig.withLabelHeaders(grpcMetrics.getLabelsToReport());
       }
 
       // Apply config to create an interceptor and apply it to the GRPC server.
