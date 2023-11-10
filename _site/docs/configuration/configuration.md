@@ -293,21 +293,27 @@ worker:
 
 ### Sandbox Settings
 
-| Configuration | Accepted and _Default_ Values | Description                                       |
-|---------------|-------------------------------|---------------------------------------------------|
-| alwaysUse             | boolean, _false_      | Enforce that the sandbox be used on every acion.  |
-| selectForBlockNetwork | boolean, _false_      | `block-network` enables sandbox action execution. |
-| selectForTmpFs        | boolean, _false_      | `tmpfs` enables sandbox action execution.         |
+| Configuration | Accepted and _Default_ Values | Description                                          |
+|---------------|-------------------------------|------------------------------------------------------|
+| alwaysUseSandbox      | boolean, _false_      | Enforce that the sandbox be used on every acion.     |
+| alwaysUseCgroups      | boolean, _true_       | Enforce that actions run under cgroups.              |
+| alwaysUseTmpFs        | boolean, _false_      | Enforce that the sandbox uses tmpfs on every acion.  |
+| selectForBlockNetwork | boolean, _false_      | `block-network` enables sandbox action execution.    |
+| selectForTmpFs        | boolean, _false_      | `tmpfs` enables sandbox action execution.            |
 
 Example:
 
 ```yaml
 worker:
   sandboxSettings:
-    alwaysUse: true
+    alwaysUseSandbox: true
+    alwaysUseCgroups: true
+    alwaysUseTmpFs: true
     selectForBlockNetwork: false
     selectForTmpFs: false
 ```
+
+Note: In order for these settings to take effect, you must also configure `limitGlobalExecution: true`.
 
 ### Dequeue Match
 
@@ -327,6 +333,8 @@ worker:
 
 ### Worker CAS
 
+Unless specified, options are only relevant for FILESYSTEM type
+
 | Configuration                | Accepted and _Default_ Values | Description                                                                                                   |
 |------------------------------|-------------------------------|---------------------------------------------------------------------------------------------------------------|
 | type                         | _FILESYSTEM_, GRPC            | Type of CAS used                                                                                              |
@@ -338,6 +346,8 @@ worker:
 
 Example:
 
+This definition will create a filesystem-based CAS file cache at the path "<root>/cache" on the worker that will reject entries over 2GiB in size, and will expire LRU blobs when the aggregate size of all blobs exceeds 2GiB in order to insert additional entries.
+
 ```yaml
 worker:
   storages:
@@ -345,14 +355,15 @@ worker:
       path: "cache"
       maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
       maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
-      target:
 ```
+
+This definition elides FILESYSTEM configuration with '...', will read-through an external GRPC CAS supporting the REAPI CAS Services into its storage, and will attempt to write expiring entries into the GRPC CAS (i.e. pushing new entries into the head of a worker LRU list will drop the entries from the tail into the GRPC CAS).
 
 ```
 worker:
   storages:
     - type: FILESYSTEM
-      path: "cache"
+      ...
     - type: GRPC
       target: "cas.external.com:1234"
 ```

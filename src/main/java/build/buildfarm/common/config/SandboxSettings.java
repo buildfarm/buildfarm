@@ -26,11 +26,25 @@ import lombok.Data;
 @Data
 public class SandboxSettings {
   /**
-   * @field alwaysUse
+   * @field alwaysUseSandbox
    * @brief Whether or not to always use the sandbox when running actions.
    * @details It may be preferred to enforce sandbox usage than rely on client selection.
    */
-  public boolean alwaysUse = false;
+  public boolean alwaysUseSandbox = false;
+
+  /**
+   * @field alwaysUseCgroups
+   * @brief Whether or not to use cgroups when sandboxing actions.
+   * @details It may be preferred to enforce cgroup usage.
+   */
+  public boolean alwaysUseCgroups = true;
+
+  /**
+   * @field alwaysUseTmpFs
+   * @brief Whether or not to always use tmpfs when using the sandbox.
+   * @details It may be preferred to enforce sandbox usage than rely on client selection.
+   */
+  public boolean alwaysUseTmpFs = false;
 
   /**
    * @field selectForBlockNetwork

@@ -46,6 +46,7 @@ public class DequeueMatchEvaluator {
    * @brief Decide whether the worker should keep the operation or put it back on the queue.
    * @details Compares the platform properties of the worker to the operation's platform properties.
    * @param workerProvisions The provisions of the worker.
+   * @param name Worker name.
    * @param resourceSet The limited resources that the worker has available.
    * @param queueEntry An entry recently removed from the queue.
    * @return Whether or not the worker should accept or reject the queue entry.
@@ -54,11 +55,12 @@ public class DequeueMatchEvaluator {
    */
   @SuppressWarnings("NullableProblems")
   @NotNull
-  public static boolean shouldKeepOperation(
+  public static DequeueResults shouldKeepOperation(
       SetMultimap<String, String> workerProvisions,
+      String name,
       LocalResourceSet resourceSet,
       QueueEntry queueEntry) {
-    return shouldKeepViaPlatform(workerProvisions, resourceSet, queueEntry.getPlatform());
+    return shouldKeepViaPlatform(workerProvisions, name, resourceSet, queueEntry.getPlatform());
   }
 
   /**
@@ -67,6 +69,7 @@ public class DequeueMatchEvaluator {
    * @details Compares the platform properties of the worker to the platform properties of the
    *     operation.
    * @param workerProvisions The provisions of the worker.
+   * @param name Worker name.
    * @param resourceSet The limited resources that the worker has available.
    * @param platform The platforms of operation.
    * @return Whether or not the worker should accept or reject the operation.
@@ -74,21 +77,43 @@ public class DequeueMatchEvaluator {
    */
   @SuppressWarnings("NullableProblems")
   @NotNull
-  private static boolean shouldKeepViaPlatform(
+  private static DequeueResults shouldKeepViaPlatform(
       SetMultimap<String, String> workerProvisions,
+      String name,
       LocalResourceSet resourceSet,
       Platform platform) {
     // attempt to execute everything the worker gets off the queue,
     // provided there is enough resources to do so.
-    // this is a recommended configuration.
+    DequeueResults results = new DequeueResults();
+
     if (!LocalResourceSetUtils.claimResources(platform, resourceSet)) {
-      return false;
+      return results;
     }
-    if (configs.getWorker().getDequeueMatchSettings().isAcceptEverything()) {
-      return true;
+    results.resourcesClaimed = true;
+
+    // The action might be requesting to run on a particular action
+    if (!keepForThisWorker(platform, name)) {
+      return results;
     }
 
-    return satisfiesProperties(workerProvisions, platform);
+    if (configs.getWorker().getDequeueMatchSettings().isAcceptEverything()) {
+      results.keep = true;
+      return results;
+    }
+
+    results.keep = satisfiesProperties(workerProvisions, platform);
+    return results;
+  }
+
+  private static boolean keepForThisWorker(Platform platform, String name) {
+    for (Platform.Property property : platform.getPropertiesList()) {
+      if (property.getName().equals(ExecutionProperties.WORKER)
+          && !property.getValue().equals(name)) {
+        // requested worker does not match this worker, reject
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

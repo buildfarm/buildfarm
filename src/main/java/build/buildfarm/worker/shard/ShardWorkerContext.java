@@ -55,6 +55,7 @@ import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.worker.DequeueMatchEvaluator;
+import build.buildfarm.worker.DequeueResults;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
@@ -283,10 +284,14 @@ class ShardWorkerContext implements WorkerContext {
   @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     QueueEntry queueEntry = takeEntryOffOperationQueue(listener);
-    decideWhetherToKeepOperation(queueEntry, listener);
+    if (queueEntry == null) {
+      listener.onEntry(null);
+    } else {
+      decideWhetherToKeepOperation(queueEntry, listener);
+    }
   }
 
-  private QueueEntry takeEntryOffOperationQueue(MatchListener listener)
+  private @Nullable QueueEntry takeEntryOffOperationQueue(MatchListener listener)
       throws IOException, InterruptedException {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
@@ -314,10 +319,14 @@ class ShardWorkerContext implements WorkerContext {
 
   private void decideWhetherToKeepOperation(QueueEntry queueEntry, MatchListener listener)
       throws IOException, InterruptedException {
-    if (queueEntry == null
-        || DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, resourceSet, queueEntry)) {
+    DequeueResults results =
+        DequeueMatchEvaluator.shouldKeepOperation(matchProvisions, name, resourceSet, queueEntry);
+    if (results.keep) {
       listener.onEntry(queueEntry);
     } else {
+      if (results.resourcesClaimed) {
+        returnLocalResources(queueEntry);
+      }
       backplane.rejectOperation(queueEntry);
     }
     if (Thread.interrupted()) {
@@ -827,7 +836,7 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public void createExecutionLimits() {
-    if (shouldLimitCoreUsage()) {
+    if (shouldLimitCoreUsage() && configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
       createOperationExecutionLimits();
     }
   }
@@ -859,11 +868,13 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public void destroyExecutionLimits() {
-    try {
-      operationsGroup.getCpu().close();
-      executionsGroup.getCpu().close();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    if (configs.getWorker().getSandboxSettings().isAlwaysUseCgroups()) {
+      try {
+        operationsGroup.getCpu().close();
+        executionsGroup.getCpu().close();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
@@ -921,28 +932,31 @@ class ShardWorkerContext implements WorkerContext {
     // ResourceLimits object. We apply the cgroup settings to file resources
     // and collect group names to use on the CLI.
     String operationId = getOperationId(operationName);
-    final Group group = operationsGroup.getChild(operationId);
     ArrayList<IOResource> resources = new ArrayList<>();
-    ArrayList<String> usedGroups = new ArrayList<>();
 
-    // Possibly set core restrictions.
-    if (limits.cpu.limit) {
-      applyCpuLimits(group, limits, resources);
-      usedGroups.add(group.getCpu().getName());
-    }
+    if (limits.cgroups) {
+      final Group group = operationsGroup.getChild(operationId);
+      ArrayList<String> usedGroups = new ArrayList<>();
 
-    // Possibly set memory restrictions.
-    if (limits.mem.limit) {
-      applyMemLimits(group, limits, resources);
-      usedGroups.add(group.getMem().getName());
-    }
+      // Possibly set core restrictions.
+      if (limits.cpu.limit) {
+        applyCpuLimits(group, limits, resources);
+        usedGroups.add(group.getCpu().getName());
+      }
 
-    // Decide the CLI for running under cgroups
-    if (!usedGroups.isEmpty()) {
-      arguments.add(
-          configs.getExecutionWrappers().getCgroups(),
-          "-g",
-          String.join(",", usedGroups) + ":" + group.getHierarchy());
+      // Possibly set memory restrictions.
+      if (limits.mem.limit) {
+        applyMemLimits(group, limits, resources);
+        usedGroups.add(group.getMem().getName());
+      }
+
+      // Decide the CLI for running under cgroups
+      if (!usedGroups.isEmpty()) {
+        arguments.add(
+            configs.getExecutionWrappers().getCgroups(),
+            "-g",
+            String.join(",", usedGroups) + ":" + group.getHierarchy());
+      }
     }
 
     // Possibly set network restrictions.
