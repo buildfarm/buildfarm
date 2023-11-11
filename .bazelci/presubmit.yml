@@ -56,7 +56,7 @@ tasks:
   macos:
     name: "Unit Tests"
     environment:
-      BAZEL_USE_XCODE_TOOLCHAIN: 0
+      USE_BAZEL_VERSION: 17be878292730359c9c90efdceabed26126df7ae
     build_flags:
     - "--cxxopt=-std=c++14"
     - "--build_tag_filters=-container"
