@@ -19,10 +19,8 @@ jobs:
         uses: MaximilianoBz/dockerhub-buildpush@v1.0
         with:
           registry_url: 'docker.io'
-          repository_name: 'bazelbuild'
+          repository_name: 'bazelbuild/buildfarm-worker-base'
           user_name: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
           password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
-          image_version: 'buildfarm-worker-base:jammy'
+          image_version: 'jammy'
           docker_file: './ci/base-worker-image/jammy'
-      - name: Get pre step result output image_pull_url
-        run: echo "The time was ${{ steps.buildAndPushImage.outputs.image_pull_url }}"
