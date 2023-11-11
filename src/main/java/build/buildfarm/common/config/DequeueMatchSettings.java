@@ -3,11 +3,16 @@ package build.buildfarm.common.config;
 import build.bazel.remote.execution.v2.Platform;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
 
 @Data
 public class DequeueMatchSettings {
-  private boolean acceptEverything = true;
+
+  @Getter(AccessLevel.NONE)
+  private boolean acceptEverything; // deprecated
+
   private boolean allowUnmatched = false;
   private List<Property> properties = new ArrayList();
 
