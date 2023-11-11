@@ -36,9 +36,9 @@ def archive_dependencies(third_party):
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
         {
             "name": "com_google_protobuf",
-            "sha256": "25f1292d4ea6666f460a2a30038eef121e6c3937ae0f61d610611dfb14b0bd32",
-            "strip_prefix": "protobuf-3.19.1",
-            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.19.1.zip"],
+            "sha256": "79082dc68d8bab2283568ce0be3982b73e19ddd647c2411d1977ca5282d2d6b3",
+            "strip_prefix": "protobuf-25.0",
+            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v25.0.zip"],
         },
         {
             "name": "com_github_bazelbuild_buildtools",
