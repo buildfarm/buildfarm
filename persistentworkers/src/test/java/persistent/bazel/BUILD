@@ -3,6 +3,7 @@ COMMON_DEPS = [
     "//persistentworkers/src/main/java/persistent/bazel:bazel-persistent-workers",
     "//persistentworkers/src/test/java/persistent/testutil:testutil",
     "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
+    "@maven//:com_google_guava_guava",
     "@maven//:com_google_protobuf_protobuf_java",
     "@maven//:com_google_truth_truth",
     "@maven//:commons_io_commons_io",

@@ -6,6 +6,7 @@ COMMON_DEPS = [
     "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
     "//src/test/java/build/buildfarm:test_runner",
     "//third_party/jedis",
+    "@maven//:com_google_guava_guava",
     "@maven//:com_google_truth_truth",
     "@maven//:io_grpc_grpc_api",
     "@maven//:org_mockito_mockito_core",
