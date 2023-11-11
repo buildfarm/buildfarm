@@ -55,7 +55,10 @@ tasks:
     - "..."
   macos:
     name: "Unit Tests"
+    environment:
+      BAZEL_USE_XCODE_TOOLCHAIN: 0
     build_flags:
+    - "--cxxopt=-std=c++14"
     - "--build_tag_filters=-container"
     build_targets:
     - "..."
