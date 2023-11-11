@@ -319,7 +319,6 @@ Note: In order for these settings to take effect, you must also configure `limit
 
 | Configuration    | Accepted and _Default_ Values | Description |
 |------------------|-------------------------------|-------------|
-| acceptEverything | boolean, _true_               |             |
 | allowUnmatched   | boolean, _false_              |             |
 
 Example:
@@ -327,7 +326,6 @@ Example:
 ```yaml
 worker:
   dequeueMatchSettings:
-    acceptEverything: true
     allowUnmatched: false
 ```
 

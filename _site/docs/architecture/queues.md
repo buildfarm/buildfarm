@@ -41,19 +41,17 @@ Additionally, if the action contains any platform properties is not mentioned by
 setting `allowUnmatched: true` can be used to allow a superset of action properties as long as a subset matches the provision queue.
 If no provision queues can be matched, the operation queue will provide an analysis on why none of the queues were eligible.
 
-When taking elements off of the operation queue, the worker's matching algorithm behaves in a similar manner:
-The worker's `DequeueMatchSettings` also have an `allowUnmatched` property.
-Workers also have the ability to reject an operation after matching with a provision queue and dequeuing a value.
-To avoid any of these rejections by the worker, you can use `acceptEverything: true`.
-
-When configuring your worker, consider the following decisions:
-First, if the `allowEverything` setting is `true`, the job is accepted.
-Otherwise, if any execution property for the queue has a wildcard key, the job is accepted.
-Otherwise, if the `allowUnmatched` setting is `true`, each key present in the queue's properties must be a wildcard or exist in the execution request's properties with an equal value.
-Otherwise, the execution request's properties must have exactly the same set of keys as the queue's execution properties, and the request's value for each property must equal the queue's if the queue's value for this property is not a wildcard.
+A worker will dequeue operations from matching queues and determine whether to keep and execute it according to the following procedure:
+For each property key-value in the operation's platform, an operation is REJECTED if:
+  The key is `min-cores` and the integer value is greater than the number of cores on the worker.
+  Or The key is `min-mem` and the integer value is greater than the number of bytes of RAM on the worker.
+  Or if the key exists in the `DequeueMatchSettings` platform with neither the value nor a `*` in the corresponding DMS platform key's values, 
+  Or if the `allowUnmatched` setting is `false`.
+For each resource requested in the operation's platform with the resource: prefix, the action is rejected if:
+  The resource amount cannot currently be satisfied with the associated resource capacity count
 
 There are special predefined execution property names which resolve to dynamic configuration for the worker to match against:
-`Worker`: The worker's `publicName` with no wildcard resolution
+`Worker`: The worker's `publicName`
 `min-cores`: Less than or equal to the `executeStageWidth`
 `process-wrapper`: The set of named `process-wrappers` present in configuration
 
