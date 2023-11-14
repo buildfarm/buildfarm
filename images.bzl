@@ -26,10 +26,26 @@ def buildfarm_images():
         repository = "distroless/java",
     )
 
+    # Base mantic worker image for public releases (built via github action from ci/base-worker-image/mantic/Dockerfile)
     container_pull(
         name = "ubuntu-mantic",
-        digest = "sha256:1419bba15470a95242e917b3abcd8981ae36707b99df5ac705e1eee4d920c51c",
         registry = "index.docker.io",
         repository = "bazelbuild/buildfarm-worker-base",
-        tag = "mantic-java17-gcc",
+        tag = "mantic",
+    )
+
+    # Base worker image for public releases (built via github action from ci/base-worker-image/jammy/Dockerfile)
+    container_pull(
+        name = "ubuntu-jammy",
+        registry = "index.docker.io",
+        repository = "bazelbuild/buildfarm-worker-base",
+        tag = "jammy",
+    )
+
+    # Server base image
+    container_pull(
+        name = "amazon_corretto_java_image_base",
+        registry = "public.ecr.aws/amazoncorretto",
+        repository = "amazoncorretto",
+        tag = "21",
     )

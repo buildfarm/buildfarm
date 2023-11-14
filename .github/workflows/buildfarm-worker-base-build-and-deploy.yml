@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - ci/base-worker-image/jammy/Dockerfile
+      - ci/base-worker-image/mantic/Dockerfile
 jobs:
   build:
     name: Build Base Buildfarm Worker Image
@@ -14,8 +15,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Build Docker Image
-        id: buildAndPushImage
+      - name: Build Jammy Docker Image
+        id: buildAndPushJammyImage
         uses: MaximilianoBz/dockerhub-buildpush@v1.0
         with:
           registry_url: 'docker.io'
@@ -24,3 +25,14 @@ jobs:
           password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
           image_version: 'jammy'
           docker_file: './ci/base-worker-image/jammy'
+
+      - name: Build Mantic Docker Image
+        id: buildAndPushManticImage
+        uses: MaximilianoBz/dockerhub-buildpush@v1.0
+        with:
+          registry_url: 'docker.io'
+          repository_name: 'bazelbuild/buildfarm-worker-base'
+          user_name: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
+          password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
+          image_version: 'mantic'
+          docker_file: './ci/base-worker-image/mantic'
