@@ -205,6 +205,7 @@ container_push(
     registry = "index.docker.io",
     repository = "bazelbuild/buildfarm-server",
     tag = "latest",
+    tags = ["container"],
 )
 
 container_push(
@@ -214,4 +215,5 @@ container_push(
     registry = "index.docker.io",
     repository = "bazelbuild/buildfarm-worker",
     tag = "latest",
+    tags = ["container"],
 )
