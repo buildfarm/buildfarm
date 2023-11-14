@@ -11,6 +11,8 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/common/resources",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
+        "//src/main/java/build/buildfarm/common/blake3",
+        "//src/main/java/build/buildfarm/common/jni",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//third_party/jedis",
         "@googleapis//:google_longrunning_operations_java_proto",
