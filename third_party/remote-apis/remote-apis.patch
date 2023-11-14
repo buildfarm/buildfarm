@@ -20,3 +20,20 @@ index 2b36886..6ffc75b 100644
 
  def _switch(enabled, enabled_value):
      return enabled_value if enabled else ""
+
+diff --git a/build/bazel/remote/execution/v2/remote_execution.proto b/build/bazel/remote/execution/v2/remote_execution.proto
+index dbeff9c..4398b2f 100644
+--- a/build/bazel/remote/execution/v2/remote_execution.proto
++++ b/build/bazel/remote/execution/v2/remote_execution.proto
+@@ -1688,6 +1688,10 @@ message DigestFunction {
+     // cryptographic hash function and its collision properties are not strongly guaranteed.
+     // See https://github.com/aappleby/smhasher/wiki/MurmurHash3 .
+     MURMUR3 = 7;
++
++    // The BLAKE3 hash function.
++    // See https://github.com/BLAKE3-team/BLAKE3.
++    BLAKE3 = 9;
+   }
+ }
+ 
+

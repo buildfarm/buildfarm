@@ -17,6 +17,9 @@ package build.buildfarm.common;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
+import build.buildfarm.common.blake3.Blake3HashFunction;
+import build.buildfarm.common.blake3.Blake3Provider;
+import build.buildfarm.common.jni.JniLoader;
 import com.google.common.hash.Funnels;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hasher;
@@ -31,9 +34,26 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.Security;
 
 /** Utility methods to work with {@link Digest}. */
 public class DigestUtil {
+
+  static {
+    if (JniLoader.isJniAvailable()) {
+      try {
+        Security.addProvider(new Blake3Provider());
+      } catch (UnsatisfiedLinkError ignored) {
+      }
+    } else {
+      // Consider throwing a runtime error here if they've set the hash
+      // function to BLAKE3.
+    }
+  }
+
+  // Triggers loading of the JNI via static function.
+  public static void load() {}
+
   /** Type of hash function to use for digesting blobs. */
   // The underlying HashFunctions are immutable and thread safe.
   @SuppressWarnings("ImmutableEnumChecker")
@@ -42,7 +62,8 @@ public class DigestUtil {
     MD5(Hashing.md5()),
     @SuppressWarnings("deprecation")
     SHA1(Hashing.sha1()),
-    SHA256(Hashing.sha256());
+    SHA256(Hashing.sha256()),
+    BLAKE3(new Blake3HashFunction());
 
     private final com.google.common.hash.HashFunction hash;
     final HashCode empty;
@@ -62,12 +83,19 @@ public class DigestUtil {
       if (this == MD5) {
         return DigestFunction.Value.MD5;
       }
+      if (this == BLAKE3) {
+        return DigestFunction.Value.BLAKE3;
+      }
+
       return DigestFunction.Value.UNKNOWN;
     }
 
     public static HashFunction forHash(String hexDigest) {
       if (SHA256.isValidHexDigest(hexDigest)) {
         return SHA256;
+      }
+      if (BLAKE3.isValidHexDigest(hexDigest)) {
+        return BLAKE3;
       }
       if (SHA1.isValidHexDigest(hexDigest)) {
         return SHA1;
@@ -90,6 +118,8 @@ public class DigestUtil {
           return SHA1;
         case MD5:
           return MD5;
+        case BLAKE3:
+          return BLAKE3;
       }
     }
 

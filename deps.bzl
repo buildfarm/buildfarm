@@ -140,7 +140,13 @@ def archive_dependencies(third_party):
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
         },
-
+        {
+            "name": "blake3",
+            "sha256": "bb529ba133c0256df49139bd403c17835edbf60d2ecd6463549c6a5fe279364d",
+            "build_file": "%s:BUILD.blake3" % third_party,
+            "url": "https://github.com/BLAKE3-team/BLAKE3/archive/refs/tags/1.3.3.zip",
+            "strip_prefix": "BLAKE3-1.3.3",
+        },
         # Optional execution wrappers
         {
             "name": "skip_sleep",
