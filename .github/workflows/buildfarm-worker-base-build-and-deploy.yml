@@ -1,4 +1,4 @@
-name: Build and push base Buildfarm worker image
+name: Build and Push Base Buildfarm Worker Images
 
 on:
   push:
@@ -15,24 +15,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Build Jammy Docker Image
-        id: buildAndPushJammyImage
-        uses: MaximilianoBz/dockerhub-buildpush@v1.0
+      - name: Login to Bazelbuild Docker Hub
+        uses: docker/login-action@v3
         with:
-          registry_url: 'docker.io'
-          repository_name: 'bazelbuild/buildfarm-worker-base'
-          user_name: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
+          username: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
           password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
-          image_version: 'jammy'
-          docker_file: './ci/base-worker-image/jammy'
 
-      - name: Build Mantic Docker Image
-        id: buildAndPushManticImage
-        uses: MaximilianoBz/dockerhub-buildpush@v1.0
+      - name: Build Jammy Docker image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
         with:
-          registry_url: 'docker.io'
-          repository_name: 'bazelbuild/buildfarm-worker-base'
-          user_name: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
-          password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
-          image_version: 'mantic'
-          docker_file: './ci/base-worker-image/mantic'
+          context: .
+          file: ./ci/base-worker-image/jammy/Dockerfile
+          push: true
+          tags: bazelbuild/buildfarm-worker-base:jammy
+
+      - name: Build Mantic Docker image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          context: .
+          file: ./ci/base-worker-image/mantic/Dockerfile
+          push: true
+          tags: bazelbuild/buildfarm-worker-base:mantic
