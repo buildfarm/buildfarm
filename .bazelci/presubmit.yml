@@ -41,6 +41,8 @@ tasks:
     name: "Unit Tests"
     build_targets:
     - "..."
+    build_flags:
+    - "--build_tag_filters=-container"
     test_flags:
     - "--test_tag_filters=-integration,-redis"
     test_targets:
@@ -49,6 +51,8 @@ tasks:
     name: "Unit Tests"
     build_targets:
     - "..."
+    build_flags:
+    - "--build_tag_filters=-container"
     test_flags:
     - "--test_tag_filters=-integration,-redis"
     test_targets:
