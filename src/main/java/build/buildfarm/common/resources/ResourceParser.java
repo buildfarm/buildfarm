@@ -284,7 +284,7 @@ public class ResourceParser {
     // requests.
     // Prior to blake3 we'd have:
     // "bytestream://$instance/blobs/$hash/$size",
-    // But now, we have the name ofthe blob
+    // But now, we have the name of the blob
     // "bytestream://$instance/blobs/$digestName/$hash/$size",
     // Perhaps consider adding this based on what the config file is set VS
     // parsing every time.
