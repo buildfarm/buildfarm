@@ -103,6 +103,7 @@ worker:
   inlineContentLimit: 1048567 # 1024 * 1024
   operationPollPeriod: 1
   dequeueMatchSettings:
+    acceptEverything: true
     allowUnmatched: false
   storages:
     - type: FILESYSTEM
