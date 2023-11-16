@@ -1,4 +1,4 @@
-name: Build and push Buildfarm images
+name: Build and Push Latest Buildfarm Images
 
 on:
   push:
