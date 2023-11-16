@@ -204,7 +204,7 @@ container_push(
     image = ":buildfarm-server",
     registry = "index.docker.io",
     repository = "bazelbuild/buildfarm-server",
-    tag = "latest",
+    tag = "$(release_version)",
     tags = ["container"],
 )
 
@@ -214,6 +214,6 @@ container_push(
     image = ":buildfarm-shard-worker",
     registry = "index.docker.io",
     repository = "bazelbuild/buildfarm-worker",
-    tag = "latest",
+    tag = "$(release_version)",
     tags = ["container"],
 )
