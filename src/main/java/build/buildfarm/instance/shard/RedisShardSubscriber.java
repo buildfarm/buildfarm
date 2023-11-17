@@ -261,10 +261,12 @@ class RedisShardSubscriber extends JedisPubSub {
 
   void addWorker(WorkerChange workerChange) {
     synchronized (workers) {
-      workers.put(workerChange.getName(), ShardWorker.newBuilder()
-          .setEndpoint(workerChange.getName())
-          .setFirstRegisteredAt(toEpochMillis(workerChange.getAdd().getFirstRegisteredAt()))
-          .build());
+      workers.put(
+          workerChange.getName(),
+          ShardWorker.newBuilder()
+              .setEndpoint(workerChange.getName())
+              .setFirstRegisteredAt(toEpochMillis(workerChange.getAdd().getFirstRegisteredAt()))
+              .build());
     }
   }
 

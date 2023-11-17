@@ -143,7 +143,8 @@ public class RedisShardBackplane implements Backplane {
   private @Nullable RedisClient client = null;
 
   private Deadline storageWorkersDeadline = null;
-  private final Map<String, ShardWorker> storageWorkers = Collections.synchronizedMap(new HashMap<>());
+  private final Map<String, ShardWorker> storageWorkers =
+      Collections.synchronizedMap(new HashMap<>());
   private final Supplier<Set<String>> recentExecuteWorkers;
 
   private DistributedState state = new DistributedState();
@@ -477,10 +478,7 @@ public class RedisShardBackplane implements Backplane {
     subscriberService = BuildfarmExecutors.getSubscriberPool();
     subscriber =
         new RedisShardSubscriber(
-            watchers,
-            storageWorkers,
-            configs.getBackplane().getWorkerChannel(),
-            subscriberService);
+            watchers, storageWorkers, configs.getBackplane().getWorkerChannel(), subscriberService);
 
     operationSubscription =
         new RedisShardSubscription(
@@ -593,18 +591,21 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void addWorker(ShardWorker shardWorker) throws IOException {
     String json = JsonFormat.printer().print(shardWorker);
-    Timestamp registrationTime = Timestamp.newBuilder()
-        .setSeconds(shardWorker.getFirstRegisteredAt() / 1000)
-        .setNanos((int) ((shardWorker.getFirstRegisteredAt() % 1000) * 1000000)).build();
+    Timestamp registrationTime =
+        Timestamp.newBuilder()
+            .setSeconds(shardWorker.getFirstRegisteredAt() / 1000)
+            .setNanos((int) ((shardWorker.getFirstRegisteredAt() % 1000) * 1000000))
+            .build();
     String workerChangeJson =
         JsonFormat.printer()
             .print(
                 WorkerChange.newBuilder()
                     .setEffectiveAt(toTimestamp(Instant.now()))
                     .setName(shardWorker.getEndpoint())
-                    .setAdd(WorkerChange.Add.newBuilder()
-                        .setFirstRegisteredAt(registrationTime)
-                        .build())
+                    .setAdd(
+                        WorkerChange.Add.newBuilder()
+                            .setFirstRegisteredAt(registrationTime)
+                            .build())
                     .build());
     client.call(
         jedis -> {
@@ -709,15 +710,17 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames) throws IOException  {
+  public Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames)
+      throws IOException {
     refreshStorageWorkersIfExpired();
     Map<String, Long> workerAndStartTime = new HashMap<>();
-    workerNames.forEach(worker -> {
-      ShardWorker workerInfo = storageWorkers.get(worker);
-      if (workerInfo != null) {
-        workerAndStartTime.put(worker, workerInfo.getFirstRegisteredAt() / 1000L);
-      }
-    });
+    workerNames.forEach(
+        worker -> {
+          ShardWorker workerInfo = storageWorkers.get(worker);
+          if (workerInfo != null) {
+            workerAndStartTime.put(worker, workerInfo.getFirstRegisteredAt() / 1000L);
+          }
+        });
     return workerAndStartTime;
   }
 

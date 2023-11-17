@@ -40,7 +40,6 @@ import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -366,8 +365,10 @@ public class RedisShardBackplaneTest {
     String storageWorkerKey = configs.getBackplane().getWorkersHashName() + "_storage";
     Map<String, String> workersJson =
         Map.of(
-            "worker1", "{\"endpoint\": \"worker1\", \"expireAt\": \"9999999999999\", \"workerType\": 3, \"firstRegisteredAt\": \"1685292624000\"}",
-            "worker2", "{\"endpoint\": \"worker2\", \"expireAt\": \"9999999999999\", \"workerType\": 3, \"firstRegisteredAt\": \"1685282624000\"}");
+            "worker1",
+                "{\"endpoint\": \"worker1\", \"expireAt\": \"9999999999999\", \"workerType\": 3, \"firstRegisteredAt\": \"1685292624000\"}",
+            "worker2",
+                "{\"endpoint\": \"worker2\", \"expireAt\": \"9999999999999\", \"workerType\": 3, \"firstRegisteredAt\": \"1685282624000\"}");
     when(jedisCluster.hgetAll(storageWorkerKey)).thenReturn(workersJson);
     Map<String, Long> workersStartTime = backplane.getWorkersStartTimeInEpochSecs(workerNames);
     assertThat(workersStartTime.size()).isEqualTo(2);
