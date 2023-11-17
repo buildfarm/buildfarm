@@ -275,7 +275,9 @@ message ShardWorker {
 }
 
 message WorkerChange {
-  message Add {}
+  message Add {
+    google.protobuf.Timestamp firstRegisteredAt = 1;
+  }
 
   message Remove {
     string source = 1;

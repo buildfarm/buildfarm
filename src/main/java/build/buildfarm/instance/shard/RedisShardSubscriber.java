@@ -20,6 +20,7 @@ import static java.lang.String.format;
 
 import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.v1test.OperationChange;
+import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
@@ -29,7 +30,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import java.time.Instant;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -59,13 +60,13 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   private final ListMultimap<String, TimedWatchFuture> watchers;
-  private final Set<String> workers;
+  private final Map<String, ShardWorker> workers;
   private final String workerChannel;
   private final Executor executor;
 
   RedisShardSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers,
-      Set<String> workers,
+      Map<String, ShardWorker> workers,
       String workerChannel,
       Executor executor) {
     this.watchers = watchers;
@@ -250,23 +251,26 @@ class RedisShardSubscriber extends JedisPubSub {
                 workerChange.getName(), workerChange.getEffectiveAt()));
         break;
       case ADD:
-        addWorker(workerChange.getName());
+        addWorker(workerChange);
         break;
       case REMOVE:
-        removeWorker(workerChange.getName());
+        removeWorker(workerChange);
         break;
     }
   }
 
-  void addWorker(String worker) {
+  void addWorker(WorkerChange workerChange) {
     synchronized (workers) {
-      workers.add(worker);
+      workers.put(workerChange.getName(), ShardWorker.newBuilder()
+          .setEndpoint(workerChange.getName())
+          .setFirstRegisteredAt(toEpochMillis(workerChange.getAdd().getFirstRegisteredAt()))
+          .build());
     }
   }
 
-  boolean removeWorker(String worker) {
+  boolean removeWorker(WorkerChange workerChange) {
     synchronized (workers) {
-      return workers.remove(worker);
+      return workers.remove(workerChange.getName()) != null;
     }
   }
 
@@ -281,6 +285,10 @@ class RedisShardSubscriber extends JedisPubSub {
 
   static Instant toInstant(Timestamp timestamp) {
     return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
+  }
+
+  static long toEpochMillis(Timestamp timestamp) {
+    return timestamp.getSeconds() * 1000 + timestamp.getNanos() / 1000000;
   }
 
   void resetOperation(String channel, OperationChange.Reset reset) {
