@@ -119,7 +119,8 @@ public class DequeueMatchEvaluator {
   private static boolean satisfiesProperty(
       SetMultimap<String, String> workerProvisions, Platform.Property property) {
     // validate min cores
-    if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
+    if (property.getName().equals(ExecutionProperties.CORES)
+        || property.getName().equals(ExecutionProperties.MIN_CORES)) {
       if (!workerProvisions.containsKey(ExecutionProperties.CORES)) {
         return false;
       }
