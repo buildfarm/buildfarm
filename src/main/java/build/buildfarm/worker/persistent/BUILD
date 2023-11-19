@@ -1,6 +1,7 @@
 java_library(
     name = "persistent",
     srcs = glob(["*.java"]),
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
         "//persistentworkers/src/main/java/persistent/bazel:bazel-persistent-workers",
@@ -25,5 +26,6 @@ java_library(
         "@maven//:io_prometheus_simpleclient",
         "@maven//:org_apache_commons_commons_compress",
         "@maven//:org_jetbrains_annotations",
+        "@maven//:org_projectlombok_lombok",
     ],
 )

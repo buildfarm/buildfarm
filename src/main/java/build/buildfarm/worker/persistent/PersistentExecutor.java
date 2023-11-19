@@ -1,3 +1,17 @@
+// Copyright 2023 The Bazel Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.worker.persistent;
 
 import build.bazel.remote.execution.v2.ActionResult;
@@ -16,8 +30,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import lombok.extern.java.Log;
 import persistent.bazel.client.WorkerKey;
 
 /**
@@ -27,9 +41,8 @@ import persistent.bazel.client.WorkerKey;
  * workers, likely for debugging purposes, but need to revisit. (Can't remember fully since it was
  * so long ago!)
  */
+@Log
 public class PersistentExecutor {
-  private static final Logger logger = Logger.getLogger(PersistentExecutor.class.getName());
-
   private static final ProtoCoordinator coordinator =
       ProtoCoordinator.ofCommonsPool(getMaxWorkersPerKey());
 
@@ -54,7 +67,7 @@ public class PersistentExecutor {
     try {
       return Integer.parseInt(System.getenv("BUILDFARM_MAX_WORKERS_PER_KEY"));
     } catch (Exception ignored) {
-      logger.info(
+      log.info(
           "Could not get env var BUILDFARM_MAX_WORKERS_PER_KEY; defaulting to "
               + defaultMaxWorkersPerKey);
     }
@@ -79,17 +92,20 @@ public class PersistentExecutor {
       throws IOException {
     //// Pull out persistent worker start command from the overall action request
 
-    logger.log(Level.FINE, "executeCommandOnPersistentWorker[" + operationName + "]");
+    log.log(Level.FINE, "executeCommandOnPersistentWorker[" + operationName + "]");
 
     ImmutableList<String> initCmd = parseInitCmd(persistentWorkerInitCmd, argsList);
 
     String executionName = getExecutionName(argsList);
     if (executionName.isEmpty()) {
-      logger.log(Level.SEVERE, "Invalid Argument: " + argsList);
+      log.log(Level.SEVERE, "Invalid Argument: " + argsList);
       return Code.INVALID_ARGUMENT;
     }
 
     // TODO revisit why this was necessary in the first place
+    // (@wiwa) I believe the reason has to do with JavaBuilder workers not relying on env vars,
+    // as compared to rules_scala, only reading info from the argslist of each command.
+    // That would mean the Java worker keys should be invariant to the env vars we see.
     ImmutableMap<String, String> env;
     if (executionName.equals(JAVAC_EXEC_NAME)) {
       env = ImmutableMap.of();
@@ -153,7 +169,7 @@ public class PersistentExecutor {
     //// Run request
     //// Required file operations (in/out) are the responsibility of the coordinator
 
-    logger.log(Level.FINE, "Request with key: " + key);
+    log.log(Level.FINE, "Request with key: " + key);
     WorkResponse response;
     String stdErr = "";
     try {
@@ -171,8 +187,8 @@ public class PersistentExecutor {
               + request.getArgumentsList();
       String msg = "Exception while running request: " + e + debug + "\n\n";
 
-      logger.log(Level.SEVERE, msg);
-      e.printStackTrace();
+      log.log(Level.SEVERE, msg, e);
+
       response =
           WorkResponse.newBuilder()
               .setOutput(msg)
@@ -183,7 +199,7 @@ public class PersistentExecutor {
     //// Set results
 
     String responseOut = response.getOutput();
-    logger.log(Level.FINE, "WorkResponse.output: " + responseOut);
+    log.log(Level.FINE, "WorkResponse.output: " + responseOut);
 
     int exitCode = response.getExitCode();
     resultBuilder
@@ -195,7 +211,7 @@ public class PersistentExecutor {
       return Code.OK;
     }
 
-    logger.severe(
+    log.severe(
         "PersistentExecutor.runOnPersistentWorker Failed with code: "
             + exitCode
             + "\n"
@@ -226,7 +242,7 @@ public class PersistentExecutor {
     // Parse init command into list of space-separated words, without the persistent worker flag
     ImmutableList.Builder<String> initCmdBuilder = ImmutableList.builder();
     for (String s : argsList) {
-      if (cmd.length() == 0) {
+      if (cmd.isEmpty()) {
         break;
       }
       cmd = cmd.substring(s.length()).trim();

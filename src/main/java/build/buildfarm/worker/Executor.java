@@ -65,13 +65,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import lombok.extern.java.Log;
 
 @Log
 class Executor {
-  private static final Logger logger = Logger.getLogger(Executor.class.getName());
-
   private static final int INCOMPLETE_EXIT_CODE = -1;
 
   private final WorkerContext workerContext;
@@ -445,7 +442,7 @@ class Executor {
         !limits.persistentWorkerKey.isEmpty() && !limits.persistentWorkerCommand.isEmpty();
 
     if (usePersistentWorker) {
-      logger.fine(
+      log.fine(
           "usePersistentWorker; got persistentWorkerCommand of : "
               + limits.persistentWorkerCommand);
 

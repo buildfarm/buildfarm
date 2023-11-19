@@ -1,3 +1,17 @@
+// Copyright 2023 The Bazel Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.worker.persistent;
 
 import static persistent.bazel.client.PersistentWorker.TOOL_INPUT_SUBDIR;
@@ -14,7 +28,7 @@ import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import lombok.extern.java.Log;
 import persistent.bazel.client.CommonsWorkerPool;
 import persistent.bazel.client.PersistentWorker;
 import persistent.bazel.client.WorkCoordinator;
@@ -26,9 +40,8 @@ import persistent.bazel.client.WorkerSupervisor;
  * requirements, e.g. ensuring tool input files 3) post-response requirements, i.e. putting output
  * files in the right place
  */
+@Log
 public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, CommonsWorkerPool> {
-  private static final Logger logger = Logger.getLogger(ProtoCoordinator.class.getName());
-
   private static final String WORKER_INIT_LOG_SUFFIX = ".initargs.log";
 
   private static final ConcurrentHashMap<RequestCtx, PersistentWorker> pendingReqs =
@@ -119,7 +132,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
   // copyToolInputsIntoWorkerToolRoot() should have been called before this.
   private static void copyToolsIntoWorkerExecRoot(WorkerKey key, Path workerExecRoot)
       throws IOException {
-    logger.log(Level.FINE, "loadToolsIntoWorkerRoot() into: " + workerExecRoot);
+    log.log(Level.FINE, "loadToolsIntoWorkerRoot() into: " + workerExecRoot);
 
     Path toolInputRoot = key.getExecRoot().resolve(TOOL_INPUT_SUBDIR);
     for (Path relPath : key.getWorkerFilesWithHashes().keySet()) {
@@ -188,9 +201,8 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
         .append("getOutputDirectoriesList:\n")
         .append(context.outputDirectories);
 
-    logger.severe(sb.toString());
+    log.log(Level.SEVERE, sb.toString(), e);
 
-    e.printStackTrace();
     return new IOException("Response was OK but failed on postWorkCleanup", e);
   }
 
@@ -216,11 +228,8 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     }
 
     for (String relOutput : context.outputFiles) {
-      System.out.println(relOutput);
       Path execOutputPath = workerExecRoot.resolve(relOutput);
-      System.out.println(execOutputPath);
       Path opOutputPath = opRoot.resolve(relOutput);
-      System.out.println(opOutputPath);
 
       FileAccessUtils.moveFile(execOutputPath, opOutputPath);
     }
@@ -258,11 +267,11 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
 
   private void onTimeout(RequestCtx request, PersistentWorker worker) {
     if (worker != null) {
-      logger.severe("Persistent Worker timed out on request: " + request.request);
+      log.severe("Persistent Worker timed out on request: " + request.request);
       try {
         this.workerPool.invalidateObject(worker.getKey(), worker);
       } catch (Exception e) {
-        logger.severe(
+        log.severe(
             "Tried to invalidate worker for request:\n"
                 + request
                 + "\n\tbut got: "
