@@ -46,6 +46,7 @@ import build.buildfarm.common.io.Dirent;
 import build.buildfarm.worker.ExecDirException;
 import build.buildfarm.worker.ExecDirException.ViolationException;
 import build.buildfarm.worker.OutputDirectory;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -402,7 +403,8 @@ class CFCExecFileSystem implements ExecFileSystem {
     return ImmutableSet.of();
   }
 
-  private OutputDirectory createOutputDirectory(Command command) {
+  @VisibleForTesting
+  static OutputDirectory createOutputDirectory(Command command) {
     Iterable<String> files;
     Iterable<String> dirs;
     if (command.getOutputPathsCount() != 0) {
@@ -411,6 +413,10 @@ class CFCExecFileSystem implements ExecFileSystem {
     } else {
       files = command.getOutputFilesList();
       dirs = command.getOutputDirectoriesList();
+    }
+    if (!command.getWorkingDirectory().isEmpty()) {
+      files = Iterables.transform(files, file -> command.getWorkingDirectory() + "/" + file);
+      dirs = Iterables.transform(dirs, dir -> command.getWorkingDirectory() + "/" + dir);
     }
     return OutputDirectory.parse(files, dirs, command.getEnvironmentVariablesList());
   }
