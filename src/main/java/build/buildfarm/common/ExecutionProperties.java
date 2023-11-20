@@ -297,7 +297,21 @@ public class ExecutionProperties {
   /**
    * @field WORKER
    * @brief The exec_property to ensure that the action only runs on the worker name given.
-   * @details Useful for diagnosing woker issues by targeting builds to a specific worker.
+   * @details Useful for diagnosing worker issues by targeting builds to a specific worker.
    */
   public static final String WORKER = "Worker";
+
+  /**
+   * @field PERSISTENT_WORKER_KEY
+   * @brief Hash of tool inputs from --experiemental_remote_mark_tool_inputs
+   * @details See https://github.com/bazelbuild/bazel/issues/10091
+   */
+  public static final String PERSISTENT_WORKER_KEY = "persistentWorkerKey";
+
+  /**
+   * @field PERSISTENT_WORKER_COMMAND
+   * @brief Command string to start the persistent worker
+   * @details See https://github.com/bazelbuild/bazel/issues/10091
+   */
+  public static final String PERSISTENT_WORKER_COMMAND = "persistentWorkerCommand";
 }
