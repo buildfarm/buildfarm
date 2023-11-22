@@ -98,7 +98,7 @@ public class ReportResultStage extends PipelineStage {
       workerContext.uploadOutputs(
           operationContext.queueEntry.getExecuteEntry().getActionDigest(),
           resultBuilder,
-          operationContext.execDir.resolve(operationContext.command.getWorkingDirectory()),
+          operationContext.execDir,
           operationContext.command);
     } catch (StatusException | StatusRuntimeException e) {
       ExecuteResponse executeResponse = operationContext.executeResponse.build();
