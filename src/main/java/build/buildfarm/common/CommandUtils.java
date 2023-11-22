@@ -46,7 +46,7 @@ public class CommandUtils {
    * @return The list of output paths.
    * @note Suggested return identifier: output_paths.
    */
-  public static List<Path> getResolvedOutputPaths(Command command, Path actionRoot) {
+  public static List<Path> getResolvedOutputPaths(Command command, Path workingDirectory) {
     // REAPI clients previously needed to specify whether the output path was a directory or file.
     // This turned out to be too restrictive-- some build tools don't know what an action produces
     // until it is done.
@@ -65,7 +65,7 @@ public class CommandUtils {
     // `output_directories` will be ignored!"
     if (command.getOutputPathsCount() != 0) {
       for (String outputPath : command.getOutputPathsList()) {
-        resolvedPaths.add(actionRoot.resolve(outputPath));
+        resolvedPaths.add(workingDirectory.resolve(outputPath));
       }
       return resolvedPaths;
     }
@@ -73,10 +73,10 @@ public class CommandUtils {
     // Assuming `output_paths` was not used,
     // fetch deprecated `output_files` and `output_directories` for backwards compatibility.
     for (String outputPath : command.getOutputFilesList()) {
-      resolvedPaths.add(actionRoot.resolve(outputPath));
+      resolvedPaths.add(workingDirectory.resolve(outputPath));
     }
     for (String outputPath : command.getOutputDirectoriesList()) {
-      resolvedPaths.add(actionRoot.resolve(outputPath));
+      resolvedPaths.add(workingDirectory.resolve(outputPath));
     }
 
     return resolvedPaths;
