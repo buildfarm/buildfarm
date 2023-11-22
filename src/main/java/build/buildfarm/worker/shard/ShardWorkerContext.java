@@ -499,11 +499,11 @@ class ShardWorkerContext implements WorkerContext {
   private void uploadOutputFile(
       ActionResult.Builder resultBuilder,
       Path outputPath,
-      Path actionRoot,
+      Path workingDirectory,
       String entrySizeViolationType,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
-    String outputFile = actionRoot.relativize(outputPath).toString();
+    String outputFile = workingDirectory.relativize(outputPath).toString();
     if (!Files.exists(outputPath)) {
       log.log(Level.FINER, "ReportResultStage: " + outputFile + " does not exist...");
       return;
@@ -733,14 +733,23 @@ class ShardWorkerContext implements WorkerContext {
 
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
 
-    List<Path> outputPaths = CommandUtils.getResolvedOutputPaths(command, actionRoot);
+    Path workingDirectory = actionRoot.resolve(command.getWorkingDirectory());
+    List<Path> outputPaths = CommandUtils.getResolvedOutputPaths(command, workingDirectory);
     for (Path outputPath : outputPaths) {
       if (Files.isDirectory(outputPath)) {
         uploadOutputDirectory(
-            resultBuilder, outputPath, actionRoot, entrySizeViolationType, preconditionFailure);
+            resultBuilder,
+            outputPath,
+            workingDirectory,
+            entrySizeViolationType,
+            preconditionFailure);
       } else {
         uploadOutputFile(
-            resultBuilder, outputPath, actionRoot, entrySizeViolationType, preconditionFailure);
+            resultBuilder,
+            outputPath,
+            workingDirectory,
+            entrySizeViolationType,
+            preconditionFailure);
       }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
