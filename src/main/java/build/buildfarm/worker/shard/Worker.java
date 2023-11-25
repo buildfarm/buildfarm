@@ -21,7 +21,6 @@ import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
@@ -92,9 +91,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
-import lombok.SneakyThrows;
 import lombok.extern.java.Log;
-import redis.clients.jedis.exceptions.JedisClusterOperationException;
 
 @Log
 public final class Worker extends LoggingMain {
@@ -442,16 +439,16 @@ public final class Worker extends LoggingMain {
     throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
-  @SneakyThrows
   private void addWorker(ShardWorker worker) {
     while (!backplane.isStopped()) {
       try {
         backplane.addWorker(worker);
         return;
-      } catch (JedisClusterOperationException e) {
-        // This error may arise from a redis cluster restart or an overloaded redis cluster.
-        // Wait briefly and retry.
-        MILLISECONDS.sleep(100);
+      } catch (IOException e) {
+        Status status = Status.fromThrowable(e);
+        if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
+          throw status.asRuntimeException();
+        }
       }
     }
     throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();

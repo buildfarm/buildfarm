@@ -20,7 +20,6 @@ java_library(
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "//third_party/jedis",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@io_grpc_grpc_proto//:health_java_proto",
         "@io_grpc_grpc_proto//:health_proto",
