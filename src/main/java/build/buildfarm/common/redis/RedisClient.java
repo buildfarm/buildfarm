@@ -24,6 +24,7 @@ import java.net.SocketTimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.exceptions.JedisClusterMaxAttemptsException;
 import redis.clients.jedis.exceptions.JedisClusterOperationException;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisDataException;
@@ -132,7 +133,7 @@ public class RedisClient implements Closeable {
       // we are technically not at RESOURCE_EXHAUSTED, this is a
       // persistent state which can exist long past the error
       throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
-    } catch (JedisConnectionException | JedisClusterOperationException e) {
+    } catch (JedisConnectionException e) {
       if ((e.getMessage() != null && e.getMessage().equals("Unexpected end of stream."))
           || e.getCause() instanceof ConnectException) {
         throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
@@ -156,6 +157,8 @@ public class RedisClient implements Closeable {
         }
       }
       throw new IOException(status.withCause(cause == null ? e : cause).asRuntimeException());
+    } catch (JedisClusterMaxAttemptsException e) {
+      throw new IOException(Status.UNAVAILABLE.withCause(e.getCause()).asRuntimeException());
     }
   }
 }
