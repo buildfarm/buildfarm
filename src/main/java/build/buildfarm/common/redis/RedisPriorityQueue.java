@@ -15,10 +15,13 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.StringVisitor;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.exceptions.JedisNoScriptException;
 
 /**
  * @class RedisQueue
@@ -39,6 +42,7 @@ public class RedisPriorityQueue extends QueueInterface {
   private final String name;
 
   private final String script;
+  private final String scriptDigest;
   private Timestamp time;
   private final List<String> keys;
   private final long pollIntervalMillis;
@@ -88,6 +92,7 @@ public class RedisPriorityQueue extends QueueInterface {
     this.time = time;
     this.keys = Arrays.asList(name);
     this.script = getLuaScript();
+    this.scriptDigest = computeSHA1(this.script);
     this.pollIntervalMillis = pollIntervalMillis;
   }
 
@@ -150,10 +155,10 @@ public class RedisPriorityQueue extends QueueInterface {
   public String dequeue(JedisCluster jedis, int timeout_s) throws InterruptedException {
     int maxAttempts = (int) (timeout_s / (pollIntervalMillis / 1000.0));
     List<String> args = Arrays.asList(name, getDequeueName(), "true");
-    String val;
+
     for (int i = 0; i < maxAttempts; ++i) {
-      Object obj_val = jedis.eval(script, keys, args);
-      val = String.valueOf(obj_val);
+      Object obj_val = eval(jedis, script, scriptDigest, keys, args);
+      String val = String.valueOf(obj_val);
       if (!isEmpty(val)) {
         return val;
       }
@@ -172,7 +177,7 @@ public class RedisPriorityQueue extends QueueInterface {
   @Override
   public String nonBlockingDequeue(JedisCluster jedis) throws InterruptedException {
     List<String> args = Arrays.asList(name, getDequeueName());
-    Object obj_val = jedis.eval(script, keys, args);
+    Object obj_val = eval(jedis, script, scriptDigest, keys, args);
     String val = String.valueOf(obj_val);
     if (!isEmpty(val)) {
       return val;
@@ -181,6 +186,22 @@ public class RedisPriorityQueue extends QueueInterface {
       throw new InterruptedException();
     }
     return null;
+  }
+
+  /**
+   * @brief Make a Redis eval call via Jedis.
+   * @details This attempts to use a cached version of the eval script before falling back to the
+   *     non-cached method.
+   * @param script A Lua eval script.
+   * @param digest The SHA1 digest of the eval script.
+   */
+  private Object eval(
+      JedisCluster jedis, String script, String digest, List<String> keys, List<String> args) {
+    try {
+      return jedis.evalsha(digest, keys, args);
+    } catch (JedisNoScriptException e) {
+    }
+    return jedis.eval(script, keys, args);
   }
 
   /**
@@ -299,6 +320,27 @@ public class RedisPriorityQueue extends QueueInterface {
         "    end",
         "  end",
         "return val");
+  }
+
+  /**
+   * @brief Compute the SHA1 digest of a string
+   * @details We can precompute the SHA1 digest of the Lua script and invoke the script on a Redis
+   *     server via its SHA1 digest if the server has cached the script.
+   */
+  private String computeSHA1(String str) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-1");
+      byte[] hashBytes = digest.digest(str.getBytes());
+      StringBuilder hexString = new StringBuilder();
+      for (byte b : hashBytes) {
+        String hex = Integer.toHexString(0xff & b);
+        if (hex.length() == 1) hexString.append('0');
+        hexString.append(hex);
+      }
+      return hexString.toString();
+    } catch (NoSuchAlgorithmException e) {
+      throw new RuntimeException("SHA-1 algorithm not found", e);
+    }
   }
 
   /**

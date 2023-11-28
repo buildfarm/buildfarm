@@ -68,6 +68,7 @@ import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -141,6 +142,7 @@ public class RedisShardBackplane implements Backplane {
   private RedisShardSubscriber subscriber = null;
   private RedisShardSubscription operationSubscription = null;
   private ExecutorService subscriberService = null;
+  private ListeningExecutorService deprequeueService = null;
   private @Nullable RedisClient client = null;
 
   private Deadline storageWorkersDeadline = null;
@@ -559,8 +561,17 @@ public class RedisShardBackplane implements Backplane {
     }
     if (subscriberService != null) {
       subscriberService.shutdown();
+    }
+    if (deprequeueService != null) {
+      deprequeueService.shutdownNow();
+    }
+    if (subscriberService != null) {
       subscriberService.awaitTermination(10, SECONDS);
       log.log(Level.FINER, "subscriberService has been stopped");
+    }
+    if (deprequeueService != null) {
+      deprequeueService.awaitTermination(10, SECONDS);
+      log.log(Level.FINER, "depreqeueuService has been stopped");
     }
     if (client != null) {
       client.close();
@@ -1216,8 +1227,9 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public ExecuteEntry deprequeueOperation() throws IOException, InterruptedException {
-    return client.blockingCall(this::deprequeueOperation);
+  public ListenableFuture<ExecuteEntry> deprequeueOperation()
+      throws IOException, InterruptedException {
+    return deprequeueService.submit(() -> client.blockingCall(this::deprequeueOperation));
   }
 
   private @Nullable QueueEntry dispatchOperation(
