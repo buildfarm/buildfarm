@@ -39,6 +39,7 @@ public final class BuildfarmConfigs {
   private boolean allowSymlinkTargetAbsolute = false;
   private Server server = new Server();
   private Backplane backplane = new Backplane();
+  private Executors executors = new Executors();
   private Worker worker = new Worker();
   private ExecutionWrappers executionWrappers = new ExecutionWrappers();
 

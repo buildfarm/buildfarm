@@ -17,10 +17,13 @@ package build.buildfarm.common.redis;
 import build.buildfarm.common.Queue;
 import build.buildfarm.common.StringVisitor;
 import com.google.common.collect.ImmutableList;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.exceptions.JedisNoScriptException;
 
 /**
  * @class RedisPriorityQueue
@@ -49,9 +52,11 @@ public class RedisPriorityQueue implements Queue<String> {
    */
   private final String name;
 
-  private final String script;
   private final Clock clock;
   private final long pollIntervalMillis;
+
+  private final String script;
+  private final String scriptDigest;
 
   /**
    * @brief Constructor.
@@ -88,7 +93,7 @@ public class RedisPriorityQueue implements Queue<String> {
    * @details Construct a named redis queue with an established redis cluster. Used to ease the
    *     testing of the order of the queued actions
    * @param name The global name of the queue.
-   * @param time Timestamp of the operation.
+   * @param clock A clock to provide timestamps.
    * @param pollIntervalMillis pollInterval to use when dqueuing from redis.
    */
   public RedisPriorityQueue(Jedis jedis, String name, Clock clock, long pollIntervalMillis) {
@@ -96,6 +101,7 @@ public class RedisPriorityQueue implements Queue<String> {
     this.name = name;
     this.clock = clock;
     this.script = getLuaScript();
+    this.scriptDigest = computeSHA1(this.script);
     this.pollIntervalMillis = pollIntervalMillis;
   }
 
@@ -159,10 +165,9 @@ public class RedisPriorityQueue implements Queue<String> {
   public String take(Duration timeout) throws InterruptedException {
     int maxAttempts = Math.max(1, (int) (timeout.toMillis() / pollIntervalMillis));
     List<String> args = ImmutableList.of(name, getDequeueName(), "true");
-    String val;
     for (int i = 0; i < maxAttempts; ++i) {
-      Object obj_val = jedis.eval(script, ImmutableList.of(name), args);
-      val = String.valueOf(obj_val);
+      Object obj_val = eval(jedis, script, scriptDigest, ImmutableList.of(name), args);
+      String val = String.valueOf(obj_val);
       if (!isEmpty(val)) {
         return val;
       }
@@ -181,12 +186,28 @@ public class RedisPriorityQueue implements Queue<String> {
   @Override
   public String poll() {
     List<String> args = ImmutableList.of(name, getDequeueName());
-    Object obj_val = jedis.eval(script, ImmutableList.of(name), args);
+    Object obj_val = eval(jedis, script, scriptDigest, ImmutableList.of(name), args);
     String val = String.valueOf(obj_val);
     if (!isEmpty(val)) {
       return val;
     }
     return null;
+  }
+
+  /**
+   * @brief Make a Redis eval call via Jedis.
+   * @details This attempts to use a cached version of the eval script before falling back to the
+   *     non-cached method.
+   * @param script A Lua eval script.
+   * @param digest The SHA1 digest of the eval script.
+   */
+  private Object eval(
+      Jedis jedis, String script, String digest, List<String> keys, List<String> args) {
+    try {
+      return jedis.evalsha(digest, keys, args);
+    } catch (JedisNoScriptException e) {
+    }
+    return jedis.eval(script, keys, args);
   }
 
   /**
@@ -303,6 +324,27 @@ public class RedisPriorityQueue implements Queue<String> {
         "  end",
         "end",
         "return val");
+  }
+
+  /**
+   * @brief Compute the SHA1 digest of a string
+   * @details We can precompute the SHA1 digest of the Lua script and invoke the script on a Redis
+   *     server via its SHA1 digest if the server has cached the script.
+   */
+  private String computeSHA1(String str) {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-1");
+      byte[] hashBytes = digest.digest(str.getBytes());
+      StringBuilder hexString = new StringBuilder();
+      for (byte b : hashBytes) {
+        String hex = Integer.toHexString(0xff & b);
+        if (hex.length() == 1) hexString.append('0');
+        hexString.append(hex);
+      }
+      return hexString.toString();
+    } catch (NoSuchAlgorithmException e) {
+      throw new RuntimeException("SHA-1 algorithm not found", e);
+    }
   }
 
   /**

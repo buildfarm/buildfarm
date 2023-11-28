@@ -36,6 +36,7 @@ import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.exceptions.JedisNoScriptException;
 
 /**
  * @class RedisPriorityQueueMockTest
@@ -198,7 +199,7 @@ public class RedisPriorityQueueMockTest {
   @Test
   public void dequeueElementCanBeDequeuedWithTimeout() throws Exception {
     // ARRANGE
-    when(redis.eval(any(String.class), any(List.class), any(List.class))).thenReturn("foo");
+    when(redis.evalsha(any(String.class), any(List.class), any(List.class))).thenReturn("foo");
     RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
@@ -214,7 +215,7 @@ public class RedisPriorityQueueMockTest {
   @Test
   public void dequeueElementIsNotDequeuedIfTimeRunsOut() throws Exception {
     // ARRANGE
-    when(redis.eval(any(String.class), any(List.class), any(List.class))).thenReturn(null);
+    when(redis.evalsha(any(String.class), any(List.class), any(List.class))).thenReturn(null);
     RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
@@ -251,9 +252,28 @@ public class RedisPriorityQueueMockTest {
   // Reason for testing: the element is able to be polled
   // Failure explanation: something prevented the element from being polled
   @Test
+  public void dequeueWithNonCachedScriptDigest() throws Exception {
+    // ARRANGE
+    when(redis.evalsha(any(String.class), any(List.class), any(List.class)))
+        .thenThrow(new JedisNoScriptException(""));
+    when(redis.eval(any(String.class), any(List.class), any(List.class))).thenReturn("foo");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+
+    // ACT
+    assertThat(queue.offer("foo")).isTrue();
+    String val = queue.poll();
+
+    // ASSERT
+    assertThat(val).isEqualTo("foo");
+  }
+
+  // Function under test: nonBlockingDequeue
+  // Reason for testing: the element is able to be dequeued
+  // Failure explanation: something prevented the element from being dequeued
+  @Test
   public void nonBlockingDequeueElementCanBeDequeued() throws Exception {
     // ARRANGE
-    when(redis.eval(any(String.class), any(List.class), any(List.class))).thenReturn("foo");
+    when(redis.evalsha(any(String.class), any(List.class), any(List.class))).thenReturn("foo");
     RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT

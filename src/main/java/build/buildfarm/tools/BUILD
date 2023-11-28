@@ -274,3 +274,13 @@ java_library(
         "@maven//:redis_clients_jedis",
     ],
 )
+
+java_binary(
+    name = "test",
+    srcs = ["Test.java"],
+    main_class = "build.buildfarm.tools.Test",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@maven//:com_google_guava_guava",
+    ],
+)

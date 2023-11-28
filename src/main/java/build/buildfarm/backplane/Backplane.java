@@ -201,7 +201,7 @@ public interface Backplane {
    */
   boolean putOperation(Operation operation, ExecutionStage.Value stage) throws IOException;
 
-  ExecuteEntry deprequeueOperation() throws IOException, InterruptedException;
+  ListenableFuture<ExecuteEntry> deprequeueOperation() throws IOException, InterruptedException;
 
   /**
    * The state of operations is tracked in a series of lists representing the order in which the
