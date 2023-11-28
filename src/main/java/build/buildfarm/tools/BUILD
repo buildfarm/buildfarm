@@ -316,3 +316,13 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
     ],
 )
+
+java_binary(
+    name = "test",
+    srcs = ["Test.java"],
+    main_class = "build.buildfarm.tools.Test",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@maven//:com_google_guava_guava",
+    ],
+)

@@ -89,6 +89,15 @@ backplane:
           value: "*"
         - name: "max-cores"
           value: "*"
+executors:
+  numScanCachePoolThreads: -1 # Sentinel value for 1 thread / cpu
+  numComputeCachePoolThreads: -1 # Sentinel value for 1 thread / cpu
+  numRemoveDirectoryPoolThreads: 32
+  numSubscriberPoolThreads: 32
+  numTransformServicePoolThreads: 24
+  numDeprequeuePoolThreads: 12
+  numActionCacheFetchServicePoolThreads: 24
+  numFetchServicePoolThreads: 128
 worker:
   port: 8981
   publicName: "localhost:8981"
