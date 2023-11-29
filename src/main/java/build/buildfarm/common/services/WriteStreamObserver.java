@@ -205,7 +205,6 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
         log.log(
             Level.FINEST, format("delivering committed_size for %s of %d", name, committedSize));
         responseObserver.onNext(response);
-        responseObserver.onCompleted();
       } catch (Exception e) {
         log.log(Level.SEVERE, format("error delivering committed_size to %s", name), e);
       }
@@ -479,5 +478,23 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   @Override
   public void onCompleted() {
     log.log(Level.FINER, format("write completed for %s", name));
+    if (write == null) {
+      responseObserver.onCompleted();
+    } else {
+      Futures.addCallback(
+          write.getFuture(),
+          new FutureCallback<Long>() {
+            @Override
+            public void onSuccess(Long committedSize) {
+              responseObserver.onCompleted();
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+              // ignore
+            }
+          },
+          directExecutor());
+    }
   }
 }

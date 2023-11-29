@@ -131,21 +131,25 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public void close() throws IOException {
+    StreamObserver<WriteRequest> finishedWriteObserver;
+    boolean cancelled = false;
     if (!checkComplete()) {
       boolean finishWrite = expectedSize == UNLIMITED_EXPECTED_SIZE;
       if (finishWrite || offset != 0) {
         initiateWrite();
         flushSome(finishWrite);
       }
-      synchronized (this) {
-        if (writeObserver != null) {
-          if (finishWrite || getCommittedSize() + offset == expectedSize) {
-            writeObserver.onCompleted();
-          } else {
-            writeObserver.onError(Status.CANCELLED.asException());
-          }
-          writeObserver = null;
-        }
+      cancelled = !finishWrite && getCommittedSize() + offset != expectedSize;
+    }
+    synchronized (this) {
+      finishedWriteObserver = writeObserver;
+      writeObserver = null;
+    }
+    if (finishedWriteObserver != null) {
+      if (cancelled) {
+        finishedWriteObserver.onError(Status.CANCELLED.asException());
+      } else {
+        finishedWriteObserver.onCompleted();
       }
     }
   }
@@ -334,11 +338,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.onReadyHandler = onReadyHandler;
-    synchronized (this) {
-      if (writeObserver == null) {
-        initiateWrite();
-      }
-    }
+    initiateWrite();
     return this;
   }
 
