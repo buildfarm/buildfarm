@@ -82,6 +82,7 @@ import io.grpc.Deadline;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.prometheus.client.Counter;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitResult;
@@ -496,14 +497,24 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
+  private static String toREOutputPath(String nativePath) {
+    // RE API OutputFile/Directory path
+    // The path separator is a forward slash `/`.
+    if (File.separatorChar != '/') {
+      return nativePath.replace(File.separatorChar, '/');
+    }
+    return nativePath;
+  }
+
   private void uploadOutputFile(
       ActionResult.Builder resultBuilder,
       Path outputPath,
-      Path actionRoot,
+      Path workingDirectory,
       String entrySizeViolationType,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
-    String outputFile = actionRoot.relativize(outputPath).toString();
+    String outputFile = toREOutputPath(workingDirectory.relativize(outputPath).toString());
+
     if (!Files.exists(outputPath)) {
       log.log(Level.FINER, "ReportResultStage: " + outputFile + " does not exist...");
       return;
@@ -599,11 +610,12 @@ class ShardWorkerContext implements WorkerContext {
   private void uploadOutputDirectory(
       ActionResult.Builder resultBuilder,
       Path outputDirPath,
-      Path actionRoot,
+      Path workingDirectory,
       String entrySizeViolationType,
       PreconditionFailure.Builder preconditionFailure)
       throws IOException, InterruptedException {
-    String outputDir = actionRoot.relativize(outputDirPath).toString();
+    String outputDir = toREOutputPath(workingDirectory.relativize(outputDirPath).toString());
+
     if (!Files.exists(outputDirPath)) {
       log.log(Level.FINER, "ReportResultStage: " + outputDir + " does not exist...");
       return;
@@ -733,14 +745,23 @@ class ShardWorkerContext implements WorkerContext {
 
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
 
-    List<Path> outputPaths = CommandUtils.getResolvedOutputPaths(command, actionRoot);
+    Path workingDirectory = actionRoot.resolve(command.getWorkingDirectory());
+    List<Path> outputPaths = CommandUtils.getResolvedOutputPaths(command, workingDirectory);
     for (Path outputPath : outputPaths) {
       if (Files.isDirectory(outputPath)) {
         uploadOutputDirectory(
-            resultBuilder, outputPath, actionRoot, entrySizeViolationType, preconditionFailure);
+            resultBuilder,
+            outputPath,
+            workingDirectory,
+            entrySizeViolationType,
+            preconditionFailure);
       } else {
         uploadOutputFile(
-            resultBuilder, outputPath, actionRoot, entrySizeViolationType, preconditionFailure);
+            resultBuilder,
+            outputPath,
+            workingDirectory,
+            entrySizeViolationType,
+            preconditionFailure);
       }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
