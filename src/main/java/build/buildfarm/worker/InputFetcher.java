@@ -31,6 +31,7 @@ import build.buildfarm.common.OperationFailer;
 import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.Tree;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
@@ -232,7 +233,7 @@ public class InputFetcher implements Runnable {
     boolean completed = false;
     try {
       long fetchUSecs = stopwatch.elapsed(MICROSECONDS);
-      proceedToOutput(queuedOperation.getAction(), command, execDir);
+      proceedToOutput(queuedOperation.getAction(), command, execDir, queuedOperation.getTree());
       completed = true;
       return stopwatch.elapsed(MICROSECONDS) - fetchUSecs;
     } finally {
@@ -248,7 +249,7 @@ public class InputFetcher implements Runnable {
     }
   }
 
-  private void proceedToOutput(Action action, Command command, Path execDir)
+  private void proceedToOutput(Action action, Command command, Path execDir, Tree tree)
       throws InterruptedException {
     // switch poller to disable deadline
     operationContext.poller.pause();
@@ -266,6 +267,7 @@ public class InputFetcher implements Runnable {
             .setExecDir(execDir)
             .setAction(action)
             .setCommand(command)
+            .setTree(tree)
             .build();
     boolean claimed = owner.output().claim(fetchedOperationContext);
     operationContext.poller.pause();
