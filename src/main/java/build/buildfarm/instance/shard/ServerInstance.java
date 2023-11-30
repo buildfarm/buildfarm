@@ -1655,6 +1655,7 @@ public class ServerInstance extends NodeInstance {
           }
         },
         directExecutor());
+    write.reset(); // prevents a queryWriteStatus at index 0
     try (OutputStream out = write.getOutput(timeout.getSeconds(), SECONDS, () -> {})) {
       content.writeTo(out);
     } catch (IOException e) {

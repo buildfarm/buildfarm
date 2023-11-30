@@ -446,7 +446,7 @@ class Executor {
           "usePersistentWorker; got persistentWorkerCommand of : "
               + limits.persistentWorkerCommand);
 
-      Tree execTree = workerContext.getQueuedOperation(operationContext.queueEntry).getTree();
+      Tree execTree = operationContext.tree;
 
       WorkFilesContext filesContext =
           WorkFilesContext.fromContext(execDir, execTree, operationContext.command);
