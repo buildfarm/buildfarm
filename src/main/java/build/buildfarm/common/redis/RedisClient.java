@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.exceptions.JedisClusterMaxAttemptsException;
-import redis.clients.jedis.exceptions.JedisClusterOperationException;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
@@ -150,8 +149,6 @@ public class RedisClient implements Closeable {
           status = Status.DEADLINE_EXCEEDED;
         } else if (cause instanceof IOException) {
           throw (IOException) cause;
-        } else if (cause instanceof JedisClusterOperationException) {
-          cause = cause.getSuppressed()[cause.getSuppressed().length - 1];
         } else {
           cause = cause.getCause();
         }
