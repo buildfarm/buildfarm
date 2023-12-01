@@ -979,6 +979,10 @@ class ShardWorkerContext implements WorkerContext {
       addLinuxSandboxCli(arguments, options);
     }
 
+    if (configs.getWorker().getSandboxSettings().isAlwaysUseAsNobody() || limits.fakeUsername) {
+      arguments.add(configs.getExecutionWrappers().getAsNobody());
+    }
+
     if (limits.time.skipSleep) {
       arguments.add(configs.getExecutionWrappers().getSkipSleep());
 
@@ -1043,8 +1047,6 @@ class ShardWorkerContext implements WorkerContext {
 
   private void addLinuxSandboxCli(
       ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
-    arguments.add(configs.getExecutionWrappers().getAsNobody());
-
     // Choose the sandbox which is built and deployed with the worker image.
     arguments.add(configs.getExecutionWrappers().getLinuxSandbox());
 
