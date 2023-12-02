@@ -144,7 +144,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
   public InputStream newInput(Compressor.Value compressor, Digest blobDigest, long offset)
       throws IOException {
     return newInput(
-        compressor, blobDigest, offset, 300, SECONDS, RequestMetadata.getDefaultInstance());
+        compressor, blobDigest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
   }
 
   public InputStream newInput(

@@ -204,10 +204,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               });
   private final LoadingCache<BlobWriteKey, Write> writes =
       CacheBuilder.newBuilder()
-          .expireAfterAccess(15, MINUTES)
-          // .removalListener(
-          //     (RemovalListener<BlobWriteKey, Write>)
-          //         notification -> notification.getValue().reset())
+          .expireAfterAccess(1, HOURS)
+          .removalListener(
+              (RemovalListener<BlobWriteKey, Write>)
+                  notification -> notification.getValue().reset())
           .build(
               new CacheLoader<BlobWriteKey, Write>() {
                 @SuppressWarnings("NullableProblems")
@@ -218,7 +218,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               });
   private final LoadingCache<Digest, SettableFuture<Long>> writesInProgress =
       CacheBuilder.newBuilder()
-          .expireAfterAccess(15, MINUTES)
+          .expireAfterAccess(1, HOURS)
           .removalListener(
               (RemovalListener<Digest, SettableFuture<Long>>)
                   notification -> {
@@ -1376,9 +1376,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               }
             },
             "Prometheus CAS Metrics Collector");
-    log.log(Level.INFO, "Starting prometheus thread");
     prometheusMetricsThread.start();
-    log.log(Level.INFO, "Starting prometheus thread started");
 
     // return information about the cache startup.
     StartupCacheResults startupResults = new StartupCacheResults();

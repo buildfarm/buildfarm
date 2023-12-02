@@ -404,24 +404,6 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   @GuardedBy("this")
   private void writeData(ByteString data) throws EntryLimitException {
     try {
-      FeedbackOutputStream outputStream = getOutput();
-
-      // FIXME: getOutput should not return null.
-      // FIXME: data.writeTo function should not throw a NullPointerException.
-      if (outputStream == null) {
-        log.log(
-            Level.SEVERE,
-            "WriteStreamObserver::writeData: FeedbackOutputStream should not be null");
-        return;
-      }
-
-      // FIXME: is data null?  That shouldn't happen easier.
-      // FIXME: verify none of this is null at the function API level.
-      if (data == null) {
-        log.log(Level.SEVERE, "WriteStreamObserver::writeData: data should not be null");
-        return;
-      }
-
       data.writeTo(outputStream);
       requestNextIfReady();
       ioMetric.observe(data.size());
