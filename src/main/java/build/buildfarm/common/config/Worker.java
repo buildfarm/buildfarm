@@ -17,7 +17,7 @@ import lombok.extern.java.Log;
 public class Worker {
   private int port = 8981;
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
-  private String publicName = "";
+  private String publicName;
   private Capabilities capabilities = new Capabilities();
   private String root = "/tmp/worker";
   private int inlineContentLimit = 1048567; // 1024 * 1024
@@ -27,7 +27,7 @@ public class Worker {
   private int executeStageWidth = 0;
   private int executeStageWidthOffset = 0;
   private int inputFetchStageWidth = 0;
-  private int inputFetchDeadline = 1200;
+  private int inputFetchDeadline = 60;
   private boolean linkInputDirectories = true;
   private List<String> linkedInputDirectories = Arrays.asList("(?!external)[^/]+");
   private String execOwner;
@@ -41,7 +41,7 @@ public class Worker {
   private SandboxSettings sandboxSettings = new SandboxSettings();
   private boolean createSymlinkOutputs = false;
 
-  // These limited resources are specific to the individual worker.
+  // These limited resources are only for the individual worker.
   // An example would be hardware resources such as GPUs.
   // If you want GPU actions to run exclusively, define a single GPU resource.
   private List<LimitedResource> resources = new ArrayList<>();

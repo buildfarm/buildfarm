@@ -199,13 +199,6 @@ public class ServerInstance extends NodeInstance {
           .name("queue_failure")
           .help("Number of operations that failed to queue.")
           .register();
-  private static final Counter queueSuccessCounter =
-      Counter.build()
-          .name("queue_success")
-          .help("Number of operations that succeed in being queued.")
-          .register();
-  private static final Counter queueIterationCounter =
-      Counter.build().name("queue_iteration").help("Tracks queue iterations").register();
   // Metrics about the dispatched operations
   private static final Gauge dispatchedOperationsSize =
       Gauge.build()
@@ -434,8 +427,7 @@ public class ServerInstance extends NodeInstance {
                         new FutureCallback<Void>() {
                           @Override
                           public void onSuccess(Void result) {
-                            log.log(Level.FINE, "successfully queued " + operationName);
-                            queueSuccessCounter.inc();
+                            log.log(Level.FINER, "successfully queued " + operationName);
                           }
 
                           @Override
@@ -468,7 +460,6 @@ public class ServerInstance extends NodeInstance {
                     while (transformTokensQueue.offer(new Object(), 5, MINUTES)) {
                       stopwatch.start();
                       try {
-                        queueIterationCounter.inc();
                         iterate()
                             .addListener(
                                 () -> {
@@ -1863,8 +1854,6 @@ public class ServerInstance extends NodeInstance {
 
           @Override
           public void onFailure(Throwable t) {
-            requeueFailureCounter.inc();
-            log.log(Level.SEVERE, "failed to requeue: " + operationName, t);
             com.google.rpc.Status status = StatusProto.fromThrowable(t);
             if (status == null) {
               log.log(Level.SEVERE, "no rpc status from exception for " + operationName, t);

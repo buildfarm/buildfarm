@@ -404,7 +404,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   @GuardedBy("this")
   private void writeData(ByteString data) throws EntryLimitException {
     try {
-      data.writeTo(outputStream);
+      data.writeTo(getOutput());
       requestNextIfReady();
       ioMetric.observe(data.size());
     } catch (EntryLimitException e) {
