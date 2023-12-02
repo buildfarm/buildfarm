@@ -1854,6 +1854,8 @@ public class ServerInstance extends NodeInstance {
 
           @Override
           public void onFailure(Throwable t) {
+            requeueFailureCounter.inc();	
+            log.log(Level.SEVERE, "failed to requeue: " + operationName, t);
             com.google.rpc.Status status = StatusProto.fromThrowable(t);
             if (status == null) {
               log.log(Level.SEVERE, "no rpc status from exception for " + operationName, t);
@@ -2484,7 +2486,6 @@ public class ServerInstance extends NodeInstance {
           @Override
           public void onFailure(Throwable t) {
             queueFailureCounter.inc();
-            log.log(Level.SEVERE, "failure at end of transformAndQueue");
             poller.pause();
             com.google.rpc.Status status = StatusProto.fromThrowable(t);
             if (status == null) {
