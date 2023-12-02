@@ -63,7 +63,9 @@ public class DequeueMatchEvaluatorTest {
 
     // ACT
     boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(workerProvisions, "worker-name", resourceSet, entry).keep;
+        DequeueMatchEvaluator.shouldKeepOperation(
+                workerProvisions, "worker-name", resourceSet, entry)
+            .keep;
 
     // ASSERT
     assertThat(shouldKeep).isTrue();

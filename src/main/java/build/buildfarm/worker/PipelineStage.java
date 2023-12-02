@@ -43,7 +43,6 @@ public abstract class PipelineStage implements Runnable {
     this.error = error;
   }
 
-
   public String getName() {
     return name;
   }
@@ -62,27 +61,27 @@ public abstract class PipelineStage implements Runnable {
   public void run() {
     boolean keepRunningStage = true;
     while (keepRunningStage) {
-    try {
-      runInterruptible();
-    } catch (InterruptedException e) {
-      // ignore
-    } catch (Exception e) {
-      getLogger()
-          .log(Level.SEVERE, format("%s::run(): stage terminated due to exception", name), e);
-    } finally {
-      boolean wasInterrupted = Thread.interrupted();
       try {
         runInterruptible();
-
-        // If the run finishes without exception, the stage can also stop running.
-        keepRunningStage = false;
-
+      } catch (InterruptedException e) {
+        // ignore
       } catch (Exception e) {
-        keepRunningStage = decideTermination(e);
-      }
-    }
+        getLogger()
+            .log(Level.SEVERE, format("%s::run(): stage terminated due to exception", name), e);
+      } finally {
+        boolean wasInterrupted = Thread.interrupted();
+        try {
+          runInterruptible();
 
-    close();
+          // If the run finishes without exception, the stage can also stop running.
+          keepRunningStage = false;
+
+        } catch (Exception e) {
+          keepRunningStage = decideTermination(e);
+        }
+      }
+
+      close();
     }
   }
 
@@ -212,6 +211,7 @@ public abstract class PipelineStage implements Runnable {
   }
 
   protected void after(OperationContext operationContext) {}
+
   public synchronized boolean claim(OperationContext operationContext) throws InterruptedException {
     while (!closed && claimed) {
       wait();
@@ -276,6 +276,7 @@ public abstract class PipelineStage implements Runnable {
 
     @Override
     public void release() {}
+
     @Override
     public OperationContext take() {
       throw new UnsupportedOperationException();
@@ -283,10 +284,13 @@ public abstract class PipelineStage implements Runnable {
 
     @Override
     public void put(OperationContext operationContext) throws InterruptedException {}
+
     @Override
     public void run() {}
+
     @Override
     public void close() {}
+
     @Override
     public boolean isClosed() {
       return false;
