@@ -155,7 +155,8 @@ public class DequeueMatchEvaluator {
   private static boolean satisfiesProperty(
       SetMultimap<String, String> workerProvisions, Platform.Property property) {
     // validate min cores
-    if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
+    if (property.getName().equals(ExecutionProperties.CORES)
+        || property.getName().equals(ExecutionProperties.MIN_CORES)) {
       if (!workerProvisions.containsKey(ExecutionProperties.CORES)) {
         return false;
       }
@@ -187,13 +188,13 @@ public class DequeueMatchEvaluator {
       return possibleMemories >= memBytesRequested;
     }
 
-    // accept other properties not specified on the worker
-    if (configs.getWorker().getDequeueMatchSettings().isAllowUnmatched()) {
-      return true;
+    // ensure exact matches
+    if (workerProvisions.containsKey(property.getName())) {
+      return workerProvisions.containsEntry(property.getName(), property.getValue())
+          || workerProvisions.containsEntry(property.getName(), "*");
     }
 
-    // ensure exact matches
-    return workerProvisions.containsEntry(property.getName(), property.getValue())
-        || workerProvisions.containsEntry(property.getName(), "*");
+    // accept other properties not specified on the worker
+    return configs.getWorker().getDequeueMatchSettings().isAllowUnmatched();
   }
 }

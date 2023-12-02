@@ -37,6 +37,7 @@ public final class BuildfarmConfigs {
   private long maximumActionTimeout = 3600;
   private long maxEntrySizeBytes = 2147483648L; // 2 * 1024 * 1024 * 1024
   private int prometheusPort = 9090;
+  private boolean allowSymlinkTargetAbsolute = false;
   private Server server = new Server();
   private Backplane backplane = new Backplane();
   private Worker worker = new Worker();
@@ -72,7 +73,7 @@ public final class BuildfarmConfigs {
       log.severe("Could not parse yml configuration file." + e);
       throw new RuntimeException(e);
     }
-    if (!options.publicName.isEmpty()) {
+    if (!Strings.isNullOrEmpty(options.publicName)) {
       buildfarmConfigs.getServer().setPublicName(options.publicName);
     }
     if (options.port > 0) {
@@ -100,11 +101,17 @@ public final class BuildfarmConfigs {
     if (!Strings.isNullOrEmpty(options.publicName)) {
       buildfarmConfigs.getWorker().setPublicName(options.publicName);
     }
+    if (options.port >= 0) {
+      buildfarmConfigs.getWorker().setPort(options.port);
+    }
     if (options.prometheusPort >= 0) {
       buildfarmConfigs.setPrometheusPort(options.prometheusPort);
     }
     if (!Strings.isNullOrEmpty(options.redisUri)) {
       buildfarmConfigs.getBackplane().setRedisUri(options.redisUri);
+    }
+    if (!Strings.isNullOrEmpty(options.root)) {
+      buildfarmConfigs.getWorker().setRoot(options.root);
     }
     adjustWorkerConfigs(buildfarmConfigs);
     return buildfarmConfigs;

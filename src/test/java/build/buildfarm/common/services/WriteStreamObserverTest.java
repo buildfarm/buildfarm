@@ -28,6 +28,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
@@ -88,6 +89,53 @@ public class WriteStreamObserverTest {
             any(RequestMetadata.class));
     verify(write, times(1)).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(out, times(1)).close();
+    verifyZeroInteractions(responseObserver);
+  }
+
+  @Test
+  public void noErrorWhenContextCancelled() throws Exception {
+    CancellableContext context = Context.current().withCancellation();
+    Instance instance = mock(Instance.class);
+    StreamObserver<WriteResponse> responseObserver = mock(StreamObserver.class);
+    ByteString cancelled = ByteString.copyFromUtf8("cancelled data");
+    Digest cancelledDigest = DIGEST_UTIL.compute(cancelled);
+    UUID uuid = UUID.randomUUID();
+    UploadBlobRequest uploadBlobRequest =
+        UploadBlobRequest.newBuilder()
+            .setBlob(BlobInformation.newBuilder().setDigest(cancelledDigest))
+            .setUuid(uuid.toString())
+            .build();
+    SettableFuture<Long> future = SettableFuture.create();
+    Write write = mock(Write.class);
+    when(write.getFuture()).thenReturn(future);
+    when(write.isComplete()).thenReturn(Boolean.TRUE);
+    when(instance.getBlobWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(cancelledDigest),
+            eq(uuid),
+            any(RequestMetadata.class)))
+        .thenReturn(write);
+
+    WriteStreamObserver observer =
+        context.call(
+            () -> new WriteStreamObserver(instance, 1, SECONDS, () -> {}, responseObserver));
+    context.run(
+        () ->
+            observer.onNext(
+                WriteRequest.newBuilder()
+                    .setResourceName(uploadResourceName(uploadBlobRequest))
+                    .setData(cancelled)
+                    .build()));
+    context.cancel(new RuntimeException("Cancelled by test"));
+    future.setException(new IOException("test cancel"));
+
+    verify(write, times(1)).isComplete();
+    verify(instance, times(1))
+        .getBlobWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(cancelledDigest),
+            eq(uuid),
+            any(RequestMetadata.class));
     verifyZeroInteractions(responseObserver);
   }
 }

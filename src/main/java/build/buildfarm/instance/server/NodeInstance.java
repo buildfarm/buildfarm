@@ -144,7 +144,7 @@ import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 @Log
-public abstract class AbstractServerInstance implements Instance {
+public abstract class NodeInstance implements Instance {
   private final String name;
   protected final ContentAddressableStorage contentAddressableStorage;
   protected final ActionCache actionCache;
@@ -177,6 +177,8 @@ public abstract class AbstractServerInstance implements Instance {
 
   public static final String ENVIRONMENT_VARIABLES_NOT_SORTED =
       "The `Command`'s `environment_variables` are not correctly sorted by `name`.";
+
+  public static final String SYMLINK_TARGET_ABSOLUTE = "A symlink target is absolute.";
 
   public static final String MISSING_ACTION = "The action was not found in the CAS.";
 
@@ -227,7 +229,7 @@ public abstract class AbstractServerInstance implements Instance {
   public static final String NO_REQUEUE_COMPLETE_MESSAGE =
       "Operation %s not requeued.  Operation has already completed.";
 
-  public AbstractServerInstance(
+  public NodeInstance(
       String name,
       DigestUtil digestUtil,
       ContentAddressableStorage contentAddressableStorage,
@@ -790,6 +792,7 @@ public abstract class AbstractServerInstance implements Instance {
       Stack<Digest> pathDigests,
       Set<Digest> visited,
       Map<Digest, Directory> directoriesIndex,
+      boolean allowSymlinkTargetAbsolute,
       Consumer<String> onInputFile,
       Consumer<String> onInputDirectory,
       Consumer<Digest> onInputDigest,
@@ -837,6 +840,14 @@ public abstract class AbstractServerInstance implements Instance {
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject("/" + directoryPath + ": " + lastSymlinkName + " > " + symlinkName)
             .setDescription(DIRECTORY_NOT_SORTED);
+      }
+      String symlinkTarget = symlinkNode.getTarget();
+      if (!allowSymlinkTargetAbsolute && symlinkTarget.charAt(0) == '/') {
+        preconditionFailure
+            .addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject("/" + directoryPath + ": " + symlinkName + " -> " + symlinkTarget)
+            .setDescription(SYMLINK_TARGET_ABSOLUTE);
       }
       /* FIXME serverside validity check? regex?
       Preconditions.checkState(
@@ -907,6 +918,7 @@ public abstract class AbstractServerInstance implements Instance {
               pathDigests,
               visited,
               directoriesIndex,
+              allowSymlinkTargetAbsolute,
               onInputFile,
               onInputDirectory,
               onInputDigest,
@@ -922,6 +934,7 @@ public abstract class AbstractServerInstance implements Instance {
       Stack<Digest> pathDigests,
       Set<Digest> visited,
       Map<Digest, Directory> directoriesIndex,
+      boolean allowSymlinkTargetAbsolute,
       Consumer<String> onInputFile,
       Consumer<String> onInputDirectory,
       Consumer<Digest> onInputDigest,
@@ -946,6 +959,7 @@ public abstract class AbstractServerInstance implements Instance {
           pathDigests,
           visited,
           directoriesIndex,
+          allowSymlinkTargetAbsolute,
           onInputFile,
           onInputDirectory,
           onInputDigest,
@@ -1203,12 +1217,16 @@ public abstract class AbstractServerInstance implements Instance {
     ImmutableSet.Builder<String> inputFilesBuilder = ImmutableSet.builder();
 
     inputDirectoriesBuilder.add(ACTION_INPUT_ROOT_DIRECTORY_PATH);
+    boolean allowSymlinkTargetAbsolute =
+        getCacheCapabilities().getSymlinkAbsolutePathStrategy()
+            == SymlinkAbsolutePathStrategy.Value.ALLOWED;
     validateActionInputDirectoryDigest(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         action.getInputRootDigest(),
         new Stack<>(),
         new HashSet<>(),
         directoriesIndex,
+        allowSymlinkTargetAbsolute,
         inputFilesBuilder::add,
         inputDirectoriesBuilder::add,
         onInputDigest,
@@ -1949,19 +1967,18 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public WorkerProfileMessage getWorkerProfile() {
     throw new UnsupportedOperationException(
-        "AbstractServerInstance doesn't support getWorkerProfile() method.");
+        "NodeInstance doesn't support getWorkerProfile() method.");
   }
 
   @Override
   public WorkerListMessage getWorkerList() {
-    throw new UnsupportedOperationException(
-        "AbstractServerInstance doesn't support getWorkerList() method.");
+    throw new UnsupportedOperationException("NodeInstance doesn't support getWorkerList() method.");
   }
 
   @Override
   public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
     throw new UnsupportedOperationException(
-        "AbstractServerInstance doesn't support drainWorkerPipeline() method.");
+        "NodeInstance doesn't support drainWorkerPipeline() method.");
   }
 
   @Override

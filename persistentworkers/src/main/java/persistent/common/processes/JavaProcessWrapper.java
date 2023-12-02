@@ -10,12 +10,16 @@ import com.google.common.collect.ImmutableList;
 
 public class JavaProcessWrapper extends ProcessWrapper {
 
+  // Get the path of the JVM from the current process to avoid breaking the Bazel sandbox
+  public static final String CURRENT_JVM_COMMAND =
+          ProcessHandle.current().info().command().orElseThrow(() -> new RuntimeException("Unable to retrieve the path of the running JVM"));
+
   public JavaProcessWrapper(
       Path workDir, String classPath, String fullClassName, String[] args
   ) throws IOException {
     super(workDir, cmdArgs(
         new String[]{
-            "java",
+            CURRENT_JVM_COMMAND,
             "-cp",
             classPath,
             fullClassName

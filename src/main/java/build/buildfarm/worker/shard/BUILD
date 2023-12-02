@@ -22,6 +22,8 @@ java_library(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
+        "@io_grpc_grpc_proto//:health_java_proto",
+        "@io_grpc_grpc_proto//:health_proto",
         "@maven//:com_github_ben_manes_caffeine_caffeine",
         "@maven//:com_github_pcj_google_options",
         "@maven//:com_google_code_findbugs_jsr305",

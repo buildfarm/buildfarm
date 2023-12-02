@@ -14,6 +14,10 @@
 
 package build.buildfarm.worker;
 
+import static build.buildfarm.common.ExecutionProperties.CORES;
+import static build.buildfarm.common.ExecutionProperties.MAX_CORES;
+import static build.buildfarm.common.ExecutionProperties.MIN_CORES;
+import static build.buildfarm.worker.DequeueMatchEvaluator.shouldKeepOperation;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Platform;
@@ -75,14 +79,14 @@ public class DequeueMatchEvaluatorTest {
     // ARRANGE
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     LocalResourceSet resourceSet = new LocalResourceSet();
-    workerProvisions.put("cores", "11");
+    workerProvisions.put(CORES, "11");
 
-    QueueEntry entry =
+    QueueEntry minCoresEntry =
         QueueEntry.newBuilder()
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(
-                        Platform.Property.newBuilder().setName("min-cores").setValue("10")))
+                        Platform.Property.newBuilder().setName(MIN_CORES).setValue("10")))
             .build();
 
     // ACT
@@ -90,6 +94,20 @@ public class DequeueMatchEvaluatorTest {
         DequeueMatchEvaluator.shouldKeepOperation(
                 workerProvisions, "worker-name", resourceSet, entry)
             .keep;
+
+    // ASSERT
+    // the worker accepts because it has more cores than the min-cores requested
+    assertThat(shouldKeep).isTrue();
+
+    QueueEntry coresEntry =
+        QueueEntry.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(Platform.Property.newBuilder().setName(CORES).setValue("10")))
+            .build();
+
+    // ACT
+    shouldKeep = shouldKeepOperation(workerProvisions, "worker-name", resourceSet, coresEntry);
 
     // ASSERT
     // the worker accepts because it has more cores than the min-cores requested
@@ -104,17 +122,30 @@ public class DequeueMatchEvaluatorTest {
   @Test
   public void shouldKeepOperationInvalidMinCoresQueueEntry() throws Exception {
     // ARRANGE
-    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     LocalResourceSet resourceSet = new LocalResourceSet();
-    workerProvisions.put("cores", "10");
+    workerProvisions.put(CORES, "10");
 
-    QueueEntry entry =
+    QueueEntry minCoresEntry =
         QueueEntry.newBuilder()
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(
-                        Platform.Property.newBuilder().setName("min-cores").setValue("11")))
+                        Platform.Property.newBuilder().setName(MIN_CORES).setValue("11")))
+            .build();
+
+    // ACT
+    boolean shouldKeep = shouldKeepOperation(workerProvisions, resourceSet, minCoresEntry);
+
+    // ASSERT
+    // the worker rejects because it has less cores than the min-cores requested
+    assertThat(shouldKeep).isFalse();
+
+    QueueEntry coresEntry =
+        QueueEntry.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(Platform.Property.newBuilder().setName(CORES).setValue("11")))
             .build();
 
     // ACT
@@ -136,16 +167,15 @@ public class DequeueMatchEvaluatorTest {
     // ARRANGE
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     LocalResourceSet resourceSet = new LocalResourceSet();
-    workerProvisions.put("cores", "10");
+    workerProvisions.put(CORES, "10");
 
-    QueueEntry entry =
+    QueueEntry minCoresEntry =
         QueueEntry.newBuilder()
             .setPlatform(
                 Platform.newBuilder()
+                    .addProperties(Platform.Property.newBuilder().setName(MIN_CORES).setValue("10"))
                     .addProperties(
-                        Platform.Property.newBuilder().setName("min-cores").setValue("10"))
-                    .addProperties(
-                        Platform.Property.newBuilder().setName("max-cores").setValue("20")))
+                        Platform.Property.newBuilder().setName(MAX_CORES).setValue("20")))
             .build();
 
     // ACT
@@ -157,6 +187,22 @@ public class DequeueMatchEvaluatorTest {
     // ASSERT
     // the worker accepts because it has the same cores as the min-cores requested
     assertThat(shouldKeep).isTrue();
+
+    QueueEntry coresEntry =
+        QueueEntry.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(Platform.Property.newBuilder().setName(CORES).setValue("10"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName(MAX_CORES).setValue("20")))
+            .build();
+
+    // ACT
+    shouldKeep = shouldKeepOperation(workerProvisions, resourceSet, coresEntry);
+
+    // ASSERT
+    // the worker accepts because it has the same cores as the cores requested
+    assertThat(shouldKeep).isTrue();
   }
 
   // Function under test: shouldKeepOperation
@@ -166,7 +212,6 @@ public class DequeueMatchEvaluatorTest {
   @Test
   public void shouldKeepOperationUnmatchedPropertiesRejectionAcceptance() throws Exception {
     // ARRANGE
-    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(false);
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     LocalResourceSet resourceSet = new LocalResourceSet();
@@ -219,7 +264,6 @@ public class DequeueMatchEvaluatorTest {
   @Test
   public void shouldKeepOperationClaimsResource() throws Exception {
     // ARRANGE
-    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(true);
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     LocalResourceSet resourceSet = new LocalResourceSet();
@@ -260,12 +304,43 @@ public class DequeueMatchEvaluatorTest {
   }
 
   // Function under test: shouldKeepOperation
+  // Reason for testing: the local resource should be claimed
+  // Failure explanation: semaphore claim did not work as expected.
+  @Test
+  public void rejectOperationIgnoresResource() throws Exception {
+    // ARRANGE
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
+    SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
+    resourceSet.resources.put("FOO", new Semaphore(1));
+
+    QueueEntry entry =
+        QueueEntry.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("resource:FOO").setValue("1"))
+                    .addProperties(Platform.Property.newBuilder().setName("os").setValue("randos")))
+            .build();
+
+    // PRE-ASSERT
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(1);
+
+    // ACT
+    boolean shouldKeep = shouldKeepOperation(workerProvisions, resourceSet, entry);
+
+    // ASSERT
+    // the worker rejects because the os is not satisfied
+    assertThat(shouldKeep).isFalse();
+    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(1);
+  }
+
+  // Function under test: shouldKeepOperation
   // Reason for testing: the local resources should be claimed
   // Failure explanation: semaphore claim did not work as expected.
   @Test
   public void shouldKeepOperationClaimsMultipleResource() throws Exception {
     // ARRANGE
-    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(true);
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     LocalResourceSet resourceSet = new LocalResourceSet();
@@ -330,7 +405,6 @@ public class DequeueMatchEvaluatorTest {
   @Test
   public void shouldKeepOperationFailsToClaimSameAmountRemains() throws Exception {
     // ARRANGE
-    configs.getWorker().getDequeueMatchSettings().setAcceptEverything(true);
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     LocalResourceSet resourceSet = new LocalResourceSet();
@@ -368,5 +442,23 @@ public class DequeueMatchEvaluatorTest {
     assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(50);
     assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(100);
     assertThat(resourceSet.resources.get("BAZ").availablePermits()).isEqualTo(200);
+  }
+
+  @Test
+  public void shouldMatchCoresAsMinAndMax() throws Exception {
+    SetMultimap<String, String> workerProvisions = HashMultimap.create();
+    LocalResourceSet resourceSet = new LocalResourceSet();
+    configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
+
+    QueueEntry multicoreEntry =
+        QueueEntry.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(Platform.Property.newBuilder().setName(CORES).setValue("2"))
+                    .build())
+            .build();
+
+    // cores must be present from worker provisions to keep cores specified in platform
+    assertThat(shouldKeepOperation(workerProvisions, resourceSet, multicoreEntry)).isFalse();
   }
 }

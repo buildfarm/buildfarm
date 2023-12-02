@@ -70,6 +70,7 @@ import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
@@ -122,7 +123,7 @@ public final class Worker extends LoggingMain {
   private boolean inGracefulShutdown = false;
   private boolean isPaused = false;
 
-  private ShardWorkerInstance instance;
+  private WorkerInstance instance;
 
   @SuppressWarnings("deprecation")
   private final HealthStatusManager healthStatusManager = new HealthStatusManager();
@@ -135,6 +136,52 @@ public final class Worker extends LoggingMain {
   private Backplane backplane;
   private LoadingCache<String, Instance> workerStubs;
   private AtomicBoolean released = new AtomicBoolean(true);
+
+  /**
+   * The method will prepare the worker for graceful shutdown when the worker is ready. Note on
+   * using stderr here instead of log. By the time this is called in PreDestroy, the log is no
+   * longer available and is not logging messages.
+   */
+  public void prepareWorkerForGracefulShutdown() {
+    if (configs.getWorker().getGracefulShutdownSeconds() == 0) {
+      log.info(
+          String.format(
+              "Graceful Shutdown is not enabled. Worker is shutting down without finishing executions in progress."));
+    } else {
+      inGracefulShutdown = true;
+      log.info(
+          "Graceful Shutdown - The current worker will not be registered again and should be shutdown gracefully!");
+      pipeline.stopMatchingOperations();
+      int scanRate = 30; // check every 30 seconds
+      int timeWaited = 0;
+      int timeOut = configs.getWorker().getGracefulShutdownSeconds();
+      try {
+        if (pipeline.isEmpty()) {
+          log.info("Graceful Shutdown - no work in the pipeline.");
+        } else {
+          log.info(String.format("Graceful Shutdown - waiting for executions to finish."));
+        }
+        while (!pipeline.isEmpty() && timeWaited < timeOut) {
+          SECONDS.sleep(scanRate);
+          timeWaited += scanRate;
+          log.info(
+              String.format(
+                  "Graceful Shutdown - Pipeline is still not empty after %d seconds.", timeWaited));
+        }
+      } catch (InterruptedException e) {
+        log.info(
+            "Graceful Shutdown - The worker gracefully shutdown is interrupted: " + e.getMessage());
+      } finally {
+        log.info(
+            String.format(
+                "Graceful Shutdown - It took the worker %d seconds to %s",
+                timeWaited,
+                pipeline.isEmpty()
+                    ? "finish all actions"
+                    : "gracefully shutdown but still cannot finish all actions"));
+      }
+    }
+  }
 
   private Worker() {
     super("BuildFarmShardWorker");
@@ -158,6 +205,7 @@ public final class Worker extends LoggingMain {
     serverBuilder.addService(new ContentAddressableStorageService(instance));
     serverBuilder.addService(new ByteStreamService(instance));
     serverBuilder.addService(new ShutDownWorkerGracefully(this));
+    serverBuilder.addService(ProtoReflectionService.newInstance());
 
     // We will build a worker's server based on it's capabilities.
     // A worker that is capable of execution will construct an execution pipeline.
@@ -335,6 +383,7 @@ public final class Worker extends LoggingMain {
         owner,
         configs.getWorker().isLinkInputDirectories(),
         configs.getWorker().getLinkedInputDirectories(),
+        configs.isAllowSymlinkTargetAbsolute(),
         removeDirectoryService,
         accessRecorder
         /* deadlineAfter=*/
@@ -530,14 +579,13 @@ public final class Worker extends LoggingMain {
             remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
 
     instance =
-        new ShardWorkerInstance(
-            configs.getWorker().getPublicName(), digestUtil, backplane, storage);
+        new WorkerInstance(configs.getWorker().getPublicName(), digestUtil, backplane, storage);
 
     // Create the appropriate writer for the context
     CasWriter writer;
     if (!configs.getWorker().getCapabilities().isCas()) {
       Retrier retrier = new Retrier(Backoff.sequential(5), Retrier.DEFAULT_IS_RETRIABLE);
-      writer = new RemoteCasWriter(backplane.getStorageWorkers(), workerStubs, retrier);
+      writer = new RemoteCasWriter(backplane, workerStubs, retrier);
     } else {
       writer = new LocalCasWriter(execFileSystem);
     }
@@ -564,6 +612,7 @@ public final class Worker extends LoggingMain {
             configs.getWorker().isOnlyMulticoreTests(),
             configs.getWorker().isAllowBringYourOwnContainer(),
             configs.getWorker().isErrorOperationRemainingResources(),
+            configs.getWorker().isErrorOperationOutputSizeExceeded(),
             LocalResourceSetUtils.create(configs.getWorker().getResources()),
             writer);
 
@@ -637,6 +686,7 @@ public final class Worker extends LoggingMain {
 
   private void shutdown() throws InterruptedException {
     log.info("*** shutting down gRPC server since JVM is shutting down");
+    prepareWorkerForGracefulShutdown();
     PrometheusPublisher.stopHttpServer();
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {

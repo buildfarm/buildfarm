@@ -18,9 +18,6 @@ import com.google.devtools.common.options.Option;
 
 /** Command-line options definition for example server. */
 public class ServerOptions extends BuildfarmOptions {
-  @Option(name = "port", abbrev = 'p', help = "Port to use.", defaultValue = "-1")
-  public int port;
-
   @Option(name = "public_name", abbrev = 'n', help = "Name of this server.", defaultValue = "")
   public String publicName;
 }

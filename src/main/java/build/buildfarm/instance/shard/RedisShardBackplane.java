@@ -1514,4 +1514,9 @@ public class RedisShardBackplane implements Backplane {
     }
     return GetClientStartTimeResult.newBuilder().addAllClientStartTime(startTimes).build();
   }
+
+  @Override
+  public void updateDigestsExpiry(Iterable<Digest> digests) throws IOException {
+    state.casWorkerMap.setExpire(client, digests);
+  }
 }

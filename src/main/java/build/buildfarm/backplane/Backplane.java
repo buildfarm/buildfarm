@@ -279,5 +279,6 @@ public interface Backplane {
 
   GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) throws IOException;
 
-  void startDequeuePool() throws IOException;
+  /** Set expiry time for digests */
+  void updateDigestsExpiry(Iterable<Digest> digests) throws IOException;;
 }

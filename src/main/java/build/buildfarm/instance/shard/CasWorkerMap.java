@@ -121,4 +121,11 @@ public interface CasWorkerMap {
    * @note Suggested return identifier: mapSize.
    */
   int size(RedisClient client) throws IOException;
+
+  /**
+   * @brief Set the expiry duration for the digests.
+   * @param client Client used for interacting with redis when not using cacheMap.
+   * @param blobDigests The blob digests to set new the expiry duration.
+   */
+  void setExpire(RedisClient client, Iterable<Digest> blobDigests) throws IOException;
 }

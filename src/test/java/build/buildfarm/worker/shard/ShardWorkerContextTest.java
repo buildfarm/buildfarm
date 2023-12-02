@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static build.buildfarm.common.config.Server.INSTANCE_TYPE.SHARD;
+import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -22,9 +23,14 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
@@ -37,7 +43,11 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.jimfs.Jimfs;
 import com.google.protobuf.Duration;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.Before;
@@ -106,6 +116,7 @@ public class ShardWorkerContextTest {
         /* onlyMulticoreTests=*/ false,
         /* allowBringYourOwnContainer=*/ false,
         /* errorOperationRemainingResources=*/ false,
+        /* errorOperationOutputSizeExceeded=*/ false,
         /* resourceSet=*/ new LocalResourceSet(),
         writer);
   }
@@ -163,5 +174,23 @@ public class ShardWorkerContextTest {
     MatchListener listener = mock(MatchListener.class);
     context.match(listener);
     verify(listener, times(1)).onEntry(queueEntry);
+  }
+
+  @Test
+  public void uploadOutputsWorkingDirectoryRelative() throws Exception {
+    WorkerContext context = createTestContext();
+    Command command =
+        Command.newBuilder().setWorkingDirectory("foo/bar").addOutputFiles("baz/quux").build();
+    ContentAddressableStorage storage = mock(ContentAddressableStorage.class);
+    when(execFileSystem.getStorage()).thenReturn(storage);
+    Path actionRoot = Iterables.getFirst(Jimfs.newFileSystem().getRootDirectories(), null);
+    Files.createDirectories(actionRoot.resolve("foo/bar/baz"));
+    Files.createFile(actionRoot.resolve("foo/bar/baz/quux"));
+    ActionResult.Builder resultBuilder = ActionResult.newBuilder();
+    context.uploadOutputs(Digest.getDefaultInstance(), resultBuilder, actionRoot, command);
+
+    ActionResult result = resultBuilder.build();
+    OutputFile outputFile = Iterables.getOnlyElement(result.getOutputFilesList());
+    assertThat(outputFile.getPath()).isEqualTo("baz/quux");
   }
 }

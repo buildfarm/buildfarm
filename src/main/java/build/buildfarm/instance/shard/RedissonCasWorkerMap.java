@@ -209,6 +209,14 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
     return cacheMap.size();
   }
 
+  @Override
+  public void setExpire(RedisClient client, Iterable<Digest> blobDigests) {
+    for (Digest blobDigest : blobDigests) {
+      String key = cacheMapCasKey(blobDigest);
+      cacheMap.expireKey(key, keyExpiration_s, TimeUnit.SECONDS);
+    }
+  }
+
   /**
    * @brief Get a random element from the set.
    * @details Assumes the set is not empty.

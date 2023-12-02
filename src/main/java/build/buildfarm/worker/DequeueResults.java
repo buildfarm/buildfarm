@@ -16,7 +16,7 @@ package build.buildfarm.worker;
 
 /**
  * @class DequeueResults
- * @brief Ehe results of evaluating a dequeued operation.
+ * @brief The results of evaluating a dequeued operation.
  * @details Contains information about whether the operation should be kept and if resources were
  *     claimed.
  */

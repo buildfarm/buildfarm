@@ -3,6 +3,7 @@ defaultActionTimeout: 600
 maximumActionTimeout: 3600
 maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
 prometheusPort: 9090
+allowSymlinkTargetAbsolute: false
 server:
   instanceType: SHARD
   name: shard
@@ -12,6 +13,7 @@ server:
     enabled: true
     provideLatencyHistograms: true
     latencyBuckets: [0.001, 0.01, 0.1, 1, 5, 10, 20, 40, 60, +Infinity]
+    labelsToReport: []
   maxInboundMessageSizeBytes: 0
   maxInboundMetadataSize: 0
   casWriteTimeout: 3600
@@ -101,7 +103,6 @@ worker:
   inlineContentLimit: 1048567 # 1024 * 1024
   operationPollPeriod: 1
   dequeueMatchSettings:
-    acceptEverything: true
     allowUnmatched: false
   storages:
     - type: FILESYSTEM
@@ -125,6 +126,7 @@ worker:
   onlyMulticoreTests: false
   allowBringYourOwnContainer: false
   errorOperationRemainingResources: false
+  errorOperationOutputSizeExceeded: false
   gracefulShutdownSeconds: 0
   sandboxSettings:
     alwaysUseSandbox: false
@@ -132,6 +134,7 @@ worker:
     alwaysUseTmpFs: false
     selectForBlockNetwork: false
     selectForTmpFs: false
+  createSymlinkOutputs: false
   executionPolicies:
     - name: test
       executionWrapper:

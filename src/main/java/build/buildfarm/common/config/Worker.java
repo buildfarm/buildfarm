@@ -39,11 +39,14 @@ public class Worker {
   private int gracefulShutdownSeconds = 0;
   private ExecutionPolicy[] executionPolicies = {};
   private SandboxSettings sandboxSettings = new SandboxSettings();
+  private boolean createSymlinkOutputs = false;
 
   // These limited resources are specific to the individual worker.
   // An example would be hardware resources such as GPUs.
   // If you want GPU actions to run exclusively, define a single GPU resource.
   private List<LimitedResource> resources = new ArrayList<>();
+
+  private boolean errorOperationOutputSizeExceeded = false;
 
   public ExecutionPolicy[] getExecutionPolicies() {
     if (executionPolicies != null) {

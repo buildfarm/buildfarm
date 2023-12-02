@@ -46,6 +46,7 @@ import build.buildfarm.common.io.Dirent;
 import build.buildfarm.worker.ExecDirException;
 import build.buildfarm.worker.ExecDirException.ViolationException;
 import build.buildfarm.worker.OutputDirectory;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -82,6 +83,9 @@ class CFCExecFileSystem implements ExecFileSystem {
   // indicate symlinking above for a set of matching paths
   private final Iterable<Pattern> linkedInputDirectories;
 
+  // permit symlinks to point to absolute paths in inputs
+  private final boolean allowSymlinkTargetAbsolute;
+
   private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
   private final ExecutorService fetchService = BuildfarmExecutors.getFetchServicePool();
@@ -95,6 +99,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       @Nullable UserPrincipal owner,
       boolean linkInputDirectories,
       Iterable<String> linkedInputDirectories,
+      boolean allowSymlinkTargetAbsolute,
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder) {
     this.root = root;
@@ -104,6 +109,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     this.linkedInputDirectories =
         Iterables.transform(
             linkedInputDirectories, realInputDirectory -> Pattern.compile(realInputDirectory));
+    this.allowSymlinkTargetAbsolute = allowSymlinkTargetAbsolute;
     this.removeDirectoryService = removeDirectoryService;
     this.accessRecorder = accessRecorder;
   }
@@ -180,7 +186,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   private ListenableFuture<Void> putSymlink(Path path, SymlinkNode symlinkNode) {
     Path symlinkPath = path.resolve(symlinkNode.getName());
     Path relativeTargetPath = path.getFileSystem().getPath(symlinkNode.getTarget());
-    checkState(!relativeTargetPath.isAbsolute());
+    checkState(allowSymlinkTargetAbsolute || !relativeTargetPath.isAbsolute());
     return listeningDecorator(fetchService)
         .submit(
             () -> {
@@ -398,16 +404,30 @@ class CFCExecFileSystem implements ExecFileSystem {
     return ImmutableSet.of();
   }
 
+  @VisibleForTesting
+  static OutputDirectory createOutputDirectory(Command command) {
+    Iterable<String> files;
+    Iterable<String> dirs;
+    if (command.getOutputPathsCount() != 0) {
+      files = command.getOutputPathsList();
+      dirs = ImmutableList.of(); // output paths require the action to create their own directory
+    } else {
+      files = command.getOutputFilesList();
+      dirs = command.getOutputDirectoriesList();
+    }
+    if (!command.getWorkingDirectory().isEmpty()) {
+      files = Iterables.transform(files, file -> command.getWorkingDirectory() + "/" + file);
+      dirs = Iterables.transform(dirs, dir -> command.getWorkingDirectory() + "/" + dir);
+    }
+    return OutputDirectory.parse(files, dirs, command.getEnvironmentVariablesList());
+  }
+
   @Override
   public Path createExecDir(
       String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
       throws IOException, InterruptedException {
     Digest inputRootDigest = action.getInputRootDigest();
-    OutputDirectory outputDirectory =
-        OutputDirectory.parse(
-            command.getOutputFilesList(),
-            command.getOutputDirectoriesList(),
-            command.getEnvironmentVariablesList());
+    OutputDirectory outputDirectory = createOutputDirectory(command);
 
     Path execDir = root.resolve(operationName);
     if (Files.exists(execDir)) {

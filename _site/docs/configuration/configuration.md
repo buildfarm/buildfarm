@@ -7,7 +7,7 @@ has_children: true
 
 Minimal required:
 
-```
+```yaml
 backplane:
   redisUri: "redis://localhost:6379"
   queues:
@@ -28,17 +28,18 @@ For an example configuration containing all of the configuration values, see `ex
 
 ### Common
 
-| Configuration        | Accepted and _Default_ Values | Command Line Argument | Description                                       |
-|----------------------|-------------------------------|-----------------------|---------------------------------------------------|
-| digestFunction       | _SHA256_, SHA1                |                       | Digest function for this implementation           |
-| defaultActionTimeout | Integer, _600_                |                       | Default timeout value for an action (seconds)     |
-| maximumActionTimeout | Integer, _3600_               |                       | Maximum allowed action timeout (seconds)          |
-| maxEntrySizeBytes    | Long, _2147483648_            |                       | Maximum size of a single blob accepted (bytes)    |
-| prometheusPort       | Integer, _9090_               | --prometheus_port     | Listening port of the Prometheus metrics endpoint |
+| Configuration                | Accepted and _Default_ Values | Command Line Argument | Description                                                  |
+|------------------------------|-------------------------------|-----------------------|--------------------------------------------------------------|
+| digestFunction               | _SHA256_, SHA1                |                       | Digest function for this implementation                      |
+| defaultActionTimeout         | Integer, _600_                |                       | Default timeout value for an action (seconds)                |
+| maximumActionTimeout         | Integer, _3600_               |                       | Maximum allowed action timeout (seconds)                     |
+| maxEntrySizeBytes            | Long, _2147483648_            |                       | Maximum size of a single blob accepted (bytes)               |
+| prometheusPort               | Integer, _9090_               | --prometheus_port     | Listening port of the Prometheus metrics endpoint            |
+| allowSymlinkTargetAbsolute   | boolean, _false_              |                       | Permit inputs to contain symlinks with absolute path targets |
 
 Example:
 
-```
+```yaml
 digestFunction: SHA1
 defaultActionTimeout: 1800
 maximumActionTimeout: 1800
@@ -79,7 +80,7 @@ worker:
 
 Example:
 
-```
+```yaml
 server:
   instanceType: SHARD
   name: shard
@@ -93,14 +94,16 @@ server:
 |--------------------------|-------------------------------|--------------------------------------------------------|
 | enabled                  | boolean, _false_              | Publish basic GRPC metrics to a Prometheus endpoint    |
 | provideLatencyHistograms | boolean, _false_              | Publish detailed, more expensive to calculate, metrics |
+| labelsToReport           | List of Strings, _[]_         | Include custom metrics labels in Prometheus metrics    |
 
 Example:
 
-```
+```yaml
 server:
   grpcMetrics:
     enabled: false
     provideLatencyHistograms: false
+    labelsToReport: []
 ```
 
 ### Server Caches
@@ -114,7 +117,7 @@ server:
 
 Example:
 
-```
+```yaml
 server:
   caches:
     directoryCacheMaxEntries: 10000
@@ -132,7 +135,7 @@ server:
 
 Example:
 
-```
+```yaml
 server:
   admin:
     deploymentEnvironment: AWS
@@ -151,14 +154,14 @@ server:
 
 Example:
 
-```
+```yaml
 server:
   metrics:
     publisher: log
     logLevel: INFO
 ```
 
-```
+```yaml
 server:
   metrics:
     publisher: aws
@@ -207,7 +210,7 @@ server:
 
 Example:
 
-```
+```yaml
 backplane:
   type: SHARD
   redisUri: "redis://localhost:6379"
@@ -224,7 +227,7 @@ backplane:
 
 Example:
 
-```
+```yaml
 backplane:
   type: SHARD
   redisUri: "redis://localhost:6379"
@@ -259,10 +262,12 @@ backplane:
 | onlyMulticoreTests               | boolean, _false_              |                       | Only permit tests to exceed the default coresvalue for their min/max-cores range specification (only works with non-zero defaultMaxCores)                                                                                                                                                                                |
 | allowBringYourOwnContainer       | boolean, _false_              |                       | Enable execution in a custom Docker container                                                                                                                                                                                                                                                                            |
 | errorOperationRemainingResources | boolean, _false_              |                       |                                                                                                                                                                                                                                                                                                                          |
+| errorOperationOutputSizeExceeded | boolean, _false_              |                       | Operations which produce single output files which exceed maxEntrySizeBytes will fail with a violation type which implies a user error. When disabled, the violation will indicate a transient error, with the action blacklisted.                                                                                       |
 | realInputDirectories             | List of Strings, _external_   |                       | A list of paths that will not be subject to the effects of linkInputDirectories setting, may also be used to provide writable directories as input roots for actions which expect to be able to write to an input location and will fail if they cannot                                                                  |
 | gracefulShutdownSeconds          | Integer, 0                    |                       | Time in seconds to allow for operations in flight to finish when shutdown signal is received                                                                                                                                                                                                                             |
+| createSymlinkOutputs             | boolean, _false_              |                       | Creates SymlinkNodes for symbolic links discovered in output paths for actions. No verification of the symlink target path occurs. Buildstream, for example, requires this.                                                                                                                                              |
 
-```
+```yaml
 worker:
   port: 8981
   publicName: "localhost:8981"
@@ -279,7 +284,7 @@ worker:
 
 Example:
 
-```
+```yaml
 worker:
   capabilities:
     cas: true
@@ -298,7 +303,7 @@ worker:
 
 Example:
 
-```
+```yaml
 worker:
   sandboxSettings:
     alwaysUseSandbox: true
@@ -314,19 +319,19 @@ Note: In order for these settings to take effect, you must also configure `limit
 
 | Configuration    | Accepted and _Default_ Values | Description |
 |------------------|-------------------------------|-------------|
-| acceptEverything | boolean, _true_               |             |
 | allowUnmatched   | boolean, _false_              |             |
 
 Example:
 
-```
+```yaml
 worker:
   dequeueMatchSettings:
-    acceptEverything: true
     allowUnmatched: false
 ```
 
 ### Worker CAS
+
+Unless specified, options are only relevant for FILESYSTEM type
 
 | Configuration                | Accepted and _Default_ Values | Description                                                                                                   |
 |------------------------------|-------------------------------|---------------------------------------------------------------------------------------------------------------|
@@ -339,21 +344,24 @@ worker:
 
 Example:
 
-```
+This definition will create a filesystem-based CAS file cache at the path "<root>/cache" on the worker that will reject entries over 2GiB in size, and will expire LRU blobs when the aggregate size of all blobs exceeds 2GiB in order to insert additional entries.
+
+```yaml
 worker:
   storages:
     - type: FILESYSTEM
       path: "cache"
       maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
       maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
-      target:
 ```
+
+This definition elides FILESYSTEM configuration with '...', will read-through an external GRPC CAS supporting the REAPI CAS Services into its storage, and will attempt to write expiring entries into the GRPC CAS (i.e. pushing new entries into the head of a worker LRU list will drop the entries from the tail into the GRPC CAS).
 
 ```
 worker:
   storages:
     - type: FILESYSTEM
-      path: "cache"
+      ...
     - type: GRPC
       target: "cas.external.com:1234"
 ```
@@ -367,7 +375,7 @@ worker:
 
 Example:
 
-```
+```yaml
 worker:
   executionPolicies:
     - name: test

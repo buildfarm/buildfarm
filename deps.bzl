@@ -36,9 +36,9 @@ def archive_dependencies(third_party):
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
         {
             "name": "com_google_protobuf",
-            "sha256": "dd513a79c7d7e45cbaeaf7655289f78fd6b806e52dbbd7018ef4e3cf5cff697a",
-            "strip_prefix": "protobuf-3.15.8",
-            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.15.8.zip"],
+            "sha256": "79082dc68d8bab2283568ce0be3982b73e19ddd647c2411d1977ca5282d2d6b3",
+            "strip_prefix": "protobuf-25.0",
+            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v25.0.zip"],
         },
         {
             "name": "com_github_bazelbuild_buildtools",
@@ -151,9 +151,11 @@ def archive_dependencies(third_party):
         },
         {
             "name": "rules_oss_audit",
-            "sha256": "02962810bcf82d0c66f929ccc163423f53773b8b154574ca956345523243e70d",
-            "strip_prefix": "rules_oss_audit-1b2690cefd5a960c181e0d89bf3c076294a0e6f4",
-            "url": "https://github.com/vmware/rules_oss_audit/archive/1b2690cefd5a960c181e0d89bf3c076294a0e6f4.zip",
+            "sha256": "8ee8376b05b5ddd2287b070e9a88ec85ef907d47f44e321ce5d4bc2b192eed4e",
+            "strip_prefix": "rules_oss_audit-167dab5b16abdb5996438f22364de544ff24693f",
+            "url": "https://github.com/vmware/rules_oss_audit/archive/167dab5b16abdb5996438f22364de544ff24693f.zip",
+            "patch_args": ["-p1"],
+            "patches": ["%s:rules_oss_audit_pyyaml.patch" % third_party],
         },
     ]
 
