@@ -326,9 +326,6 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
       throws EntryLimitException {
     long committedSize;
     try {
-      if (offset == 0) {
-        write.reset();
-      }
       committedSize = getCommittedSizeForWrite();
     } catch (IOException e) {
       errorResponse(e);
@@ -355,6 +352,10 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
                       resourceName, name))
               .asException());
     } else {
+      if (offset == 0 && offset != committedSize) {
+        write.reset();
+        committedSize = 0;
+      }
       if (earliestOffset < 0 || offset < earliestOffset) {
         earliestOffset = offset;
       }
