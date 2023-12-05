@@ -1,0 +1,25 @@
+---
+name: Package and Publish Helm Chart
+
+on:
+  push:
+    tags:
+      - '*'
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  build:
+    if: github.repository == 'bazelbuild/bazel-buildfarm'
+    name: Package and Release BuildFarm Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: helm package
+        run: |-
+          set -ex
+          helm dep up kubernetes/helm-charts/buildfarm
+          helm package kubernetes/helm-charts/buildfarm
+          gh release create "${{ github.ref_name }}" *.tgz
