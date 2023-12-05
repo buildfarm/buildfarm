@@ -132,3 +132,15 @@ load("@build_buildfarm//:images.bzl", "buildfarm_images")
 
 buildfarm_images()
 ```
+
+### Helm Chart
+
+To install with helm:
+
+```bash
+helm install \
+  -n bazel-buildfarm \
+  --create-namespace \
+  bazel-buildfarm \
+  "https://github.com/bazelbuild/bazel-buildfarm/releases/download/${BUILDFARM_VERSION:-2.7.1}/buildfarm-${CHART_VERSION:-0.1.0}.tgz"
+```
