@@ -1,11 +1,14 @@
 package build.buildfarm.common.services;
 
 import static build.buildfarm.common.resources.ResourceParser.uploadResourceName;
+import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
@@ -137,5 +140,67 @@ public class WriteStreamObserverTest {
             eq(uuid),
             any(RequestMetadata.class));
     verifyZeroInteractions(responseObserver);
+  }
+
+  @Test
+  public void observerCalledInRequestContext() throws Exception {
+    Context.Key<String> REQ_KEY = Context.key("requester");
+    Instance instance = mock(Instance.class);
+    StreamObserver<WriteResponse> responseObserver =
+        spy(
+            new StreamObserver<WriteResponse>() {
+              @Override
+              public void onNext(WriteResponse response) {
+                assertThat(REQ_KEY.get()).isEqualTo("true");
+              }
+
+              @Override
+              public void onError(Throwable t) {
+                assertThat(REQ_KEY.get()).isEqualTo("true");
+              }
+
+              @Override
+              public void onCompleted() {
+                assertThat(REQ_KEY.get()).isEqualTo("true");
+              }
+            });
+    ByteString data = ByteString.copyFromUtf8("contextual data");
+    Digest digest = DIGEST_UTIL.compute(data);
+    UUID uuid = UUID.randomUUID();
+    UploadBlobRequest uploadBlobRequest =
+        UploadBlobRequest.newBuilder()
+            .setBlob(BlobInformation.newBuilder().setDigest(digest))
+            .setUuid(uuid.toString())
+            .build();
+    SettableFuture<Long> future = SettableFuture.create();
+    Write write = mock(Write.class);
+    when(write.getFuture()).thenReturn(future);
+    when(write.isComplete()).thenReturn(Boolean.TRUE);
+    when(instance.getBlobWrite(
+            eq(Compressor.Value.IDENTITY), eq(digest), eq(uuid), any(RequestMetadata.class)))
+        .thenReturn(write);
+
+    Context requester = Context.current().withValue(REQ_KEY, "true");
+    assertThat(REQ_KEY.get()).isNull();
+    WriteStreamObserver observer =
+        requester.call(
+            () -> new WriteStreamObserver(instance, 1, SECONDS, () -> {}, responseObserver));
+    requester.run(
+        () ->
+            observer.onNext(
+                WriteRequest.newBuilder()
+                    .setResourceName(uploadResourceName(uploadBlobRequest))
+                    .setData(data)
+                    .build()));
+    requester.run(observer::onCompleted);
+    verify(responseObserver, never()).onCompleted();
+
+    future.set(digest.getSizeBytes());
+
+    verify(write, times(1)).isComplete();
+    verify(instance, times(1))
+        .getBlobWrite(
+            eq(Compressor.Value.IDENTITY), eq(digest), eq(uuid), any(RequestMetadata.class));
+    verify(responseObserver, times(1)).onCompleted();
   }
 }

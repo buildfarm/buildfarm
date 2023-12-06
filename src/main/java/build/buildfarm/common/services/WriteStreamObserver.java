@@ -493,7 +493,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
               // ignore
             }
           },
-          directExecutor());
+          withCancellation.fixedContextExecutor(directExecutor()));
     }
   }
 }
