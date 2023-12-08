@@ -1,2 +1,9 @@
-# TODO: migrate all dependencies from WORKSPACE to MODULE.bazel
-# https://github.com/bazelbuild/bazel-buildfarm/issues/1479
+module(
+    name = "build_buildfarm",
+    repo_name = "build_buildfarm",
+)
+
+bazel_dep(name = "platforms", version = "0.0.7")
+bazel_dep(name = "rules_cc", version = "0.0.9")
+bazel_dep(name = "rules_jvm_external", version = "5.3")
+bazel_dep(name = "rules_license", version = "0.0.7")
