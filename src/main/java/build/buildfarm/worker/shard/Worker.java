@@ -70,8 +70,8 @@ import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionService;
-import io.grpc.services.HealthStatusManager;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import java.io.File;
@@ -125,7 +125,6 @@ public final class Worker extends LoggingMain {
 
   private WorkerInstance instance;
 
-  @SuppressWarnings("deprecation")
   private final HealthStatusManager healthStatusManager = new HealthStatusManager();
 
   private Server server;
