@@ -101,6 +101,8 @@ spec:
     - metadata:
         name: {{ include "buildfarm.fullname" . }}-shard-worker-data
       spec:
+        csi:
+          fsType: "xfs"
         accessModes: ["ReadWriteOnce"]
         {{- with .Values.shardWorker.storage.class }}
         storageClassName: "{{ . }}"
