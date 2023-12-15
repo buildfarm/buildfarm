@@ -607,10 +607,7 @@ public class RedisShardBackplane implements Backplane {
                 WorkerChange.newBuilder()
                     .setEffectiveAt(toTimestamp(Instant.now()))
                     .setName(shardWorker.getEndpoint())
-                    .setAdd(
-                        WorkerChange.Add.newBuilder()
-                            .setEffectiveAt(registrationTime)
-                            .build())
+                    .setAdd(WorkerChange.Add.newBuilder().setEffectiveAt(registrationTime).build())
                     .build());
     client.call(
         jedis -> {
