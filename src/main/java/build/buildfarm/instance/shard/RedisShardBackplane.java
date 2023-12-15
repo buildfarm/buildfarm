@@ -15,6 +15,7 @@
 package build.buildfarm.instance.shard;
 
 import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.ActionResult;
@@ -80,13 +81,13 @@ import io.grpc.Deadline;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -143,8 +144,7 @@ public class RedisShardBackplane implements Backplane {
   private @Nullable RedisClient client = null;
 
   private Deadline storageWorkersDeadline = null;
-  private final Map<String, ShardWorker> storageWorkers =
-      Collections.synchronizedMap(new HashMap<>());
+  private final Map<String, ShardWorker> storageWorkers = new ConcurrentHashMap<>();
   private final Supplier<Set<String>> recentExecuteWorkers;
 
   private DistributedState state = new DistributedState();
@@ -591,10 +591,15 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void addWorker(ShardWorker shardWorker) throws IOException {
     String json = JsonFormat.printer().print(shardWorker);
+    long firstRegisteredSeconds = MILLISECONDS.toSeconds(shardWorker.getFirstRegisteredAt());
+    int firstRegisteredNanos =
+        (int)
+            (MILLISECONDS.toNanos(shardWorker.getFirstRegisteredAt())
+                - SECONDS.toNanos(firstRegisteredSeconds));
     Timestamp registrationTime =
         Timestamp.newBuilder()
-            .setSeconds(shardWorker.getFirstRegisteredAt() / 1000)
-            .setNanos((int) ((shardWorker.getFirstRegisteredAt() % 1000) * 1000000))
+            .setSeconds(firstRegisteredSeconds)
+            .setNanos(firstRegisteredNanos)
             .build();
     String workerChangeJson =
         JsonFormat.printer()
@@ -604,7 +609,7 @@ public class RedisShardBackplane implements Backplane {
                     .setName(shardWorker.getEndpoint())
                     .setAdd(
                         WorkerChange.Add.newBuilder()
-                            .setFirstRegisteredAt(registrationTime)
+                            .setEffectiveAt(registrationTime)
                             .build())
                     .build());
     client.call(

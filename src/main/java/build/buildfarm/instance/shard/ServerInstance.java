@@ -795,7 +795,7 @@ public class ServerInstance extends NodeInstance {
             .immutableCopy();
     if (!workersToBeRemoved.isEmpty()) {
       try {
-        log.log(Level.FINE, format("adjusting locations for the digest %s", digest));
+        log.log(Level.INFO, format("adjusting locations for the digest %s", digest));
         backplane.adjustBlobLocations(digest, Collections.emptySet(), workersToBeRemoved);
       } catch (IOException e) {
         log.log(

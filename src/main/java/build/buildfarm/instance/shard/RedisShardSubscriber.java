@@ -17,6 +17,8 @@ package build.buildfarm.instance.shard;
 import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationChange;
 import static build.buildfarm.instance.shard.RedisShardBackplane.parseWorkerChange;
 import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.v1test.OperationChange;
@@ -265,7 +267,7 @@ class RedisShardSubscriber extends JedisPubSub {
           workerChange.getName(),
           ShardWorker.newBuilder()
               .setEndpoint(workerChange.getName())
-              .setFirstRegisteredAt(toEpochMillis(workerChange.getAdd().getFirstRegisteredAt()))
+              .setFirstRegisteredAt(toEpochMillis(workerChange.getAdd().getEffectiveAt()))
               .build());
     }
   }
@@ -290,7 +292,7 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   static long toEpochMillis(Timestamp timestamp) {
-    return timestamp.getSeconds() * 1000 + timestamp.getNanos() / 1000000;
+    return SECONDS.toMillis(timestamp.getSeconds()) + NANOSECONDS.toMillis(timestamp.getNanos());
   }
 
   void resetOperation(String channel, OperationChange.Reset reset) {
