@@ -163,4 +163,17 @@ public class ResourceLimits {
    * @details This can be used to debug execution behavior.
    */
   public final ArrayList<String> description = new ArrayList<>();
+  /**
+   * @field persistentWorkerKey
+   * @brief Hash of tool inputs for remote persistent workers
+   * @details See https://github.com/bazelbuild/bazel/issues/10091
+   */
+  public String persistentWorkerKey = "";
+
+  /**
+   * @field persistentWorkerCommand
+   * @brief Command string to start the persistent worker
+   * @details See https://github.com/bazelbuild/bazel/issues/10091
+   */
+  public String persistentWorkerCommand = "";
 }

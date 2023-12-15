@@ -41,8 +41,8 @@ import build.buildfarm.server.services.PublishBuildEventService;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionService;
-import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import io.prometheus.client.Counter;
 import java.io.File;
@@ -55,7 +55,6 @@ import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
-@SuppressWarnings("deprecation")
 @Log
 public class BuildFarmServer extends LoggingMain {
   private static final java.util.logging.Logger nettyLogger =
@@ -88,8 +87,7 @@ public class BuildFarmServer extends LoggingMain {
    */
   public void prepareServerForGracefulShutdown() {
     if (configs.getServer().getGracefulShutdownSeconds() == 0) {
-      log.info(
-          String.format("Graceful Shutdown is not enabled. Server is shutting down immediately."));
+      log.info("Graceful Shutdown is not enabled. Server is shutting down immediately.");
     } else {
       try {
         log.info(

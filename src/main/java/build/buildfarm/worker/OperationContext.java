@@ -19,16 +19,18 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.Tree;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
 
-final class OperationContext {
+public final class OperationContext {
   final ExecuteResponse.Builder executeResponse;
   final Operation operation;
   final Poller poller;
   final Path execDir;
   final Action action;
   final Command command;
+  final Tree tree;
   final QueueEntry queueEntry;
 
   private OperationContext(
@@ -38,6 +40,7 @@ final class OperationContext {
       Path execDir,
       Action action,
       Command command,
+      Tree tree,
       QueueEntry queueEntry) {
     this.executeResponse = executeResponse;
     this.operation = operation;
@@ -45,6 +48,7 @@ final class OperationContext {
     this.execDir = execDir;
     this.action = action;
     this.command = command;
+    this.tree = tree;
     this.queueEntry = queueEntry;
   }
 
@@ -55,6 +59,7 @@ final class OperationContext {
     private Path execDir;
     private Action action;
     private Command command;
+    private Tree tree;
     private QueueEntry queueEntry;
 
     private Builder(
@@ -64,6 +69,7 @@ final class OperationContext {
         Path execDir,
         Action action,
         Command command,
+        Tree tree,
         QueueEntry queueEntry) {
       this.executeResponse = executeResponse;
       this.operation = operation;
@@ -71,6 +77,7 @@ final class OperationContext {
       this.execDir = execDir;
       this.action = action;
       this.command = command;
+      this.tree = tree;
       this.queueEntry = queueEntry;
     }
 
@@ -99,6 +106,11 @@ final class OperationContext {
       return this;
     }
 
+    public Builder setTree(Tree tree) {
+      this.tree = tree;
+      return this;
+    }
+
     public Builder setQueueEntry(QueueEntry queueEntry) {
       this.queueEntry = queueEntry;
       return this;
@@ -106,7 +118,7 @@ final class OperationContext {
 
     public OperationContext build() {
       return new OperationContext(
-          executeResponse, operation, poller, execDir, action, command, queueEntry);
+          executeResponse, operation, poller, execDir, action, command, tree, queueEntry);
     }
   }
 
@@ -118,10 +130,12 @@ final class OperationContext {
         /* execDir=*/ null,
         /* action=*/ null,
         /* command=*/ null,
+        /* tree=*/ null,
         /* queueEntry=*/ null);
   }
 
   public Builder toBuilder() {
-    return new Builder(executeResponse, operation, poller, execDir, action, command, queueEntry);
+    return new Builder(
+        executeResponse, operation, poller, execDir, action, command, tree, queueEntry);
   }
 }
