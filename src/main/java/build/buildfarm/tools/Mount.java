@@ -37,10 +37,14 @@ import java.util.Map;
 
 class Mount {
   @SuppressWarnings("BusyWait")
-  public static void main(String[] args) throws Exception {
-    String host = args[0];
-    String instanceName = args[1];
-    DigestUtil digestUtil = DigestUtil.forHash(args[2]);
+  public static void mount(
+      String host,
+      String instanceName,
+      DigestUtil digestUtil,
+      String root,
+      Digest inputRoot,
+      String name)
+      throws IOException, InterruptedException {
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
 
@@ -48,7 +52,7 @@ class Mount {
 
     FuseCAS fuse =
         new FuseCAS(
-            cwd.resolve(args[3]),
+            cwd.resolve(root),
             new InputStreamFactory() {
               final Map<Digest, ByteString> cache = new HashMap<>();
 
@@ -75,8 +79,7 @@ class Mount {
               }
             });
 
-    // FIXME make bettar
-    fuse.createInputRoot(args[5], DigestUtil.parseDigest(args[4]));
+    fuse.createInputRoot(name, inputRoot);
 
     try {
       //noinspection InfiniteLoopStatement
@@ -88,5 +91,22 @@ class Mount {
     } finally {
       fuse.stop();
     }
+  }
+
+  public static void main(String[] args) throws Exception {
+    if (args.length != 6) {
+      System.err.println(
+          "Usage: bf-mount <endpoint> <instance-name> <digest-type> <root> <digest> <name>");
+      System.err.println("\nMount an REAPI directory specified by 'digest' at 'name' under 'root'");
+      System.exit(1);
+    }
+
+    String host = args[0];
+    String instanceName = args[1];
+    DigestUtil digestUtil = DigestUtil.forHash(args[2]);
+    String root = args[3];
+    Digest inputRoot = DigestUtil.parseDigest(args[4]);
+    String name = args[5];
+    mount(host, instanceName, digestUtil, root, inputRoot, name);
   }
 }
