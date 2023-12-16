@@ -1021,13 +1021,11 @@ class ShardWorkerContext implements WorkerContext {
     // TODO: provide proper support for bazel sandbox's fakeUsername "-U" flag.
     // options.fakeUsername = limits.fakeUsername;
 
-    // these were hardcoded in bazel based on a filesystem configuration typical to ours
-    // TODO: they may be incorrect for say Windows, and support will need adjusted in the future.
-    options.writableFiles.add("/tmp");
-    options.writableFiles.add("/dev/shm");
+    options.writableFiles.addAll(
+        configs.getWorker().getSandboxSettings().getAdditionalWritePaths());
 
     if (limits.tmpFs) {
-      options.tmpfsDirs.add("/tmp");
+      options.writableFiles.addAll(configs.getWorker().getSandboxSettings().getTmpFsPaths());
     }
 
     if (limits.debugAfterExecution) {
