@@ -75,16 +75,6 @@ def archive_dependencies(third_party):
             "patch_args": ["-p0"],
             "patches": ["%s:docker_go_toolchain.patch" % third_party],
         },
-
-        # Updated versions of io_bazel_rules_docker dependencies for bazel compatibility
-        {
-            "name": "io_bazel_rules_go",
-            "sha256": "d6ab6b57e48c09523e93050f13698f708428cfd5e619252e369d377af6597707",
-            "urls": [
-                "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.43.0/rules_go-v0.43.0.zip",
-                "https://github.com/bazelbuild/rules_go/releases/download/v0.43.0/rules_go-v0.43.0.zip",
-            ],
-        },
         {
             "name": "bazel_gazelle",
             "sha256": "b7387f72efb59f876e4daae42f1d3912d0d45563eac7cb23d1de0b094ab588cf",

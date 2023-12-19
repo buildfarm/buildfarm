@@ -5,5 +5,6 @@ module(
 
 bazel_dep(name = "platforms", version = "0.0.7")
 bazel_dep(name = "rules_cc", version = "0.0.9")
+bazel_dep(name = "rules_go", version = "0.43.0", repo_name = "io_bazel_rules_go")
 bazel_dep(name = "rules_jvm_external", version = "5.3")
 bazel_dep(name = "rules_license", version = "0.0.7")
