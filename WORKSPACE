@@ -8,6 +8,10 @@ load(":defs.bzl", "buildfarm_init")
 
 buildfarm_init()
 
+load("@maven//:defs.bzl", "pinned_maven_install")
+
+pinned_maven_install()
+
 load("@rules_oss_audit//oss_audit:repositories.bzl", "rules_oss_audit_dependencies")
 
 rules_oss_audit_dependencies()

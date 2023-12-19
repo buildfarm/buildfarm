@@ -114,6 +114,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.projectlombok:lombok:1.18.30",
                     ],
         generate_compat_repositories = True,
+        maven_install_json = "@//:maven_install.json",
         override_targets = IO_GRPC_GRPC_JAVA_OVERRIDE_TARGETS,
         repositories = [
             "https://repo1.maven.org/maven2",
