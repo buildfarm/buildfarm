@@ -75,15 +75,6 @@ def archive_dependencies(third_party):
             "patch_args": ["-p0"],
             "patches": ["%s:docker_go_toolchain.patch" % third_party],
         },
-        {
-            "name": "bazel_gazelle",
-            "sha256": "b7387f72efb59f876e4daae42f1d3912d0d45563eac7cb23d1de0b094ab588cf",
-            "urls": [
-                "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.34.0/bazel-gazelle-v0.34.0.tar.gz",
-                "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.34.0/bazel-gazelle-v0.34.0.tar.gz",
-            ],
-        },
-
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
         {
             "name": "bazel",
