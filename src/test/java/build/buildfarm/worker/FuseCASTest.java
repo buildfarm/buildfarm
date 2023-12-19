@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
@@ -29,9 +30,7 @@ import jnr.ffi.Struct;
 import jnr.ffi.provider.DelegatingMemoryIO;
 import jnr.ffi.provider.converters.StringResultConverter;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import ru.serce.jnrfuse.ErrorCodes;
@@ -41,8 +40,6 @@ import ru.serce.jnrfuse.struct.FuseFileInfo;
 @RunWith(JUnit4.class)
 public class FuseCASTest {
   private FuseCAS fuseCAS;
-
-  @Rule public final ExpectedException exception = ExpectedException.none();
 
   private final ByteString content = ByteString.copyFromUtf8("Peanut Butter");
 
@@ -97,30 +94,34 @@ public class FuseCASTest {
     assertThat(fuseCAS.getattr("/test", createFileStat())).isEqualTo(0);
   }
 
-  @Test
+  @Test(expected = IllegalArgumentException.class)
   public void createInputRootEmptyTopdirThrows() throws IOException, InterruptedException {
-    exception.expect(IllegalArgumentException.class);
     fuseCAS.createInputRoot("", Digest.newBuilder().build());
   }
 
-  @Test
+  @Test(expected = IllegalArgumentException.class)
   public void createInputRootEmptyAfterSlashes() throws IOException, InterruptedException {
-    exception.expect(IllegalArgumentException.class);
     fuseCAS.createInputRoot("///", Digest.newBuilder().build());
   }
 
   @Test
   public void createInputRootFileAsDirectoryThrows() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().setHash("/test").build());
-    exception.expect(IllegalArgumentException.class);
-    fuseCAS.createInputRoot("test/file/subdir", Digest.newBuilder().build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          fuseCAS.createInputRoot("test/file/subdir", Digest.newBuilder().build());
+        });
   }
 
   @Test
   public void createInputRootEmptyComponentsIgnored() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("/test/", Digest.newBuilder().setHash("/test").build());
-    exception.expect(IllegalArgumentException.class);
-    fuseCAS.createInputRoot("test/file/subdir", Digest.newBuilder().build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          fuseCAS.createInputRoot("test/file/subdir", Digest.newBuilder().build());
+        });
   }
 
   @Test

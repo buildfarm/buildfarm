@@ -15,28 +15,30 @@
 package build.buildfarm.common;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class DigestUtilTest {
-  @Rule public final ExpectedException exception = ExpectedException.none();
 
   @Test
   public void buildThrowsOnInvalidHashCode() {
     DigestUtil digestUtil = new DigestUtil(HashFunction.MD5);
-    exception.expect(NumberFormatException.class);
-    exception.expectMessage("[foo] is not a valid MD5 hash.");
-    digestUtil.build("foo", 3);
+    NumberFormatException expected =
+        assertThrows(
+            NumberFormatException.class,
+            () -> {
+              digestUtil.build("foo", 3);
+            });
+    assertThat(expected.getMessage()).isEqualTo("[foo] is not a valid MD5 hash.");
   }
 
   @Test
