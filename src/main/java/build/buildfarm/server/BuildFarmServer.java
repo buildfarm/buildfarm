@@ -87,7 +87,7 @@ public class BuildFarmServer extends LoggingMain {
    */
   public void prepareServerForGracefulShutdown() {
     if (configs.getServer().getGracefulShutdownSeconds() == 0) {
-      log.info("Graceful Shutdown is not enabled. Server is shutting down immediately.");
+      log.severe("Graceful Shutdown is not enabled. Server is shutting down immediately.");
     } else {
       try {
         log.info(
@@ -96,7 +96,7 @@ public class BuildFarmServer extends LoggingMain {
                 configs.getServer().getGracefulShutdownSeconds()));
         SECONDS.sleep(configs.getServer().getGracefulShutdownSeconds());
       } catch (InterruptedException e) {
-        log.info(
+        log.severe(
             "Graceful Shutdown - The server graceful shutdown is interrupted: " + e.getMessage());
       } finally {
         log.info(

@@ -14,6 +14,8 @@
 
 package build.buildfarm.common.config;
 
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Data;
 
 /**
@@ -33,6 +35,13 @@ public class SandboxSettings {
   public boolean alwaysUseSandbox = false;
 
   /**
+   * @field alwaysUseAsNobody
+   * @brief Whether or not to always use the as-nobody wrapper when running actions.
+   * @details It may be preferred to enforce this wrapper instead of relying on client selection.
+   */
+  public boolean alwaysUseAsNobody = false;
+
+  /**
    * @field alwaysUseCgroups
    * @brief Whether or not to use cgroups when sandboxing actions.
    * @details It may be preferred to enforce cgroup usage.
@@ -45,6 +54,20 @@ public class SandboxSettings {
    * @details It may be preferred to enforce sandbox usage than rely on client selection.
    */
   public boolean alwaysUseTmpFs = false;
+
+  /**
+   * @field additionalWritePaths
+   * @brief Additional paths the sandbox is allowed to write to.
+   * @details Suggestions may include: /tmp, /dev/shm
+   */
+  public List<String> additionalWritePaths = new ArrayList();
+
+  /**
+   * @field tmpFsPaths
+   * @brief Additional paths the sandbox uses for tmpfs
+   * @details Suggestions may include: /tmp
+   */
+  public List<String> tmpFsPaths = new ArrayList();
 
   /**
    * @field selectForBlockNetwork
