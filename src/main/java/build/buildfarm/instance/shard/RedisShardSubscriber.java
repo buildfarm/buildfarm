@@ -17,8 +17,6 @@ package build.buildfarm.instance.shard;
 import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationChange;
 import static build.buildfarm.instance.shard.RedisShardBackplane.parseWorkerChange;
 import static java.lang.String.format;
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
-import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.v1test.OperationChange;
@@ -30,6 +28,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -267,7 +266,7 @@ class RedisShardSubscriber extends JedisPubSub {
           workerChange.getName(),
           ShardWorker.newBuilder()
               .setEndpoint(workerChange.getName())
-              .setFirstRegisteredAt(toEpochMillis(workerChange.getAdd().getEffectiveAt()))
+              .setFirstRegisteredAt(Timestamps.toMillis(workerChange.getAdd().getEffectiveAt()))
               .build());
     }
   }
@@ -289,10 +288,6 @@ class RedisShardSubscriber extends JedisPubSub {
 
   static Instant toInstant(Timestamp timestamp) {
     return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
-  }
-
-  static long toEpochMillis(Timestamp timestamp) {
-    return SECONDS.toMillis(timestamp.getSeconds()) + NANOSECONDS.toMillis(timestamp.getNanos());
   }
 
   void resetOperation(String channel, OperationChange.Reset reset) {

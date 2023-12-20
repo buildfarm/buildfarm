@@ -591,23 +591,14 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void addWorker(ShardWorker shardWorker) throws IOException {
     String json = JsonFormat.printer().print(shardWorker);
-    long firstRegisteredSeconds = MILLISECONDS.toSeconds(shardWorker.getFirstRegisteredAt());
-    int firstRegisteredNanos =
-        (int)
-            (MILLISECONDS.toNanos(shardWorker.getFirstRegisteredAt())
-                - SECONDS.toNanos(firstRegisteredSeconds));
-    Timestamp registrationTime =
-        Timestamp.newBuilder()
-            .setSeconds(firstRegisteredSeconds)
-            .setNanos(firstRegisteredNanos)
-            .build();
+    Timestamp effectiveAt = Timestamps.fromMillis(shardWorker.getFirstRegisteredAt());
     String workerChangeJson =
         JsonFormat.printer()
             .print(
                 WorkerChange.newBuilder()
                     .setEffectiveAt(toTimestamp(Instant.now()))
                     .setName(shardWorker.getEndpoint())
-                    .setAdd(WorkerChange.Add.newBuilder().setEffectiveAt(registrationTime).build())
+                    .setAdd(WorkerChange.Add.newBuilder().setEffectiveAt(effectiveAt).build())
                     .build());
     client.call(
         jedis -> {
@@ -704,7 +695,10 @@ public class RedisShardBackplane implements Backplane {
     removeWorker(workerName, "Requested shutdown");
   }
 
-  @SuppressWarnings("ConstantConditions")
+  /**
+   * Returns a new set containing copies of the storage workers. Note: This method does not grant
+   * access to the shared storage set.
+   */
   @Override
   public Set<String> getStorageWorkers() throws IOException {
     refreshStorageWorkersIfExpired();
@@ -720,7 +714,8 @@ public class RedisShardBackplane implements Backplane {
         worker -> {
           ShardWorker workerInfo = storageWorkers.get(worker);
           if (workerInfo != null) {
-            workerAndStartTime.put(worker, workerInfo.getFirstRegisteredAt() / 1000L);
+            workerAndStartTime.put(
+                worker, MILLISECONDS.toSeconds(workerInfo.getFirstRegisteredAt()));
           }
         });
     return workerAndStartTime;

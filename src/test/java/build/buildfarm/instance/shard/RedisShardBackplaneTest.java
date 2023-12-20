@@ -16,6 +16,7 @@ package build.buildfarm.instance.shard;
 
 import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationChange;
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -32,6 +33,7 @@ import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -396,5 +398,28 @@ public class RedisShardBackplaneTest {
     assertThat(insertTimeInSecs)
         .isGreaterThan(Instant.now().getEpochSecond() - expirationInSecs + ttl - 2);
     assertThat(insertTimeInSecs).isAtMost(Instant.now().getEpochSecond() - expirationInSecs + ttl);
+  }
+
+  @Test
+  public void testAddWorker() throws IOException {
+    ShardWorker shardWorker =
+        ShardWorker.newBuilder().setWorkerType(3).setFirstRegisteredAt(1703065913000L).build();
+    JedisCluster jedisCluster = mock(JedisCluster.class);
+    when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
+    when(jedisCluster.hset(anyString(), anyString(), anyString())).thenReturn(1L);
+    RedisShardBackplane backplane = createBackplane("add-worker-test");
+    backplane.start("addWorker/test:0000");
+    backplane.addWorker(shardWorker);
+    verify(jedisCluster, times(1))
+        .hset(
+            configs.getBackplane().getWorkersHashName() + "_storage",
+            "",
+            JsonFormat.printer().print(shardWorker));
+    verify(jedisCluster, times(1))
+        .hset(
+            configs.getBackplane().getWorkersHashName() + "_execute",
+            "",
+            JsonFormat.printer().print(shardWorker));
+    verify(jedisCluster, times(1)).publish(anyString(), anyString());
   }
 }
