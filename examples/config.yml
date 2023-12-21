@@ -79,6 +79,7 @@ backplane:
   priorityQueue: false
   priorityPollIntervalMillis: 100
   timeout: 10000
+  maxInvocationIdTimeout: 604800
   maxAttempts: 20
   cacheCas: false
   queues:

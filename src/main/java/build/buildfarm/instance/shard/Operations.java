@@ -18,6 +18,7 @@ import build.buildfarm.common.redis.RedisMap;
 import java.util.Map;
 import java.util.Set;
 import redis.clients.jedis.JedisCluster;
+import build.buildfarm.common.config.BuildfarmConfigs;
 
 /**
  * @class Operations
@@ -28,6 +29,7 @@ import redis.clients.jedis.JedisCluster;
  *     information about the operations that ran.
  */
 public class Operations {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   /**
    * @field operationIds
    * @brief A mapping from operationID -> operation
@@ -98,7 +100,12 @@ public class Operations {
 
     // We also store a mapping from invocationID -> operationIDs
     // This is a common lookup that needs to be performant.
-    jedis.sadd(invocationId, operationId);
+    if (invocationId != "") {
+      jedis.sadd(invocationId, operationId);
+      if (jedis.scard(invocationId) == 1) {
+        jedis.expire(invocationId, configs.getBackplane().getMaxInvocationIdTimeout());
+      }
+    }
   }
 
   /**
