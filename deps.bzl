@@ -25,14 +25,6 @@ def archive_dependencies(third_party):
             "url": "https://github.com/bazelbuild/rules_jvm_external/releases/download/%s/rules_jvm_external-%s.tar.gz" % (RULES_JVM_EXTERNAL_TAG, RULES_JVM_EXTERNAL_TAG),
         },
 
-        # Kubernetes rules.  Useful for local development with tilt.
-        {
-            "name": "io_bazel_rules_k8s",
-            "strip_prefix": "rules_k8s-0.7",
-            "url": "https://github.com/bazelbuild/rules_k8s/archive/refs/tags/v0.7.tar.gz",
-            "sha256": "ce5b9bc0926681e2e7f2147b49096f143e6cbc783e71bc1d4f36ca76b00e6f4a",
-        },
-
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
         {
             "name": "com_google_protobuf",
