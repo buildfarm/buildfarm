@@ -14,11 +14,11 @@
 
 package build.buildfarm.instance.shard;
 
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.redis.RedisMap;
 import java.util.Map;
 import java.util.Set;
 import redis.clients.jedis.JedisCluster;
-import build.buildfarm.common.config.BuildfarmConfigs;
 
 /**
  * @class Operations
