@@ -142,5 +142,5 @@ helm install \
   -n bazel-buildfarm \
   --create-namespace \
   bazel-buildfarm \
-  "https://github.com/bazelbuild/bazel-buildfarm/releases/download/${BUILDFARM_VERSION:-2.7.1}/buildfarm-${CHART_VERSION:-0.1.0}.tgz"
+  "https://github.com/bazelbuild/bazel-buildfarm/releases/download/${BUILDFARM_VERSION:-2.8.0}/buildfarm-${CHART_VERSION:-0.2.0}.tgz"
 ```
