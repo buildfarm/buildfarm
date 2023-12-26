@@ -77,13 +77,13 @@ run_proto_formatter () {
     # This is intended to be done by the CI.
     if [[ "$@" == "--check" ]]
     then
-        find . -name '*.proto' -exec $BAZEL run $CLANG_FORMAT -- -i --dry-run --Werror {} +
+        find . -name '*.proto' -exec $BAZEL run $CLANG_FORMAT -- -i -style='{AllowShortFunctionsOnASingleLine: Empty}' --dry-run --Werror {} +
         handle_format_error_check
         return
     fi
 
     # Fixes formatting issues
-    find . -name '*.proto' -exec $BAZEL run $CLANG_FORMAT -- -i {} +
+    find . -name '*.proto' -exec $BAZEL run $CLANG_FORMAT -- -i -style='{AllowShortFunctionsOnASingleLine: Empty}' {} +
 }
 
 run_buildifier () {

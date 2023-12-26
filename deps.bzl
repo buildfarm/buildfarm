@@ -92,9 +92,9 @@ def archive_dependencies(third_party):
         # Used to format proto files
         {
             "name": "com_grail_bazel_toolchain",
-            "sha256": "ee74a364a978fa3c85ea56d736010bfc44ea22b439691e9cefdf72284d6c9b93",
-            "strip_prefix": "bazel-toolchain-d46339675a83e3517d955f5456e525501c3e05b8",
-            "url": "https://github.com/grailbio/bazel-toolchain/archive/d46339675a83e3517d955f5456e525501c3e05b8.tar.gz",
+            "sha256": "95f0bab6982c7e5a83447e08bf32fa7a47f210169da5e5ec62411fef0d8e7f59",
+            "strip_prefix": "bazel-toolchain-0.9",
+            "url": "https://github.com/grailbio/bazel-toolchain/archive/refs/tags/0.9.tar.gz",
             "patch_args": ["-p1"],
             "patches": ["%s:clang_toolchain.patch" % third_party],
         },
