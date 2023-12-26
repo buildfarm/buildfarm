@@ -7,7 +7,7 @@ FROM ubuntu:18.04
 RUN echo 'APT::Acquire::Retries "5";' > /etc/apt/apt.conf.d/80retries
 
 RUN apt-get update
-RUN apt-get -y install wget git python gcc openjdk-8-jdk g++ redis redis-server
+RUN apt-get -y install wget git zip python gcc openjdk-8-jdk g++ redis redis-server
 RUN wget --tries=10 -O get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py
 RUN python2 get-pip.py
 RUN pip install python-dateutil
