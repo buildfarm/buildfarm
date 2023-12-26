@@ -1532,9 +1532,7 @@ message DigestFunction {
 }
 
 // Describes the server/instance capabilities for updating the action cache.
-message ActionCacheUpdateCapabilities {
-  bool update_enabled = 1;
-}
+message ActionCacheUpdateCapabilities { bool update_enabled = 1; }
 
 // Allowed values for priority in
 // [ResultsCachePolicy][google.devtools.remoteexecution.v2.ResultsCachePolicy]

@@ -142,5 +142,5 @@ def buildfarm_init(name = "buildfarm"):
 
     llvm_toolchain(
         name = "llvm_toolchain",
-        llvm_version = "16.0.0",
+        llvm_version = "10.0.0",
     )

@@ -53,9 +53,7 @@ option optimize_for = SPEED;
 
 // The protocol compiler can output a FileDescriptorSet containing the .proto
 // files it parses.
-message FileDescriptorSet {
-  repeated FileDescriptorProto file = 1;
-}
+message FileDescriptorSet { repeated FileDescriptorProto file = 1; }
 
 // Describes a complete .proto file.
 message FileDescriptorProto {
