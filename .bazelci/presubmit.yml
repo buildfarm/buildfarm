@@ -63,6 +63,7 @@ tasks:
       USE_BAZEL_VERSION: 17be878292730359c9c90efdceabed26126df7ae
     build_flags:
     - "--cxxopt=-std=c++14"
+    # FIXME: remove audit subtraction when https://github.com/bazelbuild/bazel-buildfarm/issues/1595 fixed
     - "--build_tag_filters=-container,-audit"
     build_targets:
     - "..."
