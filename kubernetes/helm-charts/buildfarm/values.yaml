@@ -27,16 +27,6 @@ config:
     recordBesEvents: true
   worker:
     port: 8982
-    publicName: "localhost:8982"
-    executeStageWidth: 80
-    inputFetchStageWidth: 8
-    realInputDirectories:
-      - "external"
-    root: "/tmp/worker"
-    storages:
-      - type: FILESYSTEM
-        path: "cache"
-        maxSizeBytes: 536870912000 # 500 * 1024 * 1024 * 1024
 
 server:
   image:
