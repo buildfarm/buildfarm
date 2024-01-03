@@ -238,14 +238,16 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
                     @Override
                     public void onError(Throwable t) {
-                      log.log(
-                          WARNING,
-                          format(
-                              "%s: write(%s) on worker %s after %d bytes of content",
-                              Status.fromThrowable(t).getCode().name(),
-                              resourceName,
-                              bsStub.get().getChannel().authority(),
-                              writtenBytes));
+                      if (Status.fromThrowable(t).getCode() != Code.CANCELLED) {
+                        log.log(
+                            WARNING,
+                            format(
+                                "%s: write(%s) on worker %s after %d bytes of content",
+                                Status.fromThrowable(t).getCode().name(),
+                                resourceName,
+                                bsStub.get().getChannel().authority(),
+                                writtenBytes));
+                      }
                       writeFuture.setException(exceptionTranslator.apply(t));
                     }
 
