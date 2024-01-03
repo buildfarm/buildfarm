@@ -15,6 +15,7 @@
 package build.buildfarm.common.grpc;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static java.lang.String.format;
 import static java.util.logging.Level.WARNING;
@@ -164,12 +165,18 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
       request.setResourceName(resourceName);
     }
     synchronized (this) {
-      writeObserver.onNext(request.build());
+      // writeObserver can be nulled by a completion race
+      // expect that we are completed in this case
+      if (writeObserver != null) {
+        writeObserver.onNext(request.build());
+        wasReset = false;
+        writtenBytes += offset;
+        offset = 0;
+        sentResourceName = true;
+      } else {
+        checkState(writeFuture.isDone(), "writeObserver nulled without completion");
+      }
     }
-    wasReset = false;
-    writtenBytes += offset;
-    offset = 0;
-    sentResourceName = true;
   }
 
   @Override
@@ -231,14 +238,16 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
                     @Override
                     public void onError(Throwable t) {
-                      log.log(
-                          WARNING,
-                          format(
-                              "%s: write(%s) on worker %s after %d bytes of content",
-                              Status.fromThrowable(t).getCode().name(),
-                              resourceName,
-                              bsStub.get().getChannel().authority(),
-                              writtenBytes));
+                      if (Status.fromThrowable(t).getCode() != Code.CANCELLED) {
+                        log.log(
+                            WARNING,
+                            format(
+                                "%s: write(%s) on worker %s after %d bytes of content",
+                                Status.fromThrowable(t).getCode().name(),
+                                resourceName,
+                                bsStub.get().getChannel().authority(),
+                                writtenBytes));
+                      }
                       writeFuture.setException(exceptionTranslator.apply(t));
                     }
 

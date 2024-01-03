@@ -77,7 +77,9 @@ message ShutDownWorkerGracefullyRequest {
 
 message ShutDownWorkerGracefullyRequestResults {}
 
-message DisableScaleInProtectionRequest { string instance_name = 1; }
+message DisableScaleInProtectionRequest {
+  string instance_name = 1;
+}
 
 message DisableScaleInProtectionRequestResults {}
 
@@ -200,7 +202,9 @@ service OperationQueue {
   }
 }
 
-message OperationsStatusRequest { string instance_name = 1; }
+message OperationsStatusRequest {
+  string instance_name = 1;
+}
 
 message TakeOperationRequest {
   // The instance of the execution system to operate against. A server may
@@ -262,9 +266,13 @@ message AwsMetricsConfig {
   string region = 4;
 }
 
-message GcpMetricsConfig { string operations_metrics_topic = 1; }
+message GcpMetricsConfig {
+  string operations_metrics_topic = 1;
+}
 
-message LogMetricsConfig { string log_level = 1; }
+message LogMetricsConfig {
+  string log_level = 1;
+}
 
 message AdminConfig {
   string deployment_environment = 1;
@@ -279,7 +287,9 @@ message AdminConfig {
   bool enable_graceful_shutdown = 5;
 }
 
-message AwsAdminConfig { string region = 1; }
+message AwsAdminConfig {
+  string region = 1;
+}
 
 message GcpAdminConfig {}
 
@@ -404,7 +414,9 @@ message ProvisionedQueue {
   build.bazel.remote.execution.v2.Platform platform = 2;
 }
 
-message ProvisionedQueuesConfig { repeated ProvisionedQueue queues = 1; }
+message ProvisionedQueuesConfig {
+  repeated ProvisionedQueue queues = 1;
+}
 
 message RedisShardBackplaneConfig {
   // the uri endpoint of the redis target. This must be a single host entry
@@ -681,7 +693,9 @@ message OperationChange {
     google.longrunning.Operation operation = 2;
   }
 
-  message Expire { bool force = 1; }
+  message Expire {
+    bool force = 1;
+  }
 
   google.protobuf.Timestamp effectiveAt = 1;
 
@@ -870,7 +884,9 @@ message ExecutionWrapper {
 message ExecutionPolicy {
   string name = 1;
 
-  oneof policy { ExecutionWrapper wrapper = 2; }
+  oneof policy {
+    ExecutionWrapper wrapper = 2;
+  }
 }
 
 message WorkerConfig {
@@ -964,7 +980,9 @@ message TreeIteratorToken {
   repeated build.bazel.remote.execution.v2.Digest directories = 1;
 }
 
-message OperationIteratorToken { string operation_name = 1; }
+message OperationIteratorToken {
+  string operation_name = 1;
+}
 
 message BlobWriteKey {
   build.bazel.remote.execution.v2.Digest digest = 1;
@@ -1040,7 +1058,9 @@ message WorkerProfileRequest {}
 
 message WorkerListRequest {}
 
-message WorkerListMessage { repeated string workers = 1; }
+message WorkerListMessage {
+  repeated string workers = 1;
+}
 
 service WorkerProfile {
   rpc GetWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}

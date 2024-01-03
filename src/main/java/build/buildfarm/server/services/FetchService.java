@@ -72,7 +72,7 @@ public class FetchService extends FetchImplBase {
     if (expectedDigest == null) {
       responseObserver.onError(
           Status.INVALID_ARGUMENT
-              .withDescription(format("Missing qualifier 'checksum.sri'"))
+              .withDescription("Missing qualifier 'checksum.sri'")
               .asException());
     } else if (request.getUrisCount() != 0) {
       addCallback(

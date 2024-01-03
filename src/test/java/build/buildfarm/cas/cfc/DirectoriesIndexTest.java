@@ -51,6 +51,7 @@ public class DirectoriesIndexTest {
     } else {
       throw new IllegalArgumentException("DirectoriesIndex type is not supported.");
     }
+    directoriesIndex.start();
   }
 
   @Before
