@@ -1,8 +1,9 @@
 ---
-name: Package and Publish Helm Chart
+name: Lint Helm Chart
 
 on:
-  path: kubernetes/helm-charts/buildfarm
+  push:
+  paths: kubernetes/helm-charts/buildfarm/**
 
 env:
   CHART_ROOT: kubernetes/helm-charts/buildfarm
