@@ -15,6 +15,7 @@
 package build.buildfarm.instance.shard;
 
 import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.ActionResult;
@@ -79,15 +80,14 @@ import com.google.rpc.Status;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -142,7 +142,7 @@ public class RedisShardBackplane implements Backplane {
   private @Nullable RedisClient client = null;
 
   private Deadline storageWorkersDeadline = null;
-  private final Set<String> storageWorkerSet = Collections.synchronizedSet(new HashSet<>());
+  private final Map<String, ShardWorker> storageWorkers = new ConcurrentHashMap<>();
   private final Supplier<Set<String>> recentExecuteWorkers;
 
   private DistributedState state = new DistributedState();
@@ -168,7 +168,7 @@ public class RedisShardBackplane implements Backplane {
         Suppliers.memoizeWithExpiration(
             () -> {
               try {
-                return client.call(this::fetchAndExpireExecuteWorkers);
+                return client.call(this::fetchAndExpireExecuteWorkers).keySet();
               } catch (IOException e) {
                 throw new RuntimeException(e);
               }
@@ -464,10 +464,7 @@ public class RedisShardBackplane implements Backplane {
     subscriberService = BuildfarmExecutors.getSubscriberPool();
     subscriber =
         new RedisShardSubscriber(
-            watchers,
-            storageWorkerSet,
-            configs.getBackplane().getWorkerChannel(),
-            subscriberService);
+            watchers, storageWorkers, configs.getBackplane().getWorkerChannel(), subscriberService);
 
     operationSubscription =
         new RedisShardSubscription(
@@ -584,13 +581,14 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void addWorker(ShardWorker shardWorker) throws IOException {
     String json = JsonFormat.printer().print(shardWorker);
+    Timestamp effectiveAt = Timestamps.fromMillis(shardWorker.getFirstRegisteredAt());
     String workerChangeJson =
         JsonFormat.printer()
             .print(
                 WorkerChange.newBuilder()
                     .setEffectiveAt(toTimestamp(Instant.now()))
                     .setName(shardWorker.getEndpoint())
-                    .setAdd(WorkerChange.Add.getDefaultInstance())
+                    .setAdd(WorkerChange.Add.newBuilder().setEffectiveAt(effectiveAt).build())
                     .build());
     client.call(
         jedis -> {
@@ -638,7 +636,7 @@ public class RedisShardBackplane implements Backplane {
             .setRemove(WorkerChange.Remove.newBuilder().setSource(source).setReason(reason).build())
             .build();
     String workerChangeJson = JsonFormat.printer().print(workerChange);
-    return subscriber.removeWorker(name)
+    return storageWorkers.remove(name) != null
         && client.call(
             jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson, /* storage=*/ true));
   }
@@ -687,45 +685,41 @@ public class RedisShardBackplane implements Backplane {
     removeWorker(workerName, "Requested shutdown");
   }
 
-  @SuppressWarnings("ConstantConditions")
+  /**
+   * Returns a new set containing copies of the storage workers. Note: This method does not grant
+   * access to the shared storage set.
+   */
   @Override
-  public synchronized Set<String> getStorageWorkers() throws IOException {
-    if (storageWorkersDeadline == null || storageWorkersDeadline.isExpired()) {
-      synchronized (storageWorkerSet) {
-        Set<String> newWorkerSet = client.call(this::fetchAndExpireStorageWorkers);
-        storageWorkerSet.clear();
-        storageWorkerSet.addAll(newWorkerSet);
-      }
-      storageWorkersDeadline = Deadline.after(workerSetMaxAge, SECONDS);
-    }
-    return new HashSet<>(storageWorkerSet);
+  public Set<String> getStorageWorkers() throws IOException {
+    refreshStorageWorkersIfExpired();
+    return new HashSet<>(storageWorkers.keySet());
   }
 
   @Override
   public Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames)
       throws IOException {
-    if (workerNames.isEmpty()) {
-      return Collections.emptyMap();
-    }
-    List<String> workerList = client.call(jedis -> state.storageWorkers.mget(jedis, workerNames));
+    refreshStorageWorkersIfExpired();
+    Map<String, Long> workerAndStartTime = new HashMap<>();
+    workerNames.forEach(
+        worker -> {
+          ShardWorker workerInfo = storageWorkers.get(worker);
+          if (workerInfo != null) {
+            workerAndStartTime.put(
+                worker, MILLISECONDS.toSeconds(workerInfo.getFirstRegisteredAt()));
+          }
+        });
+    return workerAndStartTime;
+  }
 
-    return workerList.stream()
-        .filter(Objects::nonNull)
-        .map(
-            workerJson -> {
-              try {
-                ShardWorker.Builder builder = ShardWorker.newBuilder();
-                JsonFormat.parser().merge(workerJson, builder);
-                ShardWorker worker = builder.build();
-                return new AbstractMap.SimpleEntry<>(
-                    worker.getEndpoint(), worker.getFirstRegisteredAt() / 1000L);
-              } catch (InvalidProtocolBufferException e) {
-                return null;
-              }
-            })
-        .filter(Objects::nonNull)
-        .collect(
-            Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue));
+  private synchronized void refreshStorageWorkersIfExpired() throws IOException {
+    if (storageWorkersDeadline == null || storageWorkersDeadline.isExpired()) {
+      synchronized (storageWorkers) {
+        Map<String, ShardWorker> newWorkers = client.call(this::fetchAndExpireStorageWorkers);
+        storageWorkers.clear();
+        storageWorkers.putAll(newWorkers);
+      }
+      storageWorkersDeadline = Deadline.after(workerSetMaxAge, SECONDS);
+    }
   }
 
   @Override
@@ -798,18 +792,18 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
-  private Set<String> fetchAndExpireStorageWorkers(JedisCluster jedis) {
+  private Map<String, ShardWorker> fetchAndExpireStorageWorkers(JedisCluster jedis) {
     return fetchAndExpireWorkers(jedis, state.storageWorkers.asMap(jedis), /* storage=*/ true);
   }
 
-  private Set<String> fetchAndExpireExecuteWorkers(JedisCluster jedis) {
+  private Map<String, ShardWorker> fetchAndExpireExecuteWorkers(JedisCluster jedis) {
     return fetchAndExpireWorkers(jedis, state.executeWorkers.asMap(jedis), /* storage=*/ false);
   }
 
-  private Set<String> fetchAndExpireWorkers(
+  private Map<String, ShardWorker> fetchAndExpireWorkers(
       JedisCluster jedis, Map<String, String> workers, boolean publish) {
     long now = System.currentTimeMillis();
-    Set<String> returnWorkers = Sets.newConcurrentHashSet();
+    Map<String, ShardWorker> returnWorkers = Maps.newConcurrentMap();
     ImmutableList.Builder<ShardWorker> invalidWorkers = ImmutableList.builder();
     for (Map.Entry<String, String> entry : workers.entrySet()) {
       String json = entry.getValue();
@@ -824,7 +818,7 @@ public class RedisShardBackplane implements Backplane {
           if (worker.getExpireAt() <= now) {
             invalidWorkers.add(worker);
           } else {
-            returnWorkers.add(worker.getEndpoint());
+            returnWorkers.put(worker.getEndpoint(), worker);
           }
         }
       } catch (InvalidProtocolBufferException e) {
