@@ -18,19 +18,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - id: get-chart-ver
+        name: Extracting Helm Chart Version from Tag
         run: |
           set -ex
           echo "chart_ver=$(echo $GITHUB_REF | cut -d / -f 4)" >> $GITHUB_STATE
       - id: set-chart-yaml-version
+        name: Etching Helm Chart Version into Chart.yaml for Packaging
         run: |
           set -ex
-          echo setting version to \
+          echo setting Chart version to \
             "${{ steps.get-chart-ver.outputs.chart_ver }}" \
             in ${CHART_ROOT}/Chart.yaml
           yq -i \
             '.version |= "${{ steps.get-chart-ver.outputs.chart_ver }}"' \
             ${CHART_ROOT}/Chart.yaml
-      - name: helm-lint-package-release
+      - id: helm-lint-package-release
+        name: Helm Chart Lint, Package, and Release
         run: |-
           set -ex
           helm dep up "${CHART_ROOT}"

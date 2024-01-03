@@ -16,7 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: helm-lint
+      - id: helm-lint
+        name: Lint Helm Chart
         run: |-
           set -ex
           helm dep up "${CHART_ROOT}"
