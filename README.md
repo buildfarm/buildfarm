@@ -138,11 +138,11 @@ buildfarm_images()
 To install with helm:
 
 ```bash
-CHART_VER="0.2.1-beta4"
-# https://github.com/andrewrothstein/bazel-buildfarm/releases/download/helm%2F0.2.1-beta3/buildfarm-0.2.1-beta4.tgz
+# https://github.com/andrewrothstein/bazel-buildfarm/releases/download/helm%2F0.2.2/buildfarm-0.2.2.tgz
+CHART_VER="0.2.2"
 helm install \
   -n bazel-buildfarm \
   --create-namespace \
   bazel-buildfarm \
-  "https://github.com/bazelbuild/bazel-buildfarm/releases/download/$(echo ${CHART_VER} | jq "@uri" -jRr)/buildfarm-${CHART_VER}.tgz"
+  "https://github.com/bazelbuild/bazel-buildfarm/releases/download/helm%2F${CHART_VER}/buildfarm-${CHART_VER}.tgz"
 ```
