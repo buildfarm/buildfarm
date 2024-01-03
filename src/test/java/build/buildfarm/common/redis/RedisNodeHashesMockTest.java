@@ -47,7 +47,10 @@ public class RedisNodeHashesMockTest {
   public void getEvenlyDistributedHashesCanRetrieveDistributedHashes() throws Exception {
     // ARRANGE
     Jedis node = mock(Jedis.class);
-    when(node.clusterSlots()).thenReturn(Collections.singletonList(Arrays.asList(0L, 100L)));
+    when(node.clusterSlots())
+        .thenReturn(
+            Collections.singletonList(
+                Arrays.asList(0L, 100L, Arrays.asList(null, null, "nodeId"))));
 
     JedisPool pool = mock(JedisPool.class);
     when(pool.getResource()).thenReturn(node);
@@ -97,7 +100,10 @@ public class RedisNodeHashesMockTest {
     // ARRANGE
     Jedis node = mock(Jedis.class);
     when(node.clusterSlots())
-        .thenReturn(Arrays.asList(Arrays.asList(0L, 100L), Arrays.asList(101L, 200L)));
+        .thenReturn(
+            Arrays.asList(
+                Arrays.asList(0L, 100L, Arrays.asList(null, null, "nodeId1")),
+                Arrays.asList(101L, 200L, Arrays.asList(null, null, "nodeId2"))));
 
     JedisPool pool = mock(JedisPool.class);
     when(pool.getResource()).thenReturn(node);
