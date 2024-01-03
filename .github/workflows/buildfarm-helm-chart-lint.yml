@@ -2,17 +2,14 @@
 name: Package and Publish Helm Chart
 
 on:
-  push:
-    tags:
-      - 'helm/*'
+  path: kubernetes/helm-charts/buildfarm
 
 env:
-  GH_TOKEN: ${{ github.token }}
   CHART_ROOT: kubernetes/helm-charts/buildfarm
 
 jobs:
-  build:
-    name: Package and Release BuildFarm Helm Chart
+  lint:
+    name: Lint Helm Chart
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,5 +18,4 @@ jobs:
         run: |-
           set -ex
           helm dep up "${CHART_ROOT}"
-          helm package "${CHART_ROOT}"
-          gh release create "${{ github.ref_name }}" *.tgz
+          helm lint "${CHART_ROOT}"
