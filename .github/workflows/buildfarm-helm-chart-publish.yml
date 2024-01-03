@@ -20,8 +20,7 @@ jobs:
       - id: get-chart-ver
         run: |
           set -ex
-          chart_ver=$(echo $GITHUB_REF | cut -d / -f 4)
-          echo "::set-output name=chart_ver::$chart_ver"
+          echo "chart_ver=$(echo $GITHUB_REF | cut -d / -f 4)" >> $GITHUB_STATE
       - id: set-chart-yaml-version
         run: |
           set -ex
