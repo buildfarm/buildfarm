@@ -21,7 +21,7 @@ jobs:
         name: Extracting Helm Chart Version from Tag
         run: |
           set -ex
-          echo "chart_ver=$(echo $GITHUB_REF | cut -d / -f 4)" >> $GITHUB_STATE
+          echo "chart_ver=$(echo $GITHUB_REF | cut -d / -f 4)" >> $GITHUB_OUTPUT
       - id: set-chart-yaml-version
         name: Etching Helm Chart Version into Chart.yaml for Packaging
         run: |
