@@ -279,7 +279,9 @@ message ShardWorker {
 }
 
 message WorkerChange {
-  message Add { google.protobuf.Timestamp effectiveAt = 1; }
+  message Add {
+    google.protobuf.Timestamp effectiveAt = 1;
+  }
 
   message Remove {
     string source = 1;
