@@ -144,8 +144,7 @@ public final class Worker extends LoggingMain {
   public void prepareWorkerForGracefulShutdown() {
     if (configs.getWorker().getGracefulShutdownSeconds() == 0) {
       log.info(
-          String.format(
-              "Graceful Shutdown is not enabled. Worker is shutting down without finishing executions in progress."));
+          "Graceful Shutdown is not enabled. Worker is shutting down without finishing executions in progress.");
     } else {
       inGracefulShutdown = true;
       log.info(
@@ -158,7 +157,7 @@ public final class Worker extends LoggingMain {
         if (pipeline.isEmpty()) {
           log.info("Graceful Shutdown - no work in the pipeline.");
         } else {
-          log.info(String.format("Graceful Shutdown - waiting for executions to finish."));
+          log.info("Graceful Shutdown - waiting for executions to finish.");
         }
         while (!pipeline.isEmpty() && timeWaited < timeOut) {
           SECONDS.sleep(scanRate);
