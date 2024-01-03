@@ -11,6 +11,17 @@ env:
   CHART_ROOT: kubernetes/helm-charts/buildfarm
 
 jobs:
+  lint:
+    name: Lint Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: helm package
+        run: |-
+          set -ex
+          helm dep up "${CHART_ROOT}"
+          helm lint "${CHART_ROOT}"
   build:
     name: Package and Release BuildFarm Helm Chart
     runs-on: ubuntu-latest
