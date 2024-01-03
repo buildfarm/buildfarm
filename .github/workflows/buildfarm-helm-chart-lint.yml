@@ -3,7 +3,8 @@ name: Lint Helm Chart
 
 on:
   push:
-  paths: kubernetes/helm-charts/buildfarm/**
+    paths:
+      - kubernetes/helm-charts/buildfarm/**
 
 env:
   CHART_ROOT: kubernetes/helm-charts/buildfarm
