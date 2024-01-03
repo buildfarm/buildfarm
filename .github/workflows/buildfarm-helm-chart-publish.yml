@@ -11,26 +11,30 @@ env:
   CHART_ROOT: kubernetes/helm-charts/buildfarm
 
 jobs:
-  lint:
-    name: Lint Helm Chart
+  build:
+    name: Lint, Package, and Release BuildFarm Helm Chart
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: helm package
+      - id: get-chart-ver
+        run: |
+          set -ex
+          chart_ver=$(echo $GITHUB_REF | cut -d / -f 4)
+          echo "::set-output name=chart_ver::$chart_ver"
+      - id: set-chart-yaml-version
+        run: |
+          set -ex
+          echo setting version to \
+            "${{ steps.get-chart-ver.outputs.chart_ver }}" \
+            in ${CHART_ROOT}/Chart.yaml
+          yq -i \
+            '.version |= "${{ steps.get-chart-ver.outputs.chart_ver }}"' \
+            ${CHART_ROOT}/Chart.yaml
+      - name: helm-lint-package-release
         run: |-
           set -ex
           helm dep up "${CHART_ROOT}"
           helm lint "${CHART_ROOT}"
-  build:
-    name: Package and Release BuildFarm Helm Chart
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: helm package
-        run: |-
-          set -ex
-          helm dep up "${CHART_ROOT}"
           helm package "${CHART_ROOT}"
           gh release create "${{ github.ref_name }}" *.tgz
