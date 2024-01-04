@@ -57,19 +57,13 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
         throw new RuntimeException(e);
       }
 
-      String createDirectoriesSql =
-          "CREATE TABLE directories (id INTEGER PRIMARY KEY, name VARCHAR UNIQUE)";
-      String createFilesSql = "CREATE TABLE files (id INTEGER PRIMARY KEY, name VARCHAR UNIQUE)";
       String createEntriesSql =
           "CREATE TABLE entries (\n"
-              + "    file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,\n"
-              + "    directory_id INTEGER NOT NULL REFERENCES directories(id) ON DELETE CASCADE,\n"
-              + "    PRIMARY KEY (file_id, directory_id)\n"
+              + "    path TEXT NOT NULL,\n"
+              + "    directory TEXT NOT NULL\n"
               + ")";
 
       try (Statement stmt = conn.createStatement()) {
-        stmt.execute(createDirectoriesSql);
-        stmt.execute(createFilesSql);
         stmt.execute(createEntriesSql);
       } catch (SQLException e) {
         throw new RuntimeException(e);
@@ -83,13 +77,11 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
   public synchronized void start() {
     open();
 
-    String createPathIndexSql = "CREATE INDEX file_idx ON entries (file_id)";
-    String createDirectoryIndexSql = "CREATE INDEX directory_idx ON entries (directory_id)";
-    String enforceForeignKeys = "PRAGMA foreign_keys=ON";
+    String createPathIndexSql = "CREATE INDEX path_idx ON entries (path)";
+    String createDirectoryIndexSql = "CREATE INDEX directory_idx ON entries (directory)";
     try (Statement stmt = conn.createStatement()) {
       stmt.execute(createPathIndexSql);
       stmt.execute(createDirectoryIndexSql);
-      stmt.execute(enforceForeignKeys);
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
@@ -109,8 +101,7 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
   private Set<Digest> removeEntryDirectories(String entry) {
     open();
 
-    String selectSql =
-        "SELECT d.name as directory FROM files f INNER JOIN entries e ON f.id = e.file_id INNER JOIN directories d ON d.id = e.directory_id WHERE f.name = ?";
+    String selectSql = "SELECT directory FROM entries WHERE path = ?";
 
     ImmutableSet.Builder<Digest> directoriesBuilder = ImmutableSet.builder();
     try (PreparedStatement selectStatement = conn.prepareStatement(selectSql)) {
@@ -125,7 +116,7 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
     }
     // all directories featuring this entry are now invalid
     ImmutableSet<Digest> directories = directoriesBuilder.build();
-    String deleteSql = "DELETE FROM directories where name = ?";
+    String deleteSql = "DELETE FROM entries where directory = ?";
     try (PreparedStatement deleteStatement = conn.prepareStatement(deleteSql)) {
       conn.setAutoCommit(false);
       for (Digest directory : directories) {
@@ -134,14 +125,6 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
       }
       deleteStatement.executeBatch();
       conn.commit();
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
-    }
-    // clear out orphaned files
-    try (Statement orphanStatement = conn.createStatement()) {
-      String deleteOrphanSql =
-          "DELETE FROM files WHERE id NOT IN (SELECT DISTINCT file_id FROM entries)";
-      orphanStatement.execute(deleteOrphanSql);
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
@@ -155,41 +138,16 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
     return directories;
   }
 
-  // inserts here specifically avoids integer key maintenance in java
   private synchronized void addEntriesDirectory(Set<String> entries, Digest directory) {
     open();
 
-    String directoryName = DigestUtil.toString(directory);
-    String filesInsertSql = "INSERT OR IGNORE INTO files (name) VALUES (?)";
-    try (PreparedStatement filesInsertStatement = conn.prepareStatement(filesInsertSql)) {
+    String digest = DigestUtil.toString(directory);
+    String insertSql = "INSERT INTO entries (path, directory) VALUES (?,?)";
+    try (PreparedStatement insertStatement = conn.prepareStatement(insertSql)) {
       conn.setAutoCommit(false);
-      for (String entry : entries) {
-        filesInsertStatement.setString(1, entry);
-        filesInsertStatement.addBatch();
-      }
-      filesInsertStatement.executeBatch();
-      conn.commit();
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
-    }
-    // should be novel directory
-    String directoriesInsertSql = "INSERT INTO directories (name) VALUES (?)";
-    try (PreparedStatement directoriesInsertStatement =
-        conn.prepareStatement(directoriesInsertSql)) {
-      conn.setAutoCommit(false);
-      directoriesInsertStatement.setString(1, directoryName);
-      directoriesInsertStatement.executeUpdate();
-      conn.commit();
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
-    }
-    String entriesInsertSql =
-        "INSERT INTO entries (file_id, directory_id) SELECT f.id, d.id FROM files f, directories d WHERE f.name = ? AND d.name = ?";
-    try (PreparedStatement insertStatement = conn.prepareStatement(entriesInsertSql)) {
-      conn.setAutoCommit(false);
+      insertStatement.setString(2, digest);
       for (String entry : entries) {
         insertStatement.setString(1, entry);
-        insertStatement.setString(2, directoryName);
         insertStatement.addBatch();
       }
       insertStatement.executeBatch();
@@ -210,9 +168,8 @@ class SqliteFileDirectoriesIndex extends FileDirectoriesIndex {
     open();
 
     String digest = DigestUtil.toString(directory);
-    String deleteSql = "DELETE FROM directories WHERE name = ?";
+    String deleteSql = "DELETE FROM entries WHERE directory = ?";
     try (PreparedStatement deleteStatement = conn.prepareStatement(deleteSql)) {
-      conn.setAutoCommit(true);
       deleteStatement.setString(1, digest);
       deleteStatement.executeUpdate();
     } catch (SQLException e) {
