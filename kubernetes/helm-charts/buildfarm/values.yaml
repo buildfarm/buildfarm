@@ -140,10 +140,10 @@ shardWorker:
     #   secretName: my-secret
     #   defaultMode: 0600
 
-  extraVolumeMounts: []
-    # - name: customConfig
-    #   mountPath: /mnt/config
-    #   readOnly: true
+  #extraVolumeMounts:
+  # - name: customConfig
+  #   mountPath: /mnt/config
+  #   readOnly: true
   extraEnv:
   - name: JAVABIN
     value: "/usr/bin/java"

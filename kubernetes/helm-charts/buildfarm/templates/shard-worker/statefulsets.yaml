@@ -74,7 +74,7 @@ spec:
               readOnly: true
             - mountPath: /tmp/worker
               name: {{ include "buildfarm.fullname" . }}-shard-worker-data
-          {{- with .Values.extraVolumeMounts }}
+          {{- with .Values.shardWorker.extraVolumeMounts }}
           {{- tpl (toYaml .) $ | nindent 12 -}}
           {{- end }}
       {{- with .Values.shardWorker.nodeSelector }}
