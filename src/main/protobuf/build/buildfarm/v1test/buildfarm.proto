@@ -448,7 +448,12 @@ message BackplaneStatus {
 
   DispatchedOperationsStatus dispatched_operations = 9;
 
+  // Maintained for backward compatibility.
   repeated string active_workers = 4;
+
+  repeated string active_storage_workers = 12;
+
+  repeated string active_execute_workers = 13;
 
   int64 cas_lookup_size = 5;
 
