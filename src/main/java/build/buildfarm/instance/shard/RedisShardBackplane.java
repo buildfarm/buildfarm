@@ -1468,7 +1468,11 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public BackplaneStatus backplaneStatus() throws IOException {
     BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
-    builder.addAllActiveWorkers(Sets.union(getExecuteWorkers(), getStorageWorkers()));
+    Set<String> executeWorkers = getExecuteWorkers();
+    Set<String> storageWorkers = getStorageWorkers();
+    builder.addAllActiveExecuteWorkers(executeWorkers);
+    builder.addAllActiveStorageWorkers(storageWorkers);
+    builder.addAllActiveWorkers(Sets.union(executeWorkers, storageWorkers));
     builder.setDispatchedSize(client.call(jedis -> state.dispatchedOperations.size(jedis)));
     builder.setOperationQueue(state.operationQueue.status(client.call(jedis -> jedis)));
     builder.setPrequeue(state.prequeue.status(client.call(jedis -> jedis)));
