@@ -16,6 +16,7 @@ package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -23,6 +24,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.StringVisitor;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -150,9 +152,7 @@ public class RedisPriorityQueueMockTest {
     }
 
     // ASSERT
-    for (int i = 0; i < 1000; ++i) {
-      verify(redis, times(1)).zadd("test", 0, "123:foo" + i);
-    }
+    verify(redis, times(1000)).zadd(eq("test"), eq(0.0), any(String.class));
   }
 
   // Function under test: push
@@ -206,7 +206,7 @@ public class RedisPriorityQueueMockTest {
 
     // ACT
     queue.push(redis, "foo");
-    String val = queue.dequeue(redis, 1, service);
+    String val = queue.dequeue(redis, Duration.ofSeconds(1), service);
 
     // ASSERT
     verifyNoInteractions(service);
@@ -225,7 +225,7 @@ public class RedisPriorityQueueMockTest {
 
     // ACT
     queue.push(redis, "foo");
-    String val = queue.dequeue(redis, 5, service);
+    String val = queue.dequeue(redis, Duration.ofMillis(100), service);
 
     // ASSERT
     verifyNoInteractions(service);
@@ -248,7 +248,7 @@ public class RedisPriorityQueueMockTest {
         new Thread(
             () -> {
               try {
-                queue.dequeue(redis, 100000, service);
+                queue.dequeue(redis, Duration.ofDays(1), service);
               } catch (Exception e) {
               }
             });

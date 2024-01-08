@@ -18,6 +18,7 @@ import static redis.clients.jedis.args.ListDirection.LEFT;
 import static redis.clients.jedis.args.ListDirection.RIGHT;
 
 import build.buildfarm.common.StringVisitor;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -35,6 +36,10 @@ import redis.clients.jedis.Jedis;
  *     queue.
  */
 public class RedisQueue extends QueueInterface {
+  private static double toRedisTimeoutSeconds(Duration timeout) {
+    return timeout.getSeconds() + timeout.getNano() / 1e9;
+  }
+
   /**
    * @field name
    * @brief The unique name of the queue.
@@ -100,15 +105,15 @@ public class RedisQueue extends QueueInterface {
    * @details This pops the element from one queue atomically into an internal list called the
    *     dequeue. It will wait until the timeout has expired. Null is returned if the timeout has
    *     expired.
-   * @param timeout_s Timeout to wait if there is no item to dequeue. (units: seconds (s))
+   * @param timeout Timeout to wait if there is no item to dequeue.
    * @return The value of the transfered element. null if the thread was interrupted.
    * @note Overloaded.
    * @note Suggested return identifier: val.
    */
-  public String dequeue(Jedis jedis, int timeout_s, ExecutorService service)
+  public String dequeue(Jedis jedis, Duration timeout, ExecutorService service)
       throws InterruptedException {
     return interruptibleRequest(
-        () -> jedis.blmove(name, getDequeueName(), RIGHT, LEFT, timeout_s),
+        () -> jedis.blmove(name, getDequeueName(), RIGHT, LEFT, toRedisTimeoutSeconds(timeout)),
         jedis::disconnect,
         service);
   }
