@@ -15,6 +15,7 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.StringVisitor;
+import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import redis.clients.jedis.Jedis;
 
@@ -61,12 +62,12 @@ public abstract class QueueInterface {
    *     dequeue. It will wait until the timeout has expired. Null is returned if the timeout has
    *     expired. It is up to the caller to maintain the Jedis object and ensure it is valid for the
    *     queue operations.
-   * @param timeout_s Timeout to wait if there is no item to dequeue. (units: seconds (s))
+   * @param timeout Timeout to wait if there is no item to dequeue.
    * @return The value of the transfered element. null if the thread was interrupted.
    * @note Overloaded.
    * @note Suggested return identifier: val.
    */
-  abstract String dequeue(Jedis jedis, int timeout_s, ExecutorService service)
+  abstract String dequeue(Jedis jedis, Duration timeout, ExecutorService service)
       throws InterruptedException;
 
   /**

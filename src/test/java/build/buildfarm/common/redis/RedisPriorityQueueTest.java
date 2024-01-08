@@ -15,14 +15,15 @@
 package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.shard.JedisClusterFactory;
+import com.google.common.base.Stopwatch;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -196,6 +197,7 @@ public class RedisPriorityQueueTest {
     // ARRANGE
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
     ExecutorService service = mock(ExecutorService.class);
+    Duration timeout = Duration.ofSeconds(1);
 
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
@@ -211,17 +213,17 @@ public class RedisPriorityQueueTest {
     assertThat(queue.size(redis)).isEqualTo(5);
     queue.push(redis, "baz4");
     assertThat(queue.size(redis)).isEqualTo(6);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(5);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(4);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(3);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(2);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(1);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(0);
     verifyNoInteractions(service);
   }
@@ -234,6 +236,7 @@ public class RedisPriorityQueueTest {
     // ARRANGE
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
     ExecutorService service = mock(ExecutorService.class);
+    Duration timeout = Duration.ofSeconds(1);
     String val;
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
@@ -249,22 +252,22 @@ public class RedisPriorityQueueTest {
     assertThat(queue.size(redis)).isEqualTo(5);
     queue.push(redis, "baz4", 1);
     assertThat(queue.size(redis)).isEqualTo(6);
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("bar");
     assertThat(queue.size(redis)).isEqualTo(5);
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("baz2");
     assertThat(queue.size(redis)).isEqualTo(4);
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("baz4");
     assertThat(queue.size(redis)).isEqualTo(3);
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("foo");
     assertThat(queue.size(redis)).isEqualTo(2);
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("baz3");
     assertThat(queue.size(redis)).isEqualTo(1);
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("baz");
     assertThat(queue.size(redis)).isEqualTo(0);
     verifyNoInteractions(service);
@@ -279,11 +282,10 @@ public class RedisPriorityQueueTest {
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
     ExecutorService service = mock(ExecutorService.class);
 
-    Instant start = Instant.now();
-    String val = queue.dequeue(redis, 1, service);
-    Instant finish = Instant.now();
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    String val = queue.dequeue(redis, Duration.ofSeconds(1), service);
+    long timeElapsed = stopwatch.elapsed(MILLISECONDS);
 
-    long timeElapsed = Duration.between(start, finish).toMillis();
     assertThat(timeElapsed).isGreaterThan(1000L);
     assertThat(val).isEqualTo(null);
     verifyNoInteractions(service);
@@ -297,6 +299,7 @@ public class RedisPriorityQueueTest {
     // ARRANGE
     RedisPriorityQueue queue = new RedisPriorityQueue("test");
     ExecutorService service = mock(ExecutorService.class);
+    Duration timeout = Duration.ofSeconds(1);
     String val;
 
     // ACT / ASSERT
@@ -309,21 +312,21 @@ public class RedisPriorityQueueTest {
     queue.push(redis, "baz-2", 2);
     queue.push(redis, "foo-4", 4);
 
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("negative-50");
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("negative-1");
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("foo-1");
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("baz-2");
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("foo-3");
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("foo-4");
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("foo-5");
-    val = queue.dequeue(redis, 1, service);
+    val = queue.dequeue(redis, timeout, service);
     assertThat(val).isEqualTo("foo-6");
     verifyNoInteractions(service);
   }

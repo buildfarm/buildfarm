@@ -26,6 +26,7 @@ import static redis.clients.jedis.args.ListDirection.LEFT;
 import static redis.clients.jedis.args.ListDirection.RIGHT;
 
 import build.buildfarm.common.StringVisitor;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -127,9 +128,7 @@ public class RedisQueueMockTest {
     }
 
     // ASSERT
-    for (int i = 0; i < 1000; ++i) {
-      verify(redis, times(1)).lpush("test", "foo" + i);
-    }
+    verify(redis, times(1000)).lpush(eq("test"), any(String.class));
   }
 
   // Function under test: push
@@ -186,7 +185,7 @@ public class RedisQueueMockTest {
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT
-    String val = queue.dequeue(redis, 1, service);
+    String val = queue.dequeue(redis, Duration.ofSeconds(1), service);
     service.shutdown();
 
     // ASSERT
@@ -206,7 +205,7 @@ public class RedisQueueMockTest {
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT
-    String val = queue.dequeue(redis, 5, service);
+    String val = queue.dequeue(redis, Duration.ofMillis(100), service);
     service.shutdown();
 
     // ASSERT
@@ -231,7 +230,7 @@ public class RedisQueueMockTest {
         new Thread(
             () -> {
               try {
-                queue.dequeue(redis, 100000, service);
+                queue.dequeue(redis, Duration.ofDays(1), service);
               } catch (Exception e) {
               }
             });

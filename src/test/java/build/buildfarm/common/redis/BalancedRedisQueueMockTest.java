@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.StringVisitor;
 import com.google.common.collect.ImmutableList;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -122,7 +123,7 @@ public class BalancedRedisQueueMockTest {
   public void dequeueExponentialBackoffElementDequeuedOnBlock() throws Exception {
     // MOCK
     when(subQueue.nonBlockingDequeue(any(Jedis.class))).thenReturn(null);
-    when(subQueue.dequeue(any(Jedis.class), any(Integer.class), any(ExecutorService.class)))
+    when(subQueue.dequeue(any(Jedis.class), any(Duration.class), any(ExecutorService.class)))
         .thenReturn("foo");
 
     // ARRANGE

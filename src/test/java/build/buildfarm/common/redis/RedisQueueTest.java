@@ -21,6 +21,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.shard.JedisClusterFactory;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -194,6 +195,8 @@ public class RedisQueueTest {
     // ARRANGE
     RedisQueue queue = new RedisQueue("{hash}test");
     ExecutorService service = newSingleThreadExecutor();
+    Duration timeout = Duration.ofSeconds(1);
+
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
     queue.push(redis, "foo");
@@ -208,17 +211,17 @@ public class RedisQueueTest {
     assertThat(queue.size(redis)).isEqualTo(5);
     queue.push(redis, "baz");
     assertThat(queue.size(redis)).isEqualTo(6);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(5);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(4);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(3);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(2);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(1);
-    queue.dequeue(redis, 1, service);
+    queue.dequeue(redis, timeout, service);
     assertThat(queue.size(redis)).isEqualTo(0);
     service.shutdown();
     assertThat(service.awaitTermination(1, MILLISECONDS)).isTrue();

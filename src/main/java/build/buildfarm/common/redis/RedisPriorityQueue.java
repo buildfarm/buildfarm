@@ -15,6 +15,7 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.StringVisitor;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -142,15 +143,15 @@ public class RedisPriorityQueue extends QueueInterface {
    * @details This pops the element from one queue atomically into an internal list called the
    *     dequeue. It will wait until the timeout has expired. Null is returned if the timeout has
    *     expired.
-   * @param timeout_s Timeout to wait if there is no item to dequeue. (units: seconds (s))
+   * @param timeout Timeout to wait if there is no item to dequeue.
    * @return The value of the transfered element. null if the thread was interrupted.
    * @note Overloaded.
    * @note Suggested return identifier: val.
    */
   @Override
-  public String dequeue(Jedis jedis, int timeout_s, ExecutorService service)
+  public String dequeue(Jedis jedis, Duration timeout, ExecutorService service)
       throws InterruptedException {
-    int maxAttempts = (int) (timeout_s / (pollIntervalMillis / 1000.0));
+    int maxAttempts = Math.max(1, (int) (timeout.toMillis() / pollIntervalMillis));
     List<String> args = Arrays.asList(name, getDequeueName(), "true");
     String val;
     for (int i = 0; i < maxAttempts; ++i) {
@@ -295,7 +296,7 @@ public class RedisPriorityQueue extends QueueInterface {
         "local pped = redis.call('ZRANGE', zset, 0, 0)",
         "if next(pped) ~= nil then",
         "  for _,item in ipairs(pped) do",
-        "    val = item.sub('^%d*:', '')",
+        "    val = string.gsub(item, '^%d*:', '')",
         "    redis.call('ZREM', zset, item)",
         "    redis.call('LPUSH', deqName, val)",
         "  end",
