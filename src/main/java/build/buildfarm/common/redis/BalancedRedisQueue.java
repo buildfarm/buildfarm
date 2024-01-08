@@ -39,9 +39,9 @@ import redis.clients.jedis.util.JedisClusterCRC16;
  *     the same underlying redis queues.
  */
 public class BalancedRedisQueue {
-  private static final int START_TIMEOUT_SECONDS = 1;
+  private static final int START_TIMEOUT_MILLISECONDS = 1000;
 
-  private static final int MAX_TIMEOUT_SECONDS = 8;
+  private static final int MAX_TIMEOUT_MILLISECONDS = 1000;
 
   /**
    * @field name
@@ -222,13 +222,13 @@ public class BalancedRedisQueue {
     // end this phase if we have done a full round-robin
     boolean blocking = false;
     // try each of the internal queues with exponential backoff
-    int currentTimeout_s = START_TIMEOUT_SECONDS;
+    int currentTimeout_ms = START_TIMEOUT_MILLISECONDS;
     while (true) {
       final String val;
       QueueInterface queue = queues.get(roundRobinPopIndex());
       try (Jedis jedis = getJedisFromKey(unified, queue.getName())) {
         if (blocking) {
-          val = queue.dequeue(jedis, currentTimeout_s, service);
+          val = queue.dequeue(jedis, currentTimeout_ms, service);
         } else {
           val = queue.nonBlockingDequeue(jedis);
         }
@@ -246,7 +246,7 @@ public class BalancedRedisQueue {
       if (currentPopQueue == startQueue) {
         // advance timeout if blocking on queue and not at max each queue cycle
         if (blocking) {
-          currentTimeout_s = Math.min(currentTimeout_s * 2, MAX_TIMEOUT_SECONDS);
+          currentTimeout_ms = Math.min(currentTimeout_ms * 2, MAX_TIMEOUT_MILLISECONDS);
         } else {
           blocking = true;
         }

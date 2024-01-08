@@ -61,12 +61,12 @@ public abstract class QueueInterface {
    *     dequeue. It will wait until the timeout has expired. Null is returned if the timeout has
    *     expired. It is up to the caller to maintain the Jedis object and ensure it is valid for the
    *     queue operations.
-   * @param timeout_s Timeout to wait if there is no item to dequeue. (units: seconds (s))
+   * @param timeout_ms Timeout to wait if there is no item to dequeue. (units: milliseconds (ms))
    * @return The value of the transfered element. null if the thread was interrupted.
    * @note Overloaded.
    * @note Suggested return identifier: val.
    */
-  abstract String dequeue(Jedis jedis, int timeout_s, ExecutorService service)
+  abstract String dequeue(Jedis jedis, int timeout_ms, ExecutorService service)
       throws InterruptedException;
 
   /**

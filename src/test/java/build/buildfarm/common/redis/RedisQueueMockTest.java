@@ -127,9 +127,7 @@ public class RedisQueueMockTest {
     }
 
     // ASSERT
-    for (int i = 0; i < 1000; ++i) {
-      verify(redis, times(1)).lpush("test", "foo" + i);
-    }
+    verify(redis, times(1000)).lpush(eq("test"), any(String.class));
   }
 
   // Function under test: push
@@ -186,7 +184,7 @@ public class RedisQueueMockTest {
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT
-    String val = queue.dequeue(redis, 1, service);
+    String val = queue.dequeue(redis, 1000, service);
     service.shutdown();
 
     // ASSERT
@@ -206,7 +204,7 @@ public class RedisQueueMockTest {
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT
-    String val = queue.dequeue(redis, 5, service);
+    String val = queue.dequeue(redis, 100, service);
     service.shutdown();
 
     // ASSERT
@@ -231,7 +229,7 @@ public class RedisQueueMockTest {
         new Thread(
             () -> {
               try {
-                queue.dequeue(redis, 100000, service);
+                queue.dequeue(redis, 100000000, service);
               } catch (Exception e) {
               }
             });

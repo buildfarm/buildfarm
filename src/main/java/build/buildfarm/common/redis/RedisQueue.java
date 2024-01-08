@@ -100,15 +100,15 @@ public class RedisQueue extends QueueInterface {
    * @details This pops the element from one queue atomically into an internal list called the
    *     dequeue. It will wait until the timeout has expired. Null is returned if the timeout has
    *     expired.
-   * @param timeout_s Timeout to wait if there is no item to dequeue. (units: seconds (s))
+   * @param timeout_ms Timeout to wait if there is no item to dequeue. (units: milliseconds (ms))
    * @return The value of the transfered element. null if the thread was interrupted.
    * @note Overloaded.
    * @note Suggested return identifier: val.
    */
-  public String dequeue(Jedis jedis, int timeout_s, ExecutorService service)
+  public String dequeue(Jedis jedis, int timeout_ms, ExecutorService service)
       throws InterruptedException {
     return interruptibleRequest(
-        () -> jedis.blmove(name, getDequeueName(), RIGHT, LEFT, timeout_s),
+        () -> jedis.blmove(name, getDequeueName(), RIGHT, LEFT, timeout_ms / 1000.0),
         jedis::disconnect,
         service);
   }
