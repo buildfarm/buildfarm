@@ -38,6 +38,8 @@ import redis.clients.jedis.util.JedisClusterCRC16;
  *     return that slot number.
  */
 public class RedisSlotToHash {
+  private static final List<String> LOOKUP_TABLE = createLookupTable();
+
   /**
    * @brief Convert slot number into string that hashes to slot.
    * @details A short alphanumeric string will be given which when hashed by redis's crc16 algorithm
@@ -123,8 +125,7 @@ public class RedisSlotToHash {
    * @note Suggested return identifier: hashtag.
    */
   private static String staticLookup(long slotNumber) {
-    List<String> lookupTable = getLookupTable();
-    return lookupTable.get((int) slotNumber);
+    return LOOKUP_TABLE.get((int) slotNumber);
   }
 
   /**
@@ -135,8 +136,8 @@ public class RedisSlotToHash {
    * @return The hashtags organized by slot index.
    * @note Suggested return identifier: lookupTable.
    */
-  private static List<String> getLookupTable() {
-    List<String> lookupTable = new ArrayList<>();
+  private static List<String> createLookupTable() {
+    List<String> lookupTable = new ArrayList<>(CLUSTER_HASHSLOTS);
     lookupTable.addAll(slots0To4999());
     lookupTable.addAll(slots5000To9999());
     lookupTable.addAll(slots10000To14999());
