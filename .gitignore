@@ -21,6 +21,3 @@ unused_deps
 buildozer
 java_formatter.jar
 lcov
-
-# emacs undo-changes
-**/*.~undo-tree~
