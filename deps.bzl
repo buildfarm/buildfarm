@@ -19,6 +19,7 @@ def archive_dependencies(third_party):
             "sha256": "a02ba93b96a8151b5d8d3466580f6c1f7e77212c4eb181cba53eb2cae7752a23",
             "strip_prefix": "buildtools-3.5.0",
             "urls": ["https://github.com/bazelbuild/buildtools/archive/3.5.0.tar.gz"],
+            # Bzlmod: Waiting for https://github.com/bazelbuild/bazel-central-registry/issues/380
         },
 
         # Needed for @grpc_java//compiler:grpc_java_plugin.
@@ -27,6 +28,7 @@ def archive_dependencies(third_party):
             "sha256": "b8fb7ae4824fb5a5ae6e6fa26ffe2ad7ab48406fdeee54e8965a3b5948dd957e",
             "strip_prefix": "grpc-java-1.56.1",
             "urls": ["https://github.com/grpc/grpc-java/archive/v1.56.1.zip"],
+            # Bzlmod: Waiting for https://github.com/bazelbuild/bazel-central-registry/issues/353
         },
         {
             "name": "rules_pkg",
@@ -35,6 +37,7 @@ def archive_dependencies(third_party):
                 "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.9.0/rules_pkg-0.9.0.tar.gz",
                 "https://github.com/bazelbuild/rules_pkg/releases/download/0.9.0/rules_pkg-0.9.0.tar.gz",
             ],
+            # Bzlmod : Waiting for >0.9.1 for https://github.com/bazelbuild/rules_pkg/pull/766 to be released
         },
 
         # The APIs that we implement.
