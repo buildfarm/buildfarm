@@ -14,14 +14,6 @@ def archive_dependencies(third_party):
             "strip_prefix": "protobuf-25.0",
             "urls": ["https://github.com/protocolbuffers/protobuf/archive/v25.0.zip"],
         },
-        {
-            "name": "com_github_bazelbuild_buildtools",
-            "sha256": "a02ba93b96a8151b5d8d3466580f6c1f7e77212c4eb181cba53eb2cae7752a23",
-            "strip_prefix": "buildtools-3.5.0",
-            "urls": ["https://github.com/bazelbuild/buildtools/archive/3.5.0.tar.gz"],
-            # Bzlmod: Waiting for https://github.com/bazelbuild/bazel-central-registry/issues/380
-        },
-
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
