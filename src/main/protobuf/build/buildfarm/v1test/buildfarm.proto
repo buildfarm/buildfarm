@@ -77,7 +77,9 @@ message ShutDownWorkerGracefullyRequest {
 
 message ShutDownWorkerGracefullyRequestResults {}
 
-message DisableScaleInProtectionRequest { string instance_name = 1; }
+message DisableScaleInProtectionRequest {
+  string instance_name = 1;
+}
 
 message DisableScaleInProtectionRequestResults {}
 
@@ -200,7 +202,9 @@ service OperationQueue {
   }
 }
 
-message BackplaneStatusRequest { string instance_name = 1; }
+message BackplaneStatusRequest {
+  string instance_name = 1;
+}
 
 message TakeOperationRequest {
   // The instance of the execution system to operate against. A server may
@@ -275,7 +279,9 @@ message ShardWorker {
 }
 
 message WorkerChange {
-  message Add {}
+  message Add {
+    google.protobuf.Timestamp effectiveAt = 1;
+  }
 
   message Remove {
     string source = 1;
@@ -301,7 +307,9 @@ message OperationChange {
     google.longrunning.Operation operation = 2;
   }
 
-  message Expire { bool force = 1; }
+  message Expire {
+    bool force = 1;
+  }
 
   google.protobuf.Timestamp effectiveAt = 1;
 
@@ -440,7 +448,12 @@ message BackplaneStatus {
 
   DispatchedOperationsStatus dispatched_operations = 9;
 
+  // Maintained for backward compatibility.
   repeated string active_workers = 4;
+
+  repeated string active_storage_workers = 12;
+
+  repeated string active_execute_workers = 13;
 
   int64 cas_lookup_size = 5;
 
@@ -556,14 +569,18 @@ message ExecutionWrapper {
 message ExecutionPolicy {
   string name = 1;
 
-  oneof policy { ExecutionWrapper wrapper = 2; }
+  oneof policy {
+    ExecutionWrapper wrapper = 2;
+  }
 }
 
 message TreeIteratorToken {
   repeated build.bazel.remote.execution.v2.Digest directories = 1;
 }
 
-message OperationIteratorToken { string operation_name = 1; }
+message OperationIteratorToken {
+  string operation_name = 1;
+}
 
 message BlobWriteKey {
   build.bazel.remote.execution.v2.Digest digest = 1;
@@ -643,7 +660,9 @@ message WorkerProfileRequest {}
 
 message WorkerListRequest {}
 
-message WorkerListMessage { repeated string workers = 1; }
+message WorkerListMessage {
+  repeated string workers = 1;
+}
 
 service WorkerProfile {
   rpc GetWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}

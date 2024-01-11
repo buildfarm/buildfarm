@@ -4,22 +4,39 @@ name: Package and Publish Helm Chart
 on:
   push:
     tags:
-      - '*'
+      - 'helm/*'
 
 env:
   GH_TOKEN: ${{ github.token }}
+  CHART_ROOT: kubernetes/helm-charts/buildfarm
 
 jobs:
   build:
-    if: github.repository == 'bazelbuild/bazel-buildfarm'
-    name: Package and Release BuildFarm Helm Chart
+    name: Lint, Package, and Release BuildFarm Helm Chart
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: helm package
+        uses: actions/checkout@v4
+      - id: get-chart-ver
+        name: Extracting Helm Chart Version from Tag
+        run: |
+          set -ex
+          echo "chart_ver=$(echo $GITHUB_REF | cut -d / -f 4)" >> $GITHUB_OUTPUT
+      - id: set-chart-yaml-version
+        name: Etching Helm Chart Version into Chart.yaml for Packaging
+        run: |
+          set -ex
+          echo setting Chart version to \
+            "${{ steps.get-chart-ver.outputs.chart_ver }}" \
+            in ${CHART_ROOT}/Chart.yaml
+          yq -i \
+            '.version |= "${{ steps.get-chart-ver.outputs.chart_ver }}"' \
+            ${CHART_ROOT}/Chart.yaml
+      - id: helm-lint-package-release
+        name: Helm Chart Lint, Package, and Release
         run: |-
           set -ex
-          helm dep up kubernetes/helm-charts/buildfarm
-          helm package kubernetes/helm-charts/buildfarm
+          helm dep up "${CHART_ROOT}"
+          helm lint "${CHART_ROOT}"
+          helm package "${CHART_ROOT}"
           gh release create "${{ github.ref_name }}" *.tgz

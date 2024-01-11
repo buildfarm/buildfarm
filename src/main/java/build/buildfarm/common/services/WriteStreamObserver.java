@@ -72,6 +72,8 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private boolean initialized = false;
   private volatile boolean committed = false;
   private String name = null;
+
+  @GuardedBy("this")
   private Write write = null;
 
   @GuardedBy("this")
@@ -492,9 +494,13 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @Override
-  public void onCompleted() {
+  public synchronized void onCompleted() {
     log.log(Level.FINER, format("write completed for %s", name));
     if (write == null) {
+      // we must return with a response lest we emit a grpc warning
+      // there can be no meaningful response at this point, as we
+      // have no idea what the size was
+      responseObserver.onNext(WriteResponse.getDefaultInstance());
       responseObserver.onCompleted();
     }
   }
