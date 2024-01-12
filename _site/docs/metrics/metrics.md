@@ -100,6 +100,14 @@ The number of dispatched operations that have been requeued
 
 Gauge of the number of workers available
 
+**storage_worker_pool_size**
+
+Gauge of the number of storage workers available
+
+**execute_worker_pool_size**
+
+Gauge of the number of execute workers available.
+
 **queue_size**
 
 Gauge of the size of the queue (using a queue_name label for each individual queue)
