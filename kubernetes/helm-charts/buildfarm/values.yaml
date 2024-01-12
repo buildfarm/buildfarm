@@ -131,22 +131,25 @@ shardWorker:
     type: ClusterIP
     port: 8982
 
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-  extraVolumes: []
-    # - name: additionalSecret
-    #   secret:
-    #   secretName: my-secret
-    #   defaultMode: 0600
+  #nodeSelector: {}
+  #tolerations: []
+  #affinity: {}
 
-  extraVolumeMounts: []
-    # - name: customConfig
-    #   mountPath: /mnt/config
-    #   readOnly: true
+  #extraVolumes:
+  # - name: additionalSecret
+  #   secret:
+  #   secretName: my-secret
+  #   defaultMode: 0600
+
+  #extraVolumeMounts:
+  # - name: customConfig
+  #   mountPath: /mnt/config
+  #   readOnly: true
+
   extraEnv:
   - name: JAVABIN
     value: "/usr/bin/java"
+
   serviceMonitor:
     ## If true, a ServiceMonitor CRD is created for a prometheus operator
     ## https://github.com/coreos/prometheus-operator
