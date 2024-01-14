@@ -24,6 +24,7 @@ import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
+import redis.clients.jedis.util.SafeEncoder;
 
 /**
  * @class RedisNodeHashes
@@ -101,7 +102,7 @@ public class RedisNodeHashes {
       List<Object> slotInfo = (List<Object>) slotInfoObj;
       List<Object> slotRangeNodes = (List<Object>) slotInfo.get(2);
       // 2 is primary node id
-      String nodeId = (String) slotRangeNodes.get(2);
+      String nodeId = (String) SafeEncoder.encode((byte[]) slotRangeNodes.get(2));
       if (nodes.add(nodeId)) {
         List<Long> slotNums = slotInfoToSlotRange(slotInfo);
         slotRanges.add(slotNums);
