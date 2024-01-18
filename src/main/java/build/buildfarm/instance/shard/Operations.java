@@ -102,9 +102,7 @@ public class Operations {
     // This is a common lookup that needs to be performant.
     if (invocationId != "") {
       jedis.sadd(invocationId, operationId);
-      if (jedis.scard(invocationId) == 1) {
-        jedis.expire(invocationId, configs.getBackplane().getMaxInvocationIdTimeout());
-      }
+      jedis.expire(invocationId, configs.getBackplane().getMaxInvocationIdTimeout());
     }
   }
 
