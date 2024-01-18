@@ -1,4 +1,5 @@
 #!/bin/bash
+set -ex
 # Run from the root of repository.
 # This script will format all of the java source files.
 # Use the flag --check if you want the script to fail when formatting is not correct.
