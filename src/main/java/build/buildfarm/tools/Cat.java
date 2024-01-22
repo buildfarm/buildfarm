@@ -101,8 +101,7 @@ class Cat {
   }
 
   private static void printAction(int level, Action action) {
-    indentOut(
-        level + 1, "Command Digest: Command " + DigestUtil.toString(action.getCommandDigest()));
+    indentOut(level, "Command Digest: Command " + DigestUtil.toString(action.getCommandDigest()));
     indentOut(
         level, "Input Root Digest: Directory " + DigestUtil.toString(action.getInputRootDigest()));
     indentOut(level, "DoNotCache: " + (action.getDoNotCache() ? "true" : "false"));
@@ -113,6 +112,8 @@ class Cat {
               + (action.getTimeout().getSeconds() + action.getTimeout().getNanos() / 1e9)
               + "s");
     }
+    indentOut(level, "Salt: " + action.getSalt());
+    indentOut(level, "Platform: " + action.getPlatform());
   }
 
   private static void printCommand(ByteString commandBlob) {
