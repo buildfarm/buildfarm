@@ -1,6 +1,10 @@
 # Bazel Buildfarm
 
 ![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/bazelbuild/bazel-buildfarm/badge)](https://securityscorecards.dev/viewer/?uri=github.com/bazelbuild/bazel-buildfarm)
+![GitHub License](https://img.shields.io/github/license/bazelbuild/bazel-buildfarm)
+![GitHub Release](https://img.shields.io/github/v/release/bazelbuild/bazel-buildfarm)
+
 
 This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
 
