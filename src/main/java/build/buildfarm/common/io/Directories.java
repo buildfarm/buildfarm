@@ -82,6 +82,29 @@ public class Directories {
     }
   }
 
+  private static void makeFileDeletable(Path path, FileStore fileStore) throws IOException {
+    if (fileStore.supportsFileAttributeView("posix")) {
+      // delete perms are maintained by directory
+    } else if (fileStore.supportsFileAttributeView("acl")) {
+      // windows, we hope
+      UserPrincipal authenticatedUsers =
+          path.getFileSystem()
+              .getUserPrincipalLookupService()
+              .lookupPrincipalByName("Authenticated Users");
+      AclEntry entry =
+          AclEntry.newBuilder()
+              .setType(AclEntryType.ALLOW)
+              .setPrincipal(authenticatedUsers)
+              .setPermissions(AclEntryPermission.DELETE)
+              .build();
+
+      AclFileAttributeView view = Files.getFileAttributeView(path, AclFileAttributeView.class);
+      List<AclEntry> acl = view.getAcl();
+      acl.add(0, entry);
+      view.setAcl(acl);
+    }
+  }
+
   public static ListenableFuture<Void> remove(
       Path path, FileStore fileStore, ExecutorService service) {
     String suffix = UUID.randomUUID().toString();
@@ -123,6 +146,7 @@ public class Directories {
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
             // we will *NOT* delete the file on windows if it is still open
+            makeFileDeletable(file, fileStore);
             Files.delete(file);
             return FileVisitResult.CONTINUE;
           }
