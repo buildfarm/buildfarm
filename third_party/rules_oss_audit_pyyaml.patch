@@ -1,7 +1,0 @@
-diff --git a/oss_audit/tools/requirements.txt b/oss_audit/tools/requirements.txt
-index 932bd69..be2b74d 100644
---- a/oss_audit/tools/requirements.txt
-+++ b/oss_audit/tools/requirements.txt
-@@ -1 +1 @@
--PyYAML==5.4.1
-+PyYAML==6.0.1
