@@ -40,7 +40,11 @@ spec:
           imagePullPolicy: {{ .Values.shardWorker.image.pullPolicy }}
           args:
             - /config/config.yml
+            {{- if .Values.shardWorker.service.headless }}
+            - --public_name=$(POD_NAME).{{ include "buildfarm.fullname" . }}-shard-worker.$(POD_NAMESPACE).svc.cluster.local:8982
+            {{- else }}
             - --public_name=$(POD_IP):8982
+            {{- end }}
           command:
             - bash
             - /app/build_buildfarm/buildfarm-shard-worker.binary
@@ -50,6 +54,14 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: status.podIP
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             {{- if .Values.shardWorker.extraEnv }}
             {{- toYaml .Values.shardWorker.extraEnv | nindent 12 }}
             {{- end }}

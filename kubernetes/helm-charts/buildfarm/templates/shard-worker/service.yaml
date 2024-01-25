@@ -11,6 +11,9 @@ metadata:
   {{- end }}
 spec:
   type: {{ .Values.shardWorker.service.type }}
+  {{- if .Values.shardWorker.service.headless }}
+  clusterIP: None
+  {{- end }}
   ports:
     - port: {{ .Values.shardWorker.service.port }}
       targetPort: worker-comm
