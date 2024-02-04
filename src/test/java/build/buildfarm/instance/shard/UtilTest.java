@@ -25,7 +25,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Digest;
@@ -135,7 +135,7 @@ public class UtilTest {
     }
     verify(instance, times(1)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
     assertThat(caughtException).isTrue();
-    verifyZeroInteractions(backplane);
+    verifyNoInteractions(backplane);
   }
 
   @Test

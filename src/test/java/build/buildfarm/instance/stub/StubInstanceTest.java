@@ -20,7 +20,8 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheImplBase;
@@ -419,7 +420,7 @@ public class StubInstanceTest {
     assertThat(ioException).isNotNull();
     Status status = Status.fromThrowable(ioException);
     assertThat(status.getCode()).isEqualTo(Code.UNAVAILABLE);
-    verifyZeroInteractions(out);
+    verifyNoInteractions(out);
     instance.stop();
   }
 
@@ -491,7 +492,7 @@ public class StubInstanceTest {
     assertThat(ioException).isNotNull();
     Status status = Status.fromThrowable(ioException);
     assertThat(status.getCode()).isEqualTo(Code.DEADLINE_EXCEEDED);
-    verifyZeroInteractions(out);
+    verifyNoInteractions(out);
     instance.stop();
   }
 
@@ -510,7 +511,7 @@ public class StubInstanceTest {
     verify(mockBlobObserver, times(1)).setOnReadyHandler(onReadyCaptor.capture());
     // call it
     onReadyCaptor.getValue().run();
-    // verify zero interactions with mockRequestStream
-    verifyZeroInteractions(mockRequestStream);
+    // verify no more interactions with mockRequestStream
+    verifyNoMoreInteractions(mockRequestStream);
   }
 }

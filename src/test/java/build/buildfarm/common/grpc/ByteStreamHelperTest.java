@@ -20,7 +20,6 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -43,17 +42,20 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.MockitoAnnotations;
+import org.mockito.Spy;
 
 @RunWith(JUnit4.class)
 public class ByteStreamHelperTest {
   @Rule public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
 
-  private final ByteStreamImplBase serviceImpl = mock(ByteStreamImplBase.class);
+  @Spy private ByteStreamImplBase serviceImpl;
 
   private Channel channel;
 
   @Before
   public void setUp() throws Exception {
+    MockitoAnnotations.initMocks(this);
     String serverName = InProcessServerBuilder.generateName();
 
     grpcCleanup

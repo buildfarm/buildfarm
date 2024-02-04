@@ -103,7 +103,7 @@ def buildfarm_init(name = "buildfarm"):
                         "me.dinowernli:java-grpc-prometheus:0.6.0",
                         "org.apache.tomcat:annotations-api:6.0.53",
                         "org.checkerframework:checker-qual:3.38.0",
-                        "org.mockito:mockito-core:2.25.0",
+                        "org.mockito:mockito-core:5.10.0",
                         "org.openjdk.jmh:jmh-core:1.37",
                         "org.openjdk.jmh:jmh-generator-annprocess:1.37",
                         "org.redisson:redisson:3.23.4",

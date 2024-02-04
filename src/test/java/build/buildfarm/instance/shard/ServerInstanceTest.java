@@ -32,6 +32,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.AdditionalAnswers.answer;
 import static org.mockito.ArgumentMatchers.anyIterable;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.any;
@@ -121,7 +122,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
-import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.stubbing.Answer;
@@ -355,7 +355,7 @@ public class ServerInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
-    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(false);
+    when(mockBackplane.propertiesEligibleForQueue(anyList())).thenReturn(false);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -482,7 +482,7 @@ public class ServerInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
-    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -555,7 +555,7 @@ public class ServerInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
-    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -621,7 +621,7 @@ public class ServerInstanceTest {
             .setActionDigest(actionKey.getDigest())
             .build();
 
-    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -733,7 +733,7 @@ public class ServerInstanceTest {
     Digest missingDirectoryDigest =
         Digest.newBuilder().setHash("missing-directory").setSizeBytes(1).build();
 
-    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(anyList())).thenReturn(true);
 
     when(mockBackplane.getOperation(eq(operationName)))
         .thenReturn(

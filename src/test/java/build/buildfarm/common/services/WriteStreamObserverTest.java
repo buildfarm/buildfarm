@@ -8,7 +8,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Compressor;
@@ -89,7 +89,7 @@ public class WriteStreamObserverTest {
             any(RequestMetadata.class));
     verify(write, times(1)).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(out, times(1)).close();
-    verifyZeroInteractions(responseObserver);
+    verifyNoInteractions(responseObserver);
   }
 
   @Test
@@ -136,6 +136,6 @@ public class WriteStreamObserverTest {
             eq(cancelledDigest),
             eq(uuid),
             any(RequestMetadata.class));
-    verifyZeroInteractions(responseObserver);
+    verifyNoInteractions(responseObserver);
   }
 }
