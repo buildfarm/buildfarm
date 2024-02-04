@@ -16,7 +16,7 @@ package build.buildfarm.cas;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
@@ -45,6 +45,6 @@ public class MemoryWriteOutputStreamTest {
     writtenFuture.set(content);
     assertThat(write.isComplete()).isTrue();
     assertThat(write.getCommittedSize()).isEqualTo(digest.getSizeBytes());
-    verifyZeroInteractions(cas);
+    verifyNoInteractions(cas);
   }
 }

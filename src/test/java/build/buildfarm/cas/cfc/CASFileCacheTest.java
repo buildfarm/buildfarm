@@ -32,7 +32,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Compressor;
@@ -212,7 +212,7 @@ class CASFileCacheTest {
     try {
       fileCache.put(blobDigest, false);
     } finally {
-      verifyZeroInteractions(mockInputStreamFactory);
+      verifyNoInteractions(mockInputStreamFactory);
     }
   }
 
@@ -886,7 +886,7 @@ class CASFileCacheTest {
 
     fileCache.put(new Blob(ByteString.copyFromUtf8("Hello, World"), DIGEST_UTIL));
 
-    verifyZeroInteractions(onExpire);
+    verifyNoInteractions(onExpire);
     // assert expiration of non-executable digest
     String expiringKey = fileCache.getKey(expiringBlob.getDigest(), /* isExecutable=*/ false);
     assertThat(storage.containsKey(expiringKey)).isFalse();

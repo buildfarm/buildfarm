@@ -19,9 +19,11 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageImplBase;
@@ -162,7 +164,7 @@ public class GrpcCASTest {
     verify(uploader, times(1))
         .uploadBlob(eq(HashCode.fromString(digest.getHash())), any(Chunker.class));
     assertThat(onExpirations.get(digest)).containsExactly(onExpiration);
-    verifyZeroInteractions(onExpiration);
+    verifyNoInteractions(onExpiration);
   }
 
   @Test
@@ -220,11 +222,13 @@ public class GrpcCASTest {
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     Runnable onExpiration = mock(Runnable.class);
     GrpcCAS cas = new GrpcCAS("test", /* readonly=*/ false, channel, null, onExpirations);
-    ContentAddressableStorageImplBase casService = mock(ContentAddressableStorageImplBase.class);
+    ContentAddressableStorageImplBase casService = spy(ContentAddressableStorageImplBase.class);
     serviceRegistry.addService(casService);
+    // Mutable calls bindService, and clearInvocations is undesirable
+    verify(casService, times(1)).bindService();
     Digest emptyDigest = Digest.getDefaultInstance();
     assertThat(cas.findMissingBlobs(ImmutableList.of(emptyDigest))).isEmpty();
-    verifyZeroInteractions(casService);
-    verifyZeroInteractions(onExpiration);
+    verifyNoMoreInteractions(casService);
+    verifyNoInteractions(onExpiration);
   }
 }
