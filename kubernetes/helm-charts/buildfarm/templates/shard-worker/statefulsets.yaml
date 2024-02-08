@@ -79,7 +79,8 @@ spec:
             {{- end }}
 
       {{- with .Values.shardWorker.nodeSelector }}
-      {{- tpl (toYaml .) $ | nindent 6 -}}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
       {{- end }}
 
       {{- with .Values.shardWorker.affinity }}
