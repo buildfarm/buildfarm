@@ -79,15 +79,18 @@ spec:
             {{- end }}
 
       {{- with .Values.shardWorker.nodeSelector }}
-      {{- tpl (toYaml .) $ | nindent 6 -}}
+      nodeSelector:
+        {{- tpl (toYaml .) $ | nindent 8 -}}
       {{- end }}
 
       {{- with .Values.shardWorker.affinity }}
-      {{- tpl (toYaml .) $ | nindent 6 -}}
+      affinity:
+        {{- tpl (toYaml .) $ | nindent 8 -}}
       {{- end }}
 
       {{- with .Values.shardWorker.tolerations }}
-      {{- tpl (toYaml .) $ | nindent 6 -}}
+      tolerations:
+        {{- tpl (toYaml .) $ | nindent 8 -}}
       {{- end }}
       volumes:
         - configMap:
