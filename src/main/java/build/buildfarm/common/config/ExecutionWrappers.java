@@ -44,7 +44,7 @@ public class ExecutionWrappers {
    * @brief The program to use when running actions under bazel's sandbox.
    * @details This program is expected to be packaged with the worker image.
    */
-  public String linuxSandbox = "/app/build_buildfarm/linux-sandbox";
+  public String linuxSandbox = "/app/build_buildfarm/src/execution_wrappers/linux-sandbox";
 
   /**
    * @field asNobody
@@ -52,28 +52,29 @@ public class ExecutionWrappers {
    * @details This program is expected to be packaged with the worker image. The linux-sandbox is
    *     also capable of doing what this standalone programs does and may be chosen instead.
    */
-  public String asNobody = "/app/build_buildfarm/as-nobody";
+  public String asNobody = "/app/build_buildfarm/src/execution_wrappers/as-nobody";
 
   /**
    * @field processWrapper
    * @brief The program to use when running actions under bazel's process-wrapper
    * @details This program is expected to be packaged with the worker image.
    */
-  public String processWrapper = "/app/build_buildfarm/process-wrapper";
+  public String processWrapper = "/app/build_buildfarm/src/execution_wrappers/process-wrapper";
 
   /**
    * @field skipSleep
    * @brief The program to use when running actions under bazel's skip sleep wrapper.
    * @details This program is expected to be packaged with the worker image.
    */
-  public String skipSleep = "/app/build_buildfarm/skip_sleep";
+  public String skipSleep = "/app/build_buildfarm/src/execution_wrappers/skip_sleep";
 
   /**
    * @field skipSleepPreload
    * @brief The shared object that the skip sleep wrapper uses to spoof syscalls.
    * @details The shared object needs passed to the program which will LD_PRELOAD it.
    */
-  public String skipSleepPreload = "/app/build_buildfarm/skip_sleep_preload.so";
+  public String skipSleepPreload =
+      "/app/build_buildfarm/src/execution_wrappers/skip_sleep_preload.so";
 
   /**
    * @field delay
@@ -81,5 +82,5 @@ public class ExecutionWrappers {
    * @details This program is expected to be packaged with the worker image. Warning: This wrapper
    *     is only intended to be used with skip_sleep.
    */
-  public String delay = "/app/build_buildfarm/delay.sh";
+  public String delay = "/app/build_buildfarm/src/execution_wrappers/delay.sh";
 }
