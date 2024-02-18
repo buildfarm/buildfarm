@@ -336,13 +336,13 @@ worker:
 Unless specified, options are only relevant for FILESYSTEM type
 
 | Configuration                | Accepted and _Default_ Values | Description                                                                                                   |
-|------------------------------|-------------------------------|---------------------------------------------------------------------------------------------------------------|
-| type                         | _FILESYSTEM_, GRPC            | Type of CAS used                                                                                              |
-| path                         | String, _cache_               | Local cache location relative to the 'root', or absolute                                                      |
-| maxSizeBytes                 | Integer, _2147483648_         | Limit for contents of files retained from CAS in the cache                                                    |
-| fileDirectoriesIndexInMemory | boolean, _false_              | Determines if the file directories bidirectional mapping should be stored in memory or in sqllite             |
-| skipLoad                     | boolean, _false_              | Determines if transient data on the worker should be loaded into CAS on worker startup (affects startup time) |
-| target                       | String, _null_                | For GRPC CAS type, target for external CAS endpoint                                                           |
+|------------------------------|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| type                         | _FILESYSTEM_, GRPC            | Type of CAS used                                                                                                                                   |
+| path                         | String, _cache_               | Local cache location relative to the 'root', or absolute                                                                                           |
+| maxSizeBytes                 | Integer, _0_                  | Limit for contents of files retained from CAS in the cache, value of 0 means to auto-configure to 90% of _root_/_path_ underlying filesystem space |
+| fileDirectoriesIndexInMemory | boolean, _false_              | Determines if the file directories bidirectional mapping should be stored in memory or in sqlite                                                  |
+| skipLoad                     | boolean, _false_              | Determines if transient data on the worker should be loaded into CAS on worker startup (affects startup time)                                |
+| target                       | String, _null_                | For GRPC CAS type, target for external CAS endpoint                                                                                                |
 
 Example:
 
