@@ -172,7 +172,8 @@ redis:
   ## - set to `false` if using `externalRedis.*`
   ##
   enabled: true
-  password: changeme
+  auth:
+    enabled: false
   replica:
     replicaCount: 1
 
