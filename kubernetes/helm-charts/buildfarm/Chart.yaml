@@ -27,4 +27,4 @@ dependencies:
   - condition: redis.enabled
     name: redis
     repository: oci://registry-1.docker.io/bitnamicharts
-    version: 18.13.0
+    version: 18.14.2
