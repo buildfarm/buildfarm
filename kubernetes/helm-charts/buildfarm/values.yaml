@@ -172,19 +172,10 @@ redis:
   ## - set to `false` if using `externalRedis.*`
   ##
   enabled: true
-  scheme: "redis"
-  ## See more redis configs: https://github.com/bitnami/charts/blob/main/bitnami/redis/README.md
-  usePassword: false
-  ## configs for redis cluster mode
-  ##
-  cluster:
-    ## if redis runs in cluster mode
-    ##
+  auth:
     enabled: false
-
-    ## the number of redis slaves
-    ##
-    slaveCount: 1
+  replica:
+    replicaCount: 1
 
 externalRedis:
   uri: "redis://localhost:6379"

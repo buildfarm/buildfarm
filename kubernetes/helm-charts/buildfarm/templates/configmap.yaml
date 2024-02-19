@@ -11,7 +11,7 @@ data:
     {{- end }}
     backplane:
       {{- if .Values.redis.enabled }}
-      redisUri: "{{ .Values.redis.scheme }}://{{ printf "%s-redis-master.%s" (include "redis.fullname" .) (.Release.Namespace) }}:{{ "6379" }}"
+      redisUri: '{{ printf "redis://%s-redis-master.%s:6379" .Release.Name .Release.Namespace }}'
       {{- else }}
       redisUri: "{{ .Values.externalRedis.uri }}"
       {{- end }}
