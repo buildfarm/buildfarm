@@ -650,7 +650,9 @@ public final class Worker extends LoggingMain {
   }
 
   public void initiateShutdown() {
-    pipeline.stopMatchingOperations();
+    if (pipeline != null) {
+      pipeline.stopMatchingOperations();
+    }
     if (server != null) {
       server.shutdown();
     }
