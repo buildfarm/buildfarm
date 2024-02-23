@@ -244,17 +244,20 @@ public class RedisShardBackplane implements Backplane {
           protected void visit(ExecuteEntry executeEntry, String executeEntryJson) {
             String operationName = executeEntry.getOperationName();
             String value = state.processingOperations.get(jedis, operationName);
-            long defaultTimeout_ms = configs.getBackplane().getProcessingTimeoutMillis();
+            long processingTimeout_ms = configs.getBackplane().getProcessingTimeoutMillis();
 
             // get the operation's expiration
             Instant expiresAt = convertToMilliInstant(value, operationName);
 
             // if expiration is invalid, add a valid one.
             if (expiresAt == null) {
-              expiresAt = now.plusMillis(defaultTimeout_ms);
+              expiresAt = now.plusMillis(processingTimeout_ms);
               String keyValue = String.format("%d", expiresAt.toEpochMilli());
-              long timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
-              state.processingOperations.insert(jedis, operationName, keyValue, timeout_s);
+              // persist the flag for at least an hour, and at most 10 times longer than the timeout
+              // the key identifies so that we don't loop with the flag expired, resetting the
+              // unaccounted for operation
+              long expire_s = Math.max(3600, Time.millisecondsToSeconds(processingTimeout_ms) * 10);
+              state.processingOperations.insert(jedis, operationName, keyValue, expire_s);
             }
 
             // handle expiration
@@ -277,17 +280,21 @@ public class RedisShardBackplane implements Backplane {
           protected void visit(QueueEntry queueEntry, String queueEntryJson) {
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             String value = state.dispatchingOperations.get(jedis, operationName);
-            long defaultTimeout_ms = configs.getBackplane().getDispatchingTimeoutMillis();
+            long dispatchingTimeout_ms = configs.getBackplane().getDispatchingTimeoutMillis();
 
             // get the operation's expiration
             Instant expiresAt = convertToMilliInstant(value, operationName);
 
             // if expiration is invalid, add a valid one.
             if (expiresAt == null) {
-              expiresAt = now.plusMillis(defaultTimeout_ms);
+              expiresAt = now.plusMillis(dispatchingTimeout_ms);
               String keyValue = String.format("%d", expiresAt.toEpochMilli());
-              long timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
-              state.dispatchingOperations.insert(jedis, operationName, keyValue, timeout_s);
+              // persist the flag for at least an hour, and at most 10 times longer than the timeout
+              // the key identifies so that we don't loop with the flag expired, resetting the
+              // unaccounted for operation
+              long expire_s =
+                  Math.max(3600, Time.millisecondsToSeconds(dispatchingTimeout_ms) * 10);
+              state.dispatchingOperations.insert(jedis, operationName, keyValue, expire_s);
             }
 
             // handle expiration
