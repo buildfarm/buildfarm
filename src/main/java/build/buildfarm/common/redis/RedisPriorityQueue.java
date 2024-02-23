@@ -17,13 +17,10 @@ package build.buildfarm.common.redis;
 import build.buildfarm.common.Queue;
 import build.buildfarm.common.StringVisitor;
 import com.google.common.collect.ImmutableList;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.exceptions.JedisNoScriptException;
 
 /**
  * @class RedisPriorityQueue
@@ -54,9 +51,7 @@ public class RedisPriorityQueue implements Queue<String> {
 
   private final Clock clock;
   private final long pollIntervalMillis;
-
-  private final String script;
-  private final String scriptDigest;
+  private final RedisLuaScript dequeueScript;
 
   /**
    * @brief Constructor.
@@ -100,9 +95,8 @@ public class RedisPriorityQueue implements Queue<String> {
     this.jedis = jedis;
     this.name = name;
     this.clock = clock;
-    this.script = getLuaScript();
-    this.scriptDigest = computeSHA1(this.script);
     this.pollIntervalMillis = pollIntervalMillis;
+    this.dequeueScript = new RedisLuaScript(getDequeueLuaScript());
   }
 
   /**
@@ -166,7 +160,7 @@ public class RedisPriorityQueue implements Queue<String> {
     int maxAttempts = Math.max(1, (int) (timeout.toMillis() / pollIntervalMillis));
     List<String> args = ImmutableList.of(name, getDequeueName(), "true");
     for (int i = 0; i < maxAttempts; ++i) {
-      Object obj_val = eval(jedis, script, scriptDigest, ImmutableList.of(name), args);
+      Object obj_val = dequeueScript.eval(jedis, ImmutableList.of(name), args);
       String val = String.valueOf(obj_val);
       if (!isEmpty(val)) {
         return val;
@@ -186,28 +180,12 @@ public class RedisPriorityQueue implements Queue<String> {
   @Override
   public String poll() {
     List<String> args = ImmutableList.of(name, getDequeueName());
-    Object obj_val = eval(jedis, script, scriptDigest, ImmutableList.of(name), args);
+    Object obj_val = dequeueScript.eval(jedis, ImmutableList.of(name), args);
     String val = String.valueOf(obj_val);
     if (!isEmpty(val)) {
       return val;
     }
     return null;
-  }
-
-  /**
-   * @brief Make a Redis eval call via Jedis.
-   * @details This attempts to use a cached version of the eval script before falling back to the
-   *     non-cached method.
-   * @param script A Lua eval script.
-   * @param digest The SHA1 digest of the eval script.
-   */
-  private Object eval(
-      Jedis jedis, String script, String digest, List<String> keys, List<String> args) {
-    try {
-      return jedis.evalsha(digest, keys, args);
-    } catch (JedisNoScriptException e) {
-    }
-    return jedis.eval(script, keys, args);
   }
 
   /**
@@ -302,7 +280,7 @@ public class RedisPriorityQueue implements Queue<String> {
    * @brief Adds additional functionality to the jedis client.
    * @details Load the custom lua script so we can have zpoplpush functionality in our container.
    */
-  private String getLuaScript() {
+  private String getDequeueLuaScript() {
     // We return the lua code in-line to avoid any build complexities having to bundle lua code with
     // the buildfarm artifacts.  Lua code is fed to redis via the eval call.
     return String.join(
@@ -324,27 +302,6 @@ public class RedisPriorityQueue implements Queue<String> {
         "  end",
         "end",
         "return val");
-  }
-
-  /**
-   * @brief Compute the SHA1 digest of a string
-   * @details We can precompute the SHA1 digest of the Lua script and invoke the script on a Redis
-   *     server via its SHA1 digest if the server has cached the script.
-   */
-  private String computeSHA1(String str) {
-    try {
-      MessageDigest digest = MessageDigest.getInstance("SHA-1");
-      byte[] hashBytes = digest.digest(str.getBytes());
-      StringBuilder hexString = new StringBuilder();
-      for (byte b : hashBytes) {
-        String hex = Integer.toHexString(0xff & b);
-        if (hex.length() == 1) hexString.append('0');
-        hexString.append(hex);
-      }
-      return hexString.toString();
-    } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException("SHA-1 algorithm not found", e);
-    }
   }
 
   /**
