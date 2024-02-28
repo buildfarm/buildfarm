@@ -1,4 +1,4 @@
-load("@rules_pkg//:rpm.bzl", "pkg_rpm")
+load("@rules_pkg//pkg:rpm.bzl", "pkg_rpm")
 
 pkg_rpm(
     name = "buildfarm-server-rpm",
