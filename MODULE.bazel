@@ -1,3 +1,5 @@
+"""Buildfarm build and test"""
+
 module(
     name = "build_buildfarm",
     repo_name = "build_buildfarm",

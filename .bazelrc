@@ -26,5 +26,10 @@ common --incompatible_disallow_empty_glob
 
 common --enable_bzlmod
 
+# See also https://bazel.build/external/lockfile.
+common --lockfile_mode=off
+# It's off because we have mac/windows/linux developers who may not have access
+# to all three to update the platform-specific bits of the lockfile.
+
 # Support protobuf on macOS with Xcode 15.x
 common:macos --host_cxxopt=-std=c++14 --cxxopt=-std=c++14
