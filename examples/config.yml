@@ -7,7 +7,7 @@ allowSymlinkTargetAbsolute: false
 server:
   instanceType: SHARD
   name: shard
-  actionCacheReadOnly: false
+  actionCacheReadOnly: true
   port: 8980
   grpcMetrics:
     enabled: true
