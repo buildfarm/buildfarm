@@ -40,7 +40,7 @@ public class DirectoriesIndexTest {
   private final DirectoriesIndex directoriesIndex;
 
   protected DirectoriesIndexTest(Path root, DirectoriesIndexType type) {
-    entryPathStrategy = new HexBucketEntryPathStrategy(root, /*levels=*/ 0);
+    entryPathStrategy = new HexBucketEntryPathStrategy(root, /* levels= */ 0);
     if (type == DirectoriesIndexType.Sqlite) {
       String jdbcIndexUrl = "jdbc:sqlite::memory:";
       directoriesIndex = new SqliteFileDirectoriesIndex(jdbcIndexUrl, entryPathStrategy);
@@ -112,8 +112,7 @@ public class DirectoriesIndexTest {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
-                      Configuration.windows()
-                          .toBuilder()
+                      Configuration.windows().toBuilder()
                           .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
                           .build())
                   .getRootDirectories(),
@@ -128,8 +127,7 @@ public class DirectoriesIndexTest {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
-                      Configuration.unix()
-                          .toBuilder()
+                      Configuration.unix().toBuilder()
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
@@ -144,8 +142,7 @@ public class DirectoriesIndexTest {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
-                      Configuration.osX()
-                          .toBuilder()
+                      Configuration.osX().toBuilder()
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
@@ -161,8 +158,7 @@ public class DirectoriesIndexTest {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
-                      Configuration.windows()
-                          .toBuilder()
+                      Configuration.windows().toBuilder()
                           .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
                           .build())
                   .getRootDirectories(),
@@ -177,8 +173,7 @@ public class DirectoriesIndexTest {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
-                      Configuration.unix()
-                          .toBuilder()
+                      Configuration.unix().toBuilder()
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
@@ -193,8 +188,7 @@ public class DirectoriesIndexTest {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
-                      Configuration.osX()
-                          .toBuilder()
+                      Configuration.osX().toBuilder()
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),

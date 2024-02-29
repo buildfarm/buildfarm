@@ -90,34 +90,34 @@ public class ShardWorkerContextTest {
   }
 
   WorkerContext createTestContext() {
-    return createTestContext(/* policies=*/ ImmutableList.of());
+    return createTestContext(/* policies= */ ImmutableList.of());
   }
 
   WorkerContext createTestContext(Iterable<ExecutionPolicy> policies) {
     return new ShardWorkerContext(
         "test",
-        /* operationPollPeriod=*/ Duration.getDefaultInstance(),
-        /* operationPoller=*/ (queueEntry, stage, requeueAt) -> false,
-        /* inlineContentLimit=*/
-        /* inputFetchStageWidth=*/ 0,
-        /* executeStageWidth=*/ 0,
-        /* inputFetchDeadline=*/ 60,
+        /* operationPollPeriod= */ Duration.getDefaultInstance(),
+        /* operationPoller= */ (queueEntry, stage, requeueAt) -> false,
+        /* inlineContentLimit= */
+        /* inputFetchStageWidth= */ 0,
+        /* executeStageWidth= */ 0,
+        /* inputFetchDeadline= */ 60,
         backplane,
         execFileSystem,
         inputStreamFactory,
         policies,
         instance,
-        /* deadlineAfter=*/
-        /* deadlineAfterUnits=*/
-        /* defaultActionTimeout=*/ Duration.getDefaultInstance(),
-        /* maximumActionTimeout=*/ Duration.getDefaultInstance(),
-        /* defaultMaxCores=*/ 0,
-        /* limitGlobalExecution=*/ false,
-        /* onlyMulticoreTests=*/ false,
-        /* allowBringYourOwnContainer=*/ false,
-        /* errorOperationRemainingResources=*/ false,
-        /* errorOperationOutputSizeExceeded=*/ false,
-        /* resourceSet=*/ new LocalResourceSet(),
+        /* deadlineAfter= */
+        /* deadlineAfterUnits= */
+        /* defaultActionTimeout= */ Duration.getDefaultInstance(),
+        /* maximumActionTimeout= */ Duration.getDefaultInstance(),
+        /* defaultMaxCores= */ 0,
+        /* limitGlobalExecution= */ false,
+        /* onlyMulticoreTests= */ false,
+        /* allowBringYourOwnContainer= */ false,
+        /* errorOperationRemainingResources= */ false,
+        /* errorOperationOutputSizeExceeded= */ false,
+        /* resourceSet= */ new LocalResourceSet(),
         writer);
   }
 

@@ -159,7 +159,7 @@ public class ByteStreamServiceTest {
     HashCode hash = HashCode.fromString(digest.getHash());
     String resourceName =
         ByteStreamUploader.uploadResourceName(
-            /* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
+            /* instanceName= */ null, uuid, hash, digest.getSizeBytes());
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamStub service = ByteStreamGrpc.newStub(channel);
@@ -232,7 +232,7 @@ public class ByteStreamServiceTest {
     HashCode hash = HashCode.fromString(digest.getHash());
     String resourceName =
         ByteStreamUploader.uploadResourceName(
-            /* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
+            /* instanceName= */ null, uuid, hash, digest.getSizeBytes());
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamStub service = ByteStreamGrpc.newStub(channel);

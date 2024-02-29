@@ -39,7 +39,7 @@ public class EmptyInputStreamFactoryTest {
             });
     InputStream in =
         emptyFactory.newInput(
-            Compressor.Value.IDENTITY, Digest.getDefaultInstance(), /* offset=*/ 0);
+            Compressor.Value.IDENTITY, Digest.getDefaultInstance(), /* offset= */ 0);
     assertThat(in.read()).isEqualTo(-1);
   }
 
@@ -56,7 +56,7 @@ public class EmptyInputStreamFactoryTest {
               throw new IOException("invalid");
             });
     InputStream in =
-        emptyFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset=*/ 0);
+        emptyFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset= */ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);
   }
 }

@@ -112,7 +112,7 @@ public class StubInstanceTest {
     String test1Name = "test1";
     ByteString test1Blob = ByteString.copyFromUtf8(test1Name);
     DigestUtil test1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
-    Instance test1Instance = new StubInstance(test1Name, test1DigestUtil, /* channel=*/ null);
+    Instance test1Instance = new StubInstance(test1Name, test1DigestUtil, /* channel= */ null);
     assertThat(test1Instance.getName()).isEqualTo(test1Name);
     assertThat(test1Instance.getDigestUtil().compute(test1Blob))
         .isEqualTo(test1DigestUtil.compute(test1Blob));
@@ -121,7 +121,7 @@ public class StubInstanceTest {
     String test2Name = "test2";
     ByteString test2Blob = ByteString.copyFromUtf8(test2Name);
     DigestUtil test2DigestUtil = new DigestUtil(DigestUtil.HashFunction.MD5);
-    Instance test2Instance = new StubInstance(test2Name, test2DigestUtil, /* channel=*/ null);
+    Instance test2Instance = new StubInstance(test2Name, test2DigestUtil, /* channel= */ null);
     assertThat(test2Instance.getName()).isEqualTo(test2Name);
     assertThat(test2Instance.getDigestUtil().compute(test2Blob))
         .isEqualTo(test2DigestUtil.compute(test2Blob));

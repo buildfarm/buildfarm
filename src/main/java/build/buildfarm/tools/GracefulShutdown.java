@@ -94,7 +94,8 @@ class GracefulShutdown {
         break;
       default:
         System.out.println(
-            "The action your choose is wrong. Please choose one from ShutDown, PrepareWorker, and DisableProtection");
+            "The action your choose is wrong. Please choose one from ShutDown, PrepareWorker, and"
+                + " DisableProtection");
         break;
     }
   }

@@ -311,7 +311,8 @@ public final class BuildfarmConfigs {
                   if (Files.notExists(Paths.get(tool))) {
                     String message =
                         String.format(
-                            "the execution wrapper %s is missing and therefore the following features will not be available: %s",
+                            "the execution wrapper %s is missing and therefore the following"
+                                + " features will not be available: %s",
                             tool, String.join(", ", features));
                     log.warning(message);
                   }

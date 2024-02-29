@@ -113,7 +113,7 @@ public class ExecDirException extends IOException {
           if (putDirCause instanceof IOException) {
             Violation.Builder violation = preconditionFailure.addViolationsBuilder();
             ViolationException.toViolation(
-                violation, putDirCause, /* path=*/ null, /* isExecutable=*/ false);
+                violation, putDirCause, /* path= */ null, /* isExecutable= */ false);
             if (putDirCause instanceof NoSuchFileException) {
               violation.setSubject("blobs/" + putDirCause.getMessage());
             } else {

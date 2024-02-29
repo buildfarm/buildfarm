@@ -106,18 +106,18 @@ public class NodeInstanceTest {
     DummyServerInstance(
         ContentAddressableStorage contentAddressableStorage, ActionCache actionCache) {
       super(
-          /* name=*/ null,
-          /* digestUtil=*/ null,
+          /* name= */ null,
+          /* digestUtil= */ null,
           contentAddressableStorage,
           actionCache,
-          /* outstandingOperations=*/ null,
-          /* completedOperations=*/ null,
-          /* activeBlobWrites=*/ null,
+          /* outstandingOperations= */ null,
+          /* completedOperations= */ null,
+          /* activeBlobWrites= */ null,
           false);
     }
 
     DummyServerInstance() {
-      this(/* contentAddressableStorage=*/ null, /* actionCache=*/ null);
+      this(/* contentAddressableStorage= */ null, /* actionCache= */ null);
     }
 
     @Override
@@ -269,13 +269,13 @@ public class NodeInstanceTest {
                     FileNode.newBuilder().setName("foo").build(),
                     FileNode.newBuilder().setName("foo").build()))
             .build(),
-        /* pathDigests=*/ new Stack<>(),
-        /* visited=*/ Sets.newHashSet(),
-        /* directoriesIndex=*/ Maps.newHashMap(),
-        /* allowSymlinkTargetAbsolute=*/ false,
-        /* onInputFile=*/ file -> {},
-        /* onInputDirectorie=*/ directory -> {},
-        /* onInputDigest=*/ digest -> {},
+        /* pathDigests= */ new Stack<>(),
+        /* visited= */ Sets.newHashSet(),
+        /* directoriesIndex= */ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute= */ false,
+        /* onInputFile= */ file -> {},
+        /* onInputDirectorie= */ directory -> {},
+        /* onInputDigest= */ digest -> {},
         preconditionFailure);
 
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -304,13 +304,13 @@ public class NodeInstanceTest {
                         .setDigest(emptyDirectoryDigest)
                         .build()))
             .build(),
-        /* pathDigests=*/ new Stack<>(),
-        /* visited=*/ Sets.newHashSet(),
-        /* directoriesIndex=*/ ImmutableMap.of(Digest.getDefaultInstance(), emptyDirectory),
-        /* allowSymlinkTargetAbsolute=*/ false,
-        /* onInputFiles=*/ file -> {},
-        /* onInputDirectories=*/ directory -> {},
-        /* onInputDigests=*/ digest -> {},
+        /* pathDigests= */ new Stack<>(),
+        /* visited= */ Sets.newHashSet(),
+        /* directoriesIndex= */ ImmutableMap.of(Digest.getDefaultInstance(), emptyDirectory),
+        /* allowSymlinkTargetAbsolute= */ false,
+        /* onInputFiles= */ file -> {},
+        /* onInputDirectories= */ directory -> {},
+        /* onInputDigests= */ digest -> {},
         preconditionFailure);
 
     checkPreconditionFailure(
@@ -328,13 +328,13 @@ public class NodeInstanceTest {
                     FileNode.newBuilder().setName("foo").build(),
                     FileNode.newBuilder().setName("bar").build()))
             .build(),
-        /* pathDigests=*/ new Stack<>(),
-        /* visited=*/ Sets.newHashSet(),
-        /* directoriesIndex=*/ Maps.newHashMap(),
-        /* allowSymlinkTargetAbsolute=*/ false,
-        /* onInputFiles=*/ file -> {},
-        /* onInputDirectories=*/ directory -> {},
-        /* onInputDigests=*/ digest -> {},
+        /* pathDigests= */ new Stack<>(),
+        /* visited= */ Sets.newHashSet(),
+        /* directoriesIndex= */ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute= */ false,
+        /* onInputFiles= */ file -> {},
+        /* onInputDirectories= */ directory -> {},
+        /* onInputDigests= */ digest -> {},
         preconditionFailure);
 
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -363,13 +363,13 @@ public class NodeInstanceTest {
                         .setDigest(emptyDirectoryDigest)
                         .build()))
             .build(),
-        /* pathDigests=*/ new Stack<>(),
-        /* visited=*/ Sets.newHashSet(),
-        /* directoriesIndex=*/ ImmutableMap.of(emptyDirectoryDigest, emptyDirectory),
-        /* allowSymlinkTargetAbsolute=*/ false,
-        /* onInputFiles=*/ file -> {},
-        /* onInputDirectories=*/ directory -> {},
-        /* onInputDigests=*/ digest -> {},
+        /* pathDigests= */ new Stack<>(),
+        /* visited= */ Sets.newHashSet(),
+        /* directoriesIndex= */ ImmutableMap.of(emptyDirectoryDigest, emptyDirectory),
+        /* allowSymlinkTargetAbsolute= */ false,
+        /* onInputFiles= */ file -> {},
+        /* onInputDirectories= */ directory -> {},
+        /* onInputDigests= */ digest -> {},
         preconditionFailure);
 
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -398,13 +398,13 @@ public class NodeInstanceTest {
                         .setDigest(emptyDirectoryDigest)
                         .build()))
             .build(),
-        /* pathDigests=*/ new Stack<>(),
-        /* visited=*/ Sets.newHashSet(),
-        /* directoriesIndex=*/ ImmutableMap.of(emptyDirectoryDigest, emptyDirectory),
-        /* allowSymlinkTargetAbsolute=*/ false,
-        /* onInputFiles=*/ file -> {},
-        /* onInputDirectories=*/ directory -> {},
-        /* onInputDigests=*/ digest -> {},
+        /* pathDigests= */ new Stack<>(),
+        /* visited= */ Sets.newHashSet(),
+        /* directoriesIndex= */ ImmutableMap.of(emptyDirectoryDigest, emptyDirectory),
+        /* allowSymlinkTargetAbsolute= */ false,
+        /* onInputFiles= */ file -> {},
+        /* onInputDirectories= */ directory -> {},
+        /* onInputDigests= */ digest -> {},
         preconditionFailure);
 
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -425,13 +425,13 @@ public class NodeInstanceTest {
     NodeInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         absoluteSymlinkDirectory,
-        /* pathDigests=*/ new Stack<>(),
-        /* visited=*/ Sets.newHashSet(),
-        /* directoriesIndex=*/ Maps.newHashMap(),
-        /* allowSymlinkTargetAbsolute=*/ false,
-        /* onInputFile=*/ file -> {},
-        /* onInputDirectorie=*/ directory -> {},
-        /* onInputDigest=*/ digest -> {},
+        /* pathDigests= */ new Stack<>(),
+        /* visited= */ Sets.newHashSet(),
+        /* directoriesIndex= */ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute= */ false,
+        /* onInputFile= */ file -> {},
+        /* onInputDirectorie= */ directory -> {},
+        /* onInputDigest= */ digest -> {},
         preconditionFailure);
 
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -445,13 +445,13 @@ public class NodeInstanceTest {
     NodeInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         absoluteSymlinkDirectory,
-        /* pathDigests=*/ new Stack<>(),
-        /* visited=*/ Sets.newHashSet(),
-        /* directoriesIndex=*/ Maps.newHashMap(),
-        /* allowSymlinkTargetAbsolute=*/ true,
-        /* onInputFile=*/ file -> {},
-        /* onInputDirectorie=*/ directory -> {},
-        /* onInputDigest=*/ digest -> {},
+        /* pathDigests= */ new Stack<>(),
+        /* visited= */ Sets.newHashSet(),
+        /* directoriesIndex= */ Maps.newHashMap(),
+        /* allowSymlinkTargetAbsolute= */ true,
+        /* onInputFile= */ file -> {},
+        /* onInputDirectorie= */ directory -> {},
+        /* onInputDigest= */ digest -> {},
         preconditionFailure);
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(0);
   }
@@ -593,13 +593,13 @@ public class NodeInstanceTest {
     NodeInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         root,
-        /* pathDigests=*/ new Stack<>(),
-        /* visited=*/ Sets.newHashSet(),
-        /* directoriesIndex=*/ ImmutableMap.of(),
-        /* allowSymlinkTargetAbsolute=*/ false,
-        /* onInputFiles=*/ file -> {},
-        /* onInputDirectories=*/ directory -> {},
-        /* onInputDigests=*/ digest -> {},
+        /* pathDigests= */ new Stack<>(),
+        /* visited= */ Sets.newHashSet(),
+        /* directoriesIndex= */ ImmutableMap.of(),
+        /* allowSymlinkTargetAbsolute= */ false,
+        /* onInputFiles= */ file -> {},
+        /* onInputDirectories= */ directory -> {},
+        /* onInputDigests= */ digest -> {},
         preconditionFailure);
 
     String missingSubject = "blobs/" + DigestUtil.toString(missingDirectoryDigest);
@@ -655,13 +655,13 @@ public class NodeInstanceTest {
     NodeInstance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         root,
-        /* pathDigests=*/ new Stack<>(),
-        /* visited=*/ Sets.newHashSet(),
-        /* directoriesIndex=*/ ImmutableMap.of(fooDigest, foo),
-        /* allowSymlinkTargetAbsolute=*/ false,
-        /* onInputFiles=*/ file -> {},
-        /* onInputDirectories=*/ directory -> {},
-        /* onInputDigests=*/ digest -> {},
+        /* pathDigests= */ new Stack<>(),
+        /* visited= */ Sets.newHashSet(),
+        /* directoriesIndex= */ ImmutableMap.of(fooDigest, foo),
+        /* allowSymlinkTargetAbsolute= */ false,
+        /* onInputFiles= */ file -> {},
+        /* onInputDirectories= */ directory -> {},
+        /* onInputDigests= */ digest -> {},
         preconditionFailure);
 
     String missingSubject = "blobs/" + DigestUtil.toString(missingDirectoryDigest);
@@ -696,7 +696,7 @@ public class NodeInstanceTest {
         .get(
             eq(Compressor.Value.IDENTITY),
             eq(digest),
-            /* offset=*/ eq(0L),
+            /* offset= */ eq(0L),
             eq(digest.getSizeBytes()),
             any(ServerCallStreamObserver.class),
             eq(requestMetadata));
@@ -765,7 +765,7 @@ public class NodeInstanceTest {
         .get(
             eq(Compressor.Value.IDENTITY),
             eq(treeDigest),
-            /* offset=*/ eq(0L),
+            /* offset= */ eq(0L),
             eq(treeDigest.getSizeBytes()),
             any(ServerCallStreamObserver.class),
             eq(requestMetadata));

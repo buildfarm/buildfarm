@@ -110,7 +110,7 @@ public class GrpcCASTest {
     GrpcCAS cas =
         new GrpcCAS(
             instanceName,
-            /* readonly=*/ true,
+            /* readonly= */ true,
             InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
             mock(ByteStreamUploader.class),
             onExpirations);
@@ -140,7 +140,7 @@ public class GrpcCASTest {
     GrpcCAS cas =
         new GrpcCAS(
             instanceName,
-            /* readonly=*/ true,
+            /* readonly= */ true,
             InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
             mock(ByteStreamUploader.class),
             onExpirations);
@@ -158,7 +158,8 @@ public class GrpcCASTest {
         MultimapBuilder.hashKeys().arrayListValues().build();
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamUploader uploader = mock(ByteStreamUploader.class);
-    GrpcCAS cas = new GrpcCAS(instanceName, /* readonly=*/ false, channel, uploader, onExpirations);
+    GrpcCAS cas =
+        new GrpcCAS(instanceName, /* readonly= */ false, channel, uploader, onExpirations);
     Runnable onExpiration = mock(Runnable.class);
     cas.put(new Blob(uploadContent, digest), onExpiration);
     verify(uploader, times(1))
@@ -185,7 +186,7 @@ public class GrpcCASTest {
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     GrpcCAS cas =
         new GrpcCAS(
-            instanceName, /* readonly=*/ false, channel, /* uploader=*/ null, onExpirations);
+            instanceName, /* readonly= */ false, channel, /* uploader= */ null, onExpirations);
     RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
     Write initialWrite = cas.getWrite(Compressor.Value.IDENTITY, digest, uuid, requestMetadata);
     try (OutputStream writeOut = initialWrite.getOutput(1, SECONDS, () -> {})) {
@@ -207,9 +208,9 @@ public class GrpcCASTest {
     GrpcCAS cas =
         new GrpcCAS(
             instanceName,
-            /* readonly=*/ true,
-            /* channel=*/ null,
-            /* uploader=*/ null,
+            /* readonly= */ true,
+            /* channel= */ null,
+            /* uploader= */ null,
             onExpirations);
 
     RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
@@ -221,7 +222,7 @@ public class GrpcCASTest {
   public void findMissingBlobsSwallowsFilteredList() throws Exception {
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     Runnable onExpiration = mock(Runnable.class);
-    GrpcCAS cas = new GrpcCAS("test", /* readonly=*/ false, channel, null, onExpirations);
+    GrpcCAS cas = new GrpcCAS("test", /* readonly= */ false, channel, null, onExpirations);
     ContentAddressableStorageImplBase casService = spy(ContentAddressableStorageImplBase.class);
     serviceRegistry.addService(casService);
     // Mutable calls bindService, and clearInvocations is undesirable

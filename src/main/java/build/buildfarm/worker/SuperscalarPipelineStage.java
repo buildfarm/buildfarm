@@ -95,7 +95,7 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
         releaseClaim(operationContext.operation.getName(), claimsRequired(operationContext));
       } else {
         try {
-          wait(/* timeout=*/ 10);
+          wait(/* timeout= */ 10);
         } catch (InterruptedException e) {
           interrupted = Thread.interrupted() || interrupted;
           // ignore, we will throw it eventually

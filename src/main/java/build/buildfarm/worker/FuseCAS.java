@@ -399,7 +399,7 @@ public class FuseCAS extends FuseStubFS {
         log.log(Level.INFO, "Mounting FuseCAS");
         String[] fuseOpts = {"-o", "max_write=131072", "-o", "big_writes"};
         try {
-          mount(mountPath, /* blocking=*/ false, /* debug=*/ false, /* fuseOpts=*/ fuseOpts);
+          mount(mountPath, /* blocking= */ false, /* debug= */ false, /* fuseOpts= */ fuseOpts);
         } catch (FuseException e) {
           throw new IOException(e);
         }

@@ -538,7 +538,8 @@ class ShardWorkerContext implements WorkerContext {
     if (maxEntrySize != UNLIMITED_ENTRY_SIZE_MAX && size > maxEntrySize) {
       String message =
           String.format(
-              "ReportResultStage: The output %s could not be uploaded because it exceeded the maximum size of an entry (%d > %d)",
+              "ReportResultStage: The output %s could not be uploaded because it exceeded the"
+                  + " maximum size of an entry (%d > %d)",
               outputPath, size, maxEntrySize);
       preconditionFailure
           .addViolationsBuilder()
@@ -696,7 +697,8 @@ class ShardWorkerContext implements WorkerContext {
                   .setType(entrySizeViolationType)
                   .setSubject("blobs/" + DigestUtil.toString(digest))
                   .setDescription(
-                      "An output could not be uploaded because it exceeded the maximum size of an entry");
+                      "An output could not be uploaded because it exceeded the maximum size of an"
+                          + " entry");
             }
           }
 

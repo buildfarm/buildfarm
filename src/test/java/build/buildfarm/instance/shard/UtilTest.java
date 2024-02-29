@@ -80,7 +80,7 @@ public class UtilTest {
         correctMissingBlob(
             backplane,
             workerSet,
-            /* originalLocationSet=*/ ImmutableSet.of(),
+            /* originalLocationSet= */ ImmutableSet.of(),
             workerInstanceFactory,
             digest,
             directExecutor(),
@@ -120,7 +120,7 @@ public class UtilTest {
         correctMissingBlob(
             backplane,
             workerSet,
-            /* originalLocationSet=*/ ImmutableSet.of(),
+            /* originalLocationSet= */ ImmutableSet.of(),
             workerInstanceFactory,
             digest,
             directExecutor(),
@@ -170,7 +170,7 @@ public class UtilTest {
         correctMissingBlob(
             backplane,
             workerSet,
-            /* originalLocationSet=*/ ImmutableSet.of(),
+            /* originalLocationSet= */ ImmutableSet.of(),
             workerInstanceFactory,
             digest,
             directExecutor(),
@@ -207,7 +207,7 @@ public class UtilTest {
         correctMissingBlob(
             backplane,
             workerSet,
-            /* originalLocationSet=*/ ImmutableSet.of(),
+            /* originalLocationSet= */ ImmutableSet.of(),
             workerInstanceFactory,
             digest,
             directExecutor(),
@@ -247,7 +247,7 @@ public class UtilTest {
         correctMissingBlob(
             backplane,
             workerSet,
-            /* originalLocationSet=*/ ImmutableSet.of(),
+            /* originalLocationSet= */ ImmutableSet.of(),
             workerInstanceFactory,
             digest,
             directExecutor(),

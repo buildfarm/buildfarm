@@ -406,7 +406,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
   @Override
   public boolean containsKey(String key) throws IOException, InterruptedException {
     try {
-      return get(key, /* out=*/ null, true, false).get();
+      return get(key, /* out= */ null, true, false).get();
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       Throwables.throwIfInstanceOf(e, IOException.class);

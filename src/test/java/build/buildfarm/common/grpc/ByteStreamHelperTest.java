@@ -87,11 +87,11 @@ public class ByteStreamHelperTest {
     try (InputStream in =
         ByteStreamHelper.newInput(
             resourceName,
-            /* offset=*/ 0,
+            /* offset= */ 0,
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             NO_RETRIES::newBackoff,
             NO_RETRIES::isRetriable,
-            /* retryService=*/ null)) {
+            /* retryService= */ null)) {
       fail("should not get here");
     } catch (IOException e) {
       assertThat(e).isInstanceOf(NoSuchFileException.class);

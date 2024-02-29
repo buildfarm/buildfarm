@@ -30,8 +30,7 @@ import com.google.rpc.Status;
  */
 public class OperationFailer {
   public static Operation get(Operation operation, ExecuteEntry executeEntry, Status status) {
-    return operation
-        .toBuilder()
+    return operation.toBuilder()
         .setDone(true)
         .setName(executeEntry.getOperationName())
         .setMetadata(

@@ -929,7 +929,8 @@ class Cat {
   static class TreeLayout extends DigestsCommand {
     @Override
     public String description() {
-      return "Rich tree layout of root directory [digests...], with weighting and missing tolerance";
+      return "Rich tree layout of root directory [digests...], with weighting and missing"
+          + " tolerance";
     }
 
     @Override
@@ -1009,7 +1010,8 @@ class Cat {
   static class DumpQueuedOperation extends BlobCommand {
     @Override
     public String description() {
-      return "Binary QueuedOperation [digests...] content, suitable for retention in local 'blobs' directory and use with bf-executor";
+      return "Binary QueuedOperation [digests...] content, suitable for retention in local 'blobs'"
+          + " directory and use with bf-executor";
     }
 
     @Override

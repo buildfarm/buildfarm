@@ -57,7 +57,7 @@ public class ReportResultStageTest {
     OperationContext operationContext = null;
 
     public SingleOutputSink() {
-      super("SingleOutputSink", /* workerContext=*/ null, /* output=*/ null, /* error=*/ null);
+      super("SingleOutputSink", /* workerContext= */ null, /* output= */ null, /* error= */ null);
     }
 
     @Override
@@ -110,7 +110,7 @@ public class ReportResultStageTest {
             .build();
     when(context.putOperation(any(Operation.class))).thenReturn(true);
 
-    PipelineStage reportResultStage = new ReportResultStage(context, output, /* error=*/ null);
+    PipelineStage reportResultStage = new ReportResultStage(context, output, /* error= */ null);
     reportResultStage.put(reportedContext);
     reportResultStage.run();
     verify(context, times(1)).destroyExecDir(reportedContext.execDir);
@@ -159,7 +159,7 @@ public class ReportResultStageTest {
             eq(erroringContext.execDir),
             eq(Command.getDefaultInstance()));
 
-    PipelineStage reportResultStage = new ReportResultStage(context, output, /* error=*/ null);
+    PipelineStage reportResultStage = new ReportResultStage(context, output, /* error= */ null);
     reportResultStage.put(erroringContext);
     reportResultStage.run();
     verify(context, times(1)).destroyExecDir(erroringContext.execDir);

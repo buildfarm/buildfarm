@@ -25,8 +25,8 @@ public class AuthAndTLSOptions extends OptionsBase {
       name = "google_default_credentials",
       defaultValue = "false",
       help =
-          "Whether to use 'Google Application Default Credentials' for authentication."
-              + " See https://cloud.google.com/docs/authentication for details. Disabled by default.")
+          "Whether to use 'Google Application Default Credentials' for authentication. See"
+              + " https://cloud.google.com/docs/authentication for details. Disabled by default.")
   public boolean useGoogleDefaultCredentials;
 
   @Option(

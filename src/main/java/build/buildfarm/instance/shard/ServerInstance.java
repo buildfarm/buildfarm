@@ -269,7 +269,7 @@ public class ServerInstance extends NodeInstance {
     if (configs.getBackplane().getType().equals(SHARD)) {
       return new RedisShardBackplane(
           identifier,
-          /* subscribeToBackplane=*/ true,
+          /* subscribeToBackplane= */ true,
           configs.getServer().isRunFailsafeOperation(),
           ServerInstance::stripOperation,
           ServerInstance::stripQueuedOperation);
@@ -285,7 +285,7 @@ public class ServerInstance extends NodeInstance {
         digestUtil,
         createBackplane(identifier),
         onStop,
-        /* actionCacheFetchService=*/ BuildfarmExecutors.getActionCacheFetchServicePool());
+        /* actionCacheFetchService= */ BuildfarmExecutors.getActionCacheFetchServicePool());
   }
 
   private ServerInstance(
@@ -360,11 +360,11 @@ public class ServerInstance extends NodeInstance {
     super(
         name,
         digestUtil,
-        /* contentAddressableStorage=*/ null,
-        /* actionCache=*/ actionCache,
-        /* outstandingOperations=*/ null,
-        /* completedOperations=*/ null,
-        /* activeBlobWrites=*/ null,
+        /* contentAddressableStorage= */ null,
+        /* actionCache= */ actionCache,
+        /* outstandingOperations= */ null,
+        /* completedOperations= */ null,
+        /* activeBlobWrites= */ null,
         ensureOutputsPresent);
     this.backplane = backplane;
     this.actionCache = actionCache;
@@ -453,7 +453,8 @@ public class ServerInstance extends NodeInstance {
                     log.log(
                         Level.FINER,
                         format(
-                            "OperationQueuer: Dispatched To Transform %s: %dus in canQueue, %dus in transform dispatch",
+                            "OperationQueuer: Dispatched To Transform %s: %dus in canQueue, %dus in"
+                                + " transform dispatch",
                             operationName, canQueueUSecs, operationTransformDispatchUSecs));
                     return queueFuture;
                   } catch (Throwable t) {
@@ -1710,7 +1711,10 @@ public class ServerInstance extends NodeInstance {
           .setSubject(INVALID_PLATFORM)
           .setDescription(
               format(
-                  "properties are not valid for queue eligibility: %s.  If you think your queue should still accept these poperties without them being specified in queue configuration, consider configuring the queue with `allow_unmatched: True`",
+                  "properties are not valid for queue eligibility: %s.  If you think your queue"
+                      + " should still accept these poperties without them being specified in queue"
+                      + " configuration, consider configuring the queue with `allow_unmatched:"
+                      + " True`",
                   platform.getPropertiesList()));
     }
 
@@ -2113,8 +2117,7 @@ public class ServerInstance extends NodeInstance {
 
       if (inDenyList(requestMetadata)) {
         watcher.observe(
-            operation
-                .toBuilder()
+            operation.toBuilder()
                 .setDone(true)
                 .setResponse(Any.pack(denyActionResponse(actionDigest, BLOCK_LIST_ERROR)))
                 .build());
@@ -2124,7 +2127,7 @@ public class ServerInstance extends NodeInstance {
       return watchOperation(
           operation,
           newActionResultWatcher(DigestUtil.asActionKey(actionDigest), watcher),
-          /* initial=*/ false);
+          /* initial= */ false);
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }
@@ -2197,8 +2200,7 @@ public class ServerInstance extends NodeInstance {
             .build();
 
     Operation completedOperation =
-        operation
-            .toBuilder()
+        operation.toBuilder()
             .setDone(true)
             .setResponse(
                 Any.pack(
@@ -2375,7 +2377,8 @@ public class ServerInstance extends NodeInstance {
               log.log(
                   Level.FINER,
                   format(
-                      "ServerInstance(%s): queue(%s): fetched action %s transforming queuedOperation",
+                      "ServerInstance(%s): queue(%s): fetched action %s transforming"
+                          + " queuedOperation",
                       getName(), operation.getName(), actionDigest.getHash()));
               Stopwatch transformStopwatch = Stopwatch.createStarted();
               return transform(
@@ -2479,7 +2482,8 @@ public class ServerInstance extends NodeInstance {
               log.log(
                   Level.FINER,
                   format(
-                      "ServerInstance(%s): queue(%s): %dus checkCache, %dus transform, %dus validate, %dus upload, %dus queue, %dus elapsed",
+                      "ServerInstance(%s): queue(%s): %dus checkCache, %dus transform, %dus"
+                          + " validate, %dus upload, %dus queue, %dus elapsed",
                       getName(),
                       queueOperation.getName(),
                       checkCacheUSecs,
@@ -2674,7 +2678,7 @@ public class ServerInstance extends NodeInstance {
               .withDescription(String.format("Operation not found: %s", operationName))
               .asException());
     }
-    return watchOperation(operation, watcher, /* initial=*/ true);
+    return watchOperation(operation, watcher, /* initial= */ true);
   }
 
   private static Operation stripOperation(Operation operation) {
@@ -2688,8 +2692,7 @@ public class ServerInstance extends NodeInstance {
   private static Operation stripQueuedOperation(Operation operation) {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       operation =
-          operation
-              .toBuilder()
+          operation.toBuilder()
               .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
               .build();
     }
@@ -2789,8 +2792,7 @@ public class ServerInstance extends NodeInstance {
         configs.isAllowSymlinkTargetAbsolute()
             ? SymlinkAbsolutePathStrategy.Value.ALLOWED
             : SymlinkAbsolutePathStrategy.Value.DISALLOWED;
-    return super.getCacheCapabilities()
-        .toBuilder()
+    return super.getCacheCapabilities().toBuilder()
         .setSymlinkAbsolutePathStrategy(symlinkAbsolutePathStrategy)
         .build();
   }

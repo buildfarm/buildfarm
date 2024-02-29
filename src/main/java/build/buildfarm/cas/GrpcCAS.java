@@ -121,7 +121,7 @@ public class GrpcCAS implements ContentAddressableStorage {
         bsStub,
         NO_RETRIES::newBackoff,
         NO_RETRIES::isRetriable,
-        /* retryService=*/ null);
+        /* retryService= */ null);
   }
 
   private String readResourceName(Compressor.Value compressor, Digest digest) {
@@ -237,7 +237,7 @@ public class GrpcCAS implements ContentAddressableStorage {
   @Override
   public Blob get(Digest digest) {
     try (InputStream in =
-        newStreamInput(readResourceName(Compressor.Value.IDENTITY, digest), /* offset=*/ 0)) {
+        newStreamInput(readResourceName(Compressor.Value.IDENTITY, digest), /* offset= */ 0)) {
       ByteString content = ByteString.readFrom(in);
       if (content.size() != digest.getSizeBytes()) {
         throw new IOException(
@@ -282,7 +282,7 @@ public class GrpcCAS implements ContentAddressableStorage {
         resourceName,
         Functions.identity(),
         digest.getSizeBytes(),
-        /* autoflush=*/ false);
+        /* autoflush= */ false);
   }
 
   @Override

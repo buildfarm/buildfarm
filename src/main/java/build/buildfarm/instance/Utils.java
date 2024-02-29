@@ -47,7 +47,7 @@ public final class Utils {
       RequestMetadata requestMetadata)
       throws IOException, InterruptedException {
     return getBlob(
-        instance, compressor, blobDigest, /* offset=*/ 0, 60, TimeUnit.SECONDS, requestMetadata);
+        instance, compressor, blobDigest, /* offset= */ 0, 60, TimeUnit.SECONDS, requestMetadata);
   }
 
   public static ByteString getBlob(

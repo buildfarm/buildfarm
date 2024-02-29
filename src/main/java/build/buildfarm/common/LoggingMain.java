@@ -21,8 +21,8 @@ public abstract class LoggingMain {
     Runtime.getRuntime()
         .addShutdownHook(
             new Thread(
-                /* group=*/ null,
-                /* target=*/ this::shutdown,
-                /* name=*/ applicationName + "-Shutdown"));
+                /* group= */ null,
+                /* target= */ this::shutdown,
+                /* name= */ applicationName + "-Shutdown"));
   }
 }

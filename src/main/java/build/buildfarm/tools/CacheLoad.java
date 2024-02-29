@@ -67,10 +67,10 @@ class CacheLoad {
         new LocalCASFileCache(
             root,
             configs.getWorker().getStorages().get(0),
-            /* maxSizeInBytes=*/ Size.gbToBytes(500),
+            /* maxSizeInBytes= */ Size.gbToBytes(500),
             new DigestUtil(HashFunction.SHA1),
-            /* expireService=*/ newDirectExecutorService(),
-            /* accessRecorder=*/ directExecutor());
+            /* expireService= */ newDirectExecutorService(),
+            /* accessRecorder= */ directExecutor());
 
     // Start cache and measure startup time (reported internally).
     StartupCacheResults results = fileCache.start(newDirectExecutorService(), true);

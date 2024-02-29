@@ -90,7 +90,7 @@ public class ByteStreamServiceTest {
   }
 
   static String createBlobUploadResourceName(String id, Digest digest) {
-    return createBlobUploadResourceName(/* instanceName=*/ "", id, digest);
+    return createBlobUploadResourceName(/* instanceName= */ "", id, digest);
   }
 
   static String createBlobUploadResourceName(String instanceName, String id, Digest digest) {
@@ -100,7 +100,7 @@ public class ByteStreamServiceTest {
   }
 
   private String createBlobDownloadResourceName(Digest digest) {
-    return createBlobDownloadResourceName(/* instanceName=*/ "", digest);
+    return createBlobDownloadResourceName(/* instanceName= */ "", digest);
   }
 
   private String createBlobDownloadResourceName(String instanceName, Digest digest) {

@@ -175,7 +175,7 @@ class RedisShardSubscriber extends JedisPubSub {
   private void terminateExpiredWatchers(String channel, Instant now, boolean force) {
     onOperation(
         channel,
-        /* operation=*/ null,
+        /* operation= */ null,
         (watcher) -> {
           boolean expired = force || watcher.isExpiredAt(now);
           if (expired) {
@@ -187,7 +187,7 @@ class RedisShardSubscriber extends JedisPubSub {
           }
           return expired;
         },
-        /* expiresAt=*/ null);
+        /* expiresAt= */ null);
   }
 
   public void onOperation(String channel, Operation operation, Instant expiresAt) {

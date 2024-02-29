@@ -63,7 +63,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   private final Writes writes = new Writes(this);
 
   public MemoryCAS(long maxSizeInBytes) {
-    this(maxSizeInBytes, (digest) -> {}, /* delegate=*/ null);
+    this(maxSizeInBytes, (digest) -> {}, /* delegate= */ null);
   }
 
   public MemoryCAS(
@@ -281,7 +281,8 @@ public class MemoryCAS implements ContentAddressableStorage {
       log.log(
           Level.WARNING,
           String.format(
-              "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
+              "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list ="
+                  + " %d",
               sizeInBytes, maxSizeInBytes, storage.size(), size()));
     }
 

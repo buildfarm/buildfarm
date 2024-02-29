@@ -85,6 +85,7 @@ public class DockerExecutor {
     cleanUpContainer(dockerClient, containerId);
     return Code.OK;
   }
+
   /**
    * @brief Setup the container for the action.
    * @details This ensures the image is fetched, the container is started, and that the container
@@ -113,6 +114,7 @@ public class DockerExecutor {
     // container is ready for running actions
     return containerId;
   }
+
   /**
    * @brief Fetch the user requested image for running the action.
    * @details The image will not be fetched if it already exists.
@@ -130,6 +132,7 @@ public class DockerExecutor {
           .awaitCompletion(fetchTimeout.getSeconds(), TimeUnit.SECONDS);
     }
   }
+
   /**
    * @brief Check to see if the image was already available.
    * @details Checking to see if the image is already available can avoid having to re-fetch it.
@@ -148,6 +151,7 @@ public class DockerExecutor {
     }
     return true;
   }
+
   /**
    * @brief Get all the host paths that should be populated into the container.
    * @details Paths with use docker's copy archive API.
@@ -161,6 +165,7 @@ public class DockerExecutor {
     paths.addAll(Utils.getSymbolicLinkReferences(execDir));
     return paths;
   }
+
   /**
    * @brief Populate the container as needed by copying files into it.
    * @details This may or may not be necessary depending on mounts / volumes.
@@ -174,6 +179,7 @@ public class DockerExecutor {
       copyPathIntoContainer(dockerClient, containerId, path);
     }
   }
+
   /**
    * @brief Copies the file or directory into the container.
    * @details Copies all folder descendants.
@@ -190,6 +196,7 @@ public class DockerExecutor {
     cmd.withRemotePath(path.toAbsolutePath().toString());
     cmd.exec();
   }
+
   /**
    * @brief Get the exit code of the action that was executed inside the container.
    * @details Docker stores the exit code after the execution and it can be queried with an execId.
@@ -203,6 +210,7 @@ public class DockerExecutor {
     InspectExecResponse response = inspectExecCmd.exec();
     resultBuilder.setExitCode(response.getExitCodeLong().intValue());
   }
+
   /**
    * @brief Extract information from the container after the action ran.
    * @details This can include exit code, output artifacts, and various docker information.
@@ -222,6 +230,7 @@ public class DockerExecutor {
     extractExitCode(dockerClient, execId, resultBuilder);
     copyOutputsOutOfContainer(dockerClient, settings, containerId);
   }
+
   /**
    * @brief Copies action outputs out of the container.
    * @details The outputs are known by the operation context.
@@ -241,6 +250,7 @@ public class DockerExecutor {
       outputDirPath.toFile().mkdirs();
     }
   }
+
   /**
    * @brief Delete the container.
    * @details Forces container deletion.
@@ -254,6 +264,7 @@ public class DockerExecutor {
       log.log(Level.SEVERE, "couldn't shutdown container: ", e);
     }
   }
+
   /**
    * @brief Assuming the container is already created and properly populated/mounted with data, this
    *     can be used to spawn an action inside of it.
@@ -289,6 +300,7 @@ public class DockerExecutor {
 
     return execId;
   }
+
   /**
    * @brief Create a docker container for the action to run in.
    * @details We can use a separate container per action or keep containers alive and re-use them.
@@ -317,6 +329,7 @@ public class DockerExecutor {
     // container is ready and started
     return response.getId();
   }
+
   /**
    * @brief Create a host config used for container creation.
    * @details This can determine container mounts and volumes.
@@ -329,6 +342,7 @@ public class DockerExecutor {
     mountExecRoot(config, execDir);
     return config;
   }
+
   /**
    * @brief Add paths needed to mount the exec root.
    * @details These are added to the host config.
@@ -350,6 +364,7 @@ public class DockerExecutor {
 
     config.withBinds(binds);
   }
+
   /**
    * @brief Copy the given file out of the container to the same host path.
    * @details The file is extracted as a tar and deserialized.

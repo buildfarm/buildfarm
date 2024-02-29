@@ -53,11 +53,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -88,10 +88,10 @@ public class ResourceDeciderTest {
             command,
             "worker",
             defaultMaxCores,
-            /* onlyMulticoreTests=*/ true,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* onlyMulticoreTests= */ true,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -120,11 +120,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -152,11 +152,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ true,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ true,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -184,11 +184,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -216,11 +216,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -247,11 +247,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -273,11 +273,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -303,11 +303,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -336,11 +336,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -371,11 +371,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -408,11 +408,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -437,7 +437,8 @@ public class ResourceDeciderTest {
                         Platform.Property.newBuilder()
                             .setName("env-vars")
                             .setValue(
-                                "{\"foo\": \"{{limits.cpu.min}}\", \"bar\": \"{{limits.cpu.max}}\"}")))
+                                "{\"foo\": \"{{limits.cpu.min}}\", \"bar\":"
+                                    + " \"{{limits.cpu.max}}\"}")))
             .build();
 
     // ACT
@@ -445,11 +446,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -480,11 +481,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -516,11 +517,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -552,11 +553,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -589,11 +590,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -624,11 +625,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -659,11 +660,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "worker",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -683,11 +684,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "foo",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -707,11 +708,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "foo",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             new SandboxSettings());
 
     // ASSERT
@@ -733,11 +734,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "foo",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             sandboxSettings);
 
     // ASSERT
@@ -767,11 +768,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "foo",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             sandboxSettings);
 
     // ASSERT
@@ -801,11 +802,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "foo",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             sandboxSettings);
 
     // ASSERT
@@ -835,11 +836,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "foo",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             sandboxSettings);
 
     // ASSERT
@@ -869,11 +870,11 @@ public class ResourceDeciderTest {
         ResourceDecider.decideResourceLimitations(
             command,
             "foo",
-            /* defaultMaxCores=*/ 0,
-            /* onlyMulticoreTests=*/ false,
-            /* limitGlobalExecution=*/ false,
-            /* executeStageWidth=*/ 100,
-            /* allowBringYourOwnContainer=*/ false,
+            /* defaultMaxCores= */ 0,
+            /* onlyMulticoreTests= */ false,
+            /* limitGlobalExecution= */ false,
+            /* executeStageWidth= */ 100,
+            /* allowBringYourOwnContainer= */ false,
             sandboxSettings);
 
     // ASSERT

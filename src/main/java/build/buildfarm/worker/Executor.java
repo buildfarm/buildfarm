@@ -114,9 +114,7 @@ class Executor {
     }
 
     Operation operation =
-        operationContext
-            .operation
-            .toBuilder()
+        operationContext.operation.toBuilder()
             .setMetadata(
                 Any.pack(
                     ExecutingOperationMetadata.newBuilder()

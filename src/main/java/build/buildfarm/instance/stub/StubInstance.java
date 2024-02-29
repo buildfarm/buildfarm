@@ -184,7 +184,7 @@ public class StubInstance implements Instance {
       DigestUtil digestUtil,
       ManagedChannel channel,
       Duration grpcTimeout) {
-    this(name, identifier, digestUtil, channel, grpcTimeout, NO_RETRIES, /* retryService=*/ null);
+    this(name, identifier, digestUtil, channel, grpcTimeout, NO_RETRIES, /* retryService= */ null);
   }
 
   public StubInstance(
@@ -502,7 +502,7 @@ public class StubInstance implements Instance {
         name,
         Functions.identity(),
         StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
-        /* autoflush=*/ true,
+        /* autoflush= */ true,
         RequestMetadata.getDefaultInstance());
   }
 
@@ -536,6 +536,7 @@ public class StubInstance implements Instance {
     private final ServerCallStreamObserver<ByteString> blobObserver;
 
     private ClientCallStreamObserver<ReadRequest> requestStream;
+
     // Guard against spurious onReady() calls caused by a race between onNext() and
     // onReady(). If the transport toggles isReady() from false to true while onNext()
     // is executing, but before onNext() checks isReady(). request(1) would be called
@@ -543,9 +544,11 @@ public class StubInstance implements Instance {
     // execution.
     @GuardedBy("this")
     private boolean wasReady = false;
+
     // We must not attempt to call request(1) on the stub until the call has been started.
     @GuardedBy("this")
     private boolean wasStarted = false;
+
     // Indicator for request completion, so that callbacks throw or are ignored
     final AtomicBoolean wasCompleted = new AtomicBoolean(false);
 
@@ -715,7 +718,7 @@ public class StubInstance implements Instance {
         compressor == Compressor.Value.IDENTITY
             ? digest.getSizeBytes()
             : StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
-        /* autoflush=*/ false,
+        /* autoflush= */ false,
         requestMetadata);
   }
 

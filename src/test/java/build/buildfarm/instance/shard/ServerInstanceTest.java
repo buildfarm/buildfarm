@@ -156,17 +156,17 @@ public class ServerInstanceTest {
             DIGEST_UTIL,
             mockBackplane,
             actionCache,
-            /* runDispatchedMonitor=*/ false,
-            /* dispatchedMonitorIntervalSeconds=*/ 0,
-            /* runOperationQueuer=*/ false,
-            /* maxBlobSize=*/ 0,
-            /* maxCpu=*/ 1,
-            /* maxRequeueAttempts=*/ 1,
-            /* maxActionTimeout=*/ Duration.getDefaultInstance(),
-            /* useDenyList=*/ true,
+            /* runDispatchedMonitor= */ false,
+            /* dispatchedMonitorIntervalSeconds= */ 0,
+            /* runOperationQueuer= */ false,
+            /* maxBlobSize= */ 0,
+            /* maxCpu= */ 1,
+            /* maxRequeueAttempts= */ 1,
+            /* maxActionTimeout= */ Duration.getDefaultInstance(),
+            /* useDenyList= */ true,
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
-            /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()),
+            /* actionCacheFetchService= */ listeningDecorator(newSingleThreadExecutor()),
             false);
     instance.start("startTime/test:0000");
   }
@@ -177,11 +177,11 @@ public class ServerInstanceTest {
   }
 
   private Action createAction() throws Exception {
-    return createAction(/* provideAction=*/ true, /* provideCommand=*/ true, SIMPLE_COMMAND);
+    return createAction(/* provideAction= */ true, /* provideCommand= */ true, SIMPLE_COMMAND);
   }
 
   private Action createAction(boolean provideAction) throws Exception {
-    return createAction(provideAction, /* provideCommand=*/ true, SIMPLE_COMMAND);
+    return createAction(provideAction, /* provideCommand= */ true, SIMPLE_COMMAND);
   }
 
   private Action createAction(boolean provideAction, boolean provideCommand) throws Exception {
@@ -276,11 +276,11 @@ public class ServerInstanceTest {
     Watcher mockWatcher = mock(Watcher.class);
     instance.execute(
         actionDigest,
-        /* skipCacheLookup=*/ false,
+        /* skipCacheLookup= */ false,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
         RequestMetadata.getDefaultInstance(),
-        /* watcher=*/ mockWatcher);
+        /* watcher= */ mockWatcher);
     verify(mockWatcher, times(1)).observe(any(Operation.class));
     ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
     verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));
@@ -383,7 +383,10 @@ public class ServerInstanceTest {
                     .setType(VIOLATION_TYPE_INVALID)
                     .setSubject(INVALID_PLATFORM)
                     .setDescription(
-                        "properties are not valid for queue eligibility: [].  If you think your queue should still accept these poperties without them being specified in queue configuration, consider configuring the queue with `allow_unmatched: True`"))
+                        "properties are not valid for queue eligibility: [].  If you think your"
+                            + " queue should still accept these poperties without them being"
+                            + " specified in queue configuration, consider configuring the queue"
+                            + " with `allow_unmatched: True`"))
             .build();
     ExecuteResponse executeResponse =
         ExecuteResponse.newBuilder()
@@ -714,11 +717,11 @@ public class ServerInstanceTest {
     Watcher mockWatcher = mock(Watcher.class);
     instance.execute(
         actionDigest,
-        /* skipCacheLookup=*/ false,
+        /* skipCacheLookup= */ false,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
         requestMetadata,
-        /* watcher=*/ mockWatcher);
+        /* watcher= */ mockWatcher);
     verify(mockWatcher, times(1)).observe(any(Operation.class));
     ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
     verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));

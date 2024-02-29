@@ -417,7 +417,7 @@ public abstract class NodeInstance implements Instance {
   }
 
   protected ByteString getBlob(Digest blobDigest) throws InterruptedException {
-    return getBlob(blobDigest, /* count=*/ blobDigest.getSizeBytes());
+    return getBlob(blobDigest, /* count= */ blobDigest.getSizeBytes());
   }
 
   ByteString getBlob(Digest blobDigest, long count) throws IndexOutOfBoundsException {
@@ -445,7 +445,7 @@ public abstract class NodeInstance implements Instance {
   protected ListenableFuture<ByteString> getBlobFuture(
       Compressor.Value compressor, Digest blobDigest, RequestMetadata requestMetadata) {
     return getBlobFuture(
-        compressor, blobDigest, /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
+        compressor, blobDigest, /* count= */ blobDigest.getSizeBytes(), requestMetadata);
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
@@ -454,7 +454,7 @@ public abstract class NodeInstance implements Instance {
     getBlob(
         compressor,
         blobDigest,
-        /* offset=*/ 0,
+        /* offset= */ 0,
         count,
         new ServerCallStreamObserver<ByteString>() {
           ByteString content = ByteString.EMPTY;
@@ -980,7 +980,7 @@ public abstract class NodeInstance implements Instance {
               Tree.Builder tree = Tree.newBuilder().setRootDigest(inputRoot);
 
               TokenizableIterator<DirectoryEntry> iterator =
-                  createTreeIterator(reason, inputRoot, /* pageToken=*/ "");
+                  createTreeIterator(reason, inputRoot, /* pageToken= */ "");
               while (iterator.hasNext()) {
                 DirectoryEntry entry = iterator.next();
                 Directory directory = entry.getDirectory();
@@ -1862,8 +1862,7 @@ public abstract class NodeInstance implements Instance {
             .setRequestMetadata(requestMetadata)
             .build();
     putOperation(
-        operation
-            .toBuilder()
+        operation.toBuilder()
             .setDone(true)
             .setMetadata(Any.pack(completedMetadata))
             .setResponse(Any.pack(ExecuteResponse.newBuilder().setStatus(status).build()))
@@ -1891,8 +1890,7 @@ public abstract class NodeInstance implements Instance {
     }
     metadata = metadata.toBuilder().setStage(ExecutionStage.Value.COMPLETED).build();
     putOperation(
-        operation
-            .toBuilder()
+        operation.toBuilder()
             .setDone(true)
             .setMetadata(Any.pack(metadata))
             .setResponse(Any.pack(executeResponse))

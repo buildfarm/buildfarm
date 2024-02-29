@@ -369,7 +369,7 @@ class Executor {
     FileStore fileStore = Files.getFileStore(blobsDir);
     try (DirectoryStream<Path> stream = Files.newDirectoryStream(blobsDir)) {
       for (Path file : stream) {
-        FileStatus stat = stat(file, /* followSymlinks=*/ false, fileStore);
+        FileStatus stat = stat(file, /* followSymlinks= */ false, fileStore);
 
         Digest digest =
             DigestUtil.buildDigest(file.getFileName().toString().split("_")[0], stat.getSize());

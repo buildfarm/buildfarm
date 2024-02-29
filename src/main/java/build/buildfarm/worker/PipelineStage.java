@@ -246,7 +246,7 @@ public abstract class PipelineStage implements Runnable {
 
   public static class NullStage extends PipelineStage {
     public NullStage() {
-      this(/* workerContext=*/ null, /* output=*/ null);
+      this(/* workerContext= */ null, /* output= */ null);
     }
 
     public NullStage(WorkerContext workerContext, PipelineStage output) {

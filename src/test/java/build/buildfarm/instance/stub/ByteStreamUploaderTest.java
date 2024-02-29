@@ -79,10 +79,10 @@ public class ByteStreamUploaderTest {
         });
     ByteStreamUploader uploader =
         new ByteStreamUploader(
-            /* instanceName=*/ null,
+            /* instanceName= */ null,
             InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-            /* callCredentials=*/ null,
-            /* callTimeoutSecs=*/ 1,
+            /* callCredentials= */ null,
+            /* callTimeoutSecs= */ 1,
             NO_RETRIES);
     Chunker chunker = Chunker.builder().setInput(ByteString.copyFromUtf8("Hello, World!")).build();
     uploader.uploadBlob(HashCode.fromInt(42), chunker);

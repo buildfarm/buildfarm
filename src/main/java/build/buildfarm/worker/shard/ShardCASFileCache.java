@@ -56,7 +56,7 @@ class ShardCASFileCache extends CASFileCache {
         digestUtil,
         expireService,
         accessRecorder,
-        /* storage=*/ Maps.newConcurrentMap(),
+        /* storage= */ Maps.newConcurrentMap(),
         DEFAULT_DIRECTORIES_INDEX_NAME,
         onPut,
         onExpire,

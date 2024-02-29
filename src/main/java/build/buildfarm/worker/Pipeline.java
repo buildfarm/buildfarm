@@ -27,6 +27,7 @@ public class Pipeline {
   private final Map<PipelineStage, Integer> stageClosePriorities;
   private Thread joiningThread = null;
   private boolean closing = false;
+
   // FIXME ThreadGroup?
 
   public Pipeline() {

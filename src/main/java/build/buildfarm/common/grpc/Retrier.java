@@ -100,10 +100,10 @@ public class Retrier {
 
     static Supplier<Backoff> sequential(int maxAttempts) {
       return exponential(
-          /* initial=*/ Duration.ZERO,
-          /* max=*/ Duration.ZERO,
-          /* multiplier=*/ 1.1,
-          /* jitter=*/ 0.0,
+          /* initial= */ Duration.ZERO,
+          /* max= */ Duration.ZERO,
+          /* multiplier= */ 1.1,
+          /* jitter= */ 0.0,
           maxAttempts);
     }
 
@@ -203,7 +203,7 @@ public class Retrier {
 
   @SuppressWarnings("Guava")
   public Retrier(Supplier<Backoff> backoffSupplier, Predicate<Status> isRetriable) {
-    this(backoffSupplier, isRetriable, /* retryScheduler=*/ null);
+    this(backoffSupplier, isRetriable, /* retryScheduler= */ null);
   }
 
   @SuppressWarnings("Guava")

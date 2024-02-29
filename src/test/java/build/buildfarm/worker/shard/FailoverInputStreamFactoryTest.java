@@ -37,17 +37,17 @@ public class FailoverInputStreamFactoryTest {
     Digest contentDigest = DIGEST_UTIL.compute(content);
     FailoverInputStreamFactory failoverFactory =
         new FailoverInputStreamFactory(
-            /* primary=*/ (compressor, digest, offset) -> {
+            /* primary= */ (compressor, digest, offset) -> {
               if (digest.equals(contentDigest)) {
                 return content.newInput();
               }
               throw new NoSuchFileException(DigestUtil.toString(digest));
             },
-            /* failover=*/ (compressor, digest, offset) -> {
+            /* failover= */ (compressor, digest, offset) -> {
               throw new IOException("invalid");
             });
     InputStream in =
-        failoverFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset=*/ 0);
+        failoverFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset= */ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);
   }
 
@@ -57,17 +57,17 @@ public class FailoverInputStreamFactoryTest {
     Digest contentDigest = DIGEST_UTIL.compute(content);
     FailoverInputStreamFactory failoverFactory =
         new FailoverInputStreamFactory(
-            /* primary=*/ (compressor, digest, offset) -> {
+            /* primary= */ (compressor, digest, offset) -> {
               throw new NoSuchFileException(DigestUtil.toString(digest));
             },
-            /* failover=*/ (compressor, digest, offset) -> {
+            /* failover= */ (compressor, digest, offset) -> {
               if (digest.equals(contentDigest)) {
                 return content.newInput();
               }
               throw new IOException("invalid");
             });
     InputStream in =
-        failoverFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset=*/ 0);
+        failoverFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset= */ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);
   }
 }

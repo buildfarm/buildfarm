@@ -78,8 +78,8 @@ public final class ContentAddressableStorages {
             config,
             configs.getMaxEntrySizeBytes(),
             DigestUtil.forHash("SHA256"),
-            /* expireService=*/ newDirectExecutorService(),
-            /* accessRecorder=*/ directExecutor()) {
+            /* expireService= */ newDirectExecutorService(),
+            /* accessRecorder= */ directExecutor()) {
           @Override
           protected InputStream newExternalInput(
               Compressor.Value compressor, Digest digest, long offset) throws IOException {

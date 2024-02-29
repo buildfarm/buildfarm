@@ -174,8 +174,7 @@ public class ReportResultStage extends PipelineStage {
             .build();
 
     Operation completedOperation =
-        operation
-            .toBuilder()
+        operation.toBuilder()
             .setDone(true)
             .setMetadata(Any.pack(completedMetadata))
             .setResponse(Any.pack(executeResponse))

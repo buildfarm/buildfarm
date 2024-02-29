@@ -351,8 +351,7 @@ public class WorkerInstance extends NodeInstance {
   }
 
   public Operation stripOperation(Operation operation) {
-    return operation
-        .toBuilder()
+    return operation.toBuilder()
         .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
         .build();
   }
@@ -360,8 +359,7 @@ public class WorkerInstance extends NodeInstance {
   public Operation stripQueuedOperation(Operation operation) {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       operation =
-          operation
-              .toBuilder()
+          operation.toBuilder()
               .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
               .build();
     }
