@@ -5,7 +5,7 @@
 
 FORMAT_JAVA=true
 REMOVE_NEWLINES_AFTER_START_BRACKET=true
-JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/google-java-format-1.7/google-java-format-1.7-all-deps.jar
+JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/v1.20.0/google-java-format-1.20.0-all-deps.jar
 LOCAL_FORMATTER="java_formatter.jar"
 
 FORMAT_PROTO=true
