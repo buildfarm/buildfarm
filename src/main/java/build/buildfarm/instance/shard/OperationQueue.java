@@ -332,10 +332,10 @@ public class OperationQueue {
     }
 
     throw new RuntimeException(
-        "there are no eligible queues for the provided execution requirements. One solution to is"
+        "There are no eligible queues for the provided execution requirements. One solution to is"
             + " to configure a provision queue with no requirements which would be eligible to all"
             + " operations. See"
-            + " https://github.com/bazelbuild/bazel-buildfarm/wiki/Shard-Platform-Operation-Queue"
+            + " https://bazelbuild.github.io/bazel-buildfarm/docs/architecture/queues/"
             + " for details. "
             + eligibilityResults);
   }
