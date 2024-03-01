@@ -1,8 +1,8 @@
 load("@buildifier_prebuilt//:rules.bzl", "buildifier")
-load("@io_bazel_rules_docker//java:image.bzl", "java_image")
+load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_push")
 load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "download_pkgs")
 load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
-load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_push")
+load("@io_bazel_rules_docker//java:image.bzl", "java_image")
 load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
 
 package(default_visibility = ["//visibility:public"])

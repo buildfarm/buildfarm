@@ -2,8 +2,8 @@
 Provide a simple C++ build graph as large as desired.
 """
 
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 load("@bazel_skylib//rules:write_file.bzl", _write_file = "write_file")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
 def write_file(name, out, lines):
     """
