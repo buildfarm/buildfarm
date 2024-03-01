@@ -7,13 +7,6 @@ load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 def archive_dependencies(third_party):
     return [
-        # Needed for "well-known protos" and @com_google_protobuf//:protoc.
-        {
-            "name": "com_google_protobuf",
-            "sha256": "79082dc68d8bab2283568ce0be3982b73e19ddd647c2411d1977ca5282d2d6b3",
-            "strip_prefix": "protobuf-25.0",
-            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v25.0.zip"],
-        },
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
