@@ -1,10 +1,11 @@
+load("@io_grpc_grpc_java//:java_grpc_library.bzl", "java_grpc_library")
+load("@rules_java//java:defs.bzl", "java_proto_library")
+
 package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
 exports_files(["LICENSE"])
-
-load("@io_grpc_grpc_java//:java_grpc_library.bzl", "java_grpc_library")
 
 java_proto_library(
     name = "build_bazel_remote_asset_v1_remote_asset_java_proto",
