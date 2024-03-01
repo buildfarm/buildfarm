@@ -10,5 +10,5 @@ RUN apt-get update
 RUN apt-get -y install wget git zip python gcc openjdk-8-jdk g++ redis redis-server
 RUN wget --tries=10 -O get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py
 RUN python2 get-pip.py
-RUN pip install python-dateutil
+RUN pip install python-dateutil==2.8.2
 COPY . buildfarm
