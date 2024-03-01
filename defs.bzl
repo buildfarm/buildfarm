@@ -2,7 +2,6 @@
 buildfarm definitions that can be imported into other WORKSPACE files
 """
 
-load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 
@@ -13,8 +12,6 @@ def buildfarm_init(name = "buildfarm"):
     Args:
       name: the name of the repository
     """
-
-    protobuf_deps()
 
     grpc_java_repositories()
 
