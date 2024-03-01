@@ -1,3 +1,5 @@
+load("@io_grpc_grpc_java//:java_grpc_library.bzl", "java_grpc_library")
+load("@rules_java//java:defs.bzl", "java_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
 package(default_visibility = ["//visibility:public"])
@@ -5,8 +7,6 @@ package(default_visibility = ["//visibility:public"])
 licenses(["notice"])
 
 exports_files(["LICENSE"])
-
-load("@io_grpc_grpc_java//:java_grpc_library.bzl", "java_grpc_library")
 
 java_proto_library(
     name = "google_devtools_build_v1_build_status_java_proto",
