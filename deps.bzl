@@ -7,19 +7,12 @@ load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 def archive_dependencies(third_party):
     return [
-        # Needed for "well-known protos" and @com_google_protobuf//:protoc.
-        {
-            "name": "com_google_protobuf",
-            "sha256": "79082dc68d8bab2283568ce0be3982b73e19ddd647c2411d1977ca5282d2d6b3",
-            "strip_prefix": "protobuf-25.0",
-            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v25.0.zip"],
-        },
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "sha256": "b8fb7ae4824fb5a5ae6e6fa26ffe2ad7ab48406fdeee54e8965a3b5948dd957e",
-            "strip_prefix": "grpc-java-1.56.1",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.56.1.zip"],
+            "sha256": "5d617856c295d863307f4036a1b1e93f9eeaf6da41424d2de7c9b330a810fc3b",
+            "strip_prefix": "grpc-java-1.62.2",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.62.2.zip"],
             # Bzlmod: Waiting for https://github.com/bazelbuild/bazel-central-registry/issues/353
         },
         {
