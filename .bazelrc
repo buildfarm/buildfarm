@@ -24,7 +24,9 @@ test --test_tag_filters=-redis,-integration
 # https://buildkite.com/bazel/bazelisk-plus-incompatible-flags
 common --incompatible_disallow_empty_glob
 
-common --enable_bzlmod
+# TODO: migrate all dependencies from WORKSPACE to MODULE.bazel
+# https://github.com/bazelbuild/bazel-buildfarm/issues/1479
+common --noenable_bzlmod
 
 # Support protobuf on macOS with Xcode 15.x
 common:macos --host_cxxopt=-std=c++14 --cxxopt=-std=c++14

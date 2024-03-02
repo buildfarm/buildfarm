@@ -35,14 +35,16 @@ public class ExampleConfigsTest {
   @Test
   public void shardWorkerConfig() throws IOException {
     Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "_main", "examples", "config.minimal.yml");
+        Paths.get(
+            System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.minimal.yml");
     BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
     configs.loadConfigs(configPath);
   }
 
   @Test
   public void fullConfig() throws IOException {
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "_main", "examples", "config.yml");
+    Path configPath =
+        Paths.get(System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "config.yml");
     BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
     configs.loadConfigs(configPath);
   }
