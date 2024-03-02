@@ -17,9 +17,9 @@ def archive_dependencies(third_party):
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "sha256": "b8fb7ae4824fb5a5ae6e6fa26ffe2ad7ab48406fdeee54e8965a3b5948dd957e",
-            "strip_prefix": "grpc-java-1.56.1",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.56.1.zip"],
+            "sha256": "5d617856c295d863307f4036a1b1e93f9eeaf6da41424d2de7c9b330a810fc3b",
+            "strip_prefix": "grpc-java-1.62.2",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.62.2.zip"],
             # Bzlmod: Waiting for https://github.com/bazelbuild/bazel-central-registry/issues/353
         },
         {
