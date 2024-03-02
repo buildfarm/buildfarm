@@ -3,10 +3,16 @@ buildfarm dependencies that can be imported into other WORKSPACE files
 """
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
-load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 def archive_dependencies(third_party):
     return [
+        # Needed for "well-known protos" and @com_google_protobuf//:protoc.
+        # {
+        #     "name": "com_google_protobuf",
+        #     "sha256": "79082dc68d8bab2283568ce0be3982b73e19ddd647c2411d1977ca5282d2d6b3",
+        #     "strip_prefix": "protobuf-25.0",
+        #     "urls": ["https://github.com/protocolbuffers/protobuf/archive/v25.0.zip"],
+        # },
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
@@ -63,23 +69,22 @@ def archive_dependencies(third_party):
         },
     ]
 
-def buildfarm_dependencies(repository_name = "build_buildfarm"):
+def _buildfarm_extension_impl(ctx):
     """
     Define all 3rd party archive rules for buildfarm
 
     Args:
       repository_name: the name of the repository
     """
-    third_party = "@%s//third_party" % repository_name
+    repository_name = "@build_buildfarm"
+    third_party = "//third_party"
     for dependency in archive_dependencies(third_party):
         params = {}
         params.update(**dependency)
-        name = params.pop("name")
-        maybe(http_archive, name, **params)
+        http_archive(**params)
 
-    maybe(
-        http_jar,
-        "opentelemetry",
+    http_jar(
+        name = "opentelemetry",
         sha256 = "eccd069da36031667e5698705a6838d173d527a5affce6cc514a14da9dbf57d7",
         urls = [
             "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.28.0/opentelemetry-javaagent.jar",
@@ -91,3 +96,7 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
         sha256 = "12d20136605531b09a2c2dac02ccee85e1b874eb322ef6baf7561cd93f93c855",
         urls = ["https://github.com/krallin/tini/releases/download/v0.18.0/tini"],
     )
+
+build_deps = module_extension(
+    implementation = _buildfarm_extension_impl,
+)

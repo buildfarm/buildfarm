@@ -182,9 +182,11 @@ build_deps = use_extension("//:extensions.bzl", "build_deps")
 use_repo(
     build_deps,
     "bazel",
+    "com_grail_bazel_toolchain",
+    "googleapis",
     "io_grpc_grpc_java",
-    "jedis",
     "opentelemetry",
+    "remote_apis",
     "skip_sleep",
     "tini",
 )
