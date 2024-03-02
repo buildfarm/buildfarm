@@ -8,8 +8,6 @@ REMOVE_NEWLINES_AFTER_START_BRACKET=true
 JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/v1.20.0/google-java-format-1.20.0-all-deps.jar
 LOCAL_FORMATTER="java_formatter.jar"
 
-FORMAT_PROTO=true
-CLANG_FORMAT=@llvm_toolchain//:clang-format
 if [ -z "$BAZEL" ]; then
   BAZEL=bazel
 fi
@@ -71,30 +69,12 @@ run_java_formatter () {
     java -jar $LOCAL_FORMATTER -i $files
 }
 
-run_proto_formatter () {
-    # Check whether any formatting changes need to be made.
-    # This is intended to be done by the CI.
-    if [[ "$@" == "--check" ]]
-    then
-        find $PWD -name '*.proto' -exec $BAZEL run $CLANG_FORMAT -- -i --dry-run --Werror {} +
-        handle_format_error_check
-        return
-    fi
-
-    # Fixes formatting issues
-    find $PWD -name '*.proto' -exec $BAZEL run $CLANG_FORMAT -- -i {} +
-}
-
 run_buildifier () {
     $BAZEL run $BUILDIFIER -- -r > /dev/null 2>&1
 }
 
 if [ "${FORMAT_JAVA:-false}" = true ]; then
     run_java_formatter "$@"
-fi;
-
-if [ "${FORMAT_PROTO:-false}" = true ]; then
-    run_proto_formatter "$@"
 fi;
 
 if [ "${FORMAT_BUILD:-false}" = true ]; then
