@@ -10,8 +10,8 @@ java_library(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/operations",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@googleapis//:google_rpc_code_java_proto",
-        "@googleapis//:google_rpc_error_details_java_proto",
+        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
+        "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
@@ -26,6 +26,5 @@ java_library(
         "@maven//:org_apache_commons_commons_pool2",
         "@maven//:org_projectlombok_lombok",
         "@maven//:redis_clients_jedis",
-        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )

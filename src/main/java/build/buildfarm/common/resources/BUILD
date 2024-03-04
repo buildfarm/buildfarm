@@ -7,12 +7,12 @@ proto_library(
     name = "resource_proto",
     srcs = ["resource.proto"],
     deps = [
+        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_proto",
+        "@com_google_googleapis//google/api:annotations_proto",
+        "@com_google_googleapis//google/longrunning:operations_proto",
+        "@com_google_googleapis//google/rpc:status_proto",
         "@com_google_protobuf//:duration_proto",
         "@com_google_protobuf//:timestamp_proto",
-        "@googleapis//:google_api_annotations_proto",
-        "@googleapis//:google_longrunning_operations_proto",
-        "@googleapis//:google_rpc_status_proto",
-        "@remote_apis//build/bazel/remote/execution/v2:remote_execution_proto",
     ],
 )
 
@@ -30,9 +30,9 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@googleapis//:google_longrunning_operations_java_proto",
-        "@googleapis//:google_rpc_code_java_proto",
-        "@googleapis//:google_rpc_error_details_java_proto",
+        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
+        "@com_google_googleapis//google/longrunning:longrunning_java_proto",
+        "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_jnr_jnr_constants",
         "@maven//:com_github_jnr_jnr_ffi",
         "@maven//:com_github_jnr_jnr_posix",
@@ -49,6 +49,5 @@ java_library(
         "@maven//:org_apache_commons_commons_lang3",
         "@maven//:org_threeten_threetenbp",
         "@maven//:redis_clients_jedis",
-        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
