@@ -5,7 +5,8 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@googleapis//:google_longrunning_operations_java_proto",
+        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
+        "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_failureaccess",
         "@maven//:com_google_guava_guava",
@@ -15,6 +16,5 @@ java_library(
         "@maven//:io_grpc_grpc_core",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
-        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )

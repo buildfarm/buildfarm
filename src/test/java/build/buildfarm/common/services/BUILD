@@ -14,8 +14,9 @@ java_test(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/test/java/build/buildfarm:test_runner",
-        "@googleapis//:google_bytestream_bytestream_java_grpc",
-        "@googleapis//:google_bytestream_bytestream_java_proto",
+        "//third_party/googleapis:google_bytestream_bytestream_java_grpc",
+        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
+        "@com_google_googleapis//google/bytestream:bytestream_java_proto",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_truth_truth",
@@ -25,6 +26,5 @@ java_test(
         "@maven//:io_grpc_grpc_inprocess",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
-        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )

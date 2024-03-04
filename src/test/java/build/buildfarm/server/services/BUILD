@@ -11,11 +11,11 @@ java_test(
         "//src/main/java/build/buildfarm/server/services",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
+        "@bazel_remote_apis//build/bazel/remote/asset/v1:remote_asset_java_grpc",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_truth_truth",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
-        "@remote_apis//:build_bazel_remote_asset_v1_remote_asset_java_proto",
     ],
 )
