@@ -4,8 +4,6 @@ build --java_runtime_version=remotejdk_17
 build --tool_java_language_version=17
 build --tool_java_runtime_version=remotejdk_17
 
-# Prevents rules_docker issues when building with bazel 7
-build --@io_bazel_rules_docker//transitions:enable=false
 
 common --enable_platform_specific_config
 

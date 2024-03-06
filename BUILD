@@ -1,6 +1,6 @@
 load("@buildifier_prebuilt//:rules.bzl", "buildifier")
-load("@io_bazel_rules_docker//container:container.bzl", "container_push")
-load("@io_bazel_rules_docker//java:image.bzl", "java_image")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_image_index", "oci_push", "oci_tarball")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
 
 package(default_visibility = ["//visibility:public"])
@@ -41,7 +41,6 @@ java_library(
         ":process-wrapper.binary",
         ":skip_sleep.binary",
         ":skip_sleep.preload",
-        ":tini.binary",
     ],
 )
 
@@ -112,67 +111,138 @@ sh_binary(
     name = "macos-wrapper",
     srcs = ["macos-wrapper.sh"],
 )
+################################################################################
+## rules_oci
+################################################################################
 
-# Docker images for buildfarm components
-java_image(
-    name = "buildfarm-server",
-    args = ["/app/build_buildfarm/examples/config.minimal.yml"],
-    base = "@amazon_corretto_java_image_base//image",
-    classpath_resources = [
-        "//src/main/java/build/buildfarm:configs",
-    ],
-    data = [
-        "//examples:example_configs",
-        "//src/main/java/build/buildfarm:configs",
-    ],
-    jvm_flags = server_jvm_flags(),
-    main_class = "build.buildfarm.server.BuildFarmServer",
-    tags = ["container"],
-    runtime_deps = [
-        ":telemetry_tools",
-        "//src/main/java/build/buildfarm/server",
-    ],
-)
+ARCH = [
+    # "aarch64", # TODO
+    "amd64",
+]
 
-java_image(
-    name = "buildfarm-shard-worker",
-    args = ["/app/build_buildfarm/examples/config.minimal.yml"],
-    base = "@ubuntu-mantic//image",
-    classpath_resources = [
-        "//src/main/java/build/buildfarm:configs",
-    ],
-    data = [
-        "//examples:example_configs",
-        "//src/main/java/build/buildfarm:configs",
-    ],
-    jvm_flags = worker_jvm_flags(),
-    main_class = "build.buildfarm.worker.shard.Worker",
-    tags = ["container"],
-    runtime_deps = [
-        ":execution_wrappers",
-        ":telemetry_tools",
-        "//src/main/java/build/buildfarm/worker/shard",
-    ],
-)
-
-# Below targets push public docker images to bazelbuild dockerhub.
-
-container_push(
-    name = "public_push_buildfarm-server",
-    format = "Docker",
-    image = ":buildfarm-server",
-    registry = "index.docker.io",
-    repository = "bazelbuild/buildfarm-server",
-    tag = "$(release_version)",
+pkg_tar(
+    name = "layer_tini_amd64",
+    srcs = ["@tini//file"],
+    mode = "0755",
+    remap_paths = {"/downloaded": "/tini"},
     tags = ["container"],
 )
 
-container_push(
-    name = "public_push_buildfarm-worker",
-    format = "Docker",
-    image = ":buildfarm-shard-worker",
-    registry = "index.docker.io",
-    repository = "bazelbuild/buildfarm-worker",
-    tag = "$(release_version)",
+pkg_tar(
+    name = "layer_buildfarm_server",
+    srcs = ["//src/main/java/build/buildfarm:buildfarm-server_deploy.jar"],
+    package_dir = "app",
+    # Put everything in /app
     tags = ["container"],
 )
+
+pkg_tar(
+    name = "layer_buildfarm_worker",
+    srcs = ["//src/main/java/build/buildfarm:buildfarm-shard-worker_deploy.jar"],
+    # Put everything in /app
+    package_dir = "app",
+    tags = ["container"],
+)
+
+pkg_tar(
+    name = "layer_minimal_config",
+    srcs = ["@build_buildfarm//src/main/java/build/buildfarm:configs"],
+    package_dir = "app/config",
+    tags = ["container"],
+)
+
+oci_image(
+    name = "buildfarm-server_linux_amd64",
+    base = "@amazon_corretto_java_image_base",
+    entrypoint = [
+        "/app/buildfarm-server_deploy.jar",
+    ],
+    env = {
+        "JAVA_TOOL_OPTIONS": server_jvm_flags(),
+        "CONFIG_PATH": "/app/build_buildfarm/config.minimal.yml",
+    },
+    labels = {
+        "org.opencontainers.image.source": "https://github.com/bazelbuild/bazel-buildfarm",
+    },
+    tags = ["container"],
+    tars = [
+        # do not sort
+        ":layer_minimal_config",
+        # TODO :telemetry_tools
+        ":layer_buildfarm_server",
+    ],
+)
+
+oci_image(
+    name = "buildfarm-worker_linux_amd64",
+    base = "@ubuntu_mantic",
+    entrypoint = [
+        # do not sort
+        "/tini",
+        "--",
+        "java",
+        "-jar",
+        "/app/buildfarm-shard-worker_deploy.jar",
+    ],
+    env = {
+        "JAVA_TOOL_OPTIONS": worker_jvm_flags(),
+        "CONFIG_PATH": "/app/build_buildfarm/config.minimal.yml",
+    },
+    labels = {
+        "org.opencontainers.image.source": "https://github.com/bazelbuild/bazel-buildfarm",
+    },
+    tags = ["container"],
+    tars = [
+        # do not sort
+        ":layer_minimal_config",
+        ":layer_tini_amd64",
+        # TODO execution wrappers
+        # TODO :telemetry_tools
+        ":layer_buildfarm_worker",
+    ],
+)
+
+[
+    oci_image_index(
+        name = "buildfarm-%s" % image,
+        images = [
+            ":buildfarm-%s_linux_%s" % (image, arch)
+            for arch in ARCH
+        ],
+        tags = ["container"],
+    )
+    for image in [
+        "server",
+        "worker",
+    ]
+]
+
+######
+# Helpers to write to the local Docker Desktop's registry
+# Usage: `bazel run //:tarball_server_amd64 && docker run --rm buildfarm-server:amd64`
+# ####
+[
+    [
+        oci_tarball(
+            name = "tarball_%s_%s" % (image, arch),
+            image = ":buildfarm-%s_linux_%s" % (image, arch),
+            repo_tags = ["buildfarm-%s:%s" % (image, arch)],
+            tags = ["container"],
+        ),
+        # # Below targets push public docker images to bazelbuild dockerhub.
+        oci_push(
+            name = "public_push_buildfarm-%s" % image,
+            image = ":buildfarm-%s" % image,
+            remote_tags = [
+                "$(release_version)",
+            ],
+            repository = "index.docker.io/bazelbuild/buildfarm-%s" % image,
+            tags = ["container"],
+        ),
+    ]
+    for arch in ARCH
+    for image in [
+        "server",
+        "worker",
+    ]
+]

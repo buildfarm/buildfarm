@@ -4,10 +4,6 @@ buildfarm definitions that can be imported into other WORKSPACE files
 
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
-load(
-    "@io_bazel_rules_docker//repositories:repositories.bzl",
-    container_repositories = "repositories",
-)
 load("@io_grpc_grpc_java//:repositories.bzl", "IO_GRPC_GRPC_JAVA_OVERRIDE_TARGETS", "grpc_java_repositories")
 load("@remote_apis//:repository_rules.bzl", "switched_rules_by_language")
 load("@rules_jvm_external//:defs.bzl", "maven_install")
@@ -125,8 +121,6 @@ def buildfarm_init(name = "buildfarm"):
         name = "bazel_remote_apis_imports",
         java = True,
     )
-
-    container_repositories()
 
     protobuf_deps()
 
