@@ -8,6 +8,7 @@ import javax.annotation.Nullable;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
+import lombok.ToString;
 import oshi.util.FileUtil;
 import redis.clients.jedis.util.JedisURIHelper;
 
@@ -53,6 +54,7 @@ public class Backplane {
   private boolean priorityQueue = false;
   private Queue[] queues = {};
   private String redisCredentialFile;
+  @ToString.Exclude // Do not log the password on start-up.
   private String redisPassword;
   private int timeout = 10000;
   private String[] redisNodes = {};
