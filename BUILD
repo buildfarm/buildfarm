@@ -31,9 +31,9 @@ buildifier(
 # bazel version is used in buildfarm agents as is used by bazel clients.  There has not been any known issues due
 # to version mismatch, but we state the possibility here.  Some execution wrappers will not be compatible with all
 # operating systems.  We make a best effort and ensure they all work in the below images.
-java_library(
+pkg_tar(
     name = "execution_wrappers",
-    data = [
+    srcs = [
         ":as-nobody",
         ":delay",
         ":linux-sandbox.binary",
@@ -42,13 +42,17 @@ java_library(
         ":skip_sleep.binary",
         ":skip_sleep.preload",
     ],
+    package_dir = "app/build_buildfarm",
+    tags = ["container"],
 )
 
-java_library(
+pkg_tar(
     name = "telemetry_tools",
-    data = [
+    srcs = [
         ":opentelemetry-javaagent",
     ],
+    package_dir = "app/build_buildfarm",
+    tags = ["container"],
 )
 
 genrule(
@@ -123,7 +127,7 @@ ARCH = [
 pkg_tar(
     name = "layer_tini_amd64",
     srcs = ["@tini//file"],
-    mode = "0755",
+    mode = "0555",
     remap_paths = {"/downloaded": "/tini"},
     tags = ["container"],
 )
@@ -146,8 +150,15 @@ pkg_tar(
 
 pkg_tar(
     name = "layer_minimal_config",
+    srcs = ["@build_buildfarm//examples:example_configs"],
+    package_dir = "/app/build_buildfarm",
+    tags = ["container"],
+)
+
+pkg_tar(
+    name = "layer_logging_config",
     srcs = ["@build_buildfarm//src/main/java/build/buildfarm:configs"],
-    package_dir = "app/config",
+    package_dir = "/app/build_buildfarm/src/main/java/build/buildfarm",
     tags = ["container"],
 )
 
@@ -155,6 +166,8 @@ oci_image(
     name = "buildfarm-server_linux_amd64",
     base = "@amazon_corretto_java_image_base",
     entrypoint = [
+        "java",
+        "-jar",
         "/app/buildfarm-server_deploy.jar",
     ],
     env = {
@@ -167,8 +180,9 @@ oci_image(
     tags = ["container"],
     tars = [
         # do not sort
+        ":layer_logging_config",
         ":layer_minimal_config",
-        # TODO :telemetry_tools
+        ":telemetry_tools",
         ":layer_buildfarm_server",
     ],
 )
@@ -194,10 +208,11 @@ oci_image(
     tags = ["container"],
     tars = [
         # do not sort
+        ":layer_logging_config",
         ":layer_minimal_config",
         ":layer_tini_amd64",
-        # TODO execution wrappers
-        # TODO :telemetry_tools
+        ":execution_wrappers",
+        ":telemetry_tools",
         ":layer_buildfarm_worker",
     ],
 )
