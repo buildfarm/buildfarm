@@ -1,0 +1,32 @@
+"""Tests for our OCI image outputs"""
+
+load("@container_structure_test//:defs.bzl", "container_structure_test")
+
+DRIVER = "docker"  # Use tar if your host is not amd64, but it's a lot slower. (for example, you use hardware from Apple and you have aarch64)
+
+container_structure_test(
+    name = "worker_test",
+    configs = [
+        # keep sorted
+        "example_config.yaml",
+        "telemetry_tools.yaml",
+        "worker.yaml",
+        "worker_wrappers.yaml",
+    ],
+    driver = DRIVER,
+    image = "//:buildfarm-worker_linux_amd64",
+    tags = ["container"],
+)
+
+container_structure_test(
+    name = "server_test",
+    configs = [
+        # keep sorted
+        "example_config.yaml",
+        "server.yaml",
+        "telemetry_tools.yaml",
+    ],
+    driver = DRIVER,
+    image = "//:buildfarm-server_linux_amd64",
+    tags = ["container"],
+)

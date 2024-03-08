@@ -1,0 +1,21 @@
+---
+schemaVersion: "2.0.0"
+
+fileExistenceTests:
+  - name: "JAR"
+    path: '/app/buildfarm-shard-worker_deploy.jar'
+    shouldExist: true
+
+  - name: "tini"
+    path: '/tini'
+    shouldExist: true
+    permissions: '-r-xr-xr-x'
+
+metadataTest:
+  envVars:
+    - key: JAVA_TOOL_OPTIONS
+      value: 'UseContainerSupport'
+      isRegex: true
+  labels:
+    - key: 'org.opencontainers.image.source'
+      value: 'https://github.com/bazelbuild/bazel-buildfarm'
