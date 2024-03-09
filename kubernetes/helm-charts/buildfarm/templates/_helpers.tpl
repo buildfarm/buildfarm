@@ -61,6 +61,18 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{/*
+Create the APIsersion of the holizontal pod autoscaler
+*/}}
+{{- define "buildfarm.autoscalingVersion" -}}
+{{- if (.Capabilities.APIVersions.Has "autoscaling/v2") -}}
+autoscaling/v2
+{{- else if (.Capabilities.APIVersions.Has "autoscaling/v2beta2") -}}
+autoscaling/v2beta2
+{{- else -}}
+autoscaling/v1
+{{- end -}}
+{{- end -}}
 
 {{/* Checks for `externalRedis` */}}
 {{- if .Values.externalRedis.host }}
