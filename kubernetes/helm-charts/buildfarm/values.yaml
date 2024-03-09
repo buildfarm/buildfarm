@@ -109,7 +109,15 @@ shardWorker:
     enabled: true
     minReplicas: 2
     maxReplicas: 4
-    targetCPUUtilizationPercentage: 50
+    behavior: {} # effective only in `v2*`
+    metrics: # effective only in `v2*`
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+    targetCPUUtilizationPercentage: 50 # effective only in `v1`
 
   resources: { }
     # We usually recommend not to specify default resources and to leave this as a conscious
