@@ -103,7 +103,8 @@ class BlobWriteObserver implements WriteObserver {
       log.log(
           Level.WARNING,
           String.format(
-              "ByteStreamServer:write:%s: finish_write request of size %d for write size %d != expected %d",
+              "ByteStreamServer:write:%s: finish_write request of size %d for write size %d !="
+                  + " expected %d",
               resourceName, request.getData().size(), sizeAfterWrite, size));
       throw new IllegalArgumentException("Write size invalid: " + sizeAfterWrite);
     }

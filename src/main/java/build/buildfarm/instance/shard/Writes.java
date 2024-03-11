@@ -117,7 +117,7 @@ class Writes {
   }
 
   Writes(Supplier<Instance> instanceSupplier) {
-    this(instanceSupplier, /* writeExpiresAfter=*/ 1);
+    this(instanceSupplier, /* writeExpiresAfter= */ 1);
   }
 
   Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter) {

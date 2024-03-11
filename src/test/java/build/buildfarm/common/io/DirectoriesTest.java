@@ -142,8 +142,7 @@ class DirectoriesTest {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
-                      Configuration.osX()
-                          .toBuilder()
+                      Configuration.osX().toBuilder()
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
@@ -157,8 +156,7 @@ class DirectoriesTest {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
-                      Configuration.unix()
-                          .toBuilder()
+                      Configuration.unix().toBuilder()
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
@@ -172,8 +170,7 @@ class DirectoriesTest {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
-                      Configuration.windows()
-                          .toBuilder()
+                      Configuration.windows().toBuilder()
                           .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
                           .build())
                   .getRootDirectories(),

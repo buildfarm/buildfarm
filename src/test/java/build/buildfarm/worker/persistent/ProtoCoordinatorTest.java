@@ -56,8 +56,7 @@ public class ProtoCoordinatorTest {
       rootDir =
           Iterables.getFirst(
               Jimfs.newFileSystem(
-                      Configuration.unix()
-                          .toBuilder()
+                      Configuration.unix().toBuilder()
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),

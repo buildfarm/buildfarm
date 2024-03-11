@@ -101,8 +101,8 @@ public class StubWriteOutputStreamTest {
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             unimplementedResourceName,
             Functions.identity(),
-            /* expectedSize=*/ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
-            /* autoflush=*/ true);
+            /* expectedSize= */ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
+            /* autoflush= */ true);
     assertThat(write.getCommittedSize()).isEqualTo(0);
 
     write =
@@ -111,8 +111,8 @@ public class StubWriteOutputStreamTest {
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             notFoundResourceName,
             Functions.identity(),
-            /* expectedSize=*/ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
-            /* autoflush=*/ true);
+            /* expectedSize= */ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
+            /* autoflush= */ true);
     assertThat(write.getCommittedSize()).isEqualTo(0);
   }
 
@@ -135,8 +135,8 @@ public class StubWriteOutputStreamTest {
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             resourceName,
             Functions.identity(),
-            /* expectedSize=*/ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
-            /* autoflush=*/ true);
+            /* expectedSize= */ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
+            /* autoflush= */ true);
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       content.writeTo(out);
@@ -159,8 +159,8 @@ public class StubWriteOutputStreamTest {
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             resourceName,
             Functions.identity(),
-            /* expectedSize=*/ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
-            /* autoflush=*/ true);
+            /* expectedSize= */ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
+            /* autoflush= */ true);
 
     boolean callbackTimedOut = false;
     try (OutputStream out =

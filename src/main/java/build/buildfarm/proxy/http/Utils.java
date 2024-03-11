@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutionException;
 /** Utility methods for the remote package. * */
 public final class Utils {
   private Utils() {}
+
   /**
    * Returns the result of a {@link ListenableFuture} if successful, or throws any checked {@link
    * Exception} directly if it's an {@link IOException} or else wraps it in an {@link IOException}.

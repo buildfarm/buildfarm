@@ -94,7 +94,7 @@ public class InputFetcherTest {
                     new ViolationException(
                         Digest.getDefaultInstance(),
                         root.resolve("input"),
-                        /* isExecutable=*/ false,
+                        /* isExecutable= */ false,
                         new NoSuchFileException("input-digest")),
                     new PutDirectoryException(
                         root.resolve("dir"),
@@ -107,9 +107,9 @@ public class InputFetcherTest {
             return 1;
           }
         };
-    InputFetchStage owner = new InputFetchStage(workerContext, /* output=*/ null, error);
+    InputFetchStage owner = new InputFetchStage(workerContext, /* output= */ null, error);
     InputFetcher inputFetcher = new InputFetcher(workerContext, operationContext, owner);
-    inputFetcher.fetchPolled(/* stopwatch=*/ null);
+    inputFetcher.fetchPolled(/* stopwatch= */ null);
     Operation failedOperation = checkNotNull(failedOperationRef.get());
     verify(error, times(1)).put(any(OperationContext.class));
     ExecuteResponse executeResponse = failedOperation.getResponse().unpack(ExecuteResponse.class);

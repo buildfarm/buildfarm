@@ -52,6 +52,7 @@ public class CasFallbackDelegate {
       fileCacheDelegate.start(onStartPut, removeDirectoryService, skipLoad);
     }
   }
+
   /**
    * @brief Get an inputstream to read the given digest data.
    * @details Creates the delegate's inputstream if possible.
@@ -74,6 +75,7 @@ public class CasFallbackDelegate {
     }
     return delegate.newInput(compressor, digest, offset);
   }
+
   /**
    * @brief Query delegate CAS to find missing blobs.
    * @details Will not query delegate if there are no missing blobs given.
@@ -92,6 +94,7 @@ public class CasFallbackDelegate {
 
     return delegate.findMissingBlobs(missingDigests);
   }
+
   /**
    * @brief Check if delegate CAS contains blob.
    * @details Will be false if CAS delegate is unavailable.

@@ -116,7 +116,7 @@ public class WorkerInstanceTest {
   public void listOperationsIsUnsupported() {
     ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
     instance.listOperations(
-        /* pageSize=*/ 0, /* pageToken=*/ "", /* filter=*/ "", /* operations=*/ operations);
+        /* pageSize= */ 0, /* pageToken= */ "", /* filter= */ "", /* operations= */ operations);
   }
 
   @Test(expected = UnsupportedOperationException.class)
@@ -127,49 +127,49 @@ public class WorkerInstanceTest {
   @Test(expected = UnsupportedOperationException.class)
   public void getTreeIsUnsupported() {
     instance.getTree(
-        /* rootDigest=*/ Digest.getDefaultInstance(),
-        /* pageSize=*/ 0,
-        /* pageToken=*/ "",
-        /* tree=*/ Tree.newBuilder());
+        /* rootDigest= */ Digest.getDefaultInstance(),
+        /* pageSize= */ 0,
+        /* pageToken= */ "",
+        /* tree= */ Tree.newBuilder());
   }
 
   @Test(expected = UnsupportedOperationException.class)
   public void getOperationStreamWriteIsUnsupported() {
-    instance.getOperationStreamWrite(/* name=*/ null);
+    instance.getOperationStreamWrite(/* name= */ null);
   }
 
   @Test(expected = UnsupportedOperationException.class)
   public void newOperationStreamInputIsUnsupported() {
     instance.newOperationStreamInput(
-        /* name=*/ null,
-        /* offset=*/ 0,
-        /* deadlineAfter=*/
-        /* deadlineAfterUnits=*/ RequestMetadata.getDefaultInstance());
+        /* name= */ null,
+        /* offset= */ 0,
+        /* deadlineAfter= */
+        /* deadlineAfterUnits= */ RequestMetadata.getDefaultInstance());
   }
 
   @Test(expected = UnsupportedOperationException.class)
   public void executeIsUnsupported() {
     instance.execute(
-        /* actionDigest=*/ null,
-        /* skipCacheLookup=*/ false,
-        /* executionPolicy=*/ null,
-        /* resultsCachePolicy=*/ null,
-        /* requestMetadata=*/ null,
-        /* watcher=*/ null);
+        /* actionDigest= */ null,
+        /* skipCacheLookup= */ false,
+        /* executionPolicy= */ null,
+        /* resultsCachePolicy= */ null,
+        /* requestMetadata= */ null,
+        /* watcher= */ null);
   }
 
   @Test(expected = UnsupportedOperationException.class)
   public void matchIsUnsupported() throws InterruptedException {
-    instance.match(/* platform=*/ null, /* listener=*/ null);
+    instance.match(/* platform= */ null, /* listener= */ null);
   }
 
   @Test(expected = UnsupportedOperationException.class)
   public void cancelOperationIsUnsupported() throws InterruptedException {
-    instance.cancelOperation(/* name=*/ null);
+    instance.cancelOperation(/* name= */ null);
   }
 
   @Test(expected = UnsupportedOperationException.class)
   public void deleteOperation() throws InterruptedException {
-    instance.deleteOperation(/* name=*/ null);
+    instance.deleteOperation(/* name= */ null);
   }
 }

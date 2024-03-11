@@ -41,14 +41,12 @@ public class MetricsPublisherTest {
   private final ExecuteOperationMetadata defaultExecuteOperationMetadata =
       ExecuteOperationMetadata.getDefaultInstance();
   private final RequestMetadata defaultRequestMetadata =
-      RequestMetadata.getDefaultInstance()
-          .toBuilder()
+      RequestMetadata.getDefaultInstance().toBuilder()
           .setCorrelatedInvocationsId(
               "http://user@host-name?uuid_source\\u003d%2Fproc%2Fsys%2Fkernel%2Frandom%2Fuuid\\u0026OSTYPE\\u003dlinux-gnu#c09a5efa-f015-4d7b-b889-8ee0d097dff7")
           .build();
   private final Operation defaultOperation =
-      Operation.getDefaultInstance()
-          .toBuilder()
+      Operation.getDefaultInstance().toBuilder()
           .setDone(true)
           .setName("shard/operations/123")
           .build();
@@ -74,8 +72,7 @@ public class MetricsPublisherTest {
   @Test
   public void publishCompleteMetricsTest() throws InvalidProtocolBufferException {
     Operation operation =
-        defaultOperation
-            .toBuilder()
+        defaultOperation.toBuilder()
             .setResponse(Any.pack(defaultExecuteResponse))
             .setMetadata(Any.pack(defaultExecuteOperationMetadata))
             .build();
@@ -128,8 +125,7 @@ public class MetricsPublisherTest {
         Status.getDefaultInstance().toBuilder().addDetails(Any.pack(preconditionFailure)).build();
 
     Operation operation =
-        defaultOperation
-            .toBuilder()
+        defaultOperation.toBuilder()
             .setResponse(Any.pack(defaultExecuteResponse.toBuilder().setStatus(status).build()))
             .setMetadata(Any.pack(defaultExecuteOperationMetadata))
             .build();

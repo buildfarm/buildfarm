@@ -96,7 +96,8 @@ public class PipelineStageTest {
         };
     Thread stageThread = new Thread(stage);
     stageThread.start();
-    while (count.get() != 1) ;
+    while (count.get() != 1)
+      ;
     stage.cancelTick();
     stageThread.join();
     assertThat(count.get()).isEqualTo(2);

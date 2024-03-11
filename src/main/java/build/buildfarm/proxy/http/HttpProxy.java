@@ -53,7 +53,7 @@ public class HttpProxy extends LoggingMain {
     SimpleBlobStore simpleBlobStore =
         HttpBlobStore.create(
             URI.create(options.httpCache),
-            /* remoteMaxConnections=*/ 0,
+            /* remoteMaxConnections= */ 0,
             (int) SECONDS.toMillis(options.timeout),
             creds);
     server =

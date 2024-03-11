@@ -66,6 +66,7 @@ public interface Write {
         /** Discards the specified byte. */
         @Override
         public void write(int b) {}
+
         /** Discards the specified byte array. */
         @Override
         public void write(byte[] b) {

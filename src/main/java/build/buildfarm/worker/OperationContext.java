@@ -124,14 +124,14 @@ public final class OperationContext {
 
   public static Builder newBuilder() {
     return new Builder(
-        /* executeResponse=*/ ExecuteResponse.newBuilder(),
-        /* operation=*/ null,
-        /* poller=*/ null,
-        /* execDir=*/ null,
-        /* action=*/ null,
-        /* command=*/ null,
-        /* tree=*/ null,
-        /* queueEntry=*/ null);
+        /* executeResponse= */ ExecuteResponse.newBuilder(),
+        /* operation= */ null,
+        /* poller= */ null,
+        /* execDir= */ null,
+        /* action= */ null,
+        /* command= */ null,
+        /* tree= */ null,
+        /* queueEntry= */ null);
   }
 
   public Builder toBuilder() {

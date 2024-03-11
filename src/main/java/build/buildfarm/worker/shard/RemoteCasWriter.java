@@ -151,8 +151,8 @@ public class RemoteCasWriter implements CasWriter {
     // the callback closes the stream and prepares the future.
     FeedbackOutputStream out =
         write.getOutput(
-            /* deadlineAfter=*/ 1,
-            /* deadlineAfterUnits=*/ DAYS,
+            /* deadlineAfter= */ 1,
+            /* deadlineAfterUnits= */ DAYS,
             () -> {
               try {
                 FeedbackOutputStream outStream = (FeedbackOutputStream) write;

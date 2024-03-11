@@ -42,6 +42,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public class DequeueMatchEvaluator {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   /**
    * @brief Decide whether the worker should keep the operation or put it back on the queue.
    * @details Compares the platform properties of the worker to the operation's platform properties.

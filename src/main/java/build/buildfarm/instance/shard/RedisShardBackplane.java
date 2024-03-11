@@ -490,14 +490,14 @@ public class RedisShardBackplane implements Backplane {
     operationSubscription =
         new RedisShardSubscription(
             subscriber,
-            /* onUnsubscribe=*/ () -> {
+            /* onUnsubscribe= */ () -> {
               subscriptionThread = null;
               if (onUnsubscribe != null) {
                 onUnsubscribe.runInterruptibly();
               }
             },
-            /* onReset=*/ this::updateWatchedIfDone,
-            /* subscriptions=*/ subscriber::subscribedChannels,
+            /* onReset= */ this::updateWatchedIfDone,
+            /* subscriptions= */ subscriber::subscribedChannels,
             client);
 
     // use Executors...
@@ -655,7 +655,7 @@ public class RedisShardBackplane implements Backplane {
     String workerChangeJson = JsonFormat.printer().print(workerChange);
     return storageWorkers.remove(name) != null
         && client.call(
-            jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson, /* storage=*/ true));
+            jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson, /* storage= */ true));
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -800,11 +800,11 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private Map<String, ShardWorker> fetchAndExpireStorageWorkers(JedisCluster jedis) {
-    return fetchAndExpireWorkers(jedis, state.storageWorkers.asMap(jedis), /* storage=*/ true);
+    return fetchAndExpireWorkers(jedis, state.storageWorkers.asMap(jedis), /* storage= */ true);
   }
 
   private Map<String, ShardWorker> fetchAndExpireExecuteWorkers(JedisCluster jedis) {
-    return fetchAndExpireWorkers(jedis, state.executeWorkers.asMap(jedis), /* storage=*/ false);
+    return fetchAndExpireWorkers(jedis, state.executeWorkers.asMap(jedis), /* storage= */ false);
   }
 
   private Map<String, ShardWorker> fetchAndExpireWorkers(

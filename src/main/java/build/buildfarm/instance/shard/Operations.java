@@ -30,6 +30,7 @@ import redis.clients.jedis.JedisCluster;
  */
 public class Operations {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   /**
    * @field operationIds
    * @brief A mapping from operationID -> operation

@@ -44,7 +44,7 @@ public class ExecuteActionStageTest {
             .setExecDir(Paths.get("error-operation-path"))
             .build();
 
-    PipelineStage executeActionStage = new ExecuteActionStage(context, /* output=*/ null, error);
+    PipelineStage executeActionStage = new ExecuteActionStage(context, /* output= */ null, error);
     executeActionStage.error().put(errorContext);
     verify(context, times(1)).destroyExecDir(errorContext.execDir);
     verify(error, times(1)).put(errorContext);

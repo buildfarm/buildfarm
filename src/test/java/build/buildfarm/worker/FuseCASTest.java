@@ -371,14 +371,14 @@ public class FuseCASTest {
 
     ByteString data = ByteString.copyFromUtf8("Hello, World\n");
     Pointer buf = pointerFromByteString(data);
-    assertThat(fuseCAS.write("/foo", buf, data.size(), /* offset=*/ 0, fi)).isEqualTo(data.size());
+    assertThat(fuseCAS.write("/foo", buf, data.size(), /* offset= */ 0, fi)).isEqualTo(data.size());
     FileStat fileStat = createFileStat();
     fuseCAS.getattr("/foo", fileStat);
     assertThat(fileStat.st_size.longValue()).isEqualTo(data.size());
 
     ByteString overwriteData = ByteString.copyFromUtf8("Goodbye");
     Pointer overwriteBuf = pointerFromByteString(overwriteData);
-    fuseCAS.write("/foo", overwriteBuf, overwriteData.size(), /* offset=*/ 0, fi);
+    fuseCAS.write("/foo", overwriteBuf, overwriteData.size(), /* offset= */ 0, fi);
     fuseCAS.getattr("/foo", fileStat);
     assertThat(fileStat.st_size.longValue()).isEqualTo(data.size());
   }
@@ -404,7 +404,8 @@ public class FuseCASTest {
     FuseFileInfo fi = new SystemFuseFileInfo();
     //noinspection OctalInteger
     fuseCAS.create("/foo", 0644, fi);
-    assertThat(fuseCAS.read("/foo", /* buf=*/ null, /* size=*/ 1, /* offset=*/ 0, fi)).isEqualTo(0);
+    assertThat(fuseCAS.read("/foo", /* buf= */ null, /* size= */ 1, /* offset= */ 0, fi))
+        .isEqualTo(0);
   }
 
   @Test
@@ -415,12 +416,12 @@ public class FuseCASTest {
 
     ByteString data = ByteString.copyFromUtf8("Hello, World\n");
     Pointer buf = pointerFromByteString(data);
-    fuseCAS.write("/foo", buf, data.size(), /* offset=*/ 0, fi);
+    fuseCAS.write("/foo", buf, data.size(), /* offset= */ 0, fi);
 
     byte[] readData = new byte[5];
     u8[] array = Struct.arrayOf(Runtime.getSystemRuntime(), u8.class, readData.length);
     Pointer readBuf = ((DelegatingMemoryIO) Struct.getMemory(array[0])).getDelegatedMemoryIO();
-    assertThat(fuseCAS.read("/foo", readBuf, /* size=*/ readData.length, /* offset=*/ 7, fi))
+    assertThat(fuseCAS.read("/foo", readBuf, /* size= */ readData.length, /* offset= */ 7, fi))
         .isEqualTo(readData.length);
     readBuf.get(0, readData, 0, readData.length);
     assertThat(new String(readData, 0)).isEqualTo("World");
@@ -436,7 +437,8 @@ public class FuseCASTest {
     fi.flags.set(0);
     assertThat(fuseCAS.open("/test/file", fi)).isEqualTo(0);
     assertThat(
-            fuseCAS.read("/test/file", /* buf=*/ buf, /* size=*/ data.length, /* offset=*/ 0, fi))
+            fuseCAS.read(
+                "/test/file", /* buf= */ buf, /* size= */ data.length, /* offset= */ 0, fi))
         .isEqualTo(data.length);
     buf.get(0, data, 0, data.length);
     assertThat(new String(data, 0)).isEqualTo("Peanut");
@@ -448,8 +450,8 @@ public class FuseCASTest {
             fuseCAS.fallocate(
                 "/op_not_supp",
                 /* FALLOC_FL_PUNCH_HOLE */ 2,
-                /* off=*/ -1,
-                /* length=*/ -1,
+                /* off= */ -1,
+                /* length= */ -1,
                 new SystemFuseFileInfo()))
         .isEqualTo(-ErrorCodes.EOPNOTSUPP());
   }
@@ -459,7 +461,7 @@ public class FuseCASTest {
     fuseCAS.mkdir("/foo", 755);
     assertThat(
             fuseCAS.fallocate(
-                "/foo", /* mode=*/ 0, /* off=*/ -1, /* length=*/ -1, new SystemFuseFileInfo()))
+                "/foo", /* mode= */ 0, /* off= */ -1, /* length= */ -1, new SystemFuseFileInfo()))
         .isEqualTo(-ErrorCodes.EISDIR());
   }
 
@@ -469,9 +471,9 @@ public class FuseCASTest {
     assertThat(
             fuseCAS.fallocate(
                 "/test/file",
-                /* mode=*/ 0,
-                /* off=*/ -1,
-                /* length=*/ -1,
+                /* mode= */ 0,
+                /* off= */ -1,
+                /* length= */ -1,
                 new SystemFuseFileInfo()))
         .isEqualTo(-ErrorCodes.EPERM());
   }
@@ -482,7 +484,7 @@ public class FuseCASTest {
     fuseCAS.create("/foo", 0644, new SystemFuseFileInfo());
     assertThat(
             fuseCAS.fallocate(
-                "/foo", /* mode=*/ 0, /* off=*/ 0, /* length=*/ 1024, new SystemFuseFileInfo()))
+                "/foo", /* mode= */ 0, /* off= */ 0, /* length= */ 1024, new SystemFuseFileInfo()))
         .isEqualTo(0);
     FileStat fileStat = createFileStat();
     fuseCAS.getattr("/foo", fileStat);

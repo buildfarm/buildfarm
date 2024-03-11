@@ -19,7 +19,7 @@ import java.time.Instant;
 
 class UnobservableWatcher extends TimedWatcher {
   UnobservableWatcher() {
-    this(/* expiresAt=*/ Instant.now());
+    this(/* expiresAt= */ Instant.now());
   }
 
   UnobservableWatcher(Instant expiresAt) {

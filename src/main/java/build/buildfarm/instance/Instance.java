@@ -127,6 +127,7 @@ public interface Instance {
   boolean putAndValidateOperation(Operation operation) throws InterruptedException;
 
   boolean pollOperation(String operationName, ExecutionStage.Value stage);
+
   // returns nextPageToken suitable for list restart
   String listOperations(
       int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations);

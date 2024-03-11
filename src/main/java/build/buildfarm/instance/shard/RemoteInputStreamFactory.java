@@ -72,7 +72,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
       Random rand,
       LoadingCache<String, Instance> workerStubs,
       UnavailableConsumer onUnavailable) {
-    this(/* publicName=*/ null, backplane, rand, workerStubs, onUnavailable);
+    this(/* publicName= */ null, backplane, rand, workerStubs, onUnavailable);
   }
 
   @SuppressWarnings("NullableProblems")

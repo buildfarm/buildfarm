@@ -81,8 +81,7 @@ public class MatchStage extends PipelineStage {
 
       Preconditions.checkState(poller == null);
       operationContext =
-          operationContext
-              .toBuilder()
+          operationContext.toBuilder()
               .setQueueEntry(queueEntry)
               .setPoller(workerContext.createPoller("MatchStage", queueEntry, QUEUED))
               .build();

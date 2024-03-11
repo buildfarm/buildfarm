@@ -73,8 +73,8 @@ public class RedisShardBackplaneTest {
   public RedisShardBackplane createBackplane(String name) {
     return new RedisShardBackplane(
         name,
-        /* subscribeToBackplane=*/ false,
-        /* runFailsafeOperation=*/ false,
+        /* subscribeToBackplane= */ false,
+        /* runFailsafeOperation= */ false,
         o -> o,
         o -> o,
         mockJedisClusterFactory);
@@ -368,9 +368,11 @@ public class RedisShardBackplaneTest {
     Map<String, String> workersJson =
         Map.of(
             "worker1",
-                "{\"endpoint\": \"worker1\", \"expireAt\": \"9999999999999\", \"workerType\": 3, \"firstRegisteredAt\": \"1685292624000\"}",
+                "{\"endpoint\": \"worker1\", \"expireAt\": \"9999999999999\", \"workerType\": 3,"
+                    + " \"firstRegisteredAt\": \"1685292624000\"}",
             "worker2",
-                "{\"endpoint\": \"worker2\", \"expireAt\": \"9999999999999\", \"workerType\": 3, \"firstRegisteredAt\": \"1685282624000\"}");
+                "{\"endpoint\": \"worker2\", \"expireAt\": \"9999999999999\", \"workerType\": 3,"
+                    + " \"firstRegisteredAt\": \"1685282624000\"}");
     when(jedisCluster.hgetAll(storageWorkerKey)).thenReturn(workersJson);
     Map<String, Long> workersStartTime = backplane.getWorkersStartTimeInEpochSecs(workerNames);
     assertThat(workersStartTime.size()).isEqualTo(2);

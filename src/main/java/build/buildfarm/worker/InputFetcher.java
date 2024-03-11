@@ -218,9 +218,7 @@ public class InputFetcher implements Runnable {
     String programName = queuedOperation.getCommand().getArguments(0);
     Directory root = directoriesIndex.get(queuedOperation.getTree().getRootDigest());
     Command command =
-        queuedOperation
-            .getCommand()
-            .toBuilder()
+        queuedOperation.getCommand().toBuilder()
             .clearArguments()
             .addArguments(getExecutablePath(programName, root, directoriesIndex))
             .addAllArguments(Iterables.skip(queuedOperation.getCommand().getArgumentsList(), 1))
@@ -262,8 +260,7 @@ public class InputFetcher implements Runnable {
         Deadline.after(10, DAYS));
 
     OperationContext fetchedOperationContext =
-        operationContext
-            .toBuilder()
+        operationContext.toBuilder()
             .setExecDir(execDir)
             .setAction(action)
             .setCommand(command)

@@ -34,7 +34,7 @@ public class ByteStreamServiceWriter extends ByteStreamImplBase {
   private final ByteString.Output out;
 
   public ByteStreamServiceWriter(String resourceName, SettableFuture<ByteString> content) {
-    this(resourceName, content, /* expectedSize=*/ 0);
+    this(resourceName, content, /* expectedSize= */ 0);
   }
 
   public ByteStreamServiceWriter(

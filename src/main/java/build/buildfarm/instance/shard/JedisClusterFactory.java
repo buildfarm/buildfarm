@@ -160,13 +160,13 @@ public class JedisClusterFactory {
     return () ->
         new JedisCluster(
             new HostAndPort(redisUri.getHost(), redisUri.getPort()),
-            /* connectionTimeout=*/ Integer.max(2000, timeout),
-            /* soTimeout=*/ Integer.max(2000, timeout),
+            /* connectionTimeout= */ Integer.max(2000, timeout),
+            /* soTimeout= */ Integer.max(2000, timeout),
             Integer.max(5, maxAttempts),
             password,
             identifier,
             poolConfig,
-            /* ssl=*/ JedisURIHelper.isRedisSSLScheme(redisUri));
+            /* ssl= */ JedisURIHelper.isRedisSSLScheme(redisUri));
   }
 
   /**
@@ -190,14 +190,15 @@ public class JedisClusterFactory {
     return () ->
         new JedisCluster(
             redisUrisNodes,
-            /* connectionTimeout=*/ Integer.max(2000, timeout),
-            /* soTimeout=*/ Integer.max(2000, timeout),
+            /* connectionTimeout= */ Integer.max(2000, timeout),
+            /* soTimeout= */ Integer.max(2000, timeout),
             Integer.max(5, maxAttempts),
             password,
             identifier,
             poolConfig,
-            /* ssl=*/ false);
+            /* ssl= */ false);
   }
+
   /**
    * @brief Create a jedis pool config.
    * @details Use configuration to build the appropriate jedis pool configuration.

@@ -70,7 +70,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
   }
 
   public AbstractMetricsPublisher() {
-    this(/* clusterId=*/ null);
+    this(/* clusterId= */ null);
   }
 
   @Override
@@ -95,8 +95,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
               .build();
       if (operation.getDone() && operation.getResponse().is(ExecuteResponse.class)) {
         operationRequestMetadata =
-            operationRequestMetadata
-                .toBuilder()
+            operationRequestMetadata.toBuilder()
                 .setExecuteResponse(operation.getResponse().unpack(ExecuteResponse.class))
                 .build();
         operationStatus
@@ -151,8 +150,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
       }
       if (operation.getMetadata().is(ExecuteOperationMetadata.class)) {
         operationRequestMetadata =
-            operationRequestMetadata
-                .toBuilder()
+            operationRequestMetadata.toBuilder()
                 .setExecuteOperationMetadata(
                     operation.getMetadata().unpack(ExecuteOperationMetadata.class))
                 .build();
