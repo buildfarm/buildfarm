@@ -4,7 +4,7 @@ schemaVersion: "2.0.0"
 fileExistenceTests:
 
   - name: "JAR"
-    path: '/app/buildfarm-server_deploy.jar'
+    path: '/app/build_buildfarm/buildfarm-server_deploy.jar'
     shouldExist: true
 
 metadataTest:

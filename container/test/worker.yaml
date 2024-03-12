@@ -3,7 +3,7 @@ schemaVersion: "2.0.0"
 
 fileExistenceTests:
   - name: "JAR"
-    path: '/app/buildfarm-shard-worker_deploy.jar'
+    path: '/app/build_buildfarm/buildfarm-shard-worker_deploy.jar'
     shouldExist: true
 
   - name: "tini"

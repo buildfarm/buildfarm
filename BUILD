@@ -2,6 +2,7 @@ load("@buildifier_prebuilt//:rules.bzl", "buildifier")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_image_index", "oci_push", "oci_tarball")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
+load("//container:defs.bzl", "oci_image_env")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -16,6 +17,17 @@ buildifier(
 # For example, "debgging tools", "introspection tools", and "exeution wrappers" are examples of dependencies
 # that many need included within deployed containers.  This BUILD file creates docker images that bundle
 # additional dependencies alongside the buildfarm agents.
+ARCH = [
+    # keep sorted
+    # "aarch64", # TODO
+    "amd64",
+]
+
+DEFAULT_IMAGE_LABELS = {
+    "org.opencontainers.image.source": "https://github.com/bazelbuild/bazel-buildfarm",
+}
+
+DEFAULT_PACKAGE_DIR = "app/build_buildfarm"
 
 # == Execution Wrappers ==
 # Execution wrappers are programs that buildfarm chooses to use when running REAPI actions.  They are used for
@@ -42,7 +54,7 @@ pkg_tar(
         ":skip_sleep.binary",
         ":skip_sleep.preload",
     ],
-    package_dir = "app/build_buildfarm",
+    package_dir = DEFAULT_PACKAGE_DIR,
     tags = ["container"],
 )
 
@@ -51,7 +63,7 @@ pkg_tar(
     srcs = [
         ":opentelemetry-javaagent",
     ],
-    package_dir = "app/build_buildfarm",
+    package_dir = DEFAULT_PACKAGE_DIR,
     tags = ["container"],
 )
 
@@ -115,14 +127,6 @@ sh_binary(
     name = "macos-wrapper",
     srcs = ["macos-wrapper.sh"],
 )
-################################################################################
-## rules_oci
-################################################################################
-
-ARCH = [
-    # "aarch64", # TODO
-    "amd64",
-]
 
 pkg_tar(
     name = "layer_tini_amd64",
@@ -135,31 +139,35 @@ pkg_tar(
 pkg_tar(
     name = "layer_buildfarm_server",
     srcs = ["//src/main/java/build/buildfarm:buildfarm-server_deploy.jar"],
-    package_dir = "app",
-    # Put everything in /app
+    package_dir = DEFAULT_PACKAGE_DIR,
     tags = ["container"],
 )
 
 pkg_tar(
     name = "layer_buildfarm_worker",
     srcs = ["//src/main/java/build/buildfarm:buildfarm-shard-worker_deploy.jar"],
-    # Put everything in /app
-    package_dir = "app",
+    package_dir = DEFAULT_PACKAGE_DIR,
     tags = ["container"],
 )
 
 pkg_tar(
     name = "layer_minimal_config",
     srcs = ["@build_buildfarm//examples:example_configs"],
-    package_dir = "/app/build_buildfarm",
+    package_dir = DEFAULT_PACKAGE_DIR,
     tags = ["container"],
 )
 
 pkg_tar(
     name = "layer_logging_config",
     srcs = ["@build_buildfarm//src/main/java/build/buildfarm:configs"],
-    package_dir = "/app/build_buildfarm/src/main/java/build/buildfarm",
+    package_dir = DEFAULT_PACKAGE_DIR + "/src/main/java/build/buildfarm",
     tags = ["container"],
+)
+
+oci_image_env(
+    name = "env_server",
+    configpath = "/" + DEFAULT_PACKAGE_DIR + "/config.minimal.yml",
+    jvm_args = server_jvm_flags(),
 )
 
 oci_image(
@@ -168,15 +176,10 @@ oci_image(
     entrypoint = [
         "java",
         "-jar",
-        "/app/buildfarm-server_deploy.jar",
+        "/" + DEFAULT_PACKAGE_DIR + "/buildfarm-server_deploy.jar",
     ],
-    env = {
-        "JAVA_TOOL_OPTIONS": server_jvm_flags(),
-        "CONFIG_PATH": "/app/build_buildfarm/config.minimal.yml",
-    },
-    labels = {
-        "org.opencontainers.image.source": "https://github.com/bazelbuild/bazel-buildfarm",
-    },
+    env = ":env_server",
+    labels = DEFAULT_IMAGE_LABELS,
     tags = ["container"],
     tars = [
         # do not sort
@@ -185,6 +188,12 @@ oci_image(
         ":telemetry_tools",
         ":layer_buildfarm_server",
     ],
+)
+
+oci_image_env(
+    name = "env_worker",
+    configpath = "/" + DEFAULT_PACKAGE_DIR + "/config.minimal.yml",
+    jvm_args = worker_jvm_flags(),
 )
 
 oci_image(
@@ -196,21 +205,16 @@ oci_image(
         "--",
         "java",
         "-jar",
-        "/app/buildfarm-shard-worker_deploy.jar",
+        "/" + DEFAULT_PACKAGE_DIR + "/buildfarm-shard-worker_deploy.jar",
     ],
-    env = {
-        "JAVA_TOOL_OPTIONS": worker_jvm_flags(),
-        "CONFIG_PATH": "/app/build_buildfarm/config.minimal.yml",
-    },
-    labels = {
-        "org.opencontainers.image.source": "https://github.com/bazelbuild/bazel-buildfarm",
-    },
+    env = ":env_worker",
+    labels = DEFAULT_IMAGE_LABELS,
     tags = ["container"],
     tars = [
         # do not sort
+        ":layer_tini_amd64",
         ":layer_logging_config",
         ":layer_minimal_config",
-        ":layer_tini_amd64",
         ":execution_wrappers",
         ":telemetry_tools",
         ":layer_buildfarm_worker",
@@ -244,7 +248,7 @@ oci_image(
             repo_tags = ["buildfarm-%s:%s" % (image, arch)],
             tags = ["container"],
         ),
-        # # Below targets push public docker images to bazelbuild dockerhub.
+        # Below targets push public docker images to bazelbuild dockerhub.
         oci_push(
             name = "public_push_buildfarm-%s" % image,
             image = ":buildfarm-%s" % image,
