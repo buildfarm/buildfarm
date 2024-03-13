@@ -342,7 +342,7 @@ Note that in order to accept resources from a configured queue, the dequeueMatch
  * contain "resource:<name>" in properties, with either a specific limited resource count as the only accepted value for the action property or "*"
 
 | Configuration | Accepted Values | Description                           |
-|-------------------------------------------------------------------------|
+|---------------|-----------------|---------------------------------------|
 | name          | string          | Resource identifier present on worker |
 | amount        | Integer         | Resource count depleted by actions    |
 
