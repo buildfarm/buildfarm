@@ -319,9 +319,10 @@ Note: In order for these settings to take effect, you must also configure `limit
 
 ### Dequeue Match
 
-| Configuration    | Accepted and _Default_ Values | Description |
-|------------------|-------------------------------|-------------|
-| allowUnmatched   | boolean, _false_              |             |
+| Configuration    | Accepted and _Default_ Values | Description                                                      |
+|------------------|-------------------------------|------------------------------------------------------------------|
+| allowUnmatched   | boolean, _false_              |                                                                  |
+| properties       | List of name/value pairs      | Pairs of provisions available to match against action properties |
 
 Example:
 
@@ -329,6 +330,31 @@ Example:
 worker:
   dequeueMatchSettings:
     allowUnmatched: false
+    properties:
+    - "gpu": "nvidia RTX 2090"
+```
+
+### Resources
+
+A list of limited resources that are available to the worker to be depleted by actions which execute containing a "resource:<name>": "N" property.
+Note that in order to accept resources from a configured queue, the dequeueMatchSettings must either:
+ * specify `allowUnmatched: true`
+ * contain "resource:<name>" in properties, with either a specific limited resource count as the only accepted value for the action property or "*"
+
+| Configuration | Accepted Values | Description                           |
+|-------------------------------------------------------------------------|
+| name          | string          | Resource identifier present on worker |
+| amount        | Integer         | Resource count depleted by actions    |
+
+Example:
+```yaml
+worker:
+  dequeueMatchSettings:
+    properties:
+    - "resource:special-compiler-license": "1" # only actions which request one compiler license at a time will be accepted
+  resources:
+    name: "special-compiler-license"
+    amount: 3
 ```
 
 ### Worker CAS
