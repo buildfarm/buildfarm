@@ -2,7 +2,7 @@
 
 def _oci_image_env_impl(ctx):
     """
-    Helper method to write out a "key=value" pair on sepaarate lines. This file is fed into oci_image() in the `env` kwargs.
+    Helper method to write out a "key=value" pair on separate lines. This file is fed into oci_image() in the `env` kwargs.
     """
     envs = {
         "CONFIG_PATH": ctx.attr.configpath,

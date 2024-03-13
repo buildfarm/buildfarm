@@ -25,7 +25,7 @@ oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 
 # Server base image
 oci.pull(
-    # Tnis is a multi-arch image!
+    # This is a multi-arch image!
     name = "amazon_corretto_java_image_base",
     digest = "sha256:f0e6040a09168500a1e96d02fef42a26176aaec8e0f136afba081366cb98e2f6",  # tag:21 as of today.
     image = "public.ecr.aws/amazoncorretto/amazoncorretto",
