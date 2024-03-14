@@ -6,13 +6,6 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 
 def archive_dependencies(third_party):
     return [
-        # Needed for "well-known protos" and @com_google_protobuf//:protoc.
-        # {
-        #     "name": "com_google_protobuf",
-        #     "sha256": "79082dc68d8bab2283568ce0be3982b73e19ddd647c2411d1977ca5282d2d6b3",
-        #     "strip_prefix": "protobuf-25.0",
-        #     "urls": ["https://github.com/protocolbuffers/protobuf/archive/v25.0.zip"],
-        # },
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
@@ -21,17 +14,6 @@ def archive_dependencies(third_party):
             "urls": ["https://github.com/grpc/grpc-java/archive/v1.62.2.zip"],
             # Bzlmod: Waiting for https://github.com/bazelbuild/bazel-central-registry/issues/353
         },
-        # The APIs that we implement.
-        {
-            "name": "googleapis",
-            "build_file": "%s:BUILD.googleapis" % third_party,
-            "patch_cmds": ["find google -name 'BUILD.bazel' -type f -delete"],
-            "patch_cmds_win": ["Remove-Item google -Recurse -Include *.bazel"],
-            "sha256": "1980dc4a4d02420d4da588665e3ecbe55e02a1c2e32d8906a2268c67d1085e0b",
-            "strip_prefix": "googleapis-5f8a02d6b7e77bd26e0375a00ca20eb2f3ee1ba2",
-            "url": "https://github.com/googleapis/googleapis/archive/5f8a02d6b7e77bd26e0375a00ca20eb2f3ee1ba2.zip",
-        },
-
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
         {
             "name": "bazel",
