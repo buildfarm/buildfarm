@@ -4,6 +4,7 @@
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/bazelbuild/bazel-buildfarm/badge)](https://securityscorecards.dev/viewer/?uri=github.com/bazelbuild/bazel-buildfarm)
 ![GitHub License](https://img.shields.io/github/license/bazelbuild/bazel-buildfarm)
 ![GitHub Release](https://img.shields.io/github/v/release/bazelbuild/bazel-buildfarm)
+![Docker Pulls](https://img.shields.io/docker/pulls/bazelbuild/buildfarm-server)
 
 
 This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
