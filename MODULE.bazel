@@ -43,8 +43,8 @@ oci.pull(
 # Worker base image
 oci.pull(
     name = "ubuntu_mantic",
+    digest = "sha256:2520e0725493c8f63452dd8aa153fbf0b489a9442096b7693641193709a765b7",  # tag: mantic
     image = "index.docker.io/bazelbuild/buildfarm-worker-base",
-    tag = "mantic",
 )
 use_repo(
     oci,
