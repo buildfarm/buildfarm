@@ -1,0 +1,17 @@
+---
+schemaVersion: "2.0.0"
+
+fileExistenceTests:
+
+  - name: "JAR"
+    path: '/app/build_buildfarm/buildfarm-server_deploy.jar'
+    shouldExist: true
+
+metadataTest:
+  envVars:
+    - key: JAVA_TOOL_OPTIONS
+      value: 'UseContainerSupport'
+      isRegex: true
+  labels:
+    - key: 'org.opencontainers.image.source'
+      value: 'https://github.com/bazelbuild/bazel-buildfarm'

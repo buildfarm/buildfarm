@@ -1,0 +1,47 @@
+---
+schemaVersion: "2.0.0"
+# These align with the default paths in //src/main/java/build/buildfarm/common/config/ExecutionWrappers.java
+fileExistenceTests:
+  - name: "cgroups cexec"
+    path: "/usr/bin/cgexec"
+    shouldExist: true
+    permissions: '-rwxr-xr-x'
+
+  - name: "unshare"
+    path: "/usr/bin/unshare"
+    shouldExist: true
+    permissions: '-rwxr-xr-x'
+
+  - name: "as-nobody wrapper"
+    path: '/app/build_buildfarm/as-nobody'
+    shouldExist: true
+    permissions: '-r-xr-xr-x'
+
+  - name: "process-wrapper"
+    path: '/app/build_buildfarm/process-wrapper'
+    shouldExist: true
+    permissions: '-r-xr-xr-x'
+
+  - name: "skip-sleep"
+    path: '/app/build_buildfarm/skip_sleep'
+    shouldExist: true
+    permissions: '-r-xr-xr-x'
+
+  - name: "skip-sleep-preload"
+    path: '/app/build_buildfarm/skip_sleep_preload.so'
+    shouldExist: true
+
+  - name: "delay.sh"
+    path: '/app/build_buildfarm/delay.sh'
+    shouldExist: true
+    permissions: '-r-xr-xr-x'
+#-----
+# These are documented in //:execution_wrappers
+  - name: "linux-sandbox"
+    path: '/app/build_buildfarm/linux-sandbox'
+    shouldExist: true
+    permissions: '-r-xr-xr-x'
+  - name: "macos-wrapper"
+    path: '/app/build_buildfarm/macos-wrapper.sh'
+    shouldExist: true
+    permissions: '-r-xr-xr-x'

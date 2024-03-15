@@ -39,12 +39,10 @@ spec:
           image: "{{ .Values.shardWorker.image.repository }}:{{ .Values.shardWorker.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.shardWorker.image.pullPolicy }}
           args:
-            - /config/config.yml
             - --public_name=$(POD_IP):8982
-          command:
-            - bash
-            - /app/build_buildfarm/buildfarm-shard-worker.binary
           env:
+            - name: CONFIG_PATH
+              value: /config/config.yml
             - name: POD_IP
               valueFrom:
                 fieldRef:

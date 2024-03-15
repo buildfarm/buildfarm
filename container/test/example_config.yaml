@@ -1,0 +1,15 @@
+---
+schemaVersion: "2.0.0"
+
+fileExistenceTests:
+  - name: "config.minimal.yaml"
+    path: '/app/build_buildfarm/config.minimal.yml'
+    shouldExist: true
+  - name: 'logging.properties'
+    path: '/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties'
+    shouldExist: true
+
+metadataTest:
+  envVars:
+    - key: CONFIG_PATH
+      value: /app/build_buildfarm/config.minimal.yml

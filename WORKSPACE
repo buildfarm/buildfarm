@@ -12,10 +12,6 @@ load("@maven//:compat.bzl", "compat_repositories")
 
 compat_repositories()
 
-load(":images.bzl", "buildfarm_images")
-
-buildfarm_images()
-
 # Find rpmbuild if it exists.
 load("@rules_pkg//toolchains/rpm:rpmbuild_configure.bzl", "find_system_rpmbuild")
 

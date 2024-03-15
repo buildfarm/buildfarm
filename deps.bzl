@@ -55,14 +55,6 @@ def archive_dependencies(third_party):
             "patches": ["%s:clang_toolchain.patch" % third_party],
         },
 
-        # Used to build release container images
-        {
-            "name": "io_bazel_rules_docker",
-            "sha256": "b1e80761a8a8243d03ebca8845e9cc1ba6c82ce7c5179ce2b295cd36f7e394bf",
-            "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.25.0/rules_docker-v0.25.0.tar.gz"],
-            "patch_args": ["-p0"],
-            "patches": ["%s:docker_go_toolchain.patch" % third_party],
-        },
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
         {
             "name": "bazel",

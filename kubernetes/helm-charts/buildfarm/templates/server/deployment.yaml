@@ -31,12 +31,9 @@ spec:
         - name: buildfarm-server
           image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.server.image.pullPolicy }}
-          command:
-            - bash
-            - /app/build_buildfarm/buildfarm-server.binary
-          args:
-            - /config/config.yml
           env:
+            - name: CONFIG_PATH
+              value: /config/config.yml
             {{- if .Values.server.extraEnv }}
             {{- toYaml .Values.server.extraEnv | nindent 12 }}
             {{- end }}

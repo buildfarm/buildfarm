@@ -12,9 +12,37 @@ bazel_dep(name = "rules_cc", version = "0.0.9")
 bazel_dep(name = "rules_go", version = "0.43.0", repo_name = "io_bazel_rules_go")
 bazel_dep(name = "rules_jvm_external", version = "5.3")
 bazel_dep(name = "rules_license", version = "0.0.7")
+bazel_dep(name = "rules_oci", version = "1.7.4")
+bazel_dep(name = "container_structure_test", version = "1.16.0")
 
 bazel_dep(
     name = "buildifier_prebuilt",
     version = "6.4.0",
     dev_dependency = True,
+)
+
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+
+# Server base image
+oci.pull(
+    # This is a multi-arch image!
+    name = "amazon_corretto_java_image_base",
+    digest = "sha256:f0e6040a09168500a1e96d02fef42a26176aaec8e0f136afba081366cb98e2f6",  # tag:21 as of today.
+    image = "public.ecr.aws/amazoncorretto/amazoncorretto",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64/v8",
+    ],
+)
+
+# Worker base image
+oci.pull(
+    name = "ubuntu_mantic",
+    image = "index.docker.io/bazelbuild/buildfarm-worker-base",
+    tag = "mantic",
+)
+use_repo(
+    oci,
+    "amazon_corretto_java_image_base",
+    "ubuntu_mantic",
 )
