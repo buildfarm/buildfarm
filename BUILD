@@ -239,7 +239,7 @@ oci_image(
 ######
 # Helpers to write to the local Docker Desktop's registry
 # Usage: `bazel run //:tarball_server_amd64 && docker run --rm buildfarm-server:amd64`
-# ####
+######
 [
     [
         oci_tarball(
@@ -252,10 +252,8 @@ oci_image(
         oci_push(
             name = "public_push_buildfarm-%s" % image,
             image = ":buildfarm-%s" % image,
-            remote_tags = [
-                "$(release_version)",
-            ],
             repository = "index.docker.io/bazelbuild/buildfarm-%s" % image,
+            # Specify the tag with `bazel run public_push_buildfarm-server public_push_buildfarm-worker -- --tag latest`
             tags = ["container"],
         ),
     ]
