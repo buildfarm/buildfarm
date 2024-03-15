@@ -3,10 +3,10 @@ schemaVersion: "2.0.0"
 
 fileExistenceTests:
   - name: "config.minimal.yaml"
-    path: '/app/build_buildfarm/config.minimal.yml'
+    path: "/app/build_buildfarm/config.minimal.yml"
     shouldExist: true
-  - name: 'logging.properties'
-    path: '/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties'
+  - name: "logging.properties"
+    path: "/app/build_buildfarm/src/main/java/build/buildfarm/logging.properties"
     shouldExist: true
 
 metadataTest:
