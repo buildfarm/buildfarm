@@ -24,8 +24,8 @@ jobs:
 
       - name: Build Server Image
         id: buildAndPushServerImage
-        run: bazel run public_push_buildfarm-server --define release_version=latest
+        run: bazel run public_push_buildfarm-server -- --tag latest
 
       - name: Build Worker Image
         id: buildAndPushWorkerImage
-        run: bazel run public_push_buildfarm-worker --define release_version=latest
+        run: bazel run public_push_buildfarm-worker -- --tag latest
