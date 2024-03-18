@@ -1,7 +1,8 @@
-{{- $ingress := .Values.server.ingress -}}
+{{- $server := .Values.server -}}
+{{- $ingress := $server.ingress -}}
 {{- if $ingress.enabled -}}
 {{- $fullName := include "buildfarm.fullname" . -}}
-{{- $svcPort := .Values.service.port -}}
+{{- $svcPort := $server.service.port -}}
 {{- if and $ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
   {{- if not (hasKey $ingress.annotations "kubernetes.io/ingress.class") }}
   {{- $_ := set $ingress.annotations "kubernetes.io/ingress.class" $ingress.className}}
