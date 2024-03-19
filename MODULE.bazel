@@ -31,6 +31,16 @@ bazel_dep(
     dev_dependency = True,
 )
 
+bazel_dep(name = "bazel_remote_apis", version = "66f0212d5cf703db65f7f56a1b54c60d4b41f920")
+archive_override(
+    module_name = "bazel_remote_apis",
+    integrity = "sha256-1qzzTZxQh9IpK0GH1/n32onHKhknIrdOKC12Nu9sUds=",
+    strip_prefix = "remote-apis-66f0212d5cf703db65f7f56a1b54c60d4b41f920",
+    urls = [
+        "https://github.com/bazelbuild/remote-apis/archive/66f0212d5cf703db65f7f56a1b54c60d4b41f920.zip",
+    ],
+)
+
 IO_NETTY_MODULES = [
     "buffer",
     "codec",
@@ -184,7 +194,6 @@ use_repo(
     "bazel",
     "io_grpc_grpc_java",
     "opentelemetry",
-    "remote_apis",
     "skip_sleep",
     "tini",
 )
