@@ -65,6 +65,17 @@ python.toolchain(
     python_version = "3.11",
 )
 
+build_deps = use_extension("//:extensions.bzl", "build_deps")
+use_repo(
+    build_deps,
+    "bazel",
+    "io_grpc_grpc_java",
+    "jedis",
+    "opentelemetry",
+    "skip_sleep",
+    "tini",
+)
+
 find_rpm = use_extension("@rules_pkg//toolchains/rpm:rpmbuild_configure.bzl", "find_system_rpmbuild_bzlmod")
 use_repo(find_rpm, "rules_pkg_rpmbuild")
 
