@@ -17,3 +17,11 @@ java_grpc_library(
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
     ],
 )
+
+java_grpc_library(
+    name = "google_devtools_build_v1_publish_build_event_java_grpc",
+    srcs = ["@com_google_googleapis//google/devtools/build/v1:build_proto"],
+    deps = [
+        "@com_google_googleapis//google/devtools/build/v1:build_java_proto",
+    ],
+)

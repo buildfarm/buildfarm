@@ -24,7 +24,7 @@ java_proto_library(
     name = "build_bazel_remote_execution_v2_remote_execution_java_proto",
     deps = [
         "//build/bazel/remote/execution/v2:remote_execution_proto",
-        "@googleapis//:google_longrunning_operations_proto",
+        "@com_google_googleapis//google/longrunning:operations_proto",
     ],
 )
 
