@@ -183,7 +183,6 @@ use_repo(
     build_deps,
     "bazel",
     "com_grail_bazel_toolchain",
-    "googleapis",
     "io_grpc_grpc_java",
     "opentelemetry",
     "remote_apis",
