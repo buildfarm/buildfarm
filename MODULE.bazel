@@ -76,6 +76,27 @@ use_repo(
     "tini",
 )
 
+bazel_dep(name = "com_google_googleapis", version = "2a40f63ea714c7f4c6856a5db4d1f3cc7d4c4b18")
+archive_override(
+    module_name = "com_google_googleapis",
+    integrity = "sha256-ZZb7DC2S7M9G53Uu3gALP7UpXctrvnZ/HcGmPXq+A6U=",
+    patch_strip = 1,
+    patches = [
+        "third_party/googleapis_add_bzlmod_support.patch",
+    ],
+    strip_prefix = "googleapis-2a40f63ea714c7f4c6856a5db4d1f3cc7d4c4b18",
+    urls = [
+        "https://github.com/googleapis/googleapis/archive/2a40f63ea714c7f4c6856a5db4d1f3cc7d4c4b18.zip",
+    ],
+)
+
+googleapis_switched_rules = use_extension("@com_google_googleapis//:extensions.bzl", "switched_rules")
+googleapis_switched_rules.use_languages(
+    #grpc = True, # This REALLY wants `@io_grpc_grpc_java` to be defined, but try as I might, it cannot be found.
+    java = True,
+)
+use_repo(googleapis_switched_rules, "com_google_googleapis_imports")
+
 find_rpm = use_extension("@rules_pkg//toolchains/rpm:rpmbuild_configure.bzl", "find_system_rpmbuild_bzlmod")
 use_repo(find_rpm, "rules_pkg_rpmbuild")
 
