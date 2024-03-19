@@ -135,11 +135,15 @@ maven.install(
         "org.xerial:sqlite-jdbc:3.34.0",
         "org.yaml:snakeyaml:2.2",
         "redis.clients:jedis:5.1.2",
+    ] + [
+        # GRPC_JAVA stuff
+        "com.google.api.grpc:proto-google-common-protos:2.22.0",
     ],
     excluded_artifacts = [
         "com.google.protobuf:protobuf-java",
         "com.google.protobuf:protobuf-javalite",
     ],
+    generate_compat_repositories = True,
     # generate_compat_repositories = True,
     #fail_if_repin_required = True,
     #lock_file = "//:maven_install.json",
@@ -147,9 +151,19 @@ maven.install(
     repositories = [
         "https://repo.maven.apache.org/maven2",
     ],
-    strict_visibility = True,
+    strict_visibility = False,  # True breaks aws jars
 )
-use_repo(maven, "maven")
+use_repo(
+    maven,
+    "com_google_api_grpc_proto_google_common_protos",
+    "com_google_code_findbugs_jsr305",
+    "com_google_errorprone_error_prone_annotations",
+    "com_google_guava_failureaccess",
+    "com_google_guava_guava",
+    "com_google_j2objc_j2objc_annotations",
+    "maven",
+    "org_apache_tomcat_annotations_api",
+)
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 
