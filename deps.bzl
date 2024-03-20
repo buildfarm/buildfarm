@@ -98,14 +98,14 @@ def archive_dependencies(third_party):
         },
 
         # Used to format proto files
-        {
-            "name": "com_grail_bazel_toolchain",
-            "sha256": "b2d168315dd0785f170b2b306b86e577c36e812b8f8b05568f9403141f2c24dd",
-            "strip_prefix": "toolchains_llvm-0.9",
-            "url": "https://github.com/bazel-contrib/toolchains_llvm/archive/refs/tags/0.9.tar.gz",
-            "patch_args": ["-p1"],
-            "patches": ["%s:clang_toolchain.patch" % third_party],
-        },
+        # {
+        #     "name": "com_grail_bazel_toolchain",
+        #     "sha256": "b2d168315dd0785f170b2b306b86e577c36e812b8f8b05568f9403141f2c24dd",
+        #     "strip_prefix": "toolchains_llvm-0.9",
+        #     "url": "https://github.com/bazel-contrib/toolchains_llvm/archive/refs/tags/0.9.tar.gz",
+        #     "patch_args": ["-p1"],
+        #     "patches": ["%s:clang_toolchain.patch" % third_party],
+        # },
 
         # Used to build release container images
         {
