@@ -75,4 +75,4 @@ bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/c
 Now, you should have something like this, and you can now run / debug Buildfarm
 Server from inside of IntelliJ, just like any other program:
 
-![IntelliJ Buildfarm Server run configuration]]({{site.url}}{{site.baseurl}}/assets/images/intellij-server-run-config.png)
+![IntelliJ Buildfarm Server run configuration]({{site.url}}{{site.baseurl}}/assets/images/intellij-server-run-config.png)
