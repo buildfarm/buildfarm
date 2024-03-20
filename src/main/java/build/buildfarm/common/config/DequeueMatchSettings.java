@@ -9,7 +9,6 @@ import lombok.Getter;
 
 @Data
 public class DequeueMatchSettings {
-
   @Getter(AccessLevel.NONE)
   private boolean acceptEverything; // deprecated
 
