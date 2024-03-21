@@ -34,14 +34,10 @@ def archive_dependencies(third_party):
         },
     ]
 
-def _buildfarm_extension_impl(ctx):
+def _buildfarm_extension_impl(_ctx):
     """
     Define all 3rd party archive rules for buildfarm
-
-    Args:
-      repository_name: the name of the repository
     """
-    repository_name = "@build_buildfarm"
     third_party = "//third_party"
     for dependency in archive_dependencies(third_party):
         params = {}
