@@ -8,7 +8,8 @@ on:
 
 env:
   CHART_NAME: buildfarm
-  CHART_ROOT: "${{ github.workspace }}/kubernetes/helm-charts/buildfarm"
+  CHART_ROOT: ${{ github.workspace }}/kubernetes/helm-charts/buildfarm
+  GHCR_REPO: ghcr.io/${{ github.repository_owner }}
 
 jobs:
   build:
@@ -44,8 +45,8 @@ jobs:
           set -e
           echo ${{ secrets.GITHUB_TOKEN }} | \
             helm registry \
-              login ${{ env.GCR_IMAGE }} \
-              --username ${{ github.repository_owner }} \
+              login "${GHCR_REPO}" \
+              --username "${{ github.repository_owner }}" \
               --password-stdin
           set -ex
           helm dep up "${CHART_ROOT}"
@@ -55,4 +56,4 @@ jobs:
           ls -l "${CHART_BUNDLE}"
           helm push \
             "${CHART_BUNDLE}" \
-            "ghcr.io/${{ github.repository_owner }}"
+            "${GHCR_REPO}"
