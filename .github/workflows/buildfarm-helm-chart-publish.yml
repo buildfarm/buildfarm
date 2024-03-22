@@ -56,4 +56,4 @@ jobs:
           ls -l "${CHART_BUNDLE}"
           helm push \
             "${CHART_BUNDLE}" \
-            "${GHCR_REPO}"
+            "oci://${GHCR_REPO}"
