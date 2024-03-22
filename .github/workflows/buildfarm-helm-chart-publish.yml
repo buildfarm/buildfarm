@@ -7,8 +7,8 @@ on:
       - 'helm/*'
 
 env:
-  GH_TOKEN: ${{ github.token }}
-  CHART_ROOT: kubernetes/helm-charts/buildfarm
+  CHART_ROOT: "${{ github.workspace }}/kubernetes/helm-charts/buildfarm"
+  GCR_IMAGE: ghcr.io/${{ github.repository_owner }}/buildfarm
 
 jobs:
   build:
@@ -32,11 +32,27 @@ jobs:
           yq -i \
             '.version |= "${{ steps.get-chart-ver.outputs.chart_ver }}"' \
             ${CHART_ROOT}/Chart.yaml
-      - id: helm-lint-package-release
+      - id: helm-lint
         name: Helm Chart Lint, Package, and Release
         run: |-
           set -ex
           helm dep up "${CHART_ROOT}"
           helm lint "${CHART_ROOT}"
-          helm package "${CHART_ROOT}"
-          gh release create "${{ github.ref_name }}" *.tgz
+      - id: helm-bundle-push
+        name: Helm Chart Lint, Package, and Release
+        run: |-
+          set -e
+          echo ${{ secrets.GITHUB_TOKEN }} | \
+            helm registry \
+              login ${{ env.GCR_IMAGE }} \
+              --username ${{ github.repository_owner }} \
+              --password-stdin
+          set -ex
+          helm dep up "${CHART_ROOT}"
+          helm lint "${CHART_ROOT}"
+          export FQ_IMAGE="${{ env.GCR_IMAGE }}:${{ steps.get-chart-ver.outputs.chart_ver }}"
+          helm chart save \
+            "${CHART_ROOT}" \
+            "${FQ_IMAGE}"
+          helm chart push \
+            "${FQ_IMAGE}"
