@@ -7,8 +7,8 @@ on:
       - 'helm/*'
 
 env:
-  CHART_ROOT: "${{ github.workspace }}/kubernetes/helm-charts/buildfarm"
-  GCR_IMAGE: ghcr.io/${{ github.repository_owner }}/bazel-buildfarm
+  CHART_NAME: buildfarm
+  CHART_ROOT: "${{ github.workspace }}/kubernetes/helm-charts/${{ env.CHART_NAME }}"
 
 jobs:
   build:
@@ -39,7 +39,7 @@ jobs:
           helm dep up "${CHART_ROOT}"
           helm lint "${CHART_ROOT}"
       - id: helm-bundle-push
-        name: Helm Chart Lint, Package, and Release
+        name: Helm Chart Package, and Release
         run: |-
           set -e
           echo ${{ secrets.GITHUB_TOKEN }} | \
@@ -50,9 +50,9 @@ jobs:
           set -ex
           helm dep up "${CHART_ROOT}"
           helm lint "${CHART_ROOT}"
-          export FQ_IMAGE="${{ env.GCR_IMAGE }}:${{ steps.get-chart-ver.outputs.chart_ver }}"
-          helm chart save \
-            "${CHART_ROOT}" \
-            "${FQ_IMAGE}"
-          helm chart push \
-            "${FQ_IMAGE}"
+          helm package "${CHART_ROOT}"
+          export CHART_BUNDLE="${CHART_NAME}-${{ steps.get-chart-ver.outputs.chart_ver }}.tgz"
+          ls -l "${CHART_BUNDLE}"
+          helm push \
+            "${CHART_BUNDLE}" \
+            "ghcr.io/${{ github.repository_owner }}"
