@@ -109,7 +109,7 @@ def buildfarm_init(name = "buildfarm"):
                         "org.yaml:snakeyaml:2.2",
                         "org.projectlombok:lombok:1.18.30",
                         "org.slf4j:slf4j-simple:2.0.9",
-                        "redis.clients:jedis:5.1.0",
+                        "redis.clients:jedis:5.1.2",
                     ],
         generate_compat_repositories = True,
         override_targets = IO_GRPC_GRPC_JAVA_OVERRIDE_TARGETS,
