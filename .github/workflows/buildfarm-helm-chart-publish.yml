@@ -34,13 +34,13 @@ jobs:
             '.version |= "${{ steps.get-chart-ver.outputs.chart_ver }}"' \
             ${CHART_ROOT}/Chart.yaml
       - id: helm-lint
-        name: Helm Chart Lint, Package, and Release
+        name: Helm Chart Lint
         run: |-
           set -ex
           helm dep up "${CHART_ROOT}"
           helm lint "${CHART_ROOT}"
       - id: helm-bundle-push
-        name: Helm Chart Package, and Release
+        name: Helm Chart Package and Release
         run: |-
           set -e
           echo ${{ secrets.GITHUB_TOKEN }} | \
@@ -50,7 +50,6 @@ jobs:
               --password-stdin
           set -ex
           helm dep up "${CHART_ROOT}"
-          helm lint "${CHART_ROOT}"
           helm package "${CHART_ROOT}"
           export CHART_BUNDLE="${CHART_NAME}-${{ steps.get-chart-ver.outputs.chart_ver }}.tgz"
           ls -l "${CHART_BUNDLE}"
