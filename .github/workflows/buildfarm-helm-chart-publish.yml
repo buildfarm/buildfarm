@@ -40,7 +40,7 @@ jobs:
           helm dep up "${CHART_ROOT}"
           helm lint "${CHART_ROOT}"
       - id: helm-bundle-push
-        name: Helm Chart Package and Release
+        name: Helm Chart Bundle and Push
         run: |-
           set -e
           echo ${{ secrets.GITHUB_TOKEN }} | \
