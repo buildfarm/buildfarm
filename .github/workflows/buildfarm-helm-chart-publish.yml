@@ -8,7 +8,7 @@ on:
 
 env:
   CHART_NAME: buildfarm
-  CHART_ROOT: "${{ github.workspace }}/kubernetes/helm-charts/${{ env.CHART_NAME }}"
+  CHART_ROOT: "${{ github.workspace }}/kubernetes/helm-charts/buildfarm"
 
 jobs:
   build:
