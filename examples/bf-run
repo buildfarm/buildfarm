@@ -3,7 +3,7 @@
 set -e
 
 REDIS_NAME="buildfarm-redis"
-REDIS_IMAGE="redis:5.0.9"
+REDIS_IMAGE="redis:7.2.4"
 
 SERVER_NAME="buildfarm-server"
 SERVER_IMAGE="bazelbuild/buildfarm-server:latest"
