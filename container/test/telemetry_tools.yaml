@@ -3,5 +3,5 @@ schemaVersion: "2.0.0"
 
 fileExistenceTests:
   - name: "opentelemetry-javaagent"
-    path: '/app/build_buildfarm/opentelemetry-javaagent.jar'
+    path: "/app/build_buildfarm/opentelemetry-javaagent.jar"
     shouldExist: true
