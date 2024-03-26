@@ -140,14 +140,13 @@ buildfarm_images()
 
 ### Helm Chart
 
-To install with helm:
+To install OCI bundled Helm chart:
 
 ```bash
-# https://github.com/bazelbuild/bazel-buildfarm/releases/download/helm%2F0.3.0/buildfarm-0.3.0.tgz
-CHART_VER="0.3.0"
 helm install \
   -n bazel-buildfarm \
   --create-namespace \
   bazel-buildfarm \
-  "https://github.com/bazelbuild/bazel-buildfarm/releases/download/helm%2F${CHART_VER}/buildfarm-${CHART_VER}.tgz"
+  oci://ghcr.io/bazelbuild/buildfarm \
+  --version "0.2.4"
 ```
