@@ -1,6 +1,7 @@
 load("@buildifier_prebuilt//:rules.bzl", "buildifier")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_image_index", "oci_push", "oci_tarball")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
 load("//container:defs.bzl", "oci_image_env")
 
@@ -46,13 +47,8 @@ DEFAULT_PACKAGE_DIR = "app/build_buildfarm"
 pkg_tar(
     name = "execution_wrappers",
     srcs = [
-        ":as-nobody",
-        ":delay",
-        ":linux-sandbox.binary",
-        ":macos-wrapper",
-        ":process-wrapper.binary",
-        ":skip_sleep.binary",
-        ":skip_sleep.preload",
+        ":exec-wrapper-files",
+        ":exec-wrapper-helpers",
     ],
     package_dir = DEFAULT_PACKAGE_DIR,
     tags = ["container"],
@@ -67,32 +63,28 @@ pkg_tar(
     tags = ["container"],
 )
 
-genrule(
-    name = "process-wrapper.binary",
-    srcs = ["@bazel//src/main/tools:process-wrapper"],
-    outs = ["process-wrapper"],
-    cmd = "cp $< $@;",
-)
-
-genrule(
-    name = "linux-sandbox.binary",
-    srcs = ["@bazel//src/main/tools:linux-sandbox"],
-    outs = ["linux-sandbox"],
-    cmd = "cp $< $@;",
-)
-
-genrule(
+pkg_files(
     name = "tini.binary",
     srcs = ["@tini//file"],
-    outs = ["tini"],
-    cmd = "cp $< $@ && chmod +x $@",
+    attributes = pkg_attributes(
+        mode = "0555",
+    ),
+    renames = {
+        "@tini//file": "tini",
+    },
+    tags = ["container"],
 )
 
-genrule(
+pkg_files(
     name = "opentelemetry-javaagent",
     srcs = ["@opentelemetry//jar"],
-    outs = ["opentelemetry-javaagent.jar"],
-    cmd = "cp $< $@;",
+    attributes = pkg_attributes(
+        mode = "0444",
+    ),
+    renames = {
+        "@opentelemetry//jar": "opentelemetry-javaagent.jar",
+    },
+    tags = ["container"],
 )
 
 cc_binary(
@@ -101,38 +93,42 @@ cc_binary(
         "//config:windows": ["as-nobody-windows.c"],
         "//conditions:default": ["as-nobody.c"],
     }),
+    tags = ["container"],
 )
 
-genrule(
-    name = "skip_sleep.binary",
-    srcs = ["@skip_sleep"],
-    outs = ["skip_sleep"],
-    cmd = "cp $< $@;",
+pkg_files(
+    name = "exec-wrapper-files",
+    srcs = [
+        ":as-nobody",
+        "@bazel//src/main/tools:linux-sandbox",
+        "@bazel//src/main/tools:process-wrapper",
+        "@skip_sleep",
+        # The delay wrapper is only intended to be used with the "skip_sleep" wrapper.
+        "delay.sh",
+        "macos-wrapper.sh",
+    ],
+    attributes = pkg_attributes(
+        mode = "0555",
+    ),
+    tags = ["container"],
 )
 
-genrule(
-    name = "skip_sleep.preload",
+pkg_files(
+    name = "exec-wrapper-helpers",
     srcs = ["@skip_sleep//:skip_sleep_preload"],
-    outs = ["skip_sleep_preload.so"],
-    cmd = "cp $< $@;",
-)
-
-# The delay wrapper is only intended to be used with the "skip_sleep" wrapper.
-sh_binary(
-    name = "delay",
-    srcs = ["delay.sh"],
-)
-
-sh_binary(
-    name = "macos-wrapper",
-    srcs = ["macos-wrapper.sh"],
+    attributes = pkg_attributes(
+        mode = "0444",
+    ),
+    prefix = DEFAULT_PACKAGE_DIR,
+    renames = {
+        "@skip_sleep//:skip_sleep_preload": "skip_sleep_preload.so",
+    },
+    tags = ["container"],
 )
 
 pkg_tar(
     name = "layer_tini_amd64",
-    srcs = ["@tini//file"],
-    mode = "0555",
-    remap_paths = {"/downloaded": "/tini"},
+    srcs = [":tini.binary"],
     tags = ["container"],
 )
 
