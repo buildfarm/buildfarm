@@ -15,6 +15,7 @@
 package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertThrows;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -61,5 +62,29 @@ public class RedisHashtagsTest {
     assertThat(RedisHashtags.existingHash("x{y}")).isEqualTo("y");
     assertThat(RedisHashtags.existingHash("x{y}x")).isEqualTo("y");
     assertThat(RedisHashtags.existingHash("{Execution}QueuedOperations")).isEqualTo("Execution");
+  }
+
+  // Function under test: hashedName, unhashedName
+  // Reason for testing: the hashtag can be empty
+  // Failure explanation: the format is not as expected when extracting the hashtag
+  @Test
+  public void emptyTestCases() throws Exception {
+    // ASSERT
+    assertThat(RedisHashtags.hashedName("", "")).isEqualTo("");
+    assertThat(RedisHashtags.hashedName("x", "")).isEqualTo("x");
+    assertThat(RedisHashtags.hashedName("x", null)).isEqualTo("x");
+
+    assertThat(RedisHashtags.unhashedName("{}x")).isEqualTo("x");
+    assertThat(RedisHashtags.unhashedName("z{}")).isEqualTo("z");
+    assertThat(RedisHashtags.unhashedName("")).isEqualTo("");
+  }
+
+  // Function under test: hashedName, unhashedName
+  // Reason for testing: the hashtag can be null or empty
+  @Test
+  public void testNulls() throws Exception {
+    // ASSERT
+    assertThrows(NullPointerException.class, () -> RedisHashtags.hashedName(null, null));
+    assertThrows(NullPointerException.class, () -> RedisHashtags.unhashedName(null));
   }
 }
