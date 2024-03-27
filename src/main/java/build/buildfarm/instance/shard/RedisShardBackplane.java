@@ -53,7 +53,9 @@ import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
+import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
@@ -1497,16 +1499,17 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public BackplaneStatus backplaneStatus() throws IOException {
-    BackplaneStatus.Builder builder = BackplaneStatus.newBuilder();
     Set<String> executeWorkers = getExecuteWorkers();
     Set<String> storageWorkers = getStorageWorkers();
-    builder.addAllActiveExecuteWorkers(executeWorkers);
-    builder.addAllActiveStorageWorkers(storageWorkers);
-    builder.addAllActiveWorkers(Sets.union(executeWorkers, storageWorkers));
-    builder.setDispatchedSize(client.call(jedis -> state.dispatchedOperations.size(jedis)));
-    builder.setOperationQueue(state.operationQueue.status(client.call(jedis -> jedis)));
-    builder.setPrequeue(state.prequeue.status(client.call(jedis -> jedis)));
-    return builder.build();
+    return BackplaneStatus.newBuilder()
+        .addAllActiveExecuteWorkers(executeWorkers)
+        .addAllActiveStorageWorkers(storageWorkers)
+        .addAllActiveWorkers(Sets.union(executeWorkers, storageWorkers))
+        .setDispatchedSize(client.call(jedis -> state.dispatchedOperations.size(jedis)))
+        .setOperationQueue(
+            (OperationQueueStatus) client.call(jedis -> state.operationQueue.status(jedis)))
+        .setPrequeue((QueueStatus) client.call(jedis -> state.prequeue.status(jedis)))
+        .build();
   }
 
   @SuppressWarnings("ConstantConditions")
