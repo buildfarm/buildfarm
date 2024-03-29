@@ -180,7 +180,7 @@ public class OperationQueue {
   public void push(
       UnifiedJedis jedis, List<Platform.Property> provisions, String val, int priority) {
     BalancedRedisQueue queue = chooseEligibleQueue(provisions);
-    queue.push(jedis, val, (double) priority);
+    queue.offer(jedis, val, (double) priority);
   }
 
   /**
@@ -197,16 +197,14 @@ public class OperationQueue {
       throws InterruptedException {
     // Select all matched queues, and attempt dequeuing via round-robin.
     List<BalancedRedisQueue> queues = chooseEligibleQueues(provisions);
-    int index = roundRobinPopIndex(queues);
-    String value = queues.get(index).nonBlockingDequeue(jedis);
-
     // Keep iterating over matched queues until we find one that is non-empty and provides a
     // dequeued value.
-    while (value == null) {
-      index = roundRobinPopIndex(queues);
-      value = queues.get(index).nonBlockingDequeue(jedis);
+    for (int index = roundRobinPopIndex(queues); ; index = roundRobinPopIndex(queues)) {
+      String value = queues.get(index).poll(jedis);
+      if (value != null) {
+        return value;
+      }
     }
-    return value;
   }
 
   /**

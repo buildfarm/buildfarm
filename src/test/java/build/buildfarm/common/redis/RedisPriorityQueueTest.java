@@ -23,6 +23,7 @@ import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -68,110 +69,95 @@ public class RedisPriorityQueueTest {
 
   // Function under test: RedisPriorityQueue
   // Reason for testing: the queue can be constructed with a valid cluster instance and name
-  // Failure explanation: the queue is throwing an exception upon construction
+  // Failure explanation: the queue throws an exception upon construction
   @Test
   public void redisPriorityQueueConstructsWithoutError() throws Exception {
     // ACT
-    new RedisPriorityQueue("test");
+    new RedisPriorityQueue(redis, "test");
   }
 
-  // Function under test: push
-  // Reason for testing: the queue can have a value pushed onto it
-  // Failure explanation: the queue is throwing an exception upon push
+  // Function under test: offer
+  // Reason for testing: the queue can have a value offered to it
+  // Failure explanation: the queue throws an exception upon offer
   @Test
-  public void pushPushWithoutError() throws Exception {
+  public void offerWithoutError() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
-    queue.push(redis, "foo");
+    queue.offer("foo");
   }
 
-  // Function under test: push
-  // Reason for testing: the queue can have the different values pushed onto it
-  // Failure explanation: the queue is throwing an exception upon pushing different values
+  // Function under test: offer
+  // Reason for testing: the queue can have the different values offered to it
+  // Failure explanation: the queue throws an exception upon offering different values
   @Test
-  public void pushPushDifferentWithoutError() throws Exception {
+  public void offerDifferentWithoutError() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
-    queue.push(redis, "foo");
-    queue.push(redis, "bar");
+    queue.offer("foo");
+    queue.offer("bar");
   }
 
-  // Function under test: push
-  // Reason for testing: the queue can have the same values pushed onto it
-  // Failure explanation: the queue is throwing an exception upon pushing the same values
+  // Function under test: offer
+  // Reason for testing: the queue can have the same values offered to it
+  // Failure explanation: the queue throws an exception upon offering the same values
   @Test
   public void pushPushSameWithoutError() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
-    queue.push(redis, "foo");
-    queue.push(redis, "foo");
+    queue.offer("foo");
+    queue.offer("foo");
   }
 
-  // Function under test: push
-  // Reason for testing: the queue can have many values pushed into it
-  // Failure explanation: the queue is throwing an exception upon pushing many values
+  // Function under test: offer
+  // Reason for testing: the queue can have many values offered to it
+  // Failure explanation: the queue throws an exception upon offering many values
   @Test
   public void pushPushMany() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
     for (int i = 0; i < 1000; ++i) {
-      queue.push(redis, "foo" + i);
+      queue.offer("foo" + i);
     }
   }
 
-  // Function under test: push
-  // Reason for testing: the queue size increases as elements are pushed
-  // Failure explanation: the queue size is not accurately reflecting the pushes
+  // Function under test: offer
+  // Reason for testing: the queue size increases as elements are offered
+  // Failure explanation: the queue size does not reflect offers
   @Test
   public void pushPushIncreasesSize() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT / ASSERT
-    assertThat(queue.size(redis)).isEqualTo(0);
-    queue.push(redis, "foo");
-    assertThat(queue.size(redis)).isEqualTo(1);
-    queue.push(redis, "foo1");
-    assertThat(queue.size(redis)).isEqualTo(2);
-    queue.push(redis, "foo2");
-    assertThat(queue.size(redis)).isEqualTo(3);
-    queue.push(redis, "foo3");
-    assertThat(queue.size(redis)).isEqualTo(4);
-    queue.push(redis, "foo4");
-    assertThat(queue.size(redis)).isEqualTo(5);
-    queue.push(redis, "foo5");
-    assertThat(queue.size(redis)).isEqualTo(6);
-    queue.push(redis, "foo6");
-    assertThat(queue.size(redis)).isEqualTo(7);
-    queue.push(redis, "foo7");
-    assertThat(queue.size(redis)).isEqualTo(8);
-    queue.push(redis, "foo8");
-    assertThat(queue.size(redis)).isEqualTo(9);
-    queue.push(redis, "foo9");
-    assertThat(queue.size(redis)).isEqualTo(10);
-  }
-
-  // Function under test: getName
-  // Reason for testing: the name can be received
-  // Failure explanation: name does not match what it should
-  @Test
-  public void getNameNameIsStored() throws Exception {
-    // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("queue_name");
-
-    // ACT
-    String name = queue.getName();
-
-    // ASSERT
-    assertThat(name).isEqualTo("queue_name");
+    assertThat(queue.size()).isEqualTo(0);
+    queue.offer("foo");
+    assertThat(queue.size()).isEqualTo(1);
+    queue.offer("foo1");
+    assertThat(queue.size()).isEqualTo(2);
+    queue.offer("foo2");
+    assertThat(queue.size()).isEqualTo(3);
+    queue.offer("foo3");
+    assertThat(queue.size()).isEqualTo(4);
+    queue.offer("foo4");
+    assertThat(queue.size()).isEqualTo(5);
+    queue.offer("foo5");
+    assertThat(queue.size()).isEqualTo(6);
+    queue.offer("foo6");
+    assertThat(queue.size()).isEqualTo(7);
+    queue.offer("foo7");
+    assertThat(queue.size()).isEqualTo(8);
+    queue.offer("foo8");
+    assertThat(queue.size()).isEqualTo(9);
+    queue.offer("foo9");
+    assertThat(queue.size()).isEqualTo(10);
   }
 
   // Function under test: getDequeueName
@@ -180,7 +166,7 @@ public class RedisPriorityQueueTest {
   @Test
   public void getDequeueNameNameIsStored() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("queue_name");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "queue_name");
 
     // ACT
     String name = queue.getDequeueName();
@@ -190,86 +176,78 @@ public class RedisPriorityQueueTest {
   }
 
   // Function under test: size
-  // Reason for testing: size adjusts with push and dequeue
+  // Reason for testing: size adjusts with offer(and dequeue
   // Failure explanation: size is incorrectly reporting the expected queue size
   @Test
   public void sizeAdjustPushDequeue() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
     ExecutorService service = mock(ExecutorService.class);
     Duration timeout = Duration.ofSeconds(1);
 
     // ACT / ASSERT
-    assertThat(queue.size(redis)).isEqualTo(0);
-    queue.push(redis, "foo");
-    assertThat(queue.size(redis)).isEqualTo(1);
-    queue.push(redis, "bar");
-    assertThat(queue.size(redis)).isEqualTo(2);
-    queue.push(redis, "baz");
-    assertThat(queue.size(redis)).isEqualTo(3);
-    queue.push(redis, "baz2");
-    assertThat(queue.size(redis)).isEqualTo(4);
-    queue.push(redis, "baz3");
-    assertThat(queue.size(redis)).isEqualTo(5);
-    queue.push(redis, "baz4");
-    assertThat(queue.size(redis)).isEqualTo(6);
-    queue.dequeue(redis, timeout, service);
-    assertThat(queue.size(redis)).isEqualTo(5);
-    queue.dequeue(redis, timeout, service);
-    assertThat(queue.size(redis)).isEqualTo(4);
-    queue.dequeue(redis, timeout, service);
-    assertThat(queue.size(redis)).isEqualTo(3);
-    queue.dequeue(redis, timeout, service);
-    assertThat(queue.size(redis)).isEqualTo(2);
-    queue.dequeue(redis, timeout, service);
-    assertThat(queue.size(redis)).isEqualTo(1);
-    queue.dequeue(redis, timeout, service);
-    assertThat(queue.size(redis)).isEqualTo(0);
+    assertThat(queue.size()).isEqualTo(0);
+    queue.offer("foo");
+    assertThat(queue.size()).isEqualTo(1);
+    queue.offer("bar");
+    assertThat(queue.size()).isEqualTo(2);
+    queue.offer("baz");
+    assertThat(queue.size()).isEqualTo(3);
+    queue.offer("baz2");
+    assertThat(queue.size()).isEqualTo(4);
+    queue.offer("baz3");
+    assertThat(queue.size()).isEqualTo(5);
+    queue.offer("baz4");
+    assertThat(queue.size()).isEqualTo(6);
+    queue.take(timeout);
+    assertThat(queue.size()).isEqualTo(5);
+    queue.take(timeout);
+    assertThat(queue.size()).isEqualTo(4);
+    queue.take(timeout);
+    assertThat(queue.size()).isEqualTo(3);
+    queue.take(timeout);
+    assertThat(queue.size()).isEqualTo(2);
+    queue.take(timeout);
+    assertThat(queue.size()).isEqualTo(1);
+    queue.take(timeout);
+    assertThat(queue.size()).isEqualTo(0);
     verifyNoInteractions(service);
   }
 
   // Function under test: size
-  // Reason for testing: size adjusts with push and dequeue
+  // Reason for testing: size adjusts with offer(and take(timeout);
   // Failure explanation: size is incorrectly reporting the expected queue size
   @Test
   public void checkPriorityOnDequeue() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
     ExecutorService service = mock(ExecutorService.class);
     Duration timeout = Duration.ofSeconds(1);
-    String val;
     // ACT / ASSERT
-    assertThat(queue.size(redis)).isEqualTo(0);
-    queue.push(redis, "foo", 2);
-    assertThat(queue.size(redis)).isEqualTo(1);
-    queue.push(redis, "bar", 1);
-    assertThat(queue.size(redis)).isEqualTo(2);
-    queue.push(redis, "baz", 3);
-    assertThat(queue.size(redis)).isEqualTo(3);
-    queue.push(redis, "baz2", 1);
-    assertThat(queue.size(redis)).isEqualTo(4);
-    queue.push(redis, "baz3", 2);
-    assertThat(queue.size(redis)).isEqualTo(5);
-    queue.push(redis, "baz4", 1);
-    assertThat(queue.size(redis)).isEqualTo(6);
-    val = queue.dequeue(redis, timeout, service);
-    assertThat(val).isEqualTo("bar");
-    assertThat(queue.size(redis)).isEqualTo(5);
-    val = queue.dequeue(redis, timeout, service);
-    assertThat(val).isEqualTo("baz2");
-    assertThat(queue.size(redis)).isEqualTo(4);
-    val = queue.dequeue(redis, timeout, service);
-    assertThat(val).isEqualTo("baz4");
-    assertThat(queue.size(redis)).isEqualTo(3);
-    val = queue.dequeue(redis, timeout, service);
-    assertThat(val).isEqualTo("foo");
-    assertThat(queue.size(redis)).isEqualTo(2);
-    val = queue.dequeue(redis, timeout, service);
-    assertThat(val).isEqualTo("baz3");
-    assertThat(queue.size(redis)).isEqualTo(1);
-    val = queue.dequeue(redis, timeout, service);
-    assertThat(val).isEqualTo("baz");
-    assertThat(queue.size(redis)).isEqualTo(0);
+    assertThat(queue.size()).isEqualTo(0);
+    queue.offer("prio_2_1", 2);
+    assertThat(queue.size()).isEqualTo(1);
+    queue.offer("prio_1_1", 1);
+    assertThat(queue.size()).isEqualTo(2);
+    queue.offer("prio_3_1", 3);
+    assertThat(queue.size()).isEqualTo(3);
+    queue.offer("prio_1_2", 1);
+    assertThat(queue.size()).isEqualTo(4);
+    queue.offer("prio_2_2", 2);
+    assertThat(queue.size()).isEqualTo(5);
+    queue.offer("prio_1_3", 1);
+    assertThat(queue.size()).isEqualTo(6);
+    // priority 1
+    assertThat(ImmutableList.of(queue.take(timeout), queue.take(timeout), queue.take(timeout)))
+        .containsExactly("prio_1_1", "prio_1_2", "prio_1_3");
+    assertThat(queue.size()).isEqualTo(3);
+    // priority 2
+    assertThat(ImmutableList.of(queue.take(timeout), queue.take(timeout)))
+        .containsExactly("prio_2_1", "prio_2_2");
+    assertThat(queue.size()).isEqualTo(1);
+    // priority 3
+    assertThat(ImmutableList.of(queue.take(timeout))).containsExactly("prio_3_1");
+    assertThat(queue.size()).isEqualTo(0);
     verifyNoInteractions(service);
   }
 
@@ -279,11 +257,11 @@ public class RedisPriorityQueueTest {
   @Test
   public void checkDequeueTimeout() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
     ExecutorService service = mock(ExecutorService.class);
 
     Stopwatch stopwatch = Stopwatch.createStarted();
-    String val = queue.dequeue(redis, Duration.ofSeconds(1), service);
+    String val = queue.take(Duration.ofSeconds(1));
     long timeElapsed = stopwatch.elapsed(MILLISECONDS);
 
     assertThat(timeElapsed).isGreaterThan(1000L);
@@ -297,36 +275,36 @@ public class RedisPriorityQueueTest {
   @Test
   public void checkNegativesInPriority() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
     ExecutorService service = mock(ExecutorService.class);
     Duration timeout = Duration.ofSeconds(1);
     String val;
 
     // ACT / ASSERT
-    queue.push(redis, "foo-6", 6);
-    queue.push(redis, "foo-5", 5);
-    queue.push(redis, "foo-3", 3);
-    queue.push(redis, "negative-50", -50);
-    queue.push(redis, "negative-1", -1);
-    queue.push(redis, "foo-1", 1);
-    queue.push(redis, "baz-2", 2);
-    queue.push(redis, "foo-4", 4);
+    queue.offer("foo-6", 6);
+    queue.offer("foo-5", 5);
+    queue.offer("foo-3", 3);
+    queue.offer("negative-50", -50);
+    queue.offer("negative-1", -1);
+    queue.offer("foo-1", 1);
+    queue.offer("baz-2", 2);
+    queue.offer("foo-4", 4);
 
-    val = queue.dequeue(redis, timeout, service);
+    val = queue.take(timeout);
     assertThat(val).isEqualTo("negative-50");
-    val = queue.dequeue(redis, timeout, service);
+    val = queue.take(timeout);
     assertThat(val).isEqualTo("negative-1");
-    val = queue.dequeue(redis, timeout, service);
+    val = queue.take(timeout);
     assertThat(val).isEqualTo("foo-1");
-    val = queue.dequeue(redis, timeout, service);
+    val = queue.take(timeout);
     assertThat(val).isEqualTo("baz-2");
-    val = queue.dequeue(redis, timeout, service);
+    val = queue.take(timeout);
     assertThat(val).isEqualTo("foo-3");
-    val = queue.dequeue(redis, timeout, service);
+    val = queue.take(timeout);
     assertThat(val).isEqualTo("foo-4");
-    val = queue.dequeue(redis, timeout, service);
+    val = queue.take(timeout);
     assertThat(val).isEqualTo("foo-5");
-    val = queue.dequeue(redis, timeout, service);
+    val = queue.take(timeout);
     assertThat(val).isEqualTo("foo-6");
     verifyNoInteractions(service);
   }
@@ -337,15 +315,15 @@ public class RedisPriorityQueueTest {
   @Test
   public void visitCheckVisitOfEachElement() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
-    queue.push(redis, "element 1");
-    queue.push(redis, "element 2");
-    queue.push(redis, "element 3");
-    queue.push(redis, "element 4");
-    queue.push(redis, "element 5");
-    queue.push(redis, "element 6");
-    queue.push(redis, "element 7");
-    queue.push(redis, "element 8");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    queue.offer("element 1");
+    queue.offer("element 2");
+    queue.offer("element 3");
+    queue.offer("element 4");
+    queue.offer("element 5");
+    queue.offer("element 6");
+    queue.offer("element 7");
+    queue.offer("element 8");
 
     // ACT
     List<String> visited = new ArrayList<>();
@@ -355,7 +333,7 @@ public class RedisPriorityQueueTest {
             visited.add(entry);
           }
         };
-    queue.visit(redis, visitor);
+    queue.visit(visitor);
 
     // ASSERT
     assertThat(visited.size()).isEqualTo(8);
@@ -375,9 +353,9 @@ public class RedisPriorityQueueTest {
   @Test
   public void visitVisitManyOverPageSize() throws Exception {
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
     for (int i = 0; i < 2500; ++i) {
-      queue.push(redis, "foo" + i);
+      queue.offer("foo" + i);
     }
 
     // ACT
@@ -388,7 +366,7 @@ public class RedisPriorityQueueTest {
             visited.add(entry);
           }
         };
-    queue.visit(redis, visitor);
+    queue.visit(visitor);
 
     // ASSERT
     assertThat(visited.size()).isEqualTo(2500);

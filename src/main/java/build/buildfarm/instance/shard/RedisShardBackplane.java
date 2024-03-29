@@ -1214,7 +1214,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private ExecuteEntry deprequeueOperation(UnifiedJedis jedis) throws InterruptedException {
-    String executeEntryJson = state.prequeue.dequeue(jedis, dequeueService);
+    String executeEntryJson = state.prequeue.take(jedis, dequeueService);
     if (executeEntryJson == null) {
       return null;
     }
@@ -1378,7 +1378,7 @@ public class RedisShardBackplane implements Backplane {
     client.run(
         jedis -> {
           state.operations.insert(jedis, invocationId, operationName, operationJson);
-          state.prequeue.push(jedis, executeEntryJson, priority);
+          state.prequeue.offer(jedis, executeEntryJson, priority);
           publishReset(jedis, publishOperation);
         });
   }

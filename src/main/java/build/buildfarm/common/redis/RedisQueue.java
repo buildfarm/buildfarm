@@ -17,13 +17,10 @@ package build.buildfarm.common.redis;
 import static redis.clients.jedis.args.ListDirection.LEFT;
 import static redis.clients.jedis.args.ListDirection.RIGHT;
 
+import build.buildfarm.common.Queue;
 import build.buildfarm.common.StringVisitor;
 import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import redis.clients.jedis.Jedis;
 
 /**
@@ -32,13 +29,21 @@ import redis.clients.jedis.Jedis;
  * @details A redis queue is an implementation of a queue data structure which internally uses redis
  *     to store and distribute the data. It's important to know that the lifetime of the queue
  *     persists before and after the queue data structure is created (since it exists in redis).
- *     Therefore, two redis queues with the same name, would in fact be the same underlying redis
- *     queue.
+ *     Therefore, two redis queues with the same name and redis service, would in fact be the same
+ *     underlying redis queue.
  */
-public class RedisQueue extends QueueInterface {
+public class RedisQueue implements Queue<String> {
+  private static final int defaultListPageSize = 10000;
+
+  public static Queue decorate(Jedis jedis, String name) {
+    return new RedisQueue(jedis, name, defaultListPageSize);
+  }
+
   private static double toRedisTimeoutSeconds(Duration timeout) {
     return timeout.getSeconds() + timeout.getNano() / 1e9;
   }
+
+  private final Jedis jedis;
 
   /**
    * @field name
@@ -48,16 +53,21 @@ public class RedisQueue extends QueueInterface {
    */
   private final String name;
 
+  private final int listPageSize;
+
   /**
    * @brief Constructor.
    * @details Construct a named redis queue with an established redis cluster.
    * @param name The global name of the queue.
    */
-  public RedisQueue(String name) {
-    // In order for dequeue properly, the queue needs to have a hashtag.  Otherwise it will error
-    // with: "No way to dispatch this command to Redis Cluster because keys have different slots."
-    // when trying to blmove. If no hashtag was given we provide a default.
+  public RedisQueue(Jedis jedis, String name) {
+    this(jedis, name, defaultListPageSize);
+  }
+
+  public RedisQueue(Jedis jedis, String name, int listPageSize) {
+    this.jedis = jedis;
     this.name = name;
+    this.listPageSize = listPageSize;
   }
 
   /**
@@ -65,8 +75,9 @@ public class RedisQueue extends QueueInterface {
    * @details Adds the value into the backend redis queue.
    * @param val The value to push onto the queue.
    */
-  public void push(Jedis jedis, String val) {
-    push(jedis, val, 1);
+  @Override
+  public boolean offer(String val) {
+    return offer(val, 1);
   }
 
   /**
@@ -74,8 +85,10 @@ public class RedisQueue extends QueueInterface {
    * @details Adds the value into the backend redis queue.
    * @param val The value to push onto the queue.
    */
-  public void push(Jedis jedis, String val, double priority) {
+  @Override
+  public boolean offer(String val, double priority) {
     jedis.lpush(name, val);
+    return true;
   }
 
   /**
@@ -85,7 +98,8 @@ public class RedisQueue extends QueueInterface {
    * @return Whether the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
-  public boolean removeFromDequeue(Jedis jedis, String val) {
+  @Override
+  public boolean removeFromDequeue(String val) {
     return jedis.lrem(getDequeueName(), -1, val) != 0;
   }
 
@@ -96,7 +110,7 @@ public class RedisQueue extends QueueInterface {
    * @return Whether the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
-  public boolean removeAll(Jedis jedis, String val) {
+  public boolean removeAll(String val) {
     return jedis.lrem(name, 0, val) != 0;
   }
 
@@ -110,41 +124,9 @@ public class RedisQueue extends QueueInterface {
    * @note Overloaded.
    * @note Suggested return identifier: val.
    */
-  public String dequeue(Jedis jedis, Duration timeout, ExecutorService service)
-      throws InterruptedException {
-    return interruptibleRequest(
-        () -> jedis.blmove(name, getDequeueName(), RIGHT, LEFT, toRedisTimeoutSeconds(timeout)),
-        jedis::disconnect,
-        service);
-  }
-
-  private <T> T interruptibleRequest(
-      Callable<T> command, Runnable onInterrupted, ExecutorService service)
-      throws InterruptedException {
-    Future<T> reply = service.submit(command);
-    return getBlockingReply(reply, onInterrupted);
-  }
-
-  private <T> T getBlockingReply(Future<T> reply, Runnable onInterrupted)
-      throws InterruptedException {
-    InterruptedException interruption = null;
-    for (; ; ) {
-      try {
-        return reply.get();
-      } catch (ExecutionException e) {
-        Throwable cause = e.getCause();
-        if (interruption != null) {
-          interruption.addSuppressed(cause);
-          Thread.currentThread().interrupt();
-          throw interruption;
-        }
-        throw new RuntimeException(cause);
-      } catch (InterruptedException e) {
-        interruption = e;
-        Thread.interrupted();
-        onInterrupted.run();
-      }
-    }
+  @Override
+  public String take(Duration timeout) {
+    return jedis.blmove(name, getDequeueName(), RIGHT, LEFT, toRedisTimeoutSeconds(timeout));
   }
 
   /**
@@ -154,25 +136,9 @@ public class RedisQueue extends QueueInterface {
    * @return The value of the transfered element. null if nothing was dequeued.
    * @note Suggested return identifier: val.
    */
-  public String nonBlockingDequeue(Jedis jedis) throws InterruptedException {
-    String val = jedis.lmove(name, getDequeueName(), RIGHT, LEFT);
-    if (val != null) {
-      return val;
-    }
-    if (Thread.currentThread().isInterrupted()) {
-      throw new InterruptedException();
-    }
-    return null;
-  }
-
-  /**
-   * @brief Get name.
-   * @details Get the name of the queue. this is the redis key used for the list.
-   * @return The name of the queue.
-   * @note Suggested return identifier: name.
-   */
-  public String getName() {
-    return name;
+  @Override
+  public String poll() {
+    return jedis.lmove(name, getDequeueName(), RIGHT, LEFT);
   }
 
   /**
@@ -192,7 +158,7 @@ public class RedisQueue extends QueueInterface {
    * @return The current length of the queue.
    * @note Suggested return identifier: length.
    */
-  public long size(Jedis jedis) {
+  public long size() {
     return jedis.llen(name);
   }
 
@@ -202,8 +168,8 @@ public class RedisQueue extends QueueInterface {
    * @param visitor A visitor for each visited element in the queue.
    * @note Overloaded.
    */
-  public void visit(Jedis jedis, StringVisitor visitor) {
-    visit(jedis, name, visitor);
+  public void visit(StringVisitor visitor) {
+    visit(name, visitor);
   }
 
   /**
@@ -211,8 +177,8 @@ public class RedisQueue extends QueueInterface {
    * @details Enacts a visitor over each element in the dequeue.
    * @param visitor A visitor for each visited element in the queue.
    */
-  public void visitDequeue(Jedis jedis, StringVisitor visitor) {
-    visit(jedis, getDequeueName(), visitor);
+  public void visitDequeue(StringVisitor visitor) {
+    visit(getDequeueName(), visitor);
   }
 
   /**
@@ -222,9 +188,7 @@ public class RedisQueue extends QueueInterface {
    * @param visitor A visitor for each visited element in the queue.
    * @note Overloaded.
    */
-  private void visit(Jedis jedis, String queueName, StringVisitor visitor) {
-    int listPageSize = 10000;
-
+  private void visit(String queueName, StringVisitor visitor) {
     int index = 0;
     int nextIndex = listPageSize;
     List<String> entries;

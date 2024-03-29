@@ -17,18 +17,16 @@ package build.buildfarm.common.redis;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.StringVisitor;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.Before;
@@ -51,7 +49,7 @@ import redis.clients.jedis.Jedis;
 @RunWith(JUnit4.class)
 public class RedisPriorityQueueMockTest {
   @Mock private Jedis redis;
-  @Mock private Timestamp time;
+  @Mock private Clock clock;
 
   @Before
   public void setUp() {
@@ -64,113 +62,113 @@ public class RedisPriorityQueueMockTest {
   @Test
   public void redisPriorityQueueConstructsWithoutError() throws Exception {
     // ACT
-    new RedisPriorityQueue("test");
+    new RedisPriorityQueue(redis, "test");
   }
 
-  // Function under test: push
-  // Reason for testing: the queue can have a value pushed onto it
-  // Failure explanation: the queue is throwing an exception upon push
+  // Function under test: offer
+  // Reason for testing: the queue can have a value offered to it
+  // Failure explanation: the queue is throwing an exception upon offer
   @Test
-  public void pushPushWithoutError() throws Exception {
+  public void offerOfferWithoutError() throws Exception {
     // ARRANGE
-    when(time.getNanos()).thenReturn(123L);
-    RedisPriorityQueue queue = new RedisPriorityQueue("test", time);
+    when(clock.millis()).thenReturn(123L);
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test", clock);
 
     // ACT
-    queue.push(redis, "foo");
+    queue.offer("foo");
 
     // ASSERT
     verify(redis, times(1)).zadd("test", 0, "123:foo");
   }
 
-  // Function under test: push
-  // Reason for testing: the queue can have the different values pushed onto it
-  // Failure explanation: the queue is throwing an exception upon pushing different values
+  // Function under test: offer
+  // Reason for testing: the queue can have the different values offered onto it
+  // Failure explanation: the queue is throwing an exception upon offering different values
   @Test
-  public void pushPushDifferentWithoutError() throws Exception {
+  public void offerOfferDifferentWithoutError() throws Exception {
     // ARRANGE
-    when(time.getNanos()).thenReturn(123L, 124L);
-    RedisPriorityQueue queue = new RedisPriorityQueue("test", time);
+    when(clock.millis()).thenReturn(123L, 124L);
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test", clock);
 
     // ACT
-    queue.push(redis, "foo");
-    queue.push(redis, "bar");
+    queue.offer("foo");
+    queue.offer("bar");
 
     // ASSERT
     verify(redis, times(1)).zadd("test", 0, "123:foo");
     verify(redis, times(1)).zadd("test", 0, "124:bar");
   }
 
-  // Function under test: push
-  // Reason for testing: the queue can have the same values pushed onto it
-  // Failure explanation: the queue is throwing an exception upon pushing the same values
+  // Function under test: offer
+  // Reason for testing: the queue can have the same values offered to it
+  // Failure explanation: the queue is throwing an exception upon offering the same values
   @Test
-  public void pushPushSameWithoutError() throws Exception {
+  public void offerOfferSameWithoutError() throws Exception {
     // ARRANGE
-    when(time.getNanos()).thenReturn(123L, 124L);
-    RedisPriorityQueue queue = new RedisPriorityQueue("test", time);
+    when(clock.millis()).thenReturn(123L, 124L);
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test", clock);
 
     // ACT
-    queue.push(redis, "foo");
-    queue.push(redis, "foo");
+    queue.offer("foo");
+    queue.offer("foo");
 
     // ASSERT
     verify(redis, times(1)).zadd("test", 0, "123:foo");
     verify(redis, times(1)).zadd("test", 0, "124:foo");
   }
 
-  // Function under test: push
-  // Reason for testing: the queue can have the same values pushed onto it
-  // Failure explanation: the queue is throwing an exception upon pushing the same values
+  // Function under test: offer
+  // Reason for testing: the queue can have the same values offered to it
+  // Failure explanation: the queue throws an exception when offered the same values
   @Test
-  public void pushPushPriorityWithoutError() throws Exception {
+  public void offerOfferPriorityWithoutError() throws Exception {
     // ARRANGE
-    when(time.getNanos()).thenReturn(123L, 124L);
-    RedisPriorityQueue queue = new RedisPriorityQueue("test", time);
+    when(clock.millis()).thenReturn(123L, 124L);
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test", clock);
 
     // ACT
-    queue.push(redis, "foo", 1);
-    queue.push(redis, "foo2", 2);
+    queue.offer("foo", 1);
+    queue.offer("foo2", 2);
 
     // ASSERT
     verify(redis, times(1)).zadd("test", 1, "123:foo");
     verify(redis, times(1)).zadd("test", 2, "124:foo2");
   }
 
-  // Function under test: push
-  // Reason for testing: the queue can have many values pushed into it
-  // Failure explanation: the queue is throwing an exception upon pushing many values
+  // Function under test: offer
+  // Reason for testing: the queue can have many values offered to it
+  // Failure explanation: the queue throws an exception when offered many values
   @Test
-  public void pushPushMany() throws Exception {
+  public void offerMany() throws Exception {
     // ARRANGE
-    when(time.getNanos()).thenReturn(123L);
-    RedisPriorityQueue queue = new RedisPriorityQueue("test", time);
+    when(clock.millis()).thenReturn(123L);
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test", clock);
 
     // ACT
     for (int i = 0; i < 1000; ++i) {
-      queue.push(redis, "foo" + i);
+      queue.offer("foo" + i);
     }
 
     // ASSERT
     verify(redis, times(1000)).zadd(eq("test"), eq(0.0), any(String.class));
   }
 
-  // Function under test: push
-  // Reason for testing: the queue size increases as elements are pushed
-  // Failure explanation: the queue size is not accurately reflecting the pushes
+  // Function under test: offer
+  // Reason for testing: the queue size increases as elements are offered
+  // Failure explanation: the queue size does not reflect the offerings
   @Test
-  public void pushCallsLPush() throws Exception {
+  public void offerCallsZAdd() throws Exception {
     // ARRANGE
-    when(time.getNanos()).thenReturn(123L, 124L, 125L);
-    RedisPriorityQueue queue = new RedisPriorityQueue("test", time);
+    when(clock.millis()).thenReturn(123L, 124L, 125L);
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test", clock);
 
     // ACT
-    queue.push(redis, "foo", 0);
-    queue.push(redis, "foo1", 2);
-    queue.push(redis, "foo2", 2);
+    queue.offer("foo", 0);
+    queue.offer("foo1", 2);
+    queue.offer("foo2", 2);
 
     // ASSERT
-    verify(time, times(3)).getNanos();
+    verify(clock, times(3)).millis();
     verify(redis, times(1)).zadd("test", 0, "123:foo");
     verify(redis, times(1)).zadd("test", 2, "124:foo1");
     verify(redis, times(1)).zadd("test", 2, "125:foo2");
@@ -184,125 +182,85 @@ public class RedisPriorityQueueMockTest {
   public void removeFromDequeueRemoveADequeueValue() throws Exception {
     // ARRANGE
     when(redis.lrem("test_dequeue", -1, "foo")).thenReturn(1L);
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
-    boolean wasRemoved = queue.removeFromDequeue(redis, "foo");
+    boolean wasRemoved = queue.removeFromDequeue("foo");
 
     // ASSERT
     assertThat(wasRemoved).isTrue();
     verify(redis, times(1)).lrem("test_dequeue", -1, "foo");
   }
 
-  // Function under test: dequeue
-  // Reason for testing: the element is able to be dequeued
-  // Failure explanation: something prevented the element from being dequeued
+  // Function under test: take
+  // Reason for testing: the element is able to be taken
+  // Failure explanation: something prevented the element from being taken
   @Test
   public void dequeueElementCanBeDequeuedWithTimeout() throws Exception {
     // ARRANGE
     when(redis.eval(any(String.class), any(List.class), any(List.class))).thenReturn("foo");
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
-    ExecutorService service = mock(ExecutorService.class);
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
-    queue.push(redis, "foo");
-    String val = queue.dequeue(redis, Duration.ofSeconds(1), service);
+    String val = queue.take(Duration.ofSeconds(1));
 
     // ASSERT
-    verifyNoInteractions(service);
     assertThat(val).isEqualTo("foo");
   }
 
-  // Function under test: dequeue
-  // Reason for testing: element is not dequeued
-  // Failure explanation: element was dequeued
+  // Function under test: take
+  // Reason for testing: element is not taken
+  // Failure explanation: element was taken
   @Test
   public void dequeueElementIsNotDequeuedIfTimeRunsOut() throws Exception {
     // ARRANGE
     when(redis.eval(any(String.class), any(List.class), any(List.class))).thenReturn(null);
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
-    ExecutorService service = mock(ExecutorService.class);
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
-    queue.push(redis, "foo");
-    String val = queue.dequeue(redis, Duration.ofMillis(100), service);
+    String val = queue.take(Duration.ofMillis(100));
 
     // ASSERT
-    verifyNoInteractions(service);
     assertThat(val).isEqualTo(null);
   }
 
-  // Function under test: dequeue
-  // Reason for testing: the dequeue is interrupted
-  // Failure explanation: the dequeue was not interrupted as expected
+  // Function under test: take
+  // Reason for testing: the take is interrupted
+  // Failure explanation: the take was not interrupted as expected
   @Test
   public void dequeueInterrupt() throws Exception {
     // ARRANGE
     when(redis.eval(any(String.class), any(List.class), any(List.class))).thenReturn(null);
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
-    ExecutorService service = mock(ExecutorService.class);
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
-    queue.push(redis, "foo");
     Thread call =
         new Thread(
             () -> {
               try {
-                queue.dequeue(redis, Duration.ofDays(1), service);
+                queue.take(Duration.ofDays(1));
               } catch (Exception e) {
               }
             });
     call.start();
     call.interrupt();
     call.join();
-    verifyNoInteractions(service);
   }
 
-  // Function under test: nonBlockingDequeue
-  // Reason for testing: the element is able to be dequeued
-  // Failure explanation: something prevented the element from being dequeued
+  // Function under test: poll
+  // Reason for testing: the element is able to be polled
+  // Failure explanation: something prevented the element from being polled
   @Test
   public void nonBlockingDequeueElementCanBeDequeued() throws Exception {
     // ARRANGE
     when(redis.eval(any(String.class), any(List.class), any(List.class))).thenReturn("foo");
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
-    queue.push(redis, "foo");
-    String val = queue.nonBlockingDequeue(redis);
+    String val = queue.poll();
 
     // ASSERT
     assertThat(val).isEqualTo("foo");
-  }
-
-  // Function under test: getName
-  // Reason for testing: the name can be received
-  // Failure explanation: name does not match what it should
-  @Test
-  public void getNameNameIsStored() throws Exception {
-    // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("queue_name");
-
-    // ACT
-    String name = queue.getName();
-
-    // ASSERT
-    assertThat(name).isEqualTo("queue_name");
-  }
-
-  // Function under test: getDequeueName
-  // Reason for testing: the name can be received
-  // Failure explanation: name does not match what it should
-  @Test
-  public void getDequeueNameNameIsStored() throws Exception {
-    // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("queue_name");
-
-    // ACT
-    String name = queue.getDequeueName();
-
-    // ASSERT
-    assertThat(name).isEqualTo("queue_name_dequeue");
   }
 
   // Function under test: visit
@@ -325,15 +283,15 @@ public class RedisPriorityQueueMockTest {
                 .collect(Collectors.toList()));
 
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
-    queue.push(redis, "element 1");
-    queue.push(redis, "element 2");
-    queue.push(redis, "element 3");
-    queue.push(redis, "element 4");
-    queue.push(redis, "element 5");
-    queue.push(redis, "element 6");
-    queue.push(redis, "element 7");
-    queue.push(redis, "element 8");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
+    queue.offer("element 1");
+    queue.offer("element 2");
+    queue.offer("element 3");
+    queue.offer("element 4");
+    queue.offer("element 5");
+    queue.offer("element 6");
+    queue.offer("element 7");
+    queue.offer("element 8");
 
     // ACT
     List<String> visited = new ArrayList<>();
@@ -343,7 +301,7 @@ public class RedisPriorityQueueMockTest {
             visited.add(entry);
           }
         };
-    queue.visit(redis, visitor);
+    queue.visit(visitor);
 
     // ASSERT
     assertThat(visited.size()).isEqualTo(8);
@@ -376,7 +334,7 @@ public class RedisPriorityQueueMockTest {
                 "element 8"));
 
     // ARRANGE
-    RedisPriorityQueue queue = new RedisPriorityQueue("test");
+    RedisPriorityQueue queue = new RedisPriorityQueue(redis, "test");
 
     // ACT
     List<String> visited = new ArrayList<>();
@@ -386,7 +344,7 @@ public class RedisPriorityQueueMockTest {
             visited.add(entry);
           }
         };
-    queue.visitDequeue(redis, visitor);
+    queue.visitDequeue(visitor);
 
     // ASSERT
     assertThat(visited.size()).isEqualTo(8);
