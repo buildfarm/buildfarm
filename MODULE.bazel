@@ -8,7 +8,8 @@ module(
 bazel_dep(name = "bazel_skylib", version = "1.5.0")
 bazel_dep(name = "blake3", version = "1.3.3.bcr.1")
 bazel_dep(name = "gazelle", version = "0.35.0", repo_name = "bazel_gazelle")
-bazel_dep(name = "grpc", version = "1.48.1.bcr.2", repo_name = "com_github_grpc_grpc")
+bazel_dep(name = "grpc-java", version = "1.62.2")
+bazel_dep(name = "googleapis", version = "0.0.0-20240326-1c8d509c5", repo_name = "com_google_googleapis")
 bazel_dep(name = "platforms", version = "0.0.8")
 bazel_dep(name = "protobuf", version = "23.1", repo_name = "com_google_protobuf")
 bazel_dep(name = "rules_cc", version = "0.0.9")
@@ -32,13 +33,13 @@ bazel_dep(
     dev_dependency = True,
 )
 
-bazel_dep(name = "bazel_remote_apis", version = "66f0212d5cf703db65f7f56a1b54c60d4b41f920")
+bazel_dep(name = "remoteapis", version = "eb433accc6a666b782ea4b787eb598e5c3d27c93")
 archive_override(
-    module_name = "bazel_remote_apis",
-    integrity = "sha256-1qzzTZxQh9IpK0GH1/n32onHKhknIrdOKC12Nu9sUds=",
-    strip_prefix = "remote-apis-66f0212d5cf703db65f7f56a1b54c60d4b41f920",
+    module_name = "remoteapis",
+    integrity = "sha256-68wzxNAkPZ49/zFwPYQ5z9MYbgxoeIEazKJ24+4YqIQ=",
+    strip_prefix = "remote-apis-eb433accc6a666b782ea4b787eb598e5c3d27c93",
     urls = [
-        "https://github.com/bazelbuild/remote-apis/archive/66f0212d5cf703db65f7f56a1b54c60d4b41f920.zip",
+        "https://github.com/bazelbuild/remote-apis/archive/eb433accc6a666b782ea4b787eb598e5c3d27c93.zip",
     ],
 )
 
@@ -195,20 +196,6 @@ use_repo(
     "opentelemetry",
     "skip_sleep",
     "tini",
-)
-
-bazel_dep(name = "com_google_googleapis", version = "2a40f63ea714c7f4c6856a5db4d1f3cc7d4c4b18")
-archive_override(
-    module_name = "com_google_googleapis",
-    integrity = "sha256-ZZb7DC2S7M9G53Uu3gALP7UpXctrvnZ/HcGmPXq+A6U=",
-    patch_strip = 1,
-    patches = [
-        "third_party/googleapis_add_bzlmod_support.patch",
-    ],
-    strip_prefix = "googleapis-2a40f63ea714c7f4c6856a5db4d1f3cc7d4c4b18",
-    urls = [
-        "https://github.com/googleapis/googleapis/archive/2a40f63ea714c7f4c6856a5db4d1f3cc7d4c4b18.zip",
-    ],
 )
 
 googleapis_switched_rules = use_extension("@com_google_googleapis//:extensions.bzl", "switched_rules")
