@@ -16,7 +16,6 @@ java_library(
         "//src/main/java/build/buildfarm/common/resources",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_jnr_jnr_constants",
@@ -38,6 +37,7 @@ java_library(
         "@maven//:org_projectlombok_lombok",
         "@maven//:org_threeten_threetenbp",
         "@maven//:redis_clients_jedis",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -54,7 +54,6 @@ java_library(
         "//src/main/java/build/buildfarm/common/resources",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_jnr_jnr_constants",
@@ -76,6 +75,7 @@ java_library(
         "@maven//:org_projectlombok_lombok",
         "@maven//:org_threeten_threetenbp",
         "@maven//:redis_clients_jedis",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 

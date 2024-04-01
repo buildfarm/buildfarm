@@ -17,7 +17,6 @@ java_library(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/operations",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_google_code_findbugs_jsr305",
@@ -30,5 +29,6 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_netty_netty_codec_http",
         "@maven//:org_projectlombok_lombok",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

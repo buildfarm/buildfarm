@@ -28,5 +28,6 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_projectlombok_lombok",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
