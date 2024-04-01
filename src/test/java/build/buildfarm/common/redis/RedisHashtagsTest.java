@@ -72,7 +72,6 @@ public class RedisHashtagsTest {
     // ASSERT
     assertThat(RedisHashtags.hashedName("", "")).isEqualTo("");
     assertThat(RedisHashtags.hashedName("x", "")).isEqualTo("x");
-    assertThat(RedisHashtags.hashedName("x", null)).isEqualTo("x");
 
     assertThat(RedisHashtags.unhashedName("{}x")).isEqualTo("x");
     assertThat(RedisHashtags.unhashedName("z{}")).isEqualTo("z");
@@ -84,7 +83,9 @@ public class RedisHashtagsTest {
   @Test
   public void testNulls() throws Exception {
     // ASSERT
-    assertThrows(NullPointerException.class, () -> RedisHashtags.hashedName(null, null));
+    assertThat(RedisHashtags.hashedName(null, "")).isEqualTo(null);
+    assertThat(RedisHashtags.hashedName(null, null)).isEqualTo(null);
+    assertThat(RedisHashtags.hashedName("x", null)).isEqualTo("x");
     assertThrows(NullPointerException.class, () -> RedisHashtags.unhashedName(null));
   }
 }
