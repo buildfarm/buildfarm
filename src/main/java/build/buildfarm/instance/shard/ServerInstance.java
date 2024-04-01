@@ -79,6 +79,7 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
+import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.NodeInstance;
@@ -541,7 +542,9 @@ public class ServerInstance extends NodeInstance {
   private void updateQueueSizes(List<QueueStatus> queues) {
     if (queueSize != null) {
       for (QueueStatus queueStatus : queues) {
-        queueSize.labels(queueStatus.getName()).set(queueStatus.getSize());
+        queueSize
+            .labels(RedisHashtags.unhashedName(queueStatus.getName()))
+            .set(queueStatus.getSize());
       }
     }
   }
