@@ -33,6 +33,7 @@ bazel_dep(
     dev_dependency = True,
 )
 
+# TODO: remove this after https://github.com/bazelbuild/remote-apis/pull/293 is merged
 bazel_dep(name = "remoteapis", version = "eb433accc6a666b782ea4b787eb598e5c3d27c93")
 archive_override(
     module_name = "remoteapis",
