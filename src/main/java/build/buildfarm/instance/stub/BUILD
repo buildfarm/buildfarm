@@ -12,7 +12,6 @@ java_library(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/bytestream:bytestream_java_grpc",
         "@com_google_googleapis//google/bytestream:bytestream_java_proto",
         "@com_google_googleapis//google/longrunning:longrunning_java_grpc",

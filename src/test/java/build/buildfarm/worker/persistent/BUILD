@@ -17,7 +17,6 @@ java_test(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "//src/test/java/build/buildfarm/worker/util:worker_test_utils",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_jnr_jnr_constants",
         "@maven//:com_github_jnr_jnr_ffi",
@@ -32,5 +31,6 @@ java_test(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:org_mockito_mockito_core",
         "@maven//:org_projectlombok_lombok",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

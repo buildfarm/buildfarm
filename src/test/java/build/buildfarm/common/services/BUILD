@@ -26,5 +26,6 @@ java_test(
         "@maven//:io_grpc_grpc_inprocess",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

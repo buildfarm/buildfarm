@@ -199,7 +199,7 @@ use_repo(
 
 googleapis_switched_rules = use_extension("@com_google_googleapis//:extensions.bzl", "switched_rules")
 googleapis_switched_rules.use_languages(
-    #grpc = True, # This REALLY wants `@io_grpc_grpc_java` to be defined, but try as I might, it cannot be found.
+    grpc = True,
     java = True,
 )
 use_repo(googleapis_switched_rules, "com_google_googleapis_imports")
