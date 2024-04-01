@@ -138,6 +138,7 @@ maven.install(
         "org.yaml:snakeyaml:2.2",
         "redis.clients:jedis:5.1.2",
     ],
+    fail_if_repin_required = True,  # TO RE-PIN: REPIN=1 bazel run @unpinned_maven//:pin
     generate_compat_repositories = True,
     lock_file = "//:maven_install.json",
     repositories = [
