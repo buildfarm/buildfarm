@@ -6,7 +6,7 @@ java_test(
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/test/java/build/buildfarm:test_runner",
-        "//third_party/googleapis:google_bytestream_bytestream_java_grpc",
+        "@com_google_googleapis//google/bytestream:bytestream_java_grpc",
         "@com_google_googleapis//google/bytestream:bytestream_java_proto",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_jimfs_jimfs",
