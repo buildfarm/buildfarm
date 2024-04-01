@@ -610,9 +610,7 @@ public class ServerInstance extends NodeInstance {
     onStop.run();
     backplane.stop();
     if (!contextDeadlineScheduler.awaitTermination(10, SECONDS)) {
-      log.log(
-          Level.SEVERE,
-          "Could not shut down operation deletion service, some operations may be zombies");
+      log.log(Level.SEVERE, "Could not shut down context deadline scheduler");
     }
     if (!operationDeletionService.awaitTermination(10, SECONDS)) {
       log.log(
