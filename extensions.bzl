@@ -50,6 +50,16 @@ def _buildfarm_extension_impl(_ctx):
         urls = ["https://github.com/krallin/tini/releases/download/v0.18.0/tini"],
     )
 
+    if not native.existing_rule("com_github_grpc_grpc"):
+        http_archive(
+            name = "com_github_grpc_grpc",
+            strip_prefix = "grpc-1.46.0",
+            sha256 = "67423a4cd706ce16a88d1549297023f0f9f0d695a96dd684adc21e67b021f9bc",
+            urls = [
+                "https://github.com/grpc/grpc/archive/v1.46.0.tar.gz",
+            ],
+        )
+
 build_deps = module_extension(
     implementation = _buildfarm_extension_impl,
 )
