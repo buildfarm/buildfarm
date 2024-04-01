@@ -17,7 +17,6 @@ java_library(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//third_party/googleapis:google_bytestream_bytestream_java_grpc",
         "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/bytestream:bytestream_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_jnr_jnr_ffi",
@@ -34,5 +33,6 @@ java_library(
         "@maven//:io_prometheus_simpleclient",
         "@maven//:net_jcip_jcip_annotations",
         "@maven//:org_projectlombok_lombok",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
