@@ -17,7 +17,6 @@ java_test(
         "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_ben_manes_caffeine_caffeine",
@@ -31,6 +30,7 @@ java_test(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
         "@maven//:redis_clients_jedis",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -54,7 +54,6 @@ java_test(
         "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_ben_manes_caffeine_caffeine",
@@ -68,6 +67,7 @@ java_test(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
         "@maven//:redis_clients_jedis",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -90,7 +90,6 @@ java_test(
         "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_ben_manes_caffeine_caffeine",
@@ -104,6 +103,7 @@ java_test(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
         "@maven//:redis_clients_jedis",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -126,7 +126,6 @@ java_test(
         "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_ben_manes_caffeine_caffeine",
@@ -140,6 +139,7 @@ java_test(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
         "@maven//:redis_clients_jedis",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -162,7 +162,6 @@ java_test(
         "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_ben_manes_caffeine_caffeine",
@@ -176,6 +175,7 @@ java_test(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
         "@maven//:redis_clients_jedis",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -198,7 +198,6 @@ java_test(
         "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_ben_manes_caffeine_caffeine",
@@ -212,6 +211,7 @@ java_test(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
         "@maven//:redis_clients_jedis",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 

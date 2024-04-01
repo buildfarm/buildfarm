@@ -33,11 +33,11 @@ java_binary(
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@maven//:com_github_jnr_jnr_constants",
         "@maven//:com_github_jnr_jnr_ffi",
         "@maven//:com_github_jnr_jnr_posix",
         "@maven//:com_google_guava_guava",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 
@@ -73,6 +73,7 @@ java_binary(
         "@maven//:io_grpc_grpc_core",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
 

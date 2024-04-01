@@ -9,7 +9,6 @@ java_test(
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
-        "@bazel_remote_apis//build/bazel/remote/execution/v2:remote_execution_java_grpc",
         "@com_google_googleapis//google/bytestream:bytestream_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_google_guava_guava",
@@ -23,5 +22,6 @@ java_test(
         "@maven//:io_grpc_grpc_testing",
         "@maven//:org_mockito_mockito_core",
         "@maven//:redis_clients_jedis",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )
