@@ -4,7 +4,7 @@ java_library(
     visibility = ["//src/test/java/build/buildfarm:__subpackages__"],
     deps = [
         "//src/main/java/build/buildfarm/common/grpc",
-        "//third_party/googleapis:google_bytestream_bytestream_java_grpc",
+        "@com_google_googleapis//google/bytestream:bytestream_java_grpc",
         "@com_google_googleapis//google/bytestream:bytestream_java_proto",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
@@ -21,7 +21,7 @@ java_test(
     deps = [
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/test/java/build/buildfarm:test_runner",
-        "//third_party/googleapis:google_bytestream_bytestream_java_grpc",
+        "@com_google_googleapis//google/bytestream:bytestream_java_grpc",
         "@com_google_googleapis//google/bytestream:bytestream_java_proto",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
