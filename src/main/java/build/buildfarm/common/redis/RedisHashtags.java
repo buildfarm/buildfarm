@@ -14,12 +14,8 @@
 
 package build.buildfarm.common.redis;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /**
  * @class RedisHashtags
@@ -35,8 +31,7 @@ public class RedisHashtags {
    * @return A valid queue name for one of the internal queues.
    * @note Suggested return identifier: queueName.
    */
-  public static String hashedName(@Nonnull String name, @Nullable String hashtag) {
-    checkNotNull(name, "Name is required");
+  public static String hashedName(String name, String hashtag) {
     if (hashtag != null && !hashtag.isEmpty()) return "{" + hashtag + "}" + name;
     return name;
   }
@@ -48,8 +43,7 @@ public class RedisHashtags {
    * @return A valid keyname without hashtags.
    * @note Suggested return identifier: queueName.
    */
-  public static String unhashedName(@Nonnull String name) {
-    checkNotNull(name, "Name is required");
+  public static String unhashedName(String name) {
     return name.replaceAll("\\{.*?\\}", "");
   }
 
@@ -61,8 +55,7 @@ public class RedisHashtags {
    * @return The existing hashtag name found in the string (brackets are removed).
    * @note Suggested return identifier: hashtag.
    */
-  public static String existingHash(@Nonnull String name) {
-    checkNotNull(name, "Name is required");
+  public static String existingHash(String name) {
     String regex = "\\{.*?\\}";
     Pattern pattern = Pattern.compile(regex);
     Matcher matcher = pattern.matcher(name);
