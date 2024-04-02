@@ -3,16 +3,22 @@
 # Start redis container
 docker run -d --rm --name buildfarm-redis --network host redis:7.2.4 --bind localhost
 
+if [ -z "$BAZEL" ]
+then
+    BAZEL=bazel
+fi
 # Build worker and server targets
-bazel build //src/main/java/build/buildfarm:buildfarm-shard-worker
-bazel build //src/main/java/build/buildfarm:buildfarm-server
+$BAZEL build //src/main/java/build/buildfarm:buildfarm-shard-worker
+$BAZEL build //src/main/java/build/buildfarm:buildfarm-server
 
 # Start a single worker
-bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $(pwd)/examples/config.minimal.yml > worker.log 2>&1 &
+$BAZEL run //src/main/java/build/buildfarm:buildfarm-shard-worker $(pwd)/examples/config.minimal.yml > worker.log 2>&1 &
+server_pid=$!
 echo "Started buildfarm-shard-worker..."
 
 # Start a single server
-bazel run //src/main/java/build/buildfarm:buildfarm-server $(pwd)/examples/config.minimal.yml > server.log 2>&1 &
+$BAZEL run //src/main/java/build/buildfarm:buildfarm-server $(pwd)/examples/config.minimal.yml > server.log 2>&1 &
+worker_pid=$!
 echo "Started buildfarm-server..."
 
 echo "Wait for startup to finish..."
@@ -24,4 +30,14 @@ cat worker.log
 
 # Build bazel targets with buildfarm
 echo "Running server integration tests..."
-bazel test --test_tag_filters=integration src/test/java/build/buildfarm/server:all
+$BAZEL test --test_tag_filters=integration src/test/java/build/buildfarm/server:all
+status=$?
+
+kill $worker_pid $server_pid
+
+wait $server_pid
+wait $worker_pid
+
+docker stop buildfarm-redis
+
+exit $status

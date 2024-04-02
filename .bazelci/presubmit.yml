@@ -159,11 +159,11 @@ tasks:
     - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
     - export TEST_ARG1=--experimental_remote_grpc_log='./grpc.log'
     - export TEST_ARG2=--experimental_remote_grpc_log='./grpc2.log'
-    - export SHA1_TOOLS_REMOTE=eeddeff416118c86856fd76c95733307256dc855
+    - export SHA1_TOOLS_REMOTE=8ac4b7595baa239e1eee4785547c5dcb7587e11c
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/cache_test.sh
 
-  integration_test_absei:
+  integration_test_abseil:
     name: "Abseil Test"
     platform: ubuntu1804
     shell_commands:

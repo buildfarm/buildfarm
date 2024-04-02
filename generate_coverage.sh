@@ -30,7 +30,14 @@ DEFAULT_TEST_TARGET="//src/test/java/...:all"
 DEFAULT_TEST_TAG_FILTERS="-redis,-integration"
 
 # How to spawn bazel.  The CI has a bazel available.
-DEFAULT_BAZEL_WRAPPER=bazel
+if [ -z "$DEFAULT_BAZEL_WRAPPER" ] ; then
+    DEFAULT_BAZEL_WRAPPER=bazel
+fi
+
+if [ -z "$COVERAGE_PORT" ] ; then
+    COVERAGE_PORT=8080
+fi
+
 
 # Where test logs will occur.
 # Individual code coverage files can be found within this directory.
@@ -144,17 +151,13 @@ if [ "${BUILDFARM_SKIP_COVERAGE_HOST:-false}" = false ]; then
     command -v genhtml >/dev/null 2>&1 || { echo >&2 'genhtml does not exist.  You may need to install lcov.'; exit 1; }
     genhtml -f $traces
 
-    command -v python >/dev/null 2>&1 || { echo >&2 'python could not be found, so the coverage report cannot be locally hosted.'; exit 1; }
+    command -v python3 >/dev/null 2>&1 || { echo >&2 'python could not be found, so the coverage report cannot be locally hosted.'; exit 1; }
 
     # Get python version
-    pythonVersion=`python -c 'import platform; major, minor, patch = platform.python_version_tuple(); print(major);'`
+    pythonVersion=`python3 -c 'import platform; major, minor, patch = platform.python_version_tuple(); print(major);'`
 
-    # Host code coverage based on python version
-    if [ $pythonVersion -eq 2 ];then
-        python -m SimpleHTTPServer 8080
-    else
-        python -m http.server 8080
-    fi
+    # Host code coverage
+    python3 -m http.server $COVERAGE_PORT
 else
     echo "Skipped coverage hosting."
 fi
