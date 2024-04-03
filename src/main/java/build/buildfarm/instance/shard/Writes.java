@@ -22,6 +22,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Write;
@@ -127,7 +128,11 @@ class Writes {
   }
 
   public Write get(
-      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
+      Compressor.Value compressor,
+      Digest digest,
+      DigestFunction.Value digestFunction,
+      UUID uuid,
+      RequestMetadata requestMetadata)
       throws EntryLimitException {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
@@ -140,7 +145,9 @@ class Writes {
             .build();
     try {
       return new InvalidatingWrite(
-          blobWriteInstances.get(key).getBlobWrite(compressor, digest, uuid, requestMetadata),
+          blobWriteInstances
+              .get(key)
+              .getBlobWrite(compressor, digest, digestFunction, uuid, requestMetadata),
           () -> blobWriteInstances.invalidate(key));
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();

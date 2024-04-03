@@ -99,8 +99,8 @@ public class AbstractServerInstanceTest {
     DummyServerInstance(
         ContentAddressableStorage contentAddressableStorage, ActionCache actionCache) {
       super(
-          /* name=*/ null,
-          /* digestUtil=*/ null,
+          /* name= */ null,
+          /* digestUtil= */ DIGEST_UTIL,
           contentAddressableStorage,
           actionCache,
           /* outstandingOperations=*/ null,

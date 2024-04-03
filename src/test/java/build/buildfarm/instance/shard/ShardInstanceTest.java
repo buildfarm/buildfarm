@@ -47,6 +47,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
@@ -524,6 +525,7 @@ public class ShardInstanceTest {
         .getBlobWrite(
             any(Compressor.Value.class),
             any(Digest.class),
+            any(DigestFunction.Value.class),
             any(UUID.class),
             any(RequestMetadata.class));
 
@@ -620,6 +622,7 @@ public class ShardInstanceTest {
         .getBlobWrite(
             any(Compressor.Value.class),
             any(Digest.class),
+            any(DigestFunction.Value.class),
             any(UUID.class),
             any(RequestMetadata.class));
 
