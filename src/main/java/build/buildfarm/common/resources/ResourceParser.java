@@ -16,10 +16,12 @@ package build.buildfarm.common.resources;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.mutable.MutableInt;
@@ -58,7 +60,14 @@ public class ResourceParser {
    * @brief A list of keywords to their corresponding types.
    * @details This lookup table is used for parsing resource_names.
    */
-  private static final HashMap<String, Resource.TypeCase> KEYWORDS = keywordResourceMap();
+  private static final Map<String, Resource.TypeCase> KEYWORDS = keywordResourceMap();
+
+  /**
+   * @field DIGEST_FUNCTIONS
+   * @brief A map of uppercase digest function names to DigestFunction.Value.
+   * @details This lookup table is used to parse digest_function in resource_names.
+   */
+  private static final Map<String, DigestFunction.Value> DIGEST_FUNCTIONS = digestFunctionMap();
 
   /**
    * @brief Categorize the resource type by analyzing a resource name URI.
@@ -103,7 +112,7 @@ public class ResourceParser {
     MutableInt index = startIndex(segments, Resource.TypeCase.UPLOAD_BLOB_REQUEST);
 
     // Extract each of the following segments:
-    // `{instance_name}/uploads/{uuid}/blobs/{hash}/{size}{/optional_metadata}` or
+    // `{instance_name}/uploads/{uuid}/blobs/{digest_function/}{hash}/{size}{/optional_metadata}` or
     // `{instance_name}/uploads/{uuid}/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}{/optional_metadata}`
     UploadBlobRequest.Builder builder = UploadBlobRequest.newBuilder();
     builder.setInstanceName(asResourcePath(previousSegments(segments, index)));
@@ -145,6 +154,9 @@ public class ResourceParser {
   private static void addBlobResource(
       ImmutableList.Builder<String> resource, BlobInformation blob) {
     addCompressorName(resource, blob.getCompressor());
+    if (blob.getDigestFunction() != DigestFunction.Value.UNKNOWN) {
+      resource.add(blob.getDigestFunction().toString().toLowerCase());
+    }
     addDigestResource(resource, blob.getDigest());
   }
 
@@ -210,13 +222,30 @@ public class ResourceParser {
    * @return A lookup table for keyword to resource type.
    * @note Suggested return identifier: keywordMap.
    */
-  private static HashMap<String, Resource.TypeCase> keywordResourceMap() {
-    HashMap<String, Resource.TypeCase> keywords = new HashMap<>();
-    keywords.put("blobs", Resource.TypeCase.DOWNLOAD_BLOB_REQUEST);
-    keywords.put(COMPRESSED_BLOBS_KEYWORD, Resource.TypeCase.DOWNLOAD_BLOB_REQUEST);
-    keywords.put("uploads", Resource.TypeCase.UPLOAD_BLOB_REQUEST);
-    keywords.put("operations", Resource.TypeCase.STREAM_OPERATION_REQUEST);
-    return keywords;
+  private static Map<String, Resource.TypeCase> keywordResourceMap() {
+    return ImmutableMap.of(
+        "blobs",
+        Resource.TypeCase.DOWNLOAD_BLOB_REQUEST,
+        COMPRESSED_BLOBS_KEYWORD,
+        Resource.TypeCase.DOWNLOAD_BLOB_REQUEST,
+        "uploads",
+        Resource.TypeCase.UPLOAD_BLOB_REQUEST,
+        "operations",
+        Resource.TypeCase.STREAM_OPERATION_REQUEST);
+  }
+
+  /**
+   * @brief A mapping of DigestFunction.Value values to their respective enum types.
+   * @details This lookup table can be used for parsing.
+   * @return A lookup table for digest_function to DigestFunction.Value.
+   * @note Suggested return identifier: digestFunctionMap.
+   */
+  private static Map<String, DigestFunction.Value> digestFunctionMap() {
+    ImmutableMap.Builder<String, DigestFunction.Value> builder = ImmutableMap.builder();
+    for (DigestFunction.Value digestFunction : DigestFunction.Value.values()) {
+      builder.put(digestFunction.toString().toUpperCase(), digestFunction);
+    }
+    return builder.build();
   }
 
   /**
@@ -254,7 +283,7 @@ public class ResourceParser {
    * @note Suggested return identifier: keywordIndex.
    */
   private static int findKeywordIndex(
-      String[] segments, HashMap<String, Resource.TypeCase> keywords, Resource.TypeCase type) {
+      String[] segments, Map<String, Resource.TypeCase> keywords, Resource.TypeCase type) {
     return IntStream.range(0, segments.length)
         .filter(i -> keywords.get(segments[i]) == type)
         .findFirst()
@@ -277,6 +306,11 @@ public class ResourceParser {
           Compressor.Value.valueOf(segments[index.getAndIncrement()].toUpperCase()));
     } else {
       builder.setCompressor(Compressor.Value.IDENTITY);
+    }
+    String maybeDigestFunction = segments[index.getValue()].toUpperCase();
+    if (DIGEST_FUNCTIONS.containsKey(maybeDigestFunction)) {
+      builder.setDigestFunction(DIGEST_FUNCTIONS.get(maybeDigestFunction));
+      index.getAndIncrement();
     }
     String hash = segments[index.getAndIncrement()];
     String size = segments[index.getAndIncrement()];

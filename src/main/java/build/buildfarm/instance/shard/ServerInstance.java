@@ -51,6 +51,7 @@ import build.bazel.remote.execution.v2.CacheCapabilities;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
@@ -1295,8 +1296,15 @@ public class ServerInstance extends NodeInstance {
 
   @Override
   public Write getBlobWrite(
-      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
+      Compressor.Value compressor,
+      Digest digest,
+      DigestFunction.Value digestFunction,
+      UUID uuid,
+      RequestMetadata requestMetadata)
       throws EntryLimitException {
+    checkState(
+        digestFunction == DigestFunction.Value.UNKNOWN
+            || digestFunction == digestUtil.getDigestFunction());
     try {
       if (inDenyList(requestMetadata)) {
         throw Status.UNAVAILABLE.withDescription(BLOCK_LIST_ERROR).asRuntimeException();
@@ -1308,7 +1316,7 @@ public class ServerInstance extends NodeInstance {
       throw new EntryLimitException(digest.getSizeBytes(), maxEntrySizeBytes);
     }
     // FIXME small blob write to proto cache
-    return writes.get(compressor, digest, uuid, requestMetadata);
+    return writes.get(compressor, digest, digestFunction, uuid, requestMetadata);
   }
 
   protected int getTreeDefaultPageSize() {
@@ -1656,7 +1664,12 @@ public class ServerInstance extends NodeInstance {
     checkState(digest.getSizeBytes() == content.size());
     SettableFuture<Long> writtenFuture = SettableFuture.create();
     Write write =
-        getBlobWrite(Compressor.Value.IDENTITY, digest, UUID.randomUUID(), requestMetadata);
+        getBlobWrite(
+            Compressor.Value.IDENTITY,
+            digest,
+            digestUtil.getDigestFunction(),
+            UUID.randomUUID(),
+            requestMetadata);
     addCallback(
         write.getFuture(),
         new FutureCallback<Long>() {

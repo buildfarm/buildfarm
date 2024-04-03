@@ -17,6 +17,7 @@ package build.buildfarm.common;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
+import build.buildfarm.common.blake3.Blake3HashFunction;
 import com.google.common.hash.Funnels;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hasher;
@@ -42,7 +43,8 @@ public class DigestUtil {
     MD5(Hashing.md5()),
     @SuppressWarnings("deprecation")
     SHA1(Hashing.sha1()),
-    SHA256(Hashing.sha256());
+    SHA256(Hashing.sha256()),
+    BLAKE3(new Blake3HashFunction());
 
     private final com.google.common.hash.HashFunction hash;
     final HashCode empty;
@@ -53,6 +55,9 @@ public class DigestUtil {
     }
 
     public DigestFunction.Value getDigestFunction() {
+      if (this == BLAKE3) {
+        return DigestFunction.Value.BLAKE3;
+      }
       if (this == SHA256) {
         return DigestFunction.Value.SHA256;
       }
@@ -69,6 +74,9 @@ public class DigestUtil {
       if (SHA256.isValidHexDigest(hexDigest)) {
         return SHA256;
       }
+      if (BLAKE3.isValidHexDigest(hexDigest)) {
+        return BLAKE3;
+      }
       if (SHA1.isValidHexDigest(hexDigest)) {
         return SHA1;
       }
@@ -84,6 +92,8 @@ public class DigestUtil {
         case UNRECOGNIZED:
         case UNKNOWN:
           throw new IllegalArgumentException(digestFunction.toString());
+        case BLAKE3:
+          return BLAKE3;
         case SHA256:
           return SHA256;
         case SHA1:

@@ -27,7 +27,6 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class BackplaneTest {
-
   @Before
   public void assertNoEnvVariable() {
     // If a REDIS_PASSWORD env variable is set, it wins. We're not mocking env vars.

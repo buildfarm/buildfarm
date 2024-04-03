@@ -19,6 +19,7 @@ import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
@@ -95,7 +96,11 @@ public interface Instance {
   String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree);
 
   Write getBlobWrite(
-      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
+      Compressor.Value compressor,
+      Digest digest,
+      DigestFunction.Value digestFunction,
+      UUID uuid,
+      RequestMetadata requestMetadata)
       throws EntryLimitException;
 
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)

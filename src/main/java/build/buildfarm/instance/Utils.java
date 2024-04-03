@@ -91,7 +91,13 @@ public final class Utils {
     }
     SettableFuture<Digest> future = SettableFuture.create();
     try {
-      Write write = instance.getBlobWrite(compressor, digest, UUID.randomUUID(), requestMetadata);
+      Write write =
+          instance.getBlobWrite(
+              compressor,
+              digest,
+              instance.getDigestUtil().getDigestFunction(),
+              UUID.randomUUID(),
+              requestMetadata);
       // indicate that we know this write is novel
       write.reset();
       Futures.addCallback(

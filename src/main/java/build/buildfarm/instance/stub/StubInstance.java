@@ -42,6 +42,7 @@ import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
@@ -698,12 +699,22 @@ public class StubInstance implements Instance {
    */
   @Override
   public Write getBlobWrite(
-      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+      Compressor.Value compressor,
+      Digest digest,
+      DigestFunction.Value digestFunction,
+      UUID uuid,
+      RequestMetadata requestMetadata) {
+    BlobInformation blob =
+        BlobInformation.newBuilder()
+            .setCompressor(compressor)
+            .setDigest(digest)
+            .setDigestFunction(digestFunction)
+            .build();
     String resourceName =
         ResourceParser.uploadResourceName(
             UploadBlobRequest.newBuilder()
                 .setInstanceName(getName())
-                .setBlob(BlobInformation.newBuilder().setCompressor(compressor).setDigest(digest))
+                .setBlob(blob)
                 .setUuid(uuid.toString())
                 .build());
     return getWrite(

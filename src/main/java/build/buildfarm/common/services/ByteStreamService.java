@@ -16,9 +16,7 @@ package build.buildfarm.common.services;
 
 import static build.buildfarm.common.UrlPath.detectResourceOperation;
 import static build.buildfarm.common.UrlPath.parseBlobDigest;
-import static build.buildfarm.common.UrlPath.parseUploadBlobCompressor;
-import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
-import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
+import static build.buildfarm.common.resources.ResourceParser.parseUploadBlobRequest;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static io.grpc.Status.INVALID_ARGUMENT;
 import static io.grpc.Status.NOT_FOUND;
@@ -39,6 +37,7 @@ import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.resources.DownloadBlobRequest;
 import build.buildfarm.common.resources.ResourceParser;
+import build.buildfarm.common.resources.UploadBlobRequest;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -425,14 +424,19 @@ public class ByteStreamService extends ByteStreamImplBase {
     };
   }
 
-  static Write getUploadBlobWrite(
-      Instance instance, Compressor.Value compressor, Digest digest, UUID uuid)
+  static Write getUploadBlobWrite(Instance instance, String resourceName)
       throws EntryLimitException {
+    UploadBlobRequest request = parseUploadBlobRequest(resourceName);
+    Digest digest = request.getBlob().getDigest();
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
     return instance.getBlobWrite(
-        compressor, digest, uuid, TracingMetadataUtils.fromCurrentContext());
+        request.getBlob().getCompressor(),
+        digest,
+        request.getBlob().getDigestFunction(),
+        UUID.fromString(request.getUuid()),
+        TracingMetadataUtils.fromCurrentContext());
   }
 
   static Write getOperationStreamWrite(Instance instance, String resourceName) {
@@ -444,11 +448,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       case DOWNLOAD_BLOB_REQUEST:
         return getBlobWrite(instance, parseBlobDigest(resourceName));
       case UPLOAD_BLOB_REQUEST:
-        return getUploadBlobWrite(
-            instance,
-            parseUploadBlobCompressor(resourceName),
-            parseUploadBlobDigest(resourceName),
-            parseUploadBlobUUID(resourceName));
+        return getUploadBlobWrite(instance, resourceName);
       case STREAM_OPERATION_REQUEST:
         return getOperationStreamWrite(instance, resourceName);
       default:

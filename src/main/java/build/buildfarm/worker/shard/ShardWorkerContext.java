@@ -27,6 +27,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutionStage;
@@ -465,15 +466,16 @@ class ShardWorkerContext implements WorkerContext {
     return maximumActionTimeout;
   }
 
-  private void insertBlob(Digest digest, ByteString content)
+  private void insertBlob(Digest digest, DigestFunction.Value digestFunction, ByteString content)
       throws IOException, InterruptedException {
     if (digest.getSizeBytes() > 0) {
-      writer.insertBlob(digest, content);
+      writer.insertBlob(digest, digestFunction, content);
     }
   }
 
-  private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
-    writer.write(digest, file);
+  private void insertFile(Digest digest, DigestFunction.Value digestFunction, Path file)
+      throws IOException, InterruptedException {
+    writer.write(digest, digestFunction, file);
   }
 
   private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder)
@@ -483,7 +485,7 @@ class ShardWorkerContext implements WorkerContext {
       // reset to allow policy to determine inlining
       resultBuilder.setStdoutRaw(ByteString.EMPTY);
       Digest stdoutDigest = getDigestUtil().compute(stdoutRaw);
-      insertBlob(stdoutDigest, stdoutRaw);
+      insertBlob(stdoutDigest, getDigestUtil().getDigestFunction(), stdoutRaw);
       resultBuilder.setStdoutDigest(stdoutDigest);
     }
 
@@ -492,7 +494,7 @@ class ShardWorkerContext implements WorkerContext {
       // reset to allow policy to determine inlining
       resultBuilder.setStderrRaw(ByteString.EMPTY);
       Digest stderrDigest = getDigestUtil().compute(stderrRaw);
-      insertBlob(stderrDigest, stderrRaw);
+      insertBlob(stderrDigest, getDigestUtil().getDigestFunction(), stderrRaw);
       resultBuilder.setStderrDigest(stderrDigest);
     }
   }
@@ -567,7 +569,7 @@ class ShardWorkerContext implements WorkerContext {
         .setIsExecutable(Files.isExecutable(outputPath));
 
     try {
-      insertFile(digest, outputPath);
+      insertFile(digest, getDigestUtil().getDigestFunction(), outputPath);
     } catch (EntryLimitException e) {
       preconditionFailure
           .addViolationsBuilder()
@@ -688,7 +690,7 @@ class ShardWorkerContext implements WorkerContext {
                     .setIsExecutable(Files.isExecutable(file))
                     .build());
             try {
-              insertFile(digest, file);
+              insertFile(digest, getDigestUtil().getDigestFunction(), file);
             } catch (InterruptedException e) {
               throw new IOException(e);
             } catch (EntryLimitException e) {
@@ -734,7 +736,7 @@ class ShardWorkerContext implements WorkerContext {
     Tree tree = treeBuilder.build();
     ByteString treeBlob = tree.toByteString();
     Digest treeDigest = getDigestUtil().compute(treeBlob);
-    insertBlob(treeDigest, treeBlob);
+    insertBlob(treeDigest, getDigestUtil().getDigestFunction(), treeBlob);
     resultBuilder.addOutputDirectoriesBuilder().setPath(outputDir).setTreeDigest(treeDigest);
   }
 

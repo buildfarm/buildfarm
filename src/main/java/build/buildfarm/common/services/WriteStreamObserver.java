@@ -17,7 +17,6 @@ package build.buildfarm.common.services;
 import static build.buildfarm.common.UrlPath.detectResourceOperation;
 import static build.buildfarm.common.UrlPath.parseUploadBlobCompressor;
 import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
-import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.grpc.Status.ABORTED;
@@ -26,7 +25,6 @@ import static io.grpc.Status.INVALID_ARGUMENT;
 import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.EntryLimitException;
@@ -134,13 +132,8 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
       throws EntryLimitException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case UPLOAD_BLOB_REQUEST:
-        Digest uploadBlobDigest = parseUploadBlobDigest(resourceName);
-        expectedCommittedSize = uploadBlobDigest.getSizeBytes();
-        return ByteStreamService.getUploadBlobWrite(
-            instance,
-            parseUploadBlobCompressor(resourceName),
-            uploadBlobDigest,
-            parseUploadBlobUUID(resourceName));
+        expectedCommittedSize = parseUploadBlobDigest(resourceName).getSizeBytes();
+        return ByteStreamService.getUploadBlobWrite(instance, resourceName);
       case STREAM_OPERATION_REQUEST:
         return ByteStreamService.getOperationStreamWrite(instance, resourceName);
       case DOWNLOAD_BLOB_REQUEST:

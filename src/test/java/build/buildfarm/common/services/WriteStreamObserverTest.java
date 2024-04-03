@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -68,6 +69,7 @@ public class WriteStreamObserverTest {
     when(instance.getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
+            eq(DigestFunction.Value.UNKNOWN),
             eq(uuid),
             any(RequestMetadata.class)))
         .thenReturn(write);
@@ -85,6 +87,7 @@ public class WriteStreamObserverTest {
         .getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
+            eq(DigestFunction.Value.UNKNOWN),
             eq(uuid),
             any(RequestMetadata.class));
     verify(write, times(1)).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
@@ -112,6 +115,7 @@ public class WriteStreamObserverTest {
     when(instance.getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
+            eq(DigestFunction.Value.UNKNOWN),
             eq(uuid),
             any(RequestMetadata.class)))
         .thenReturn(write);
@@ -134,6 +138,7 @@ public class WriteStreamObserverTest {
         .getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
+            eq(DigestFunction.Value.UNKNOWN),
             eq(uuid),
             any(RequestMetadata.class));
     verifyNoInteractions(responseObserver);
