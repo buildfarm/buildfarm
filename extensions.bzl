@@ -59,6 +59,12 @@ def _buildfarm_extension_impl(_ctx):
                 "https://github.com/grpc/grpc/archive/v1.46.0.tar.gz",
             ],
         )
+    http_archive(
+        name = "io_grpc_grpc_proto",
+        sha256 = "729ac127a003836d539ed9da72a21e094aac4c4609e0481d6fc9e28a844e11af",
+        strip_prefix = "grpc-proto-4f245d272a28a680606c0739753506880cf33b5f",
+        urls = ["https://github.com/grpc/grpc-proto/archive/4f245d272a28a680606c0739753506880cf33b5f.zip"],
+    )
 
 build_deps = module_extension(
     implementation = _buildfarm_extension_impl,

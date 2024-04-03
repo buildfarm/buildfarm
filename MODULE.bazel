@@ -194,6 +194,7 @@ build_deps = use_extension("//:extensions.bzl", "build_deps")
 use_repo(
     build_deps,
     "bazel",
+    "io_grpc_grpc_proto",
     "opentelemetry",
     "skip_sleep",
     "tini",
