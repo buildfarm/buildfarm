@@ -43,6 +43,7 @@ import build.bazel.remote.execution.v2.CacheCapabilities;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
@@ -406,8 +407,15 @@ public abstract class NodeInstance implements Instance {
 
   @Override
   public Write getBlobWrite(
-      Compressor.Value compressor, Digest digest, UUID uuid, RequestMetadata requestMetadata)
+      Compressor.Value compressor,
+      Digest digest,
+      DigestFunction.Value digestFunction,
+      UUID uuid,
+      RequestMetadata requestMetadata)
       throws EntryLimitException {
+    Preconditions.checkState(
+        digestFunction == DigestFunction.Value.UNKNOWN
+            || digestFunction == digestUtil.getDigestFunction());
     return contentAddressableStorage.getWrite(compressor, digest, uuid, requestMetadata);
   }
 
@@ -673,7 +681,11 @@ public abstract class NodeInstance implements Instance {
                 throw new DigestMismatchException(actualDigest, expectedDigest);
               }
               return getBlobWrite(
-                      Compressor.Value.IDENTITY, actualDigest, UUID.randomUUID(), requestMetadata)
+                      Compressor.Value.IDENTITY,
+                      actualDigest,
+                      digestUtil.getDigestFunction(),
+                      UUID.randomUUID(),
+                      requestMetadata)
                   .getOutput(1, DAYS, () -> {});
             });
         return immediateFuture(actualDigestBuilder.build());

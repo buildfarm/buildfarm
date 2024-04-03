@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
@@ -153,7 +154,11 @@ public class ByteStreamServiceTest {
     when(write.getFuture()).thenReturn(writtenFuture);
 
     when(instance.getBlobWrite(
-            Compressor.Value.IDENTITY, digest, uuid, RequestMetadata.getDefaultInstance()))
+            Compressor.Value.IDENTITY,
+            digest,
+            DigestFunction.Value.UNKNOWN,
+            uuid,
+            RequestMetadata.getDefaultInstance()))
         .thenReturn(write);
 
     HashCode hash = HashCode.fromString(digest.getHash());
@@ -226,7 +231,11 @@ public class ByteStreamServiceTest {
     when(write.getFuture()).thenReturn(writtenFuture);
 
     when(instance.getBlobWrite(
-            Compressor.Value.IDENTITY, digest, uuid, RequestMetadata.getDefaultInstance()))
+            Compressor.Value.IDENTITY,
+            digest,
+            DigestFunction.Value.UNKNOWN,
+            uuid,
+            RequestMetadata.getDefaultInstance()))
         .thenReturn(write);
 
     HashCode hash = HashCode.fromString(digest.getHash());

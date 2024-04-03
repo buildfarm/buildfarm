@@ -18,6 +18,7 @@ import static java.util.concurrent.TimeUnit.DAYS;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.function.IOSupplier;
@@ -38,11 +39,14 @@ class LocalCasWriter implements CasWriter {
     this.execFileSystem = execFileSystem;
   }
 
-  public void write(Digest digest, Path file) throws IOException, InterruptedException {
+  @Override
+  public void write(Digest digest, DigestFunction.Value digestFunction, Path file)
+      throws IOException, InterruptedException {
     insertStream(digest, () -> Files.newInputStream(file));
   }
 
-  public void insertBlob(Digest digest, ByteString content)
+  @Override
+  public void insertBlob(Digest digest, DigestFunction.Value digestFunction, ByteString content)
       throws IOException, InterruptedException {
     insertStream(digest, content::newInput);
   }

@@ -107,7 +107,7 @@ public class NodeInstanceTest {
         ContentAddressableStorage contentAddressableStorage, ActionCache actionCache) {
       super(
           /* name= */ null,
-          /* digestUtil= */ null,
+          /* digestUtil= */ DIGEST_UTIL,
           contentAddressableStorage,
           actionCache,
           /* outstandingOperations= */ null,
