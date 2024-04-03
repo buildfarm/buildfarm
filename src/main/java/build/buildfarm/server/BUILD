@@ -16,7 +16,7 @@ java_library(
         "//src/main/java/build/buildfarm/metrics/prometheus",
         "//src/main/java/build/buildfarm/server/services",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@@grpc-java~1.62.2~grpc_java_repositories_extension~io_grpc_grpc_proto//:health_java_proto",
+        "@io_grpc_grpc_proto//:health_java_proto",
         "@maven//:com_github_pcj_google_options",
         "@maven//:com_google_api_grpc_proto_google_common_protos",
         "@maven//:com_google_guava_guava",
