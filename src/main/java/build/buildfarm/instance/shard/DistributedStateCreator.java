@@ -19,11 +19,14 @@ import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Queue;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
+import build.buildfarm.common.redis.QueueDecorator;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.RedisHashMap;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
+import build.buildfarm.common.redis.RedisPriorityQueue;
+import build.buildfarm.common.redis.RedisQueue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
@@ -90,7 +93,7 @@ public class DistributedStateCreator {
         getPreQueuedOperationsListName(),
         getQueueHashes(client, getPreQueuedOperationsListName()),
         configs.getBackplane().getMaxPreQueueDepth(),
-        getQueueType());
+        getQueueDecorator());
   }
 
   private static OperationQueue createOperationQueue(RedisClient client) throws IOException {
@@ -104,7 +107,7 @@ public class DistributedStateCreator {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               getQueueName(queueConfig),
-              getQueueType(),
+              getQueueDecorator(),
               getQueueHashes(client, getQueueName(queueConfig)),
               toMultimap(queueConfig.getPlatform().getPropertiesList()),
               queueConfig.isAllowUnmatched());
@@ -124,7 +127,7 @@ public class DistributedStateCreator {
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
               getQueuedOperationsListName(),
-              getQueueType(),
+              getQueueDecorator(),
               getQueueHashes(client, getQueuedOperationsListName()),
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
@@ -146,6 +149,12 @@ public class DistributedStateCreator {
       set.put(property.getName(), property.getValue());
     }
     return set;
+  }
+
+  private static QueueDecorator getQueueDecorator() {
+    return configs.getBackplane().isPriorityQueue()
+        ? RedisPriorityQueue::decorate
+        : RedisQueue::decorate;
   }
 
   private static Queue.QUEUE_TYPE getQueueType() {

@@ -20,7 +20,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.common.config.Queue;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -66,95 +65,95 @@ public class BalancedRedisQueueTest {
   @Test
   public void balancedRedisQueueCreateHashesConstructsWithoutError() throws Exception {
     // ACT
-    new BalancedRedisQueue("test", ImmutableList.of());
+    new BalancedRedisQueue("test", ImmutableList.of(), RedisQueue::decorate);
   }
 
-  // Function under test: push
+  // Function under test: offer
   // Reason for testing: the queue can have a value pushed onto it
-  // Failure explanation: the queue is throwing an exception upon push
+  // Failure explanation: the queue is throwing an exception upon offer
   @Test
   public void pushPushWithoutError() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
 
     // ACT
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
   }
 
-  // Function under test: push
+  // Function under test: offer
   // Reason for testing: the queue can have the different values pushed onto it
   // Failure explanation: the queue is throwing an exception upon pushing different values
   @Test
   public void pushPushDifferentWithoutError() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
 
     // ACT
-    queue.push(jedis, "foo");
-    queue.push(jedis, "bar");
+    queue.offer(jedis, "foo");
+    queue.offer(jedis, "bar");
   }
 
-  // Function under test: push
+  // Function under test: offer
   // Reason for testing: the queue can have the same values pushed onto it
   // Failure explanation: the queue is throwing an exception upon pushing the same values
   @Test
   public void pushPushSameWithoutError() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
 
     // ACT
-    queue.push(jedis, "foo");
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
+    queue.offer(jedis, "foo");
   }
 
-  // Function under test: push
+  // Function under test: offer
   // Reason for testing: the queue can have many values pushed into it
   // Failure explanation: the queue is throwing an exception upon pushing many values
   @Test
   public void pushPushMany() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
 
     // ACT
     for (int i = 0; i < 1000; ++i) {
-      queue.push(jedis, "foo" + i);
+      queue.offer(jedis, "foo" + i);
     }
   }
 
-  // Function under test: push
+  // Function under test: offer
   // Reason for testing: the queue size increases as elements are pushed
   // Failure explanation: the queue size is not accurately reflecting the pushes
   @Test
   public void pushPushIncreasesSize() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
 
     // ACT / ASSERT
     assertThat(queue.size(jedis)).isEqualTo(0);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.size(jedis)).isEqualTo(1);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.size(jedis)).isEqualTo(2);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.size(jedis)).isEqualTo(3);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.size(jedis)).isEqualTo(4);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.size(jedis)).isEqualTo(5);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.size(jedis)).isEqualTo(6);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.size(jedis)).isEqualTo(7);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.size(jedis)).isEqualTo(8);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.size(jedis)).isEqualTo(9);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.size(jedis)).isEqualTo(10);
   }
 
@@ -167,7 +166,7 @@ public class BalancedRedisQueueTest {
   public void removeFromDequeueFalseOnEmpty() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
 
     // ACT
     Boolean success = queue.removeFromDequeue(jedis, "foo");
@@ -185,14 +184,14 @@ public class BalancedRedisQueueTest {
   public void removeFromDequeueFalseWhenValueIsMissing() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT
-    queue.push(jedis, "foo");
-    queue.push(jedis, "bar");
-    queue.dequeue(jedis, service);
-    queue.dequeue(jedis, service);
+    queue.offer(jedis, "foo");
+    queue.offer(jedis, "bar");
+    queue.take(jedis, service);
+    queue.take(jedis, service);
     service.shutdown();
     Boolean success = queue.removeFromDequeue(jedis, "baz");
 
@@ -209,16 +208,16 @@ public class BalancedRedisQueueTest {
   public void removeFromDequeueTrueWhenValueExists() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT
-    queue.push(jedis, "foo");
-    queue.push(jedis, "bar");
-    queue.push(jedis, "baz");
-    queue.dequeue(jedis, service);
-    queue.dequeue(jedis, service);
-    queue.dequeue(jedis, service);
+    queue.offer(jedis, "foo");
+    queue.offer(jedis, "bar");
+    queue.offer(jedis, "baz");
+    queue.take(jedis, service);
+    queue.take(jedis, service);
+    queue.take(jedis, service);
     service.shutdown();
     Boolean success = queue.removeFromDequeue(jedis, "bar");
 
@@ -234,7 +233,7 @@ public class BalancedRedisQueueTest {
   public void getNameNameIsStored() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", hashtags, RedisQueue::decorate);
 
     // ACT
     String name = queue.getName();
@@ -250,7 +249,8 @@ public class BalancedRedisQueueTest {
   public void getNameNameHasHashtagRemovedFront() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("{hash}queue_name", hashtags);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("{hash}queue_name", hashtags, RedisQueue::decorate);
     // ACT
     String name = queue.getName();
 
@@ -266,7 +266,7 @@ public class BalancedRedisQueueTest {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
     BalancedRedisQueue queue =
-        new BalancedRedisQueue("{hash}queue_name", hashtags, Queue.QUEUE_TYPE.priority);
+        new BalancedRedisQueue("{hash}queue_name", hashtags, RedisPriorityQueue::decorate);
     // ACT
     String name = queue.getName();
 
@@ -282,7 +282,8 @@ public class BalancedRedisQueueTest {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
     // similar to what has been seen in configuration files
-    BalancedRedisQueue queue = new BalancedRedisQueue("{Execution}:QueuedOperations", hashtags);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("{Execution}:QueuedOperations", hashtags, RedisQueue::decorate);
     // ACT
     String name = queue.getName();
 
@@ -299,7 +300,8 @@ public class BalancedRedisQueueTest {
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
     // similar to what has been seen in configuration files
     BalancedRedisQueue queue =
-        new BalancedRedisQueue("{Execution}:QueuedOperations", hashtags, Queue.QUEUE_TYPE.priority);
+        new BalancedRedisQueue(
+            "{Execution}:QueuedOperations", hashtags, RedisPriorityQueue::decorate);
     // ACT
     String name = queue.getName();
 
@@ -314,7 +316,8 @@ public class BalancedRedisQueueTest {
   public void getNameNameHasHashtagRemovedBack() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name{hash}", hashtags);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("queue_name{hash}", hashtags, RedisQueue::decorate);
     // ACT
     String name = queue.getName();
 
@@ -329,7 +332,8 @@ public class BalancedRedisQueueTest {
   public void getNameNameHasHashtagRemovedMiddle() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("queue_{hash}name", hashtags);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("queue_{hash}name", hashtags, RedisQueue::decorate);
     // ACT
     String name = queue.getName();
 
@@ -344,7 +348,8 @@ public class BalancedRedisQueueTest {
   public void getNameNameHasHashtagRemovedFrontBack() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("{hash}queue_name{hash}", hashtags);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("{hash}queue_name{hash}", hashtags, RedisQueue::decorate);
     // ACT
     String name = queue.getName();
 
@@ -353,80 +358,81 @@ public class BalancedRedisQueueTest {
   }
 
   // Function under test: size
-  // Reason for testing: size adjusts with push and dequeue
+  // Reason for testing: size adjusts with offer and take
   // Failure explanation: size is incorrectly reporting the expected queue size
   @Test
   public void sizeAdjustPushPop() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT / ASSERT
     assertThat(queue.size(jedis)).isEqualTo(0);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.size(jedis)).isEqualTo(1);
-    queue.push(jedis, "bar");
+    queue.offer(jedis, "bar");
     assertThat(queue.size(jedis)).isEqualTo(2);
-    queue.push(jedis, "baz");
+    queue.offer(jedis, "baz");
     assertThat(queue.size(jedis)).isEqualTo(3);
-    queue.push(jedis, "baz");
+    queue.offer(jedis, "baz");
     assertThat(queue.size(jedis)).isEqualTo(4);
-    queue.push(jedis, "baz");
+    queue.offer(jedis, "baz");
     assertThat(queue.size(jedis)).isEqualTo(5);
-    queue.push(jedis, "baz");
+    queue.offer(jedis, "baz");
     assertThat(queue.size(jedis)).isEqualTo(6);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(5);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(4);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(3);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(2);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(1);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(0);
     service.shutdown();
     assertThat(service.awaitTermination(0, SECONDS)).isTrue();
   }
 
   // Function under test: size
-  // Reason for testing: size adjusts with push and dequeue
+  // Reason for testing: size adjusts with offer and take
   // Failure explanation: size is incorrectly reporting the expected queue size
   @Test
   public void sizeAdjustPushPopPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, RedisPriorityQueue::decorate);
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT / ASSERT
     assertThat(queue.size(jedis)).isEqualTo(0);
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo1");
     assertThat(queue.size(jedis)).isEqualTo(1);
-    queue.push(jedis, "bar");
+    queue.offer(jedis, "foo2");
     assertThat(queue.size(jedis)).isEqualTo(2);
-    queue.push(jedis, "baz");
+    queue.offer(jedis, "foo3");
     assertThat(queue.size(jedis)).isEqualTo(3);
-    queue.push(jedis, "baz");
+    queue.offer(jedis, "foo4");
     assertThat(queue.size(jedis)).isEqualTo(4);
-    queue.push(jedis, "baz");
+    queue.offer(jedis, "foo5");
     assertThat(queue.size(jedis)).isEqualTo(5);
-    queue.push(jedis, "baz");
+    queue.offer(jedis, "foo6");
     assertThat(queue.size(jedis)).isEqualTo(6);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(5);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(4);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(3);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(2);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(1);
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.size(jedis)).isEqualTo(0);
     service.shutdown();
     assertThat(service.awaitTermination(0, SECONDS)).isTrue();
@@ -439,15 +445,15 @@ public class BalancedRedisQueueTest {
   public void visitCheckVisitOfEachElement() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
-    queue.push(jedis, "element 1");
-    queue.push(jedis, "element 2");
-    queue.push(jedis, "element 3");
-    queue.push(jedis, "element 4");
-    queue.push(jedis, "element 5");
-    queue.push(jedis, "element 6");
-    queue.push(jedis, "element 7");
-    queue.push(jedis, "element 8");
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
+    queue.offer(jedis, "element 1");
+    queue.offer(jedis, "element 2");
+    queue.offer(jedis, "element 3");
+    queue.offer(jedis, "element 4");
+    queue.offer(jedis, "element 5");
+    queue.offer(jedis, "element 6");
+    queue.offer(jedis, "element 7");
+    queue.offer(jedis, "element 8");
 
     // ACT
     List<String> visited = new ArrayList<>();
@@ -478,15 +484,16 @@ public class BalancedRedisQueueTest {
   public void visitCheckVisitOfEachElementPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
-    queue.push(jedis, "element 1");
-    queue.push(jedis, "element 2");
-    queue.push(jedis, "element 3");
-    queue.push(jedis, "element 4");
-    queue.push(jedis, "element 5");
-    queue.push(jedis, "element 6");
-    queue.push(jedis, "element 7");
-    queue.push(jedis, "element 8");
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, RedisPriorityQueue::decorate);
+    queue.offer(jedis, "element 1");
+    queue.offer(jedis, "element 2");
+    queue.offer(jedis, "element 3");
+    queue.offer(jedis, "element 4");
+    queue.offer(jedis, "element 5");
+    queue.offer(jedis, "element 6");
+    queue.offer(jedis, "element 7");
+    queue.offer(jedis, "element 8");
 
     // ACT
     List<String> visited = new ArrayList<>();
@@ -517,7 +524,7 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedEmptyIsEvenlyDistributed() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
 
     // ACT
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(jedis);
@@ -533,7 +540,8 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedEmptyIsEvenlyDistributedPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(jedis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, RedisPriorityQueue::decorate);
 
     // ACT
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(jedis);
@@ -550,11 +558,11 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedFourNodesFourHundredPushesIsEven() throws Exception {
     // ARRANGE
     List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
 
     // ACT
     for (int i = 0; i < 400; ++i) {
-      queue.push(jedis, "foo");
+      queue.offer(jedis, "foo");
     }
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(jedis);
 
@@ -570,11 +578,12 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedFourNodesFourHundredPushesIsEvenPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, RedisPriorityQueue::decorate);
 
     // ACT
     for (int i = 0; i < 400; ++i) {
-      queue.push(jedis, "foo");
+      queue.offer(jedis, "foo");
     }
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(jedis);
 
@@ -590,11 +599,11 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedFourNodesFourHundredOnePushesIsNotEven() throws Exception {
     // ARRANGE
     List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
 
     // ACT
     for (int i = 0; i < 401; ++i) {
-      queue.push(jedis, "foo");
+      queue.offer(jedis, "foo" + i);
     }
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(jedis);
 
@@ -610,11 +619,12 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedFourNodesFourHundredOnePushesIsNotEvenPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, RedisPriorityQueue::decorate);
 
     // ACT
     for (int i = 0; i < 401; ++i) {
-      queue.push(jedis, "foo");
+      queue.offer(jedis, "foo" + i);
     }
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(jedis);
 
@@ -630,25 +640,25 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedSingleNodeAlwaysEvenlyDistributes() throws Exception {
     // ARRANGE
     List<String> hashtags = Collections.singletonList("single_node");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT / ASSERT
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
     service.shutdown();
     assertThat(service.awaitTermination(0, SECONDS)).isTrue();
@@ -662,25 +672,26 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedSingleNodeAlwaysEvenlyDistributesPriority() throws Exception {
     // ARRANGE
     List<String> hashtags = Collections.singletonList("single_node");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, RedisPriorityQueue::decorate);
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT / ASSERT
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "bar");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "baz");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "quux");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
     service.shutdown();
     assertThat(service.awaitTermination(0, SECONDS)).isTrue();
@@ -693,38 +704,38 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedTwoNodeExample() throws Exception {
     // ARRANGE
     List<String> hashtags = Arrays.asList("node_1", "node_2");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT / ASSERT
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo1");
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo2");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo3");
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo4");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo5");
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo6");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo7");
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
     service.shutdown();
     assertThat(service.awaitTermination(0, SECONDS)).isTrue();
@@ -737,38 +748,39 @@ public class BalancedRedisQueueTest {
   public void isEvenlyDistributedTwoNodeExamplePriority() throws Exception {
     // ARRANGE
     List<String> hashtags = Arrays.asList("node_1", "node_2");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, Queue.QUEUE_TYPE.priority);
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", hashtags, RedisPriorityQueue::decorate);
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT / ASSERT
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo");
+    queue.offer(jedis, "foo");
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.push(jedis, "foo1");
+    queue.offer(jedis, "foo1");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo2");
+    queue.offer(jedis, "foo2");
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.push(jedis, "foo3");
+    queue.offer(jedis, "foo3");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo4");
+    queue.offer(jedis, "foo4");
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.push(jedis, "foo5");
+    queue.offer(jedis, "foo5");
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.push(jedis, "foo6");
+    queue.offer(jedis, "foo6");
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isFalse();
-    queue.dequeue(jedis, service);
+    queue.take(jedis, service);
     assertThat(queue.isEvenlyDistributed(jedis)).isTrue();
     service.shutdown();
     assertThat(service.awaitTermination(0, SECONDS)).isTrue();
