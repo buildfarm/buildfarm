@@ -1501,14 +1501,16 @@ public class RedisShardBackplane implements Backplane {
   public BackplaneStatus backplaneStatus() throws IOException {
     Set<String> executeWorkers = getExecuteWorkers();
     Set<String> storageWorkers = getStorageWorkers();
+    OperationQueueStatus operationQueueStatus =
+        client.call(jedis -> state.operationQueue.status(jedis));
+    QueueStatus prequeueStatus = client.call(jedis -> state.prequeue.status(jedis));
     return BackplaneStatus.newBuilder()
         .addAllActiveExecuteWorkers(executeWorkers)
         .addAllActiveStorageWorkers(storageWorkers)
         .addAllActiveWorkers(Sets.union(executeWorkers, storageWorkers))
         .setDispatchedSize(client.call(jedis -> state.dispatchedOperations.size(jedis)))
-        .setOperationQueue(
-            (OperationQueueStatus) client.call(jedis -> state.operationQueue.status(jedis)))
-        .setPrequeue((QueueStatus) client.call(jedis -> state.prequeue.status(jedis)))
+        .setOperationQueue(operationQueueStatus)
+        .setPrequeue(prequeueStatus)
         .build();
   }
 
