@@ -74,19 +74,19 @@ Counter for the number of actions processed
 
 **operations_stage_load**
 
-Gauge for the number of operations in each stage (using a stage_name for each individual stage)
+Counter for the number of operations in each stage (using a `stage_name` for each individual stage)
 
 **operation_status**
 
-Gauge for the completed operations status (using a status_code label for each individual GRPC code)
+Counter for the completed operations status (using a `status_code` label for each individual GRPC code)
 
 **operation_exit_code**
 
-Gauge for the completed operations exit code (using a exit_code label for each individual execution exit code)
+Counter for the completed operations exit code (using an `exit_code` label for each individual execution exit code)
 
 **operation_worker**
 
-Gauge for the number of operations executed on each worker (using a worker_name label for each individual worker)
+Counter for the number of operations executed on each worker (using a `worker_name` label for each individual worker)
 
 **action_results**
 
