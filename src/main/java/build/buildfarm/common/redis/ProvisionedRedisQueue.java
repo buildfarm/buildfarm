@@ -42,6 +42,8 @@ import java.util.Set;
  *     queues.
  */
 public class ProvisionedRedisQueue {
+  public static final int UNLIMITED_QUEUE_DEPTH = -1;
+
   /**
    * @field WILDCARD_VALUE
    * @brief Wildcard value.
@@ -90,7 +92,7 @@ public class ProvisionedRedisQueue {
    */
   public ProvisionedRedisQueue(
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
-    this(name, RedisQueue::decorate, hashtags, filterProvisions, false);
+    this(name, hashtags, filterProvisions, false);
   }
 
   /**
@@ -108,7 +110,13 @@ public class ProvisionedRedisQueue {
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions,
       boolean allowUserUnmatched) {
-    this(name, RedisQueue::decorate, hashtags, filterProvisions, allowUserUnmatched);
+    this(
+        name,
+        RedisQueue::decorate,
+        hashtags,
+        UNLIMITED_QUEUE_DEPTH,
+        filterProvisions,
+        allowUserUnmatched);
   }
 
   /**
@@ -125,7 +133,25 @@ public class ProvisionedRedisQueue {
       QueueDecorator queueDecorator,
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions) {
-    this(name, queueDecorator, hashtags, filterProvisions, false);
+    this(name, queueDecorator, hashtags, UNLIMITED_QUEUE_DEPTH, filterProvisions, false);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct the provision queue.
+   * @param name The global name of the queue.
+   * @param type The type of the redis queue (regular or priority).
+   * @param hashtags Hashtags to distribute queue data.
+   * @param filterProvisions The filtered provisions of the queue.
+   * @note Overloaded.
+   */
+  public ProvisionedRedisQueue(
+      String name,
+      QueueDecorator queueDecorator,
+      List<String> hashtags,
+      int maxNodeQueueSize,
+      SetMultimap<String, String> filterProvisions) {
+    this(name, queueDecorator, hashtags, maxNodeQueueSize, filterProvisions, false);
   }
 
   /**
@@ -143,9 +169,10 @@ public class ProvisionedRedisQueue {
       String name,
       QueueDecorator queueDecorator,
       List<String> hashtags,
+      int maxNodeQueueSize,
       SetMultimap<String, String> filterProvisions,
       boolean allowUserUnmatched) {
-    this.queue = new BalancedRedisQueue(name, hashtags, queueDecorator);
+    this.queue = new BalancedRedisQueue(name, hashtags, maxNodeQueueSize, queueDecorator);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
     provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard);
     this.allowUserUnmatched = allowUserUnmatched;

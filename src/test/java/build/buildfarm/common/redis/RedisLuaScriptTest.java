@@ -15,11 +15,13 @@
 package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.never;
+
 import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
@@ -33,7 +35,6 @@ import redis.clients.jedis.exceptions.JedisNoScriptException;
 /**
  * @class RedisLuaScriptTest
  * @brief exercises the RedisLuaScript class
- * @details DBG_AVA
  */
 @RunWith(JUnit4.class)
 public class RedisLuaScriptTest {
@@ -47,54 +48,43 @@ public class RedisLuaScriptTest {
     MockitoAnnotations.initMocks(this);
   }
 
-  // DBG_AAV fixme
-  // Function under test: removeFromDequeue
-  // Reason for testing: removing returns false because the queue is empty and there is nothing to
-  // remove
-  // Failure explanation: the queue was either not empty, or an error occured while removing from an
-  // empty queue
   @Test
   public void canConstruct() throws Exception {
-    // ARRANGE
-
-    // ACT
     RedisLuaScript luaScript = new RedisLuaScript(script);
 
-    // ASSERT
     assertThat(luaScript.getScript()).contains(script);
     assertThat(luaScript.getDigest()).contains(scriptSHA1);
   }
 
+  @Test
+  public void canEvalWithKnownScript() throws Exception {
+    List<String> keys = List.of("key0", "key1");
+    List<String> args = List.of("arg0", "arg1");
+    RedisLuaScript luaScript = new RedisLuaScript(script);
+    Object obj = new Object();
+    when(redis.evalsha(anyString(), anyList(), anyList())).thenReturn(obj);
 
- @Test
- public void canEvalWithKnownScript() throws Exception {
-   // ARRANGE
-   List<String> keys = List.of("key0", "key1");
-   List<String> args = List.of("arg0", "arg1");
-   RedisLuaScript luaScript = new RedisLuaScript(script);
+    Object retObj = luaScript.eval(redis, keys, args);
 
-   // ACT
-   Object obj = luaScript.eval(redis, keys, args);
+    verify(redis).evalsha(luaScript.getDigest(), keys, args);
+    verify(redis, never()).eval(anyString(), anyList(), anyList());
+    assertEquals(obj, retObj);
+  }
 
-   // ASSERT
-   verify(redis).evalsha(luaScript.getDigest(), keys, args);
-   verify(redis, never()).eval(anyString(), anyList(), anyList());
- }
+  @Test
+  public void canEvalWithUnknownScript() throws Exception {
+    when(redis.evalsha(anyString(), anyList(), anyList()))
+        .thenThrow(new JedisNoScriptException(""));
+    Object obj = new Object();
+    when(redis.eval(anyString(), anyList(), anyList())).thenReturn(obj);
+    List<String> keys = List.of("key0", "key1");
+    List<String> args = List.of("arg0", "arg1");
+    RedisLuaScript luaScript = new RedisLuaScript(script);
 
- @Test
- public void canEvalWithUnknownScript() throws Exception {
-   // ARRANGE
-   when(redis.evalsha(anyString(), anyList(), anyList())).thenThrow(new JedisNoScriptException(""));
-   List<String> keys = List.of("key0", "key1");
-   List<String> args = List.of("arg0", "arg1");
-   RedisLuaScript luaScript = new RedisLuaScript(script);
+    Object retObj = luaScript.eval(redis, keys, args);
 
-   // ACT
-   Object obj = luaScript.eval(redis, keys, args);
-
-   // ASSERT
-   verify(redis).evalsha(luaScript.getDigest(), keys, args);
-   verify(redis).eval(script, keys, args);
- }
-
+    verify(redis).evalsha(luaScript.getDigest(), keys, args);
+    verify(redis).eval(script, keys, args);
+    assertEquals(obj, retObj);
+  }
 }

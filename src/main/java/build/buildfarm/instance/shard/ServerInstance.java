@@ -476,11 +476,9 @@ public class ServerInstance extends NodeInstance {
                   // 5. Reset the watcher for the Execution entry.
                   // 6. Shut down the poller.
 
-                  ensureCanQueue(stopwatch); // wait for transition to canQueue state
-                  long canQueueUSecs = stopwatch.elapsed(MICROSECONDS);
                   stopwatch.stop();
-
                   ListenableFuture<ExecuteEntry> deprequeue = backplane.deprequeueOperation();
+
                   stopwatch.start();
                   ListenableFuture<PolledExecuteEntry> launchPoller =
                       Futures.transform(
@@ -515,66 +513,60 @@ public class ServerInstance extends NodeInstance {
                           },
                           directExecutor());
 
-                  ListenableFuture<Void> queueLauncher =
-                      Futures.transformAsync(
-                          launchPoller,
-                          polledExecuteEntry -> {
-                            ExecuteEntry executeEntry = polledExecuteEntry.executeEntry;
-                            Poller poller = polledExecuteEntry.poller;
-                            String operationName = executeEntry.getOperationName();
-                            try {
-                              log.log(Level.FINER, "queueing " + operationName);
-                              ListenableFuture<Void> queueFuture =
-                                  queue(executeEntry, poller, queueTimeout);
-                              addCallback(
-                                  queueFuture,
-                                  new FutureCallback<Void>() {
-                                    @Override
-                                    public void onSuccess(Void result) {
-                                      log.log(Level.FINER, "successfully queued " + operationName);
-                                      // nothing
-                                    }
+                  // queue launcher
+                  return Futures.transformAsync(
+                      launchPoller,
+                      polledExecuteEntry -> {
+                        ExecuteEntry executeEntry = polledExecuteEntry.executeEntry;
+                        Poller poller = polledExecuteEntry.poller;
+                        String operationName = executeEntry.getOperationName();
+                        try {
+                          log.log(Level.FINER, "queueing " + operationName);
+                          ListenableFuture<Void> queueFuture =
+                              queue(executeEntry, poller, queueTimeout);
+                          addCallback(
+                              queueFuture,
+                              new FutureCallback<Void>() {
+                                @Override
+                                public void onSuccess(Void result) {
+                                  log.log(Level.FINER, "successfully queued " + operationName);
+                                  // nothing
+                                }
 
-                                    @Override
-                                    public void onFailure(Throwable t) {
-                                      queueFailureCounter.inc();
-                                      log.log(Level.SEVERE, "error queueing " + operationName, t);
-                                    }
-                                  },
-                                  directExecutor());
-                              long operationTransformDispatchUSecs =
-                                  stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
-                              log.log(
-                                  Level.FINER,
-                                  format(
-                                      "OperationQueuer: Dispatched To Transform %s: %dus in canQueue, %dus in"
-                                          + " transform dispatch",
-                                      operationName,
-                                      canQueueUSecs,
-                                      operationTransformDispatchUSecs));
-                              return queueFuture;
-                            } catch (Throwable t) {
-                              poller.pause();
-                              queueFailureCounter.inc();
-                              log.log(Level.SEVERE, "error queueing " + operationName, t);
-                              return null;
-                            }
-                          },
-                          directExecutor());
-                  return queueLauncher;
+                                @Override
+                                public void onFailure(Throwable t) {
+                                  queueFailureCounter.inc();
+                                  log.log(Level.SEVERE, "error queueing " + operationName, t);
+                                }
+                              },
+                              directExecutor());
+                          long operationTransformDispatchUSecs = stopwatch.elapsed(MICROSECONDS);
+                          log.log(
+                              Level.FINER,
+                              format(
+                                  "OperationQueuer: Dispatched To Transform %s: %dus in transform"
+                                      + " dispatch",
+                                  operationName, operationTransformDispatchUSecs));
+                          return queueFuture;
+                        } catch (Throwable t) {
+                          poller.pause();
+                          queueFailureCounter.inc();
+                          log.log(Level.SEVERE, "error queueing " + operationName, t);
+                          return null;
+                        }
+                      },
+                      directExecutor());
                 }
 
                 @Override
                 public void run() {
                   log.log(Level.FINER, "OperationQueuer: Running");
-                  long prevNumQueueing = 0;
-                  long prevNumFinished = 0;
                   try {
                     while (!stopping || !stopped) {
                       int permitsAvailable = iteratesAvailable.availablePermits();
                       int requestedPermits = (permitsAvailable != 0) ? permitsAvailable : 1;
-                      prevNumQueueing = Integer.toUnsignedLong(numQueueing.get());
-                      prevNumFinished = Integer.toUnsignedLong(numFinished.get());
+                      long prevNumQueueing = Integer.toUnsignedLong(numQueueing.get());
+                      long prevNumFinished = Integer.toUnsignedLong(numFinished.get());
                       if (!iteratesAvailable.tryAcquire(requestedPermits, 5, MINUTES)) {
                         long currNumFinished = Integer.toUnsignedLong(numFinished.get());
                         if ((prevNumQueueing != prevNumFinished)
@@ -657,15 +649,6 @@ public class ServerInstance extends NodeInstance {
             .set(queueStatus.getSize());
       }
     }
-  }
-
-  private void ensureCanQueue(Stopwatch stopwatch) throws IOException, InterruptedException {
-    return; // DBG_AAV
-    // while (!backplane.canQueue()) {
-    //   stopwatch.stop();
-    //   TimeUnit.MILLISECONDS.sleep(100);
-    //   stopwatch.start();
-    // }
   }
 
   @Override
@@ -1756,7 +1739,6 @@ public class ServerInstance extends NodeInstance {
     QueueEntry entry =
         QueueEntry.newBuilder()
             .setExecuteEntry(executeEntry)
-            .setQueuedOperationDigest(queuedOperationDigest)
             .setPlatform(queuedOperation.getCommand().getPlatform())
             .build();
     return transform(
@@ -1924,7 +1906,7 @@ public class ServerInstance extends NodeInstance {
     RequestMetadata requestMetadata = executeEntry.getRequestMetadata();
     ListenableFuture<QueuedOperation> fetchQueuedOperationFuture =
         expect(
-            queueEntry.getQueuedOperationDigest(),
+            queueEntry.getExecuteEntry().getQueuedOperationDigest(),
             QueuedOperation.parser(),
             operationTransformService,
             requestMetadata);
@@ -1964,7 +1946,8 @@ public class ServerInstance extends NodeInstance {
                                   .setExecuteOperationMetadata(
                                       executeOperationMetadata(
                                           executeEntry, ExecutionStage.Value.QUEUED))
-                                  .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
+                                  .setQueuedOperationDigest(
+                                      queueEntry.getExecuteEntry().getQueuedOperationDigest())
                                   .setRequestMetadata(requestMetadata)
                                   .build();
                           return new QueuedOperationResult(queueEntry, metadata);
@@ -2184,11 +2167,6 @@ public class ServerInstance extends NodeInstance {
       RequestMetadata requestMetadata,
       Watcher watcher) {
     try {
-      if (!backplane.canPrequeue()) {
-        return immediateFailedFuture(
-            Status.RESOURCE_EXHAUSTED.withDescription("Too many jobs pending").asException());
-      }
-
       String operationName = createOperationName(UUID.randomUUID().toString());
 
       executionSuccess.inc();
@@ -2241,14 +2219,16 @@ public class ServerInstance extends NodeInstance {
 
       if (inDenyList(requestMetadata)) {
         watcher.observe(
-            operation
-                .toBuilder()
+            operation.toBuilder()
                 .setDone(true)
                 .setResponse(Any.pack(denyActionResponse(actionDigest, BLOCK_LIST_ERROR)))
                 .build());
         return immediateFuture(null);
       }
-      backplane.prequeue(executeEntry, operation);
+      if (!backplane.prequeue(executeEntry, operation)) {
+        return immediateFailedFuture(
+            Status.RESOURCE_EXHAUSTED.withDescription("Too many jobs pending").asException());
+      }
       return watchOperation(
           operation,
           newActionResultWatcher(DigestUtil.asActionKey(actionDigest), watcher),
@@ -2325,8 +2305,7 @@ public class ServerInstance extends NodeInstance {
             .build();
 
     Operation completedOperation =
-        operation
-            .toBuilder()
+        operation.toBuilder()
             .setDone(true)
             .setResponse(
                 Any.pack(
@@ -2591,18 +2570,20 @@ public class ServerInstance extends NodeInstance {
                 profiledQueuedMetadata.getQueuedOperationMetadata();
             Operation queueOperation =
                 operation.toBuilder().setMetadata(Any.pack(queuedOperationMetadata)).build();
+            ExecuteEntry executeEntryWOpDigest =
+                executeEntry.toBuilder()
+                    .setQueuedOperationDigest(queuedOperationMetadata.getQueuedOperationDigest())
+                    .build();
             QueueEntry queueEntry =
                 QueueEntry.newBuilder()
-                    .setExecuteEntry(executeEntry)
-                    .setQueuedOperationDigest(queuedOperationMetadata.getQueuedOperationDigest())
+                    .setExecuteEntry(executeEntryWOpDigest)
                     .setPlatform(
                         profiledQueuedMetadata.getQueuedOperation().getCommand().getPlatform())
                     .build();
             try {
-              ensureCanQueue(stopwatch);
-              long startQueueUSecs = stopwatch.elapsed(MICROSECONDS);
               poller.pause();
-              backplane.queue(queueEntry, queueOperation);
+              long startQueueUSecs = stopwatch.elapsed(MICROSECONDS);
+              boolean queued = backplane.queue(queueEntry, queueOperation);
               long elapsedUSecs = stopwatch.elapsed(MICROSECONDS);
               long queueUSecs = elapsedUSecs - startQueueUSecs;
               log.log(
@@ -2619,10 +2600,11 @@ public class ServerInstance extends NodeInstance {
                       queueUSecs,
                       elapsedUSecs));
               queueFuture.set(null);
+              if (!queued) {
+                backplane.prequeue(executeEntryWOpDigest, operation);
+              }
             } catch (IOException e) {
               onFailure(e.getCause() == null ? e : e.getCause());
-            } catch (InterruptedException e) {
-              // ignore
             }
           }
 
@@ -2754,8 +2736,7 @@ public class ServerInstance extends NodeInstance {
   private static Operation stripQueuedOperation(Operation operation) {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       operation =
-          operation
-              .toBuilder()
+          operation.toBuilder()
               .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
               .build();
     }
@@ -2938,8 +2919,7 @@ public class ServerInstance extends NodeInstance {
         configs.isAllowSymlinkTargetAbsolute()
             ? SymlinkAbsolutePathStrategy.Value.ALLOWED
             : SymlinkAbsolutePathStrategy.Value.DISALLOWED;
-    return super.getCacheCapabilities()
-        .toBuilder()
+    return super.getCacheCapabilities().toBuilder()
         .setSymlinkAbsolutePathStrategy(symlinkAbsolutePathStrategy)
         .build();
   }

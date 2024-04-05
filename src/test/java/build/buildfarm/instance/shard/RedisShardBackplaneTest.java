@@ -125,6 +125,7 @@ public class RedisShardBackplaneTest {
     DistributedState state = new DistributedState();
     state.operations = mock(Operations.class);
     state.prequeue = mock(BalancedRedisQueue.class);
+    when(state.prequeue.offer(eq(jedis), any(String.class), any(double.class))).thenReturn(true);
     RedisShardBackplane backplane = createBackplane("prequeue-operation-test");
     backplane.start(client, state, "startTime/test:0000");
 
@@ -133,6 +134,7 @@ public class RedisShardBackplaneTest {
     Operation op = Operation.newBuilder().setName(opName).build();
     backplane.prequeue(executeEntry, op);
 
+    verify(state.prequeue, times(1)).offer(eq(jedis), any(String.class), any(double.class));
     verify(state.operations, times(1))
         .insert(
             eq(jedis),
@@ -168,6 +170,9 @@ public class RedisShardBackplaneTest {
     DistributedState state = new DistributedState();
     state.dispatchedOperations = mock(RedisHashMap.class);
     state.operationQueue = mock(OperationQueue.class);
+    when(state.operationQueue.push(
+            any(UnifiedJedis.class), any(List.class), any(String.class), any(int.class)))
+        .thenReturn(true);
     RedisShardBackplane backplane = createBackplane("requeue-operation-test");
     backplane.start(client, state, "startTime/test:0000");
 
@@ -181,7 +186,7 @@ public class RedisShardBackplaneTest {
     verify(state.dispatchedOperations, times(1)).remove(jedis, opName);
     verifyNoMoreInteractions(state.dispatchedOperations);
     verify(state.operationQueue, times(1))
-        .push(
+        .unboundedPush(
             jedis,
             queueEntry.getPlatform().getPropertiesList(),
             JsonFormat.printer().print(queueEntry),

@@ -75,7 +75,6 @@ backplane:
   operationChannelPrefix: "OperationChannel"
   casPrefix: "ContentAddressableStorage"
   casExpire: 604800 # 1 week
-  maxQueueDepth: 100000
   maxPreQueueDepth: 1000000
   priorityQueue: false
   priorityPollIntervalMillis: 100
@@ -85,6 +84,7 @@ backplane:
   cacheCas: false
   queues:
     - name: "cpu"
+      maxDepth: -1 # Unlimited
       allowUnmatched: true
       properties:
         - name: "min-cores"

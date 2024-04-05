@@ -49,7 +49,6 @@ public class Backplane {
   @Getter(AccessLevel.NONE)
   private boolean runFailsafeOperation = true; // deprecated
 
-  private int maxQueueDepth = 100000;
   private int maxPreQueueDepth = 1000000;
   private boolean priorityQueue = false;
   private Queue[] queues = {};

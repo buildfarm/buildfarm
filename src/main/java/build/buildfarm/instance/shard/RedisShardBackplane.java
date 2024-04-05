@@ -1019,37 +1019,33 @@ public class RedisShardBackplane implements Backplane {
     return true;
   }
 
-  private void queue(
-      UnifiedJedis jedis,
-      String operationName,
-      List<Platform.Property> provisions,
-      String queueEntryJson,
-      int priority) {
+  private boolean queue(UnifiedJedis jedis, QueueEntry queueEntry, Operation operation)
+      throws IOException {
+    String operationName = operation.getName();
     if (state.dispatchedOperations.remove(jedis, operationName)) {
       log.log(Level.WARNING, format("removed dispatched operation %s", operationName));
     }
-    state.operationQueue.push(jedis, provisions, queueEntryJson, priority);
+    String queueEntryJson = JsonFormat.printer().print(queueEntry);
+    List<Platform.Property> provisions = queueEntry.getPlatform().getPropertiesList();
+    int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
+    return state.operationQueue.push(jedis, provisions, queueEntryJson, priority);
   }
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public void queue(QueueEntry queueEntry, Operation operation) throws IOException {
+  public boolean queue(QueueEntry queueEntry, Operation operation) throws IOException {
     String invocationId = extractInvocationId(operation);
     String operationName = operation.getName();
     String operationJson = operationPrinter.print(operation);
-    String queueEntryJson = JsonFormat.printer().print(queueEntry);
     Operation publishOperation = onPublish.apply(operation);
-    int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
-    client.run(
+    return client.call(
         jedis -> {
           state.operations.insert(jedis, invocationId, operationName, operationJson);
-          queue(
-              jedis,
-              operation.getName(),
-              queueEntry.getPlatform().getPropertiesList(),
-              queueEntryJson,
-              priority);
-          publishReset(jedis, publishOperation);
+          if (queue(jedis, queueEntry, operation)) {
+            publishReset(jedis, publishOperation);
+            return true;
+          }
+          return false;
         });
   }
 
@@ -1060,6 +1056,18 @@ public class RedisShardBackplane implements Backplane {
         client.call(
             jedis -> state.operations.findByInvocationId(jedis, invocationId, cursor, count));
     return new ScanResult<>(tokenFromRedisCursor(scanResult.getCursor()), scanResult.getResult());
+  }
+
+  public void unboundedQueue(UnifiedJedis jedis, QueueEntry queueEntry, Operation operation)
+      throws IOException {
+    String operationName = operation.getName();
+    if (state.dispatchedOperations.remove(jedis, operationName)) {
+      log.log(Level.WARNING, format("removed dispatched operation %s", operationName));
+    }
+    String queueEntryJson = JsonFormat.printer().print(queueEntry);
+    List<Platform.Property> provisions = queueEntry.getPlatform().getPropertiesList();
+    int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
+    state.operationQueue.unboundedPush(jedis, provisions, queueEntryJson, priority);
   }
 
   private String extractInvocationId(Operation operation) {
@@ -1296,18 +1304,21 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException {
+  public boolean prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException {
     String invocationId = extractInvocationId(operation);
     String operationName = operation.getName();
     String operationJson = operationPrinter.print(operation);
     String executeEntryJson = JsonFormat.printer().print(executeEntry);
     Operation publishOperation = onPublish.apply(operation);
     int priority = executeEntry.getExecutionPolicy().getPriority();
-    client.run(
+    return client.call(
         jedis -> {
           state.operations.insert(jedis, invocationId, operationName, operationJson);
-          state.prequeue.offer(jedis, executeEntryJson, priority);
-          publishReset(jedis, publishOperation);
+          if (state.prequeue.offer(jedis, executeEntryJson, priority)) {
+            publishReset(jedis, publishOperation);
+            return true;
+          }
+          return false;
         });
   }
 
@@ -1326,19 +1337,13 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException {
-    String queueEntryJson = JsonFormat.printer().print(queueEntry);
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     Operation publishOperation = keepaliveOperation(operationName);
-    int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
-    client.run(
+    client.call(
         jedis -> {
-          queue(
-              jedis,
-              operationName,
-              queueEntry.getPlatform().getPropertiesList(),
-              queueEntryJson,
-              priority);
+          unboundedQueue(jedis, queueEntry, publishOperation);
           publishReset(jedis, publishOperation);
+          return null;
         });
   }
 
@@ -1408,18 +1413,6 @@ public class RedisShardBackplane implements Backplane {
         (!requestMetadata.getToolInvocationId().isEmpty()
             && state.blockedInvocations.exists(jedis, requestMetadata.getToolInvocationId()));
     return isActionBlocked || isInvocationBlocked;
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  @Override
-  public boolean canQueue() throws IOException {
-    return client.call(jedis -> state.operationQueue.canQueue(jedis));
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  @Override
-  public boolean canPrequeue() throws IOException {
-    return client.call(jedis -> state.prequeue.canQueue(jedis));
   }
 
   @SuppressWarnings("ConstantConditions")

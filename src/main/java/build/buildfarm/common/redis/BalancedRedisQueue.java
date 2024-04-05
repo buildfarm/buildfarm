@@ -46,8 +46,9 @@ import redis.clients.jedis.util.JedisClusterCRC16;
  *     the same underlying redis queues.
  */
 public class BalancedRedisQueue {
-  private static final Duration START_TIMEOUT = Duration.ofSeconds(1);
+  public static final int UNLIMITED_QUEUE_DEPTH = -1;
 
+  private static final Duration START_TIMEOUT = Duration.ofSeconds(1);
   private static final Duration MAX_TIMEOUT = Duration.ofSeconds(8);
 
   /**
@@ -70,12 +71,12 @@ public class BalancedRedisQueue {
   private final String originalHashtag;
 
   /**
-   * @field maxQueueSize
+   * @field maxNodeQueueDepth
    * @brief The maximum amount of elements that should be added to the queue.
    * @details This is used to avoid placing too many elements onto the queue at any given time. For
    *     infinitely sized queues, use -1.
    */
-  private final int maxQueueSize;
+  private final int maxNodeQueueDepth;
 
   /**
    * @field queues
@@ -111,7 +112,7 @@ public class BalancedRedisQueue {
    * @note Overloaded.
    */
   public BalancedRedisQueue(String name, List<String> hashtags, QueueDecorator queueDecorator) {
-    this(name, hashtags, -1, queueDecorator);
+    this(name, hashtags, UNLIMITED_QUEUE_DEPTH, queueDecorator);
   }
 
   /**
@@ -119,19 +120,20 @@ public class BalancedRedisQueue {
    * @details Construct a named redis queue with an established redis cluster.
    * @param name The global name of the queue.
    * @param hashtags Hashtags to distribute queue data.
-   * @param maxQueueSize The maximum amount of elements that should be added to the queue.
+   * @param maxNodeQueueDepth The maximum amount of elements that should be added to each Redis
+   *     node's queue.
    * @note Overloaded.
    */
   public BalancedRedisQueue(
-      String name, List<String> hashtags, int maxQueueSize, QueueDecorator queueDecorator) {
-    this(name, maxQueueSize, createHashedQueues(name, hashtags), queueDecorator);
+      String name, List<String> hashtags, int maxNodeQueueDepth, QueueDecorator queueDecorator) {
+    this(name, maxNodeQueueDepth, createHashedQueues(name, hashtags), queueDecorator);
   }
 
   public BalancedRedisQueue(
-      String name, int maxQueueSize, List<String> queues, QueueDecorator queueDecorator) {
+      String name, int maxNodeQueueDepth, List<String> queues, QueueDecorator queueDecorator) {
     this.originalHashtag = RedisHashtags.existingHash(name);
     this.name = RedisHashtags.unhashedName(name);
-    this.maxQueueSize = maxQueueSize;
+    this.maxNodeQueueDepth = maxNodeQueueDepth;
     this.queues = queues;
     this.queueDecorator = queueDecorator;
   }
@@ -144,7 +146,7 @@ public class BalancedRedisQueue {
   public boolean offer(UnifiedJedis unified, String val) {
     String queue = queues.get(roundRobinPushIndex());
     try (Jedis jedis = getJedisFromKey(unified, queue)) {
-      return queueDecorator.decorate(jedis, queue).offer(val);
+      return queueDecorator.decorate(jedis, queue, maxNodeQueueDepth).offer(val);
     }
   }
 
@@ -156,7 +158,19 @@ public class BalancedRedisQueue {
   public boolean offer(UnifiedJedis unified, String val, double priority) {
     String queue = queues.get(roundRobinPushIndex());
     try (Jedis jedis = getJedisFromKey(unified, queue)) {
-      return queueDecorator.decorate(jedis, queue).offer(val, priority);
+      return queueDecorator.decorate(jedis, queue, maxNodeQueueDepth).offer(val, priority);
+    }
+  }
+
+  /**
+   * @brief Push a value onto the queue.
+   * @details Adds the value into one of the internal backend redis queues.
+   * @param val The value to push onto the queue.
+   */
+  public void unboundedAdd(UnifiedJedis unified, String val, double priority) {
+    String queue = queues.get(roundRobinPushIndex());
+    try (Jedis jedis = getJedisFromKey(unified, queue)) {
+      queueDecorator.decorate(jedis, queue, maxNodeQueueDepth).unboundedAdd(val, priority);
     }
   }
 
@@ -170,7 +184,7 @@ public class BalancedRedisQueue {
   public boolean removeFromDequeue(UnifiedJedis unified, String val) {
     for (String queue : partialIterationQueueOrder()) {
       try (Jedis jedis = getJedisFromKey(unified, queue)) {
-        if (queueDecorator.decorate(jedis, queue).removeFromDequeue(val)) {
+        if (queueDecorator.decorate(jedis, queue, maxNodeQueueDepth).removeFromDequeue(val)) {
           return true;
         }
       }
@@ -239,6 +253,10 @@ public class BalancedRedisQueue {
     // call.
     // If none of the queues are able to dequeue.  We can move onto a different strategy.
     // (a strategy in which the system appears to be under less load)
+
+    // We assume the number of elements in the queue is evenly distributed across the Redis nodes.
+    // As such, we're just going to check against against the maximum number of elements an
+    // individual Redis node should have rather than across all the Redis nodes.
     int startQueue = currentPopQueue;
     // end this phase if we have done a full round-robin
     boolean blocking = false;
@@ -248,7 +266,7 @@ public class BalancedRedisQueue {
       final String val;
       String queueName = queues.get(roundRobinPopIndex());
       try (Jedis jedis = getJedisFromKey(unified, queueName)) {
-        Queue<String> queue = queueDecorator.decorate(jedis, queueName);
+        Queue<String> queue = queueDecorator.decorate(jedis, queueName, maxNodeQueueDepth);
         if (blocking) {
           val = take(jedis, queue, currentTimeout, service);
         } else {
@@ -303,7 +321,7 @@ public class BalancedRedisQueue {
   public @Nullable String poll(UnifiedJedis unified) {
     String queue = queues.get(roundRobinPopIndex());
     try (Jedis jedis = getJedisFromKey(unified, queue)) {
-      return queueDecorator.decorate(jedis, queue).poll();
+      return queueDecorator.decorate(jedis, queue, maxNodeQueueDepth).poll();
     }
   }
 
@@ -382,7 +400,7 @@ public class BalancedRedisQueue {
 
   private long size(UnifiedJedis unified, String queue) {
     try (Jedis jedis = getJedisFromKey(unified, queue)) {
-      return queueDecorator.decorate(jedis, queue).size();
+      return queueDecorator.decorate(jedis, queue, maxNodeQueueDepth).size();
     }
   }
 
@@ -417,7 +435,7 @@ public class BalancedRedisQueue {
   public void visit(UnifiedJedis unified, StringVisitor visitor) {
     for (String queue : fullIterationQueueOrder()) {
       try (Jedis jedis = getJedisFromKey(unified, queue)) {
-        queueDecorator.decorate(jedis, queue).visit(visitor);
+        queueDecorator.decorate(jedis, queue, maxNodeQueueDepth).visit(visitor);
       }
     }
   }
@@ -430,7 +448,7 @@ public class BalancedRedisQueue {
   public void visitDequeue(UnifiedJedis unified, StringVisitor visitor) {
     for (String queue : fullIterationQueueOrder()) {
       try (Jedis jedis = getJedisFromKey(unified, queue)) {
-        queueDecorator.decorate(jedis, queue).visitDequeue(visitor);
+        queueDecorator.decorate(jedis, queue, maxNodeQueueDepth).visitDequeue(visitor);
       }
     }
   }
@@ -452,18 +470,6 @@ public class BalancedRedisQueue {
       size = queueSize;
     }
     return true;
-  }
-
-  /**
-   * @brief Whether or not more elements can be added to the queue based on the queue's configured
-   *     max size.
-   * @details Compares the size of the queue to configured max size. Queues may be configured to be
-   *     infinite in size.
-   * @param jedis Jedis cluster client.
-   * @return Whether are not a new element can be added to the queue based on its current size.
-   */
-  public boolean canQueue(UnifiedJedis jedis) {
-    return maxQueueSize < 0 || size(jedis) < maxQueueSize;
   }
 
   /**

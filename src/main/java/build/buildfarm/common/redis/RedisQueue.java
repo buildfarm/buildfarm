@@ -19,6 +19,7 @@ import static redis.clients.jedis.args.ListDirection.RIGHT;
 
 import build.buildfarm.common.Queue;
 import build.buildfarm.common.StringVisitor;
+import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.util.List;
 import redis.clients.jedis.Jedis;
@@ -33,10 +34,12 @@ import redis.clients.jedis.Jedis;
  *     underlying redis queue.
  */
 public class RedisQueue implements Queue<String> {
+  public static final int UNLIMITED_QUEUE_DEPTH = -1;
+
   private static final int defaultListPageSize = 10000;
 
-  public static Queue decorate(Jedis jedis, String name) {
-    return new RedisQueue(jedis, name, defaultListPageSize);
+  public static Queue decorate(Jedis jedis, String name, int maxQueueDepth) {
+    return new RedisQueue(jedis, name, maxQueueDepth, defaultListPageSize);
   }
 
   private static double toRedisTimeoutSeconds(Duration timeout) {
@@ -53,20 +56,37 @@ public class RedisQueue implements Queue<String> {
    */
   private final String name;
 
+  private final int maxNodeQueueDepth;
+
+  private final RedisLuaScript pushScript;
+
   private final int listPageSize;
 
   /**
    * @brief Constructor.
    * @details Construct a named redis queue with an established redis cluster.
    * @param name The global name of the queue.
+   * @param maxNodeQueueDepth The maximum size the queue is allowed to grow to.
    */
   public RedisQueue(Jedis jedis, String name) {
-    this(jedis, name, defaultListPageSize);
+    this(jedis, name, UNLIMITED_QUEUE_DEPTH, defaultListPageSize);
   }
 
-  public RedisQueue(Jedis jedis, String name, int listPageSize) {
+  /**
+   * @brief Constructor.
+   * @details Construct a named redis queue with an established redis cluster.
+   * @param name The global name of the queue.
+   * @param maxNodeQueueDepth The maximum size the queue is allowed to grow to.
+   */
+  public RedisQueue(Jedis jedis, String name, int maxNodeQueueDepth) {
+    this(jedis, name, maxNodeQueueDepth, defaultListPageSize);
+  }
+
+  public RedisQueue(Jedis jedis, String name, int maxNodeQueueDepth, int listPageSize) {
     this.jedis = jedis;
     this.name = name;
+    this.maxNodeQueueDepth = maxNodeQueueDepth;
+    this.pushScript = new RedisLuaScript(getPushLuaScript());
     this.listPageSize = listPageSize;
   }
 
@@ -87,8 +107,23 @@ public class RedisQueue implements Queue<String> {
    */
   @Override
   public boolean offer(String val, double priority) {
+    if (maxNodeQueueDepth == UNLIMITED_QUEUE_DEPTH) {
+      jedis.lpush(name, val);
+      return true;
+    }
+    ImmutableList<String> keys = ImmutableList.of(name);
+    ImmutableList<String> args = ImmutableList.of(String.valueOf(maxNodeQueueDepth), val);
+    return String.valueOf(pushScript.eval(jedis, keys, args)).equals("t");
+  }
+
+  /**
+   * @brief Push a value onto the queue.
+   * @details Adds the value into the backend redis queue.
+   * @param val The value to push onto the queue.
+   */
+  @Override
+  public void unboundedAdd(String val, double priority) {
     jedis.lpush(name, val);
-    return true;
   }
 
   /**
@@ -201,5 +236,17 @@ public class RedisQueue implements Queue<String> {
       index = nextIndex;
       nextIndex += entries.size();
     } while (entries.size() == listPageSize);
+  }
+
+  private String getPushLuaScript() {
+    return String.join(
+        "\n",
+        "local maxNodeQueueDepth = tonumber(ARGV[1])",
+        "local queueSize = redis.call('LLEN', KEYS[1])",
+        "if queueSize < maxNodeQueueDepth then",
+        "  redis.call('LPUSH', KEYS[1], ARGV[2])",
+        "  return 't'",
+        "end",
+        "return 'f'");
   }
 }

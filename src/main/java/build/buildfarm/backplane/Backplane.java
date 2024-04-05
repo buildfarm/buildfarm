@@ -255,18 +255,12 @@ public interface Backplane {
   /** Requeue a dispatched operation */
   void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException;
 
-  void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException;
+  boolean prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException;
 
-  void queue(QueueEntry queueEntry, Operation operation) throws IOException;
+  boolean queue(QueueEntry queueEntry, Operation operation) throws IOException;
 
   /** Test for whether a request is blacklisted */
   boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException;
-
-  /** Test for whether an operation may be queued */
-  boolean canQueue() throws IOException;
-
-  /** Test for whether an operation may be prequeued */
-  boolean canPrequeue() throws IOException;
 
   BackplaneStatus backplaneStatus() throws IOException;
 

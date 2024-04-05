@@ -45,7 +45,7 @@ public class RedisQueueMockTest {
 
   @Test
   public void decorateSucceeds() {
-    RedisQueue.decorate(redis, "test");
+    RedisQueue.decorate(redis, "test", RedisQueue.UNLIMITED_QUEUE_DEPTH);
   }
 
   @Test
@@ -136,7 +136,8 @@ public class RedisQueueMockTest {
   @Test
   public void visitShouldLRange() {
     int listPageSize = 3;
-    RedisQueue queue = new RedisQueue(redis, "test", listPageSize);
+    RedisQueue queue =
+        new RedisQueue(redis, "test", RedisQueue.UNLIMITED_QUEUE_DEPTH, listPageSize);
     arrangeVisitLRange("test", listPageSize, VISIT_ENTRIES);
     StringVisitor visitor = mock(StringVisitor.class);
 
@@ -148,7 +149,8 @@ public class RedisQueueMockTest {
   @Test
   public void visitDequeueShouldLRange() {
     int listPageSize = 3;
-    RedisQueue queue = new RedisQueue(redis, "test", listPageSize);
+    RedisQueue queue =
+        new RedisQueue(redis, "test", RedisQueue.UNLIMITED_QUEUE_DEPTH, listPageSize);
     arrangeVisitLRange(queue.getDequeueName(), listPageSize, VISIT_ENTRIES);
     StringVisitor visitor = mock(StringVisitor.class);
 

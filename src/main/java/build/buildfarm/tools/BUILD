@@ -275,12 +275,20 @@ java_library(
     ],
 )
 
-java_binary(
-    name = "test",
-    srcs = ["Test.java"],
-    main_class = "build.buildfarm.tools.Test",
-    visibility = ["//visibility:public"],
-    deps = [
-        "@maven//:com_google_guava_guava",
-    ],
-)
+# DBG_AVA
+# java_binary(
+#     name = "fill-prequeue",
+#     srcs = ["FillPrequeue.java"],
+#     main_class = "build.buildfarm.tools.FillPrequeue",
+#     visibility = ["//visibility:public"],
+#     deps = [
+#         "//src/main/java/build/buildfarm/common/config",
+#         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
+#         "//src/main/java/build/buildfarm/instance/shard",
+#         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+#         "@com_google_googleapis//google/longrunning:operations_proto",
+#         "@maven//:com_google_guava_guava",
+#         "@maven//:com_google_protobuf_protobuf_java",
+#         "@maven//:redis_clients_jedis",
+#     ],
+# )

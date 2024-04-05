@@ -32,11 +32,13 @@ import redis.clients.jedis.Jedis;
  *     queue.
  */
 public class RedisPriorityQueue implements Queue<String> {
+  public static final int UNLIMITED_QUEUE_DEPTH = -1;
+
   private static final Clock defaultClock = Clock.systemUTC();
   private static final long defaultPollIntervalMillis = 100;
 
-  public static Queue<String> decorate(Jedis jedis, String name) {
-    return new RedisPriorityQueue(jedis, name);
+  public static Queue<String> decorate(Jedis jedis, String name, int maxNodeQueueDepth) {
+    return new RedisPriorityQueue(jedis, name, maxNodeQueueDepth);
   }
 
   private final Jedis jedis;
@@ -51,6 +53,8 @@ public class RedisPriorityQueue implements Queue<String> {
 
   private final Clock clock;
   private final long pollIntervalMillis;
+  private final int maxNodeQueueDepth;
+  private final RedisLuaScript pushScript;
   private final RedisLuaScript dequeueScript;
 
   /**
@@ -59,7 +63,16 @@ public class RedisPriorityQueue implements Queue<String> {
    * @param name The global name of the queue.
    */
   public RedisPriorityQueue(Jedis jedis, String name) {
-    this(jedis, name, defaultPollIntervalMillis);
+    this(jedis, name, UNLIMITED_QUEUE_DEPTH, defaultPollIntervalMillis);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct a named redis queue with an established redis cluster.
+   * @param name The global name of the queue.
+   */
+  public RedisPriorityQueue(Jedis jedis, String name, int maxNodeQueueDepth) {
+    this(jedis, name, maxNodeQueueDepth, defaultPollIntervalMillis);
   }
 
   /**
@@ -69,7 +82,17 @@ public class RedisPriorityQueue implements Queue<String> {
    * @param name The global name of the queue.
    */
   public RedisPriorityQueue(Jedis jedis, String name, Clock clock) {
-    this(jedis, name, clock, defaultPollIntervalMillis);
+    this(jedis, name, UNLIMITED_QUEUE_DEPTH, clock, defaultPollIntervalMillis);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct a named redis queue with an established redis cluster. Used to ease the
+   *     testing of the order of the queued actions
+   * @param name The global name of the queue.
+   */
+  public RedisPriorityQueue(Jedis jedis, String name, int maxNodeQueueDepth, Clock clock) {
+    this(jedis, name, maxNodeQueueDepth, clock, defaultPollIntervalMillis);
   }
 
   /**
@@ -79,8 +102,9 @@ public class RedisPriorityQueue implements Queue<String> {
    * @param name The global name of the queue.
    * @param pollIntervalMillis pollInterval to use when dqueuing from redis.
    */
-  public RedisPriorityQueue(Jedis jedis, String name, long pollIntervalMillis) {
-    this(jedis, name, defaultClock, pollIntervalMillis);
+  public RedisPriorityQueue(
+      Jedis jedis, String name, int maxNodeQueueDepth, long pollIntervalMillis) {
+    this(jedis, name, maxNodeQueueDepth, defaultClock, pollIntervalMillis);
   }
 
   /**
@@ -91,12 +115,15 @@ public class RedisPriorityQueue implements Queue<String> {
    * @param clock A clock to provide timestamps.
    * @param pollIntervalMillis pollInterval to use when dqueuing from redis.
    */
-  public RedisPriorityQueue(Jedis jedis, String name, Clock clock, long pollIntervalMillis) {
+  public RedisPriorityQueue(
+      Jedis jedis, String name, int maxNodeQueueDepth, Clock clock, long pollIntervalMillis) {
     this.jedis = jedis;
     this.name = name;
+    this.maxNodeQueueDepth = maxNodeQueueDepth;
+    this.pushScript = new RedisLuaScript(getPushLuaScript());
+    this.dequeueScript = new RedisLuaScript(getDequeueLuaScript());
     this.clock = clock;
     this.pollIntervalMillis = pollIntervalMillis;
-    this.dequeueScript = new RedisLuaScript(getDequeueLuaScript());
   }
 
   /**
@@ -118,8 +145,28 @@ public class RedisPriorityQueue implements Queue<String> {
    */
   @Override
   public boolean offer(String val, double priority) {
-    jedis.zadd(name, priority, clock.millis() + ":" + val);
-    return true;
+    String stampedVal = clock.millis() + ":" + val;
+    if (maxNodeQueueDepth == UNLIMITED_QUEUE_DEPTH) {
+      jedis.zadd(name, priority, stampedVal);
+      return true;
+    }
+    List<String> keys = ImmutableList.of(name);
+    List<String> args =
+        ImmutableList.of(String.valueOf(maxNodeQueueDepth), String.valueOf(priority), stampedVal);
+    return String.valueOf(pushScript.eval(jedis, keys, args)) == "t";
+  }
+
+  /**
+   * @brief Push a value onto the queue with specified priority.
+   * @details Adds the value into the backend redis ordered set, with timestamp primary insertion to
+   *     guarantee FIFO within a single priority level
+   * @param val The value to push onto the priority queue.
+   * @param priority The priority of action 0 means highest
+   */
+  @Override
+  public void unboundedAdd(String val, double priority) {
+    String stampedVal = clock.millis() + ":" + val;
+    jedis.zadd(name, priority, stampedVal);
   }
 
   /**
@@ -158,7 +205,7 @@ public class RedisPriorityQueue implements Queue<String> {
   @Override
   public String take(Duration timeout) throws InterruptedException {
     int maxAttempts = Math.max(1, (int) (timeout.toMillis() / pollIntervalMillis));
-    List<String> args = ImmutableList.of(name, getDequeueName(), "true");
+    List<String> args = ImmutableList.of(name, getDequeueName(), String.valueOf(maxNodeQueueDepth));
     for (int i = 0; i < maxAttempts; ++i) {
       Object obj_val = dequeueScript.eval(jedis, ImmutableList.of(name), args);
       String val = String.valueOf(obj_val);
@@ -276,6 +323,21 @@ public class RedisPriorityQueue implements Queue<String> {
     } while (entries.size() == listPageSize);
   }
 
+  private String getPushLuaScript() {
+    return String.join(
+        "\n",
+        "local setName = KEYS[1]",
+        "local maxNodeQueueDepth = ARGV[1]",
+        "local priority = ARGV[2]",
+        "local value = ARGV[3]",
+        "local queueSize = redis.call('ZCARD', setName)",
+        "if queueSize < maxNodeQueueDepth then",
+        "  redis.call('ZADD', setName, priority, value)",
+        "  return 't'",
+        "end",
+        "return 'f'");
+  }
+
   /**
    * @brief Adds additional functionality to the jedis client.
    * @details Load the custom lua script so we can have zpoplpush functionality in our container.
@@ -283,6 +345,7 @@ public class RedisPriorityQueue implements Queue<String> {
   private String getDequeueLuaScript() {
     // We return the lua code in-line to avoid any build complexities having to bundle lua code with
     // the buildfarm artifacts.  Lua code is fed to redis via the eval call.
+
     return String.join(
         "\n",
         "local zset = ARGV[1]",

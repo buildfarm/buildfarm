@@ -14,6 +14,9 @@ public interface Queue<E> {
   // our special variety
   boolean offer(E e, double priority);
 
+  // Ignore capacity requirements
+  void unboundedAdd(E e, double priority);
+
   // java.util.Collection
   long size();
 

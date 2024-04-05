@@ -358,12 +358,14 @@ message ExecuteEntry {
   string stderr_stream_name = 8;
 
   google.protobuf.Timestamp queued_timestamp = 9;
+
+  optional build.bazel.remote.execution.v2.Digest queued_operation_digest = 10;
 }
 
 message QueueEntry {
   ExecuteEntry execute_entry = 1;
 
-  build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
+  reserved 2;
 
   build.bazel.remote.execution.v2.Platform platform = 3;
 

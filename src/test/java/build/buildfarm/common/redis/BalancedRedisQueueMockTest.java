@@ -21,7 +21,6 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.Queue;
@@ -57,7 +56,7 @@ public class BalancedRedisQueueMockTest {
   @Mock private Queue<String> subQueue;
 
   @SuppressWarnings("unused") // parameters are ignored
-  private Queue<String> subQueueDecorate(Jedis jedis, String name) {
+  private Queue<String> subQueueDecorate(Jedis jedis, String name, int maxNodeQueueDepth) {
     return subQueue;
   }
 
@@ -65,6 +64,46 @@ public class BalancedRedisQueueMockTest {
   public void setUp() {
     MockitoAnnotations.initMocks(this);
     when(redis.getConnectionFromSlot(any(Integer.class))).thenReturn(connection);
+  }
+
+  // Function under test: offer
+  // Reason for testing: Queueing can succeed
+  // Failure explanation: the queue fails when the underlying storage had a successful write
+  @Test
+  public void offerSucceedsWhenQueueSucceeds() {
+    // MOCK
+    when(subQueue.offer(any(String.class))).thenReturn(true);
+
+    // ARRANGE
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", ImmutableList.of("test"), 1, this::subQueueDecorate);
+
+    // ACT
+    boolean queued = queue.offer(redis, "val");
+
+    // ASSERT
+    verify(subQueue, times(1)).offer("val");
+    assertThat(queued);
+  }
+
+  // Function under test: offer
+  // Reason for testing: Full queues do not allow queuing
+  // Failure explanation: the queue still allows queueing despite being full
+  @Test
+  public void offerFailsWhenQueueFails() {
+    // MOCK
+    when(subQueue.offer(any(String.class))).thenReturn(false);
+
+    // ARRANGE
+    BalancedRedisQueue queue =
+        new BalancedRedisQueue("test", ImmutableList.of("test"), 1, this::subQueueDecorate);
+
+    // ACT
+    boolean queued = queue.offer(redis, "val");
+
+    // ASSERT
+    verify(subQueue, times(1)).offer("val");
+    assertThat(queued).isFalse();
   }
 
   // Function under test: removeFromDequeue
@@ -345,42 +384,5 @@ public class BalancedRedisQueueMockTest {
     // ASSERT
     verify(subQueue, times(1)).size();
     assertThat(isEvenlyDistributed).isTrue();
-  }
-
-  // Function under test: canQueue
-  // Reason for testing: infinite queues allow queuing
-  // Failure explanation: the queue is not accepting queuing when it should
-  @Test
-  public void canQueueInfiniteQueueAllowsQueuing() throws Exception {
-    // ARRANGE
-    BalancedRedisQueue queue =
-        new BalancedRedisQueue("test", ImmutableList.of("test"), this::subQueueDecorate);
-
-    // ACT
-    boolean canQueue = queue.canQueue(redis);
-
-    // ASSERT
-    verifyNoInteractions(subQueue);
-    assertThat(canQueue).isTrue();
-  }
-
-  // Function under test: canQueue for priority
-  // Reason for testing: Full queues do not allow queuing
-  // Failure explanation: the queue is still allows queueing despite being full
-  @Test
-  public void canQueueFullQueueNotAllowsQueueing() throws Exception {
-    // MOCK
-    when(subQueue.size()).thenReturn(123L);
-
-    // ARRANGE
-    BalancedRedisQueue queue =
-        new BalancedRedisQueue("test", ImmutableList.of("test"), 123, this::subQueueDecorate);
-
-    // ACT
-    boolean canQueue = queue.canQueue(redis);
-
-    // ASSERT
-    verify(subQueue, times(1)).size();
-    assertThat(canQueue).isFalse();
   }
 }

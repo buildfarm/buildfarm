@@ -67,16 +67,34 @@ public class RedisQueueTest {
 
   @Test
   public void decorateSucceeds() {
-    RedisQueue.decorate(redis, "test");
+    RedisQueue.decorate(redis, "test", RedisQueue.UNLIMITED_QUEUE_DEPTH);
   }
 
   @Test
-  public void offerShouldContain() {
+  public void unlimitedQueueOfferShouldContain() {
     RedisQueue queue = new RedisQueue(redis, "test");
 
-    queue.offer("foo");
+    assertThat(queue.offer("foo"));
 
     assertThat(redis.lrange("test", 0, -1)).containsExactly("foo");
+  }
+
+  @Test
+  public void limitedQueueOfferShouldContain() {
+    RedisQueue queue = new RedisQueue(redis, "test", 1);
+
+    assertThat(queue.offer("foo"));
+
+    assertThat(redis.lrange("test", 0, -1)).containsExactly("foo");
+  }
+
+  @Test
+  public void limitedQueueFailsOnFull() {
+    RedisQueue queue = new RedisQueue(redis, "test", 0);
+
+    assertThat(!queue.offer("foo"));
+
+    assertThat(redis.lrange("test", 0, -1)).containsExactly();
   }
 
   @Test

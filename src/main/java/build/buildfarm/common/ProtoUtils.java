@@ -31,7 +31,7 @@ import lombok.extern.java.Log;
 public class ProtoUtils {
   public static QueuedOperation parseQueuedOperation(
       ByteString queuedOperationBlob, QueueEntry queueEntry) {
-    Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
+    Digest queuedOperationDigest = queueEntry.getExecuteEntry().getQueuedOperationDigest();
     String operationName = queueEntry.getExecuteEntry().getOperationName();
 
     if (queuedOperationBlob == null) {

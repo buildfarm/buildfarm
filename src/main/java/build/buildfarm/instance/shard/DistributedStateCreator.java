@@ -35,6 +35,7 @@ import java.util.List;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
+import redis.clients.jedis.JedisCluster;
 
 public class DistributedStateCreator {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
@@ -92,7 +93,7 @@ public class DistributedStateCreator {
     return new BalancedRedisQueue(
         getPreQueuedOperationsListName(),
         getQueueHashes(client, getPreQueuedOperationsListName()),
-        configs.getBackplane().getMaxPreQueueDepth(),
+        getMaxNodeQueueDepth(client, configs.getBackplane().getMaxPreQueueDepth()),
         getQueueDecorator());
   }
 
@@ -109,6 +110,7 @@ public class DistributedStateCreator {
               getQueueName(queueConfig),
               getQueueDecorator(),
               getQueueHashes(client, getQueueName(queueConfig)),
+              getMaxNodeQueueDepth(client, queueConfig.getMaxDepth()),
               toMultimap(queueConfig.getPlatform().getPropertiesList()),
               queueConfig.isAllowUnmatched());
       provisionedQueues.add(provisionedQueue);
@@ -129,11 +131,12 @@ public class DistributedStateCreator {
               getQueuedOperationsListName(),
               getQueueDecorator(),
               getQueueHashes(client, getQueuedOperationsListName()),
+              Queue.UNLIMITED_QUEUE_DEPTH,
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }
 
-    return new OperationQueue(provisionedQueues.build(), configs.getBackplane().getMaxQueueDepth());
+    return new OperationQueue(provisionedQueues.build());
   }
 
   static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
@@ -141,6 +144,18 @@ public class DistributedStateCreator {
         jedis ->
             RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(
                 jedis, RedisHashtags.existingHash(queueName)));
+  }
+
+  private static int getMaxNodeQueueDepth(RedisClient client, int maxQueueDepth)
+      throws IOException {
+    return client.call(
+        jedis -> {
+          if (jedis instanceof JedisCluster) {
+            JedisCluster cluster = (JedisCluster) jedis;
+            return maxQueueDepth / cluster.getClusterNodes().keySet().size();
+          }
+          return 1;
+        });
   }
 
   private static SetMultimap<String, String> toMultimap(List<Platform.Property> provisions) {

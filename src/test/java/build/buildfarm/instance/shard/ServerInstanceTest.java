@@ -272,7 +272,6 @@ public class ServerInstanceTest {
 
   @Test
   public void executeCallsPrequeueWithAction() throws IOException {
-    when(mockBackplane.canPrequeue()).thenReturn(true);
     Digest actionDigest = Digest.newBuilder().setHash("action").setSizeBytes(10).build();
     Watcher mockWatcher = mock(Watcher.class);
     instance.execute(
@@ -300,8 +299,6 @@ public class ServerInstanceTest {
             .setActionDigest(actionDigest)
             .setSkipCacheLookup(true)
             .build();
-
-    when(mockBackplane.canQueue()).thenReturn(true);
 
     Poller poller = mock(Poller.class);
 
@@ -358,8 +355,6 @@ public class ServerInstanceTest {
 
     when(mockBackplane.propertiesEligibleForQueue(anyList())).thenReturn(false);
 
-    when(mockBackplane.canQueue()).thenReturn(true);
-
     Poller poller = mock(Poller.class);
 
     boolean failedPreconditionExceptionCaught = false;
@@ -412,8 +407,6 @@ public class ServerInstanceTest {
             .setActionDigest(actionDigest)
             .setSkipCacheLookup(true)
             .build();
-
-    when(mockBackplane.canQueue()).thenReturn(true);
 
     Poller poller = mock(Poller.class);
 
@@ -488,8 +481,6 @@ public class ServerInstanceTest {
 
     when(mockBackplane.propertiesEligibleForQueue(anyList())).thenReturn(true);
 
-    when(mockBackplane.canQueue()).thenReturn(true);
-
     Poller poller = mock(Poller.class);
 
     boolean failedPreconditionExceptionCaught = false;
@@ -562,8 +553,6 @@ public class ServerInstanceTest {
 
     when(mockBackplane.propertiesEligibleForQueue(anyList())).thenReturn(true);
 
-    when(mockBackplane.canQueue()).thenReturn(true);
-
     Poller poller = mock(Poller.class);
 
     boolean unavailableExceptionCaught = false;
@@ -628,8 +617,6 @@ public class ServerInstanceTest {
 
     when(mockBackplane.propertiesEligibleForQueue(anyList())).thenReturn(true);
 
-    when(mockBackplane.canQueue()).thenReturn(true);
-
     when(mockBackplane.getActionResult(eq(actionKey)))
         .thenThrow(new IOException(Status.UNAVAILABLE.asException()));
 
@@ -673,8 +660,6 @@ public class ServerInstanceTest {
             .setStderrDigest(Digest.newBuilder().setHash("stderr").setSizeBytes(1))
             .build();
 
-    when(mockBackplane.canQueue()).thenReturn(true);
-    when(mockBackplane.canPrequeue()).thenReturn(true);
     when(mockBackplane.getActionResult(actionKey)).thenReturn(actionResult);
 
     Digest actionDigest = actionKey.getDigest();
@@ -827,8 +812,8 @@ public class ServerInstanceTest {
                 ExecuteEntry.newBuilder()
                     .setOperationName(operationName)
                     .setSkipCacheLookup(true)
-                    .setActionDigest(actionDigest))
-            .setQueuedOperationDigest(queuedOperationDigest)
+                    .setActionDigest(actionDigest)
+                    .setQueuedOperationDigest(queuedOperationDigest))
             .build();
     instance.requeueOperation(queueEntry, Durations.fromSeconds(60)).get();
   }
