@@ -200,6 +200,9 @@ public class OperationQueue {
     // Keep iterating over matched queues until we find one that is non-empty and provides a
     // dequeued value.
     for (int index = roundRobinPopIndex(queues); ; index = roundRobinPopIndex(queues)) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException();
+      }
       String value = queues.get(index).poll(jedis);
       if (value != null) {
         return value;
