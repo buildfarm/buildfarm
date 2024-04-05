@@ -8,6 +8,7 @@ import build.buildfarm.common.redis.RedisClient;
 import com.github.fppt.jedismock.RedisServer;
 import com.github.fppt.jedismock.server.ServiceOptions;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Collections;
 import org.junit.After;
@@ -29,7 +30,7 @@ public class JedisCasWorkerMapTest {
   @Before
   public void setup() throws IOException {
     redisServer =
-        RedisServer.newRedisServer()
+        RedisServer.newRedisServer(0, InetAddress.getByName("localhost"))
             .setOptions(ServiceOptions.defaultOptions().withClusterModeEnabled())
             .start();
     redisClient =
