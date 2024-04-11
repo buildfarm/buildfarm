@@ -278,22 +278,7 @@ public class ResourceParser {
     } else {
       builder.setCompressor(Compressor.Value.IDENTITY);
     }
-
-    String firstPart = segments[index.getAndIncrement()];
-    // The resource syntax has changed in the bytestream
-    // requests.
-    // Prior to blake3 we'd have:
-    // "bytestream://$instance/blobs/$hash/$size",
-    // But now, we have the name ofthe blob
-    // "bytestream://$instance/blobs/$digestName/$hash/$size",
-    // Perhaps consider adding this based on what the config file is set VS
-    // parsing every time.
-    String hash;
-    if (firstPart.equals("blake3")) {
-      hash = segments[index.getAndIncrement()];
-    } else {
-      hash = firstPart;
-    }
+    String hash = segments[index.getAndIncrement()];
     String size = segments[index.getAndIncrement()];
     builder.setDigest(parseDigest(hash, size));
     return builder.build();

@@ -43,7 +43,6 @@ public final class BuildfarmConfigs {
   private BuildfarmConfigs() {}
 
   public static BuildfarmConfigs getInstance() {
-    DigestUtil.load();
     if (buildfarmConfigs == null) {
       buildfarmConfigs = new BuildfarmConfigs();
     }
