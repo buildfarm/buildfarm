@@ -89,9 +89,11 @@ def archive_dependencies(third_party):
         {
             "name": "remote_apis",
             "build_file": "%s:BUILD.remote_apis" % third_party,
-            "sha256": "e9a69cf51df14e20b7d3623ac9580bc8fb9275dda46305788e88eb768926b9c3",
-            "strip_prefix": "remote-apis-8f539af4b407a4f649707f9632fc2b715c9aa065",
-            "url": "https://github.com/bazelbuild/remote-apis/archive/8f539af4b407a4f649707f9632fc2b715c9aa065.zip",
+            "patch_args": ["-p1"],
+            "patches": ["%s/remote-apis:remote-apis.patch" % third_party],
+            "sha256": "743d2d5b5504029f3f825beb869ce0ec2330b647b3ee465a4f39ca82df83f8bf",
+            "strip_prefix": "remote-apis-636121a32fa7b9114311374e4786597d8e7a69f3",
+            "url": "https://github.com/bazelbuild/remote-apis/archive/636121a32fa7b9114311374e4786597d8e7a69f3.zip",
         },
         {
             "name": "rules_cc",
@@ -123,6 +125,13 @@ def archive_dependencies(third_party):
             "urls": ["https://github.com/bazelbuild/bazel/archive/refs/tags/6.0.0.tar.gz"],
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
+        },
+        {
+            "name": "blake3",
+            "sha256": "bb529ba133c0256df49139bd403c17835edbf60d2ecd6463549c6a5fe279364d",
+            "build_file": "%s:BUILD.blake3" % third_party,
+            "url": "https://github.com/BLAKE3-team/BLAKE3/archive/refs/tags/1.3.3.zip",
+            "strip_prefix": "BLAKE3-1.3.3",
         },
 
         # Optional execution wrappers

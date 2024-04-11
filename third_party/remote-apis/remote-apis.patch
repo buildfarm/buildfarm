@@ -1,0 +1,38 @@
+diff --git a/repository_rules.bzl b/repository_rules.bzl
+index 2b36886..6ffc75b 100644
+--- a/repository_rules.bzl
++++ b/repository_rules.bzl
+@@ -6,8 +6,6 @@ This is adapted from
+ https://github.com/googleapis/googleapis/blob/master/repository_rules.bzl
+ """
+
+-load("//:remote_apis_deps.bzl", "remote_apis_go_deps")
+-
+ def _switched_rules_impl(ctx):
+     disabled_rule_script = """
+ def {rule_name}(**kwargs):
+@@ -118,8 +116,6 @@ def switched_rules_by_language(
+         name = name,
+         rules = rules,
+     )
+-    if go:
+-        remote_apis_go_deps()
+
+ def _switch(enabled, enabled_value):
+     return enabled_value if enabled else ""
+
+diff --git a/build/bazel/remote/execution/v2/remote_execution.proto b/build/bazel/remote/execution/v2/remote_execution.proto
+index dbeff9c..4398b2f 100644
+--- a/build/bazel/remote/execution/v2/remote_execution.proto
++++ b/build/bazel/remote/execution/v2/remote_execution.proto
+@@ -1688,6 +1688,10 @@ message DigestFunction {
+     // cryptographic hash function and its collision properties are not strongly guaranteed.
+     // See https://github.com/aappleby/smhasher/wiki/MurmurHash3 .
+     MURMUR3 = 7;
++
++    // The BLAKE3 hash function.
++    // See https://github.com/BLAKE3-team/BLAKE3.
++    BLAKE3 = 9;
+   }
+ }
+

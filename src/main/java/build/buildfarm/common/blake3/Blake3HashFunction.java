@@ -20,10 +20,12 @@ import com.google.common.hash.Funnel;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hasher;
+import com.google.errorprone.annotations.Immutable;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 
 /** A {@link HashFunction} for BLAKE3. */
+@Immutable
 public final class Blake3HashFunction implements HashFunction {
   @Override
   public int bits() {
