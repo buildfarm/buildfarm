@@ -16,6 +16,7 @@ package build.buildfarm.tools;
 
 import static build.buildfarm.common.grpc.Channels.createChannel;
 import static build.buildfarm.instance.Utils.getBlob;
+import static build.buildfarm.server.services.OperationsService.LIST_OPERATIONS_MAXIMUM_PAGE_SIZE;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.lang.String.format;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -250,11 +251,11 @@ class Cat {
 
   private static Tree fetchTree(Instance instance, Digest rootDigest) {
     Tree.Builder tree = Tree.newBuilder();
-    String pageToken = "";
+    String pageToken = Instance.SENTINEL_PAGE_TOKEN;
 
     do {
       pageToken = instance.getTree(rootDigest, 1024, pageToken, tree);
-    } while (!pageToken.isEmpty());
+    } while (!pageToken.equals(Instance.SENTINEL_PAGE_TOKEN));
 
     return tree.build();
   }
@@ -451,23 +452,24 @@ class Cat {
     }
   }
 
-  private static void listOperations(Instance instance) {
+  private static void listOperations(Instance instance, Iterable<String> args) throws IOException {
     String pageToken = "";
-    int limit = 10;
-    int count = 0;
+    java.util.Iterator<String> arg = args.iterator();
+    String filter = "";
+    if (arg.hasNext()) {
+      filter = arg.next();
+    }
     do {
       ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
-      pageToken = instance.listOperations(1024, pageToken, "", operations);
+      pageToken =
+          instance.listOperations(
+              LIST_OPERATIONS_MAXIMUM_PAGE_SIZE, pageToken, filter, operations::add);
       System.out.println(pageToken);
       System.out.println("Page size: " + operations.build().size());
       for (Operation operation : operations.build()) {
         printOperation(operation);
       }
-      if (++count == limit) {
-        System.out.println("page limit reached");
-        break;
-      }
-    } while (!pageToken.equals(""));
+    } while (!pageToken.equals(Instance.SENTINEL_PAGE_TOKEN));
   }
 
   private static void printRequestMetadata(RequestMetadata metadata) {
@@ -801,9 +803,9 @@ class Cat {
     }
 
     @Override
-    public void run(Instance instance, Iterable<String> args) {
+    public void run(Instance instance, Iterable<String> args) throws Exception {
       System.out.println("Listing Operations");
-      listOperations(instance);
+      listOperations(instance, args);
     }
   }
 

@@ -10,7 +10,6 @@ java_test(
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/server",
-        "//src/main/java/build/buildfarm/operations",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",

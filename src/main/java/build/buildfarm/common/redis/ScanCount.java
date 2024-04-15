@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.common.redis;
+
+import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
 import com.google.common.collect.Sets;
 import java.util.Set;
@@ -79,7 +81,7 @@ public class ScanCount {
     params.count(scanCount);
 
     // iterate over all entries via scanning
-    String cursor = "0";
+    String cursor = ScanParams.SCAN_POINTER_START;
     ScanResult scanResult;
     do {
       scanResult = node.scan(cursor, params);
@@ -88,6 +90,6 @@ public class ScanCount {
         cursor = scanResult.getCursor();
       }
 
-    } while (!cursor.equals("0"));
+    } while (!cursor.equals(SCAN_POINTER_START));
   }
 }

@@ -17,6 +17,7 @@ package build.buildfarm.instance.shard;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
@@ -37,13 +38,7 @@ import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.RedisClient;
-import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
-import build.buildfarm.operations.EnrichedOperation;
-import build.buildfarm.operations.FindOperationsResults;
-import build.buildfarm.operations.FindOperationsSettings;
-import build.buildfarm.operations.finder.EnrichedOperationBuilder;
-import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
@@ -64,7 +59,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
@@ -108,17 +102,6 @@ public class RedisShardBackplane implements Backplane {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   private static final int workerSetMaxAge = 3; // seconds
-  private static final JsonFormat.Parser operationParser =
-      JsonFormat.parser()
-          .usingTypeRegistry(
-              JsonFormat.TypeRegistry.newBuilder()
-                  .add(CompletedOperationMetadata.getDescriptor())
-                  .add(ExecutingOperationMetadata.getDescriptor())
-                  .add(ExecuteOperationMetadata.getDescriptor())
-                  .add(QueuedOperationMetadata.getDescriptor())
-                  .add(PreconditionFailure.getDescriptor())
-                  .build())
-          .ignoringUnknownFields();
 
   static final JsonFormat.Printer operationPrinter =
       JsonFormat.printer()
@@ -386,7 +369,7 @@ public class RedisShardBackplane implements Backplane {
     // delete the operation?
     // update expired watches with null operation
     for (String channel : expiringChannels) {
-      Operation operation = parseOperationJson(getOperation(jedis, parseOperationChannel(channel)));
+      Operation operation = getOperation(jedis, parseOperationChannel(channel));
       if (operation == null || !operation.getDone()) {
         publishExpiration(jedis, channel, now);
       } else {
@@ -460,20 +443,18 @@ public class RedisShardBackplane implements Backplane {
             .map(RedisShardBackplane::parseOperationChannel)
             .collect(Collectors.toList());
 
-    for (Map.Entry<String, String> entry : state.operations.get(jedis, operationChannelNames)) {
-      String json = entry.getValue();
-      Operation operation = json == null ? null : RedisShardBackplane.parseOperationJson(json);
-      String operationName = entry.getKey();
+    for (Operation operation : state.operations.get(jedis, operationChannelNames)) {
       if (operation == null || operation.getDone()) {
         if (operation != null) {
           operation = onPublish.apply(operation);
         }
-        subscriber.onOperation(operationChannel(operationName), operation, nextExpiresAt(now));
+        subscriber.onOperation(
+            operationChannel(operation.getName()), operation, nextExpiresAt(now));
         log.log(
             Level.FINER,
             format(
                 "operation %s done due to %s",
-                operationName, operation == null ? "null" : "completed"));
+                operation.getName(), operation == null ? "null" : "completed"));
       }
     }
   }
@@ -692,34 +673,15 @@ public class RedisShardBackplane implements Backplane {
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
 
-  @SuppressWarnings("ConstantConditions")
-  @Override
-  public FindOperationsResults findEnrichedOperations(Instance instance, String filterPredicate)
-      throws IOException {
-    FindOperationsSettings settings = new FindOperationsSettings();
-    settings.filterPredicate = filterPredicate;
-    settings.operationQuery = configs.getBackplane().getOperationPrefix() + ":*";
-    settings.scanAmount = 10000;
-    return client.call(jedis -> OperationsFinder.findEnrichedOperations(jedis, instance, settings));
+  private static String tokenFromRedisCursor(String cursor) {
+    return cursor.equals(SCAN_POINTER_START) ? SENTINEL_PAGE_TOKEN : cursor;
   }
 
   @Override
-  public EnrichedOperation findEnrichedOperation(Instance instance, String operationId)
-      throws IOException {
-    return client.call(
-        jedis -> {
-          return EnrichedOperationBuilder.build(
-              jedis, instance, configs.getBackplane().getOperationPrefix() + ":" + operationId);
-        });
-  }
-
-  @Override
-  public List<Operation> findOperations(String filterPredicate) throws IOException {
-    FindOperationsSettings settings = new FindOperationsSettings();
-    settings.filterPredicate = filterPredicate;
-    settings.operationQuery = configs.getBackplane().getOperationPrefix() + ":*";
-    settings.scanAmount = 10000;
-    return client.call(jedis -> OperationsFinder.findOperations(jedis, settings));
+  public ScanResult<Operation> getOperations(String cursor, int count) throws IOException {
+    redis.clients.jedis.resps.ScanResult<Operation> scanResult =
+        client.call(jedis -> state.operations.scan(jedis, cursor, count));
+    return new ScanResult<>(tokenFromRedisCursor(scanResult.getCursor()), scanResult.getResult());
   }
 
   @Override
@@ -982,42 +944,26 @@ public class RedisShardBackplane implements Backplane {
   public static OperationChange parseOperationChange(String operationChangeJson)
       throws InvalidProtocolBufferException {
     OperationChange.Builder operationChange = OperationChange.newBuilder();
-    operationParser.merge(operationChangeJson, operationChange);
+    Operations.getParser().merge(operationChangeJson, operationChange);
     return operationChange.build();
   }
 
-  public static Operation parseOperationJson(String operationJson) {
-    if (operationJson == null) {
-      return null;
-    }
-    try {
-      Operation.Builder operationBuilder = Operation.newBuilder();
-      operationParser.merge(operationJson, operationBuilder);
-      return operationBuilder.build();
-    } catch (InvalidProtocolBufferException e) {
-      log.log(Level.SEVERE, "error parsing operation from " + operationJson, e);
-      return null;
-    }
-  }
-
   @Override
-  public Iterable<Map.Entry<String, String>> getOperations(Set<String> operationIds)
-      throws IOException {
+  public Iterable<Operation> getOperations(Iterable<String> operationIds) throws IOException {
     return client.call(
         jedis -> {
           return state.operations.get(jedis, operationIds);
         });
   }
 
-  private String getOperation(UnifiedJedis jedis, String operationName) {
+  private Operation getOperation(UnifiedJedis jedis, String operationName) {
     return state.operations.get(jedis, operationName);
   }
 
   @SuppressWarnings("ConstantConditions")
   @Override
   public Operation getOperation(String operationName) throws IOException {
-    String json = client.call(jedis -> getOperation(jedis, operationName));
-    return parseOperationJson(json);
+    return client.call(jedis -> getOperation(jedis, operationName));
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -1096,11 +1042,13 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
-  public Set<String> findOperationsByInvocationId(String invocationId) throws IOException {
-    return client.call(
-        jedis -> {
-          return state.operations.getByInvocationId(jedis, invocationId);
-        });
+  @Override
+  public ScanResult<Operation> findOperationsByInvocationId(
+      String invocationId, String cursor, int count) throws IOException {
+    redis.clients.jedis.resps.ScanResult<Operation> scanResult =
+        client.call(
+            jedis -> state.operations.findByInvocationId(jedis, invocationId, cursor, count));
+    return new ScanResult<>(tokenFromRedisCursor(scanResult.getCursor()), scanResult.getResult());
   }
 
   private String extractInvocationId(Operation operation) {
@@ -1162,57 +1110,23 @@ public class RedisShardBackplane implements Backplane {
     return null;
   }
 
-  @SuppressWarnings("ConstantConditions")
-  public Map<String, Operation> getOperationsMap() throws IOException {
-    ImmutableMap.Builder<String, String> builder = new ImmutableMap.Builder<>();
-    client.run(
-        jedis -> {
-          for (Map.Entry<String, String> entry :
-              state.dispatchedOperations.asMap(jedis).entrySet()) {
-            builder.put(entry.getKey(), entry.getValue());
-          }
-        });
-    return Maps.transformValues(builder.build(), RedisShardBackplane::parseOperationJson);
-  }
-
   @Override
-  public Iterable<String> getOperations() {
-    throw new UnsupportedOperationException();
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  @Override
-  public ImmutableList<DispatchedOperation> getDispatchedOperations() throws IOException {
+  public ScanResult<DispatchedOperation> getDispatchedOperations(String cursor, int count)
+      throws IOException {
     ImmutableList.Builder<DispatchedOperation> builder = new ImmutableList.Builder<>();
-    Map<String, String> operations = client.call(jedis -> state.dispatchedOperations.asMap(jedis));
-
-    ImmutableList.Builder<String> invalidOperationNames = new ImmutableList.Builder<>();
-    boolean hasInvalid = false;
+    redis.clients.jedis.resps.ScanResult<Map.Entry<String, String>> scanResult =
+        client.call(jedis -> state.dispatchedOperations.scan(jedis, cursor, count));
     // executor work queue?
-    for (Map.Entry<String, String> entry : operations.entrySet()) {
+    for (Map.Entry<String, String> entry : scanResult.getResult()) {
       try {
         DispatchedOperation.Builder dispatchedOperationBuilder = DispatchedOperation.newBuilder();
         JsonFormat.parser().merge(entry.getValue(), dispatchedOperationBuilder);
         builder.add(dispatchedOperationBuilder.build());
       } catch (InvalidProtocolBufferException e) {
-        log.log(
-            Level.SEVERE,
-            "RedisShardBackplane::getDispatchedOperations: removing invalid operation "
-                + entry.getKey(),
-            e);
-        /* guess we don't want to spin on this */
-        invalidOperationNames.add(entry.getKey());
-        hasInvalid = true;
+        log.log(Level.SEVERE, format("invalid dispatched operation %s", entry.getKey()), e);
       }
     }
-
-    if (hasInvalid) {
-      client.run(
-          jedis -> {
-            state.dispatchedOperations.remove(jedis, invalidOperationNames.build());
-          });
-    }
-    return builder.build();
+    return new ScanResult(tokenFromRedisCursor(scanResult.getCursor()), builder.build());
   }
 
   private ExecuteEntry deprequeueOperation(UnifiedJedis jedis) throws InterruptedException {
@@ -1330,7 +1244,7 @@ public class RedisShardBackplane implements Backplane {
             pollOperation(
                 jedis, operationName, dispatchedEntryJson); // complete our lease to error operation
           } else {
-            Operation operation = parseOperationJson(getOperation(jedis, operationName));
+            Operation operation = getOperation(jedis, operationName);
             boolean requeue =
                 operation != null && !operation.getDone(); // operation removed or completed somehow
             if (state.dispatchedOperations.remove(jedis, operationName) && requeue) {

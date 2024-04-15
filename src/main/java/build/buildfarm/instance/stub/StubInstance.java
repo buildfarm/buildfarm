@@ -147,6 +147,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
@@ -747,7 +748,7 @@ public class StubInstance implements Instance {
                     .setPageToken(pageToken)
                     .build());
     // new streaming interface doesn't really fit with what we're trying to do here...
-    String nextPageToken = "";
+    String nextPageToken = Instance.SENTINEL_PAGE_TOKEN;
     while (replies.hasNext()) {
       GetTreeResponse response = replies.next();
       for (Directory directory : response.getDirectoriesList()) {
@@ -876,7 +877,7 @@ public class StubInstance implements Instance {
 
   @Override
   public String listOperations(
-      int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
+      int pageSize, String pageToken, String filter, Consumer<Operation> onOperation) {
     throwIfStopped();
     ListOperationsResponse response =
         deadlined(operationsBlockingStub)
@@ -887,7 +888,7 @@ public class StubInstance implements Instance {
                     .setPageToken(pageToken)
                     .setFilter(filter)
                     .build());
-    operations.addAll(response.getOperationsList());
+    response.getOperationsList().forEach(onOperation);
     return response.getNextPageToken();
   }
 

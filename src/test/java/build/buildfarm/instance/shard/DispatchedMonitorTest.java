@@ -14,18 +14,22 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.common.Scannable.SENTINEL_PAGE_TOKEN;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.Scannable;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
@@ -38,6 +42,8 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -47,36 +53,56 @@ import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class DispatchedMonitorTest {
-  @Mock private Backplane backplane;
-
   @Mock private BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer;
-
-  private DispatchedMonitor dispatchedMonitor;
 
   @Before
   public void setUp() throws InterruptedException, IOException {
     MockitoAnnotations.initMocks(this);
     when(requeuer.apply(any(QueueEntry.class), any(Duration.class)))
         .thenReturn(immediateFailedFuture(new RuntimeException("unexpected requeue")));
-    dispatchedMonitor = new DispatchedMonitor(backplane, requeuer, /* intervalSeconds= */ 0);
   }
 
   @Test
-  public void shouldStopWhenBackplanIsStopped() {
-    when(backplane.isStopped()).thenReturn(true);
+  public void shouldStopStopsMonitor() {
+    Scannable<DispatchedOperation> location = mock(Scannable.class);
+    DispatchedMonitor dispatchedMonitor =
+        new DispatchedMonitor(
+            /* shouldStop= */ () -> true, location, requeuer, /* intervalSeconds= */ 0);
 
     dispatchedMonitor.run();
-    verify(backplane, atLeastOnce()).isStopped();
+    verifyNoInteractions(location);
     verifyNoInteractions(requeuer);
+  }
+
+  private static final class IterableScannable implements Scannable<DispatchedOperation> {
+    private final Iterable<DispatchedOperation> dispatchedOperations;
+
+    IterableScannable(Iterable<DispatchedOperation> dispatchedOperations) {
+      this.dispatchedOperations = dispatchedOperations;
+    }
+
+    @Override
+    public String getName() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public String scan(int limit, String pageToken, Consumer<DispatchedOperation> onItem) {
+      checkState(limit > 0);
+      checkState(pageToken.equals(SENTINEL_PAGE_TOKEN));
+      dispatchedOperations.forEach(onItem);
+      return SENTINEL_PAGE_TOKEN;
+    }
   }
 
   @Test
   public void shouldIgnoreOperationWithFutureRequeueAt() throws Exception {
-    when(backplane.canQueue()).thenReturn(true);
-    when(backplane.getDispatchedOperations())
-        .thenReturn(
-            ImmutableList.of(
-                DispatchedOperation.newBuilder().setRequeueAt(Long.MAX_VALUE).build()));
+    Iterable<DispatchedOperation> dispatchedOperations =
+        ImmutableList.of(DispatchedOperation.newBuilder().setRequeueAt(Long.MAX_VALUE).build());
+    Scannable<DispatchedOperation> location = new IterableScannable(dispatchedOperations);
+    DispatchedMonitor dispatchedMonitor =
+        new DispatchedMonitor(
+            /* shouldStop= */ () -> false, location, requeuer, /* intervalSeconds= */ 0);
     dispatchedMonitor.iterate();
     verifyNoInteractions(requeuer);
   }
@@ -90,49 +116,30 @@ public class DispatchedMonitorTest {
                     .setOperationName("operation-with-early-requeue-at")
                     .build())
             .build();
-    when(backplane.canQueue()).thenReturn(true);
-    when(backplane.getDispatchedOperations())
-        .thenReturn(
-            ImmutableList.of(
-                DispatchedOperation.newBuilder()
-                    .setRequeueAt(0)
-                    .setQueueEntry(queueEntry)
-                    .build()));
+    Iterable<DispatchedOperation> dispatchedOperations =
+        ImmutableList.of(
+            DispatchedOperation.newBuilder().setRequeueAt(0).setQueueEntry(queueEntry).build());
+    Scannable<DispatchedOperation> location = new IterableScannable(dispatchedOperations);
     when(requeuer.apply(eq(queueEntry), any(Duration.class))).thenReturn(immediateFuture(null));
+    DispatchedMonitor dispatchedMonitor =
+        new DispatchedMonitor(
+            /* shouldStop= */ () -> false, location, requeuer, /* intervalSeconds= */ 0);
     dispatchedMonitor.iterate();
     verify(requeuer, times(1)).apply(queueEntry, Durations.fromSeconds(60));
   }
 
   @Test
-  public void shouldIgnoreOperationWithEarlyRequeueAtWhenBackplaneDisallowsQueueing()
-      throws Exception {
-    QueueEntry queueEntry =
-        QueueEntry.newBuilder()
-            .setExecuteEntry(
-                ExecuteEntry.newBuilder()
-                    .setOperationName("operation-with-early-requeue-at")
-                    .build())
-            .build();
-    when(backplane.canQueue()).thenReturn(false);
-    when(backplane.getDispatchedOperations())
-        .thenReturn(
-            ImmutableList.of(
-                DispatchedOperation.newBuilder()
-                    .setRequeueAt(0)
-                    .setQueueEntry(queueEntry)
-                    .build()));
-    when(requeuer.apply(eq(queueEntry), any(Duration.class))).thenReturn(immediateFuture(null));
-    dispatchedMonitor.iterate();
-    verifyNoInteractions(requeuer);
-  }
-
-  @Test
-  public void shouldIgnoreBackplaneException() throws Exception {
-    when(backplane.canQueue()).thenReturn(true);
-    when(backplane.getDispatchedOperations())
+  public void shouldIgnoreScanException() throws Exception {
+    Scannable<DispatchedOperation> location = mock(Scannable.class);
+    when(location.scan(any(Integer.class), any(String.class), any(Consumer.class)))
         .thenThrow(new IOException("transient error condition"));
+    DispatchedMonitor dispatchedMonitor =
+        new DispatchedMonitor(
+            /* shouldStop= */ () -> false, location, requeuer, /* intervalSeconds= */ 0);
     dispatchedMonitor.iterate();
     verifyNoInteractions(requeuer);
+    verify(location, times(1)).scan(any(Integer.class), any(String.class), any(Consumer.class));
+    verifyNoMoreInteractions(location);
   }
 
   @Test
@@ -144,33 +151,34 @@ public class DispatchedMonitorTest {
                     .setOperationName("operation-with-early-requeue-at")
                     .build())
             .build();
-    when(backplane.canQueue()).thenReturn(true);
-    when(backplane.getDispatchedOperations())
-        .thenReturn(
-            ImmutableList.of(
-                DispatchedOperation.newBuilder()
-                    .setRequeueAt(0)
-                    .setQueueEntry(queueEntry)
-                    .build()));
+    Iterable<DispatchedOperation> dispatchedOperations =
+        ImmutableList.of(
+            DispatchedOperation.newBuilder().setRequeueAt(0).setQueueEntry(queueEntry).build());
+    Scannable<DispatchedOperation> location = new IterableScannable(dispatchedOperations);
     when(requeuer.apply(eq(queueEntry), any(Duration.class)))
         .thenReturn(immediateFailedFuture(new Exception("error during requeue")));
+    DispatchedMonitor dispatchedMonitor =
+        new DispatchedMonitor(
+            /* shouldStop= */ () -> false, location, requeuer, /* intervalSeconds= */ 0);
     dispatchedMonitor.iterate();
     verify(requeuer, times(1)).apply(queueEntry, Durations.fromSeconds(60));
   }
 
   @Test
   public void shouldStopOnInterrupt() throws IOException, InterruptedException {
-    when(backplane.canQueue()).thenReturn(true);
-    when(backplane.getDispatchedOperations()).thenReturn(ImmutableList.of());
     AtomicBoolean readyForInterrupt = new AtomicBoolean(false);
+    Scannable<DispatchedOperation> location = mock(Scannable.class);
     doAnswer(
             (invocation) -> {
               readyForInterrupt.set(true);
-              return ImmutableList.of();
+              return SENTINEL_PAGE_TOKEN;
             })
-        .when(backplane)
-        .getDispatchedOperations();
+        .when(location)
+        .scan(any(Integer.class), any(String.class), any(Consumer.class));
 
+    DispatchedMonitor dispatchedMonitor =
+        new DispatchedMonitor(
+            /* shouldStop= */ () -> false, location, requeuer, /* intervalSeconds= */ 0);
     Thread thread = new Thread(dispatchedMonitor);
     thread.start();
     while (!readyForInterrupt.get()) {
@@ -181,13 +189,18 @@ public class DispatchedMonitorTest {
   }
 
   @Test
-  public void shouldIterateUntilBackplaneIsStopped() throws IOException {
-    when(backplane.canQueue()).thenReturn(true);
-    when(backplane.getDispatchedOperations()).thenReturn(ImmutableList.of());
-    when(backplane.isStopped()).thenReturn(false).thenReturn(true);
+  public void shouldIterateUntilShouldStop() throws IOException {
+    Scannable<DispatchedOperation> location = mock(Scannable.class);
+    when(location.scan(any(Integer.class), any(String.class), any(Consumer.class)))
+        .thenReturn(SENTINEL_PAGE_TOKEN);
+    BooleanSupplier shouldStop = mock(BooleanSupplier.class);
+    when(shouldStop.getAsBoolean()).thenReturn(false).thenReturn(true);
+    DispatchedMonitor dispatchedMonitor =
+        new DispatchedMonitor(shouldStop, location, requeuer, /* intervalSeconds= */ 0);
     dispatchedMonitor.run();
-    verify(backplane, atLeastOnce()).getDispatchedOperations();
-    verify(backplane, times(2)).isStopped();
+    verify(location, atLeastOnce())
+        .scan(any(Integer.class), any(String.class), any(Consumer.class));
+    verify(shouldStop, times(2)).getAsBoolean();
   }
 
   @Test(expected = RuntimeException.class)

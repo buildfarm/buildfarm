@@ -18,7 +18,7 @@ import static com.google.common.util.concurrent.Futures.successfulAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 
-import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.Scannable;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
@@ -30,20 +30,25 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
 class DispatchedMonitor implements Runnable {
-  private final Backplane backplane;
+  private final BooleanSupplier shouldStop;
+  private final Scannable<DispatchedOperation> location;
   private final BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer;
   private final int intervalSeconds;
 
   DispatchedMonitor(
-      Backplane backplane,
+      BooleanSupplier shouldStop,
+      Scannable<DispatchedOperation> location,
       BiFunction<QueueEntry, Duration, ListenableFuture<Void>> requeuer,
       int intervalSeconds) {
-    this.backplane = backplane;
+    this.shouldStop = shouldStop;
+    this.location = location;
     this.requeuer = requeuer;
     this.intervalSeconds = intervalSeconds;
   }
@@ -77,15 +82,13 @@ class DispatchedMonitor implements Runnable {
     log.log(Level.INFO, message);
   }
 
-  private void testDispatchedOperations(
+  private void testDispatchedOperation(
       long now,
-      Iterable<DispatchedOperation> dispatchedOperations,
-      ImmutableList.Builder<ListenableFuture<Void>> requeuedFutures) {
+      DispatchedOperation dispatchedOperation,
+      Consumer<ListenableFuture<Void>> onFuture) {
     // requeue all operations that are over their dispatched duration time
-    for (DispatchedOperation o : dispatchedOperations) {
-      if (now >= o.getRequeueAt()) {
-        requeuedFutures.add(requeueDispatchedOperation(o, now));
-      }
+    if (now >= dispatchedOperation.getRequeueAt()) {
+      onFuture.accept(requeueDispatchedOperation(dispatchedOperation, now));
     }
   }
 
@@ -93,12 +96,17 @@ class DispatchedMonitor implements Runnable {
     ImmutableList.Builder<ListenableFuture<Void>> requeuedFutures = ImmutableList.builder();
     try {
       long now = System.currentTimeMillis(); /* FIXME sync */
-      boolean canQueueNow = backplane.canQueue();
-      if (canQueueNow) {
-        testDispatchedOperations(now, backplane.getDispatchedOperations(), requeuedFutures);
-      }
+      String token = Scannable.SENTINEL_PAGE_TOKEN;
+      do {
+        token =
+            location.scan(
+                100,
+                token,
+                dispatchedOperation ->
+                    testDispatchedOperation(now, dispatchedOperation, requeuedFutures::add));
+      } while (!token.equals(Scannable.SENTINEL_PAGE_TOKEN) && !shouldStop.getAsBoolean());
     } catch (Exception e) {
-      if (!backplane.isStopped()) {
+      if (!shouldStop.getAsBoolean()) {
         log.log(Level.SEVERE, "error during dispatch evaluation", e);
       }
     }
@@ -124,7 +132,7 @@ class DispatchedMonitor implements Runnable {
   }
 
   private void runInterruptibly() throws InterruptedException {
-    while (!backplane.isStopped()) {
+    while (!shouldStop.getAsBoolean()) {
       if (Thread.currentThread().isInterrupted()) {
         throw new InterruptedException();
       }
