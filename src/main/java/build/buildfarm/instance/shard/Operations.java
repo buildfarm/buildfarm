@@ -14,11 +14,24 @@
 
 package build.buildfarm.instance.shard;
 
+import static com.google.common.collect.Iterables.transform;
+import static com.google.common.collect.Lists.newArrayList;
+
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.redis.RedisMap;
-import java.util.Map;
-import java.util.Set;
+import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.QueuedOperationMetadata;
+import com.google.longrunning.Operation;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
+import com.google.rpc.PreconditionFailure;
+import java.util.logging.Level;
+import lombok.extern.java.Log;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class Operations
@@ -28,15 +41,31 @@ import redis.clients.jedis.UnifiedJedis;
  *     invocation has finished so that developers can lookup the status of their build and
  *     information about the operations that ran.
  */
+@Log
 public class Operations {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+  private static final JsonFormat.Parser operationParser =
+      JsonFormat.parser()
+          .usingTypeRegistry(
+              JsonFormat.TypeRegistry.newBuilder()
+                  .add(CompletedOperationMetadata.getDescriptor())
+                  .add(ExecutingOperationMetadata.getDescriptor())
+                  .add(ExecuteOperationMetadata.getDescriptor())
+                  .add(QueuedOperationMetadata.getDescriptor())
+                  .add(PreconditionFailure.getDescriptor())
+                  .build())
+          .ignoringUnknownFields();
+
+  static JsonFormat.Parser getParser() {
+    return operationParser;
+  }
 
   /**
-   * @field operationIds
-   * @brief A mapping from operationID -> operation
-   * @details OperationIDs are unique.
+   * @field operations
+   * @brief A mapping from operationName -> operation
+   * @details Operation names are unique.
    */
-  public RedisMap operationIds;
+  public RedisMap operations;
 
   /**
    * @brief Constructor.
@@ -45,7 +74,7 @@ public class Operations {
    * @param timeout_s When to expire operations.
    */
   public Operations(String name, int timeout_s) {
-    operationIds = new RedisMap(name, timeout_s);
+    operations = new RedisMap(name, timeout_s);
   }
 
   /**
@@ -57,34 +86,59 @@ public class Operations {
    * @note Overloaded.
    * @note Suggested return identifier: operation.
    */
-  public String get(UnifiedJedis jedis, String operationId) {
-    return operationIds.get(jedis, operationId);
+  public Operation get(UnifiedJedis jedis, String name) {
+    return parse(operations.get(jedis, name));
   }
 
   /**
    * @brief Get the operations by operationIDs.
    * @details If the operation does not exist, null is returned.
    * @param jedis Jedis cluster client.
-   * @param searchIds The IDs of the operations.
+   * @param names The names of the operations.
    * @return The json of the operations. null if the operation does not exist.
    * @note Overloaded.
    * @note Suggested return identifier: operations.
    */
-  public Iterable<Map.Entry<String, String>> get(UnifiedJedis jedis, Iterable<String> searchIds) {
-    return operationIds.get(jedis, searchIds);
+  public Iterable<Operation> get(UnifiedJedis jedis, Iterable<String> names) {
+    return transform(operations.get(jedis, names), entry -> Operations.parse(entry.getValue()));
+  }
+
+  private static Operation parse(String operationJson) {
+    if (operationJson != null) {
+      try {
+        Operation.Builder operationBuilder = Operation.newBuilder();
+        operationParser.merge(operationJson, operationBuilder);
+        return operationBuilder.build();
+      } catch (InvalidProtocolBufferException e) {
+        log.log(Level.SEVERE, "error parsing operation from " + operationJson, e);
+      }
+    }
+    return null;
+  }
+
+  private static ScanResult<Operation> parseScanResult(ScanResult<String> scanResult) {
+    return new ScanResult<>(
+        scanResult.getCursor(),
+        newArrayList(
+            transform(
+                scanResult.getResult(), name -> Operation.newBuilder().setName(name).build())));
+  }
+
+  public ScanResult<Operation> scan(UnifiedJedis jedis, String cursor, int count) {
+    return parseScanResult(operations.scan(jedis, cursor, count));
   }
 
   /**
-   * @brief Get the operation by invocationId.
+   * @brief Scan for the operations by invocationId.
    * @details If the invocation does not exist an empty set is returned.
    * @param jedis Jedis cluster client.
-   * @param operationId The ID of the invocation.
-   * @return A set of operation IDs.
-   * @note Overloaded.
-   * @note Suggested return identifier: operationIds.
+   * @param invocationId The ID of the invocation.
+   * @return The scan result
+   * @note Suggested return identifier: operationNames.
    */
-  public Set<String> getByInvocationId(UnifiedJedis jedis, String invocationId) {
-    return jedis.smembers(invocationId);
+  public ScanResult<Operation> findByInvocationId(
+      UnifiedJedis jedis, String invocationId, String cursor, int count) {
+    return parseScanResult(jedis.sscan(invocationId, cursor, new ScanParams().count(count)));
   }
 
   /**
@@ -92,16 +146,15 @@ public class Operations {
    * @details If the operation already exists, then it will be replaced.
    * @param jedis Jedis cluster client.
    * @param invocationId ID of the invocation that the operation is a part of.
-   * @param operationId ID of operation.
+   * @param name name of operation.
    * @param operation Json of the operation.
    */
-  public void insert(
-      UnifiedJedis jedis, String invocationId, String operationId, String operation) {
-    operationIds.insert(jedis, operationId, operation);
+  public void insert(UnifiedJedis jedis, String invocationId, String name, String operation) {
+    operations.insert(jedis, name, operation);
 
     // We also store a mapping from invocationID -> operationIDs
     // This is a common lookup that needs to be performant.
-    if (invocationId != "" && jedis.sadd(invocationId, operationId) == 1) {
+    if (invocationId != "" && jedis.sadd(invocationId, name) == 1) {
       jedis.expire(invocationId, configs.getBackplane().getMaxInvocationIdTimeout());
     }
   }
@@ -113,6 +166,6 @@ public class Operations {
    * @param operationId The ID of the operation.
    */
   public void remove(UnifiedJedis jedis, String operationId) {
-    operationIds.remove(jedis, operationId);
+    operations.remove(jedis, operationId);
   }
 }

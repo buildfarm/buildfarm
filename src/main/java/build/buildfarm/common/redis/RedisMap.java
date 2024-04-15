@@ -14,7 +14,13 @@
 
 package build.buildfarm.common.redis;
 
-import build.buildfarm.common.ScanCount;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.Iterables.addAll;
+import static com.google.common.collect.Iterables.limit;
+import static com.google.common.collect.Iterables.skip;
+import static com.google.common.collect.Iterables.transform;
+import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
+
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +29,8 @@ import java.util.stream.StreamSupport;
 import redis.clients.jedis.PipelineBase;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class RedisMap
@@ -208,5 +216,53 @@ public class RedisMap {
    */
   private String createKeyName(String keyName) {
     return name + ":" + keyName;
+  }
+
+  public ScanResult<String> scan(UnifiedJedis jedis, String mapCursor, int count) {
+    // redis has much worse performance when scanning for small counts
+    // break even is around 5k
+    int scanCount = 5000;
+    // maybe use type regular?
+    int offsetIndex = mapCursor.indexOf('+');
+    int offset = 0;
+    String cursor;
+    if (offsetIndex == -1) {
+      cursor = mapCursor;
+    } else {
+      cursor = mapCursor.substring(0, offsetIndex);
+      offset = Integer.parseInt(mapCursor.substring(offsetIndex + 1));
+      checkState(offset >= 0 && offset < scanCount);
+    }
+    List<String> operationNames = new ArrayList<>(count);
+    int prefixLen = name.length() + 1;
+    boolean atEnd = false;
+    ScanParams scanParams = new ScanParams().count(scanCount).match(createKeyName("*"));
+    while (count > 0 && !atEnd) {
+      ScanResult<String> result = jedis.scan(cursor, scanParams);
+      int size = result.getResult().size();
+      addAll(
+          operationNames,
+          transform(
+              limit(skip(result.getResult(), offset), count),
+              operationName -> operationName.substring(prefixLen)));
+      int available = Math.min(count, size - offset);
+      offset += available;
+      count -= available;
+
+      // advance to the next page if we have exhausted this one
+      if (offset == size) {
+        offset = 0;
+        cursor = result.getCursor();
+      }
+      // last page means that we're done with this loop
+      if (result.getCursor().equals(SCAN_POINTER_START)) {
+        atEnd = true;
+      }
+    }
+    String nextCursor = cursor + "+" + offset;
+    if (atEnd && offset == 0) {
+      nextCursor = SCAN_POINTER_START;
+    }
+    return new ScanResult(nextCursor, operationNames);
   }
 }

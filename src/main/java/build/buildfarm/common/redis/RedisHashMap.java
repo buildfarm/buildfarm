@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.Set;
 import redis.clients.jedis.PipelineBase;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class RedisHashMap
@@ -127,6 +129,10 @@ public class RedisHashMap {
    */
   public Set<String> keys(UnifiedJedis jedis) {
     return jedis.hkeys(name);
+  }
+
+  public ScanResult<Map.Entry<String, String>> scan(UnifiedJedis jedis, String cursor, int count) {
+    return jedis.hscan(name, cursor, new ScanParams().count(count));
   }
 
   /**

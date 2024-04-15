@@ -15,20 +15,17 @@
 package build.buildfarm.tools;
 
 import static build.buildfarm.common.grpc.Channels.createChannel;
+import static build.buildfarm.server.services.OperationsService.LIST_OPERATIONS_MAXIMUM_PAGE_SIZE;
 
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecutionStage;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
-import com.google.common.collect.ImmutableList;
-import com.google.longrunning.Operation;
-import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.ManagedChannel;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 class Hist {
   @SuppressWarnings("ConstantConditions")
-  private static void printHistogramValue(int executing) {
+  private static void printHistogramValue(int dispatched) {
     StringBuilder s = new StringBuilder();
     int p = 0;
     int n = 5;
@@ -36,52 +33,38 @@ class Hist {
       p /= 10;
       n++;
     }
-    int h = executing > 100 ? (100 - n) : executing;
+    int h = dispatched > 100 ? (100 - n) : dispatched;
     for (int i = 0; i < h; i++) {
       s.append('#');
     }
-    if (executing > 100) {
-      s.replace(0, n, "# (" + executing + ") ");
+    if (dispatched > 100) {
+      s.replace(0, n, "# (" + dispatched + ") ");
     }
     System.out.println(s.toString());
   }
 
   @SuppressWarnings("CatchMayIgnoreException")
-  private static void printHistogram(Instance instance) {
-    int executing = 0;
+  private static void printHistogram(Instance instance) throws IOException {
+    AtomicInteger dispatched = new AtomicInteger(0);
 
-    String pageToken = "";
+    String pageToken = Instance.SENTINEL_PAGE_TOKEN;
     do {
-      ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
-      for (; ; ) {
-        try {
-          pageToken = instance.listOperations(1024, pageToken, "", operations);
-        } catch (io.grpc.StatusRuntimeException e) {
-          continue;
-        }
-        break;
-      }
-      for (Operation operation : operations.build()) {
-        try {
-          ExecuteOperationMetadata metadata =
-              operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-          if (metadata.getStage().equals(ExecutionStage.Value.EXECUTING)) {
-            executing++;
-          }
-        } catch (InvalidProtocolBufferException e) {
-        }
-      }
-    } while (!pageToken.equals(""));
-    printHistogramValue(executing);
+      pageToken =
+          instance.listOperations(
+              LIST_OPERATIONS_MAXIMUM_PAGE_SIZE,
+              pageToken,
+              "status=dispatched",
+              name -> dispatched.incrementAndGet());
+    } while (!pageToken.equals(Instance.SENTINEL_PAGE_TOKEN));
+    printHistogramValue(dispatched.get());
   }
 
   @SuppressWarnings("BusyWait")
   public static void main(String[] args) throws Exception {
     String instanceName = args[0];
     String host = args[1];
-    DigestUtil digestUtil = DigestUtil.forHash(args[2]);
     ManagedChannel channel = createChannel(host);
-    Instance instance = new StubInstance(instanceName, digestUtil, channel);
+    Instance instance = new StubInstance(instanceName, /* digestUtil= */ null, channel);
     try {
       //noinspection InfiniteLoopStatement
       for (; ; ) {

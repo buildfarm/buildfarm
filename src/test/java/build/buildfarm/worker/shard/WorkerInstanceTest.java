@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.instance.Instance.SENTINEL_PAGE_TOKEN;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -112,11 +113,14 @@ public class WorkerInstanceTest {
     verify(backplane, times(1)).putActionResult(key, result);
   }
 
-  @Test
+  @Test(expected = UnsupportedOperationException.class)
   public void listOperationsIsUnsupported() {
     ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
     instance.listOperations(
-        /* pageSize= */ 0, /* pageToken= */ "", /* filter= */ "", /* operations= */ operations);
+        /* pageSize= */ 0,
+        /* pageToken= */ SENTINEL_PAGE_TOKEN,
+        /* filter= */ "",
+        /* operations= */ operations::add);
   }
 
   @Test(expected = UnsupportedOperationException.class)
@@ -129,7 +133,7 @@ public class WorkerInstanceTest {
     instance.getTree(
         /* rootDigest= */ Digest.getDefaultInstance(),
         /* pageSize= */ 0,
-        /* pageToken= */ "",
+        /* pageToken= */ SENTINEL_PAGE_TOKEN,
         /* tree= */ Tree.newBuilder());
   }
 

@@ -81,8 +81,6 @@ import build.buildfarm.common.resources.BlobInformation;
 import build.buildfarm.common.resources.DownloadBlobRequest;
 import build.buildfarm.common.resources.ResourceParser;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.operations.EnrichedOperation;
-import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
@@ -992,7 +990,8 @@ public abstract class NodeInstance implements Instance {
               Tree.Builder tree = Tree.newBuilder().setRootDigest(inputRoot);
 
               TokenizableIterator<DirectoryEntry> iterator =
-                  createTreeIterator(reason, inputRoot, /* pageToken= */ "");
+                  createTreeIterator(
+                      reason, inputRoot, /* pageToken= */ Instance.SENTINEL_PAGE_TOKEN);
               while (iterator.hasNext()) {
                 DirectoryEntry entry = iterator.next();
                 Directory directory = entry.getDirectory();
@@ -1746,26 +1745,6 @@ public abstract class NodeInstance implements Instance {
     }
   }
 
-  protected abstract int getListOperationsDefaultPageSize();
-
-  protected abstract int getListOperationsMaxPageSize();
-
-  protected abstract TokenizableIterator<Operation> createOperationsIterator(String pageToken);
-
-  @Override
-  public String listOperations(
-      int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
-    // todo(luxe): add proper pagination
-    FindOperationsResults results = findEnrichedOperations(filter);
-    if (results != null) {
-      for (Map.Entry<String, EnrichedOperation> entry : results.operations.entrySet()) {
-        operations.add(entry.getValue().operation);
-      }
-    }
-
-    return "";
-  }
-
   @Override
   public void deleteOperation(String name) {
     synchronized (operationLock()) {
@@ -1996,16 +1975,6 @@ public abstract class NodeInstance implements Instance {
 
   @Override
   public abstract CasIndexResults reindexCas();
-
-  public abstract FindOperationsResults findEnrichedOperations(String filterPredicate);
-
-  public abstract EnrichedOperation findEnrichedOperation(String operationId);
-
-  public abstract List<Operation> findOperations(String filterPredicate);
-
-  public abstract Set<String> findOperationsByInvocationId(String invocationId);
-
-  public abstract Iterable<Map.Entry<String, String>> getOperations(Set<String> operationIds);
 
   @Override
   public abstract void deregisterWorker(String workerName);

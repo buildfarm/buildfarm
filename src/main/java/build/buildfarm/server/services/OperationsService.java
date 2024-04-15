@@ -15,7 +15,6 @@
 package build.buildfarm.server.services;
 
 import build.buildfarm.instance.Instance;
-import com.google.common.collect.ImmutableList;
 import com.google.longrunning.CancelOperationRequest;
 import com.google.longrunning.DeleteOperationRequest;
 import com.google.longrunning.GetOperationRequest;
@@ -26,8 +25,12 @@ import com.google.longrunning.OperationsGrpc;
 import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 
 public class OperationsService extends OperationsGrpc.OperationsImplBase {
+  public static final int LIST_OPERATIONS_MAXIMUM_PAGE_SIZE = 100;
+  public static final int LIST_OPERATIONS_DEFAULT_PAGE_SIZE = 50;
+
   private final Instance instance;
 
   public OperationsService(Instance instance) {
@@ -38,22 +41,25 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   public void listOperations(
       ListOperationsRequest request, StreamObserver<ListOperationsResponse> responseObserver) {
     int pageSize = request.getPageSize();
-    if (pageSize < 0) {
+    if (pageSize < 0 || pageSize > LIST_OPERATIONS_MAXIMUM_PAGE_SIZE) {
       responseObserver.onError(Status.OUT_OF_RANGE.asException());
       return;
     }
+    if (pageSize == 0) {
+      pageSize = LIST_OPERATIONS_DEFAULT_PAGE_SIZE;
+    }
 
-    ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
-
-    String nextPageToken =
-        instance.listOperations(pageSize, request.getPageToken(), request.getFilter(), operations);
-
-    responseObserver.onNext(
-        ListOperationsResponse.newBuilder()
-            .addAllOperations(operations.build())
-            .setNextPageToken(nextPageToken)
-            .build());
-    responseObserver.onCompleted();
+    // TODO make async
+    try {
+      ListOperationsResponse.Builder response = ListOperationsResponse.newBuilder();
+      response.setNextPageToken(
+          instance.listOperations(
+              pageSize, request.getPageToken(), request.getFilter(), response::addOperations));
+      responseObserver.onNext(response.build());
+      responseObserver.onCompleted();
+    } catch (IOException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
+    }
   }
 
   @Override

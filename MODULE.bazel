@@ -104,7 +104,6 @@ maven.install(
                     "com.google.protobuf:protobuf-java:3.19.1",
                     "com.google.truth:truth:1.1.5",
                     "com.googlecode.json-simple:json-simple:1.1.1",
-                    "com.jayway.jsonpath:json-path:2.8.0",
                     "net.jcip:jcip-annotations:1.0",
                     "org.bouncycastle:bcprov-jdk15on:1.70",
                     "org.slf4j:slf4j-simple:2.0.9",

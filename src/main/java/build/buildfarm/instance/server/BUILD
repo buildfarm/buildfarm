@@ -1,11 +1,6 @@
 java_library(
     name = "server",
-    srcs = [
-        "GetDirectoryFunction.java",
-        "NodeInstance.java",
-        "OperationsMap.java",
-        "WatchFuture.java",
-    ],
+    srcs = glob(["*.java"]),
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
@@ -15,7 +10,6 @@ java_library(
         "//src/main/java/build/buildfarm/common/resources",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/java/build/buildfarm/instance",
-        "//src/main/java/build/buildfarm/operations",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",

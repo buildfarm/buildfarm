@@ -51,6 +51,7 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public interface Instance {
   String getName();
@@ -133,9 +134,12 @@ public interface Instance {
 
   boolean pollOperation(String operationName, ExecutionStage.Value stage);
 
+  String SENTINEL_PAGE_TOKEN = "";
+
   // returns nextPageToken suitable for list restart
   String listOperations(
-      int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations);
+      int pageSize, String pageToken, String filter, Consumer<Operation> operations)
+      throws IOException;
 
   Operation getOperation(String name);
 
