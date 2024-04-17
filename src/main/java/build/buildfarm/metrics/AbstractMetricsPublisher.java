@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
+import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Histogram;
@@ -41,7 +42,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
   private static final Counter operationStatus =
       Counter.build()
           .name("operation_status")
-          .labelNames("status_code")
+          .labelNames("code")
           .help("Operation execution status.")
           .register();
   private static final Counter operationsPerWorker =
@@ -99,8 +100,8 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
                 .build();
         operationStatus
             .labels(
-                Integer.toString(
-                    operationRequestMetadata.getExecuteResponse().getStatus().getCode()))
+                Code.forNumber(operationRequestMetadata.getExecuteResponse().getStatus().getCode())
+                    .name())
             .inc();
         operationExitCode
             .labels(

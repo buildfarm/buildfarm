@@ -78,7 +78,7 @@ Counter for the number of operations in each stage (using a `stage_name` for eac
 
 **operation_status**
 
-Counter for the completed operations status (using a `status_code` label for each individual GRPC code)
+Counter for the completed operations status (using a `code` label for each individual [GRPC status code](https://grpc.github.io/grpc/core/md_doc_statuscodes.html))
 
 **operation_exit_code**
 
