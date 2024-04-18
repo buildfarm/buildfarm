@@ -730,13 +730,13 @@ class Cat {
     if (args.length < 4) {
       usage();
       System.exit(1);
-    } else {
-      String host = args[0];
-      String instanceName = args[1];
-      DigestUtil digestUtil = DigestUtil.forHash(args[2]);
-      String type = args[3];
-      main(host, instanceName, digestUtil, type, Iterables.skip(Lists.newArrayList(args), 4));
     }
+
+    String host = args[0];
+    String instanceName = args[1];
+    DigestUtil digestUtil = DigestUtil.forHash(args[2]);
+    String type = args[3];
+    main(host, instanceName, digestUtil, type, Iterables.skip(Lists.newArrayList(args), 4));
   }
 
   @SuppressWarnings("ThrowFromFinallyBlock")
