@@ -2,7 +2,6 @@ java_library(
     name = "server",
     srcs = ["BuildFarmServer.java"],
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
-    resources = ["//src/main/resources:ui_resources"],
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
