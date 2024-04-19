@@ -62,6 +62,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.common.ZstdDecompressingOutputStream;
+import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.common.io.CountingOutputStream;
@@ -181,11 +182,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Consumer<Iterable<Digest>> onExpire;
   private final Executor accessRecorder;
   private final ExecutorService expireService;
-  private Thread prometheusMetricsThread;
 
   private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newConcurrentMap();
   private final DirectoriesIndex directoriesIndex;
   private final String directoriesIndexDbName;
+  private final FixedBufferPool zstdBufferPool;
   private final LockMap locks = new LockMap();
   @Nullable private final ContentAddressableStorage delegate;
   private final boolean delegateSkipLoad;
@@ -248,6 +249,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @GuardedBy("this")
   private int removedEntryCount = 0;
+
+  private Thread prometheusMetricsThread;
 
   public synchronized long size() {
     return sizeInBytes;
@@ -318,6 +321,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Executor accessRecorder,
       ConcurrentMap<String, Entry> storage,
       String directoriesIndexDbName,
+      FixedBufferPool zstdBufferPool,
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire,
       @Nullable ContentAddressableStorage delegate,
@@ -335,6 +339,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.delegate = delegate;
     this.delegateSkipLoad = delegateSkipLoad;
     this.directoriesIndexDbName = directoriesIndexDbName;
+    this.zstdBufferPool = zstdBufferPool;
 
     entryPathStrategy = new HexBucketEntryPathStrategy(root, hexBucketLevels);
 
@@ -2876,7 +2881,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         direct = true;
         break;
       case ZSTD:
-        out = new ZstdDecompressingOutputStream(countingOut);
+        out = new ZstdDecompressingOutputStream(countingOut, zstdBufferPool);
         direct = false;
         break;
       default:
