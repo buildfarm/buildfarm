@@ -34,6 +34,7 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_prometheus_simpleclient",
         "@maven//:org_apache_commons_commons_compress",
+        "@maven//:org_apache_commons_commons_pool2",
         "@maven//:org_projectlombok_lombok",
         "@maven//:org_threeten_threetenbp",
         "@maven//:redis_clients_jedis",

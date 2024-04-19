@@ -15,13 +15,24 @@
 // This file was copied from the bazel project.
 package build.buildfarm.common;
 
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Throwables.throwIfUnchecked;
+
 import build.buildfarm.common.io.FeedbackOutputStream;
+import com.github.luben.zstd.BufferPool;
 import com.github.luben.zstd.ZstdInputStreamNoFinalizer;
 import com.google.protobuf.ByteString;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import org.apache.commons.pool2.BasePooledObjectFactory;
+import org.apache.commons.pool2.ObjectPool;
+import org.apache.commons.pool2.PooledObject;
+import org.apache.commons.pool2.impl.DefaultPooledObject;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 
 /** An {@link OutputStream} that use zstd to decompress the content. */
 public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
@@ -29,7 +40,65 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
   private ByteArrayInputStream inner;
   private final ZstdInputStreamNoFinalizer zis;
 
-  public ZstdDecompressingOutputStream(OutputStream out) throws IOException {
+  private static class ZstdDInBufferFactory extends BasePooledObjectFactory<ByteBuffer> {
+    static int getBufferSize() {
+      return (int) ZstdInputStreamNoFinalizer.recommendedDInSize();
+    }
+
+    @Override
+    public ByteBuffer create() {
+      return ByteBuffer.allocate(getBufferSize());
+    }
+
+    @Override
+    public PooledObject<ByteBuffer> wrap(ByteBuffer buffer) {
+      return new DefaultPooledObject<>(buffer);
+    }
+  }
+
+  public static final class FixedBufferPool extends GenericObjectPool<ByteBuffer> {
+    private static GenericObjectPoolConfig<ByteBuffer> createPoolConfig(int capacity) {
+      GenericObjectPoolConfig<ByteBuffer> poolConfig = new GenericObjectPoolConfig<>();
+      poolConfig.setMaxTotal(capacity);
+      return poolConfig;
+    }
+
+    public FixedBufferPool(int capacity) {
+      super(new ZstdDInBufferFactory(), createPoolConfig(capacity));
+    }
+  }
+
+  public static class ZstdFixedBufferPool implements BufferPool {
+    private final ObjectPool<ByteBuffer> pool;
+
+    public ZstdFixedBufferPool(ObjectPool<ByteBuffer> pool) {
+      this.pool = pool;
+    }
+
+    @Override
+    public ByteBuffer get(int bufferSize) {
+      // guaranteed through final
+      checkState(bufferSize > 0 && bufferSize <= ZstdDInBufferFactory.getBufferSize());
+      try {
+        return pool.borrowObject();
+      } catch (Exception e) {
+        throwIfUnchecked(e);
+        throw new RuntimeException(e);
+      }
+    }
+
+    @Override
+    public void release(ByteBuffer buffer) {
+      try {
+        pool.returnObject(buffer);
+      } catch (Exception e) {
+        throwIfUnchecked(e);
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  public ZstdDecompressingOutputStream(OutputStream out, FixedBufferPool pool) throws IOException {
     this.out = out;
     zis =
         new ZstdInputStreamNoFinalizer(
@@ -43,7 +112,8 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
                   public int read(byte[] b, int off, int len) {
                     return inner.read(b, off, len);
                   }
-                })
+                },
+                new ZstdFixedBufferPool(pool))
             .setContinuous(true);
   }
 
@@ -66,15 +136,8 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
 
   @Override
   public void close() throws IOException {
-    closeShallow();
-    out.close();
-  }
-
-  /**
-   * Free resources related to decompression without closing the underlying {@link OutputStream}.
-   */
-  public void closeShallow() throws IOException {
     zis.close();
+    out.close();
   }
 
   @Override

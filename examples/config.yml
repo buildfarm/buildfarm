@@ -136,6 +136,7 @@ worker:
     selectForBlockNetwork: false
     selectForTmpFs: false
   createSymlinkOutputs: false
+  zstdBufferPoolSize: 2048
   executionPolicies:
     - name: test
       executionWrapper:

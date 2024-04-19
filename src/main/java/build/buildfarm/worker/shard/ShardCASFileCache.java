@@ -20,6 +20,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,6 +43,7 @@ class ShardCASFileCache extends CASFileCache {
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder,
+      FixedBufferPool zstdBufferPool,
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire,
       ContentAddressableStorage delegate,
@@ -58,6 +60,7 @@ class ShardCASFileCache extends CASFileCache {
         accessRecorder,
         /* storage= */ Maps.newConcurrentMap(),
         DEFAULT_DIRECTORIES_INDEX_NAME,
+        zstdBufferPool,
         onPut,
         onExpire,
         delegate,

@@ -40,6 +40,7 @@ public class Worker {
   private ExecutionPolicy[] executionPolicies = {};
   private SandboxSettings sandboxSettings = new SandboxSettings();
   private boolean createSymlinkOutputs = false;
+  private int zstdBufferPoolSize = 2048; /* * ZSTD_DStreamInSize (current is 128k) == 256MiB */
 
   // These limited resources are only for the individual worker.
   // An example would be hardware resources such as GPUs.
