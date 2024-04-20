@@ -62,7 +62,6 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.common.ZstdDecompressingOutputStream;
-import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.common.io.CountingOutputStream;
@@ -305,31 +304,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       super(
           format("blob %s => %s: committed %d, expected %d", writePath, key, committed, expected));
     }
-  }
-
-  public CASFileCache(
-      Path root,
-      Cas config,
-      long maxEntrySizeInBytes,
-      DigestUtil digestUtil,
-      ExecutorService expireService,
-      Executor accessRecorder) {
-    this(
-        root,
-        config.getMaxSizeBytes(),
-        maxEntrySizeInBytes,
-        config.getHexBucketLevels(),
-        config.isFileDirectoriesIndexInMemory(),
-        config.isExecRootCopyFallback(),
-        digestUtil,
-        expireService,
-        accessRecorder,
-        /* storage= */ Maps.newConcurrentMap(),
-        /* directoriesIndexDbName= */ DEFAULT_DIRECTORIES_INDEX_NAME,
-        /* onPut= */ (digest) -> {},
-        /* onExpire= */ (digests) -> {},
-        /* delegate= */ null,
-        /* delegateSkipLoad= */ false);
   }
 
   public CASFileCache(
