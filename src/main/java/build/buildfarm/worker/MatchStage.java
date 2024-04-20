@@ -15,7 +15,7 @@
 package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
-import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static build.buildfarm.worker.Utils.stopwatchToMicroseconds;
 
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.buildfarm.common.Poller;
@@ -32,6 +32,8 @@ import com.google.protobuf.util.Timestamps;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.checkerframework.checker.units.qual.Prefix;
+import org.checkerframework.checker.units.qual.s;
 
 @Log
 public class MatchStage extends PipelineStage {
@@ -44,16 +46,15 @@ public class MatchStage extends PipelineStage {
   class MatchOperationListener implements MatchListener {
     private OperationContext operationContext;
     private final Stopwatch stopwatch;
-    private long waitStart;
-    private long waitDuration;
+    private @s(Prefix.micro) long waitStart;
+    private @s(Prefix.micro) long waitDuration;
     private Poller poller = null;
-    private QueueEntry queueEntry = null;
     private boolean matched = false;
 
     public MatchOperationListener(OperationContext operationContext, Stopwatch stopwatch) {
       this.operationContext = operationContext;
       this.stopwatch = stopwatch;
-      waitDuration = this.stopwatch.elapsed(MICROSECONDS);
+      waitDuration = stopwatchToMicroseconds(this.stopwatch);
     }
 
     boolean wasMatched() {
@@ -62,12 +63,13 @@ public class MatchStage extends PipelineStage {
 
     @Override
     public void onWaitStart() {
-      waitStart = stopwatch.elapsed(MICROSECONDS);
+      waitStart = stopwatchToMicroseconds(this.stopwatch);
     }
 
     @Override
     public void onWaitEnd() {
-      long elapsedUSecs = stopwatch.elapsed(MICROSECONDS);
+      @s(Prefix.micro)
+      long elapsedUSecs = stopwatchToMicroseconds(this.stopwatch);
       waitDuration += elapsedUSecs - waitStart;
       waitStart = elapsedUSecs;
     }
@@ -99,9 +101,11 @@ public class MatchStage extends PipelineStage {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
       start(operationName);
 
-      long matchingAtUSecs = stopwatch.elapsed(MICROSECONDS);
+      @s(Prefix.micro)
+      long matchingAtUSecs = stopwatchToMicroseconds(this.stopwatch);
       OperationContext matchedOperationContext = match(operationContext);
-      long matchedInUSecs = stopwatch.elapsed(MICROSECONDS) - matchingAtUSecs;
+      @s(Prefix.micro)
+      long matchedInUSecs = stopwatchToMicroseconds(this.stopwatch) - matchingAtUSecs;
       complete(operationName, matchedInUSecs, waitDuration, true);
       matchedOperationContext.poller.pause();
       try {

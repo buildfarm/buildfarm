@@ -14,13 +14,14 @@
 
 package build.buildfarm.worker;
 
+import static build.buildfarm.worker.Utils.ZERO_MICROSECONDS;
+import static build.buildfarm.worker.Utils.stopwatchToMicroseconds;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.protobuf.util.Durations.add;
 import static com.google.protobuf.util.Durations.compare;
 import static com.google.protobuf.util.Durations.fromSeconds;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
-import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -66,6 +67,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
+import org.checkerframework.checker.units.qual.Prefix;
+import org.checkerframework.checker.units.qual.s;
 
 @Log
 class Executor {
@@ -92,7 +95,7 @@ class Executor {
     }
   }
 
-  private long runInterruptible(Stopwatch stopwatch, ResourceLimits limits)
+  private @s(Prefix.micro) long runInterruptible(Stopwatch stopwatch, ResourceLimits limits)
       throws InterruptedException {
     long startedAt = System.currentTimeMillis();
 
@@ -101,7 +104,7 @@ class Executor {
       metadata = operationContext.operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     } catch (InvalidProtocolBufferException e) {
       log.log(Level.SEVERE, "invalid execute operation metadata", e);
-      return 0;
+      return ZERO_MICROSECONDS;
     }
     ExecuteOperationMetadata executingMetadata =
         metadata.toBuilder().setStage(ExecutionStage.Value.EXECUTING).build();
@@ -140,7 +143,7 @@ class Executor {
           String.format(
               "Executor::run(%s): could not transition to EXECUTING", operation.getName()));
       putError();
-      return 0;
+      return ZERO_MICROSECONDS;
     }
 
     // settings for deciding timeout
@@ -193,7 +196,16 @@ class Executor {
     return timeout;
   }
 
-  private long executePolled(
+  /**
+   * @param operation
+   * @param limits
+   * @param policies
+   * @param timeout
+   * @param stopwatch
+   * @return milliseconds elapsed, or 0 upon error.
+   * @throws InterruptedException
+   */
+  private @s(Prefix.micro) long executePolled(
       Operation operation,
       ResourceLimits limits,
       Iterable<ExecutionPolicy> policies,
@@ -274,7 +286,7 @@ class Executor {
       log.log(Level.SEVERE, format("error executing operation %s", operationName), e);
       operationContext.poller.pause();
       putError();
-      return 0;
+      return ZERO_MICROSECONDS;
     }
 
     // switch poller to disable deadline
@@ -290,7 +302,8 @@ class Executor {
     resultBuilder
         .getExecutionMetadataBuilder()
         .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
-    long executeUSecs = stopwatch.elapsed(MICROSECONDS);
+    @s(Prefix.micro)
+    long executeUSecs = stopwatchToMicroseconds(stopwatch);
 
     log.log(
         Level.FINER,
@@ -321,11 +334,14 @@ class Executor {
         }
       }
     }
-    return stopwatch.elapsed(MICROSECONDS) - executeUSecs;
+    return stopwatchToMicroseconds(stopwatch) - executeUSecs;
   }
 
   public void run(ResourceLimits limits) {
+    @SuppressWarnings("units")
+    @s(Prefix.micro)
     long stallUSecs = 0;
+
     Stopwatch stopwatch = Stopwatch.createStarted();
     String operationName = operationContext.operation.getName();
     try {
@@ -367,7 +383,7 @@ class Executor {
         owner.releaseExecutor(
             operationName,
             limits.cpu.claimed,
-            stopwatch.elapsed(MICROSECONDS),
+            stopwatchToMicroseconds(stopwatch),
             stallUSecs,
             exitCode);
       } finally {

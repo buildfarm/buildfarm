@@ -22,6 +22,8 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
 import lombok.extern.java.Log;
+import org.checkerframework.checker.units.qual.Prefix;
+import org.checkerframework.checker.units.qual.s;
 
 @Log
 public class InputFetchStage extends SuperscalarPipelineStage {
@@ -68,13 +70,16 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   }
 
   public void releaseInputFetcher(
-      String operationName, long usecs, long stallUSecs, boolean success) {
+      String operationName,
+      @s(Prefix.micro) long uSecs,
+      @s(Prefix.micro) long stallUSecs,
+      boolean success) {
     int size = removeAndRelease(operationName);
-    inputFetchTime.observe(usecs / 1000.0);
+    inputFetchTime.observe(uSecs / 1000.0);
     inputFetchStallTime.observe(stallUSecs / 1000.0);
     complete(
         operationName,
-        usecs,
+        uSecs,
         stallUSecs,
         String.format("%s, %s", success ? "Success" : "Failure", getUsage(size)));
   }

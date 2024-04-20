@@ -15,12 +15,16 @@
 package build.buildfarm.worker;
 
 import static build.buildfarm.common.io.Utils.stat;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import build.buildfarm.common.io.FileStatus;
+import com.google.common.base.Stopwatch;
 import java.io.IOException;
 import java.nio.file.FileStore;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import org.checkerframework.checker.units.qual.Prefix;
+import org.checkerframework.checker.units.qual.s;
 
 public final class Utils {
   private Utils() {}
@@ -36,4 +40,13 @@ public final class Utils {
       throw new IllegalStateException(e);
     }
   }
+
+  @SuppressWarnings("units")
+  public static @s(Prefix.micro) long stopwatchToMicroseconds(Stopwatch sw) {
+    return sw.elapsed(MICROSECONDS);
+  }
+
+  /** A typed constant for 0 uS (Microseconds) */
+  @SuppressWarnings("units")
+  public static final @s(Prefix.micro) long ZERO_MICROSECONDS = 0;
 }

@@ -20,6 +20,8 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+import org.checkerframework.checker.units.qual.Prefix;
+import org.checkerframework.checker.units.qual.s;
 
 public abstract class SuperscalarPipelineStage extends PipelineStage {
   protected final int width;
@@ -76,8 +78,12 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
   }
 
   @Override
-  protected void complete(String operationName, long usecs, long stallUSecs, String status) {
-    super.complete(operationName, usecs, stallUSecs, status);
+  protected void complete(
+      String operationName,
+      @s(Prefix.micro) long uSecs,
+      @s(Prefix.micro) long stallUSecs,
+      String status) {
+    super.complete(operationName, uSecs, stallUSecs, status);
     synchronized (operationNames) {
       operationNames.remove(operationName);
     }

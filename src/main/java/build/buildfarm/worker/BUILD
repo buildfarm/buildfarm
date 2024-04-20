@@ -1,7 +1,10 @@
 java_library(
     name = "worker",
     srcs = glob(["*.java"]),
-    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
+    plugins = [
+        "//src/main/java/build/buildfarm/common:lombok",
+        "//src/main/java/build/buildfarm/common:checker_units",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//persistentworkers/src/main/java/persistent/bazel:bazel-persistent-workers",
@@ -40,6 +43,8 @@ java_library(
         "@maven//:io_prometheus_simpleclient",
         "@maven//:org_apache_commons_commons_compress",
         "@maven//:org_apache_commons_commons_lang3",
+        "@maven//:org_checkerframework_checker_qual",
+        "@maven//:org_checkerframework_checker_util",
         "@maven//:org_jetbrains_annotations",
         "@maven//:org_projectlombok_lombok",
     ],

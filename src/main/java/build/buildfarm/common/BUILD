@@ -86,3 +86,14 @@ java_plugin(
     visibility = ["//visibility:public"],
     deps = ["@maven//:org_projectlombok_lombok"],
 )
+
+# This runs the "UnitsChecker" from CheckerFramework
+# See also: https://checkerframework.org/manual/#units-checker
+java_plugin(
+    name = "checker_units",
+    processor_class = "org.checkerframework.checker.units.UnitsChecker",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@maven//:org_checkerframework_checker",
+    ],
+)

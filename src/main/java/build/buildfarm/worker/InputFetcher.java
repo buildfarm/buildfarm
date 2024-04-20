@@ -15,9 +15,10 @@
 package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
+import static build.buildfarm.worker.Utils.ZERO_MICROSECONDS;
+import static build.buildfarm.worker.Utils.stopwatchToMicroseconds;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
-import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.Action;
@@ -50,6 +51,8 @@ import java.util.Map;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.checkerframework.checker.units.qual.Prefix;
+import org.checkerframework.checker.units.qual.s;
 
 @Log
 public class InputFetcher implements Runnable {
@@ -94,7 +97,7 @@ public class InputFetcher implements Runnable {
     return constraintFailures;
   }
 
-  private long runInterruptibly(Stopwatch stopwatch) throws InterruptedException {
+  private @s(Prefix.micro) long runInterruptibly(Stopwatch stopwatch) throws InterruptedException {
     final Thread fetcherThread = Thread.currentThread();
     workerContext.resumePoller(
         operationContext.poller,
@@ -167,6 +170,7 @@ public class InputFetcher implements Runnable {
   }
 
   @VisibleForTesting
+  @s(Prefix.micro)
   long fetchPolled(Stopwatch stopwatch) throws InterruptedException {
     String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
     log.log(Level.FINER, format("fetching inputs: %s", operationName));
@@ -189,7 +193,7 @@ public class InputFetcher implements Runnable {
             Level.SEVERE,
             format("invalid queued operation: %s", String.join(" ", constraintFailures)));
         owner.error().put(operationContext);
-        return 0;
+        return ZERO_MICROSECONDS;
       }
 
       directoriesIndex = new ProxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap());
@@ -210,7 +214,7 @@ public class InputFetcher implements Runnable {
         log.log(Level.SEVERE, format("error creating exec dir for %s", operationName), e);
       }
       failOperation(status.build());
-      return 0;
+      return ZERO_MICROSECONDS;
     }
     success = true;
 
@@ -230,10 +234,11 @@ public class InputFetcher implements Runnable {
     // we are now responsible for destroying the exec dir if anything goes wrong
     boolean completed = false;
     try {
-      long fetchUSecs = stopwatch.elapsed(MICROSECONDS);
+      @s(Prefix.micro)
+      long fetchUSecs = stopwatchToMicroseconds(stopwatch);
       proceedToOutput(queuedOperation.getAction(), command, execDir, queuedOperation.getTree());
       completed = true;
-      return stopwatch.elapsed(MICROSECONDS) - fetchUSecs;
+      return stopwatchToMicroseconds(stopwatch) - fetchUSecs;
     } finally {
       if (!completed) {
         try {
@@ -285,7 +290,10 @@ public class InputFetcher implements Runnable {
 
   @Override
   public void run() {
+    @SuppressWarnings("units")
+    @s(Prefix.micro)
     long stallUSecs = 0;
+
     String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
     Stopwatch stopwatch = Stopwatch.createStarted();
     try {
@@ -312,7 +320,7 @@ public class InputFetcher implements Runnable {
       // allow release to occur without interrupted state
       try {
         owner.releaseInputFetcher(
-            operationName, stopwatch.elapsed(MICROSECONDS), stallUSecs, success);
+            operationName, stopwatchToMicroseconds(stopwatch), stallUSecs, success);
       } finally {
         if (wasInterrupted) {
           Thread.currentThread().interrupt();

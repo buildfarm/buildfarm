@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.extern.java.Log;
+import org.checkerframework.checker.units.qual.Prefix;
+import org.checkerframework.checker.units.qual.s;
 
 @Log
 public class ExecuteActionStage extends SuperscalarPipelineStage {
@@ -103,13 +105,17 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   public void releaseExecutor(
-      String operationName, int claims, long usecs, long stallUSecs, int exitCode) {
+      String operationName,
+      int claims,
+      @s(Prefix.micro) long uSecs,
+      @s(Prefix.micro) long stallUSecs,
+      int exitCode) {
     int slotUsage = removeAndRelease(operationName, claims);
-    executionTime.observe(usecs / 1000.0);
-    executionStallTime.observe(stallUSecs / 1000.0);
+    executionTime.observe(TimeUnit.MILLISECONDS.convert(uSecs, TimeUnit.MICROSECONDS));
+    executionStallTime.observe(TimeUnit.MILLISECONDS.convert(stallUSecs, TimeUnit.MICROSECONDS));
     complete(
         operationName,
-        usecs,
+        uSecs,
         stallUSecs,
         String.format("exit code: %d, %s", exitCode, getUsage(slotUsage)));
   }
