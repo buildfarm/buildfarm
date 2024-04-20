@@ -1251,12 +1251,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
       return mutex;
     }
-
-    private synchronized void release(Path key) {
-      // prevents this lock from being exclusive to other accesses, since it
-      // must now be present
-      mutexes.remove(key);
-    }
   }
 
   private static final class FileEntryKey {
