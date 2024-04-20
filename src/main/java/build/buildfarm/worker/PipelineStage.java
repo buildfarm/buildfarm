@@ -17,7 +17,6 @@ package build.buildfarm.worker;
 import static build.buildfarm.worker.Utils.stopwatchToMicroseconds;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
-import static org.checkerframework.checker.units.util.UnitsTools.*;
 
 import com.google.common.base.Stopwatch;
 import java.util.logging.Level;
