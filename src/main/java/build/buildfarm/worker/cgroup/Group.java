@@ -114,7 +114,7 @@ public final class Group {
     }
   }
 
-  @SuppressWarnings("StatementWithEmptyBody")
+  @SuppressWarnings({"StatementWithEmptyBody", "PMD.EmptyControlStatement"})
   public void killUntilEmpty(String controllerName) throws IOException {
     while (!killAllProcs(controllerName))
       ;

@@ -1244,6 +1244,7 @@ class CASFileCacheTest {
               }
             },
             "FirstRequest");
+    @SuppressWarnings("PMD.EmptyControlStatement")
     Thread write2 =
         new Thread(
             () -> {
