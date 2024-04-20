@@ -45,7 +45,7 @@ import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
-public class Util {
+public final class Util {
   public static final Predicate<Status> SHARD_IS_RETRIABLE =
       st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.apply(st);
 

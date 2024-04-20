@@ -20,7 +20,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 
-public class ExecutionPolicies {
+public final class ExecutionPolicies {
   private static final String EXECUTION_POLICY_PROPERTY_NAME = "execution-policy";
   private static final String DEFAULT_EXECUTION_POLICY_NAME = "";
 

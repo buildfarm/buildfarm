@@ -40,7 +40,7 @@ import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
-public class Directories {
+public final class Directories {
   private static final Set<PosixFilePermission> writablePerms =
       PosixFilePermissions.fromString("rwxr-xr-x");
   private static final Set<PosixFilePermission> nonWritablePerms =
