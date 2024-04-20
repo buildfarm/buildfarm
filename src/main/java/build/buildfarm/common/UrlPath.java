@@ -19,8 +19,10 @@ import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.resources.Resource;
 import build.buildfarm.common.resources.ResourceParser;
 import java.util.UUID;
+import lombok.Getter;
 
 public class UrlPath {
+  @Getter
   public static class InvalidResourceNameException extends Exception {
     private final String resourceName;
 
@@ -32,10 +34,6 @@ public class UrlPath {
     public InvalidResourceNameException(String resourceName, String message, Throwable cause) {
       super(message, cause);
       this.resourceName = resourceName;
-    }
-
-    public String getResourceName() {
-      return resourceName;
     }
 
     @Override

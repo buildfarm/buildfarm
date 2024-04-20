@@ -28,6 +28,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Stack;
 import javax.annotation.Nullable;
+import lombok.Getter;
 
 public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryEntry> {
   private final DirectoryFetcher directoryFetcher;
@@ -97,6 +98,7 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
     }
   }
 
+  @Getter
   public static class DirectoryEntry {
     private final Digest digest;
     @Nullable private final Directory directory;
@@ -104,15 +106,6 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
     public DirectoryEntry(Digest digest, @Nullable Directory directory) {
       this.digest = digest;
       this.directory = directory;
-    }
-
-    public Digest getDigest() {
-      return digest;
-    }
-
-    @Nullable
-    public Directory getDirectory() {
-      return directory;
     }
   }
 

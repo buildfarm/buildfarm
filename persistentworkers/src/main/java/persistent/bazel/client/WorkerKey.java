@@ -9,6 +9,8 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.SortedMap;
 
+import lombok.Getter;
+
 /**
  * Based off of copy-pasting from Bazel's WorkerKey.
  * Comments also ripped off, credits to the Bazel Authors.
@@ -18,15 +20,22 @@ import java.util.SortedMap;
  */
 public final class WorkerKey {
 
+  @Getter
   private final ImmutableList<String> cmd;
 
+  @Getter
   private final ImmutableList<String> args;
 
+  @Getter
   private final ImmutableMap<String, String> env;
 
+  @Getter
   private final Path execRoot;
 
-  /** Mnemonic of the worker; but we don't actually have the real action mnemonic */
+  /**
+   * Mnemonic of the worker; but we don't actually have the real action mnemonic
+   */
+  @Getter
   private final String mnemonic;
 
   /**
@@ -34,19 +43,29 @@ public final class WorkerKey {
    * uniquely identify a kind of worker, thus it is not to be used by the .equals() / .hashCode()
    * methods.
    */
+  @Getter
   private final HashCode workerFilesCombinedHash;
 
-  /** Worker files with the corresponding hash code.
+  /**
+   * Worker files with the corresponding hash code.
    *
-   *  These paths should be stable, so use relative paths
-   *  (unless its a universal absolute path like /tmp/my_tools/...)
-   * */
+   * These paths should be stable, so use relative paths
+   * (unless it's a universal absolute path like /tmp/my_tools/...)
+   */
+  @Getter
   private final SortedMap<Path, HashCode> workerFilesWithHashes;
 
-  /** If true, the workers run inside a sandbox. */
+  /**
+   * If true, the workers run inside a sandbox.
+   * Returns true if workers are sandboxed.
+   */
+  @Getter
   private final boolean sandboxed;
 
-  /** If true, the workers for this key are able to cancel work requests. */
+  /**
+   * If true, the workers for this key are able to cancel work requests.
+   */
+  @Getter
   private final boolean cancellable;
 
   /**
@@ -79,50 +98,6 @@ public final class WorkerKey {
     this.workerFilesWithHashes = Preconditions.checkNotNull(workerFilesWithHashes);
 
     this.hash = calculateHashCode();
-  }
-
-  /** Getter function for variable cmd. */
-  public ImmutableList<String> getCmd() {
-    return cmd;
-  }
-
-  /** Getter function for variable args. */
-  public ImmutableList<String> getArgs() {
-    return args;
-  }
-
-  /** Getter function for variable env. */
-  public ImmutableMap<String, String> getEnv() {
-    return env;
-  }
-
-  /** Getter function for variable execRoot. */
-  public Path getExecRoot() {
-    return execRoot;
-  }
-
-  /** Getter function for variable mnemonic. */
-  public String getMnemonic() {
-    return mnemonic;
-  }
-
-  /** Getter function for variable workerFilesCombinedHash. */
-  public HashCode getWorkerFilesCombinedHash() {
-    return workerFilesCombinedHash;
-  }
-
-  /** Getter function for variable workerFilesWithHashes. */
-  public SortedMap<Path, HashCode> getWorkerFilesWithHashes() {
-    return workerFilesWithHashes;
-  }
-
-  /** Returns true if workers are sandboxed. */
-  public boolean isSandboxed() {
-    return sandboxed;
-  }
-
-  public boolean isCancellable() {
-    return cancellable;
   }
 
   @Override

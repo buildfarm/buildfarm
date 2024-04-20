@@ -21,15 +21,16 @@ import com.google.common.base.Stopwatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import lombok.Getter;
 
 public abstract class PipelineStage implements Runnable {
-  protected final String name;
+  @Getter protected final String name;
   protected final WorkerContext workerContext;
   protected final PipelineStage output;
   protected final PipelineStage error;
 
   protected boolean claimed = false;
-  private volatile boolean closed = false;
+  @Getter private volatile boolean closed = false;
   private Thread tickThread = null;
   private boolean tickCancelledFlag = false;
   private String operationName = null;
@@ -40,10 +41,6 @@ public abstract class PipelineStage implements Runnable {
     this.workerContext = workerContext;
     this.output = output;
     this.error = error;
-  }
-
-  public String getName() {
-    return name;
   }
 
   protected void runInterruptible() throws InterruptedException {
@@ -220,10 +217,6 @@ public abstract class PipelineStage implements Runnable {
 
   public void close() {
     closed = true;
-  }
-
-  public boolean isClosed() {
-    return closed;
   }
 
   protected boolean isClaimed() {

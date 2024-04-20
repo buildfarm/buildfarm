@@ -18,6 +18,7 @@ import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import lombok.Getter;
 
 /** Directory entry representation returned by . */
 public final class Dirent implements Serializable, Comparable<Dirent> {
@@ -33,8 +34,8 @@ public final class Dirent implements Serializable, Comparable<Dirent> {
     UNKNOWN
   }
 
-  private final String name;
-  private final Type type;
+  @Getter private final String name;
+  @Getter private final Type type;
   @Nullable private final FileStatus stat;
 
   /** Creates a new dirent with the given name and type, both of which must be non-null. */
@@ -43,14 +44,6 @@ public final class Dirent implements Serializable, Comparable<Dirent> {
     this.name = Preconditions.checkNotNull(name);
     this.type = Preconditions.checkNotNull(type);
     this.stat = stat;
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public Type getType() {
-    return type;
   }
 
   @Nullable

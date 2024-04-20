@@ -12,6 +12,7 @@ import com.google.protobuf.GeneratedMessageV3;
 
 import org.apache.commons.io.IOUtils;
 
+import lombok.Getter;
 import persistent.common.processes.ProcessWrapper;
 
 /**
@@ -30,6 +31,7 @@ import persistent.common.processes.ProcessWrapper;
  */
 public class ProtoWorkerRW {
 
+  @Getter
   private final ProcessWrapper processWrapper;
 
   private final InputStream readStream;
@@ -40,10 +42,6 @@ public class ProtoWorkerRW {
     this.processWrapper = processWrapper;
     this.readStream = processWrapper.getStdOut();
     this.writeStream = processWrapper.getStdIn();
-  }
-
-  public ProcessWrapper getProcessWrapper() {
-    return this.processWrapper;
   }
 
   public void write(WorkRequest req) throws IOException {

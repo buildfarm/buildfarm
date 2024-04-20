@@ -18,8 +18,10 @@ import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
+import lombok.Getter;
 
 /** An exception to indicate failed retry attempts. */
+@Getter
 public final class RetryException extends IOException {
   private static final long serialVersionUID = 1;
 
@@ -28,10 +30,6 @@ public final class RetryException extends IOException {
   public RetryException(Throwable cause, int retryAttempts) {
     super(cause);
     this.attempts = retryAttempts + 1;
-  }
-
-  public int getAttempts() {
-    return attempts;
   }
 
   public boolean causedByStatusCode(Code code) {

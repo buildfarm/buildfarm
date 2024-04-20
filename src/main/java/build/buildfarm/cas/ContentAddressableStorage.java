@@ -30,6 +30,7 @@ import io.grpc.stub.ServerCallStreamObserver;
 import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nullable;
+import lombok.Getter;
 import net.jcip.annotations.ThreadSafe;
 
 @ThreadSafe
@@ -44,6 +45,7 @@ public interface ContentAddressableStorage extends InputStreamFactory {
    * Blob storage for the CAS. This class should be used at all times when interacting with complete
    * blobs in order to cut down on independent digest computation.
    */
+  @Getter
   final class Blob {
     private final Digest digest;
     private final ByteString data;
@@ -56,14 +58,6 @@ public interface ContentAddressableStorage extends InputStreamFactory {
     public Blob(ByteString data, Digest digest) {
       this.data = data;
       this.digest = digest;
-    }
-
-    public Digest getDigest() {
-      return digest;
-    }
-
-    public ByteString getData() {
-      return data;
     }
 
     public long size() {

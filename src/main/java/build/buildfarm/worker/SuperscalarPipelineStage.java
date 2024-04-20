@@ -20,9 +20,10 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+import lombok.Getter;
 
 public abstract class SuperscalarPipelineStage extends PipelineStage {
-  protected final int width;
+  @Getter protected final int width;
 
   @SuppressWarnings("rawtypes")
   protected final BlockingQueue claims;
@@ -53,10 +54,6 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
   @Override
   public String getOperationName() {
     throw new UnsupportedOperationException("use getOperationNames on superscalar stages");
-  }
-
-  public int getWidth() {
-    return width;
   }
 
   public abstract int getSlotUsage();

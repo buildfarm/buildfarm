@@ -30,6 +30,7 @@ import io.grpc.Deadline;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
+import lombok.Getter;
 import lombok.extern.java.Log;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -39,16 +40,12 @@ import org.junit.runners.JUnit4;
 @Log
 public class InputFetchStageTest {
   static class PipelineSink extends PipelineStage {
-    private final List<OperationContext> operationContexts = Lists.newArrayList();
+    @Getter private final List<OperationContext> operationContexts = Lists.newArrayList();
     private final Predicate<OperationContext> onPutShouldClose;
 
     PipelineSink(Predicate<OperationContext> onPutShouldClose) {
       super("Sink", null, null, null);
       this.onPutShouldClose = onPutShouldClose;
-    }
-
-    public List<OperationContext> getOperationContexts() {
-      return operationContexts;
     }
 
     @Override

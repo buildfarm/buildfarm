@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Supplier;
+import lombok.Getter;
 
 /**
  * Splits a data source into one or more {@link Chunk}s of at most {@code chunkSize} bytes.
@@ -88,12 +89,12 @@ public final class Chunker {
   }
 
   private final Supplier<InputStream> dataSupplier;
-  private final long size;
+  @Getter private final long size;
   private final int chunkSize;
   private final Chunk emptyChunk;
 
   private InputStream data;
-  private long offset;
+  @Getter private long offset;
   private byte[] chunkCache;
 
   // Set to true on the first call to next(). This is so that the Chunker can open its data source
@@ -105,14 +106,6 @@ public final class Chunker {
     this.size = size;
     this.chunkSize = chunkSize;
     this.emptyChunk = new Chunk(ByteString.EMPTY, 0);
-  }
-
-  public long getOffset() {
-    return offset;
-  }
-
-  public long getSize() {
-    return size;
   }
 
   /**
