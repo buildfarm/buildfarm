@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import lombok.Getter;
 
 /** Utility methods to work with {@link Digest}. */
 public class DigestUtil {
@@ -46,7 +47,7 @@ public class DigestUtil {
     SHA256(Hashing.sha256()),
     BLAKE3(new Blake3HashFunction());
 
-    private final com.google.common.hash.HashFunction hash;
+    @Getter private final com.google.common.hash.HashFunction hash;
     final HashCode empty;
 
     HashFunction(com.google.common.hash.HashFunction hash) {
@@ -103,10 +104,6 @@ public class DigestUtil {
       }
     }
 
-    public com.google.common.hash.HashFunction getHash() {
-      return hash;
-    }
-
     public boolean isValidHexDigest(String hexDigest) {
       return hexDigest != null && hexDigest.length() * 8 / 2 == hash.bits();
     }
@@ -120,12 +117,9 @@ public class DigestUtil {
    * A special type of Digest that is used only as a remote action cache key. This is a separate
    * type in order to prevent accidentally using other Digests as action keys.
    */
+  @Getter
   public static final class ActionKey {
     private final Digest digest;
-
-    public Digest getDigest() {
-      return digest;
-    }
 
     private ActionKey(Digest digest) {
       this.digest = digest;

@@ -19,10 +19,11 @@ import java.io.Serializable;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import lombok.Getter;
 
 /** Directory entry representation returned by . */
 public final class PosixDirent implements Serializable, Comparable<PosixDirent> {
-  private final String name;
+  @Getter private final String name;
   @Nullable private final PosixFileAttributes stat;
 
   /** Creates a new posix dirent with the given name */
@@ -30,10 +31,6 @@ public final class PosixDirent implements Serializable, Comparable<PosixDirent> 
   public PosixDirent(String name, PosixFileAttributes stat) {
     this.name = Preconditions.checkNotNull(name);
     this.stat = stat;
-  }
-
-  public String getName() {
-    return name;
   }
 
   @Nullable

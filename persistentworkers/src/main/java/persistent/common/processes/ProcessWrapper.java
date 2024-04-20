@@ -21,6 +21,8 @@ import static java.nio.file.StandardOpenOption.WRITE;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import lombok.Getter;
+
 /**
  * Wraps a process, giving it a (possible different) working directory and environment variables.
  * Redirects stderr to a file under its working dir using a random uuid, i.e. "{{randomUUID()}}.stderr"
@@ -34,6 +36,7 @@ public class ProcessWrapper implements Closeable {
 
   private final Process process;
 
+  @Getter
   private final Path workRoot;
 
   private final ImmutableList<String> args;
@@ -90,10 +93,6 @@ public class ProcessWrapper implements Closeable {
 
   public ImmutableList<String> getInitialArgs() {
     return this.args;
-  }
-
-  public Path getWorkRoot() {
-    return this.workRoot;
   }
 
   public OutputStream getStdIn() {

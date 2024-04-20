@@ -136,6 +136,7 @@ import java.util.function.Supplier;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
+import lombok.Getter;
 import lombok.extern.java.Log;
 import org.json.simple.JSONObject;
 
@@ -171,7 +172,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
-  private final Path root;
+  @Getter private final Path root;
   private final EntryPathStrategy entryPathStrategy;
   private final long maxSizeInBytes;
   private final long maxEntrySizeInBytes;
@@ -1733,10 +1734,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  public Path getRoot() {
-    return root;
-  }
-
   public Path getPath(String filename) {
     return entryPathStrategy.getPath(filename);
   }
@@ -2270,16 +2267,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   public static class PathResult {
-    private final Path path;
+    @Getter private final Path path;
     private final boolean missed;
 
     public PathResult(Path path, boolean missed) {
       this.path = path;
       this.missed = missed;
-    }
-
-    public Path getPath() {
-      return path;
     }
 
     public boolean getMissed() {

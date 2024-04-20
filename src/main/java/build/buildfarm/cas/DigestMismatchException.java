@@ -17,7 +17,9 @@ package build.buildfarm.cas;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import java.io.IOException;
+import lombok.Getter;
 
+@Getter
 public class DigestMismatchException extends IOException {
   private final Digest actual;
   private final Digest expected;
@@ -29,13 +31,5 @@ public class DigestMismatchException extends IOException {
             DigestUtil.toString(actual), DigestUtil.toString(expected)));
     this.actual = actual;
     this.expected = expected;
-  }
-
-  public Digest getActual() {
-    return actual;
-  }
-
-  public Digest getExpected() {
-    return expected;
   }
 }

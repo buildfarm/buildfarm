@@ -14,6 +14,7 @@ import com.google.common.hash.HashCode;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
 
+import lombok.Getter;
 import persistent.bazel.processes.ProtoWorkerRW;
 import persistent.common.Worker;
 import persistent.common.processes.ProcessWrapper;
@@ -38,8 +39,11 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
 
   public static final String TOOL_INPUT_SUBDIR = "tool_inputs";
 
+  @Getter
   private final WorkerKey key;
+  @Getter
   private final ImmutableList<String> initCmd;
+  @Getter
   private final Path execRoot;
   private final ProtoWorkerRW workerRW;
 
@@ -108,18 +112,6 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
       e.printStackTrace();
       return "flushStdErr Exception: " + e;
     }
-  }
-
-  public WorkerKey getKey() {
-    return this.key;
-  }
-
-  public ImmutableList<String> getInitCmd() {
-    return this.initCmd;
-  }
-
-  public Path getExecRoot() {
-    return this.execRoot;
   }
 
   private void logRequest(WorkRequest request) {

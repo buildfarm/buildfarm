@@ -19,10 +19,11 @@ import java.io.Serializable;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import jnr.posix.FileStat;
+import lombok.Getter;
 
 /** Directory entry representation returned by . */
 public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
-  private final String name;
+  @Getter private final String name;
   @Nullable private final FileStat stat;
 
   /** Creates a new jnr dirent with the given name */
@@ -30,10 +31,6 @@ public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
   public JnrDirent(String name, FileStat stat) {
     this.name = Preconditions.checkNotNull(name);
     this.stat = stat;
-  }
-
-  public String getName() {
-    return name;
   }
 
   @Nullable

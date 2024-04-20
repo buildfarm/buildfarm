@@ -14,6 +14,9 @@
 
 package build.buildfarm.common.io;
 
+import lombok.Getter;
+
+@Getter
 public class NamedFileKey {
   private final String name;
   private final FileStatus fileStatus;
@@ -23,17 +26,5 @@ public class NamedFileKey {
     this.name = name;
     this.fileKey = fileKey;
     this.fileStatus = fileStatus;
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public Object getFileKey() {
-    return fileKey;
-  }
-
-  public FileStatus getFileStatus() {
-    return fileStatus;
   }
 }

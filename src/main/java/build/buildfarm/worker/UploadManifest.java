@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import lombok.Getter;
 
 /** FIXME move into worker implementation and implement 'fast add' with this for sharding */
 public class UploadManifest {
@@ -45,7 +46,10 @@ public class UploadManifest {
   private final FileStore fileStore;
   private final boolean allowSymlinks;
   private final int inlineContentLimit;
-  private final Map<Digest, Path> digestToFile;
+
+  /** -- GETTER -- Map of digests to file paths to upload. */
+  @Getter private final Map<Digest, Path> digestToFile;
+
   private final Map<Digest, Chunker> digestToChunkers;
   private transient int inlineContentBytes;
 
@@ -115,11 +119,6 @@ public class UploadManifest {
         illegalOutput(dir);
       }
     }
-  }
-
-  /** Map of digests to file paths to upload. */
-  public Map<Digest, Path> getDigestToFile() {
-    return digestToFile;
   }
 
   /**

@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableList;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import lombok.Getter;
 import redis.clients.jedis.Jedis;
 
 /**
@@ -46,8 +47,9 @@ public class RedisPriorityQueue implements Queue<String> {
    * @brief The unique name of the queue.
    * @details The name is used by the redis cluster client to access the queue data. If two queues
    *     had the same name, they would be instances of the same underlying redis queue.
+   * @return The name of the queue.
    */
-  private final String name;
+  @Getter private final String name;
 
   private final String script;
   private final Clock clock;
@@ -187,16 +189,6 @@ public class RedisPriorityQueue implements Queue<String> {
       return val;
     }
     return null;
-  }
-
-  /**
-   * @brief Get name.
-   * @details Get the name of the queue. this is the redis key used for the list.
-   * @return The name of the queue.
-   * @note Suggested return identifier: name.
-   */
-  public String getName() {
-    return name;
   }
 
   /**

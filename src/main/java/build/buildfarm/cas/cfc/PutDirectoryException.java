@@ -18,11 +18,12 @@ import build.bazel.remote.execution.v2.Digest;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import lombok.Getter;
 
 public class PutDirectoryException extends IOException {
   private final Path path;
-  private final Digest digest;
-  private final List<Throwable> exceptions;
+  @Getter private final Digest digest;
+  @Getter private final List<Throwable> exceptions;
 
   private static String getErrorMessage(Path path, List<Throwable> exceptions) {
     return String.format("%s: %d %s: %s", path, exceptions.size(), "exceptions", exceptions);
@@ -41,13 +42,5 @@ public class PutDirectoryException extends IOException {
 
   Path getPath() {
     return path;
-  }
-
-  public Digest getDigest() {
-    return digest;
-  }
-
-  public List<Throwable> getExceptions() {
-    return exceptions;
   }
 }

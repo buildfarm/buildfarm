@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
+import lombok.Getter;
 import redis.clients.jedis.Connection;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
@@ -55,8 +56,9 @@ public class BalancedRedisQueue {
    * @brief The unique name of the queue.
    * @details The name is used as a template for the internal queues distributed across nodes.
    *     Hashtags are added to this base name. This name will not contain a redis hashtag.
+   * @return The base name of the queue.
    */
-  private final String name;
+  @Getter private final String name;
 
   /**
    * @field originalHashtag
@@ -345,17 +347,6 @@ public class BalancedRedisQueue {
    */
   public String getDequeueName() {
     return name + "_dequeue";
-  }
-
-  /**
-   * @brief Get name.
-   * @details Get the name of the queue. this is the redis key used as base name for internal
-   *     queues.
-   * @return The base name of the queue.
-   * @note Suggested return identifier: name.
-   */
-  public String getName() {
-    return name;
   }
 
   // annoying that there's no inject/accumulate
