@@ -99,6 +99,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.stubbing.Answer;
 
+@SuppressWarnings("PMD.TestClassWithoutTestCases")
 class CASFileCacheTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 

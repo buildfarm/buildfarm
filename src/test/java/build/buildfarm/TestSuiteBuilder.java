@@ -24,6 +24,7 @@ import junit.framework.TestCase;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 
+@SuppressWarnings("PMD.TestClassWithoutTestCases")
 final class TestSuiteBuilder {
   private static class TestClassNameComparator implements Comparator<Class<?>> {
     @Override

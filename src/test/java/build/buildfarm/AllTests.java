@@ -19,6 +19,7 @@ import org.junit.runner.RunWith;
 
 /** General test suite with defaults suitable for most of our tests. */
 @RunWith(CustomSuite.class)
+@SuppressWarnings("PMD.TestClassWithoutTestCases")
 public class AllTests {
   private TestSuiteBuilder getBuilder() {
     return new TestSuiteBuilder().addPackageRecursive("build.buildfarm");

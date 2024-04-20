@@ -79,6 +79,7 @@ public class PipelineTest {
 
   // Create a test stage that exists because of an interrupt.
   // This proves the stage can be interupted.
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public class TestStage extends PipelineStage {
     public TestStage(String name) {
       super(name, null, null, null);

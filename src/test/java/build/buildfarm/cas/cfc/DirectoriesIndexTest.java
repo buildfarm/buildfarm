@@ -33,6 +33,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+@SuppressWarnings("PMD.TestClassWithoutTestCases")
 public class DirectoriesIndexTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
@@ -106,6 +107,7 @@ public class DirectoriesIndexTest {
 
   // Testing SqliteFileDirectoriesIndex implementation
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class WindowsSqliteDirectoriesIndexTest extends DirectoriesIndexTest {
     public WindowsSqliteDirectoriesIndexTest() {
       super(
@@ -121,6 +123,7 @@ public class DirectoriesIndexTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class UnixSqliteDirectoriesIndexTest extends DirectoriesIndexTest {
     public UnixSqliteDirectoriesIndexTest() {
       super(
@@ -136,6 +139,7 @@ public class DirectoriesIndexTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class OsSqliteDirectoriesIndexTest extends DirectoriesIndexTest {
     public OsSqliteDirectoriesIndexTest() {
       super(
@@ -152,6 +156,7 @@ public class DirectoriesIndexTest {
 
   // Testing MemoryFileDirectoriesIndex (using ConcurrentHashMap) implementation
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class WindowsMemoryFileDirectoriesIndexTest extends DirectoriesIndexTest {
     public WindowsMemoryFileDirectoriesIndexTest() {
       super(
@@ -167,6 +172,7 @@ public class DirectoriesIndexTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class UnixMemoryFileDirectoriesIndexTest extends DirectoriesIndexTest {
     public UnixMemoryFileDirectoriesIndexTest() {
       super(
@@ -182,6 +188,7 @@ public class DirectoriesIndexTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class OsMemoryFileDirectoriesIndexTest extends DirectoriesIndexTest {
     public OsMemoryFileDirectoriesIndexTest() {
       super(
