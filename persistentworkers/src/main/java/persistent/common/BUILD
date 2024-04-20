@@ -1,6 +1,7 @@
 java_library(
     name = "persistent-common",
     srcs = glob(["**/*.java"]),
+    plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
         "//persistentworkers/src/main/java/persistent/common/util",
@@ -17,5 +18,6 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_apache_commons_commons_pool2",
+        "@maven//:org_projectlombok_lombok",
     ],
 )
