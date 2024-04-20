@@ -78,7 +78,7 @@ public class PipelineTest {
   }
 
   // Create a test stage that exists because of an interrupt.
-  // This proves the stage can be interupted.
+  // This proves the stage can be interrupted.
   @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public class TestStage extends PipelineStage {
     public TestStage(String name) {
@@ -115,7 +115,7 @@ public class PipelineTest {
     pipeline.join();
   }
 
-  // Create a test stage that doesn't exit because of an a non-interrupt exception.
+  // Create a test stage that doesn't exit because of a non-interrupt exception.
   // This proves the stage is robust enough to continue running when experiencing an exception.
   public class ContinueStage extends PipelineStage {
     private static PipelineStage OPEN_STAGE =
