@@ -2958,7 +2958,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         out.close(); // should probably discharge here as well
 
         if (size > blobSizeInBytes) {
-          String hash = hashSupplier.get().toString();
+          String hash = hashSupplier.get();
           try {
             Files.delete(writePath);
           } finally {
@@ -2976,7 +2976,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
 
       void commit() throws IOException {
-        String hash = hashSupplier.get().toString();
+        String hash = hashSupplier.get();
         String fileName = writePath.getFileName().toString();
         if (!fileName.startsWith(hash)) {
           dischargeAndNotify(blobSizeInBytes);
