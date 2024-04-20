@@ -84,6 +84,7 @@
     <exclude name="AvoidThrowingNullPointerException"/>
     <exclude name="AvoidThrowingRawExceptionTypes"/>
     <exclude name="AvoidUncheckedExceptionsInSignatures"/>
+    <exclude name="CognitiveComplexity"/>
     <exclude name="CouplingBetweenObjects"/>
     <exclude name="CyclomaticComplexity"/>
     <exclude name="DataClass"/>
@@ -136,7 +137,6 @@
     <exclude name="AvoidLosingExceptionInformation"/>
     <exclude name="AvoidMultipleUnaryOperators"/>
     <exclude name="AvoidUsingOctalValues"/>
-    <exclude name="BeanMembersShouldSerialize"/>
     <exclude name="CheckSkipResult"/>
     <exclude name="CloseResource"/>
     <exclude name="ConstructorCallsOverridableMethod"/>
