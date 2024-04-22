@@ -21,6 +21,7 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:io_grpc_grpc_api",
         "@maven//:io_grpc_grpc_core",
+        "@maven//:io_grpc_grpc_netty",
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_util",
         "@maven//:io_prometheus_simpleclient",

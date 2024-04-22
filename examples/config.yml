@@ -9,6 +9,7 @@ server:
   name: shard
   actionCacheReadOnly: false
   port: 8980
+  bindAddress: ""
   grpcMetrics:
     enabled: true
     provideLatencyHistograms: true
