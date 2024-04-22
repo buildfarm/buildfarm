@@ -16,6 +16,7 @@ public class Server {
   private INSTANCE_TYPE instanceType = INSTANCE_TYPE.SHARD;
   private String name = "shard";
   private boolean actionCacheReadOnly = false;
+  private String bindAddress = "";
   private int port = 8980;
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
   private int casWriteTimeout = 3600;
