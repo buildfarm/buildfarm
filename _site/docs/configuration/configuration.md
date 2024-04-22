@@ -59,6 +59,7 @@ worker:
 | publicName                       | String, _DERIVED:port_        | INSTANCE_NAME   | Host:port of the GRPC server, required to be accessible by all servers                                                      |
 | actionCacheReadOnly              | boolean, _false_              |                 | Allow/Deny writing to action cache                                                                                          |
 | port                             | Integer, _8980_               |                 | Listening port of the GRPC server                                                                                           |
+| bindAddress                      | String                        |                 | Listening address of the GRPC server, default for Java Grpc (all interface addresses) if unspecified                        |
 | casWriteTimeout                  | Integer, _3600_               |                 | CAS write timeout (seconds)                                                                                                 |
 | bytestreamTimeout                | Integer, _3600_               |                 | Byte Stream write timeout (seconds)                                                                                         |
 | sslCertificatePath               | String, _null_                |                 | Absolute path of the SSL certificate (if TLS used)                                                                          |
