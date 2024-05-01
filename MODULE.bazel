@@ -130,7 +130,7 @@ maven.install(
         "org.redisson:redisson:3.23.4",
         "org.slf4j:slf4j-simple:2.0.9",
         "org.threeten:threetenbp:1.6.8",
-        "org.xerial:sqlite-jdbc:3.34.0",
+        "org.xerial:sqlite-jdbc:3.45.3.0",
         "org.yaml:snakeyaml:2.2",
         "redis.clients:jedis:5.1.2",
     ],
