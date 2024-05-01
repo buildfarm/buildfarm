@@ -89,10 +89,7 @@ public class ResourceParser {
 
     // Find the first instance of such a keyword.
     String type =
-        Stream.of(tokenize(resourceName))
-            .filter(segment -> KEYWORDS.containsKey(segment))
-            .findFirst()
-            .orElse("");
+        Stream.of(tokenize(resourceName)).filter(KEYWORDS::containsKey).findFirst().orElse("");
 
     // Return the resource type. If no resource type was identified, return null.
     return KEYWORDS.get(type);

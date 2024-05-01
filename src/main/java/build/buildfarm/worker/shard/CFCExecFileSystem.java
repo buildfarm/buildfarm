@@ -106,9 +106,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     this.fileCache = fileCache;
     this.owner = owner;
     this.linkInputDirectories = linkInputDirectories;
-    this.linkedInputDirectories =
-        Iterables.transform(
-            linkedInputDirectories, realInputDirectory -> Pattern.compile(realInputDirectory));
+    this.linkedInputDirectories = Iterables.transform(linkedInputDirectories, Pattern::compile);
     this.allowSymlinkTargetAbsolute = allowSymlinkTargetAbsolute;
     this.removeDirectoryService = removeDirectoryService;
     this.accessRecorder = accessRecorder;
@@ -441,7 +439,7 @@ class CFCExecFileSystem implements ExecFileSystem {
         ImmutableSet.copyOf(
             Iterables.transform(
                 linkedDirectories(directoriesIndex, inputRootDigest),
-                path -> execDir.resolve(path))); // does this work on windows with / separators?
+                execDir::resolve)); // does this work on windows with / separators?
 
     log.log(
         Level.FINER, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
