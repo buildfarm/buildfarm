@@ -116,7 +116,7 @@ maven.install(
         "junit:junit:4.13.2",
         "me.dinowernli:java-grpc-prometheus:0.6.0",
         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
-        "org.apache.commons:commons-compress:1.23.0",
+        "org.apache.commons:commons-compress:1.26.1",
         "org.apache.commons:commons-lang3:3.13.0",
         "org.apache.commons:commons-pool2:2.11.1",
         "org.apache.tomcat:annotations-api:6.0.53",
