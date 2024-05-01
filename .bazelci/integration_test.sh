@@ -4,12 +4,17 @@
 # All of the needed buildfarm services are initialized (redis, server, worker).
 # We ensure that the system can build a set of bazel targets.
 
-# Run redis container
-docker run -d --name buildfarm-redis --network host redis:7.2.4 --bind localhost
-
 # Build a container for buildfarm services
-cp `which bazel` bazel
+if [ -z "$BAZEL" ]
+then
+    BAZEL=bazel
+fi
+BAZEL_BINARY=$(which $BAZEL)
+cp $BAZEL_BINARY bazel
 docker build -t buildfarm .
+
+# Run redis container
+docker run --rm -d --name buildfarm-redis --network host redis:7.2.4 --bind localhost
 
 # Start the servies and do a test build
 docker run \
@@ -20,3 +25,8 @@ docker run \
     --env EXECUTION_STAGE_WIDTH=$EXECUTION_STAGE_WIDTH \
     --env BUILDFARM_CONFIG=$BUILDFARM_CONFIG \
     buildfarm buildfarm/.bazelci/test_buildfarm_container.sh
+status=$?
+
+docker stop buildfarm-redis
+
+exit $status

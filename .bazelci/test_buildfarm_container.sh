@@ -89,7 +89,10 @@ init_grpc_parser(){
         git clone https://github.com/bazelbuild/tools_remote.git
         cd tools_remote;
         git reset --hard $SHA1_TOOLS_REMOTE
-        ../bazel build //:remote_client
+        ../bazel build \
+            --java_language_version=17 --java_runtime_version=remotejdk_17 \
+            --tool_java_language_version=17 --tool_java_runtime_version=remotejdk_17 \
+            //:remote_client
         cd /buildfarm;
     fi
 }
