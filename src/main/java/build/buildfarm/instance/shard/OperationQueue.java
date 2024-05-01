@@ -306,7 +306,7 @@ public class OperationQueue {
     List<BalancedRedisQueue> eligibleQueues =
         queues.stream()
             .filter(provisionedQueue -> provisionedQueue.isEligible(toMultimap(provisions)))
-            .map(provisionedQueue -> provisionedQueue.queue())
+            .map(ProvisionedRedisQueue::queue)
             .collect(Collectors.toList());
 
     if (eligibleQueues.isEmpty()) {

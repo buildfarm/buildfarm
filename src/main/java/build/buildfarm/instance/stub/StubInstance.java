@@ -446,7 +446,7 @@ public class StubInstance implements Instance {
               Iterables.transform(
                   Iterables.partition(digests, partitionSize),
                   subDigests -> findMissingBlobs(subDigests, requestMetadata))),
-          subMissings -> Iterables.concat(subMissings),
+          Iterables::concat,
           directExecutor());
     }
     return transform(
