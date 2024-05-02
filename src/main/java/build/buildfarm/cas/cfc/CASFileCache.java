@@ -162,8 +162,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           .help("The amount of time CAS entries live on L1 storage before expiration (seconds)")
           .register();
 
-  private static final Gauge casCopyFallbackMetric =
-      Gauge.build()
+  private static final Counter casCopyFallbackMetric =
+      Counter.build()
           .name("cas_copy_fallback")
           .help("Number of times the CAS performed a file copy because hardlinking failed")
           .register();
