@@ -14,10 +14,14 @@
 
 package build.buildfarm.instance.shard;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.redis.RedisSSL;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashSet;
@@ -29,6 +33,7 @@ import redis.clients.jedis.ConnectionPool;
 import redis.clients.jedis.ConnectionPoolConfig;
 import redis.clients.jedis.DefaultJedisClientConfig;
 import redis.clients.jedis.HostAndPort;
+import redis.clients.jedis.JedisClientConfig;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.UnifiedJedis;
@@ -98,7 +103,7 @@ public class JedisClusterFactory {
   /**
    * @brief Delete existing keys on a redis cluster.
    * @details Delete all of the keys on a redis cluster and ensure that the database is empty.
-   * @param cluster An established jedis client to operate on a redis cluster.
+   * @param jedis An established jedis client to operate on a redis cluster.
    * @note Overloaded.
    */
   private static void deleteExistingKeys(UnifiedJedis jedis) throws Exception {
@@ -158,28 +163,29 @@ public class JedisClusterFactory {
       String identifier,
       ConnectionPoolConfig poolConfig,
       boolean ssl) {
+    DefaultJedisClientConfig.Builder builder =
+        DefaultJedisClientConfig.builder()
+            .connectionTimeoutMillis(connectionTimeout)
+            .socketTimeoutMillis(soTimeout)
+            .password(password)
+            .clientName(identifier)
+            .ssl(ssl);
+    if (!Strings.isNullOrEmpty(configs.getBackplane().getRedisCertificateAuthorityFile())) {
+      checkState(
+          ssl,
+          "Can't specify a Certificate Authority file if you aren't using redis with SSL. Did you"
+              + " set 'rediss://' scheme on your Redis URI?");
+      builder.sslSocketFactory(
+          RedisSSL.createSslSocketFactory(
+              new File(configs.getBackplane().getRedisCertificateAuthorityFile())));
+    }
+    JedisClientConfig jedisClientConfig = builder.build();
+
     try {
-      return new JedisCluster(
-          hostAndPorts,
-          connectionTimeout,
-          soTimeout,
-          maxAttempts,
-          password,
-          identifier,
-          poolConfig,
-          ssl);
+      return new JedisCluster(hostAndPorts, jedisClientConfig, maxAttempts, poolConfig);
     } catch (JedisClusterOperationException e) {
       // probably not a cluster
-      return new JedisPooled(
-          poolConfig,
-          Iterables.getOnlyElement(hostAndPorts),
-          DefaultJedisClientConfig.builder()
-              .connectionTimeoutMillis(connectionTimeout)
-              .socketTimeoutMillis(soTimeout)
-              .password(password)
-              .clientName(identifier)
-              .ssl(ssl)
-              .build());
+      return new JedisPooled(poolConfig, Iterables.getOnlyElement(hostAndPorts), jedisClientConfig);
     }
   }
 
