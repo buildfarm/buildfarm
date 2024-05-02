@@ -115,9 +115,6 @@ maven.install(
                     "com.google.truth:truth:1.4.2",
                     "com.googlecode.json-simple:json-simple:1.1.1",
                     "commons-io:commons-io:2.15.1",
-                    "net.jcip:jcip-annotations:1.0",
-                    "org.bouncycastle:bcprov-jdk15on:1.70",
-                    "org.slf4j:slf4j-simple:2.0.9",
                 ] + ["io.netty:netty-%s:4.1.108.Final" % module for module in IO_NETTY_MODULES] +
                 ["io.grpc:grpc-%s:1.62.2" % module for module in IO_GRPC_MODULES] + [
         # keep sorted
@@ -128,6 +125,7 @@ maven.install(
         "junit:junit:4.13.2",
         "me.dinowernli:java-grpc-prometheus:0.6.0",
         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
+        "net.jcip:jcip-annotations:1.0",
         "org.apache.commons:commons-compress:1.26.1",
         "org.apache.commons:commons-lang3:3.13.0",
         "org.apache.commons:commons-pool2:2.11.1",
