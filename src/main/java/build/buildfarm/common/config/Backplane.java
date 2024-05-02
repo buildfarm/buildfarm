@@ -56,6 +56,13 @@ public class Backplane {
   private String redisCredentialFile;
   @ToString.Exclude // Do not log the password on start-up.
   private String redisPassword;
+
+  /**
+   * Path to a CA.pem for the redis TLS. If specified, ONLY this root CA will be used (it will not
+   * be added to the defaults)
+   */
+  private String redisCertificateAuthorityFile;
+
   private int timeout = 10000;
   private String[] redisNodes = {};
   private int maxAttempts = 20;
