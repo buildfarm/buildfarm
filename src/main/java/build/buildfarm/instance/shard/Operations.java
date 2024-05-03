@@ -19,6 +19,7 @@ import static com.google.common.collect.Lists.newArrayList;
 
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.redis.OffsetScanner;
 import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -128,17 +129,16 @@ public class Operations {
     return parseScanResult(operations.scan(jedis, cursor, count));
   }
 
-  /**
-   * @brief Scan for the operations by invocationId.
-   * @details If the invocation does not exist an empty set is returned.
-   * @param jedis Jedis cluster client.
-   * @param invocationId The ID of the invocation.
-   * @return The scan result
-   * @note Suggested return identifier: operationNames.
-   */
   public ScanResult<Operation> findByInvocationId(
-      UnifiedJedis jedis, String invocationId, String cursor, int count) {
-    return parseScanResult(jedis.sscan(invocationId, cursor, new ScanParams().count(count)));
+      UnifiedJedis jedis, String invocationId, String setCursor, int count) {
+    OffsetScanner<String> offsetScanner =
+        new OffsetScanner<String>() {
+          @Override
+          protected ScanResult<String> scan(String cursor, int remaining) {
+            return jedis.sscan(invocationId, cursor, new ScanParams().count(remaining));
+          }
+        };
+    return parseScanResult(offsetScanner.fill(setCursor, count));
   }
 
   /**

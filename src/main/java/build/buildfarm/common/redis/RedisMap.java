@@ -14,13 +14,9 @@
 
 package build.buildfarm.common.redis;
 
-import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.Iterables.addAll;
-import static com.google.common.collect.Iterables.limit;
-import static com.google.common.collect.Iterables.skip;
-import static com.google.common.collect.Iterables.transform;
 import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
+import com.google.common.collect.Iterables;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -285,46 +281,18 @@ public class RedisMap {
     // break even is around 5k
     int scanCount = 5000;
     // maybe use type regular?
-    int offsetIndex = mapCursor.indexOf('+');
-    int offset = 0;
-    String cursor;
-    if (offsetIndex == -1) {
-      cursor = mapCursor;
-    } else {
-      cursor = mapCursor.substring(0, offsetIndex);
-      offset = Integer.parseInt(mapCursor.substring(offsetIndex + 1));
-      checkState(offset >= 0 && offset < scanCount);
-    }
-    List<String> operationNames = new ArrayList<>(count);
-    int prefixLen = name.length() + 1;
-    boolean atEnd = false;
     ScanParams scanParams = new ScanParams().count(scanCount).match(createKeyName("*"));
-    while (count > 0 && !atEnd) {
-      ScanResult<String> result = jedis.scan(cursor, scanParams);
-      int size = result.getResult().size();
-      addAll(
-          operationNames,
-          transform(
-              limit(skip(result.getResult(), offset), count),
-              operationName -> operationName.substring(prefixLen)));
-      int available = Math.min(count, size - offset);
-      offset += available;
-      count -= available;
+    int prefixLen = name.length() + 1;
+    return new OffsetScanner<String>() {
+      @Override
+      protected ScanResult<String> scan(String cursor, int remaining) {
+        return jedis.scan(cursor, scanParams);
+      }
 
-      // advance to the next page if we have exhausted this one
-      if (offset == size) {
-        offset = 0;
-        cursor = result.getCursor();
+      @Override
+      protected Iterable<String> transform(Iterable<String> result) {
+        return Iterables.transform(result, operationName -> operationName.substring(prefixLen));
       }
-      // last page means that we're done with this loop
-      if (result.getCursor().equals(SCAN_POINTER_START)) {
-        atEnd = true;
-      }
-    }
-    String nextCursor = cursor + "+" + offset;
-    if (atEnd && offset == 0) {
-      nextCursor = SCAN_POINTER_START;
-    }
-    return new ScanResult(nextCursor, operationNames);
+    }.fill(mapCursor, count);
   }
 }
