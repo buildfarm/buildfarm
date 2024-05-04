@@ -41,4 +41,5 @@ exports_files([
     "cgexec-wrapper",
     "delay.sh",
     "macos-wrapper.sh",
+    "single-gpu",
 ])

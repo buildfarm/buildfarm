@@ -1,0 +1,6 @@
+name: buildfarm
+purpose: release buildfarm image for dev.
+projects:
+  - name: release-buildfarm
+    path: jenkins
+    build_always: true

@@ -1,0 +1,7 @@
+name: publish-buildfarm
+maintainer: ggensure@lat.ai
+type: service
+with_credentials: svc-jenkins-fne-user-api
+pipeline:
+- name: build-and-publish
+  command: cd .. && ./publish.sh --ci --type alpha.0.build.$BUILD_NUMBER

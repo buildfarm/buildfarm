@@ -1,4 +1,5 @@
-load("@rules_oci//oci:defs.bzl", "oci_image")
+load("@aspect_bazel_lib//lib:expand_template.bzl", "expand_template")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_push")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
@@ -94,6 +95,7 @@ pkg_files(
         "//:as-nobody",
         "//:cgexec-wrapper",
         "//:macos-wrapper.sh",
+        "//:single-gpu",
         "@bazel//src/main/tools:linux-sandbox",
         "@bazel//src/main/tools:process-wrapper",
     ],
@@ -151,8 +153,20 @@ oci_image_env(
 )
 
 oci_image_env(
+    name = "env_lat_server",
+    configpath = "/" + DEFAULT_PACKAGE_DIR + "_configs/buildfarm_config.yaml",
+    jvm_args = server_jvm_flags(),
+)
+
+oci_image_env(
     name = "env_worker",
     configpath = "/" + DEFAULT_PACKAGE_DIR + "/config.minimal.yml",
+    jvm_args = worker_jvm_flags(),
+)
+
+oci_image_env(
+    name = "env_lat_worker",
+    configpath = "/" + DEFAULT_PACKAGE_DIR + "_configs/buildfarm_config.yaml",
     jvm_args = worker_jvm_flags(),
 )
 
@@ -165,6 +179,27 @@ oci_image(
         "/" + DEFAULT_PACKAGE_DIR + "/buildfarm-server_deploy.jar",
     ],
     env = ":env_server",
+    labels = DEFAULT_IMAGE_LABELS,
+    tags = ["container"],
+    tars = [
+        # do not sort
+        ":layer_logging_config",
+        ":layer_minimal_config",
+        ":telemetry_tools",
+        ":layer_buildfarm_server",
+    ],
+    visibility = ["//container:__subpackages__"],
+)
+
+oci_image(
+    name = "_buildfarm-server-lat.image",
+    base = "@amazon_corretto_java_image_base",
+    entrypoint = [
+        "java",
+        "-jar",
+        "/" + DEFAULT_PACKAGE_DIR + "/buildfarm-server_deploy.jar",
+    ],
+    env = ":env_lat_server",
     labels = DEFAULT_IMAGE_LABELS,
     tags = ["container"],
     tars = [
@@ -203,12 +238,76 @@ oci_image(
     visibility = ["//container:__subpackages__"],
 )
 
+oci_image(
+    name = "_buildfarm-worker-lat.image",
+    base = "@av_worker_image_minimal_base",
+    entrypoint = [
+        # do not sort
+        "/tini",
+        "--",
+        "java",
+        "-jar",
+        "/" + DEFAULT_PACKAGE_DIR + "/buildfarm-shard-worker_deploy.jar",
+    ],
+    env = ":env_lat_worker",
+    labels = DEFAULT_IMAGE_LABELS,
+    tags = ["container"],
+    tars = [
+        # do not sort
+        ":layer_tini",
+        ":layer_logging_config",
+        ":layer_minimal_config",
+        ":execution_wrappers",
+        ":telemetry_tools",
+        ":layer_buildfarm_worker",
+    ],
+    visibility = ["//container:__subpackages__"],
+)
+
+IMAGE_RELEASE = "2.15.0"
+
+ARTIFACTORY_REGISTRY = "artifactory.bluel3.com"
+
+REPOSITORY_NAMESPACE = ARTIFACTORY_REGISTRY + "/docker-fne/bazel-buildfarm/"
+
+expand_template(
+    name = "stamped",
+    out = "_stamped.tags.txt",
+    stamp_substitutions = {"V": "{{BUILD_EMBED_LABEL}}"},
+    template = [IMAGE_RELEASE + "-V"],
+)
+
 multiarch_oci_image(
     name = "buildfarm-server",
     image = ":_buildfarm-server.image",
 )
 
 multiarch_oci_image(
+    name = "buildfarm-server-lat",
+    image = ":_buildfarm-server-lat.image",
+)
+
+multiarch_oci_image(
     name = "buildfarm-worker",
     image = ":_buildfarm-worker.image",
+)
+
+multiarch_oci_image(
+    name = "buildfarm-worker-lat",
+    image = ":_buildfarm-worker-lat.image",
+)
+
+oci_push(
+    name = "push-buildfarm-server",
+    image = ":buildfarm-server-lat",
+    remote_tags = ":stamped",
+    repository = REPOSITORY_NAMESPACE + "buildfarm-server",
+)
+
+oci_push(
+    name = "push-buildfarm-worker",
+    image = ":buildfarm-worker-lat",
+    remote_tags = ":stamped",
+    # holdover until we change config in prod
+    repository = REPOSITORY_NAMESPACE + "buildfarm-shard-worker-minimal",
 )

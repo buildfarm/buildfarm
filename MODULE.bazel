@@ -239,11 +239,18 @@ oci.pull(
     ],
     tag = "noble",
 )
+oci.pull(
+    name = "av_worker_image_minimal_base",
+    digest = "sha256:c924f81e72b594f0bf99a393e6f646abe9cc66e522edfbe2c5a371dd0f136143",
+    image = "artifactory.bluel3.com/docker-fne/argobuild",
+    tag = "2026.01.20.0",
+)
 use_repo(
     oci,
     "amazon_corretto_java_image_base",
     "amazon_corretto_java_image_base_linux_amd64",
     "amazon_corretto_java_image_base_linux_arm64_v8",
+    "av_worker_image_minimal_base",
     "ubuntu_noble",
     "ubuntu_noble_linux_amd64",
     "ubuntu_noble_linux_arm64",
