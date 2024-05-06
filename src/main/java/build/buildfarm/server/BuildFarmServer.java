@@ -41,12 +41,15 @@ import build.buildfarm.server.services.PublishBuildEventService;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.netty.NettyServerBuilder;
 import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import io.prometheus.client.Counter;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.security.Security;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -250,13 +253,19 @@ public class BuildFarmServer extends LoggingMain {
 
     configs = BuildfarmConfigs.loadServerConfigs(args);
 
-    // Configure Spring
     BuildFarmServer server = new BuildFarmServer();
+    SocketAddress socketAddress;
+    if (configs.getServer().getBindAddress().isEmpty()) {
+      socketAddress = new InetSocketAddress(configs.getServer().getPort());
+    } else {
+      socketAddress =
+          new InetSocketAddress(
+              configs.getServer().getBindAddress(), configs.getServer().getPort());
+    }
 
     try {
       server.start(
-          ServerBuilder.forPort(configs.getServer().getPort()),
-          configs.getServer().getPublicName());
+          NettyServerBuilder.forAddress(socketAddress), configs.getServer().getPublicName());
       server.awaitTermination();
     } catch (IOException e) {
       log.severe("error: " + formatIOError(e));

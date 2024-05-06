@@ -21,26 +21,6 @@ java_binary(
     ],
 )
 
-java_binary(
-    name = "bf-cache-load",
-    srcs = ["CacheLoad.java"],
-    classpath_resources = [
-        "//src/main/java/build/buildfarm:configs",
-    ],
-    main_class = "build.buildfarm.tools.CacheLoad",
-    visibility = ["//visibility:public"],
-    deps = [
-        "//src/main/java/build/buildfarm/cas",
-        "//src/main/java/build/buildfarm/common",
-        "//src/main/java/build/buildfarm/common/config",
-        "@maven//:com_github_jnr_jnr_constants",
-        "@maven//:com_github_jnr_jnr_ffi",
-        "@maven//:com_github_jnr_jnr_posix",
-        "@maven//:com_google_guava_guava",
-        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
-    ],
-)
-
 java_plugin(
     name = "io-benchmark-plugins",
     processor_class = "org.openjdk.jmh.generators.BenchmarkProcessor",

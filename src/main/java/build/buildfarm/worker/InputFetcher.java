@@ -209,6 +209,9 @@ public class InputFetcher implements Runnable {
         status.setCode(Code.INTERNAL.getNumber());
         log.log(Level.SEVERE, format("error creating exec dir for %s", operationName), e);
       }
+      // populate the inputFetch complete to know how long it took before error
+      executedAction.setInputFetchCompletedTimestamp(
+          Timestamps.fromMillis(System.currentTimeMillis()));
       failOperation(status.build());
       return 0;
     }

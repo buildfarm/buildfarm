@@ -156,6 +156,9 @@ Histogram for amount of time CAS entries live on L1 storage before expiration (s
 
 Gauge of the total number of entries in the worker's CAS
 
+**cas_copy_fallback**
+Counter for the number of times the CAS performed a file copy because hardlinking failed
+
 Java interceptors can be used to monitor Grpc services using Prometheus.  To enable [these metrics](https://github.com/grpc-ecosystem/java-grpc-prometheus), add the following configuration to your server:
 ```
 server:

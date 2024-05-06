@@ -103,7 +103,7 @@ public class RedisShardSubscriberTest {
       } else if (command == UNSUBSCRIBE) {
         if (cargs.size() == 1) {
           // only includes command
-          pendingRequests.add(() -> unsubscribe());
+          pendingRequests.add(this::unsubscribe);
         } else {
           pendingRequests.add(() -> unsubscribe(cargs));
         }

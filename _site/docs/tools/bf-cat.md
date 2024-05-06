@@ -7,6 +7,8 @@ nav_order: 2
 
 bf-cat is a tool provided with buildfarm for investigating the various structures and status of your Buildfarm Cluster.
 
+Build or run it with `bazel build //src/main/java/build/buildfarm/tools:bf-cat`
+
 Its basic usage is:
 
 `bf-cat <host[:port]> <instance-name> <hash-function> <command> [params...]`

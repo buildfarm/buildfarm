@@ -36,6 +36,7 @@ import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
+import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.config.GrpcMetrics;
@@ -315,6 +316,7 @@ public final class Worker extends LoggingMain {
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
       Executor accessRecorder,
+      FixedBufferPool zstdBufferPool,
       List<Cas> storages)
       throws ConfigurationException {
     ContentAddressableStorage storage = null;
@@ -326,6 +328,7 @@ public final class Worker extends LoggingMain {
               remoteInputStreamFactory,
               removeDirectoryService,
               accessRecorder,
+              zstdBufferPool,
               cas,
               delegate,
               delegateSkipLoad);
@@ -339,6 +342,7 @@ public final class Worker extends LoggingMain {
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
       Executor accessRecorder,
+      FixedBufferPool zstdBufferPool,
       Cas cas,
       ContentAddressableStorage delegate,
       boolean delegateSkipLoad)
@@ -365,6 +369,7 @@ public final class Worker extends LoggingMain {
             digestUtil,
             removeDirectoryService,
             accessRecorder,
+            zstdBufferPool,
             this::onStoragePut,
             delegate == null ? this::onStorageExpire : (digests) -> {},
             delegate,
@@ -559,6 +564,20 @@ public final class Worker extends LoggingMain {
 
     ExecutorService removeDirectoryService = BuildfarmExecutors.getRemoveDirectoryPool();
     ExecutorService accessRecorder = newSingleThreadExecutor();
+    FixedBufferPool zstdBufferPool =
+        new FixedBufferPool(configs.getWorker().getZstdBufferPoolSize());
+    Gauge.build()
+        .name("zstd_buffer_pool_used")
+        .help("Current number of Zstd decompression buffers active")
+        .create()
+        .setChild(
+            new Gauge.Child() {
+              @Override
+              public double get() {
+                return zstdBufferPool.getNumActive();
+              }
+            })
+        .register();
 
     InputStreamFactory remoteInputStreamFactory =
         new RemoteInputStreamFactory(
@@ -572,6 +591,7 @@ public final class Worker extends LoggingMain {
             remoteInputStreamFactory,
             removeDirectoryService,
             accessRecorder,
+            zstdBufferPool,
             configs.getWorker().getStorages());
     execFileSystem =
         createExecFileSystem(

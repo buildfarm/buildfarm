@@ -59,6 +59,7 @@ worker:
 | publicName                       | String, _DERIVED:port_        | INSTANCE_NAME   | Host:port of the GRPC server, required to be accessible by all servers                                                      |
 | actionCacheReadOnly              | boolean, _false_              |                 | Allow/Deny writing to action cache                                                                                          |
 | port                             | Integer, _8980_               |                 | Listening port of the GRPC server                                                                                           |
+| bindAddress                      | String                        |                 | Listening address of the GRPC server, default for Java Grpc (all interface addresses) if unspecified                        |
 | casWriteTimeout                  | Integer, _3600_               |                 | CAS write timeout (seconds)                                                                                                 |
 | bytestreamTimeout                | Integer, _3600_               |                 | Byte Stream write timeout (seconds)                                                                                         |
 | sslCertificatePath               | String, _null_                |                 | Absolute path of the SSL certificate (if TLS used)                                                                          |
@@ -258,7 +259,7 @@ backplane:
 | inputFetchDeadline               | Integer, _60_                 |                       | Limit on time (seconds) for input fetch stage to fetch inputs                                                                                                                                                                                                                                                            |
 | linkInputDirectories             | boolean, _true_               |                       | Use an input directory creation strategy which creates a single directory tree at the highest level containing no output paths of any kind, and symlinks that directory into an action's execroot, saving large amounts of time spent manufacturing the same read-only input hierirchy over multiple actions' executions |
 | execOwner                        | String, _null_                |                       | Create exec trees containing directories that are owned by this user                                                                                                                                                                                                                                                     |
-| hexBucketLevels                  | Integer, _0_                  |                       | Number of levels to create for directory storage by leading byte of the hash (problematic, not recommended)                                                                                                                                                                                                              |
+| hexBucketLevels                  | Integer, _0_                  |                       | Number of levels to create for directory storage by leading byte of the hash |
 | defaultMaxCores                  | Integer, _0_                  |                       | Constrain all executions to this logical core count unless otherwise specified via min/max-cores (0 = no limit)                                                                                                                                                                                                          |
 | limitGlobalExecution             | boolean, _false_              |                       | Constrain all executions to a pool of logical cores specified in executeStageWidth                                                                                                                                                                                                                                       |
 | onlyMulticoreTests               | boolean, _false_              |                       | Only permit tests to exceed the default coresvalue for their min/max-cores range specification (only works with non-zero defaultMaxCores)                                                                                                                                                                                |
@@ -268,6 +269,7 @@ backplane:
 | realInputDirectories             | List of Strings, _external_   |                       | A list of paths that will not be subject to the effects of linkInputDirectories setting, may also be used to provide writable directories as input roots for actions which expect to be able to write to an input location and will fail if they cannot                                                                  |
 | gracefulShutdownSeconds          | Integer, 0                    |                       | Time in seconds to allow for operations in flight to finish when shutdown signal is received                                                                                                                                                                                                                             |
 | createSymlinkOutputs             | boolean, _false_              |                       | Creates SymlinkNodes for symbolic links discovered in output paths for actions. No verification of the symlink target path occurs. Buildstream, for example, requires this.                                                                                                                                              |
+| zstdBufferPoolSize               | Integer, _2048_               |                       | Specifies the maximum number of zstd data buffers that may be in use concurrently by the filesystem CAS. Increase to improve compressed blob throughput, decrease to reduce memory usage.                                                                                                                                |
 
 ```yaml
 worker:
@@ -331,7 +333,8 @@ worker:
   dequeueMatchSettings:
     allowUnmatched: false
     properties:
-    - "gpu": "nvidia RTX 2090"
+      - name: "gpu"
+      - value: "nvidia RTX 2090"
 ```
 
 ### Resources
@@ -351,7 +354,8 @@ Example:
 worker:
   dequeueMatchSettings:
     properties:
-    - "resource:special-compiler-license": "1" # only actions which request one compiler license at a time will be accepted
+      - name: "resource:special-compiler-license"
+      - value: "1" # only actions which request one compiler license at a time will be accepted
   resources:
     name: "special-compiler-license"
     amount: 3

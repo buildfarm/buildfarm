@@ -9,6 +9,7 @@ server:
   name: shard
   actionCacheReadOnly: false
   port: 8980
+  bindAddress: ""
   grpcMetrics:
     enabled: true
     provideLatencyHistograms: true
@@ -136,6 +137,7 @@ worker:
     selectForBlockNetwork: false
     selectForTmpFs: false
   createSymlinkOutputs: false
+  zstdBufferPoolSize: 2048
   executionPolicies:
     - name: test
       executionWrapper:

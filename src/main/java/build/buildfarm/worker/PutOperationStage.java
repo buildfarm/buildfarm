@@ -139,6 +139,13 @@ public class PutOperationStage extends PipelineStage.NullStage {
     }
   }
 
+  private static Duration betweenIfAfter(Timestamp a, Timestamp b) {
+    if (Timestamps.compare(a, b) > 0) {
+      return Timestamps.between(a, b);
+    }
+    return Duration.getDefaultInstance();
+  }
+
   // when operationCount == 1, an object represents one operation's time costs on each stage;
   // when operationCount > 1, an object represents aggregated time costs of multiple operations.
   public static class OperationStageDurations {
@@ -157,36 +164,36 @@ public class PutOperationStage extends PipelineStage.NullStage {
     }
 
     void reset() {
-      queuedToMatch = Duration.newBuilder().build();
-      matchToInputFetchStart = Duration.newBuilder().build();
-      inputFetchStartToComplete = Duration.newBuilder().build();
-      inputFetchCompleteToExecutionStart = Duration.newBuilder().build();
-      executionStartToComplete = Duration.newBuilder().build();
-      executionCompleteToOutputUploadStart = Duration.newBuilder().build();
-      outputUploadStartToComplete = Duration.newBuilder().build();
+      queuedToMatch = Duration.getDefaultInstance();
+      matchToInputFetchStart = Duration.getDefaultInstance();
+      inputFetchStartToComplete = Duration.getDefaultInstance();
+      inputFetchCompleteToExecutionStart = Duration.getDefaultInstance();
+      executionStartToComplete = Duration.getDefaultInstance();
+      executionCompleteToOutputUploadStart = Duration.getDefaultInstance();
+      outputUploadStartToComplete = Duration.getDefaultInstance();
       operationCount = 0;
     }
 
     void set(ExecutedActionMetadata metadata) {
       queuedToMatch =
-          Timestamps.between(metadata.getQueuedTimestamp(), metadata.getWorkerStartTimestamp());
+          betweenIfAfter(metadata.getQueuedTimestamp(), metadata.getWorkerStartTimestamp());
       matchToInputFetchStart =
-          Timestamps.between(
+          betweenIfAfter(
               metadata.getWorkerStartTimestamp(), metadata.getInputFetchStartTimestamp());
       inputFetchStartToComplete =
-          Timestamps.between(
+          betweenIfAfter(
               metadata.getInputFetchStartTimestamp(), metadata.getInputFetchCompletedTimestamp());
       inputFetchCompleteToExecutionStart =
-          Timestamps.between(
+          betweenIfAfter(
               metadata.getInputFetchCompletedTimestamp(), metadata.getExecutionStartTimestamp());
       executionStartToComplete =
-          Timestamps.between(
+          betweenIfAfter(
               metadata.getExecutionStartTimestamp(), metadata.getExecutionCompletedTimestamp());
       executionCompleteToOutputUploadStart =
-          Timestamps.between(
+          betweenIfAfter(
               metadata.getExecutionCompletedTimestamp(), metadata.getOutputUploadStartTimestamp());
       outputUploadStartToComplete =
-          Timestamps.between(
+          betweenIfAfter(
               metadata.getOutputUploadStartTimestamp(),
               metadata.getOutputUploadCompletedTimestamp());
       operationCount = 1;

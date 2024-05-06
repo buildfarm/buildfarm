@@ -14,23 +14,23 @@
 
 package build.buildfarm.common.redis;
 
-import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.Iterables.addAll;
-import static com.google.common.collect.Iterables.limit;
-import static com.google.common.collect.Iterables.skip;
-import static com.google.common.collect.Iterables.transform;
 import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
+import com.google.common.collect.Iterables;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
+import redis.clients.jedis.Connection;
+import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.PipelineBase;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
+import redis.clients.jedis.util.JedisClusterCRC16;
 
 /**
  * @class RedisMap
@@ -219,50 +219,80 @@ public class RedisMap {
   }
 
   public ScanResult<String> scan(UnifiedJedis jedis, String mapCursor, int count) {
+    if (jedis instanceof JedisCluster) {
+      JedisCluster cluster = (JedisCluster) jedis;
+      return scanCluster(cluster, mapCursor, count);
+    }
+    return scanNode(jedis, mapCursor, count);
+  }
+
+  public ScanResult<String> scanCluster(JedisCluster cluster, String mapCursor, int count) {
+    int hashIndex = mapCursor.indexOf('{') + 1;
+    String currentHash = null;
+    if (hashIndex > 0) {
+      int hashEnd = mapCursor.indexOf('}');
+      currentHash = mapCursor.substring(hashIndex, hashEnd);
+      mapCursor = mapCursor.substring(hashEnd + 1);
+    }
+    Iterator<String> hashes = RedisNodeHashes.getEvenlyDistributedHashes(cluster).iterator();
+
+    // advance to our currentHash
+    String hash = null;
+    while (currentHash != null && !currentHash.equals(hash) && hashes.hasNext()) {
+      hash = hashes.next();
+    }
+    // cursor specified hash not found
+    if (currentHash != null && !currentHash.equals(hash)) {
+      return new ScanResult<>(SCAN_POINTER_START, new ArrayList<>());
+    }
+
+    List<String> result = new ArrayList<>(count);
+    while (result.size() < count) {
+      if (currentHash == null || mapCursor.equals(SCAN_POINTER_START)) {
+        if (!hashes.hasNext()) {
+          break;
+        }
+        currentHash = hashes.next();
+      }
+      // acquire and assign resource to UnifiedJedis for release
+      Connection connection = cluster.getConnectionFromSlot(JedisClusterCRC16.getSlot(currentHash));
+      try (UnifiedJedis jedis = new UnifiedJedis(connection)) {
+        ScanResult<String> scanResult = scanNode(jedis, mapCursor, count - result.size());
+        mapCursor = scanResult.getCursor();
+        result.addAll(scanResult.getResult());
+      }
+    }
+
+    if (mapCursor.equals(SCAN_POINTER_START)) {
+      currentHash = null;
+      if (hashes.hasNext()) {
+        currentHash = hashes.next();
+      }
+    }
+    String nextCursor = SCAN_POINTER_START;
+    if (currentHash != null) {
+      nextCursor = "{" + currentHash + "}" + mapCursor;
+    }
+    return new ScanResult(nextCursor, result);
+  }
+
+  private ScanResult<String> scanNode(UnifiedJedis jedis, String mapCursor, int count) {
     // redis has much worse performance when scanning for small counts
     // break even is around 5k
     int scanCount = 5000;
     // maybe use type regular?
-    int offsetIndex = mapCursor.indexOf('+');
-    int offset = 0;
-    String cursor;
-    if (offsetIndex == -1) {
-      cursor = mapCursor;
-    } else {
-      cursor = mapCursor.substring(0, offsetIndex);
-      offset = Integer.parseInt(mapCursor.substring(offsetIndex + 1));
-      checkState(offset >= 0 && offset < scanCount);
-    }
-    List<String> operationNames = new ArrayList<>(count);
-    int prefixLen = name.length() + 1;
-    boolean atEnd = false;
     ScanParams scanParams = new ScanParams().count(scanCount).match(createKeyName("*"));
-    while (count > 0 && !atEnd) {
-      ScanResult<String> result = jedis.scan(cursor, scanParams);
-      int size = result.getResult().size();
-      addAll(
-          operationNames,
-          transform(
-              limit(skip(result.getResult(), offset), count),
-              operationName -> operationName.substring(prefixLen)));
-      int available = Math.min(count, size - offset);
-      offset += available;
-      count -= available;
+    int prefixLen = name.length() + 1;
+    return new OffsetScanner<String>() {
+      @Override
+      protected ScanResult<String> scan(String cursor, int remaining) {
+        return jedis.scan(cursor, scanParams);
+      }
 
-      // advance to the next page if we have exhausted this one
-      if (offset == size) {
-        offset = 0;
-        cursor = result.getCursor();
+      @Override
+      protected Iterable<String> transform(Iterable<String> result) {
+        return Iterables.transform(result, operationName -> operationName.substring(prefixLen));
       }
-      // last page means that we're done with this loop
-      if (result.getCursor().equals(SCAN_POINTER_START)) {
-        atEnd = true;
-      }
-    }
-    String nextCursor = cursor + "+" + offset;
-    if (atEnd && offset == 0) {
-      nextCursor = SCAN_POINTER_START;
-    }
-    return new ScanResult(nextCursor, operationNames);
+    }.fill(mapCursor, count);
   }
 }
