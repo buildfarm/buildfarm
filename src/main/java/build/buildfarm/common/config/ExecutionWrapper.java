@@ -1,29 +1,9 @@
 package build.buildfarm.common.config;
 
-import java.util.Arrays;
-import lombok.Getter;
+import lombok.Data;
 
-@Getter
+@Data
 public class ExecutionWrapper {
-  private String path;
-  private String[] arguments = new String[0];
-
-  public void setPath(String path) {
-    this.path = path;
-  }
-
-  public void setArguments(String[] arguments) {
-    this.arguments = arguments;
-  }
-
-  @Override
-  public String toString() {
-    return "ExecutionWrapper{"
-        + "path='"
-        + path
-        + '\''
-        + ", arguments="
-        + Arrays.toString(arguments)
-        + '}';
-  }
+  String path;
+  String[] arguments = new String[0];
 }
