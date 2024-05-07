@@ -4,6 +4,7 @@ java_library(
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
+        "//src/main/java/build/buildfarm/common",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_google_guava_guava",
