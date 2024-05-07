@@ -363,8 +363,6 @@ class Executor {
 
     final int messagesPerRequest = 2 * 1024 * 1024 / 80;
 
-    System.out.println("Looking for missing blobs");
-
     Stopwatch stopwatch = Stopwatch.createUnstarted();
     FileStore fileStore = Files.getFileStore(blobsDir);
     try (DirectoryStream<Path> stream = Files.newDirectoryStream(blobsDir)) {
