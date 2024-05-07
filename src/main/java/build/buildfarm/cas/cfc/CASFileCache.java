@@ -2261,17 +2261,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return false;
   }
 
+  @Getter
   public static class PathResult {
-    @Getter private final Path path;
-    private final boolean missed;
+    private final Path path;
+    private final boolean isMissed;
 
-    public PathResult(Path path, boolean missed) {
+    public PathResult(Path path, boolean isMissed) {
       this.path = path;
-      this.missed = missed;
-    }
-
-    public boolean getMissed() {
-      return missed;
+      this.isMissed = isMissed;
     }
   }
 
