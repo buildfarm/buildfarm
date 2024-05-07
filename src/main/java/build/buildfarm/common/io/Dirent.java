@@ -14,13 +14,18 @@
 
 package build.buildfarm.common.io;
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import java.io.Serializable;
-import java.util.Objects;
 import javax.annotation.Nullable;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 /** Directory entry representation returned by . */
+@EqualsAndHashCode
+@Getter
+@ToString
 public final class Dirent implements Serializable, Comparable<Dirent> {
   /** Type of the directory entry */
   public enum Type {
@@ -34,42 +39,15 @@ public final class Dirent implements Serializable, Comparable<Dirent> {
     UNKNOWN
   }
 
-  @Getter private final String name;
-  @Getter private final Type type;
-  @Nullable private final FileStatus stat;
+  private final String name;
+  private final Type type;
+  @EqualsAndHashCode.Exclude @ToString.Exclude @Nullable private final FileStatus stat;
 
   /** Creates a new dirent with the given name and type, both of which must be non-null. */
-  @SuppressWarnings("NullableProblems")
-  public Dirent(String name, Type type, FileStatus stat) {
-    this.name = Preconditions.checkNotNull(name);
-    this.type = Preconditions.checkNotNull(type);
+  public Dirent(String name, Type type, @Nullable FileStatus stat) {
+    this.name = checkNotNull(name);
+    this.type = checkNotNull(type);
     this.stat = stat;
-  }
-
-  @Nullable
-  public FileStatus getStat() {
-    return stat;
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(name, type);
-  }
-
-  @Override
-  public boolean equals(Object other) {
-    if (!(other instanceof Dirent otherDirent)) {
-      return false;
-    }
-    if (this == other) {
-      return true;
-    }
-    return name.equals(otherDirent.name) && type.equals(otherDirent.type);
-  }
-
-  @Override
-  public String toString() {
-    return name + "[" + type.toString().toLowerCase() + "]";
   }
 
   @Override
