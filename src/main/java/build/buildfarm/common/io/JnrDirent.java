@@ -14,49 +14,28 @@
 
 package build.buildfarm.common.io;
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import java.io.Serializable;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import jnr.posix.FileStat;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 /** Directory entry representation returned by . */
+@EqualsAndHashCode
+@Getter
+@ToString
 public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
-  @Getter private final String name;
-  @Nullable private final FileStat stat;
+  private final String name;
+  @EqualsAndHashCode.Exclude @ToString.Exclude @Nullable private final FileStat stat;
 
   /** Creates a new jnr dirent with the given name */
   @SuppressWarnings("NullableProblems")
   public JnrDirent(String name, FileStat stat) {
-    this.name = Preconditions.checkNotNull(name);
+    this.name = checkNotNull(name);
     this.stat = stat;
-  }
-
-  @Nullable
-  public FileStat getStat() {
-    return stat;
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(name);
-  }
-
-  @Override
-  public boolean equals(Object other) {
-    if (!(other instanceof JnrDirent otherJnrDirent)) {
-      return false;
-    }
-    if (this == other) {
-      return true;
-    }
-    return name.equals(otherJnrDirent.name);
-  }
-
-  @Override
-  public String toString() {
-    return name;
   }
 
   @Override

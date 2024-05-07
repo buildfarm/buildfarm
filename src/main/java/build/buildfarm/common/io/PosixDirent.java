@@ -14,49 +14,28 @@
 
 package build.buildfarm.common.io;
 
-import com.google.common.base.Preconditions;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import java.io.Serializable;
 import java.nio.file.attribute.PosixFileAttributes;
-import java.util.Objects;
 import javax.annotation.Nullable;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 /** Directory entry representation returned by . */
-public final class PosixDirent implements Serializable, Comparable<PosixDirent> {
-  @Getter private final String name;
-  @Nullable private final PosixFileAttributes stat;
+@EqualsAndHashCode
+@Getter
+@ToString
+public class PosixDirent implements Serializable, Comparable<PosixDirent> {
+  private final String name;
+  @EqualsAndHashCode.Exclude @ToString.Exclude @Nullable private final PosixFileAttributes stat;
 
   /** Creates a new posix dirent with the given name */
   @SuppressWarnings("NullableProblems")
   public PosixDirent(String name, PosixFileAttributes stat) {
-    this.name = Preconditions.checkNotNull(name);
+    this.name = checkNotNull(name);
     this.stat = stat;
-  }
-
-  @Nullable
-  public PosixFileAttributes getStat() {
-    return stat;
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(name);
-  }
-
-  @Override
-  public boolean equals(Object other) {
-    if (!(other instanceof PosixDirent otherPosixDirent)) {
-      return false;
-    }
-    if (this == other) {
-      return true;
-    }
-    return name.equals(otherPosixDirent.name);
-  }
-
-  @Override
-  public String toString() {
-    return name;
   }
 
   @Override
