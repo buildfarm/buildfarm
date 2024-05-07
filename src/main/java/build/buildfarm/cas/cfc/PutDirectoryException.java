@@ -20,10 +20,11 @@ import java.nio.file.Path;
 import java.util.List;
 import lombok.Getter;
 
+@Getter
 public class PutDirectoryException extends IOException {
   private final Path path;
-  @Getter private final Digest digest;
-  @Getter private final List<Throwable> exceptions;
+  private final Digest digest;
+  private final List<Throwable> exceptions;
 
   private static String getErrorMessage(Path path, List<Throwable> exceptions) {
     return String.format("%s: %d %s: %s", path, exceptions.size(), "exceptions", exceptions);
@@ -38,9 +39,5 @@ public class PutDirectoryException extends IOException {
     for (Throwable exception : exceptions) {
       addSuppressed(exception);
     }
-  }
-
-  Path getPath() {
-    return path;
   }
 }
