@@ -14,17 +14,15 @@
 
 package build.buildfarm.metrics;
 
-import static com.google.common.base.Preconditions.checkState;
-
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.Time;
 import build.buildfarm.v1test.OperationRequestMetadata;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.longrunning.Operation;
-import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
@@ -114,38 +112,17 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
             .inc();
         if (operationRequestMetadata.getExecuteResponse().hasResult()
             && operationRequestMetadata.getExecuteResponse().getResult().hasExecutionMetadata()) {
-          operationsPerWorker
-              .labels(
-                  operationRequestMetadata
-                      .getExecuteResponse()
-                      .getResult()
-                      .getExecutionMetadata()
-                      .getWorker())
-              .inc();
+          ExecutedActionMetadata executionMetadata =
+              operationRequestMetadata.getExecuteResponse().getResult().getExecutionMetadata();
+          operationsPerWorker.labels(executionMetadata.getWorker()).inc();
           queuedTime.observe(
-              toDurationMs(
-                  operationRequestMetadata
-                      .getExecuteResponse()
-                      .getResult()
-                      .getExecutionMetadata()
-                      .getQueuedTimestamp(),
-                  operationRequestMetadata
-                      .getExecuteResponse()
-                      .getResult()
-                      .getExecutionMetadata()
-                      .getExecutionStartTimestamp()));
+              Time.toDurationMs(
+                  executionMetadata.getQueuedTimestamp(),
+                  executionMetadata.getExecutionStartTimestamp()));
           outputUploadTime.observe(
-              toDurationMs(
-                  operationRequestMetadata
-                      .getExecuteResponse()
-                      .getResult()
-                      .getExecutionMetadata()
-                      .getOutputUploadStartTimestamp(),
-                  operationRequestMetadata
-                      .getExecuteResponse()
-                      .getResult()
-                      .getExecutionMetadata()
-                      .getOutputUploadCompletedTimestamp()));
+              Time.toDurationMs(
+                  executionMetadata.getOutputUploadStartTimestamp(),
+                  executionMetadata.getOutputUploadCompletedTimestamp()));
         }
       }
       if (operation.getMetadata().is(ExecuteOperationMetadata.class)) {
@@ -184,32 +161,5 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
             .print(operationRequestMetadata);
     log.log(Level.FINER, "{}", formattedRequestMetadata);
     return formattedRequestMetadata;
-  }
-
-  /**
-   * Converts the difference in two timestamps, into milliseconds
-   *
-   * @param start
-   * @param end
-   * @return The difference, in milliseconds
-   * @throws IllegalStateException if end < start.
-   */
-  static double toDurationMs(Timestamp start, Timestamp end) {
-    Duration d =
-        Duration.newBuilder()
-            .setSeconds(end.getSeconds() - start.getSeconds())
-            .setNanos(end.getNanos() - start.getNanos())
-            .build();
-    if (d.getNanos() < 0) {
-      // need to borrow from the seconds
-      d =
-          Duration.newBuilder()
-              .setSeconds(d.getSeconds() - 1)
-              .setNanos(d.getNanos() + 1000000000)
-              .build();
-    }
-    checkState(d.getSeconds() >= 0);
-    checkState(d.getNanos() >= 0);
-    return (d.getSeconds() * 1000) + (d.getNanos() / 1000000D);
   }
 }

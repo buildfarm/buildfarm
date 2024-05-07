@@ -14,8 +14,12 @@
 
 package build.buildfarm.common;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import com.google.protobuf.Duration;
+import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Durations;
+import com.google.protobuf.util.Timestamps;
 import io.grpc.Deadline;
 import java.util.concurrent.TimeUnit;
 
@@ -68,5 +72,19 @@ public class Time {
    */
   public static long millisecondsToSeconds(long milliseconds) {
     return milliseconds / 1000L;
+  }
+
+  /**
+   * Converts the difference in two timestamps, into milliseconds
+   *
+   * @param start
+   * @param end
+   * @return The difference, in milliseconds
+   * @throws IllegalArgumentException if start > end.
+   */
+  public static double toDurationMs(Timestamp start, Timestamp end) {
+    // start must be <= end
+    checkArgument(Timestamps.compare(start, end) <= 0);
+    return Durations.toMillis(Timestamps.between(start, end));
   }
 }
