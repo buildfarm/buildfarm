@@ -47,7 +47,7 @@ public class UploadManifest {
   private final boolean allowSymlinks;
   private final int inlineContentLimit;
 
-  /** -- GETTER -- Map of digests to file paths to upload. */
+  /** Map of digests to file paths to upload. */
   @Getter private final Map<Digest, Path> digestToFile;
 
   private final Map<Digest, Chunker> digestToChunkers;
