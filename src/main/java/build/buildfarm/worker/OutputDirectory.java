@@ -166,7 +166,7 @@ public class OutputDirectory {
     String prefix = "/";
     for (OutputDirectoryEntry entry : sortedOutputDirs) {
       String outputDir = entry.outputDirectory;
-      if (outputDir == currentOutputDir) {
+      if (outputDir.equals(currentOutputDir)) {
         continue;
       }
       currentOutputDir = outputDir;
