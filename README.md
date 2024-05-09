@@ -101,42 +101,60 @@ the `WORKSPACE` file.
 ### Deployments
 
 Buildfarm can be used as an external repository for composition into a deployment of your choice.
-
-Add the following to your WORKSPACE to get access to buildfarm targets, filling in the commit and sha256 values:
+See also the documentation site in the [Worker Execution Environment](https://bazelbuild.github.io/bazel-buildfarm/docs/architecture/worker-execution-environment/) section.
+ 
+Add the following to your `MODULE.bazel` to get access to buildfarm targets, filling in the `<COMMIT-SHA>` values:
 
 ```starlark
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-BUILDFARM_EXTERNAL_COMMIT = "<revision commit id>"
-BUILDFARM_EXTERNAL_SHA256 = "<sha256 digest of url below>"
-
-http_archive(
-    name = "build_buildfarm",
-    strip_prefix = "bazel-buildfarm-%s" % BUILDFARM_EXTERNAL_COMMIT,
-    sha256 = BUILDFARM_EXTERNAL_SHA256,
-    url = "https://github.com/bazelbuild/bazel-buildfarm/archive/%s.zip" % BUILDFARM_EXTERNAL_COMMIT,
+bazel_dep(name = "build_buildfarm")
+git_override(
+    module_name = "build_buildfarm",
+    commit = "<COMMIT-SHA>",
+    remote = "https://github.com/bazel/bazel-buildfarm.git",
 )
 
-load("@build_buildfarm//:deps.bzl", "buildfarm_dependencies")
+# Transitive!
+# TODO: remove this after https://github.com/bazelbuild/remote-apis/pull/293 is merged
+bazel_dep(name = "remoteapis", version = "eb433accc6a666b782ea4b787eb598e5c3d27c93")
+archive_override(
+    module_name = "remoteapis",
+    integrity = "sha256-68wzxNAkPZ49/zFwPYQ5z9MYbgxoeIEazKJ24+4YqIQ=",
+    strip_prefix = "remote-apis-eb433accc6a666b782ea4b787eb598e5c3d27c93",
+    urls = [
+        "https://github.com/bazelbuild/remote-apis/archive/eb433accc6a666b782ea4b787eb598e5c3d27c93.zip",
+    ],
+)
 
-buildfarm_dependencies()
+bazel_dep(name = "googleapis", version = "0.0.0-20240326-1c8d509c5", repo_name = "com_google_googleapis")
+bazel_dep(name = "grpc-java", version = "1.62.2")
 
-load("@build_buildfarm//:defs.bzl", "buildfarm_init")
+googleapis_switched_rules = use_extension("@com_google_googleapis//:extensions.bzl", "switched_rules")
+googleapis_switched_rules.use_languages(
+    grpc = True,
+    java = True,
+)
+use_repo(googleapis_switched_rules, "com_google_googleapis_imports")
 
-buildfarm_init()
-
-load("@maven//:compat.bzl", "compat_repositories")
-
-compat_repositories()
 ```
 
-Optionally, if you want to use the buildfarm docker container image targets, you can add this:
+You can then use the existing layer targets to build your own OCI images, for example:
 
-```starlark
-load("@build_buildfarm//:images.bzl", "buildfarm_images")
-
-buildfarm_images()
+``` starlark
+oci_image(
+    name = "mycompany-buildfarm-server",
+    base = "@<YOUPROVIDE>",
+    entrypoint = [
+        "/usr/bin/java",
+        "-jar",
+        "/app/build_buildfarm/buildfarm-server_deploy.jar",
+    ],
+    tars = [
+        "@build_buildfarm//:layer_buildfarm_server",
+    ],
+)
 ```
+
+where `@<YOUPROVIDE>` is the name of an `oci.pull(name = 'YOUPROVIDE', ...)` in your `MODULE.bazel`
 
 ### Helm Chart
 
