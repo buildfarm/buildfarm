@@ -51,8 +51,11 @@ def map_cas_page(r, count, method):
     cursors = {}
     conns = {}
     for master_node in r.connection_pool.nodes.all_masters():
-        cursors[master_node["name"]] = "0"
-        conns[master_node["name"]] = r.connection_pool.get_connection_by_node(master_node)
+        name = master_node["name"]
+        cursors[name] = "0"
+        conns[name] = r.connection_pool.get_connection_by_node(master_node)
+
+    print("Page Complete: %d %d total: %s" % (0, 0, ", ".join([name for name, cur in cursors.items() if cur != 0])))
 
     while not all(cursors[node] == 0 for node in cursors):
         for node in cursors:
@@ -62,7 +65,7 @@ def map_cas_page(r, count, method):
             conn = conns[node]
 
             pieces = [
-                'SCAN', cursors[node],
+                'SCAN', str(cursors[node]),
                 'MATCH', "ContentAddressableStorage:*"
             ]
             if count is not None:
@@ -72,11 +75,10 @@ def map_cas_page(r, count, method):
 
             raw_resp = conn.read_response()
 
-            # if you don't release the connection, the driver will make another, and you will hate your life
-            cur, resp = r._parse_scan(raw_resp)
+            cursor, resp = r._parse_scan(raw_resp)
 
-            if method(resp, conn):
-                cursors[node] = cur
+            if method(resp, conn, cursors, node):
+                cursors[node] = cursor
     for conn in conns.values():
         r.connection_pool.release(conn)
 
@@ -90,6 +92,9 @@ class FakePool:
     def release(self, conn):
         pass
 
+def highlight(name):
+    return f"\x1b[7m{name}\x1b[27m"
+
 class Indexer:
     def __init__(self, r):
         self.processed = 0
@@ -98,19 +103,20 @@ class Indexer:
     def pipeline(self, conn):
         return Pipeline(connection_pool=FakePool(conn), response_callbacks={}, transaction=False, shard_hint=None)
 
-    def process(self, cas_names, conn):
+    def process(self, cas_names, conn, cursors, current):
         count = len(cas_names)
         p = self.pipeline(conn)
         for i in range(count):
             name = cas_names[i].decode()
             keyslot = nodes.keyslot(name)
-            node_key = node_keys[keyslot]
-            set_key = "{%s}:intersecting-workers" % node_key
-            p.sinterstore(name, set_key, name)
+            # have to do this if scans return keys from other slots because... redis
+            if r.connection_pool.nodes.node_from_slot(keyslot) == current:
+                node_key = node_keys[keyslot]
+                set_key = "{%s}:intersecting-workers" % node_key
+                p.sinterstore(name, set_key, name)
         p.execute()
         self.processed += count
-        sys.stdout.write("Page Complete: %d %d total\r" % (count, self.processed))
-        sys.stdout.flush()
+        print("\x1b[A\x1b[KPage Complete: %d %d total: %s" % (count, self.processed, ", ".join([name if current != name else highlight(name) for name, cur in cursors.items() if cur != 0])))
         return True
 
 indexer = Indexer(r)
