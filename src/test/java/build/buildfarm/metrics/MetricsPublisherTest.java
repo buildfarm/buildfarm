@@ -133,13 +133,4 @@ public class MetricsPublisherTest {
     assertThat(new LogMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
         .isNotNull();
   }
-
-  @Test
-  public void noMetricsConfiguredTest() {
-    Operation operation =
-        defaultOperation.toBuilder().setResponse(Any.pack(defaultExecuteResponse)).build();
-
-    assertThat(new LogMetricsPublisher().populateRequestMetadata(operation, defaultRequestMetadata))
-        .isNotNull();
-  }
 }
