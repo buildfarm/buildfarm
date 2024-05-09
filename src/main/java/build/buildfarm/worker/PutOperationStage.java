@@ -242,13 +242,5 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
       return average;
     }
-
-    private static float millisecondBetween(Timestamp from, Timestamp to) {
-      // The time unit we want is millisecond.
-      // 1 second = 1000 milliseconds
-      // 1 millisecond = 1000,000 nanoseconds
-      Duration d = Timestamps.between(from, to);
-      return d.getSeconds() * 1000.0f + d.getNanos() / (1000.0f * 1000.0f);
-    }
   }
 }
