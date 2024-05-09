@@ -204,7 +204,6 @@
     <exclude name="UnnecessaryCaseChange"/>
     <exclude name="UnnecessaryConversionTemporary"/>
     <exclude name="UseCorrectExceptionLogging"/>
-    <exclude name="UseEqualsToCompareStrings"/>
     <exclude name="UseLocaleWithCaseConversions"/>
     <exclude name="UseProperClassLoader"/>
 </rule>
