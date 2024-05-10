@@ -199,7 +199,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       responseObserver.onNext(
           QueryWriteStatusResponse.newBuilder()
               .setCommittedSize(write.getCommittedSize())
-              .setComplete(write.getComplete())
+              .setComplete(write.isComplete())
               .build());
       responseObserver.onCompleted();
     } else {
