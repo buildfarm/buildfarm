@@ -333,7 +333,7 @@ class ShardWorkerContext implements WorkerContext {
           boolean matched = false;
 
           @Override
-          public boolean getMatched() {
+          public boolean isMatched() {
             return matched;
           }
 
@@ -380,7 +380,7 @@ class ShardWorkerContext implements WorkerContext {
             throw new RuntimeException(t);
           }
         };
-    while (!dedupMatchListener.getMatched()) {
+    while (!dedupMatchListener.isMatched()) {
       try {
         matchInterruptible(dedupMatchListener);
       } catch (IOException e) {
@@ -448,12 +448,12 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean getStreamStdout() {
+  public boolean isStreamStdout() {
     return true;
   }
 
   @Override
-  public boolean getStreamStderr() {
+  public boolean isStreamStderr() {
     return true;
   }
 

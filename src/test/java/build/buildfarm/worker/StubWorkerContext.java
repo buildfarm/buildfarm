@@ -117,12 +117,12 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean getStreamStdout() {
+  public boolean isStreamStdout() {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public boolean getStreamStderr() {
+  public boolean isStreamStderr() {
     throw new UnsupportedOperationException();
   }
 
