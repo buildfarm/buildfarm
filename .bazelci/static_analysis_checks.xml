@@ -17,29 +17,19 @@
     <exclude name="AvoidStringBufferField"/>
     <exclude name="AvoidUsingHardCodedIP"/>
     <exclude name="CheckResultSet"/>
-    <exclude name="ConstantsInInterface"/>
     <exclude name="DefaultLabelNotLastInSwitchStmt"/>
     <exclude name="GuardLogStatement"/>
-    <exclude name="JUnit4SuitesShouldUseSuiteAnnotation"/>
-    <exclude name="JUnit4TestShouldUseAfterAnnotation"/>
-    <exclude name="JUnit4TestShouldUseBeforeAnnotation"/>
-    <exclude name="JUnit4TestShouldUseTestAnnotation"/>
     <exclude name="JUnitAssertionsShouldIncludeMessage"/>
     <exclude name="JUnitTestContainsTooManyAsserts"/>
     <exclude name="JUnitTestsShouldIncludeAssert"/>
     <exclude name="LiteralsFirstInComparisons"/>
     <exclude name="LooseCoupling"/>
-    <exclude name="MethodReturnsInternalArray"/>
     <exclude name="PositionLiteralsFirstInCaseInsensitiveComparisons"/>
     <exclude name="PositionLiteralsFirstInComparisons"/>
     <exclude name="PreserveStackTrace"/>
     <exclude name="ReplaceEnumerationWithIterator"/>
     <exclude name="SwitchStmtsShouldHaveDefault"/>
     <exclude name="SystemPrintln"/>
-    <exclude name="UseAssertEqualsInsteadOfAssertTrue"/>
-    <exclude name="UseAssertNullInsteadOfAssertTrue"/>
-    <exclude name="UseAssertSameInsteadOfAssertTrue"/>
-    <exclude name="UseAssertTrueInsteadOfAssertEquals"/>
     <exclude name="UseTryWithResources"/>
     <exclude name="UseVarargs"/>
 </rule>
@@ -53,7 +43,6 @@
     <exclude name="AvoidPrefixingMethodParameters"/>
     <exclude name="AvoidProtectedFieldInFinalClass"/>
     <exclude name="AvoidProtectedMethodInFinalClassNotExtending"/>
-    <exclude name="BooleanGetMethodName"/>
     <exclude name="CallSuperInConstructor"/>
     <exclude name="ClassNamingConventions"/>
     <exclude name="CommentDefaultAccessModifier"/>
@@ -66,7 +55,6 @@
     <exclude name="FormalParameterNamingConventions"/>
     <exclude name="GenericsNaming"/>
     <exclude name="LinguisticNaming"/>
-    <exclude name="LocalHomeNamingConvention"/>
     <exclude name="LocalInterfaceSessionNamingConvention"/>
     <exclude name="LocalVariableCouldBeFinal"/>
     <exclude name="LocalVariableNamingConventions"/>
@@ -76,8 +64,6 @@
     <exclude name="MIsLeadingVariableName"/>
     <exclude name="OnlyOneReturn"/>
     <exclude name="PrematureDeclaration"/>
-    <exclude name="RemoteInterfaceNamingConvention"/>
-    <exclude name="RemoteSessionInterfaceNamingConvention"/>
     <exclude name="ShortClassName"/>
     <exclude name="ShortMethodName"/>
     <exclude name="ShortVariable"/>
@@ -120,9 +106,6 @@
     <exclude name="NPathComplexity"/>
     <exclude name="SignatureDeclareThrowsException"/>
     <exclude name="SimplifiedTernary"/>
-    <exclude name="SimplifyBooleanAssertion"/>
-    <exclude name="SimplifyBooleanExpressions"/>
-    <exclude name="SimplifyBooleanReturns"/>
     <exclude name="SingularField"/>
     <exclude name="StdCyclomaticComplexity"/>
     <exclude name="SwitchDensity"/>
@@ -145,9 +128,7 @@
     <exclude name="AvoidBranchingStatementAsLastInLoop"/>
     <exclude name="AvoidCallingFinalize"/>
     <exclude name="AvoidCatchingThrowable"/>
-    <exclude name="AvoidDecimalLiteralsInBigDecimalConstructor"/>
     <exclude name="AvoidDuplicateLiterals"/>
-    <exclude name="AvoidEnumAsIdentifier"/>
     <exclude name="AvoidFieldNameMatchingMethodName"/>
     <exclude name="AvoidFieldNameMatchingTypeName"/>
     <exclude name="AvoidInstanceofChecksInCatchClause"/>
@@ -157,48 +138,21 @@
     <exclude name="AvoidUsingOctalValues"/>
     <exclude name="BeanMembersShouldSerialize"/>
     <exclude name="CheckSkipResult"/>
-    <exclude name="ClassCastExceptionWithToArray"/>
-    <exclude name="CloneMethodMustBePublic"/>
-    <exclude name="CloneMethodMustImplementCloneable"/>
-    <exclude name="CloneThrowsCloneNotSupportedException"/>
     <exclude name="CloseResource"/>
     <exclude name="ConstructorCallsOverridableMethod"/>
     <exclude name="DataflowAnomalyAnalysis"/>
-    <exclude name="DetachedTestCase"/>
-    <exclude name="DoNotTerminateVM"/>
     <exclude name="DoNotThrowExceptionInFinally"/>
     <exclude name="EmptyCatchBlock"/>
     <exclude name="EmptyIfStmt"/>
     <exclude name="EmptyInitializer"/>
     <exclude name="EmptyWhileStmt"/>
-    <exclude name="FinalizeDoesNotCallSuperFinalize"/>
-    <exclude name="FinalizeOnlyCallsSuperFinalize"/>
-    <exclude name="FinalizeOverloaded"/>
-    <exclude name="FinalizeShouldBeProtected"/>
-    <exclude name="LoggerIsNotStaticFinal"/>
-    <exclude name="MethodWithSameNameAsEnclosingClass"/>
-    <exclude name="MissingBreakInSwitch"/>
     <exclude name="MissingSerialVersionUID"/>
     <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
-    <exclude name="MoreThanOneLogger"/>
     <exclude name="NonCaseLabelInSwitchStatement"/>
     <exclude name="NonStaticInitializer"/>
     <exclude name="NullAssignment"/>
     <exclude name="OverrideBothEqualsAndHashcode"/>
-    <exclude name="ProperCloneImplementation"/>
     <exclude name="ReturnEmptyArrayRatherThanNull"/>
-    <exclude name="SimpleDateFormatNeedsLocale"/>
-    <exclude name="SingleMethodSingleton"/>
-    <exclude name="SingletonClassReturningNewInstance"/>
-    <exclude name="StaticEJBFieldShouldBeFinal"/>
-    <exclude name="StringBufferInstantiationWithChar"/>
-    <exclude name="SuspiciousEqualsMethodName"/>
-    <exclude name="SuspiciousHashcodeMethodName"/>
-    <exclude name="SuspiciousOctalEscape"/>
-    <exclude name="UnnecessaryBooleanAssertion"/>
-    <exclude name="UnnecessaryCaseChange"/>
-    <exclude name="UnnecessaryConversionTemporary"/>
-    <exclude name="UseCorrectExceptionLogging"/>
     <exclude name="UseLocaleWithCaseConversions"/>
     <exclude name="UseProperClassLoader"/>
 </rule>
@@ -210,25 +164,18 @@
     <exclude name="AvoidUsingVolatile"/>
     <exclude name="DoNotUseThreads"/>
     <exclude name="DontCallThreadRun"/>
-    <exclude name="DoubleCheckedLocking"/>
     <exclude name="NonThreadSafeSingleton"/>
-    <exclude name="UnsynchronizedStaticDateFormatter"/>
-    <exclude name="UnsynchronizedStaticFormatter"/>
     <exclude name="UseConcurrentHashMap"/>
     <exclude name="UseNotifyAllInsteadOfNotify"/>
 </rule>
 
 <rule ref="category/java/performance.xml">
-    <exclude name="AvoidCalendarDateCreation"/>
     <exclude name="AvoidFileStream"/>
     <exclude name="AvoidInstantiatingObjectsInLoops"/>
     <exclude name="RedundantFieldInitializer"/>
     <exclude name="UseStringBufferForStringAppends"/>
 </rule>
 
-<rule ref="category/java/security.xml">
-    <exclude name="HardCodedCryptoKey"/>
-    <exclude name="InsecureCryptoIv"/>
-</rule>
+<rule ref="category/java/security.xml"/>
 
 </ruleset>
