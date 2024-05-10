@@ -88,6 +88,7 @@ public final class Blake3Hasher implements Hasher {
 
   @Override
   @CanIgnoreReturnValue
+  @SuppressWarnings("PMD.ForLoopVariableCount")
   public Hasher putUnencodedChars(CharSequence charSequence) {
     for (int i = 0, len = charSequence.length(); i < len; i++) {
       putChar(charSequence.charAt(i));
