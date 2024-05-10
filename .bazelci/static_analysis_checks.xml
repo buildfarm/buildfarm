@@ -19,7 +19,6 @@
     <exclude name="CheckResultSet"/>
     <exclude name="ConstantsInInterface"/>
     <exclude name="DefaultLabelNotLastInSwitchStmt"/>
-    <exclude name="ForLoopVariableCount"/>
     <exclude name="GuardLogStatement"/>
     <exclude name="JUnit4SuitesShouldUseSuiteAnnotation"/>
     <exclude name="JUnit4TestShouldUseAfterAnnotation"/>
