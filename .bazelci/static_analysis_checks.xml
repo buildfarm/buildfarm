@@ -161,7 +161,6 @@
     <exclude name="ClassCastExceptionWithToArray"/>
     <exclude name="CloneMethodMustBePublic"/>
     <exclude name="CloneMethodMustImplementCloneable"/>
-    <exclude name="CloneMethodReturnTypeMustMatchClassName"/>
     <exclude name="CloneThrowsCloneNotSupportedException"/>
     <exclude name="CloseResource"/>
     <exclude name="ConstructorCallsOverridableMethod"/>

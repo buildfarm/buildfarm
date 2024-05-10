@@ -69,7 +69,7 @@ public final class Blake3MessageDigest extends MessageDigest {
   }
 
   @Override
-  public Object clone() throws CloneNotSupportedException {
+  public Blake3MessageDigest clone() throws CloneNotSupportedException {
     throw new CloneNotSupportedException();
   }
 
