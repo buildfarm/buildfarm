@@ -1439,7 +1439,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     for (Path branchDir : entryPathStrategy.branchDirectories()) {
-      boolean isRoot = branchDir == root;
+      boolean isRoot = branchDir.equals(root);
       for (Path file : listDir(branchDir)) {
         // allow migration for digest-y names
         String name = file.getFileName().toString();
