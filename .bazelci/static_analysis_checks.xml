@@ -125,7 +125,6 @@
     <exclude name="SimplifyBooleanAssertion"/>
     <exclude name="SimplifyBooleanExpressions"/>
     <exclude name="SimplifyBooleanReturns"/>
-    <exclude name="SimplifyConditional"/>
     <exclude name="SingularField"/>
     <exclude name="StdCyclomaticComplexity"/>
     <exclude name="SwitchDensity"/>

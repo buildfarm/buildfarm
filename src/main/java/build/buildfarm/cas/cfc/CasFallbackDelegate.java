@@ -47,7 +47,7 @@ public class CasFallbackDelegate {
       boolean skipLoad)
       throws IOException, InterruptedException {
     // start delegate if we specifically have a CASFileCache
-    if (delegate != null && delegate instanceof CASFileCache fileCacheDelegate) {
+    if (delegate instanceof CASFileCache fileCacheDelegate) {
       fileCacheDelegate.start(onStartPut, removeDirectoryService, skipLoad);
     }
   }
