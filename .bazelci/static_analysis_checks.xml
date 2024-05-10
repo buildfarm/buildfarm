@@ -28,7 +28,6 @@
     <exclude name="JUnitAssertionsShouldIncludeMessage"/>
     <exclude name="JUnitTestContainsTooManyAsserts"/>
     <exclude name="JUnitTestsShouldIncludeAssert"/>
-    <exclude name="JUnitUseExpected"/>
     <exclude name="LiteralsFirstInComparisons"/>
     <exclude name="LooseCoupling"/>
     <exclude name="MethodReturnsInternalArray"/>

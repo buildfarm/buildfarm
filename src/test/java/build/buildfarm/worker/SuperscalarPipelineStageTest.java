@@ -80,6 +80,7 @@ public class SuperscalarPipelineStageTest {
   }
 
   @Test
+  @SuppressWarnings("PMD.JUnitUseExpected")
   public void interruptedClaimReleasesPartial() throws InterruptedException {
     AbstractSuperscalarPipelineStage stage =
         new AbstractSuperscalarPipelineStage("too-narrow", /* output= */ null, /* width= */ 3) {
@@ -118,6 +119,7 @@ public class SuperscalarPipelineStageTest {
   }
 
   @Test
+  @SuppressWarnings("PMD.JUnitUseExpected")
   public void takeReleasesQueueClaims() throws InterruptedException {
     OperationContext context =
         OperationContext.newBuilder()
