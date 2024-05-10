@@ -48,6 +48,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
       PipelineStage reportResultStage,
       PutOperationStage completeStage,
       Backplane backplane) {
+    super();
     this.storage = storage;
     this.matchStage = matchStage;
     this.inputFetchStage = inputFetchStage;
