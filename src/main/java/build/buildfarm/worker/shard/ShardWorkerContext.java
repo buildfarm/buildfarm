@@ -447,16 +447,6 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean getStreamStdout() {
-    return true;
-  }
-
-  @Override
-  public boolean getStreamStderr() {
-    return true;
-  }
-
-  @Override
   public Duration getDefaultActionTimeout() {
     return defaultActionTimeout;
   }

@@ -83,10 +83,6 @@ public interface WorkerContext {
 
   boolean hasMaximumActionTimeout();
 
-  boolean getStreamStdout();
-
-  boolean getStreamStderr();
-
   Duration getDefaultActionTimeout();
 
   Duration getMaximumActionTimeout();
