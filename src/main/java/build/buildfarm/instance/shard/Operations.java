@@ -154,7 +154,7 @@ public class Operations {
 
     // We also store a mapping from invocationID -> operationIDs
     // This is a common lookup that needs to be performant.
-    if (!"".equals(invocationId) && jedis.sadd(invocationId, name) == 1) {
+    if (!invocationId.isEmpty() && jedis.sadd(invocationId, name) == 1) {
       jedis.expire(invocationId, configs.getBackplane().getMaxInvocationIdTimeout());
     }
   }
