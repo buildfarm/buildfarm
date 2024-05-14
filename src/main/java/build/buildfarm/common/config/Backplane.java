@@ -78,7 +78,11 @@ public class Backplane {
    * @return The redis password, or <c>null</c> if unset.
    */
   public @Nullable String getRedisPassword() {
-    URI redisProperUri = URI.create(getRedisUri());
+    String r = getRedisUri();
+    if (r == null) {
+      return null;
+    }
+    URI redisProperUri = URI.create(r);
     if (!Strings.isNullOrEmpty(JedisURIHelper.getPassword(redisProperUri))) {
       return JedisURIHelper.getPassword(redisProperUri);
     }
