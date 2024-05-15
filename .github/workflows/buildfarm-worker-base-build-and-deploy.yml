@@ -1,4 +1,5 @@
 name: Build and Push Base Buildfarm Worker Images
+# Following the HOWTO at https://docs.docker.com/build/ci/github-actions/multi-platform/
 
 on:
   push:
@@ -14,7 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        # QEMU needed for the ARM variant.
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        # Docker Buildx needed for the ARM variant.
 
       - name: Login to Bazelbuild Docker Hub
         uses: docker/login-action@v3
@@ -23,17 +32,19 @@ jobs:
           password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
 
       - name: Build Jammy Docker image
-        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/amd64,linux/arm64/v8
           file: ./ci/base-worker-image/jammy/Dockerfile
           push: true
           tags: bazelbuild/buildfarm-worker-base:jammy
 
       - name: Build Mantic Docker image
-        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/amd64,linux/arm64/v8
           file: ./ci/base-worker-image/mantic/Dockerfile
           push: true
           tags: bazelbuild/buildfarm-worker-base:mantic
