@@ -67,7 +67,17 @@ public class Backplane {
    */
   private String redisCertificateAuthorityFile;
 
-  private int timeout = 10000;
+  /**
+   * Use Google Application Default Credentials to authenticate to Redis.
+   *
+   * <p>Setting GOOGLE_DEFAULT_CREDENTIALS env var can help Google credential provider find your
+   * service account.
+   *
+   * <p>If this is set, the `redisPassword` will be ignored.
+   */
+  private boolean redisAuthWithGoogleCredentials;
+
+  private int timeout = 10000; // Milliseconds
   private String[] redisNodes = {};
   private int maxAttempts = 20;
   private boolean cacheCas = false;
@@ -85,8 +95,8 @@ public class Backplane {
    *
    * <ol>
    *   <li>the password in the Redis URI (wherever that came from)
-   *   <li>The `redisPassword` from config YAML
    *   <li>the `redisCredentialFile`.
+   *   <li>The `redisPassword` from config YAML
    * </ol>
    *
    * @return The redis password, or <c>null</c> if unset.
