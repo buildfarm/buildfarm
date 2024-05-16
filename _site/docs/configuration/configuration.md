@@ -334,7 +334,7 @@ worker:
     allowUnmatched: false
     properties:
       - name: "gpu"
-      - value: "nvidia RTX 2090"
+        value: "nvidia RTX 2090"
 ```
 
 ### Resources
@@ -355,7 +355,7 @@ worker:
   dequeueMatchSettings:
     properties:
       - name: "resource:special-compiler-license"
-      - value: "1" # only actions which request one compiler license at a time will be accepted
+        value: "1" # only actions which request one compiler license at a time will be accepted
   resources:
     name: "special-compiler-license"
     amount: 3
