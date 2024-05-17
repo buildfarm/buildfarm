@@ -17,6 +17,7 @@ package build.buildfarm.worker.persistent;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static persistent.bazel.client.PersistentWorker.TOOL_INPUT_SUBDIR;
 
+import com.google.common.base.Preconditions;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
 import com.google.protobuf.util.Durations;
@@ -37,9 +38,13 @@ import persistent.bazel.client.WorkerKey;
 import persistent.bazel.client.WorkerSupervisor;
 
 /**
- * Responsible for: 1) Initializing a new Worker's file environment correctly 2) pre-request
- * requirements, e.g. ensuring tool input files 3) post-response requirements, i.e. putting output
- * files in the right place
+ * Responsible for:
+ *
+ * <ol>
+ *   <li>Initializing a new Worker's file environment correctly
+ *   <li>pre-request requirements, e.g. ensuring tool input files
+ *   <li>post-response requirements, i.e. putting output files in the right place
+ * </ol>
  */
 @Log
 public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, CommonsWorkerPool> {
@@ -64,7 +69,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     super(workerPool);
   }
 
-  public ProtoCoordinator(WorkerSupervisor supervisor, int maxWorkersPerKey) {
+  private ProtoCoordinator(WorkerSupervisor supervisor, int maxWorkersPerKey) {
     super(new CommonsWorkerPool(supervisor, maxWorkersPerKey));
   }
 

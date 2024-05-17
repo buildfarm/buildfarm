@@ -477,10 +477,8 @@ class Executor {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
     }
 
-    boolean usePersistentWorker =
-        !limits.persistentWorkerKey.isEmpty() && !limits.persistentWorkerCommand.isEmpty();
-
-    if (usePersistentWorker) {
+    if (!limits.persistentWorkerKey.isEmpty()) {
+      // RBE Client suggests to run this Action as persistent...
       log.fine(
           "usePersistentWorker; got persistentWorkerCommand of : "
               + limits.persistentWorkerCommand);
@@ -491,7 +489,6 @@ class Executor {
           WorkFilesContext.fromContext(execDir, execTree, executionContext.command);
 
       return PersistentExecutor.runOnPersistentWorker(
-          limits.persistentWorkerCommand,
           filesContext,
           operationName,
           ImmutableList.copyOf(arguments),
@@ -518,7 +515,6 @@ class Executor {
 
       return DockerExecutor.runActionWithDocker(dockerClient, settings, resultBuilder);
     }
-
     long startNanoTime = System.nanoTime();
     Process process;
     try {

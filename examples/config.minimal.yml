@@ -7,5 +7,17 @@ backplane:
           value: "*"
         - name: "max-cores"
           value: "*"
+        - name: "persistentWorkerKey"
+          value: "*"
+        - name: "persistentWorkerCommand"
+          value: "*"
 worker:
   publicName: "localhost:8981"
+  dequeueMatchSettings:
+    allowUnmatched: true
+    properties:
+      - name: "persistentWorkerKey"
+        value: "*"
+      - name: "persistentWorkerCommand"
+        value: "*"
+
