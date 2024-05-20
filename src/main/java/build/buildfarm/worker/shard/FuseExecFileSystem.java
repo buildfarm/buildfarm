@@ -20,6 +20,7 @@ import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.FuseCAS;
 import java.io.IOException;
 import java.io.InputStream;

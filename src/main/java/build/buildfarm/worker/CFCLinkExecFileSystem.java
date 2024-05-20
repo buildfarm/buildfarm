@@ -12,51 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.shard;
+package build.buildfarm.worker;
 
-import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
-import static build.buildfarm.common.io.Utils.readdir;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.Iterables.concat;
-import static com.google.common.util.concurrent.Futures.allAsList;
-import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
-import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
-import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.Collections.synchronizedList;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
-import build.bazel.remote.execution.v2.SymlinkNode;
-import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
-import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.io.Directories;
-import build.buildfarm.common.io.Dirent;
-import build.buildfarm.worker.ExecDirException;
 import build.buildfarm.worker.ExecDirException.ViolationException;
-import build.buildfarm.worker.OutputDirectory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.FileStore;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipal;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -72,28 +58,17 @@ import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 @Log
-class CFCExecFileSystem implements ExecFileSystem {
-  private final Path root;
-  private final CASFileCache fileCache;
-  private final @Nullable UserPrincipal owner;
-
+public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   // perform first-available non-output symlinking and retain directories in cache
   private final boolean linkInputDirectories;
 
   // indicate symlinking above for a set of matching paths
   private final Iterable<Pattern> linkedInputDirectories;
 
-  // permit symlinks to point to absolute paths in inputs
-  private final boolean allowSymlinkTargetAbsolute;
-
   private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
-  private final ExecutorService fetchService = BuildfarmExecutors.getFetchServicePool();
-  private final ExecutorService removeDirectoryService;
-  private final ExecutorService accessRecorder;
-  private FileStore fileStore; // initialized with start
 
-  CFCExecFileSystem(
+  public CFCLinkExecFileSystem(
       Path root,
       CASFileCache fileCache,
       @Nullable UserPrincipal owner,
@@ -101,95 +76,18 @@ class CFCExecFileSystem implements ExecFileSystem {
       Iterable<String> linkedInputDirectories,
       boolean allowSymlinkTargetAbsolute,
       ExecutorService removeDirectoryService,
-      ExecutorService accessRecorder) {
-    this.root = root;
-    this.fileCache = fileCache;
-    this.owner = owner;
+      ExecutorService accessRecorder,
+      ExecutorService fetchService) {
+    super(
+        root,
+        fileCache,
+        owner,
+        allowSymlinkTargetAbsolute,
+        removeDirectoryService,
+        accessRecorder,
+        fetchService);
     this.linkInputDirectories = linkInputDirectories;
     this.linkedInputDirectories = Iterables.transform(linkedInputDirectories, Pattern::compile);
-    this.allowSymlinkTargetAbsolute = allowSymlinkTargetAbsolute;
-    this.removeDirectoryService = removeDirectoryService;
-    this.accessRecorder = accessRecorder;
-  }
-
-  @SuppressWarnings("ConstantConditions")
-  @Override
-  public void start(Consumer<List<Digest>> onDigests, boolean skipLoad)
-      throws IOException, InterruptedException {
-    fileStore = Files.getFileStore(root);
-    List<Dirent> dirents = null;
-    try {
-      dirents = readdir(root, /* followSymlinks= */ false, fileStore);
-    } catch (IOException e) {
-      log.log(Level.SEVERE, "error reading directory " + root.toString(), e);
-    }
-
-    ImmutableList.Builder<ListenableFuture<Void>> removeDirectoryFutures = ImmutableList.builder();
-
-    // only valid path under root is cache
-    for (Dirent dirent : dirents) {
-      String name = dirent.getName();
-      Path child = root.resolve(name);
-      if (!child.equals(fileCache.getRoot())) {
-        removeDirectoryFutures.add(
-            Directories.remove(root.resolve(name), fileStore, removeDirectoryService));
-      }
-    }
-
-    ImmutableList.Builder<Digest> blobDigests = ImmutableList.builder();
-    fileCache.start(
-        digest -> {
-          synchronized (blobDigests) {
-            blobDigests.add(digest);
-          }
-        },
-        removeDirectoryService,
-        skipLoad);
-    onDigests.accept(blobDigests.build());
-
-    getInterruptiblyOrIOException(allAsList(removeDirectoryFutures.build()));
-  }
-
-  @Override
-  public void stop() throws InterruptedException {
-    fileCache.stop();
-    if (!shutdownAndAwaitTermination(fetchService, 1, MINUTES)) {
-      log.log(Level.SEVERE, "could not terminate fetchService");
-    }
-    if (!shutdownAndAwaitTermination(removeDirectoryService, 1, MINUTES)) {
-      log.log(Level.SEVERE, "could not terminate removeDirectoryService");
-    }
-    if (!shutdownAndAwaitTermination(accessRecorder, 1, MINUTES)) {
-      log.log(Level.SEVERE, "could not terminate accessRecorder");
-    }
-  }
-
-  @Override
-  public Path root() {
-    return root;
-  }
-
-  @Override
-  public ContentAddressableStorage getStorage() {
-    return fileCache;
-  }
-
-  @Override
-  public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
-      throws IOException {
-    return fileCache.newInput(compressor, digest, offset);
-  }
-
-  private ListenableFuture<Void> putSymlink(Path path, SymlinkNode symlinkNode) {
-    Path symlinkPath = path.resolve(symlinkNode.getName());
-    Path relativeTargetPath = path.getFileSystem().getPath(symlinkNode.getTarget());
-    checkState(allowSymlinkTargetAbsolute || !relativeTargetPath.isAbsolute());
-    return listeningDecorator(fetchService)
-        .submit(
-            () -> {
-              Files.createSymbolicLink(symlinkPath, relativeTargetPath);
-              return null;
-            });
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -225,97 +123,9 @@ class CFCExecFileSystem implements ExecFileSystem {
 
   private ListenableFuture<Void> catchingPut(
       Digest digest, Path root, Path path, boolean isExecutable, Consumer<String> onKey) {
-    return catchingAsync(
+    return catching(
         put(digest, path, isExecutable, onKey),
-        Throwable.class, // required per docs
-        t -> {
-          if (t instanceof IOException) {
-            return immediateFailedFuture(
-                new ViolationException(
-                    digest, root.relativize(path), isExecutable, (IOException) t));
-          }
-          return immediateFailedFuture(t);
-        },
-        directExecutor());
-  }
-
-  private Iterable<ListenableFuture<Void>> fetchInputs(
-      Path root,
-      Path path,
-      Digest directoryDigest,
-      Map<Digest, Directory> directoriesIndex,
-      OutputDirectory outputDirectory,
-      Set<Path> linkedInputDirectories,
-      Consumer<String> onKey,
-      ImmutableList.Builder<Digest> inputDirectories)
-      throws IOException {
-    Directory directory = directoriesIndex.get(directoryDigest);
-    if (directory == null) {
-      // not quite IO...
-      throw new IOException(
-          "Directory " + DigestUtil.toString(directoryDigest) + " is not in directories index");
-    }
-
-    Iterable<ListenableFuture<Void>> downloads =
-        directory.getFilesList().stream()
-            .map(
-                fileNode ->
-                    catchingPut(
-                        fileNode.getDigest(),
-                        root,
-                        path.resolve(fileNode.getName()),
-                        fileNode.getIsExecutable(),
-                        onKey))
-            .collect(ImmutableList.toImmutableList());
-
-    downloads =
-        concat(
-            downloads,
-            directory.getSymlinksList().stream()
-                .map(symlinkNode -> putSymlink(path, symlinkNode))
-                .collect(ImmutableList.toImmutableList()));
-
-    ImmutableList.Builder<ListenableFuture<Void>> linkedDirectories = ImmutableList.builder();
-    for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
-      Digest digest = directoryNode.getDigest();
-      String name = directoryNode.getName();
-      OutputDirectory childOutputDirectory =
-          outputDirectory != null ? outputDirectory.getChild(name) : null;
-      Path dirPath = path.resolve(name);
-      if (childOutputDirectory != null
-          || !linkInputDirectories
-          || !linkedInputDirectories.contains(dirPath)) {
-        Files.createDirectories(dirPath);
-        downloads =
-            concat(
-                downloads,
-                fetchInputs(
-                    root,
-                    dirPath,
-                    digest,
-                    directoriesIndex,
-                    childOutputDirectory,
-                    linkedInputDirectories,
-                    onKey,
-                    inputDirectories));
-      } else {
-        linkedDirectories.add(
-            transform(
-                linkDirectory(dirPath, digest, directoriesIndex),
-                (result) -> {
-                  // we saw null entries in the built immutable list without synchronization
-                  synchronized (inputDirectories) {
-                    inputDirectories.add(digest);
-                  }
-                  return null;
-                },
-                fetchService));
-      }
-      if (Thread.currentThread().isInterrupted()) {
-        break;
-      }
-    }
-    return concat(downloads, linkedDirectories.build());
+        e -> new ViolationException(digest, root.relativize(path), isExecutable, e));
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -419,6 +229,91 @@ class CFCExecFileSystem implements ExecFileSystem {
     return OutputDirectory.parse(files, dirs, command.getEnvironmentVariablesList());
   }
 
+  class LinkExecFileVisitor extends ExecFileVisitor {
+    private final Set<Path> linkedDirectories; // only need contains
+    private final Map<Digest, Directory> index; // only need retrieve
+    private final OutputDirectory outputDirectoryRoot;
+    private final Stack<OutputDirectory> outputDirectories = new Stack<>();
+    private final List<String> inputFiles = synchronizedList(new ArrayList<>());
+    private final List<Digest> inputDirectories = synchronizedList(new ArrayList<>());
+
+    LinkExecFileVisitor(
+        Set<Path> linkedDirectories,
+        Map<Digest, Directory> index,
+        OutputDirectory outputDirectoryRoot) {
+      this.linkedDirectories = linkedDirectories;
+      this.index = index;
+      this.outputDirectoryRoot = outputDirectoryRoot;
+    }
+
+    List<String> inputFiles() {
+      return inputFiles;
+    }
+
+    List<Digest> inputDirectories() {
+      return inputDirectories;
+    }
+
+    @Override
+    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+        throws IOException {
+      OutputDirectory outputDirectory;
+      if (outputDirectories.isEmpty()) {
+        outputDirectory = outputDirectoryRoot;
+      } else {
+        String name = dir.getFileName().toString();
+        OutputDirectory parentOutputDirectory = outputDirectories.peek();
+        outputDirectory =
+            parentOutputDirectory != null ? parentOutputDirectory.getChild(name) : null;
+      }
+      if (outputDirectory == null && linkedDirectories.contains(dir)) {
+        Digest digest = (Digest) attrs.fileKey();
+        futures.add(
+            transform(
+                linkDirectory(dir, digest, index),
+                result -> {
+                  inputDirectories.add(digest);
+                  return result;
+                },
+                fetchService));
+        return FileVisitResult.SKIP_SUBTREE;
+      }
+
+      FileVisitResult result = super.preVisitDirectory(dir, attrs);
+      if (result == FileVisitResult.CONTINUE) {
+        outputDirectories.push(outputDirectory);
+      }
+      return result;
+    }
+
+    @Override
+    public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
+      // this is only called when we've continued and placed onto stack
+      outputDirectories.pop();
+      return super.postVisitDirectory(dir, exc);
+    }
+
+    @Override
+    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+      ListenableFuture<Void> populate;
+      boolean terminate = false;
+      if (attrs.isSymbolicLink()) {
+        ExecSymlinkAttributes symlinkAttrs = (ExecSymlinkAttributes) attrs;
+        populate = putSymlink(file, symlinkAttrs.target());
+      } else if (attrs.isRegularFile()) {
+        Digest digest = (Digest) attrs.fileKey();
+        ExecFileAttributes fileAttrs = (ExecFileAttributes) attrs;
+        // mild risk here with inputFiles missing a key that was referenced...
+        populate = catchingPut(digest, root, file, fileAttrs.isExecutable(), inputFiles::add);
+      } else {
+        populate = immediateFailedFuture(new IOException("unknown file type for " + file));
+        terminate = true;
+      }
+      futures.add(populate);
+      return terminate ? FileVisitResult.TERMINATE : FileVisitResult.CONTINUE;
+    }
+  }
+
   @Override
   public Path createExecDir(
       String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
@@ -426,37 +321,25 @@ class CFCExecFileSystem implements ExecFileSystem {
     Digest inputRootDigest = action.getInputRootDigest();
     OutputDirectory outputDirectory = createOutputDirectory(command);
 
-    Path execDir = root.resolve(operationName);
+    Path execDir = root().resolve(operationName);
     if (Files.exists(execDir)) {
       Directories.remove(execDir, fileStore);
     }
     Files.createDirectories(execDir);
 
-    ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
-    ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
-
     Set<Path> linkedInputDirectories =
-        ImmutableSet.copyOf(
-            Iterables.transform(
-                linkedDirectories(directoriesIndex, inputRootDigest),
-                execDir::resolve)); // does this work on windows with / separators?
+        linkInputDirectories
+            ? ImmutableSet.copyOf(
+                Iterables.transform(
+                    linkedDirectories(directoriesIndex, inputRootDigest), execDir::resolve))
+            : ImmutableSet.of(); // does this work on windows with / separators?
 
-    log.log(
-        Level.FINER, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
-    Iterable<ListenableFuture<Void>> fetchedFutures =
-        fetchInputs(
-            execDir,
-            execDir,
-            inputRootDigest,
-            directoriesIndex,
-            outputDirectory,
-            linkedInputDirectories,
-            key -> {
-              synchronized (inputFiles) {
-                inputFiles.add(key);
-              }
-            },
-            inputDirectories);
+    log.log(Level.FINER, operationName + " walking execTree");
+    ExecTree execTree = new ExecTree(directoriesIndex);
+    LinkExecFileVisitor visitor =
+        new LinkExecFileVisitor(linkedInputDirectories, directoriesIndex, outputDirectory);
+    execTree.walk(execDir, action.getInputRootDigest(), visitor);
+    Iterable<ListenableFuture<Void>> fetchedFutures = visitor.futures();
     boolean success = false;
     try {
       InterruptedException exception = null;
@@ -492,17 +375,15 @@ class CFCExecFileSystem implements ExecFileSystem {
       success = true;
     } finally {
       if (!success) {
-        fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
+        fileCache.decrementReferences(visitor.inputFiles(), visitor.inputDirectories());
         Directories.remove(execDir, fileStore);
       }
     }
 
-    rootInputFiles.put(execDir, inputFiles.build());
-    rootInputDirectories.put(execDir, inputDirectories.build());
+    rootInputFiles.put(execDir, visitor.inputFiles());
+    rootInputDirectories.put(execDir, visitor.inputDirectories());
 
-    log.log(
-        Level.FINER,
-        "ExecFileSystem::createExecDir(" + operationName + ") stamping output directories");
+    log.log(Level.FINER, operationName + " stamping output directories");
     boolean stamped = false;
     try {
       outputDirectory.stamp(execDir);
@@ -527,8 +408,6 @@ class CFCExecFileSystem implements ExecFileSystem {
           inputFiles == null ? ImmutableList.of() : inputFiles,
           inputDirectories == null ? ImmutableList.of() : inputDirectories);
     }
-    if (Files.exists(execDir)) {
-      Directories.remove(execDir, fileStore);
-    }
+    super.destroyExecDir(execDir);
   }
 }

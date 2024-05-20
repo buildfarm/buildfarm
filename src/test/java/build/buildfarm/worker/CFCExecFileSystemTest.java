@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.shard;
+package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Command;
-import build.buildfarm.worker.OutputDirectory;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;

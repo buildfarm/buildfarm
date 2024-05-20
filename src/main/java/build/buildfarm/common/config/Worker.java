@@ -28,6 +28,7 @@ public class Worker {
   private int executeStageWidthOffset = 0;
   private int inputFetchStageWidth = 0;
   private int inputFetchDeadline = 60;
+  private boolean linkExecFileSystem = true;
   private boolean linkInputDirectories = true;
   private List<String> linkedInputDirectories = Arrays.asList("(?!external)[^/]+");
   private String execOwner;
