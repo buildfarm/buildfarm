@@ -24,7 +24,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class TimeTest {
-
   @Test
   public void toDurationMs() {
     Timestamp t1 = Timestamp.newBuilder().setSeconds(123).setNanos(100).build();

@@ -119,6 +119,7 @@ worker:
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
+  linkExecFileSystem: true
   linkInputDirectories: true
   linkedInputDirectories:
     - "(?!external)[^/]+"

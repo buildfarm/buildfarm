@@ -1670,7 +1670,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return getFileName(digest, isExecutable);
   }
 
-  private synchronized void decrementReference(String inputFile) throws IOException {
+  public synchronized void decrementReference(String inputFile) throws IOException {
     decrementReferencesSynchronized(ImmutableList.of(inputFile), ImmutableList.of());
   }
 

@@ -51,6 +51,9 @@ import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.ShardWorker;
+import build.buildfarm.worker.CFCExecFileSystem;
+import build.buildfarm.worker.CFCLinkExecFileSystem;
+import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
@@ -299,13 +302,15 @@ public final class Worker extends LoggingMain {
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
+      ExecutorService fetchService,
       ContentAddressableStorage storage)
       throws ConfigurationException {
     checkState(storage != null, "no exec fs cas specified");
     if (storage instanceof CASFileCache) {
       CASFileCache cfc = (CASFileCache) storage;
       UserPrincipal owner = getOwner(cfc.getRoot().getFileSystem());
-      return createCFCExecFileSystem(removeDirectoryService, accessRecorder, cfc, owner);
+      return createCFCExecFileSystem(
+          removeDirectoryService, accessRecorder, fetchService, cfc, owner);
     } else {
       // FIXME not the only fuse backing capacity...
       return createFuseExecFileSystem(remoteInputStreamFactory, storage);
@@ -380,19 +385,30 @@ public final class Worker extends LoggingMain {
   private ExecFileSystem createCFCExecFileSystem(
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
+      ExecutorService fetchService,
       CASFileCache fileCache,
       @Nullable UserPrincipal owner) {
-    return new CFCExecFileSystem(
-        root,
-        fileCache,
-        owner,
-        configs.getWorker().isLinkInputDirectories(),
-        configs.getWorker().getLinkedInputDirectories(),
-        configs.isAllowSymlinkTargetAbsolute(),
-        removeDirectoryService,
-        accessRecorder
-        /* deadlineAfter= */
-        /* deadlineAfterUnits= */ );
+    if (configs.getWorker().isLinkExecFileSystem()) {
+      return new CFCLinkExecFileSystem(
+          root,
+          fileCache,
+          owner,
+          configs.getWorker().isLinkInputDirectories(),
+          configs.getWorker().getLinkedInputDirectories(),
+          configs.isAllowSymlinkTargetAbsolute(),
+          removeDirectoryService,
+          accessRecorder,
+          fetchService);
+    } else {
+      return new CFCExecFileSystem(
+          root,
+          fileCache,
+          owner,
+          configs.isAllowSymlinkTargetAbsolute(),
+          removeDirectoryService,
+          accessRecorder,
+          fetchService);
+    }
   }
 
   private void onStoragePut(Digest digest) {
@@ -564,6 +580,7 @@ public final class Worker extends LoggingMain {
 
     ExecutorService removeDirectoryService = BuildfarmExecutors.getRemoveDirectoryPool();
     ExecutorService accessRecorder = newSingleThreadExecutor();
+    ExecutorService fetchService = BuildfarmExecutors.getFetchServicePool();
     FixedBufferPool zstdBufferPool =
         new FixedBufferPool(configs.getWorker().getZstdBufferPoolSize());
     Gauge.build()
@@ -595,7 +612,11 @@ public final class Worker extends LoggingMain {
             configs.getWorker().getStorages());
     execFileSystem =
         createExecFileSystem(
-            remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
+            remoteInputStreamFactory,
+            removeDirectoryService,
+            accessRecorder,
+            fetchService,
+            storage);
 
     instance =
         new WorkerInstance(configs.getWorker().getPublicName(), digestUtil, backplane, storage);

@@ -57,6 +57,7 @@ import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
