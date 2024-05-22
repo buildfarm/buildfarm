@@ -64,8 +64,7 @@ public class Pipeline {
   public void stopMatchingOperations() {
     for (Map.Entry<PipelineStage, Thread> entry : stageThreads.entrySet()) {
       PipelineStage stage = entry.getKey();
-      if (stage instanceof MatchStage) {
-        MatchStage matchStage = (MatchStage) stage;
+      if (stage instanceof MatchStage matchStage) {
         matchStage.prepareForGracefulShutdown();
         entry.getValue().interrupt();
         return;

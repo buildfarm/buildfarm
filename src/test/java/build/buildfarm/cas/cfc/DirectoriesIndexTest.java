@@ -87,8 +87,7 @@ public class DirectoriesIndexTest {
     // insert again to test remove directory-wise
     assertThat(entries).contains(digest.getHash());
     directoriesIndex.put(directory, entries);
-    if (directoriesIndex instanceof FileDirectoriesIndex) {
-      FileDirectoriesIndex fileDirIndex = (FileDirectoriesIndex) directoriesIndex;
+    if (directoriesIndex instanceof FileDirectoriesIndex fileDirIndex) {
       assertThat(Files.exists(fileDirIndex.path(directory))).isTrue();
       directoriesIndex.remove(directory);
       assertThat(Files.notExists(fileDirIndex.path(directory))).isTrue();

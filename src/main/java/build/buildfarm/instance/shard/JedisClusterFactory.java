@@ -107,8 +107,7 @@ public class JedisClusterFactory {
    * @note Overloaded.
    */
   private static void deleteExistingKeys(UnifiedJedis jedis) throws Exception {
-    if (jedis instanceof JedisCluster) {
-      JedisCluster cluster = (JedisCluster) jedis;
+    if (jedis instanceof JedisCluster cluster) {
       for (ConnectionPool pool : cluster.getClusterNodes().values()) {
         UnifiedJedis node = new UnifiedJedis(pool.getResource());
         deleteNodeExistingKeys(node);

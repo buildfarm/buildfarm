@@ -133,8 +133,7 @@ public class DigestUtil {
 
     @Override
     public boolean equals(Object o) {
-      if (o instanceof ActionKey) {
-        ActionKey actionKey = (ActionKey) o;
+      if (o instanceof ActionKey actionKey) {
         return digest.equals(actionKey.getDigest());
       }
       return false;
