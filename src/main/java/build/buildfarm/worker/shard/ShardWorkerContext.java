@@ -82,7 +82,7 @@ import com.google.rpc.PreconditionFailure;
 import io.grpc.Deadline;
 import io.grpc.Status;
 import io.grpc.StatusException;
-import io.prometheus.client.Counter;
+import io.prometheus.metrics.core.metrics.Counter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -107,9 +107,9 @@ class ShardWorkerContext implements WorkerContext {
   private static final String PROVISION_CORES_NAME = "cores";
 
   private static final Counter completedOperations =
-      Counter.build().name("completed_operations").help("Completed operations.").register();
+      Counter.builder().name("completed_operations").help("Completed operations.").register();
   private static final Counter operationPollerCounter =
-      Counter.build().name("operation_poller").help("Number of operations polled.").register();
+      Counter.builder().name("operation_poller").help("Number of operations polled.").register();
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 

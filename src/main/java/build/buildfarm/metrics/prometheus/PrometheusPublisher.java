@@ -14,8 +14,8 @@
 
 package build.buildfarm.metrics.prometheus;
 
-import io.prometheus.client.exporter.HTTPServer;
-import io.prometheus.client.hotspot.DefaultExports;
+import io.prometheus.metrics.exporter.httpserver.HTTPServer;
+import io.prometheus.metrics.instrumentation.jvm.JvmMetrics;
 import java.io.IOException;
 import lombok.extern.java.Log;
 
@@ -26,8 +26,8 @@ public class PrometheusPublisher {
   public static void startHttpServer(int port) {
     try {
       if (port > 0) {
-        DefaultExports.initialize();
-        server = new HTTPServer(port);
+        JvmMetrics.builder().register();
+        server = HTTPServer.builder().port(port).buildAndStart();
         log.info("Started Prometheus HTTP Server on port " + port);
       } else {
         log.info("Prometheus port is not configured. HTTP Server will not be started");

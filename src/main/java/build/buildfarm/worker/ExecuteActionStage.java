@@ -15,8 +15,9 @@
 package build.buildfarm.worker;
 
 import build.buildfarm.worker.resources.ResourceLimits;
-import io.prometheus.client.Gauge;
-import io.prometheus.client.Histogram;
+import io.prometheus.metrics.core.metrics.Gauge;
+import io.prometheus.metrics.core.metrics.Histogram;
+import io.prometheus.metrics.model.snapshots.Unit;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -26,13 +27,18 @@ import lombok.extern.java.Log;
 @Log
 public class ExecuteActionStage extends SuperscalarPipelineStage {
   private static final Gauge executionSlotUsage =
-      Gauge.build().name("execution_slot_usage").help("Execution slot Usage.").register();
+      Gauge.builder().name("execution_slot_usage").help("Execution slot Usage.").register();
   private static final Histogram executionTime =
-      Histogram.build().name("execution_time_ms").help("Execution time in ms.").register();
+      Histogram.builder()
+          .name("execution_time")
+          .unit(Unit.SECONDS)
+          .help("Execution time in ms.")
+          .register();
   private static final Histogram executionStallTime =
-      Histogram.build()
-          .name("execution_stall_time_ms")
-          .help("Execution stall time in ms.")
+      Histogram.builder()
+          .name("execution_stall_time")
+          .unit(Unit.SECONDS)
+          .help("Execution stall time.")
           .register();
 
   private final AtomicInteger executorClaims = new AtomicInteger(0);

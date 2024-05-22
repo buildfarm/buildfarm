@@ -14,8 +14,9 @@
 
 package build.buildfarm.worker;
 
-import io.prometheus.client.Gauge;
-import io.prometheus.client.Histogram;
+import io.prometheus.metrics.core.metrics.Gauge;
+import io.prometheus.metrics.core.metrics.Histogram;
+import io.prometheus.metrics.model.snapshots.Unit;
 import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
@@ -23,13 +24,18 @@ import lombok.extern.java.Log;
 @Log
 public class InputFetchStage extends SuperscalarPipelineStage {
   private static final Gauge inputFetchSlotUsage =
-      Gauge.build().name("input_fetch_slot_usage").help("Input fetch slot Usage.").register();
+      Gauge.builder().name("input_fetch_slot_usage").help("Input fetch slot Usage.").register();
   private static final Histogram inputFetchTime =
-      Histogram.build().name("input_fetch_time_ms").help("Input fetch time in ms.").register();
+      Histogram.builder()
+          .name("input_fetch_time")
+          .unit(Unit.SECONDS)
+          .help("Input fetch time")
+          .register();
   private static final Histogram inputFetchStallTime =
-      Histogram.build()
-          .name("input_fetch_stall_time_ms")
-          .help("Input fetch stall time in ms.")
+      Histogram.builder()
+          .name("input_fetch_stall_time")
+          .unit(Unit.SECONDS)
+          .help("Input fetch stall time")
           .register();
 
   @GuardedBy("this")

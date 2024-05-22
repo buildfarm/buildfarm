@@ -13,7 +13,7 @@ java_library(
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_code_gson_gson",
         "@maven//:com_google_guava_guava",
-        "@maven//:io_prometheus_simpleclient",
+        "@maven//:io_prometheus_prometheus_metrics_core",
         "@maven//:org_apache_commons_commons_lang3",
         "@maven//:org_projectlombok_lombok",
     ],

@@ -14,8 +14,8 @@
 
 package build.buildfarm.worker;
 
-import io.prometheus.client.Gauge;
-import io.prometheus.client.Histogram;
+import io.prometheus.metrics.core.metrics.Gauge;
+import io.prometheus.metrics.core.metrics.Histogram;
 import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
@@ -23,11 +23,14 @@ import lombok.extern.java.Log;
 @Log
 public class ReportResultStage extends SuperscalarPipelineStage {
   private static final Gauge reportResultSlotUsage =
-      Gauge.build().name("report_result_slot_usage").help("Report result slot Usage.").register();
+      Gauge.builder().name("report_result_slot_usage").help("Report result slot Usage.").register();
   private static final Histogram reportResultTime =
-      Histogram.build().name("report_result_time_ms").help("Report result time in ms.").register();
+      Histogram.builder()
+          .name("report_result_time_ms")
+          .help("Report result time in ms.")
+          .register();
   private static final Histogram reportResultStallTime =
-      Histogram.build()
+      Histogram.builder()
           .name("report_result_stall_time_ms")
           .help("Report result stall time in ms.")
           .register();

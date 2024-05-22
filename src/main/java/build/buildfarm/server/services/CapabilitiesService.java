@@ -20,12 +20,12 @@ import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.semver.SemVer;
 import build.buildfarm.instance.Instance;
 import io.grpc.stub.StreamObserver;
-import io.prometheus.client.Counter;
+import io.prometheus.metrics.core.metrics.Counter;
 
 public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
   // Prometheus metrics
   private static final Counter numberOfRemoteInvocations =
-      Counter.build().name("remote_invocations").help("Number of remote invocations.").register();
+      Counter.builder().name("remote_invocations").help("Number of remote invocations.").register();
 
   private final Instance instance;
 
