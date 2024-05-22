@@ -104,11 +104,9 @@ public class ExecDirException extends IOException {
     // aggregate into a single preconditionFailure
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     for (Throwable exception : exceptions) {
-      if (exception instanceof ViolationException) {
-        ViolationException violationException = (ViolationException) exception;
+      if (exception instanceof ViolationException violationException) {
         preconditionFailure.addViolations(violationException.getViolation());
-      } else if (exception instanceof PutDirectoryException) {
-        PutDirectoryException putDirException = (PutDirectoryException) exception;
+      } else if (exception instanceof PutDirectoryException putDirException) {
         for (Throwable putDirCause : putDirException.getExceptions()) {
           if (putDirCause instanceof IOException) {
             Violation.Builder violation = preconditionFailure.addViolationsBuilder();

@@ -75,8 +75,7 @@ public class RedisNodeHashes {
    */
   public static List<String> getEvenlyDistributedHashesWithPrefix(
       UnifiedJedis jedis, String prefix) {
-    if (jedis instanceof JedisCluster) {
-      JedisCluster cluster = (JedisCluster) jedis;
+    if (jedis instanceof JedisCluster cluster) {
       Iterable<List<List<Long>>> nodeSlotRanges = getNodeSlotRanges(cluster);
       try {
         ImmutableList.Builder hashTags = ImmutableList.builder();

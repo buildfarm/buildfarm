@@ -219,8 +219,7 @@ public class RedisMap {
   }
 
   public ScanResult<String> scan(UnifiedJedis jedis, String mapCursor, int count) {
-    if (jedis instanceof JedisCluster) {
-      JedisCluster cluster = (JedisCluster) jedis;
+    if (jedis instanceof JedisCluster cluster) {
       return scanCluster(cluster, mapCursor, count);
     }
     return scanNode(jedis, mapCursor, count);

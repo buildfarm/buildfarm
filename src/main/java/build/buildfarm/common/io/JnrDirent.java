@@ -48,13 +48,12 @@ public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
 
   @Override
   public boolean equals(Object other) {
-    if (!(other instanceof JnrDirent)) {
+    if (!(other instanceof JnrDirent otherJnrDirent)) {
       return false;
     }
     if (this == other) {
       return true;
     }
-    JnrDirent otherJnrDirent = (JnrDirent) other;
     return name.equals(otherJnrDirent.name);
   }
 

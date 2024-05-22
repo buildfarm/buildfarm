@@ -58,8 +58,7 @@ public class ProxyDirectoriesIndex implements Map<Digest, Directory> {
 
   @Override
   public Directory get(Object key) {
-    if (key instanceof Digest) {
-      Digest digest = (Digest) key;
+    if (key instanceof Digest digest) {
       return directoriesIndex.get(digest.getHash());
     }
     return null;

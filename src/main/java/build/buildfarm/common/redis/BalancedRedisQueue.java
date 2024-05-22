@@ -281,11 +281,9 @@ public class BalancedRedisQueue {
 
   private static Jedis getJedisFromKey(UnifiedJedis jedis, String name) {
     Connection connection = null;
-    if (jedis instanceof JedisCluster) {
-      JedisCluster cluster = (JedisCluster) jedis;
+    if (jedis instanceof JedisCluster cluster) {
       connection = cluster.getConnectionFromSlot(JedisClusterCRC16.getSlot(name));
-    } else if (jedis instanceof JedisPooled) {
-      JedisPooled pooled = (JedisPooled) jedis;
+    } else if (jedis instanceof JedisPooled pooled) {
       connection = pooled.getPool().getResource();
     }
     if (connection == null) {

@@ -266,8 +266,7 @@ public class Utils {
     @Override
     public boolean equals(Object obj) {
       if (obj == this) return true;
-      if (!(obj instanceof WindowsFileKey)) return false;
-      WindowsFileKey other = (WindowsFileKey) obj;
+      if (!(obj instanceof WindowsFileKey other)) return false;
       return (this.volSerialNumber == other.volSerialNumber)
           && (this.fileIndexHigh == other.fileIndexHigh)
           && (this.fileIndexLow == other.fileIndexLow);

@@ -44,8 +44,7 @@ public class ScanCount {
   public static int get(UnifiedJedis jedis, String query, int scanCount) {
     Set<String> keys = Sets.newHashSet();
 
-    if (jedis instanceof JedisCluster) {
-      JedisCluster cluster = (JedisCluster) jedis;
+    if (jedis instanceof JedisCluster cluster) {
       // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
       // This prevents us from using the cluster's SCAN to traverse all existing keys.
       // That's why we choose to scan each of the jedisNode's individually.

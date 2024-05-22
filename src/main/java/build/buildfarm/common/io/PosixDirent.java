@@ -48,13 +48,12 @@ public final class PosixDirent implements Serializable, Comparable<PosixDirent> 
 
   @Override
   public boolean equals(Object other) {
-    if (!(other instanceof PosixDirent)) {
+    if (!(other instanceof PosixDirent otherPosixDirent)) {
       return false;
     }
     if (this == other) {
       return true;
     }
-    PosixDirent otherPosixDirent = (PosixDirent) other;
     return name.equals(otherPosixDirent.name);
   }
 
