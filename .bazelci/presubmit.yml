@@ -5,39 +5,39 @@ tasks:
   # Linting jobs
   format_check:
     name: "Code Format"
-    platform: ubuntu1804
+    platform: ubuntu2204
     shell_commands:
     - ./.bazelci/format.sh --check
   package_layout:
     name: "Package Layout"
-    platform: ubuntu1804
+    platform: ubuntu2204
     shell_commands:
     - ./.bazelci/package_name_check.sh
   java_unused_deps_check:
     name: "Java Unused Dependencies"
-    platform: ubuntu1804
+    platform: ubuntu2204
     shell_commands:
     - ./.bazelci/unused_deps.sh --check
   static_analysis_check:
     name: "Static Analysis"
-    platform: ubuntu1804
+    platform: ubuntu2204
     shell_commands:
     - ./.bazelci/static_analyze.sh
   checkstyle:
     name: "Check Style"
-    platform: ubuntu1804
+    platform: ubuntu2204
     shell_commands:
     - ./.bazelci/run_checkstyle.sh
   code_coverage:
     name: "Code Coverage"
-    platform: ubuntu1804
+    platform: ubuntu2204
     shell_commands:
     - export BUILDFARM_SKIP_COVERAGE_HOST=true
     - export BUILDFARM_GATE_LCOV_RESULTS=true
     - ./generate_coverage.sh
 
   # Typical unit tests that run across a variety of operating systems.
-  ubuntu1804:
+  ubuntu2204:
     name: "Unit Tests"
     build_targets:
     - "..."
@@ -91,7 +91,7 @@ tasks:
   # Outside of this step, similar functionality may be tested with mocks.
   redis_unit_tests:
     name: "Redis Unit Tests"
-    platform: ubuntu1804
+    platform: ubuntu2004
     shell_commands:
     - ./.bazelci/redis_unit_tests.sh
 
@@ -100,7 +100,7 @@ tasks:
   # This is more of a sanity check between a defined docker file and running tests directly on the host.
   docker_unit_tests:
     name: "Docker Unit Tests"
-    platform: ubuntu1804
+    platform: ubuntu2004
     shell_commands:
     - ./.bazelci/docker_unit_test.sh
 
@@ -109,7 +109,7 @@ tasks:
   # It performs a realistic build on generated cc targets and gating projects.
   integration_test_server:
     name: "Server Integration Test"
-    platform: ubuntu1804
+    platform: ubuntu2004
     shell_commands:
       - ./.bazelci/run_server_test.sh
 
@@ -118,7 +118,7 @@ tasks:
   # It performs a realistic build on generated cc targets and gating projects.
   integration_test_many:
     name: "Integration Test"
-    platform: ubuntu1804
+    platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
@@ -129,7 +129,7 @@ tasks:
   # More issues can be caught when using the fully defined configuration file.
   integration_test_many_full_config:
     name: "Integration Test (Full Config)"
-    platform: ubuntu1804
+    platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - export BUILDFARM_CONFIG="/buildfarm/examples/config.yml"
@@ -139,7 +139,7 @@ tasks:
   # Test that buildfarm can work with zstd compression
   compression_test_many_compression:
     name: "Integration Test (Shard/Compression)"
-    platform: ubuntu1804
+    platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
     - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
@@ -152,7 +152,7 @@ tasks:
   # that latencies can be captured.
   cache_check_many:
     name: "Cache Check"
-    platform: ubuntu1804
+    platform: ubuntu2004
     shell_commands:
     - export CACHE_TEST=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_double_test.sh
@@ -165,7 +165,7 @@ tasks:
 
   integration_test_absei:
     name: "Abseil Test"
-    platform: ubuntu1804
+    platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
     - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
@@ -173,7 +173,7 @@ tasks:
     - ./.bazelci/integration_test.sh
   integration_test_abseil_shard_compression:
     name: "Abseil Test (Shard/Compression)"
-    platform: ubuntu1804
+    platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
     - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
