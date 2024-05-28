@@ -16,14 +16,13 @@ package build.buildfarm.instance.shard;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.ScanCount;
 import com.google.common.collect.ImmutableMap;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
-import redis.clients.jedis.PipelineBase;
+import redis.clients.jedis.AbstractPipeline;
+import redis.clients.jedis.UnifiedJedis;
 
 /**
  * @class JedisCasWorkerMap
@@ -32,6 +31,8 @@ import redis.clients.jedis.PipelineBase;
  *     set(worker1,worker2)}.
  */
 public class JedisCasWorkerMap implements CasWorkerMap {
+  private final UnifiedJedis jedis;
+
   /**
    * @field name
    * @brief The unique name of the map.
@@ -52,11 +53,13 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @brief Constructor.
    * @details Construct storage object under the assumption that all calls will go to redis (no
    *     caching).
+   * @param jedis Client used for interacting with redis.
    * @param name The global name of the map.
    * @param keyExpiration_s When to have keys expire automatically. (units: seconds (s))
    * @note Overloaded.
    */
-  public JedisCasWorkerMap(String name, int keyExpiration_s) {
+  public JedisCasWorkerMap(UnifiedJedis jedis, String name, int keyExpiration_s) {
+    this.jedis = jedis;
     this.name = name;
     this.keyExpiration_s = keyExpiration_s;
   }
@@ -64,26 +67,20 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   /**
    * @brief Adjust blob mappings based on worker changes.
    * @details Adjustments are made based on added and removed workers. Expirations are refreshed.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @param blobDigest The blob digest to adjust worker information from.
    * @param addWorkers Workers to add.
    * @param removeWorkers Workers to remove.
    */
   @Override
-  public void adjust(
-      RedisClient client, Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
-      throws IOException {
+  public void adjust(Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) {
     String key = redisCasKey(blobDigest);
-    client.run(
-        jedis -> {
-          for (String workerName : addWorkers) {
-            jedis.sadd(key, workerName);
-          }
-          for (String workerName : removeWorkers) {
-            jedis.srem(key, workerName);
-          }
-          jedis.expire(key, keyExpiration_s);
-        });
+    for (String workerName : addWorkers) {
+      jedis.sadd(key, workerName);
+    }
+    for (String workerName : removeWorkers) {
+      jedis.srem(key, workerName);
+    }
+    jedis.expire(key, keyExpiration_s);
   }
 
   /**
@@ -95,13 +92,10 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker to add for looking up the blob.
    */
   @Override
-  public void add(RedisClient client, Digest blobDigest, String workerName) throws IOException {
+  public void add(Digest blobDigest, String workerName) {
     String key = redisCasKey(blobDigest);
-    client.run(
-        jedis -> {
-          jedis.sadd(key, workerName);
-          jedis.expire(key, keyExpiration_s);
-        });
+    jedis.sadd(key, workerName);
+    jedis.expire(key, keyExpiration_s);
   }
 
   /**
@@ -113,18 +107,14 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker to add for looking up the blobs.
    */
   @Override
-  public void addAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
-      throws IOException {
-    client.run(
-        jedis -> {
-          try (PipelineBase p = jedis.pipelined()) {
-            for (Digest blobDigest : blobDigests) {
-              String key = redisCasKey(blobDigest);
-              p.sadd(key, workerName);
-              p.expire(key, keyExpiration_s);
-            }
-          }
-        });
+  public void addAll(Iterable<Digest> blobDigests, String workerName) {
+    try (AbstractPipeline p = jedis.pipelined()) {
+      for (Digest blobDigest : blobDigests) {
+        String key = redisCasKey(blobDigest);
+        p.sadd(key, workerName);
+        p.expire(key, keyExpiration_s);
+      }
+    }
   }
 
   /**
@@ -135,9 +125,9 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker name to remove.
    */
   @Override
-  public void remove(RedisClient client, Digest blobDigest, String workerName) throws IOException {
+  public void remove(Digest blobDigest, String workerName) {
     String key = redisCasKey(blobDigest);
-    client.run(jedis -> jedis.srem(key, workerName));
+    jedis.srem(key, workerName);
   }
 
   /**
@@ -149,17 +139,13 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @param workerName The worker name to remove.
    */
   @Override
-  public void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
-      throws IOException {
-    client.run(
-        jedis -> {
-          try (PipelineBase p = jedis.pipelined()) {
-            for (Digest blobDigest : blobDigests) {
-              String key = redisCasKey(blobDigest);
-              p.srem(key, workerName);
-            }
-          }
-        });
+  public void removeAll(Iterable<Digest> blobDigests, String workerName) {
+    try (AbstractPipeline p = jedis.pipelined()) {
+      for (Digest blobDigest : blobDigests) {
+        String key = redisCasKey(blobDigest);
+        p.srem(key, workerName);
+      }
+    }
   }
 
   /**
@@ -171,9 +157,9 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @note Suggested return identifier: workerName.
    */
   @Override
-  public String getAny(RedisClient client, Digest blobDigest) throws IOException {
+  public String getAny(Digest blobDigest) {
     String key = redisCasKey(blobDigest);
-    return client.call(jedis -> jedis.srandmember(key));
+    return jedis.srandmember(key);
   }
 
   /**
@@ -185,15 +171,15 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @note Suggested return identifier: workerNames.
    */
   @Override
-  public Set<String> get(RedisClient client, Digest blobDigest) throws IOException {
+  public Set<String> get(Digest blobDigest) {
     String key = redisCasKey(blobDigest);
-    return client.call(jedis -> jedis.smembers(key));
+    return jedis.smembers(key);
   }
 
   @Override
-  public long insertTime(RedisClient client, Digest blobDigest) throws IOException {
+  public long insertTime(Digest blobDigest) {
     String key = redisCasKey(blobDigest);
-    return Instant.now().getEpochSecond() - keyExpiration_s + client.call(jedis -> jedis.ttl(key));
+    return Instant.now().getEpochSecond() - keyExpiration_s + jedis.ttl(key);
   }
 
   /**
@@ -205,21 +191,17 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @note Suggested return identifier: casWorkerMap.
    */
   @Override
-  public Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests)
-      throws IOException {
+  public Map<Digest, Set<String>> getMap(Iterable<Digest> blobDigests) {
     ImmutableMap.Builder<Digest, Set<String>> blobDigestsWorkers = new ImmutableMap.Builder<>();
-    client.run(
-        jedis -> {
-          for (Digest blobDigest : blobDigests) {
-            String key = redisCasKey(blobDigest);
-            Set<String> workers = jedis.smembers(key);
+    for (Digest blobDigest : blobDigests) {
+      String key = redisCasKey(blobDigest);
+      Set<String> workers = jedis.smembers(key);
 
-            if (workers.isEmpty()) {
-              continue;
-            }
-            blobDigestsWorkers.put(blobDigest, workers);
-          }
-        });
+      if (workers.isEmpty()) {
+        continue;
+      }
+      blobDigestsWorkers.put(blobDigest, workers);
+    }
     return blobDigestsWorkers.build();
   }
 
@@ -230,19 +212,16 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    * @return The size of the map.
    * @note Suggested return identifier: size.
    */
-  public int size(RedisClient client) throws IOException {
-    return client.call(jedis -> ScanCount.get(jedis, name + ":*", 1000));
+  public int size() {
+    return ScanCount.get(jedis, name + ":*", 1000);
   }
 
   @Override
-  public void setExpire(RedisClient client, Iterable<Digest> blobDigests) throws IOException {
-    client.run(
-        jedis -> {
-          for (Digest blobDigest : blobDigests) {
-            String key = redisCasKey(blobDigest);
-            jedis.expire(key, keyExpiration_s);
-          }
-        });
+  public void setExpire(Iterable<Digest> blobDigests) {
+    for (Digest blobDigest : blobDigests) {
+      String key = redisCasKey(blobDigest);
+      jedis.expire(key, keyExpiration_s);
+    }
   }
 
   /**

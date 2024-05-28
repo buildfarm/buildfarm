@@ -63,6 +63,7 @@ import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
+import build.bazel.remote.execution.v2.ToolDetails;
 import build.buildfarm.actioncache.ActionCache;
 import build.buildfarm.actioncache.ShardActionCache;
 import build.buildfarm.backplane.Backplane;
@@ -72,6 +73,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.ExecutionProperties;
+import build.buildfarm.common.IterableScannable;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Scannable;
 import build.buildfarm.common.TokenizableIterator;
@@ -85,8 +87,8 @@ import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
+import build.buildfarm.instance.server.Filter;
 import build.buildfarm.instance.server.NodeInstance;
-import build.buildfarm.instance.server.OperationsFilter;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -130,12 +132,14 @@ import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.netty.handler.codec.http.QueryStringDecoder;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URI;
 import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.ArrayDeque;
@@ -230,6 +234,11 @@ public class ServerInstance extends NodeInstance {
           .buckets(new double[] {10, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000})
           .help("Read I/O (bytes)")
           .register();
+  private static final Scannable<String> bindings =
+      new IterableScannable<>(
+          "bindings",
+          ImmutableList.of(
+              BINDING_EXECUTIONS, BINDING_TOOL_INVOCATIONS, BINDING_CORRELATED_INVOCATIONS));
 
   private final Runnable onStop;
   private final long maxEntrySizeBytes;
@@ -257,8 +266,11 @@ public class ServerInstance extends NodeInstance {
   private final ExecutorService operationDeletionService = newSingleThreadExecutor();
   private final BlockingQueue<Object> transformTokensQueue = new LinkedBlockingQueue<>(256);
   private final boolean useDenyList;
-  private final Scannable<Operation> operationsList;
-  private final Scannable<DispatchedOperation> dispatchedOperationsList;
+  private final Scannable<Operation> indexKeys;
+  private final Scannable<Operation> operations;
+  private final Scannable<DispatchedOperation> dispatchedOperations;
+  private final Scannable<String> correlatedInvocations;
+  private final Scannable<String> toolInvocations;
   private Thread operationQueuer;
   private boolean stopping = false;
   private boolean stopped = true;
@@ -375,7 +387,39 @@ public class ServerInstance extends NodeInstance {
     this.maxRequeueAttempts = maxRequeueAttempts;
     this.maxActionTimeout = maxActionTimeout;
     this.useDenyList = useDenyList;
-    this.operationsList =
+    this.correlatedInvocations =
+        new Scannable<>() {
+          @Override
+          public String getName() {
+            return "correlatedInvocations";
+          }
+
+          @Override
+          public String scan(
+              int limit, String pageToken, Consumer<String> onCorrelatedInvocationsId)
+              throws IOException {
+            Backplane.ScanResult<String> result =
+                backplane.scanCorrelatedInvocations(pageToken, limit);
+            result.getResult().forEach(onCorrelatedInvocationsId);
+            return result.getToken();
+          }
+        };
+    this.toolInvocations =
+        new Scannable<>() {
+          @Override
+          public String getName() {
+            return "correlatedInvocations";
+          }
+
+          @Override
+          public String scan(int limit, String pageToken, Consumer<String> onToolInvocationId)
+              throws IOException {
+            Backplane.ScanResult<String> result = backplane.scanToolInvocations(pageToken, limit);
+            result.getResult().forEach(onToolInvocationId);
+            return result.getToken();
+          }
+        };
+    this.operations =
         new Scannable<>() {
           @Override
           public String getName() {
@@ -385,14 +429,12 @@ public class ServerInstance extends NodeInstance {
           @Override
           public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
               throws IOException {
-            Backplane.ScanResult<Operation> result = backplane.getOperations(pageToken, limit);
-            for (Operation operation : result.getResult()) {
-              onOperation.accept(operation);
-            }
+            Backplane.ScanResult<Operation> result = backplane.scanOperations(pageToken, limit);
+            result.getResult().forEach(onOperation);
             return result.getToken();
           }
         };
-    this.dispatchedOperationsList =
+    this.dispatchedOperations =
         new Scannable<>() {
           @Override
           public String getName() {
@@ -404,11 +446,28 @@ public class ServerInstance extends NodeInstance {
               int limit, String pageToken, Consumer<DispatchedOperation> onDispatchedOperation)
               throws IOException {
             Backplane.ScanResult<DispatchedOperation> scanResult =
-                backplane.getDispatchedOperations(pageToken, limit);
+                backplane.scanDispatchedOperations(pageToken, limit);
             scanResult.getResult().forEach(onDispatchedOperation);
             return scanResult.getToken();
           }
         };
+    this.indexKeys =
+        new OperationNameScannable(
+            new Scannable<>() {
+              @Override
+              public String getName() {
+                return "indexKeys";
+              }
+
+              @Override
+              public String scan(int limit, String pageToken, Consumer<String> onKey)
+                  throws IOException {
+                Backplane.ScanResult<String> scanResult =
+                    backplane.scanCorrelatedInvocationIndexKeys(pageToken, limit);
+                scanResult.getResult().forEach(onKey);
+                return scanResult.getToken();
+              }
+            });
     this.actionCacheFetchService = actionCacheFetchService;
     backplane.setOnUnsubscribe(this::stop);
 
@@ -423,7 +482,7 @@ public class ServerInstance extends NodeInstance {
           new Thread(
               new DispatchedMonitor(
                   backplane::isStopped,
-                  dispatchedOperationsList,
+                  dispatchedOperations,
                   this::requeueOperation,
                   dispatchedMonitorIntervalSeconds));
     } else {
@@ -1631,10 +1690,6 @@ public class ServerInstance extends NodeInstance {
         service);
   }
 
-  protected Operation createOperation(ActionKey actionKey) {
-    throw new UnsupportedOperationException();
-  }
-
   private static final class QueuedOperationResult {
     public final QueueEntry entry;
     public final QueuedOperationMetadata metadata;
@@ -2105,7 +2160,7 @@ public class ServerInstance extends NodeInstance {
             Status.RESOURCE_EXHAUSTED.withDescription("Too many jobs pending").asException());
       }
 
-      String operationName = createOperationName(UUID.randomUUID().toString());
+      String executionName = bindExecutions(UUID.randomUUID());
 
       executionSuccess.inc();
       log.log(
@@ -2114,7 +2169,7 @@ public class ServerInstance extends NodeInstance {
               .append("ExecutionSuccess: ")
               .append(requestMetadata.getToolInvocationId())
               .append(" -> ")
-              .append(operationName)
+              .append(executionName)
               .append(": ")
               .append(DigestUtil.toString(actionDigest))
               .toString());
@@ -2123,15 +2178,15 @@ public class ServerInstance extends NodeInstance {
       if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
         log.log(
             Level.FINER,
-            format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
+            format("%s will have skip_cache_lookup = true due to retry", executionName));
         skipCacheLookup = true;
       }
 
-      String stdoutStreamName = operationName + "/streams/stdout";
-      String stderrStreamName = operationName + "/streams/stderr";
+      String stdoutStreamName = executionName + "/streams/stdout";
+      String stderrStreamName = executionName + "/streams/stderr";
       ExecuteEntry executeEntry =
           ExecuteEntry.newBuilder()
-              .setOperationName(operationName)
+              .setOperationName(executionName)
               .setActionDigest(actionDigest)
               .setExecutionPolicy(executionPolicy)
               .setResultsCachePolicy(resultsCachePolicy)
@@ -2148,7 +2203,7 @@ public class ServerInstance extends NodeInstance {
               .setStderrStreamName(stderrStreamName)
               .build();
       Operation operation =
-          Operation.newBuilder().setName(operationName).setMetadata(Any.pack(metadata)).build();
+          Operation.newBuilder().setName(executionName).setMetadata(Any.pack(metadata)).build();
       try {
         watcher.observe(operation);
       } catch (Exception e) {
@@ -2608,11 +2663,6 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
-  public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public Operation getOperation(String name) {
     try {
       return backplane.getOperation(name);
@@ -2642,16 +2692,17 @@ public class ServerInstance extends NodeInstance {
       return immediateFuture(null);
     }
 
-    return backplane.watchOperation(operation.getName(), watcher);
+    return backplane.watchExecution(operation.getName(), watcher);
   }
 
   @Override
-  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
+  public ListenableFuture<Void> watchExecution(UUID executionId, Watcher watcher) {
+    String operationName = bindExecutions(executionId);
     Operation operation = getOperation(operationName);
     if (operation == null) {
       return immediateFailedFuture(
           Status.NOT_FOUND
-              .withDescription(String.format("Operation not found: %s", operationName))
+              .withDescription(String.format("Execution not found: %s", operationName))
               .asException());
     }
     return watchOperation(operation, watcher, /* initial= */ true);
@@ -2698,68 +2749,180 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
-  private class InvocationOperationsLocation implements Scannable<Operation> {
-    private final String invocationId;
+  private class ToolInvocationOperationsBounds implements Scannable<Operation> {
+    private final String toolInvocationId;
 
-    InvocationOperationsLocation(String invocationId) {
-      this.invocationId = invocationId;
+    ToolInvocationOperationsBounds(String toolInvocationId) {
+      this.toolInvocationId = toolInvocationId;
     }
 
     @Override
     public String getName() {
-      return "invocationId=" + invocationId;
+      return "toolInvocationId=" + toolInvocationId;
     }
 
     @Override
     public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
         throws IOException {
       Backplane.ScanResult<Operation> result =
-          backplane.findOperationsByInvocationId(invocationId, pageToken, limit);
-      for (Operation operation : result.getResult()) {
-        onOperation.accept(operation);
-      }
+          backplane.scanOperations(toolInvocationId, pageToken, limit);
+      result.getResult().forEach(onOperation);
       return result.getToken();
     }
   }
 
-  OperationsFilter parseOperationsFilter(String filter) {
-    if (filter.startsWith("invocationId=")) {
-      return new OperationsFilter(
-          ImmutableList.of(new InvocationOperationsLocation(filter.split("=")[1])));
+  private class ScopeCorrelatedInvocationsBounds implements Scannable<String> {
+    private final String scope;
+    private final String value;
+
+    ScopeCorrelatedInvocationsBounds(String scope, String value) {
+      this.scope = scope;
+      this.value = value;
+    }
+
+    @Override
+    public String getName() {
+      return scope + "=" + value;
+    }
+
+    @Override
+    public String scan(int limit, String pageToken, Consumer<String> onCorrelatedInvocationsId)
+        throws IOException {
+      Backplane.ScanResult<String> result =
+          backplane.scanCorrelatedInvocations(scope, value, pageToken, limit);
+      result.getResult().forEach(onCorrelatedInvocationsId);
+      return result.getToken();
+    }
+  }
+
+  private class CorrelatedToolInvocationsBounds implements Scannable<String> {
+    private final String correlatedInvocationsId;
+
+    CorrelatedToolInvocationsBounds(String correlatedInvocationsId) {
+      this.correlatedInvocationsId = correlatedInvocationsId;
+    }
+
+    @Override
+    public String getName() {
+      return "correlatedInvocationsId=" + correlatedInvocationsId;
+    }
+
+    @Override
+    public String scan(int limit, String pageToken, Consumer<String> onToolInvocationId)
+        throws IOException {
+      Backplane.ScanResult<String> result =
+          backplane.scanToolInvocations(correlatedInvocationsId, pageToken, limit);
+      result.getResult().forEach(onToolInvocationId);
+      return result.getToken();
+    }
+  }
+
+  static class OperationNameScannable implements Scannable<Operation> {
+    private final Scannable<String> delegate;
+
+    OperationNameScannable(Scannable<String> delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public String getName() {
+      return delegate.getName();
+    }
+
+    @Override
+    public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
+        throws IOException {
+      return delegate.scan(limit, pageToken, name -> onOperation.accept(toOperation(name)));
+    }
+
+    static Operation toOperation(String name) {
+      return Operation.newBuilder().setName(name).build();
+    }
+  }
+
+  Filter<Operation> parseOperationsFilter(String filter) {
+    if (filter.startsWith("toolInvocationId=")) {
+      return new Filter<>(
+          ImmutableList.of(new ToolInvocationOperationsBounds(filter.split("=")[1])));
     }
     if (filter.equals("status=dispatched")) {
-      return new OperationsFilter(
+      return new Filter<>(
           ImmutableList.of(
               new Scannable<>() {
                 @Override
                 public String getName() {
-                  return dispatchedOperationsList.getName();
+                  return dispatchedOperations.getName();
                 }
 
                 @Override
                 public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
                     throws IOException {
-                  return dispatchedOperationsList.scan(
+                  return dispatchedOperations.scan(
                       limit,
                       pageToken,
                       dispatchedOperation -> {
                         ExecuteEntry executeEntry =
                             dispatchedOperation.getQueueEntry().getExecuteEntry();
-                        Operation operation =
-                            Operation.newBuilder().setName(executeEntry.getOperationName()).build();
-                        onOperation.accept(operation);
+                        onOperation.accept(
+                            OperationNameScannable.toOperation(executeEntry.getOperationName()));
                       });
                 }
               }));
     }
     // more?
-    return new OperationsFilter(ImmutableList.of(operationsList));
+    return new Filter<>(ImmutableList.of(operations));
   }
 
-  @Override
-  public String listOperations(
-      int pageSize, String pageToken, String filter, Consumer<Operation> onOperation)
-      throws IOException {
+  Filter<Operation> parseCorrelatedInvocationsFilter(String filter) {
+    String[] scopeView = filter.split("=");
+    if (scopeView.length != 2) { // covers empty
+      return new Filter<>(ImmutableList.of(new OperationNameScannable(correlatedInvocations)));
+    }
+    String scope = scopeView[0];
+    String value = scopeView[1];
+    return new Filter<>(
+        ImmutableList.of(
+            new OperationNameScannable(new ScopeCorrelatedInvocationsBounds(scope, value))));
+  }
+
+  Filter<Operation> parseToolInvocationsFilter(String filter) {
+    if (filter.startsWith("correlatedInvocationsId=")) {
+      return new Filter<>(
+          ImmutableList.of(
+              new OperationNameScannable(
+                  new CorrelatedToolInvocationsBounds(filter.split("=")[1]))));
+    }
+    return new Filter<>(ImmutableList.of(new OperationNameScannable(toolInvocations)));
+  }
+
+  Filter<Operation> bindingsFilter() {
+    return new Filter<>(ImmutableList.of(new OperationNameScannable(bindings), indexKeys));
+  }
+
+  Scannable<String> indexEntriesScannable(String keyMatch) {
+    return new Scannable<>() {
+      @Override
+      public String getName() {
+        return "indexEntries";
+      }
+
+      @Override
+      public String scan(int limit, String pageToken, Consumer<String> onKey) throws IOException {
+        Backplane.ScanResult<String> scanResult =
+            backplane.scanCorrelatedInvocationIndexEntries(pageToken, limit, keyMatch);
+        scanResult.getResult().forEach(onKey);
+        return scanResult.getToken();
+      }
+    };
+  }
+
+  Filter<Operation> indexEntriesFilter(String keyMatch) {
+    return new Filter<>(
+        ImmutableList.of(new OperationNameScannable(indexEntriesScannable(keyMatch))));
+  }
+
+  private <T> String listFilter(
+      int pageSize, String pageToken, Filter<T> filter, Consumer<T> onResult) throws IOException {
     // sequence pageToken prefix
     String locationName = null;
     String token = Scannable.SENTINEL_PAGE_TOKEN;
@@ -2771,26 +2934,24 @@ public class ServerInstance extends NodeInstance {
       locationName = pageToken.substring(0, tokenIndex);
       token = pageToken.substring(tokenIndex + 1);
     }
-    boolean matchedLocationName = false;
+    boolean matchedBindingName = false;
 
     // determine filter locations
-    OperationsFilter operationsFilter = parseOperationsFilter(filter);
-    Iterator<Scannable<Operation>> iterator = operationsFilter.getLocations().iterator();
+    Iterator<Scannable<T>> iterator = filter.getBounds().iterator();
     while (pageSize > 0 && iterator.hasNext()) {
       Scannable location = iterator.next();
       if (locationName == null) {
         locationName = location.getName();
       }
       if (location.getName().equals(locationName)) {
-        matchedLocationName = true;
+        matchedBindingName = true;
         // query relevant data structures with remaining filters
         // TODO predicate operations with content by filter
-        CountingConsumer<Operation> onOperationCounting = new CountingConsumer<>(onOperation);
-        token = location.scan(pageSize, token, onOperationCounting);
+        CountingConsumer<T> onCounting = new CountingConsumer<>(onResult);
+        token = location.scan(pageSize, token, onCounting);
         checkState(
-            token.equals(Scannable.SENTINEL_PAGE_TOKEN)
-                || onOperationCounting.getCount() == pageSize);
-        pageSize -= onOperationCounting.getCount();
+            token.equals(Scannable.SENTINEL_PAGE_TOKEN) || onCounting.getCount() == pageSize);
+        pageSize -= onCounting.getCount();
         if (pageSize > 0) {
           locationName = null;
           token = Scannable.SENTINEL_PAGE_TOKEN;
@@ -2801,7 +2962,7 @@ public class ServerInstance extends NodeInstance {
     }
 
     // token location name did not exist in list
-    if (!matchedLocationName) {
+    if (!matchedBindingName) {
       return SENTINEL_PAGE_TOKEN;
     }
 
@@ -2816,12 +2977,23 @@ public class ServerInstance extends NodeInstance {
     return locationName + ":" + token; // start at the next location for subsequent pages
   }
 
-  public Iterable<Operation> getOperations(Set<String> invocationIds) {
-    try {
-      return backplane.getOperations(invocationIds);
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
+  @Override
+  public String listOperations(
+      String name, int pageSize, String pageToken, String filter, Consumer<Operation> onOperation)
+      throws IOException {
+    Filter<Operation> operationFilter;
+    if (name.equals("")) {
+      operationFilter = bindingsFilter();
+    } else if (name.equals(BINDING_CORRELATED_INVOCATIONS)) {
+      operationFilter = parseCorrelatedInvocationsFilter(filter);
+    } else if (name.equals(BINDING_TOOL_INVOCATIONS)) {
+      operationFilter = parseToolInvocationsFilter(filter);
+    } else if (name.equals(BINDING_EXECUTIONS)) {
+      operationFilter = parseOperationsFilter(filter);
+    } else {
+      operationFilter = indexEntriesFilter(name);
     }
+    return listFilter(pageSize, pageToken, operationFilter, onOperation);
   }
 
   @Override
@@ -2854,5 +3026,60 @@ public class ServerInstance extends NodeInstance {
     return super.getCacheCapabilities().toBuilder()
         .setSymlinkAbsolutePathStrategy(symlinkAbsolutePathStrategy)
         .build();
+  }
+
+  public UUID indexCorrelatedInvocations(URI uri) throws IOException {
+    // policy might not be right to apply outside of here
+    // definitely correct for directing backplane though
+    QueryStringDecoder decoder = new QueryStringDecoder(uri);
+    // FIXME could also be a part of the host, path, or query
+    UUID uuid = UUID.fromString(uri.getFragment());
+
+    // TODO stream() to select sub-map?
+    // select the url params from selector
+    Map<String, List<String>> indexScopeValues = new HashMap<>();
+
+    Set<String> indexScopes = configs.getServer().getCorrelatedInvocationsIndexScopes();
+
+    // associate uri components and query with this correlated id
+    if (indexScopes.contains("username")) {
+      String username = uri.getUserInfo().split(":")[0];
+      if (!username.isEmpty()) {
+        indexScopeValues.put("username", ImmutableList.of(username));
+      }
+    }
+    if (indexScopes.contains("host")) {
+      String host = uri.getHost();
+      if (!host.isEmpty()) {
+        indexScopeValues.put("host", ImmutableList.of(host));
+      }
+    }
+
+    // may override field-specific selection
+    for (Map.Entry<String, List<String>> parameter : decoder.parameters().entrySet()) {
+      String scope = parameter.getKey();
+      if (indexScopes.contains(scope)) {
+        indexScopeValues.put(scope, parameter.getValue());
+      }
+    }
+
+    if (!indexScopeValues.isEmpty()) {
+      backplane.indexCorrelatedInvocationsId(uuid, indexScopeValues);
+    }
+
+    return uuid;
+  }
+
+  public void addToolInvocationId(
+      UUID toolInvocationId, UUID correlatedInvocationsId, ToolDetails toolDetails)
+      throws IOException {
+    backplane.addToolInvocationId(toolInvocationId, correlatedInvocationsId, toolDetails);
+  }
+
+  public void addRequest(
+      String actionId, UUID toolInvocationId, String actionMnemonic, String targetId)
+      throws IOException {
+    // TODO maybe track per server instance as well
+    backplane.incrementRequestCounters(actionId, toolInvocationId, actionMnemonic, targetId);
   }
 }

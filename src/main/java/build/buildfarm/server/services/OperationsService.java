@@ -49,12 +49,26 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       pageSize = LIST_OPERATIONS_DEFAULT_PAGE_SIZE;
     }
 
+    // locate index
+    String name = request.getName();
+    if (name.startsWith(instance.getName() + "/")) {
+      name = name.substring(instance.getName().length() + 1);
+    } else {
+      responseObserver.onError(
+          Status.NOT_FOUND.withDescription("instance not found").asException());
+      return;
+    }
+
     // TODO make async
     try {
       ListOperationsResponse.Builder response = ListOperationsResponse.newBuilder();
       response.setNextPageToken(
           instance.listOperations(
-              pageSize, request.getPageToken(), request.getFilter(), response::addOperations));
+              name,
+              pageSize,
+              request.getPageToken(),
+              request.getFilter(),
+              response::addOperations));
       responseObserver.onNext(response.build());
       responseObserver.onCompleted();
     } catch (IOException e) {
@@ -65,6 +79,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   @Override
   public void getOperation(
       GetOperationRequest request, StreamObserver<Operation> responseObserver) {
+    // TODO drop instance from name
     responseObserver.onNext(instance.getOperation(request.getName()));
     responseObserver.onCompleted();
   }
@@ -72,6 +87,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   @Override
   public void deleteOperation(
       DeleteOperationRequest request, StreamObserver<Empty> responseObserver) {
+    // TODO drop instance from name
     try {
       instance.deleteOperation(request.getName());
       responseObserver.onNext(Empty.newBuilder().build());
@@ -84,6 +100,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   @Override
   public void cancelOperation(
       CancelOperationRequest request, StreamObserver<Empty> responseObserver) {
+    // TODO drop instance from name
     try {
       instance.cancelOperation(request.getName());
       responseObserver.onNext(Empty.getDefaultInstance());

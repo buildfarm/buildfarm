@@ -1,6 +1,6 @@
 java_library(
     name = "server",
-    srcs = ["BuildFarmServer.java"],
+    srcs = glob(["*.java"]),
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [

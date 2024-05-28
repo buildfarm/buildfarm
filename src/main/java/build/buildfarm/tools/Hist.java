@@ -51,6 +51,7 @@ class Hist {
     do {
       pageToken =
           instance.listOperations(
+              instance.getName() + "/executions",
               LIST_OPERATIONS_MAXIMUM_PAGE_SIZE,
               pageToken,
               "status=dispatched",

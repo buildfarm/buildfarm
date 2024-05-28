@@ -17,6 +17,7 @@ package build.buildfarm.instance.shard;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.RedisHashMap;
 import build.buildfarm.common.redis.RedisMap;
+import build.buildfarm.common.redis.RedisSetMap;
 
 /**
  * @class DistributedState
@@ -103,14 +104,6 @@ public class DistributedState {
   public RedisHashMap dispatchedOperations;
 
   /**
-   * @field casWorkerMap
-   * @brief This map keeps track of which workers have which CAS blobs.
-   * @details Its the worker's responsibility to share this information to others. We do this to
-   *     inform other machines where to find CAS data.
-   */
-  public CasWorkerMap casWorkerMap;
-
-  /**
    * @field blockedInvocations
    * @brief Invocations that the cluster has decided it no longer wants to execute in the future.
    * @details The requests tied to these invocations will be denied and the client will not get
@@ -127,4 +120,10 @@ public class DistributedState {
    *     and will refuse to run again.
    */
   public RedisMap blockedActions;
+
+  public RedisSetMap toolInvocations;
+
+  public RedisSetMap correlatedInvocations;
+
+  public RedisSetMap correlatedInvocationsIndex;
 }

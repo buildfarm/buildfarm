@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.shard;
 
+import static com.google.common.collect.Iterables.transform;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -25,6 +26,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ToolDetails;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.CasIndexResults;
@@ -58,13 +60,13 @@ import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
-import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
@@ -82,6 +84,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
@@ -326,7 +329,7 @@ public class RedisShardBackplane implements Backplane {
     Set<String> expiringChannels = Sets.newHashSet(subscriber.expiredWatchedOperationChannels(now));
     Consumer<String> resetChannel =
         (operationName) -> {
-          String channel = operationChannel(operationName);
+          String channel = executionChannel(operationName);
           if (expiringChannels.remove(channel)) {
             subscriber.resetWatchers(channel, expiresAt);
           }
@@ -400,7 +403,7 @@ public class RedisShardBackplane implements Backplane {
     Instant expiresAt = nextExpiresAt(effectiveAt);
     publish(
         jedis,
-        operationChannel(operation.getName()),
+        executionChannel(operation.getName()),
         Instant.now(),
         OperationChange.newBuilder()
             .setReset(
@@ -445,7 +448,7 @@ public class RedisShardBackplane implements Backplane {
           operation = onPublish.apply(operation);
         }
         subscriber.onOperation(
-            operationChannel(operation.getName()), operation, nextExpiresAt(now));
+            executionChannel(operation.getName()), operation, nextExpiresAt(now));
         log.log(
             Level.FINER,
             format(
@@ -520,7 +523,7 @@ public class RedisShardBackplane implements Backplane {
 
   private void start(RedisClient client, String clientPublicName) throws IOException {
     // Create containers that make up the backplane
-    start(client, DistributedStateCreator.create(client), clientPublicName);
+    start(client, client.call(jedis -> DistributedStateCreator.create(jedis)), clientPublicName);
   }
 
   @VisibleForTesting
@@ -585,7 +588,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
+  public ListenableFuture<Void> watchExecution(String executionName, Watcher watcher) {
     TimedWatcher timedWatcher =
         new TimedWatcher(nextExpiresAt(Instant.now())) {
           @Override
@@ -593,7 +596,7 @@ public class RedisShardBackplane implements Backplane {
             watcher.observe(operation);
           }
         };
-    return subscriber.watch(operationChannel(operationName), timedWatcher);
+    return subscriber.watch(executionChannel(executionName), timedWatcher);
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -674,10 +677,45 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public ScanResult<Operation> getOperations(String cursor, int count) throws IOException {
+  public ScanResult<Operation> scanOperations(String cursor, int count) throws IOException {
     redis.clients.jedis.resps.ScanResult<Operation> scanResult =
         client.call(jedis -> state.operations.scan(jedis, cursor, count));
     return new ScanResult<>(tokenFromRedisCursor(scanResult.getCursor()), scanResult.getResult());
+  }
+
+  @Override
+  public ScanResult<String> scanToolInvocations(String cursor, int count) throws IOException {
+    redis.clients.jedis.resps.ScanResult<String> scanResult =
+        client.call(jedis -> state.toolInvocations.scan(jedis, cursor, count));
+    return new ScanResult<>(tokenFromRedisCursor(scanResult.getCursor()), scanResult.getResult());
+  }
+
+  @Override
+  public ScanResult<String> scanCorrelatedInvocations(String cursor, int count) throws IOException {
+    redis.clients.jedis.resps.ScanResult<String> scanResult =
+        client.call(jedis -> state.correlatedInvocations.scan(jedis, cursor, count));
+    return new ScanResult<>(tokenFromRedisCursor(scanResult.getCursor()), scanResult.getResult());
+  }
+
+  @Override
+  public ScanResult<String> scanCorrelatedInvocationIndexEntries(
+      String cursor, int count, String keyMatch) throws IOException {
+    redis.clients.jedis.resps.ScanResult<String> scanResult =
+        client.call(
+            jedis -> state.correlatedInvocationsIndex.scan(jedis, cursor, count, keyMatch + "=*"));
+    return new ScanResult<>(tokenFromRedisCursor(scanResult.getCursor()), scanResult.getResult());
+  }
+
+  @Override
+  public ScanResult<String> scanCorrelatedInvocationIndexKeys(String cursor, int count)
+      throws IOException {
+    redis.clients.jedis.resps.ScanResult<String> scanResult =
+        client.call(jedis -> state.correlatedInvocationsIndex.scan(jedis, cursor, count));
+    return new ScanResult<>(
+        tokenFromRedisCursor(scanResult.getCursor()),
+        Lists.newArrayList(
+            Sets.newLinkedHashSet(
+                transform(scanResult.getResult(), entry -> entry.split("=")[0]))));
   }
 
   @Override
@@ -722,9 +760,14 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  private CasWorkerMap createCasWorkerMap(UnifiedJedis jedis) {
+    return new JedisCasWorkerMap(
+        jedis, configs.getBackplane().getCasPrefix(), configs.getBackplane().getCasExpire());
+  }
+
   @Override
   public long getDigestInsertTime(Digest blobDigest) throws IOException {
-    return state.casWorkerMap.insertTime(client, blobDigest);
+    return client.call(jedis -> createCasWorkerMap(jedis).insertTime(blobDigest));
   }
 
   private synchronized Set<String> getExecuteWorkers() throws IOException {
@@ -890,44 +933,44 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void adjustBlobLocations(
       Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException {
-    state.casWorkerMap.adjust(client, blobDigest, addWorkers, removeWorkers);
+    client.run(jedis -> createCasWorkerMap(jedis).adjust(blobDigest, addWorkers, removeWorkers));
   }
 
   @Override
   public void addBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    state.casWorkerMap.add(client, blobDigest, workerName);
+    client.run(jedis -> createCasWorkerMap(jedis).add(blobDigest, workerName));
   }
 
   @Override
   public void addBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException {
-    state.casWorkerMap.addAll(client, blobDigests, workerName);
+    client.run(jedis -> createCasWorkerMap(jedis).addAll(blobDigests, workerName));
   }
 
   @Override
   public void removeBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    state.casWorkerMap.remove(client, blobDigest, workerName);
+    client.run(jedis -> createCasWorkerMap(jedis).remove(blobDigest, workerName));
   }
 
   @Override
   public void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName)
       throws IOException {
-    state.casWorkerMap.removeAll(client, blobDigests, workerName);
+    client.run(jedis -> createCasWorkerMap(jedis).removeAll(blobDigests, workerName));
   }
 
   @Override
   public String getBlobLocation(Digest blobDigest) throws IOException {
-    return state.casWorkerMap.getAny(client, blobDigest);
+    return client.call(jedis -> createCasWorkerMap(jedis).getAny(blobDigest));
   }
 
   @Override
   public Set<String> getBlobLocationSet(Digest blobDigest) throws IOException {
-    return state.casWorkerMap.get(client, blobDigest);
+    return client.call(jedis -> createCasWorkerMap(jedis).get(blobDigest));
   }
 
   @Override
   public Map<Digest, Set<String>> getBlobDigestsWorkers(Iterable<Digest> blobDigests)
       throws IOException {
-    return state.casWorkerMap.getMap(client, blobDigests);
+    return client.call(jedis -> createCasWorkerMap(jedis).getMap(blobDigests));
   }
 
   public static WorkerChange parseWorkerChange(String workerChangeJson)
@@ -942,14 +985,6 @@ public class RedisShardBackplane implements Backplane {
     OperationChange.Builder operationChange = OperationChange.newBuilder();
     Operations.getParser().merge(operationChangeJson, operationChange);
     return operationChange.build();
-  }
-
-  @Override
-  public Iterable<Operation> getOperations(Iterable<String> operationIds) throws IOException {
-    return client.call(
-        jedis -> {
-          return state.operations.get(jedis, operationIds);
-        });
   }
 
   private Operation getOperation(UnifiedJedis jedis, String operationName) {
@@ -989,11 +1024,10 @@ public class RedisShardBackplane implements Backplane {
       publishOperation = null;
     }
 
-    String invocationId = extractInvocationId(operation);
     String name = operation.getName();
     client.run(
         jedis -> {
-          state.operations.insert(jedis, invocationId, name, json);
+          state.operations.insert(jedis, name, json);
           if (publishOperation != null) {
             publishReset(jedis, publishOperation);
           }
@@ -1019,7 +1053,6 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void queue(QueueEntry queueEntry, Operation operation) throws IOException {
-    String invocationId = extractInvocationId(operation);
     String operationName = operation.getName();
     String operationJson = operationPrinter.print(operation);
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
@@ -1027,7 +1060,7 @@ public class RedisShardBackplane implements Backplane {
     int priority = queueEntry.getExecuteEntry().getExecutionPolicy().getPriority();
     client.run(
         jedis -> {
-          state.operations.insert(jedis, invocationId, operationName, operationJson);
+          state.operations.insert(jedis, operationName, operationJson);
           queue(
               jedis,
               operation.getName(),
@@ -1039,41 +1072,36 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public ScanResult<Operation> findOperationsByInvocationId(
-      String invocationId, String cursor, int count) throws IOException {
+  public ScanResult<Operation> scanOperations(String invocationId, String cursor, int count)
+      throws IOException {
     redis.clients.jedis.resps.ScanResult<Operation> scanResult =
         client.call(
             jedis -> state.operations.findByInvocationId(jedis, invocationId, cursor, count));
     return new ScanResult<>(tokenFromRedisCursor(scanResult.getCursor()), scanResult.getResult());
   }
 
-  private String extractInvocationId(Operation operation) {
-    return expectRequestMetadata(operation).getToolInvocationId();
-  }
-
-  private static RequestMetadata expectRequestMetadata(Operation operation) {
-    String name = operation.getName();
-    Any metadata = operation.getMetadata();
-    QueuedOperationMetadata queuedOperationMetadata = maybeQueuedOperationMetadata(name, metadata);
-    if (queuedOperationMetadata != null) {
-      return queuedOperationMetadata.getRequestMetadata();
-    }
-    return RequestMetadata.getDefaultInstance();
-  }
-
-  private static QueuedOperationMetadata maybeQueuedOperationMetadata(String name, Any metadata) {
-    if (metadata.is(QueuedOperationMetadata.class)) {
-      try {
-        return metadata.unpack(QueuedOperationMetadata.class);
-      } catch (InvalidProtocolBufferException e) {
-        log.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
-      }
-    }
-    return null;
+  @Override
+  public ScanResult<String> scanToolInvocations(
+      String correlatedInvocationsId, String cursor, int count) throws IOException {
+    redis.clients.jedis.resps.ScanResult<String> scanResult =
+        client.call(
+            jedis ->
+                state.correlatedInvocations.scan(jedis, correlatedInvocationsId, cursor, count));
+    return new ScanResult<>(tokenFromRedisCursor(scanResult.getCursor()), scanResult.getResult());
   }
 
   @Override
-  public ScanResult<DispatchedOperation> getDispatchedOperations(String cursor, int count)
+  public ScanResult<String> scanCorrelatedInvocations(
+      String scope, String value, String cursor, int count) throws IOException {
+    redis.clients.jedis.resps.ScanResult<String> scanResult =
+        client.call(
+            jedis ->
+                state.correlatedInvocationsIndex.scan(jedis, scope + "=" + value, cursor, count));
+    return new ScanResult<>(tokenFromRedisCursor(scanResult.getCursor()), scanResult.getResult());
+  }
+
+  @Override
+  public ScanResult<DispatchedOperation> scanDispatchedOperations(String cursor, int count)
       throws IOException {
     ImmutableList.Builder<DispatchedOperation> builder = new ImmutableList.Builder<>();
     redis.clients.jedis.resps.ScanResult<Map.Entry<String, String>> scanResult =
@@ -1247,7 +1275,7 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException {
-    String invocationId = extractInvocationId(operation);
+    String toolInvocationId = executeEntry.getRequestMetadata().getToolInvocationId();
     String operationName = operation.getName();
     String operationJson = operationPrinter.print(operation);
     String executeEntryJson = JsonFormat.printer().print(executeEntry);
@@ -1255,7 +1283,10 @@ public class RedisShardBackplane implements Backplane {
     int priority = executeEntry.getExecutionPolicy().getPriority();
     client.run(
         jedis -> {
-          state.operations.insert(jedis, invocationId, operationName, operationJson);
+          state.operations.insert(jedis, operationName, operationJson);
+          if (!toolInvocationId.isEmpty()) {
+            state.toolInvocations.add(jedis, toolInvocationId, operationName);
+          }
           state.prequeue.offer(jedis, executeEntryJson, priority);
           publishReset(jedis, publishOperation);
         });
@@ -1327,7 +1358,7 @@ public class RedisShardBackplane implements Backplane {
     return DigestUtil.toString(actionKey.getDigest());
   }
 
-  String operationChannel(String operationName) {
+  String executionChannel(String operationName) {
     return configs.getBackplane().getOperationChannelPrefix() + ":" + operationName;
   }
 
@@ -1413,6 +1444,38 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public void updateDigestsExpiry(Iterable<Digest> digests) throws IOException {
-    state.casWorkerMap.setExpire(client, digests);
+    client.run(jedis -> createCasWorkerMap(jedis).setExpire(digests));
+  }
+
+  @Override
+  public void indexCorrelatedInvocationsId(
+      UUID correlatedInvocationsId, Map<String, List<String>> indexScopeValues) throws IOException {
+    client.run(
+        jedis -> {
+          for (Map.Entry<String, List<String>> entry : indexScopeValues.entrySet()) {
+            for (String key : entry.getValue()) {
+              state.correlatedInvocationsIndex.add(
+                  jedis, entry.getKey() + "=" + key, correlatedInvocationsId.toString());
+            }
+          }
+        });
+  }
+
+  @Override
+  public void addToolInvocationId(
+      UUID toolInvocationId, UUID correlatedInvocationsId, ToolDetails toolDetails)
+      throws IOException {
+    client.run(
+        jedis -> {
+          state.correlatedInvocations.add(
+              jedis, correlatedInvocationsId.toString(), toolInvocationId.toString());
+          // TODO maybe index by toolDetails
+        });
+  }
+
+  @Override
+  public void incrementRequestCounters(
+      String actionId, UUID toolInvocationId, String actionMnemonic, String targetId) {
+    // TODO count for each of these fields
   }
 }

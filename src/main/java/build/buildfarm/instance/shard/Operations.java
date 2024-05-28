@@ -18,9 +18,8 @@ import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Lists.newArrayList;
 
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.common.redis.OffsetScanner;
 import build.buildfarm.common.redis.RedisMap;
+import build.buildfarm.common.redis.RedisSetMap;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -29,7 +28,6 @@ import com.google.rpc.PreconditionFailure;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
 import redis.clients.jedis.UnifiedJedis;
-import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
 
 /**
@@ -42,7 +40,6 @@ import redis.clients.jedis.resps.ScanResult;
  */
 @Log
 public class Operations {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private static final JsonFormat.Parser operationParser =
       JsonFormat.parser()
           .usingTypeRegistry(
@@ -57,6 +54,8 @@ public class Operations {
     return operationParser;
   }
 
+  public RedisSetMap toolInvocations;
+
   /**
    * @field operations
    * @brief A mapping from operationName -> operation
@@ -70,7 +69,8 @@ public class Operations {
    * @param name The global name of the operation map.
    * @param timeout_s When to expire operations.
    */
-  public Operations(String name, int timeout_s) {
+  public Operations(RedisSetMap toolInvocations, String name, int timeout_s) {
+    this.toolInvocations = toolInvocations;
     operations = new RedisMap(name, timeout_s);
   }
 
@@ -127,32 +127,18 @@ public class Operations {
 
   public ScanResult<Operation> findByInvocationId(
       UnifiedJedis jedis, String invocationId, String setCursor, int count) {
-    OffsetScanner<String> offsetScanner =
-        new OffsetScanner<String>() {
-          @Override
-          protected ScanResult<String> scan(String cursor, int remaining) {
-            return jedis.sscan(invocationId, cursor, new ScanParams().count(remaining));
-          }
-        };
-    return parseScanResult(offsetScanner.fill(setCursor, count));
+    return parseScanResult(toolInvocations.scan(jedis, invocationId, setCursor, count));
   }
 
   /**
    * @brief Insert an operation.
    * @details If the operation already exists, then it will be replaced.
    * @param jedis Jedis cluster client.
-   * @param invocationId ID of the invocation that the operation is a part of.
    * @param name name of operation.
    * @param operation Json of the operation.
    */
-  public void insert(UnifiedJedis jedis, String invocationId, String name, String operation) {
+  public void insert(UnifiedJedis jedis, String name, String operation) {
     operations.insert(jedis, name, operation);
-
-    // We also store a mapping from invocationID -> operationIDs
-    // This is a common lookup that needs to be performant.
-    if (!invocationId.isEmpty() && jedis.sadd(invocationId, name) == 1) {
-      jedis.expire(invocationId, configs.getBackplane().getMaxInvocationIdTimeout());
-    }
   }
 
   /**

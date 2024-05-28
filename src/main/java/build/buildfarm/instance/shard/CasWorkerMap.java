@@ -15,8 +15,6 @@
 package build.buildfarm.instance.shard;
 
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.common.redis.RedisClient;
-import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 
@@ -24,108 +22,92 @@ public interface CasWorkerMap {
   /**
    * @brief Adjust blob mappings based on worker changes.
    * @details Adjustments are made based on added and removed workers. Expirations are refreshed.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @param blobDigest The blob digest to adjust worker information from.
    * @param addWorkers Workers to add.
    * @param removeWorkers Workers to remove.
    */
-  void adjust(
-      RedisClient client, Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
-      throws IOException;
+  void adjust(Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers);
 
   /**
    * @brief Update the blob entry for the worker.
    * @details This may add a new key if the blob did not previously exist, or it will adjust the
    *     worker values based on the worker name. The expiration time is always refreshed.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @param blobDigest The blob digest to adjust worker information from.
    * @param workerName The worker to add for looking up the blob.
    */
-  void add(RedisClient client, Digest blobDigest, String workerName) throws IOException;
+  void add(Digest blobDigest, String workerName);
 
   /**
    * @brief Update multiple blob entries for a worker.
    * @details This may add a new key if the blob did not previously exist, or it will adjust the
    *     worker values based on the worker name. The expiration time is always refreshed.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @param blobDigests The blob digests to adjust worker information from.
    * @param workerName The worker to add for looking up the blobs.
    */
-  void addAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
-      throws IOException;
+  void addAll(Iterable<Digest> blobDigests, String workerName);
 
   /**
    * @brief Remove worker value from blob key.
    * @details If the blob is already missing, or the worker doesn't exist, this will have no effect.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @param blobDigest The blob digest to remove the worker from.
    * @param workerName The worker name to remove.
    */
-  void remove(RedisClient client, Digest blobDigest, String workerName) throws IOException;
+  void remove(Digest blobDigest, String workerName);
 
   /**
    * @brief Remove worker value from all blob keys.
    * @details If the blob is already missing, or the worker doesn't exist, this will be no effect on
    *     the key.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @param blobDigests The blob digests to remove the worker from.
    * @param workerName The worker name to remove.
    */
-  void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
-      throws IOException;
+  void removeAll(Iterable<Digest> blobDigests, String workerName);
 
   /**
    * @brief Get a random worker for where the blob resides.
    * @details Picking a worker may done differently in the future.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @param blobDigest The blob digest to lookup a worker for.
    * @return A worker for where the blob is.
    * @note Suggested return identifier: workerName.
    */
-  String getAny(RedisClient client, Digest blobDigest) throws IOException;
+  String getAny(Digest blobDigest);
 
   /**
    * @brief Get all of the workers for where a blob resides.
    * @details Set is empty if the locaion of the blob is unknown.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @param blobDigest The blob digest to lookup a worker for.
    * @return All the workers where the blob is expected to be.
    * @note Suggested return identifier: workerNames.
    */
-  Set<String> get(RedisClient client, Digest blobDigest) throws IOException;
+  Set<String> get(Digest blobDigest);
 
   /**
    * @brief Get insert time for the digest.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @param blobDigest The blob digest to lookup for insert time.
    * @return insert time of the digest.
    */
-  long insertTime(RedisClient client, Digest blobDigest) throws IOException;
+  long insertTime(Digest blobDigest);
 
   /**
    * @brief Get all of the key values as a map from the digests given.
    * @details If there are no workers for the digest, the key is left out of the returned map.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @param blobDigests The blob digests to get the key/values for.
    * @return The key/value map for digests to workers.
    * @note Suggested return identifier: casWorkerMap.
    */
-  Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests)
-      throws IOException;
+  Map<Digest, Set<String>> getMap(Iterable<Digest> blobDigests);
 
   /**
    * @brief Get the size of the map.
    * @details Returns the number of key-value pairs in this multimap.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @return The size of the map.
    * @note Suggested return identifier: mapSize.
    */
-  int size(RedisClient client) throws IOException;
+  int size();
 
   /**
    * @brief Set the expiry duration for the digests.
-   * @param client Client used for interacting with redis when not using cacheMap.
    * @param blobDigests The blob digests to set new the expiry duration.
    */
-  void setExpire(RedisClient client, Iterable<Digest> blobDigests) throws IOException;
+  void setExpire(Iterable<Digest> blobDigests);
 }

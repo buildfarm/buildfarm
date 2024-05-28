@@ -171,6 +171,26 @@ server:
     secretName: buildfarm-secret
 ```
 
+### Correlated Invocations Index Scopes
+
+A set of names to extract per-correlatedInvocationsId fields from a valid URI to create indices which will contain the fragment uuid
+
+| Entry         | URI Component                             |
+|---------------|-------------------------------------------|
+| host          | authority:host                            |
+| username      | userinfo:username                         |
+| * (_any key_) | query[key] (one index per specified pair) |
+
+
+Example:
+
+```yaml
+server:
+  correlatedInvocationsIndexScopes: !!set
+    ? host
+    ? username
+```
+
 ### Redis Backplane
 
 | Configuration                 | Accepted and _Default_ Values            | Environment Var | Command Line Argument | Description                                                                                                                                                                                  |

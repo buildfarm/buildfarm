@@ -41,10 +41,12 @@ import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.SymlinkNode;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.actioncache.ActionCache;
@@ -140,11 +142,6 @@ public class NodeInstanceTest {
     }
 
     @Override
-    protected Operation createOperation(ActionKey actionKey) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
     protected boolean matchOperation(Operation operation) {
       throw new UnsupportedOperationException();
     }
@@ -155,17 +152,12 @@ public class NodeInstanceTest {
     }
 
     @Override
-    protected Object operationLock() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
     public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
+    public ListenableFuture<Void> watchExecution(UUID executionId, Watcher watcher) {
       throw new UnsupportedOperationException();
     }
 
@@ -197,7 +189,31 @@ public class NodeInstanceTest {
 
     @Override
     public String listOperations(
-        int pageSize, String pageToken, String filter, Consumer<Operation> operations) {
+        String name,
+        int pageSize,
+        String pageToken,
+        String filter,
+        Consumer<Operation> operations) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void cancelOperation(String name) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void deleteOperation(String name) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Operation getOperation(String name) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean putOperation(Operation operation) {
       throw new UnsupportedOperationException();
     }
 
@@ -218,6 +234,17 @@ public class NodeInstanceTest {
 
     @Override
     public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ListenableFuture<Void> execute(
+        Digest actionDigest,
+        boolean skipCacheLookup,
+        ExecutionPolicy executionPolicy,
+        ResultsCachePolicy resultsCachePolicy,
+        RequestMetadata requestMetadata,
+        Watcher watcher) {
       throw new UnsupportedOperationException();
     }
   }

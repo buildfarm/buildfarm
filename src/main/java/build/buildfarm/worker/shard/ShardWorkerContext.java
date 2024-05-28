@@ -248,18 +248,19 @@ class ShardWorkerContext implements WorkerContext {
           }
           if (!success) {
             log.log(
-                Level.INFO,
+                Level.WARNING,
                 format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
           } else {
             operationPollerCounter.inc();
             log.log(
-                Level.FINE, format("%s: poller: Completed Poll for %s: OK", name, operationName));
+                Level.FINEST, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
         () -> {
-          log.log(Level.FINE, format("%s: poller: Deadline expired for %s", name, operationName));
+          log.log(
+              Level.WARNING, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);

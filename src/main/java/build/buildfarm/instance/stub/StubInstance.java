@@ -76,6 +76,7 @@ import build.buildfarm.common.resources.DownloadBlobRequest;
 import build.buildfarm.common.resources.ResourceParser;
 import build.buildfarm.common.resources.UploadBlobRequest;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.InstanceBase;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
@@ -156,10 +157,9 @@ import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
 
 @Log
-public class StubInstance implements Instance {
+public class StubInstance extends InstanceBase {
   private static final long DEFAULT_DEADLINE_DAYS = 100 * 365;
 
-  private final String name;
   private final String identifier;
   private final DigestUtil digestUtil;
   private final ManagedChannel channel;
@@ -211,7 +211,7 @@ public class StubInstance implements Instance {
       Duration grpcTimeout,
       Retrier retrier,
       @Nullable ListeningScheduledExecutorService retryService) {
-    this.name = name;
+    super(name);
     this.identifier = identifier;
     this.digestUtil = digestUtil;
     this.channel = channel;
@@ -357,11 +357,6 @@ public class StubInstance implements Instance {
       stub = stub.withDeadline(Time.toDeadline(grpcTimeout));
     }
     return stub;
-  }
-
-  @Override
-  public String getName() {
-    return name;
   }
 
   @Override
@@ -854,8 +849,9 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
-    WaitExecutionRequest request = WaitExecutionRequest.newBuilder().setName(operationName).build();
+  public ListenableFuture<Void> watchExecution(UUID executionId, Watcher watcher) {
+    WaitExecutionRequest request =
+        WaitExecutionRequest.newBuilder().setName(bindExecutions(executionId)).build();
     SettableFuture<Void> result = SettableFuture.create();
     newExStub()
         .waitExecution(
@@ -881,13 +877,13 @@ public class StubInstance implements Instance {
 
   @Override
   public String listOperations(
-      int pageSize, String pageToken, String filter, Consumer<Operation> onOperation) {
+      String name, int pageSize, String pageToken, String filter, Consumer<Operation> onOperation) {
     throwIfStopped();
     ListOperationsResponse response =
         deadlined(operationsBlockingStub)
             .listOperations(
                 ListOperationsRequest.newBuilder()
-                    .setName(getName() + "/operations")
+                    .setName(getName() + "/" + name)
                     .setPageSize(pageSize)
                     .setPageToken(pageToken)
                     .setFilter(filter)

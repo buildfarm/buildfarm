@@ -134,13 +134,9 @@ public class RedisShardBackplaneTest {
     backplane.prequeue(executeEntry, op);
 
     verify(state.operations, times(1))
-        .insert(
-            eq(jedis),
-            any(String.class),
-            eq(opName),
-            eq(RedisShardBackplane.operationPrinter.print(op)));
+        .insert(eq(jedis), eq(opName), eq(RedisShardBackplane.operationPrinter.print(op)));
     verifyNoMoreInteractions(state.operations);
-    OperationChange opChange = verifyChangePublished(backplane.operationChannel(opName), jedis);
+    OperationChange opChange = verifyChangePublished(backplane.executionChannel(opName), jedis);
     assertThat(opChange.hasReset()).isTrue();
     assertThat(opChange.getReset().getOperation().getName()).isEqualTo(opName);
   }
@@ -156,7 +152,7 @@ public class RedisShardBackplaneTest {
     backplane.queueing(opName);
 
     verify(mockJedisClusterFactory, times(1)).get();
-    OperationChange opChange = verifyChangePublished(backplane.operationChannel(opName), jedis);
+    OperationChange opChange = verifyChangePublished(backplane.executionChannel(opName), jedis);
     assertThat(opChange.hasReset()).isTrue();
     assertThat(opChange.getReset().getOperation().getName()).isEqualTo(opName);
   }
@@ -187,7 +183,7 @@ public class RedisShardBackplaneTest {
             JsonFormat.printer().print(queueEntry),
             queueEntry.getExecuteEntry().getExecutionPolicy().getPriority());
     verifyNoMoreInteractions(state.operationQueue);
-    OperationChange opChange = verifyChangePublished(backplane.operationChannel(opName), jedis);
+    OperationChange opChange = verifyChangePublished(backplane.executionChannel(opName), jedis);
     assertThat(opChange.hasReset()).isTrue();
     assertThat(opChange.getReset().getOperation().getName()).isEqualTo(opName);
   }
@@ -356,7 +352,7 @@ public class RedisShardBackplaneTest {
     verify(mockJedisClusterFactory, times(1)).get();
     verify(jedis, times(1)).hdel(configs.getBackplane().getDispatchedOperationsHashName(), opName);
     verify(jedis, times(1)).del(operationName(opName));
-    OperationChange opChange = verifyChangePublished(backplane.operationChannel(opName), jedis);
+    OperationChange opChange = verifyChangePublished(backplane.executionChannel(opName), jedis);
     assertThat(opChange.hasReset()).isTrue();
     assertThat(opChange.getReset().getOperation().getName()).isEqualTo(opName);
   }

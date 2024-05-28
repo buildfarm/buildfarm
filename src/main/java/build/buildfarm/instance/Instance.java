@@ -141,8 +141,12 @@ public interface Instance {
   String SENTINEL_PAGE_TOKEN = "";
 
   // returns nextPageToken suitable for list restart
+  // SHOULD THESE BE THE SAME API with
+  // {instance_name}/[correlatedInvocations|toolInvocations|executions]/{uuid}???
+  // we've put too much into operation, it's just a moniker
+  // these should be 'actionExecutions' or something similar
   String listOperations(
-      int pageSize, String pageToken, String filter, Consumer<Operation> operations)
+      String name, int pageSize, String pageToken, String filter, Consumer<Operation> onOperation)
       throws IOException;
 
   Operation getOperation(String name);
@@ -151,7 +155,7 @@ public interface Instance {
 
   void deleteOperation(String name);
 
-  ListenableFuture<Void> watchOperation(String operationName, Watcher watcher);
+  ListenableFuture<Void> watchExecution(UUID executionId, Watcher watcher);
 
   ServerCapabilities getCapabilities();
 
@@ -179,4 +183,12 @@ public interface Instance {
       return ImmutableList.copyOf(failedResponses);
     }
   }
+
+  String bindExecutions(UUID executionId);
+
+  String bindToolInvocations(UUID toolInvocationId);
+
+  String bindCorrelatedInvocations(UUID correlatedInvocationsId);
+
+  UUID unbindExecutions(String operationName);
 }

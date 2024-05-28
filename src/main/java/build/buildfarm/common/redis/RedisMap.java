@@ -23,9 +23,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.StreamSupport;
+import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Connection;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.PipelineBase;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.params.ScanParams;
@@ -55,7 +55,7 @@ public class RedisMap {
    * @details The map can be initialized with a default expiration. In doing so, expirations can be
    *     omitted from calls to insert.
    */
-  private final int expiration_s;
+  protected final int expiration_s;
 
   /**
    * @brief Constructor.
@@ -63,7 +63,7 @@ public class RedisMap {
    * @param name The global name of the map.
    */
   public RedisMap(String name) {
-    this(name, 86400);
+    this(name, 24 * 60 * 60);
   }
 
   /**
@@ -138,7 +138,7 @@ public class RedisMap {
    * @note Overloaded.
    */
   public void remove(UnifiedJedis jedis, Iterable<String> keys) {
-    try (PipelineBase p = jedis.pipelined()) {
+    try (AbstractPipeline p = jedis.pipelined()) {
       for (String key : keys) {
         p.del(createKeyName(key));
       }
@@ -169,7 +169,7 @@ public class RedisMap {
    */
   public Iterable<Map.Entry<String, String>> get(UnifiedJedis jedis, Iterable<String> keys) {
     // Fetch items via pipeline
-    try (PipelineBase p = jedis.pipelined()) {
+    try (AbstractPipeline p = jedis.pipelined()) {
       List<Map.Entry<String, Response<String>>> values = new ArrayList<>();
       StreamSupport.stream(keys.spliterator(), false)
           .forEach(
@@ -210,22 +210,27 @@ public class RedisMap {
   /**
    * @brief Create the key name used in redis.
    * @details The key name is made more unique by leveraging the map's name.
-   * @param keyName The name of the key.
+   * @param key The name of the key.
    * @return The key name to use in redis.
-   * @note Suggested return identifier: redisKeyName.
+   * @note Suggested return identifier: keyName.
    */
-  private String createKeyName(String keyName) {
-    return name + ":" + keyName;
+  protected String createKeyName(String key) {
+    return name + ":" + key;
   }
 
   public ScanResult<String> scan(UnifiedJedis jedis, String mapCursor, int count) {
-    if (jedis instanceof JedisCluster cluster) {
-      return scanCluster(cluster, mapCursor, count);
-    }
-    return scanNode(jedis, mapCursor, count);
+    return scan(jedis, mapCursor, count, /* match= */ "*");
   }
 
-  public ScanResult<String> scanCluster(JedisCluster cluster, String mapCursor, int count) {
+  public ScanResult<String> scan(UnifiedJedis jedis, String mapCursor, int count, String match) {
+    if (jedis instanceof JedisCluster cluster) {
+      return scanCluster(cluster, mapCursor, count, match);
+    }
+    return scanNode(jedis, mapCursor, count, match);
+  }
+
+  public ScanResult<String> scanCluster(
+      JedisCluster cluster, String mapCursor, int count, String match) {
     int hashIndex = mapCursor.indexOf('{') + 1;
     String currentHash = null;
     if (hashIndex > 0) {
@@ -256,7 +261,7 @@ public class RedisMap {
       // acquire and assign resource to UnifiedJedis for release
       Connection connection = cluster.getConnectionFromSlot(JedisClusterCRC16.getSlot(currentHash));
       try (UnifiedJedis jedis = new UnifiedJedis(connection)) {
-        ScanResult<String> scanResult = scanNode(jedis, mapCursor, count - result.size());
+        ScanResult<String> scanResult = scanNode(jedis, mapCursor, count - result.size(), match);
         mapCursor = scanResult.getCursor();
         result.addAll(scanResult.getResult());
       }
@@ -275,12 +280,13 @@ public class RedisMap {
     return new ScanResult(nextCursor, result);
   }
 
-  private ScanResult<String> scanNode(UnifiedJedis jedis, String mapCursor, int count) {
+  private ScanResult<String> scanNode(
+      UnifiedJedis jedis, String mapCursor, int count, String match) {
     // redis has much worse performance when scanning for small counts
     // break even is around 5k
     int scanCount = 5000;
     // maybe use type regular?
-    ScanParams scanParams = new ScanParams().count(scanCount).match(createKeyName("*"));
+    ScanParams scanParams = new ScanParams().count(scanCount).match(createKeyName(match));
     int prefixLen = name.length() + 1;
     return new OffsetScanner<String>() {
       @Override

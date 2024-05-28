@@ -175,7 +175,7 @@ public abstract class PipelineStage implements Runnable {
   protected void start(String operationName, String message) {
     // TODO to unary stage
     this.operationName = operationName;
-    getLogger().log(Level.FINER, format("%s: %s", logIterateId(operationName), message));
+    getLogger().log(Level.FINE, format("%s: %s", logIterateId(operationName), message));
   }
 
   protected void complete(String operationName, long usecs, long stallUSecs, boolean success) {
@@ -186,7 +186,7 @@ public abstract class PipelineStage implements Runnable {
     this.operationName = operationName;
     getLogger()
         .log(
-            Level.FINER,
+            Level.FINE,
             format(
                 "%s: %g ms (%g ms stalled) %s",
                 logIterateId(operationName), usecs / 1000.0f, stallUSecs / 1000.0f, status));

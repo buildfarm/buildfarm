@@ -57,6 +57,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -234,16 +235,6 @@ public class WorkerInstance extends NodeInstance {
   }
 
   @Override
-  protected Object operationLock() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  protected Operation createOperation(ActionKey actionKey) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   protected int getTreeDefaultPageSize() {
     return 1024;
   }
@@ -279,7 +270,7 @@ public class WorkerInstance extends NodeInstance {
   }
 
   @Override
-  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
+  public ListenableFuture<Void> watchExecution(UUID executionId, Watcher watcher) {
     throw new UnsupportedOperationException();
   }
 
@@ -343,7 +334,7 @@ public class WorkerInstance extends NodeInstance {
 
   @Override
   public String listOperations(
-      int pageSize, String pageToken, String filter, Consumer<Operation> operations) {
+      String name, int pageSize, String pageToken, String filter, Consumer<Operation> operations) {
     throw new UnsupportedOperationException();
   }
 

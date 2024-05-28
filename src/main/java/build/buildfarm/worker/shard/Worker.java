@@ -241,8 +241,7 @@ public final class Worker extends LoggingMain {
               backplane));
     }
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getWorker().getGrpcMetrics());
-    serverBuilder.intercept(new ServerHeadersInterceptor());
-
+    serverBuilder.intercept(new ServerHeadersInterceptor(meta -> {}));
     return serverBuilder.build();
   }
 

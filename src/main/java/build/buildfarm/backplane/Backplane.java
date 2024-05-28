@@ -19,6 +19,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ToolDetails;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Watcher;
@@ -36,6 +37,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import lombok.Data;
 import net.jcip.annotations.ThreadSafe;
 
@@ -86,7 +88,27 @@ public interface Backplane {
 
   void deregisterWorker(String hostName) throws IOException;
 
-  ScanResult<Operation> findOperationsByInvocationId(String invocationId, String cursor, int count)
+  /** Page all operations */
+  ScanResult<Operation> scanOperations(String cursor, int count) throws IOException;
+
+  ScanResult<Operation> scanOperations(String toolInvocationId, String cursor, int count)
+      throws IOException;
+
+  /** Page all toolInvocations */
+  ScanResult<String> scanToolInvocations(String cursor, int count) throws IOException;
+
+  ScanResult<String> scanToolInvocations(String correlatedInvocationsId, String cursor, int count)
+      throws IOException;
+
+  /** Page all correlatedInvocations */
+  ScanResult<String> scanCorrelatedInvocations(String cursor, int count) throws IOException;
+
+  ScanResult<String> scanCorrelatedInvocations(String scope, String value, String cursor, int count)
+      throws IOException;
+
+  ScanResult<String> scanCorrelatedInvocationIndexKeys(String cursor, int count) throws IOException;
+
+  ScanResult<String> scanCorrelatedInvocationIndexEntries(String cursor, int count, String keyMatch)
       throws IOException;
 
   /** Returns a map of the worker name and its start time for given workers. */
@@ -240,17 +262,11 @@ public interface Backplane {
   void deleteOperation(String operationName) throws IOException;
 
   /** Register a watcher for an operation */
-  ListenableFuture<Void> watchOperation(String operationName, Watcher watcher);
+  ListenableFuture<Void> watchExecution(String executionName, Watcher watcher);
 
   /** Page all dispatched operations */
-  ScanResult<DispatchedOperation> getDispatchedOperations(String cursor, int count)
+  ScanResult<DispatchedOperation> scanDispatchedOperations(String cursor, int count)
       throws IOException;
-
-  /** Page all operations */
-  ScanResult<Operation> getOperations(String cursor, int count) throws IOException;
-
-  /** Retrieve a set of known operations */
-  Iterable<Operation> getOperations(Iterable<String> operationIds) throws IOException;
 
   /** Requeue a dispatched operation */
   void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException;
@@ -276,4 +292,15 @@ public interface Backplane {
 
   /** Set expiry time for digests */
   void updateDigestsExpiry(Iterable<Digest> digests) throws IOException;
+
+  void indexCorrelatedInvocationsId(
+      UUID correlatedInvocationsId, Map<String, List<String>> indexScopeValues) throws IOException;
+
+  void addToolInvocationId(
+      UUID toolInvocationId, UUID correlatedInvocationsId, ToolDetails toolDetails)
+      throws IOException;
+
+  void incrementRequestCounters(
+      String actionId, UUID toolInvocationId, String actionMnemonic, String targetId)
+      throws IOException;
 }

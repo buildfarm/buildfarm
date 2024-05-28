@@ -76,6 +76,8 @@ public class BuildFarmServer extends LoggingMain {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
   private AtomicBoolean shutdownInitiated = new AtomicBoolean(true);
   private AtomicBoolean released = new AtomicBoolean(true);
+  private InvocationsCollector invocationsCollector;
+  private Thread invocationsCollectorThread;
 
   BuildFarmServer() {
     super("BuildFarmServer");
@@ -123,11 +125,17 @@ public class BuildFarmServer extends LoggingMain {
       throws IOException, ConfigurationException, InterruptedException {
     shutdownInitiated.set(false);
     released.set(false);
-    instance = createInstance();
+    // FIXME change to instance = ...; instance.start();
+    ServerInstance serverInstance = createInstance();
+    instance = serverInstance;
 
     healthStatusManager = new HealthStatusManager();
 
-    ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
+    invocationsCollector = new InvocationsCollector(serverInstance);
+    invocationsCollectorThread = new Thread(invocationsCollector);
+    invocationsCollectorThread.start();
+
+    ServerInterceptor headersInterceptor = new ServerHeadersInterceptor(invocationsCollector::add);
     if (configs.getServer().getSslCertificatePath() != null
         && configs.getServer().getSslPrivateKeyPath() != null) {
       // There are different Public Key Cryptography Standards (PKCS) that users may format their
@@ -217,6 +225,11 @@ public class BuildFarmServer extends LoggingMain {
     }
     if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
       log.warning("could not shut down keepalive scheduler");
+    }
+    if (invocationsCollector != null) {
+      invocationsCollector.clear();
+      invocationsCollectorThread.interrupt();
+      invocationsCollectorThread.join();
     }
     log.info("*** server shut down");
   }
