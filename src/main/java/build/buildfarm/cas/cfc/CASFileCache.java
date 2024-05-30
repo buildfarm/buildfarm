@@ -2616,6 +2616,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             onInsert,
             isReset);
     if (out == DUPLICATE_OUTPUT_STREAM) {
+      log.log(Level.FINER, format("duplicate output stream, completing %s for %s", key, writeId));
+      writeWinner.get();
+      onInsert.run();
       return null;
     }
     log.log(Level.FINER, format("entry %s is missing, downloading and populating", key));
