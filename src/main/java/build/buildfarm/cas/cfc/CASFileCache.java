@@ -885,7 +885,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  Write newWrite(BlobWriteKey key, ListenableFuture<Long> future) {
+  Write newWrite(BlobWriteKey key, SettableFuture<Long> future) {
     Write write =
         new Write() {
           CancellableOutputStream out = null;
@@ -1004,11 +1004,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               }
             }
             SettableFuture<Void> outClosedFuture = SettableFuture.create();
+            Digest digest = key.getDigest();
             UniqueWriteOutputStream uniqueOut =
                 createUniqueWriteOutput(
                     out,
                     key.getCompressor(),
-                    key.getDigest(),
+                    digest,
                     UUID.fromString(key.getIdentifier()),
                     cancelled -> {
                       if (cancelled) {
@@ -1018,6 +1019,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     },
                     this::isComplete,
                     isReset);
+            if (uniqueOut.getPath() == null) {
+              // this is a duplicate output stream and the write is complete
+              future.set(key.getDigest().getSizeBytes());
+            }
             commitOpenState(uniqueOut.delegate(), outClosedFuture);
             return uniqueOut;
           }
@@ -2637,9 +2642,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             onInsert,
             isReset);
     if (out == DUPLICATE_OUTPUT_STREAM) {
-      log.log(Level.FINER, format("duplicate output stream, completing %s for %s", key, writeId));
-      writeWinner.get();
-      onInsert.run();
       return null;
     }
     log.log(Level.FINER, format("entry %s is missing, downloading and populating", key));
