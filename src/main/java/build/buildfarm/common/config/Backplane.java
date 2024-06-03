@@ -54,6 +54,7 @@ public class Backplane {
   private boolean priorityQueue = false;
   private Queue[] queues = {};
   private String redisCredentialFile;
+  private String redisUsername;
   @ToString.Exclude // Do not log the password on start-up.
   private String redisPassword;
 
@@ -72,6 +73,13 @@ public class Backplane {
   // These limited resources are shared across all workers.
   // An example would be a limited number of seats to a license server.
   private List<LimitedResource> resources = new ArrayList<>();
+
+  /**
+   * @return The redis username, or <c>null</c> if unset.
+   */
+  public @Nullable String getRedisUsername() {
+    return Strings.emptyToNull(redisUsername);
+  }
 
   /**
    * Look in several prioritized ways to get a Redis password:

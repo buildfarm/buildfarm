@@ -52,6 +52,7 @@ server:
 backplane:
   type: SHARD
   redisUri: "redis://localhost:6379"
+  redisUsername:
   redisPassword:
   redisNodes:
   jedisPoolMaxTotal: 4000
