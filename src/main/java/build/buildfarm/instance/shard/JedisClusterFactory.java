@@ -68,6 +68,7 @@ public class JedisClusterFactory {
           list2Set(redisNodes),
           configs.getBackplane().getTimeout(),
           configs.getBackplane().getMaxAttempts(),
+          Strings.emptyToNull(configs.getBackplane().getRedisUsername()),
           Strings.emptyToNull(configs.getBackplane().getRedisPassword()),
           createConnectionPoolConfig());
     }
@@ -78,6 +79,7 @@ public class JedisClusterFactory {
         parseUri(configs.getBackplane().getRedisUri()),
         configs.getBackplane().getTimeout(),
         configs.getBackplane().getMaxAttempts(),
+        Strings.emptyToNull(configs.getBackplane().getRedisUsername()),
         Strings.emptyToNull(configs.getBackplane().getRedisPassword()),
         createConnectionPoolConfig());
   }
@@ -158,6 +160,7 @@ public class JedisClusterFactory {
       int connectionTimeout,
       int soTimeout,
       int maxAttempts,
+      String username,
       String password,
       String identifier,
       ConnectionPoolConfig poolConfig,
@@ -166,6 +169,7 @@ public class JedisClusterFactory {
         DefaultJedisClientConfig.builder()
             .connectionTimeoutMillis(connectionTimeout)
             .socketTimeoutMillis(soTimeout)
+            .user(username)
             .password(password)
             .clientName(identifier)
             .ssl(ssl);
@@ -204,6 +208,7 @@ public class JedisClusterFactory {
       URI redisUri,
       int timeout,
       int maxAttempts,
+      String username,
       String password,
       ConnectionPoolConfig poolConfig) {
     return () ->
@@ -212,6 +217,7 @@ public class JedisClusterFactory {
             /* connectionTimeout= */ Integer.max(2000, timeout),
             /* soTimeout= */ Integer.max(2000, timeout),
             Integer.max(5, maxAttempts),
+            username,
             password,
             identifier,
             poolConfig,
@@ -234,6 +240,7 @@ public class JedisClusterFactory {
       Set<HostAndPort> redisUrisNodes,
       int timeout,
       int maxAttempts,
+      String username,
       String password,
       ConnectionPoolConfig poolConfig) {
     return () ->
@@ -242,6 +249,7 @@ public class JedisClusterFactory {
             /* connectionTimeout= */ Integer.max(2000, timeout),
             /* soTimeout= */ Integer.max(2000, timeout),
             Integer.max(5, maxAttempts),
+            username,
             password,
             identifier,
             poolConfig,
