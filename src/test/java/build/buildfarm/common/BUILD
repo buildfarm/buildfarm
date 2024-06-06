@@ -23,5 +23,6 @@ java_test(
         "@maven//:io_grpc_grpc_testing",
         "@maven//:org_mockito_mockito_core",
         "@maven//:redis_clients_jedis",
+        "@maven//:com_github_luben_zstd_jni",
     ],
 )
