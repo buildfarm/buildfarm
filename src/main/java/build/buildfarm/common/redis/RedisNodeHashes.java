@@ -18,7 +18,6 @@ import static com.google.common.collect.Iterables.transform;
 import static redis.clients.jedis.Protocol.CLUSTER_HASHSLOTS;
 
 import com.google.common.collect.ImmutableList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import redis.clients.jedis.ConnectionPool;
@@ -37,8 +36,8 @@ import redis.clients.jedis.resps.ClusterShardInfo;
  *     used to obtain the hashtags needed to hit every node in the cluster.
  */
 public class RedisNodeHashes {
-  private static final Iterable<List<List<Long>>> SINGLETON_NODE_SLOT_RANGES =
-      Collections.singleton(ImmutableList.of(ImmutableList.of(0L, CLUSTER_HASHSLOTS - 1L)));
+  private static final List<List<List<Long>>> SINGLETON_NODE_SLOT_RANGES =
+      ImmutableList.of(ImmutableList.of(ImmutableList.of(0L, CLUSTER_HASHSLOTS - 1L)));
 
   /**
    * @brief Get a list of evenly distributing hashtags for the provided redis cluster.
