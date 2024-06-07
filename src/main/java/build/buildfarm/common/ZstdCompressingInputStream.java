@@ -103,9 +103,4 @@ public class ZstdCompressingInputStream extends FilterInputStream {
     }
     in.close();
   }
-
-  @Override
-  public long skip(long n) throws IOException {
-    return super.skip(n);
-  }
 }

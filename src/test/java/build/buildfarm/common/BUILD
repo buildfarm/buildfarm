@@ -12,6 +12,7 @@ java_test(
         "//src/test/java/build/buildfarm:test_runner",
         "@com_google_googleapis//google/bytestream:bytestream_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
+        "@maven//:com_github_luben_zstd_jni",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_jimfs_jimfs",
         "@maven//:com_google_protobuf_protobuf_java",
@@ -23,6 +24,5 @@ java_test(
         "@maven//:io_grpc_grpc_testing",
         "@maven//:org_mockito_mockito_core",
         "@maven//:redis_clients_jedis",
-        "@maven//:com_github_luben_zstd_jni",
     ],
 )
