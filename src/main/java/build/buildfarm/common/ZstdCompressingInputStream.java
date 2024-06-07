@@ -103,12 +103,4 @@ public class ZstdCompressingInputStream extends FilterInputStream {
     }
     in.close();
   }
-
-  @Override
-  public long skip(long n) throws IOException {
-    if (n != 0) {
-      throw new IOException("Unsupported compression skip operation for now");
-    }
-    return n;
-  }
 }
