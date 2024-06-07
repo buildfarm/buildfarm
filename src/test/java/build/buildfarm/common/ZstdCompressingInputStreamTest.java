@@ -21,8 +21,7 @@ public class ZstdCompressingInputStreamTest {
     String blob = blobToSkip + blobToRead; // 20 bytes
     InputStream inputStream = new ByteArrayInputStream(blob.getBytes());
     ZstdCompressingInputStream zstdIn = new ZstdCompressingInputStream(inputStream);
-    long bytesSkipped = zstdIn.skip(blobToSkip.length());
-    assertThat(bytesSkipped).isEqualTo(blobToSkip.length());
+    assertThat(zstdIn.skip(blobToSkip.length())).isEqualTo(blobToSkip.length());
 
     byte[] buf = new byte[20]; // compressed data can be larger than original data
     zstdIn.read(buf);
