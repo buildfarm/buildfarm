@@ -9,6 +9,10 @@ directories:
   -bazel-out
   -bazel-testlogs
   -tmp
+  -_site
+  -admin
+  -checkstyle
+
 
 targets:
   //...
