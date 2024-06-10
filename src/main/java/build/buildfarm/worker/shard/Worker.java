@@ -788,6 +788,8 @@ public final class Worker extends LoggingMain {
       log.severe(formatIOError(e));
     } catch (InterruptedException e) {
       log.log(Level.WARNING, "interrupted", e);
+    } catch (Exception e) {
+      log.log(Level.SEVERE, "Error running application", e);
     } finally {
       worker.stop();
     }
