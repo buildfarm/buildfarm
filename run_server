@@ -15,4 +15,4 @@ else
 fi
 
 # Run Server
-bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $config
+bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $config

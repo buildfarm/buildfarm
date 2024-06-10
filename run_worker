@@ -14,5 +14,5 @@ else
   config=$1
 fi
 
-# Run Server
-bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Dlogging.config=file:$PWD/examples/logging.properties $config
+# Run Worker
+bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $config
