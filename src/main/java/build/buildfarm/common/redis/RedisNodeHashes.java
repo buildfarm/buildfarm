@@ -36,8 +36,8 @@ import redis.clients.jedis.resps.ClusterShardInfo;
  *     used to obtain the hashtags needed to hit every node in the cluster.
  */
 public class RedisNodeHashes {
-  private static final Iterable<List<List<Long>>> SINGLETON_NODE_SLOT_RANGES =
-      ImmutableList.of(ImmutableList.of(ImmutableList.of(0l, CLUSTER_HASHSLOTS - 1l)));
+  private static final List<List<List<Long>>> SINGLETON_NODE_SLOT_RANGES =
+      ImmutableList.of(ImmutableList.of(ImmutableList.of(0L, CLUSTER_HASHSLOTS - 1L)));
 
   /**
    * @brief Get a list of evenly distributing hashtags for the provided redis cluster.
@@ -50,7 +50,7 @@ public class RedisNodeHashes {
     if (jedis instanceof JedisCluster) {
       try {
         Iterable<List<List<Long>>> nodeSlotRanges = getNodeSlotRanges(jedis);
-        ImmutableList.Builder hashTags = ImmutableList.builder();
+        ImmutableList.Builder<String> hashTags = ImmutableList.builder();
         for (List<List<Long>> slotRanges : nodeSlotRanges) {
           // we can use any slot that is in range for the node.
           // in this case, we will use the first slot in the first range.
@@ -78,7 +78,7 @@ public class RedisNodeHashes {
     if (jedis instanceof JedisCluster cluster) {
       Iterable<List<List<Long>>> nodeSlotRanges = getNodeSlotRanges(cluster);
       try {
-        ImmutableList.Builder hashTags = ImmutableList.builder();
+        ImmutableList.Builder<String> hashTags = ImmutableList.builder();
         for (List<List<Long>> slotRanges : nodeSlotRanges) {
           // we can use any slot that is in range for the node.
           // in this case, we will use the first slot.
@@ -116,7 +116,7 @@ public class RedisNodeHashes {
    * @return Cluster slot information.
    * @note Suggested return identifier: clusterShards.
    */
-  private static List<ClusterShardInfo> getClusterShards(JedisCluster jedis) {
+  private static Iterable<ClusterShardInfo> getClusterShards(JedisCluster jedis) {
     JedisException nodeException = null;
     for (Map.Entry<String, ConnectionPool> node : jedis.getClusterNodes().entrySet()) {
       ConnectionPool pool = node.getValue();
