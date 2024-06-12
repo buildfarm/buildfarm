@@ -110,7 +110,7 @@ bazel_dep(name = "build_buildfarm")
 git_override(
     module_name = "build_buildfarm",
     commit = "<COMMIT-SHA>",
-    remote = "https://github.com/bazel/bazel-buildfarm.git",
+    remote = "https://github.com/bazelbuild/bazel-buildfarm.git",
 )
 
 # Transitive!
