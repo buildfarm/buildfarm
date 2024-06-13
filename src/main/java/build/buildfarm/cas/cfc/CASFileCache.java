@@ -168,6 +168,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           .name("cas_copy_fallback")
           .help("Number of times the CAS performed a file copy because hardlinking failed")
           .register();
+  private static final Counter readIOErrors =
+      Counter.build().name("read_io_errors").help("Number of IO errors on read.").register();
 
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
@@ -535,18 +537,26 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         try {
           input = compressorInputStream(compressor, Files.newInputStream(getPath(key)));
           input.skip(offset);
-        } catch (NoSuchFileException eNoEnt) {
+        } catch (IOException ioEx) {
+          if (!(ioEx instanceof NoSuchFileException)) {
+            readIOErrors.inc();
+            log.log(
+                Level.WARNING,
+                format("error opening %s at %d", DigestUtil.toString(digest), offset),
+                e);
+          }
+
           boolean removed = false;
           synchronized (this) {
-            Entry removedEntry = storage.remove(key);
+            Entry removedEntry = safeStorageRemoval(key);
             if (removedEntry == e) {
               unlinkEntry(removedEntry);
               removed = true;
             } else if (removedEntry != null) {
-              log.log(
-                  Level.SEVERE,
-                  "nonexistent entry %s did not match last unreferenced entry, restoring it",
-                  key);
+              log.severe(
+                  format(
+                      "nonexistent entry %s did not match last unreferenced entry, restoring it",
+                      key));
               storage.put(key, removedEntry);
             }
           }
@@ -1959,14 +1969,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throw new IOException(e);
     }
 
+    Entry entry;
     lock.lock();
     try {
       Files.createLink(expiredPath, path);
       deleteExpiredPath = true;
       Files.delete(path);
       deleteExpiredPath = false;
-      return storage.remove(key);
     } finally {
+      entry = storage.remove(key);
       if (deleteExpiredPath) {
         try {
           Files.delete(expiredPath);
@@ -1976,6 +1987,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
       lock.unlock();
     }
+    return entry;
   }
 
   @SuppressWarnings("NonAtomicOperationOnVolatileField")
