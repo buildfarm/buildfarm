@@ -5,8 +5,8 @@
 
 FORMAT_JAVA=true
 REMOVE_NEWLINES_AFTER_START_BRACKET=true
-JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/v1.22.0/google-java-format-1.22.0-all-deps.jar
-LOCAL_FORMATTER="java_formatter.jar"
+JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/v1.22.0/google-java-format_linux-x86-64
+LOCAL_FORMATTER="./google-java-format_linux-x86-64"
 
 if [ -z "$BAZEL" ]; then
   BAZEL=bazel
@@ -38,6 +38,7 @@ run_java_formatter () {
      # Download the formatter if we don't already have it.
     if [ ! -f "$LOCAL_FORMATTER" ] ; then
         wget -O $LOCAL_FORMATTER $JAVA_FORMATTER_URL
+        chmod +x $LOCAL_FORMATTER
     fi
     
      # Get all the files to format and format them
@@ -47,7 +48,7 @@ run_java_formatter () {
     # This is intended to be done by the CI.
     if [[ "$@" == "--check" ]]
     then
-        java -jar $LOCAL_FORMATTER --dry-run --set-exit-if-changed $files
+        $LOCAL_FORMATTER --dry-run --set-exit-if-changed $files
         handle_format_error_check
         return
     fi
@@ -66,7 +67,7 @@ run_java_formatter () {
     fi;
 
     # Fixes formatting issues
-    java -jar $LOCAL_FORMATTER -i $files
+    $LOCAL_FORMATTER -i $files
 }
 
 run_buildifier () {

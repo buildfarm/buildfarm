@@ -14,8 +14,8 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
-import build.buildfarm.v1test.FetchQualifiers;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.FetchQualifiers;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FutureCallback;
 import io.grpc.Status;
@@ -52,11 +52,13 @@ public class FetchService extends FetchImplBase {
     }
   }
 
-  private static void parseQualifier(String name, String value, FetchQualifiers.Builder fetchQualifiers) {
+  private static void parseQualifier(
+      String name, String value, FetchQualifiers.Builder fetchQualifiers) {
     switch (name) {
       case QUALIFIER_CANONICAL_ID -> fetchQualifiers.setCanonicalId(value);
       case QUALIFIER_CHECKSUM_SRI -> fetchQualifiers.setDigest(parseChecksumSRI(value));
-      case String s when s.startsWith(QUALIFIER_HTTP_HEADER_PREFIX) -> fetchQualifiers.putHeaders(s.substring(QUALIFIER_HTTP_HEADER_PREFIX.length()), value);
+      case String s when s.startsWith(QUALIFIER_HTTP_HEADER_PREFIX) ->
+          fetchQualifiers.putHeaders(s.substring(QUALIFIER_HTTP_HEADER_PREFIX.length()), value);
       default -> {
         // ignore unknown qualifiers
       }
@@ -100,14 +102,14 @@ public class FetchService extends FetchImplBase {
 
     Digest.Builder result = Digest.newBuilder();
     if (instance.containsBlob(expectedDigest, result, requestMetadata)) {
-      responseObserver.onNext(
-          FetchBlobResponse.newBuilder().setBlobDigest(result.build()).build());
+      responseObserver.onNext(FetchBlobResponse.newBuilder().setBlobDigest(result.build()).build());
       responseObserver.onCompleted();
       return;
     }
 
     addCallback(
-        instance.fetchBlob(request.getUrisList(), qualifiers.getHeadersMap(), expectedDigest, requestMetadata),
+        instance.fetchBlob(
+            request.getUrisList(), qualifiers.getHeadersMap(), expectedDigest, requestMetadata),
         new FutureCallback<Digest>() {
           @Override
           public void onSuccess(Digest actualDigest) {
