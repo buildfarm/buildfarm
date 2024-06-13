@@ -13,7 +13,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ZstdCompressingInputStreamTest {
-
   @Test
   public void testSkip() throws IOException {
     String blobToSkip = "AAAAA"; // 5 bytes

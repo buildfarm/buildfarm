@@ -32,6 +32,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
@@ -772,7 +773,19 @@ public class NodeInstanceTest {
     URL url = mock(URL.class);
     when(url.openConnection()).thenReturn(httpURLConnection);
 
-    assertThat(instance.fetchBlobUrls(ImmutableList.of(url), expectedDigest, requestMetadata).get())
+    String authorizationHeader = "Authorization";
+    String authorization = "Basic Zm9vOmJhcg==";
+    String customTokenHeader = "X-Custom-Token";
+    String customToken = "foo,bar";
+    assertThat(
+            instance
+                .fetchBlobUrls(
+                    ImmutableList.of(url),
+                    ImmutableMap.of(
+                        authorizationHeader, authorization, customTokenHeader, customToken),
+                    expectedDigest,
+                    requestMetadata)
+                .get())
         .isEqualTo(contentDigest);
     verify(contentAddressableStorage, times(1))
         .getWrite(
@@ -780,6 +793,11 @@ public class NodeInstanceTest {
     verify(write, times(1)).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(httpURLConnection, times(1)).getContentLengthLong();
     verify(httpURLConnection, times(1)).getResponseCode();
+    verify(httpURLConnection, times(1)).setInstanceFollowRedirects(true);
+    verify(httpURLConnection, times(1)).getInputStream();
+    verify(httpURLConnection, times(1)).setRequestProperty(authorizationHeader, authorization);
+    verify(httpURLConnection, times(1)).setRequestProperty(customTokenHeader, customToken);
+    verifyNoMoreInteractions(httpURLConnection);
     verify(url, times(1)).openConnection();
   }
 }

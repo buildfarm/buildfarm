@@ -682,3 +682,11 @@ service ShutDownWorker {
   rpc PrepareWorkerForGracefulShutdown(PrepareWorkerForGracefulShutDownRequest)
       returns (PrepareWorkerForGracefulShutDownRequestResults) {}
 }
+
+message FetchQualifiers {
+  build.bazel.remote.execution.v2.Digest digest = 1;
+
+  string canonical_id = 2;
+
+  map<string, string> headers = 3;
+}

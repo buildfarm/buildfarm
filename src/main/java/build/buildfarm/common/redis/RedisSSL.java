@@ -31,7 +31,6 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
 public final class RedisSSL {
-
   private RedisSSL() {
     // do not construct this helper class.
   }

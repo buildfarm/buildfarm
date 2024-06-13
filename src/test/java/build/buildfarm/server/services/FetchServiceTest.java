@@ -30,6 +30,8 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.BaseEncoding;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
@@ -51,13 +53,29 @@ public class FetchServiceTest {
     Digest contentDigest = DIGEST_UTIL.compute(content);
     Digest containsDigest = contentDigest.toBuilder().setSizeBytes(-1).build();
 
+    Iterable<String> uris =
+        ImmutableList.of(
+            "http://example.com/a", "http://example.com/b", "file:/not/limited/to/http");
+    String authorizationHeader = FetchService.QUALIFIER_HTTP_HEADER_PREFIX + "Authorization";
+    String authorization = "Basic Zm9vOmJhcg==";
+    String customTokenHeader = FetchService.QUALIFIER_HTTP_HEADER_PREFIX + "X-Custom-Token";
+    String customToken = "foo,bar";
     FetchBlobRequest request =
         FetchBlobRequest.newBuilder()
+            .addAllUris(uris)
             .addQualifiers(
                 Qualifier.newBuilder()
-                    .setName("checksum.sri")
+                    .setName(FetchService.QUALIFIER_CHECKSUM_SRI)
                     .setValue(hashChecksumSRI(contentDigest.getHash()))
                     .build())
+            .addQualifiers(
+                Qualifier.newBuilder()
+                    .setName(FetchService.QUALIFIER_CANONICAL_ID)
+                    .setValue("Canonical ID")
+                    .build())
+            .addQualifiers(
+                Qualifier.newBuilder().setName(authorizationHeader).setValue(authorization))
+            .addQualifiers(Qualifier.newBuilder().setName(customTokenHeader).setValue(customToken))
             .build();
 
     doAnswer(
@@ -72,7 +90,11 @@ public class FetchServiceTest {
     StreamObserver<FetchBlobResponse> response = mock(StreamObserver.class);
     service.fetchBlob(request, response);
     verify(instance, never())
-        .fetchBlob(any(Iterable.class), any(Digest.class), any(RequestMetadata.class));
+        .fetchBlob(
+            eq(uris),
+            eq(ImmutableMap.of(authorizationHeader, authorization, customTokenHeader, customToken)),
+            eq(contentDigest),
+            any(RequestMetadata.class));
     verify(response, times(1)).onCompleted();
     verify(response, times(1))
         .onNext(FetchBlobResponse.newBuilder().setBlobDigest(contentDigest).build());

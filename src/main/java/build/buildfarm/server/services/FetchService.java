@@ -15,6 +15,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.FetchQualifiers;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FutureCallback;
 import io.grpc.Status;
@@ -25,6 +26,17 @@ import lombok.extern.java.Log;
 @Log
 public class FetchService extends FetchImplBase {
   private final Instance instance;
+
+  // The `Qualifier::name` field uses well-known string keys to attach arbitrary
+  // key-value metadata to download requests. These are the qualifier names
+  // supported by Bazel.
+  public static final String QUALIFIER_CHECKSUM_SRI = "checksum.sri";
+  public static final String QUALIFIER_CANONICAL_ID = "bazel.canonical_id";
+
+  // The `:` character is not permitted in an HTTP header name. So, we use it to
+  // delimit the qualifier prefix which denotes an HTTP header qualifer from the
+  // header name itself.
+  public static final String QUALIFIER_HTTP_HEADER_PREFIX = "http_header:";
 
   public FetchService(Instance instance) {
     this.instance = instance;
@@ -40,6 +52,27 @@ public class FetchService extends FetchImplBase {
     }
   }
 
+  private static void parseQualifier(
+      String name, String value, FetchQualifiers.Builder fetchQualifiers) {
+    switch (name) {
+      case QUALIFIER_CANONICAL_ID -> fetchQualifiers.setCanonicalId(value);
+      case QUALIFIER_CHECKSUM_SRI -> fetchQualifiers.setDigest(parseChecksumSRI(value));
+      case String s when s.startsWith(QUALIFIER_HTTP_HEADER_PREFIX) ->
+          fetchQualifiers.putHeaders(s.substring(QUALIFIER_HTTP_HEADER_PREFIX.length()), value);
+      default -> {
+        // ignore unknown qualifiers
+      }
+    }
+  }
+
+  private static FetchQualifiers parseQualifiers(Iterable<Qualifier> qualifiers) {
+    FetchQualifiers.Builder fetchQualifiers = FetchQualifiers.newBuilder();
+    for (Qualifier qualifier : qualifiers) {
+      parseQualifier(qualifier.getName(), qualifier.getValue(), fetchQualifiers);
+    }
+    return fetchQualifiers.build();
+  }
+
   private void fetchBlob(
       Instance instance,
       FetchBlobRequest request,
@@ -47,65 +80,61 @@ public class FetchService extends FetchImplBase {
       throws InterruptedException {
     Digest expectedDigest = null;
     RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
-    if (request.getQualifiersCount() == 0) {
-      throw Status.INVALID_ARGUMENT.withDescription("Empty qualifier list").asRuntimeException();
-    }
-    for (Qualifier qualifier : request.getQualifiersList()) {
-      String name = qualifier.getName();
-      if (name.equals("checksum.sri")) {
-        expectedDigest = parseChecksumSRI(qualifier.getValue());
-        Digest.Builder result = Digest.newBuilder();
-        if (instance.containsBlob(expectedDigest, result, requestMetadata)) {
-          responseObserver.onNext(
-              FetchBlobResponse.newBuilder().setBlobDigest(result.build()).build());
-          responseObserver.onCompleted();
-          return;
-        }
-      } else {
-        responseObserver.onError(
-            Status.INVALID_ARGUMENT
-                .withDescription(format("Invalid qualifier '%s'", name))
-                .asException());
-        return;
-      }
-    }
-    if (expectedDigest == null) {
-      responseObserver.onError(
-          Status.INVALID_ARGUMENT
-              .withDescription("Missing qualifier 'checksum.sri'")
-              .asException());
-    } else if (request.getUrisCount() != 0) {
-      addCallback(
-          instance.fetchBlob(request.getUrisList(), expectedDigest, requestMetadata),
-          new FutureCallback<Digest>() {
-            @Override
-            public void onSuccess(Digest actualDigest) {
-              log.log(
-                  Level.INFO,
-                  format(
-                      "fetch blob succeeded: %s inserted into CAS",
-                      DigestUtil.toString(actualDigest)));
-              responseObserver.onNext(
-                  FetchBlobResponse.newBuilder().setBlobDigest(actualDigest).build());
-              responseObserver.onCompleted();
-            }
 
-            @SuppressWarnings("NullableProblems")
-            @Override
-            public void onFailure(Throwable t) {
-              // handle NoSuchFileException
-              log.log(Level.SEVERE, "fetch blob failed", t);
-              responseObserver.onError(t);
-            }
-          },
-          directExecutor());
-    } else {
+    if (request.getUrisCount() == 0) {
       responseObserver.onError(
           Status.INVALID_ARGUMENT.withDescription("Empty uris list").asRuntimeException());
+      return;
     }
+
+    FetchQualifiers qualifiers = parseQualifiers(request.getQualifiersList());
+
+    expectedDigest = qualifiers.getDigest();
+    if (expectedDigest.equals(Digest.getDefaultInstance())) {
+      responseObserver.onError(
+          Status.INVALID_ARGUMENT
+              .withDescription(format("Missing qualifier '%s'", QUALIFIER_CHECKSUM_SRI))
+              .asException());
+      return;
+    }
+
+    // TODO consider doing something with QUALIFIER_CANONICAL_ID
+
+    Digest.Builder result = Digest.newBuilder();
+    if (instance.containsBlob(expectedDigest, result, requestMetadata)) {
+      responseObserver.onNext(FetchBlobResponse.newBuilder().setBlobDigest(result.build()).build());
+      responseObserver.onCompleted();
+      return;
+    }
+
+    addCallback(
+        instance.fetchBlob(
+            request.getUrisList(), qualifiers.getHeadersMap(), expectedDigest, requestMetadata),
+        new FutureCallback<Digest>() {
+          @Override
+          public void onSuccess(Digest actualDigest) {
+            log.log(
+                Level.INFO,
+                format(
+                    "fetch blob succeeded: %s inserted into CAS",
+                    DigestUtil.toString(actualDigest)));
+            responseObserver.onNext(
+                FetchBlobResponse.newBuilder().setBlobDigest(actualDigest).build());
+            responseObserver.onCompleted();
+          }
+
+          @SuppressWarnings("NullableProblems")
+          @Override
+          public void onFailure(Throwable t) {
+            // handle NoSuchFileException
+            log.log(Level.SEVERE, "fetch blob failed", t);
+            responseObserver.onError(t);
+          }
+        },
+        directExecutor());
   }
 
-  private Digest parseChecksumSRI(String checksum) {
+  private static Digest parseChecksumSRI(String checksum) {
     String[] components = checksum.split("-");
     if (components.length != 2) {
       throw Status.INVALID_ARGUMENT

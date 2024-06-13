@@ -621,12 +621,16 @@ public abstract class NodeInstance implements Instance {
     OutputStream create(long contentLength) throws IOException;
   }
 
-  private static void downloadUrl(URL url, ContentOutputStreamFactory getContentOutputStream)
+  private static void downloadUrl(
+      URL url, Map<String, String> headers, ContentOutputStreamFactory getContentOutputStream)
       throws IOException {
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
     // connect timeout?
     // proxy?
     // authenticator?
+    for (Map.Entry<String, String> entry : headers.entrySet()) {
+      connection.setRequestProperty(entry.getKey(), entry.getValue());
+    }
     connection.setInstanceFollowRedirects(true);
     // request timeout?
     long contentLength = connection.getContentLengthLong();
@@ -651,7 +655,10 @@ public abstract class NodeInstance implements Instance {
 
   @Override
   public ListenableFuture<Digest> fetchBlob(
-      Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata) {
+      Iterable<String> uris,
+      Map<String, String> headers,
+      Digest expectedDigest,
+      RequestMetadata requestMetadata) {
     ImmutableList.Builder<URL> urls = ImmutableList.builder();
     for (String uri : uris) {
       try {
@@ -660,18 +667,22 @@ public abstract class NodeInstance implements Instance {
         return immediateFailedFuture(e);
       }
     }
-    return fetchBlobUrls(urls.build(), expectedDigest, requestMetadata);
+    return fetchBlobUrls(urls.build(), headers, expectedDigest, requestMetadata);
   }
 
   @VisibleForTesting
   ListenableFuture<Digest> fetchBlobUrls(
-      Iterable<URL> urls, Digest expectedDigest, RequestMetadata requestMetadata) {
+      Iterable<URL> urls,
+      Map<String, String> headers,
+      Digest expectedDigest,
+      RequestMetadata requestMetadata) {
     for (URL url : urls) {
       Digest.Builder actualDigestBuilder = expectedDigest.toBuilder();
       try {
         // some minor abuse here, we want the download to set our built digest size as side effect
         downloadUrl(
             url,
+            headers,
             contentLength -> {
               Digest actualDigest = actualDigestBuilder.setSizeBytes(contentLength).build();
               if (expectedDigest.getSizeBytes() >= 0

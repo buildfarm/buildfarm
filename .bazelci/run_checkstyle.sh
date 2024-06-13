@@ -2,7 +2,7 @@
 # Run from the root of repository.
 # This script will perform static analysis on all of the java source files.
 
-TOOL_URL=https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.6.0/checkstyle-10.6.0-all.jar
+TOOL_URL=https://github.com/checkstyle/checkstyle/releases/download/checkstyle-10.17.0/checkstyle-10.17.0-all.jar
 LOCAL_DOWNLOAD_NAME="checkstyle.jar"
 TOOL_FOLDER="checkstyle"
 
