@@ -143,6 +143,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -494,7 +495,10 @@ public class StubInstance implements Instance {
 
   @Override
   public ListenableFuture<Digest> fetchBlob(
-      Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata) {
+      Iterable<String> uris,
+      Map<String, String> headers,
+      Digest expectedDigest,
+      RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 

@@ -49,6 +49,7 @@ import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -108,7 +109,10 @@ public interface Instance {
       throws IOException, IllegalArgumentException, InterruptedException;
 
   ListenableFuture<Digest> fetchBlob(
-      Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata);
+      Iterable<String> uris,
+      Map<String, String> headers,
+      Digest expectedDigest,
+      RequestMetadata requestMetadata);
 
   Write getOperationStreamWrite(String name);
 
