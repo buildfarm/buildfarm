@@ -194,7 +194,7 @@ oci_image_env(
 
 oci_image(
     name = "buildfarm-worker_linux_amd64",
-    base = "@ubuntu_mantic",
+    base = "@ubuntu_lunar",
     entrypoint = [
         # do not sort
         "/tini",
