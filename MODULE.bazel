@@ -174,14 +174,14 @@ oci.pull(
 
 # Worker base image
 oci.pull(
-    name = "ubuntu_mantic",
-    digest = "sha256:2520e0725493c8f63452dd8aa153fbf0b489a9442096b7693641193709a765b7",  # tag: mantic
+    name = "ubuntu_lunar",
+    digest = "sha256:303223fbebbd1095df7299707ed8b0a51be5c0a7eee78292fc65ee2201c2e138",  # tag: lunar
     image = "index.docker.io/bazelbuild/buildfarm-worker-base",
 )
 use_repo(
     oci,
     "amazon_corretto_java_image_base",
-    "ubuntu_mantic",
+    "ubuntu_lunar",
 )
 
 # https://github.com/bazelbuild/rules_python/pull/713#issuecomment-1885628496
