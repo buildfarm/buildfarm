@@ -15,9 +15,10 @@
 package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
+import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.Poller;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -29,6 +30,8 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
+import java.io.IOException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
@@ -78,6 +81,11 @@ public class MatchStage extends PipelineStage {
       if (queueEntry == null) {
         return false;
       }
+
+      operationContext
+          .metadata
+          .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
+          .setRequestMetadata(queueEntry.getExecuteEntry().getRequestMetadata());
 
       Preconditions.checkState(poller == null);
       operationContext =
@@ -146,35 +154,47 @@ public class MatchStage extends PipelineStage {
     inGracefulShutdown = true;
   }
 
-  private OperationContext match(OperationContext operationContext) {
+  private void putOperation(Operation operation) throws InterruptedException {
+    boolean operationUpdateSuccess = false;
+    try {
+      operationUpdateSuccess = workerContext.putOperation(operation);
+    } catch (IOException e) {
+      log.log(Level.SEVERE, format("error putting operation %s", operation.getName()), e);
+    }
+
+    if (!operationUpdateSuccess) {
+      log.log(
+          Level.WARNING,
+          String.format("MatchStage::run(%s): could not record update", operation.getName()));
+    }
+  }
+
+  private OperationContext match(OperationContext operationContext) throws InterruptedException {
     Timestamp workerStartTimestamp = Timestamps.fromMillis(System.currentTimeMillis());
 
     ExecuteEntry executeEntry = operationContext.queueEntry.getExecuteEntry();
-    // this may be superfluous - we can probably just set the name and action digest
+    operationContext
+        .metadata
+        .getExecuteOperationMetadataBuilder()
+        .setActionDigest(executeEntry.getActionDigest())
+        .setStage(QUEUED)
+        .setStdoutStreamName(executeEntry.getStdoutStreamName())
+        .setStderrStreamName(executeEntry.getStderrStreamName())
+        .setPartialExecutionMetadata(
+            ExecutedActionMetadata.newBuilder()
+                .setWorker(workerContext.getName())
+                .setQueuedTimestamp(executeEntry.getQueuedTimestamp())
+                .setWorkerStartTimestamp(workerStartTimestamp));
+
     Operation operation =
         Operation.newBuilder()
             .setName(executeEntry.getOperationName())
-            .setMetadata(
-                Any.pack(
-                    ExecuteOperationMetadata.newBuilder()
-                        .setActionDigest(executeEntry.getActionDigest())
-                        .setStage(QUEUED)
-                        .setStdoutStreamName(executeEntry.getStdoutStreamName())
-                        .setStderrStreamName(executeEntry.getStderrStreamName())
-                        .build()))
+            .setMetadata(Any.pack(operationContext.metadata.build()))
             .build();
 
-    OperationContext matchedOperationContext =
-        operationContext.toBuilder().setOperation(operation).build();
+    putOperation(operation);
 
-    matchedOperationContext
-        .executeResponse
-        .getResultBuilder()
-        .getExecutionMetadataBuilder()
-        .setWorker(workerContext.getName())
-        .setQueuedTimestamp(executeEntry.getQueuedTimestamp())
-        .setWorkerStartTimestamp(workerStartTimestamp);
-    return matchedOperationContext;
+    return operationContext.toBuilder().setOperation(operation).build();
   }
 
   @Override

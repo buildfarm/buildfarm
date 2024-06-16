@@ -36,7 +36,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Iterables;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
 import com.google.protobuf.Duration;
+import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
@@ -166,17 +168,40 @@ public class InputFetcher implements Runnable {
     return null;
   }
 
+  private void putOperation() throws InterruptedException {
+    Operation operation =
+        operationContext.operation.toBuilder()
+            .setMetadata(Any.pack(operationContext.metadata.build()))
+            .build();
+
+    boolean operationUpdateSuccess = false;
+    try {
+      operationUpdateSuccess = workerContext.putOperation(operation);
+    } catch (IOException e) {
+      log.log(Level.SEVERE, format("error putting operation %s", operation.getName()), e);
+    }
+
+    if (!operationUpdateSuccess) {
+      log.log(
+          Level.WARNING,
+          String.format("InputFetcher::run(%s): could not record update", operation.getName()));
+    }
+  }
+
   @VisibleForTesting
   long fetchPolled(Stopwatch stopwatch) throws InterruptedException {
+    Timestamp inputFetchStart = Timestamps.fromMillis(System.currentTimeMillis());
+
     String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
     log.log(Level.FINER, format("fetching inputs: %s", operationName));
 
     ExecutedActionMetadata.Builder executedAction =
         operationContext
-            .executeResponse
-            .getResultBuilder()
-            .getExecutionMetadataBuilder()
-            .setInputFetchStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
+            .metadata
+            .getExecuteOperationMetadataBuilder()
+            .getPartialExecutionMetadataBuilder()
+            .setInputFetchStartTimestamp(inputFetchStart);
+    putOperation();
 
     final Map<Digest, Directory> directoriesIndex;
     QueuedOperation queuedOperation;
@@ -211,7 +236,7 @@ public class InputFetcher implements Runnable {
       // populate the inputFetch complete to know how long it took before error
       executedAction.setInputFetchCompletedTimestamp(
           Timestamps.fromMillis(System.currentTimeMillis()));
-      failOperation(status.build());
+      failOperation(executedAction.build(), status.build());
       return 0;
     }
     success = true;
@@ -228,6 +253,7 @@ public class InputFetcher implements Runnable {
 
     executedAction.setInputFetchCompletedTimestamp(
         Timestamps.fromMillis(System.currentTimeMillis()));
+    putOperation();
 
     // we are now responsible for destroying the exec dir if anything goes wrong
     boolean completed = false;
@@ -323,10 +349,12 @@ public class InputFetcher implements Runnable {
     }
   }
 
-  private void failOperation(Status status) throws InterruptedException {
+  private void failOperation(ExecutedActionMetadata partialExecutionMetadata, Status status)
+      throws InterruptedException {
     ExecuteEntry executeEntry = operationContext.queueEntry.getExecuteEntry();
     Operation failedOperation =
-        OperationFailer.get(operationContext.operation, executeEntry, status);
+        OperationFailer.get(
+            operationContext.operation, executeEntry, partialExecutionMetadata, status);
 
     try {
       workerContext.putOperation(failedOperation);

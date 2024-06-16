@@ -14,18 +14,22 @@
 
 package build.buildfarm.worker;
 
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
-import build.bazel.remote.execution.v2.ExecutionStage;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.collect.Lists;
+import com.google.longrunning.Operation;
 import io.grpc.Deadline;
 import java.util.List;
 import java.util.function.Predicate;
@@ -68,47 +72,22 @@ public class InputFetchStageTest {
   }
 
   @Test
-  public void invalidQueuedOperationFails() throws InterruptedException {
+  public void invalidQueuedOperationFails() throws Exception {
     Poller poller = mock(Poller.class);
 
+    Operation badOperation = Operation.newBuilder().setName("bad").build();
     QueueEntry badEntry =
         QueueEntry.newBuilder()
-            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("bad"))
+            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName(badOperation.getName()))
             .build();
 
-    WorkerContext workerContext =
-        new StubWorkerContext() {
-          @Override
-          public DigestUtil getDigestUtil() {
-            return null;
-          }
-
-          @Override
-          public void resumePoller(
-              Poller poller,
-              String name,
-              QueueEntry queueEntry,
-              ExecutionStage.Value stage,
-              Runnable onFailure,
-              Deadline deadline) {}
-
-          @Override
-          public int getInputFetchStageWidth() {
-            return 1;
-          }
-
-          @Override
-          public int getInputFetchDeadline() {
-            return 60;
-          }
-
-          @Override
-          public QueuedOperation getQueuedOperation(QueueEntry queueEntry) {
-            assertThat(queueEntry).isEqualTo(badEntry);
-            // inspire empty argument list in Command resulting in null
-            return QueuedOperation.getDefaultInstance();
-          }
-        };
+    WorkerContext workerContext = mock(WorkerContext.class);
+    when(workerContext.getInputFetchStageWidth()).thenReturn(1);
+    when(workerContext.getInputFetchDeadline()).thenReturn(60);
+    // inspire empty argument list in Command resulting in null
+    when(workerContext.getQueuedOperation(badEntry))
+        .thenReturn(QueuedOperation.getDefaultInstance());
+    when(workerContext.putOperation(any(Operation.class))).thenReturn(true);
 
     PipelineSink sinkOutput = new PipelineSink((operationContext) -> false);
     PipelineSink error =
@@ -121,12 +100,28 @@ public class InputFetchStageTest {
         };
     PipelineStage inputFetchStage = new InputFetchStage(workerContext, sinkOutput, error);
     OperationContext badContext =
-        OperationContext.newBuilder().setPoller(poller).setQueueEntry(badEntry).build();
+        OperationContext.newBuilder()
+            .setOperation(badOperation)
+            .setPoller(poller)
+            .setQueueEntry(badEntry)
+            .build();
     inputFetchStage.claim(badContext);
     inputFetchStage.put(badContext);
     inputFetchStage.run();
     verify(poller, times(1)).pause();
-    assertThat(error.getOperationContexts().size()).isEqualTo(1);
+    verify(workerContext, times(1)).getInputFetchStageWidth();
+    verify(workerContext, times(1)).getInputFetchDeadline();
+    verify(workerContext, times(1)).getQueuedOperation(badEntry);
+    verify(workerContext, times(1)).putOperation(any(Operation.class));
+    verify(workerContext, times(1))
+        .resumePoller(
+            eq(poller),
+            eq("InputFetcher"),
+            eq(badEntry),
+            eq(QUEUED),
+            any(Runnable.class),
+            any(Deadline.class));
+    verifyNoMoreInteractions(workerContext);
     OperationContext operationContext = error.getOperationContexts().get(0);
     assertThat(operationContext).isEqualTo(badContext);
   }
