@@ -19,6 +19,7 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
@@ -26,6 +27,7 @@ import java.nio.file.Path;
 public final class OperationContext {
   final ExecuteResponse.Builder executeResponse;
   final Operation operation;
+  final QueuedOperationMetadata.Builder metadata;
   final Poller poller;
   final Path execDir;
   final Action action;
@@ -36,6 +38,7 @@ public final class OperationContext {
   private OperationContext(
       ExecuteResponse.Builder executeResponse,
       Operation operation,
+      QueuedOperationMetadata.Builder metadata,
       Poller poller,
       Path execDir,
       Action action,
@@ -44,6 +47,7 @@ public final class OperationContext {
       QueueEntry queueEntry) {
     this.executeResponse = executeResponse;
     this.operation = operation;
+    this.metadata = metadata;
     this.poller = poller;
     this.execDir = execDir;
     this.action = action;
@@ -55,6 +59,7 @@ public final class OperationContext {
   public static class Builder {
     private ExecuteResponse.Builder executeResponse;
     private Operation operation;
+    private QueuedOperationMetadata.Builder metadata;
     private Poller poller;
     private Path execDir;
     private Action action;
@@ -65,6 +70,7 @@ public final class OperationContext {
     private Builder(
         ExecuteResponse.Builder executeResponse,
         Operation operation,
+        QueuedOperationMetadata.Builder metadata,
         Poller poller,
         Path execDir,
         Action action,
@@ -73,6 +79,7 @@ public final class OperationContext {
         QueueEntry queueEntry) {
       this.executeResponse = executeResponse;
       this.operation = operation;
+      this.metadata = metadata;
       this.poller = poller;
       this.execDir = execDir;
       this.action = action;
@@ -83,6 +90,11 @@ public final class OperationContext {
 
     public Builder setOperation(Operation operation) {
       this.operation = operation;
+      return this;
+    }
+
+    public Builder setMetadata(QueuedOperationMetadata.Builder metadata) {
+      this.metadata = metadata;
       return this;
     }
 
@@ -118,7 +130,7 @@ public final class OperationContext {
 
     public OperationContext build() {
       return new OperationContext(
-          executeResponse, operation, poller, execDir, action, command, tree, queueEntry);
+          executeResponse, operation, metadata, poller, execDir, action, command, tree, queueEntry);
     }
   }
 
@@ -126,6 +138,7 @@ public final class OperationContext {
     return new Builder(
         /* executeResponse= */ ExecuteResponse.newBuilder(),
         /* operation= */ null,
+        /* metadata= */ QueuedOperationMetadata.newBuilder(),
         /* poller= */ null,
         /* execDir= */ null,
         /* action= */ null,
@@ -136,6 +149,6 @@ public final class OperationContext {
 
   public Builder toBuilder() {
     return new Builder(
-        executeResponse, operation, poller, execDir, action, command, tree, queueEntry);
+        executeResponse, operation, metadata, poller, execDir, action, command, tree, queueEntry);
   }
 }

@@ -47,7 +47,11 @@ public class PutOperationStage extends PipelineStage.NullStage {
       if (operationContext.operation.getDone()) {
         for (AverageTimeCostOfLastPeriod average : averagesWithinDifferentPeriods) {
           average.addOperation(
-              operationContext.executeResponse.build().getResult().getExecutionMetadata());
+              operationContext
+                  .metadata
+                  .build()
+                  .getExecuteOperationMetadata()
+                  .getPartialExecutionMetadata());
         }
       }
     }

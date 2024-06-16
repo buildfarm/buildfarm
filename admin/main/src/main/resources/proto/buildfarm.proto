@@ -808,26 +808,6 @@ message QueuedOperation {
   Tree tree = 5;
 }
 
-message ExecutingOperationMetadata {
-  build.bazel.remote.execution.v2.ExecuteOperationMetadata
-      execute_operation_metadata = 1;
-
-  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 2;
-
-  int64 started_at = 3;
-
-  string executing_on = 4;
-}
-
-message CompletedOperationMetadata {
-  build.bazel.remote.execution.v2.ExecuteOperationMetadata
-      execute_operation_metadata = 1;
-
-  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 2;
-
-  reserved 3 to 8; // fields now in ExecutedActionMetadata
-}
-
 message OperationRequestMetadata {
   string operation_name = 1;
 

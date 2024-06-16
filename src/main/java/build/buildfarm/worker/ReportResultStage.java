@@ -18,17 +18,15 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.buildfarm.common.Actions.asExecutionStatus;
 import static build.buildfarm.common.Actions.isRetriable;
+import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.v1test.CompletedOperationMetadata;
-import build.buildfarm.v1test.ExecutingOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
@@ -84,24 +82,48 @@ public class ReportResultStage extends PipelineStage {
     }
   }
 
+  private void putOperation(OperationContext operationContext) throws InterruptedException {
+    Operation operation =
+        operationContext.operation.toBuilder()
+            .setMetadata(Any.pack(operationContext.metadata.build()))
+            .build();
+
+    boolean operationUpdateSuccess = false;
+    try {
+      operationUpdateSuccess = workerContext.putOperation(operation);
+    } catch (IOException e) {
+      log.log(Level.SEVERE, format("error putting operation %s", operation.getName()), e);
+    }
+
+    if (!operationUpdateSuccess) {
+      log.log(
+          Level.WARNING,
+          String.format(
+              "ReportResultStage::run(%s): could not record update", operation.getName()));
+    }
+  }
+
   private OperationContext reportPolled(OperationContext operationContext)
       throws InterruptedException {
     String operationName = operationContext.operation.getName();
 
-    ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
-    resultBuilder
-        .getExecutionMetadataBuilder()
-        .setOutputUploadStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
+    ExecutedActionMetadata.Builder executedAction =
+        operationContext
+            .metadata
+            .getExecuteOperationMetadataBuilder()
+            .getPartialExecutionMetadataBuilder()
+            .setOutputUploadStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
+    putOperation(operationContext);
 
     boolean blacklist = false;
     try {
       workerContext.uploadOutputs(
           operationContext.queueEntry.getExecuteEntry().getActionDigest(),
-          resultBuilder,
+          operationContext.executeResponse.getResultBuilder(),
           operationContext.execDir,
           operationContext.command);
     } catch (StatusException | StatusRuntimeException e) {
-      ExecuteResponse executeResponse = operationContext.executeResponse.build();
+      ExecuteResponse.Builder executeResponse = operationContext.executeResponse;
       if (executeResponse.getStatus().getCode() == Code.OK.getNumber()
           && executeResponse.getResult().getExitCode() == 0) {
         // something about the outputs was malformed - fail the operation with this status if not
@@ -112,7 +134,7 @@ public class ReportResultStage extends PipelineStage {
               Level.SEVERE, String.format("no rpc status from exception for %s", operationName), e);
           status = asExecutionStatus(e);
         }
-        operationContext.executeResponse.setStatus(status);
+        executeResponse.setStatus(status);
         if (isRetriable(status)) {
           blacklist = true;
         }
@@ -125,40 +147,25 @@ public class ReportResultStage extends PipelineStage {
       return null;
     }
 
-    Operation operation = operationContext.operation;
-    ExecuteOperationMetadata metadata;
-    try {
-      metadata =
-          operation
-              .getMetadata()
-              .unpack(ExecutingOperationMetadata.class)
-              .getExecuteOperationMetadata();
-    } catch (InvalidProtocolBufferException e) {
-      log.log(
-          Level.SEVERE,
-          String.format("invalid execute operation metadata for %s", operationName),
-          e);
-      return null;
-    }
+    Timestamp completed = Timestamps.fromMillis(System.currentTimeMillis());
+    executedAction
+        .setWorkerCompletedTimestamp(completed)
+        .setOutputUploadCompletedTimestamp(completed);
 
-    Timestamp now = Timestamps.fromMillis(System.currentTimeMillis());
-    resultBuilder
-        .getExecutionMetadataBuilder()
-        .setWorkerCompletedTimestamp(now)
-        .setOutputUploadCompletedTimestamp(now);
-
+    operationContext.executeResponse.getResultBuilder().setExecutionMetadata(executedAction);
     ExecuteResponse executeResponse = operationContext.executeResponse.build();
 
     if (blacklist
         || (!operationContext.action.getDoNotCache()
             && executeResponse.getStatus().getCode() == Code.OK.getNumber()
             && executeResponse.getResult().getExitCode() == 0)) {
+      Digest actionDigest = operationContext.queueEntry.getExecuteEntry().getActionDigest();
       try {
         if (blacklist) {
-          workerContext.blacklistAction(metadata.getActionDigest().getHash());
+          workerContext.blacklistAction(actionDigest.getHash());
         } else {
           workerContext.putActionResult(
-              DigestUtil.asActionKey(metadata.getActionDigest()), executeResponse.getResult());
+              DigestUtil.asActionKey(actionDigest), executeResponse.getResult());
         }
       } catch (IOException e) {
         log.log(
@@ -167,16 +174,12 @@ public class ReportResultStage extends PipelineStage {
       }
     }
 
-    CompletedOperationMetadata completedMetadata =
-        CompletedOperationMetadata.newBuilder()
-            .setExecuteOperationMetadata(metadata.toBuilder().setStage(COMPLETED).build())
-            .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
-            .build();
+    operationContext.metadata.getExecuteOperationMetadataBuilder().setStage(COMPLETED);
 
     Operation completedOperation =
-        operation.toBuilder()
+        operationContext.operation.toBuilder()
             .setDone(true)
-            .setMetadata(Any.pack(completedMetadata))
+            .setMetadata(Any.pack(operationContext.metadata.build()))
             .setResponse(Any.pack(executeResponse))
             .build();
 

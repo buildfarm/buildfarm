@@ -26,7 +26,6 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.ProcessUtils;
@@ -35,7 +34,6 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.common.config.ExecutionWrapper;
-import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.persistent.PersistentExecutor;
@@ -51,7 +49,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
@@ -92,38 +90,10 @@ class Executor {
     }
   }
 
-  private long runInterruptible(Stopwatch stopwatch, ResourceLimits limits)
-      throws InterruptedException {
-    long startedAt = System.currentTimeMillis();
-
-    ExecuteOperationMetadata metadata;
-    try {
-      metadata = operationContext.operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-    } catch (InvalidProtocolBufferException e) {
-      log.log(Level.SEVERE, "invalid execute operation metadata", e);
-      return 0;
-    }
-    ExecuteOperationMetadata executingMetadata =
-        metadata.toBuilder().setStage(ExecutionStage.Value.EXECUTING).build();
-
-    Iterable<ExecutionPolicy> policies = new ArrayList<>();
-    if (limits.useExecutionPolicies) {
-      policies =
-          ExecutionPolicies.forPlatform(
-              operationContext.command.getPlatform(), workerContext::getExecutionPolicies);
-    }
-
+  private boolean putOperation(boolean ignoreFailure) throws InterruptedException {
     Operation operation =
         operationContext.operation.toBuilder()
-            .setMetadata(
-                Any.pack(
-                    ExecutingOperationMetadata.newBuilder()
-                        .setStartedAt(startedAt)
-                        .setExecutingOn(workerContext.getName())
-                        .setExecuteOperationMetadata(executingMetadata)
-                        .setRequestMetadata(
-                            operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
-                        .build()))
+            .setMetadata(Any.pack(operationContext.metadata.build()))
             .build();
 
     boolean operationUpdateSuccess = false;
@@ -138,8 +108,25 @@ class Executor {
       log.log(
           Level.WARNING,
           String.format(
-              "Executor::run(%s): could not transition to EXECUTING", operation.getName()));
-      putError();
+              "InputFetcher::run(%s): could not transition to EXECUTING", operation.getName()));
+      if (!ignoreFailure) {
+        putError();
+      }
+    }
+    return operationUpdateSuccess;
+  }
+
+  private long runInterruptible(Stopwatch stopwatch, ResourceLimits limits)
+      throws InterruptedException {
+    Timestamp executionStartTimestamp = Timestamps.fromMillis(System.currentTimeMillis());
+
+    operationContext
+        .metadata
+        .getExecuteOperationMetadataBuilder()
+        .setStage(ExecutionStage.Value.EXECUTING)
+        .getPartialExecutionMetadataBuilder()
+        .setExecutionStartTimestamp(executionStartTimestamp);
+    if (!putOperation(/* ignoreFailure= */ false)) {
       return 0;
     }
 
@@ -160,8 +147,15 @@ class Executor {
         Thread.currentThread()::interrupt,
         pollDeadline);
 
+    Iterable<ExecutionPolicy> policies = new ArrayList<>();
+    if (limits.useExecutionPolicies) {
+      policies =
+          ExecutionPolicies.forPlatform(
+              operationContext.command.getPlatform(), workerContext::getExecutionPolicies);
+    }
+
     try {
-      return executePolled(operation, limits, policies, timeout, stopwatch);
+      return executePolled(limits, policies, timeout, stopwatch);
     } finally {
       operationContext.poller.pause();
     }
@@ -194,27 +188,20 @@ class Executor {
   }
 
   private long executePolled(
-      Operation operation,
       ResourceLimits limits,
       Iterable<ExecutionPolicy> policies,
       Duration timeout,
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
-    log.log(Level.FINER, "Executor: Operation " + operation.getName() + " Executing command");
-
-    ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
-    resultBuilder
-        .getExecutionMetadataBuilder()
-        .setExecutionStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
+    String operationName = operationContext.operation.getName();
+    log.log(Level.FINER, "Executor: Operation " + operationName + " Executing command");
 
     Command command = operationContext.command;
     Path workingDirectory = operationContext.execDir;
     if (!command.getWorkingDirectory().isEmpty()) {
       workingDirectory = workingDirectory.resolve(command.getWorkingDirectory());
     }
-
-    String operationName = operation.getName();
 
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
     Code statusCode;
@@ -249,7 +236,7 @@ class Executor {
               timeout,
               // executingMetadata.getStdoutStreamName(),
               // executingMetadata.getStderrStreamName(),
-              resultBuilder);
+              operationContext.executeResponse.getResultBuilder());
 
       // From Bazel Test Encyclopedia:
       // If the main process of a test exits, but some of its children are still running,
@@ -287,25 +274,27 @@ class Executor {
         () -> {},
         Deadline.after(10, DAYS));
 
-    resultBuilder
-        .getExecutionMetadataBuilder()
-        .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
+
+    operationContext
+        .metadata
+        .getExecuteOperationMetadataBuilder()
+        .getPartialExecutionMetadataBuilder()
+        .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
+    putOperation(/* ignoreFailure= */ true);
 
     log.log(
         Level.FINER,
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
-            operationName, resultBuilder.getExitCode()));
+            operationName, operationContext.executeResponse.getResultBuilder().getExitCode()));
 
     operationContext.executeResponse.getStatusBuilder().setCode(statusCode.getNumber());
-    OperationContext reportOperationContext =
-        operationContext.toBuilder().setOperation(operation).build();
-    boolean claimed = owner.output().claim(reportOperationContext);
+    boolean claimed = owner.output().claim(operationContext);
     operationContext.poller.pause();
     if (claimed) {
       try {
-        owner.output().put(reportOperationContext);
+        owner.output().put(operationContext);
       } catch (InterruptedException e) {
         owner.output().release();
         throw e;

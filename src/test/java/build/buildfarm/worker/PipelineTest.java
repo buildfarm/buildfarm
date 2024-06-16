@@ -115,15 +115,27 @@ public class PipelineTest {
   }
 
   // Create a test stage that doesn't exit because of an a non-interrupt exception.
-  // This proves the stage is robust enough continue running when experiencing an exception.
+  // This proves the stage is robust enough to continue running when experiencing an exception.
   public class ContinueStage extends PipelineStage {
+    private static PipelineStage OPEN_STAGE =
+        new AbstractPipelineStage("open") {
+          @Override
+          public void run() {}
+        };
+
+    private boolean first = true;
+
     public ContinueStage(String name) {
-      super(name, null, null, null);
+      super(name, /* workerContext= */ null, /* output= */ OPEN_STAGE, /* error= */ null);
     }
 
     @Override
-    protected void runInterruptible() throws InterruptedException {
-      throw new RuntimeException("Exception");
+    protected void iterate() throws InterruptedException {
+      if (first) {
+        first = false;
+        throw new RuntimeException("Exception");
+      }
+      // avoid pouring errors into test log, a single exception is enough
     }
 
     @Override

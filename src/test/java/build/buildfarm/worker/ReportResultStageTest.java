@@ -37,6 +37,7 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueueEntry;
+import com.google.common.collect.Iterables;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.rpc.Code;
@@ -115,8 +116,8 @@ public class ReportResultStageTest {
     reportResultStage.run();
     verify(context, times(1)).destroyExecDir(reportedContext.execDir);
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
-    verify(context, times(1)).putOperation(operationCaptor.capture());
-    Operation completeOperation = operationCaptor.getValue();
+    verify(context, times(2)).putOperation(operationCaptor.capture());
+    Operation completeOperation = Iterables.getLast(operationCaptor.getAllValues());
     assertThat(output.get().operation).isEqualTo(completeOperation);
   }
 
@@ -164,8 +165,8 @@ public class ReportResultStageTest {
     reportResultStage.run();
     verify(context, times(1)).destroyExecDir(erroringContext.execDir);
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
-    verify(context, times(1)).putOperation(operationCaptor.capture());
-    Operation erroredOperation = operationCaptor.getValue();
+    verify(context, times(2)).putOperation(operationCaptor.capture());
+    Operation erroredOperation = Iterables.getLast(operationCaptor.getAllValues());
     assertThat(output.get().operation).isEqualTo(erroredOperation);
     verify(context, times(1))
         .uploadOutputs(

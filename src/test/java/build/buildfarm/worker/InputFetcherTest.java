@@ -77,7 +77,10 @@ public class InputFetcherTest {
 
           @Override
           public boolean putOperation(Operation operation) {
-            return failedOperationRef.compareAndSet(null, operation);
+            if (operation.getDone()) {
+              return failedOperationRef.compareAndSet(null, operation);
+            }
+            return true;
           }
 
           @Override

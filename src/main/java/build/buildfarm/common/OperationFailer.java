@@ -16,6 +16,7 @@ package build.buildfarm.common;
 
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.v1test.ExecuteEntry;
 import com.google.longrunning.Operation;
@@ -29,23 +30,32 @@ import com.google.rpc.Status;
  *     finished and failed.
  */
 public class OperationFailer {
-  public static Operation get(Operation operation, ExecuteEntry executeEntry, Status status) {
+  public static Operation get(
+      Operation operation,
+      ExecuteEntry executeEntry,
+      ExecutedActionMetadata partialExecutionMetadata,
+      Status status) {
     return operation.toBuilder()
         .setDone(true)
         .setName(executeEntry.getOperationName())
         .setMetadata(
-            Any.pack(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED)))
+            Any.pack(
+                executeOperationMetadata(
+                    executeEntry, partialExecutionMetadata, ExecutionStage.Value.COMPLETED)))
         .setResponse(Any.pack(ExecuteResponse.newBuilder().setStatus(status).build()))
         .build();
   }
 
   private static ExecuteOperationMetadata executeOperationMetadata(
-      ExecuteEntry executeEntry, ExecutionStage.Value stage) {
+      ExecuteEntry executeEntry,
+      ExecutedActionMetadata partialExecutionMetadata,
+      ExecutionStage.Value stage) {
     return ExecuteOperationMetadata.newBuilder()
         .setActionDigest(executeEntry.getActionDigest())
         .setStdoutStreamName(executeEntry.getStdoutStreamName())
         .setStderrStreamName(executeEntry.getStderrStreamName())
         .setStage(stage)
+        .setPartialExecutionMetadata(partialExecutionMetadata)
         .build();
   }
 }
