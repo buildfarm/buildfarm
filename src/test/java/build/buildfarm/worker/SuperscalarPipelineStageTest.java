@@ -50,12 +50,12 @@ public class SuperscalarPipelineStageTest {
     }
 
     @Override
-    public void put(OperationContext operationContext) {
+    public void put(ExecutionContext executionContext) {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    OperationContext take() throws InterruptedException {
+    ExecutionContext take() throws InterruptedException {
       throw new UnsupportedOperationException();
     }
 
@@ -65,7 +65,7 @@ public class SuperscalarPipelineStageTest {
     }
 
     @Override
-    protected int claimsRequired(OperationContext operationContext) {
+    protected int claimsRequired(ExecutionContext executionContext) {
       throw new UnsupportedOperationException();
     }
 
@@ -85,7 +85,7 @@ public class SuperscalarPipelineStageTest {
     AbstractSuperscalarPipelineStage stage =
         new AbstractSuperscalarPipelineStage("too-narrow", /* output= */ null, /* width= */ 3) {
           @Override
-          protected int claimsRequired(OperationContext operationContext) {
+          protected int claimsRequired(ExecutionContext executionContext) {
             return 5;
           }
         };
@@ -108,7 +108,7 @@ public class SuperscalarPipelineStageTest {
     // start a thread, when the stage is exhausted, interrupt this one
 
     try {
-      stage.claim(/* operationContext= */ null);
+      stage.claim(/* executionContext= */ null);
       fail("should not get here");
     } catch (InterruptedException e) {
       // ignore
@@ -121,21 +121,21 @@ public class SuperscalarPipelineStageTest {
   @Test
   @SuppressWarnings("PMD.JUnitUseExpected")
   public void takeReleasesQueueClaims() throws InterruptedException {
-    OperationContext context =
-        OperationContext.newBuilder()
+    ExecutionContext context =
+        ExecutionContext.newBuilder()
             .setOperation(Operation.newBuilder().setName("operation-in-queue").build())
             .build();
-    BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
+    BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
     PipelineStage output = new PipelineStageTest.StubPipelineStage("unclosed-sink");
     PipelineStage stage =
         new AbstractSuperscalarPipelineStage("queue-claimed", output, /* width= */ 3) {
           @Override
-          protected int claimsRequired(OperationContext operationContext) {
+          protected int claimsRequired(ExecutionContext executionContext) {
             return 2;
           }
 
           @Override
-          public OperationContext take() throws InterruptedException {
+          public ExecutionContext take() throws InterruptedException {
             return takeOrDrain(queue);
           }
         };

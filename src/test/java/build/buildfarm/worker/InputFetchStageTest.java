@@ -44,10 +44,10 @@ import org.junit.runners.JUnit4;
 @Log
 public class InputFetchStageTest {
   static class PipelineSink extends PipelineStage {
-    @Getter private final List<OperationContext> operationContexts = Lists.newArrayList();
-    private final Predicate<OperationContext> onPutShouldClose;
+    @Getter private final List<ExecutionContext> executionContexts = Lists.newArrayList();
+    private final Predicate<ExecutionContext> onPutShouldClose;
 
-    PipelineSink(Predicate<OperationContext> onPutShouldClose) {
+    PipelineSink(Predicate<ExecutionContext> onPutShouldClose) {
       super("Sink", null, null, null);
       this.onPutShouldClose = onPutShouldClose;
     }
@@ -58,15 +58,15 @@ public class InputFetchStageTest {
     }
 
     @Override
-    public void put(OperationContext operationContext) {
-      operationContexts.add(operationContext);
-      if (onPutShouldClose.test(operationContext)) {
+    public void put(ExecutionContext executionContext) {
+      executionContexts.add(executionContext);
+      if (onPutShouldClose.test(executionContext)) {
         close();
       }
     }
 
     @Override
-    public OperationContext take() {
+    public ExecutionContext take() {
       throw new UnsupportedOperationException();
     }
   }
@@ -89,18 +89,18 @@ public class InputFetchStageTest {
         .thenReturn(QueuedOperation.getDefaultInstance());
     when(workerContext.putOperation(any(Operation.class))).thenReturn(true);
 
-    PipelineSink sinkOutput = new PipelineSink((operationContext) -> false);
+    PipelineSink sinkOutput = new PipelineSink((executionContext) -> false);
     PipelineSink error =
-        new PipelineSink((operationContext) -> true) {
+        new PipelineSink((executionContext) -> true) {
           @Override
-          public void put(OperationContext operationContext) {
-            super.put(operationContext);
+          public void put(ExecutionContext executionContext) {
+            super.put(executionContext);
             sinkOutput.close();
           }
         };
     PipelineStage inputFetchStage = new InputFetchStage(workerContext, sinkOutput, error);
-    OperationContext badContext =
-        OperationContext.newBuilder()
+    ExecutionContext badContext =
+        ExecutionContext.newBuilder()
             .setOperation(badOperation)
             .setPoller(poller)
             .setQueueEntry(badEntry)
@@ -122,7 +122,7 @@ public class InputFetchStageTest {
             any(Runnable.class),
             any(Deadline.class));
     verifyNoMoreInteractions(workerContext);
-    OperationContext operationContext = error.getOperationContexts().get(0);
-    assertThat(operationContext).isEqualTo(badContext);
+    ExecutionContext executionContext = error.getExecutionContexts().get(0);
+    assertThat(executionContext).isEqualTo(badContext);
   }
 }

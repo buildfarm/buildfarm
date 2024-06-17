@@ -42,7 +42,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
 
   private final Set<Thread> executors = Sets.newHashSet();
   private final AtomicInteger executorClaims = new AtomicInteger(0);
-  private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
+  private final BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
 
   public ExecuteActionStage(
       WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -58,14 +58,14 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
       WorkerContext workerContext, PipelineStage nextStage) {
     return new PipelineStage.NullStage(workerContext, nextStage) {
       @Override
-      public void put(OperationContext operationContext) throws InterruptedException {
+      public void put(ExecutionContext executionContext) throws InterruptedException {
         try {
-          workerContext.destroyExecDir(operationContext.execDir);
+          workerContext.destroyExecDir(executionContext.execDir);
         } catch (IOException e) {
           log.log(
-              Level.SEVERE, "error while destroying action root " + operationContext.execDir, e);
+              Level.SEVERE, "error while destroying action root " + executionContext.execDir, e);
         } finally {
-          output.put(operationContext);
+          output.put(executionContext);
         }
       }
     };
@@ -77,14 +77,14 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   @Override
-  public OperationContext take() throws InterruptedException {
+  public ExecutionContext take() throws InterruptedException {
     return takeOrDrain(queue);
   }
 
   @Override
-  public void put(OperationContext operationContext) throws InterruptedException {
+  public void put(ExecutionContext executionContext) throws InterruptedException {
     while (!isClosed() && !output.isClosed()) {
-      if (queue.offer(operationContext, 10, TimeUnit.MILLISECONDS)) {
+      if (queue.offer(executionContext, 10, TimeUnit.MILLISECONDS)) {
         return;
       }
     }
@@ -126,22 +126,22 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   @Override
-  protected int claimsRequired(OperationContext operationContext) {
-    return workerContext.commandExecutionClaims(operationContext.command);
+  protected int claimsRequired(ExecutionContext executionContext) {
+    return workerContext.commandExecutionClaims(executionContext.command);
   }
 
   @Override
   protected void iterate() throws InterruptedException {
-    OperationContext operationContext = take();
-    ResourceLimits limits = workerContext.commandExecutionSettings(operationContext.command);
-    Executor executor = new Executor(workerContext, operationContext, this);
+    ExecutionContext executionContext = take();
+    ResourceLimits limits = workerContext.commandExecutionSettings(executionContext.command);
+    Executor executor = new Executor(workerContext, executionContext, this);
     Thread executorThread = new Thread(() -> executor.run(limits), "ExecuteActionStage.executor");
 
     synchronized (this) {
       executors.add(executorThread);
       int slotUsage = executorClaims.addAndGet(limits.cpu.claimed);
       executionSlotUsage.set(slotUsage);
-      start(operationContext.operation.getName(), getUsage(slotUsage));
+      start(executionContext.operation.getName(), getUsage(slotUsage));
       executorThread.start();
     }
   }

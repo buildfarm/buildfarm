@@ -38,8 +38,8 @@ public class ExecuteActionStageTest {
         QueueEntry.newBuilder()
             .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("error"))
             .build();
-    OperationContext errorContext =
-        OperationContext.newBuilder()
+    ExecutionContext errorContext =
+        ExecutionContext.newBuilder()
             .setQueueEntry(errorEntry)
             .setExecDir(Paths.get("error-operation-path"))
             .build();

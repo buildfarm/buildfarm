@@ -55,7 +55,7 @@ public class ReportResultStageTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   static class SingleOutputSink extends PipelineStage {
-    OperationContext operationContext = null;
+    ExecutionContext executionContext = null;
 
     public SingleOutputSink() {
       super("SingleOutputSink", /* workerContext= */ null, /* output= */ null, /* error= */ null);
@@ -67,21 +67,21 @@ public class ReportResultStageTest {
     }
 
     @Override
-    OperationContext take() {
+    ExecutionContext take() {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public void put(OperationContext operationContext) {
-      checkNotNull(operationContext);
-      assertThat(this.operationContext).isNull();
-      this.operationContext = operationContext;
+    public void put(ExecutionContext executionContext) {
+      checkNotNull(executionContext);
+      assertThat(this.executionContext).isNull();
+      this.executionContext = executionContext;
       close();
     }
 
-    OperationContext get() {
-      checkNotNull(operationContext);
-      return operationContext;
+    ExecutionContext get() {
+      checkNotNull(executionContext);
+      return executionContext;
     }
   }
 
@@ -100,8 +100,8 @@ public class ReportResultStageTest {
             .setExecuteEntry(
                 ExecuteEntry.newBuilder().setOperationName(reportedOperation.getName()))
             .build();
-    OperationContext reportedContext =
-        OperationContext.newBuilder()
+    ExecutionContext reportedContext =
+        ExecutionContext.newBuilder()
             .setCommand(Command.getDefaultInstance())
             .setAction(Action.newBuilder().setDoNotCache(true).build())
             .setOperation(reportedOperation)
@@ -140,8 +140,8 @@ public class ReportResultStageTest {
                     .setOperationName(erroringOperation.getName())
                     .setActionDigest(actionDigest))
             .build();
-    OperationContext erroringContext =
-        OperationContext.newBuilder()
+    ExecutionContext erroringContext =
+        ExecutionContext.newBuilder()
             .setCommand(Command.getDefaultInstance())
             .setAction(action)
             .setOperation(erroringOperation)

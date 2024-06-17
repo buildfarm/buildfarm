@@ -28,11 +28,11 @@ import java.util.Map;
  */
 public class DockerExecutorSettings {
   /**
-   * @field operationContext
+   * @field executionContext
    * @brief Contains information about an action and where its results exist on a worker.
    * @details We need this for potentially extracting outputs out of the container.
    */
-  public OperationContext operationContext;
+  public ExecutionContext executionContext;
 
   /**
    * @field execDir

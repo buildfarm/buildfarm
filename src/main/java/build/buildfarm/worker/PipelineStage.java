@@ -116,20 +116,20 @@ public abstract class PipelineStage implements Runnable {
   }
 
   protected void iterate() throws InterruptedException {
-    OperationContext operationContext;
-    OperationContext nextOperationContext = null;
+    ExecutionContext executionContext;
+    ExecutionContext nextExecutionContext = null;
     long stallUSecs = 0;
     Stopwatch stopwatch = Stopwatch.createUnstarted();
     try {
-      operationContext = take();
-      start(operationContext.operation.getName());
+      executionContext = take();
+      start(executionContext.operation.getName());
       stopwatch.start();
       boolean valid = false;
       tickThread = Thread.currentThread();
       try {
-        nextOperationContext = tick(operationContext);
+        nextExecutionContext = tick(executionContext);
         long tickUSecs = stopwatch.elapsed(MICROSECONDS);
-        valid = nextOperationContext != null && output.claim(nextOperationContext);
+        valid = nextExecutionContext != null && output.claim(nextExecutionContext);
         stallUSecs = stopwatch.elapsed(MICROSECONDS) - tickUSecs;
         // ensure that we clear interrupted if we were supposed to cancel tick
         if (Thread.interrupted() && !tickCancelled()) {
@@ -147,16 +147,16 @@ public abstract class PipelineStage implements Runnable {
         }
       }
       if (valid) {
-        output.put(nextOperationContext);
+        output.put(nextExecutionContext);
       } else {
-        error.put(operationContext);
+        error.put(executionContext);
       }
     } finally {
       release();
     }
-    after(operationContext);
+    after(executionContext);
     long usecs = stopwatch.elapsed(MICROSECONDS);
-    complete(operationName, usecs, stallUSecs, nextOperationContext != null);
+    complete(operationName, usecs, stallUSecs, nextExecutionContext != null);
     operationName = null;
   }
 
@@ -192,13 +192,13 @@ public abstract class PipelineStage implements Runnable {
                 logIterateId(operationName), usecs / 1000.0f, stallUSecs / 1000.0f, status));
   }
 
-  protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
-    return operationContext;
+  protected ExecutionContext tick(ExecutionContext executionContext) throws InterruptedException {
+    return executionContext;
   }
 
-  protected void after(OperationContext operationContext) {}
+  protected void after(ExecutionContext executionContext) {}
 
-  public synchronized boolean claim(OperationContext operationContext) throws InterruptedException {
+  public synchronized boolean claim(ExecutionContext executionContext) throws InterruptedException {
     while (!closed && claimed) {
       wait();
     }
@@ -233,9 +233,9 @@ public abstract class PipelineStage implements Runnable {
 
   abstract Logger getLogger();
 
-  abstract OperationContext take() throws InterruptedException;
+  abstract ExecutionContext take() throws InterruptedException;
 
-  abstract void put(OperationContext operationContext) throws InterruptedException;
+  abstract void put(ExecutionContext executionContext) throws InterruptedException;
 
   public static class NullStage extends PipelineStage {
     public NullStage() {
@@ -252,7 +252,7 @@ public abstract class PipelineStage implements Runnable {
     }
 
     @Override
-    public boolean claim(OperationContext operationContext) {
+    public boolean claim(ExecutionContext executionContext) {
       return true;
     }
 
@@ -260,12 +260,12 @@ public abstract class PipelineStage implements Runnable {
     public void release() {}
 
     @Override
-    public OperationContext take() {
+    public ExecutionContext take() {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public void put(OperationContext operationContext) throws InterruptedException {}
+    public void put(ExecutionContext executionContext) throws InterruptedException {}
 
     @Override
     public void run() {}

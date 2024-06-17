@@ -63,8 +63,8 @@ public class InputFetcherTest {
     ExecuteEntry executeEntry =
         ExecuteEntry.newBuilder().setOperationName(operation.getName()).build();
     QueueEntry queueEntry = QueueEntry.newBuilder().setExecuteEntry(executeEntry).build();
-    OperationContext operationContext =
-        OperationContext.newBuilder().setQueueEntry(queueEntry).setOperation(operation).build();
+    ExecutionContext executionContext =
+        ExecutionContext.newBuilder().setQueueEntry(queueEntry).setOperation(operation).build();
     Command command = Command.newBuilder().addArguments("/bin/false").build();
     QueuedOperation queuedOperation = QueuedOperation.newBuilder().setCommand(command).build();
     AtomicReference<Operation> failedOperationRef = new AtomicReference<>();
@@ -111,10 +111,10 @@ public class InputFetcherTest {
           }
         };
     InputFetchStage owner = new InputFetchStage(workerContext, /* output= */ null, error);
-    InputFetcher inputFetcher = new InputFetcher(workerContext, operationContext, owner);
+    InputFetcher inputFetcher = new InputFetcher(workerContext, executionContext, owner);
     inputFetcher.fetchPolled(/* stopwatch= */ null);
     Operation failedOperation = checkNotNull(failedOperationRef.get());
-    verify(error, times(1)).put(any(OperationContext.class));
+    verify(error, times(1)).put(any(ExecutionContext.class));
     ExecuteResponse executeResponse = failedOperation.getResponse().unpack(ExecuteResponse.class);
     Status status = executeResponse.getStatus();
     assertThat(status.getCode()).isEqualTo(Code.FAILED_PRECONDITION.getNumber());

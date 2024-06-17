@@ -70,15 +70,15 @@ class Executor {
   private static final int INCOMPLETE_EXIT_CODE = -1;
 
   private final WorkerContext workerContext;
-  private final OperationContext operationContext;
+  private final ExecutionContext executionContext;
   private final ExecuteActionStage owner;
   private int exitCode = INCOMPLETE_EXIT_CODE;
   private boolean wasErrored = false;
 
   Executor(
-      WorkerContext workerContext, OperationContext operationContext, ExecuteActionStage owner) {
+      WorkerContext workerContext, ExecutionContext executionContext, ExecuteActionStage owner) {
     this.workerContext = workerContext;
-    this.operationContext = operationContext;
+    this.executionContext = executionContext;
     this.owner = owner;
   }
 
@@ -86,14 +86,14 @@ class Executor {
   private void putError() throws InterruptedException {
     if (!wasErrored) {
       wasErrored = true;
-      owner.error().put(operationContext);
+      owner.error().put(executionContext);
     }
   }
 
   private boolean putOperation(boolean ignoreFailure) throws InterruptedException {
     Operation operation =
-        operationContext.operation.toBuilder()
-            .setMetadata(Any.pack(operationContext.metadata.build()))
+        executionContext.operation.toBuilder()
+            .setMetadata(Any.pack(executionContext.metadata.build()))
             .build();
 
     boolean operationUpdateSuccess = false;
@@ -120,7 +120,7 @@ class Executor {
       throws InterruptedException {
     Timestamp executionStartTimestamp = Timestamps.now();
 
-    operationContext
+    executionContext
         .metadata
         .getExecuteOperationMetadataBuilder()
         .setStage(ExecutionStage.Value.EXECUTING)
@@ -136,13 +136,13 @@ class Executor {
     timeoutSettings.maxTimeout = workerContext.getMaximumActionTimeout();
 
     // decide timeout and begin deadline
-    Duration timeout = decideTimeout(timeoutSettings, operationContext.action);
+    Duration timeout = decideTimeout(timeoutSettings, executionContext.action);
     Deadline pollDeadline = Time.toDeadline(timeout).offset(30, TimeUnit.SECONDS);
 
     workerContext.resumePoller(
-        operationContext.poller,
+        executionContext.poller,
         "Executor",
-        operationContext.queueEntry,
+        executionContext.queueEntry,
         ExecutionStage.Value.EXECUTING,
         Thread.currentThread()::interrupt,
         pollDeadline);
@@ -151,13 +151,13 @@ class Executor {
     if (limits.useExecutionPolicies) {
       policies =
           ExecutionPolicies.forPlatform(
-              operationContext.command.getPlatform(), workerContext::getExecutionPolicies);
+              executionContext.command.getPlatform(), workerContext::getExecutionPolicies);
     }
 
     try {
       return executePolled(limits, policies, timeout, stopwatch);
     } finally {
-      operationContext.poller.pause();
+      executionContext.poller.pause();
     }
   }
 
@@ -194,11 +194,11 @@ class Executor {
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
-    String operationName = operationContext.operation.getName();
+    String operationName = executionContext.operation.getName();
     log.log(Level.FINER, "Executor: Operation " + operationName + " Executing command");
 
-    Command command = operationContext.command;
-    Path workingDirectory = operationContext.execDir;
+    Command command = executionContext.command;
+    Path workingDirectory = executionContext.execDir;
     if (!command.getWorkingDirectory().isEmpty()) {
       workingDirectory = workingDirectory.resolve(command.getWorkingDirectory());
     }
@@ -207,7 +207,7 @@ class Executor {
     Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(
-            operationName, arguments, operationContext.command, workingDirectory)) {
+            operationName, arguments, executionContext.command, workingDirectory)) {
       for (ExecutionPolicy policy : policies) {
         if (policy.getExecutionWrapper() != null) {
           arguments.addAll(transformWrapper(policy.getExecutionWrapper()));
@@ -236,7 +236,7 @@ class Executor {
               timeout,
               // executingMetadata.getStdoutStreamName(),
               // executingMetadata.getStderrStreamName(),
-              operationContext.executeResponse.getResultBuilder());
+              executionContext.executeResponse.getResultBuilder());
 
       // From Bazel Test Encyclopedia:
       // If the main process of a test exits, but some of its children are still running,
@@ -252,31 +252,31 @@ class Executor {
         // per the gRPC spec: 'The operation was attempted past the valid range.' Seems
         // appropriate
         statusCode = Code.OUT_OF_RANGE;
-        operationContext
+        executionContext
             .executeResponse
             .getStatusBuilder()
             .setMessage("command resources were referenced after execution completed");
       }
     } catch (IOException e) {
       log.log(Level.SEVERE, format("error executing operation %s", operationName), e);
-      operationContext.poller.pause();
+      executionContext.poller.pause();
       putError();
       return 0;
     }
 
     // switch poller to disable deadline
-    operationContext.poller.pause();
+    executionContext.poller.pause();
     workerContext.resumePoller(
-        operationContext.poller,
+        executionContext.poller,
         "Executor(claim)",
-        operationContext.queueEntry,
+        executionContext.queueEntry,
         ExecutionStage.Value.EXECUTING,
         Thread.currentThread()::interrupt,
         Deadline.after(10, DAYS));
 
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
-    operationContext
+    executionContext
         .metadata
         .getExecuteOperationMetadataBuilder()
         .getPartialExecutionMetadataBuilder()
@@ -287,14 +287,14 @@ class Executor {
         Level.FINER,
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
-            operationName, operationContext.executeResponse.getResultBuilder().getExitCode()));
+            operationName, executionContext.executeResponse.getResultBuilder().getExitCode()));
 
-    operationContext.executeResponse.getStatusBuilder().setCode(statusCode.getNumber());
-    boolean claimed = owner.output().claim(operationContext);
-    operationContext.poller.pause();
+    executionContext.executeResponse.getStatusBuilder().setCode(statusCode.getNumber());
+    boolean claimed = owner.output().claim(executionContext);
+    executionContext.poller.pause();
     if (claimed) {
       try {
-        owner.output().put(operationContext);
+        owner.output().put(executionContext);
       } catch (InterruptedException e) {
         owner.output().release();
         throw e;
@@ -316,7 +316,7 @@ class Executor {
   public void run(ResourceLimits limits) {
     long stallUSecs = 0;
     Stopwatch stopwatch = Stopwatch.createStarted();
-    String operationName = operationContext.operation.getName();
+    String operationName = executionContext.operation.getName();
     try {
       stallUSecs = runInterruptible(stopwatch, limits);
     } catch (InterruptedException e) {
@@ -352,7 +352,7 @@ class Executor {
       try {
         // Now that the execution has finished we can return any of the claims against local
         // resources.
-        workerContext.returnLocalResources(operationContext.queueEntry);
+        workerContext.returnLocalResources(executionContext.queueEntry);
         owner.releaseExecutor(
             operationName,
             limits.cpu.claimed,
@@ -371,7 +371,7 @@ class Executor {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
     Map<String, Property> properties =
-        uniqueIndex(operationContext.command.getPlatform().getPropertiesList(), Property::getName);
+        uniqueIndex(executionContext.command.getPlatform().getPropertiesList(), Property::getName);
 
     arguments.add(wrapper.getPath());
 
@@ -433,10 +433,10 @@ class Executor {
           "usePersistentWorker; got persistentWorkerCommand of : "
               + limits.persistentWorkerCommand);
 
-      Tree execTree = operationContext.tree;
+      Tree execTree = executionContext.tree;
 
       WorkFilesContext filesContext =
-          WorkFilesContext.fromContext(execDir, execTree, operationContext.command);
+          WorkFilesContext.fromContext(execDir, execTree, executionContext.command);
 
       return PersistentExecutor.runOnPersistentWorker(
           limits.persistentWorkerCommand,
@@ -457,7 +457,7 @@ class Executor {
       // create settings
       DockerExecutorSettings settings = new DockerExecutorSettings();
       settings.fetchTimeout = Durations.fromMinutes(1);
-      settings.operationContext = operationContext;
+      settings.executionContext = executionContext;
       settings.execDir = execDir;
       settings.limits = limits;
       settings.envVars = environment;

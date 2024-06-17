@@ -39,12 +39,12 @@ public class PipelineTest {
     }
 
     @Override
-    public void put(OperationContext operationContext) {
+    public void put(ExecutionContext executionContext) {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    OperationContext take() {
+    ExecutionContext take() {
       throw new UnsupportedOperationException();
     }
   }
@@ -91,10 +91,10 @@ public class PipelineTest {
     }
 
     @Override
-    public void put(OperationContext operationContext) throws InterruptedException {}
+    public void put(ExecutionContext executionContext) throws InterruptedException {}
 
     @Override
-    OperationContext take() {
+    ExecutionContext take() {
       throw new UnsupportedOperationException();
     }
 
@@ -140,10 +140,10 @@ public class PipelineTest {
     }
 
     @Override
-    public void put(OperationContext operationContext) throws InterruptedException {}
+    public void put(ExecutionContext executionContext) throws InterruptedException {}
 
     @Override
-    OperationContext take() {
+    ExecutionContext take() {
       throw new UnsupportedOperationException();
     }
 

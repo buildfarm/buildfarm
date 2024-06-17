@@ -45,7 +45,7 @@ import lombok.extern.java.Log;
 
 @Log
 public class ReportResultStage extends PipelineStage {
-  private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
+  private final BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
 
   public ReportResultStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super("ReportResultStage", workerContext, output, error);
@@ -57,35 +57,35 @@ public class ReportResultStage extends PipelineStage {
   }
 
   @Override
-  public OperationContext take() throws InterruptedException {
+  public ExecutionContext take() throws InterruptedException {
     return queue.take();
   }
 
   @Override
-  public void put(OperationContext operationContext) throws InterruptedException {
-    queue.put(operationContext);
+  public void put(ExecutionContext executionContext) throws InterruptedException {
+    queue.put(executionContext);
   }
 
   @Override
-  protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
+  protected ExecutionContext tick(ExecutionContext executionContext) throws InterruptedException {
     workerContext.resumePoller(
-        operationContext.poller,
+        executionContext.poller,
         "ReportResultStage",
-        operationContext.queueEntry,
+        executionContext.queueEntry,
         EXECUTING,
         this::cancelTick,
         Deadline.after(60, SECONDS));
     try {
-      return reportPolled(operationContext);
+      return reportPolled(executionContext);
     } finally {
-      operationContext.poller.pause();
+      executionContext.poller.pause();
     }
   }
 
-  private void putOperation(OperationContext operationContext) throws InterruptedException {
+  private void putOperation(ExecutionContext executionContext) throws InterruptedException {
     Operation operation =
-        operationContext.operation.toBuilder()
-            .setMetadata(Any.pack(operationContext.metadata.build()))
+        executionContext.operation.toBuilder()
+            .setMetadata(Any.pack(executionContext.metadata.build()))
             .build();
 
     boolean operationUpdateSuccess = false;
@@ -103,27 +103,27 @@ public class ReportResultStage extends PipelineStage {
     }
   }
 
-  private OperationContext reportPolled(OperationContext operationContext)
+  private ExecutionContext reportPolled(ExecutionContext executionContext)
       throws InterruptedException {
-    String operationName = operationContext.operation.getName();
+    String operationName = executionContext.operation.getName();
 
     ExecutedActionMetadata.Builder executedAction =
-        operationContext
+        executionContext
             .metadata
             .getExecuteOperationMetadataBuilder()
             .getPartialExecutionMetadataBuilder()
             .setOutputUploadStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
-    putOperation(operationContext);
+    putOperation(executionContext);
 
     boolean blacklist = false;
     try {
       workerContext.uploadOutputs(
-          operationContext.queueEntry.getExecuteEntry().getActionDigest(),
-          operationContext.executeResponse.getResultBuilder(),
-          operationContext.execDir,
-          operationContext.command);
+          executionContext.queueEntry.getExecuteEntry().getActionDigest(),
+          executionContext.executeResponse.getResultBuilder(),
+          executionContext.execDir,
+          executionContext.command);
     } catch (StatusException | StatusRuntimeException e) {
-      ExecuteResponse.Builder executeResponse = operationContext.executeResponse;
+      ExecuteResponse.Builder executeResponse = executionContext.executeResponse;
       if (executeResponse.getStatus().getCode() == Code.OK.getNumber()
           && executeResponse.getResult().getExitCode() == 0) {
         // something about the outputs was malformed - fail the operation with this status if not
@@ -152,14 +152,14 @@ public class ReportResultStage extends PipelineStage {
         .setWorkerCompletedTimestamp(completed)
         .setOutputUploadCompletedTimestamp(completed);
 
-    operationContext.executeResponse.getResultBuilder().setExecutionMetadata(executedAction);
-    ExecuteResponse executeResponse = operationContext.executeResponse.build();
+    executionContext.executeResponse.getResultBuilder().setExecutionMetadata(executedAction);
+    ExecuteResponse executeResponse = executionContext.executeResponse.build();
 
     if (blacklist
-        || (!operationContext.action.getDoNotCache()
+        || (!executionContext.action.getDoNotCache()
             && executeResponse.getStatus().getCode() == Code.OK.getNumber()
             && executeResponse.getResult().getExitCode() == 0)) {
-      Digest actionDigest = operationContext.queueEntry.getExecuteEntry().getActionDigest();
+      Digest actionDigest = executionContext.queueEntry.getExecuteEntry().getActionDigest();
       try {
         if (blacklist) {
           workerContext.blacklistAction(actionDigest.getHash());
@@ -174,16 +174,16 @@ public class ReportResultStage extends PipelineStage {
       }
     }
 
-    operationContext.metadata.getExecuteOperationMetadataBuilder().setStage(COMPLETED);
+    executionContext.metadata.getExecuteOperationMetadataBuilder().setStage(COMPLETED);
 
     Operation completedOperation =
-        operationContext.operation.toBuilder()
+        executionContext.operation.toBuilder()
             .setDone(true)
-            .setMetadata(Any.pack(operationContext.metadata.build()))
+            .setMetadata(Any.pack(executionContext.metadata.build()))
             .setResponse(Any.pack(executeResponse))
             .build();
 
-    operationContext.poller.pause();
+    executionContext.poller.pause();
 
     try {
       if (!workerContext.putOperation(completedOperation)) {
@@ -197,19 +197,19 @@ public class ReportResultStage extends PipelineStage {
       return null;
     }
 
-    return operationContext.toBuilder().setOperation(completedOperation).build();
+    return executionContext.toBuilder().setOperation(completedOperation).build();
   }
 
   @Override
-  protected void after(OperationContext operationContext) {
+  protected void after(ExecutionContext executionContext) {
     try {
-      workerContext.destroyExecDir(operationContext.execDir);
+      workerContext.destroyExecDir(executionContext.execDir);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } catch (IOException e) {
       log.log(
           Level.SEVERE,
-          String.format("error destroying exec dir %s", operationContext.execDir.toString()),
+          String.format("error destroying exec dir %s", executionContext.execDir.toString()),
           e);
     }
   }
