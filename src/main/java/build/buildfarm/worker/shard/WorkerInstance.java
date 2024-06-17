@@ -248,7 +248,7 @@ public class WorkerInstance extends NodeInstance {
   public Operation getOperation(String name) {
     while (!backplane.isStopped()) {
       try {
-        return backplane.getOperation(name);
+        return backplane.getExecution(name);
       } catch (IOException e) {
         Status status = Status.fromThrowable(e);
         if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {

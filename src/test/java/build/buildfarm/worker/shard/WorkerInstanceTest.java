@@ -89,7 +89,7 @@ public class WorkerInstanceTest {
 
   @Test(expected = StatusRuntimeException.class)
   public void getOperationThrowsOnSocketException() throws IOException, InterruptedException {
-    when(backplane.getOperation(any(String.class))).thenThrow(SocketException.class);
+    when(backplane.getExecution(any(String.class))).thenThrow(SocketException.class);
     instance.getOperation("op");
   }
 

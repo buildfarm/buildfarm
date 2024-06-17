@@ -429,7 +429,7 @@ public class ServerInstance extends NodeInstance {
           @Override
           public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
               throws IOException {
-            Backplane.ScanResult<Operation> result = backplane.scanOperations(pageToken, limit);
+            Backplane.ScanResult<Operation> result = backplane.scanExecutions(pageToken, limit);
             result.getResult().forEach(onOperation);
             return result.getToken();
           }
@@ -2664,8 +2664,9 @@ public class ServerInstance extends NodeInstance {
 
   @Override
   public Operation getOperation(String name) {
+    // TODO maybe this needs names for the parent hierarchy
     try {
-      return backplane.getOperation(name);
+      return backplane.getExecution(name);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
@@ -2749,10 +2750,10 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
-  private class ToolInvocationOperationsBounds implements Scannable<Operation> {
+  private class ToolInvocationExecutionsBounds implements Scannable<Operation> {
     private final String toolInvocationId;
 
-    ToolInvocationOperationsBounds(String toolInvocationId) {
+    ToolInvocationExecutionsBounds(String toolInvocationId) {
       this.toolInvocationId = toolInvocationId;
     }
 
@@ -2765,7 +2766,7 @@ public class ServerInstance extends NodeInstance {
     public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
         throws IOException {
       Backplane.ScanResult<Operation> result =
-          backplane.scanOperations(toolInvocationId, pageToken, limit);
+          backplane.scanExecutions(toolInvocationId, pageToken, limit);
       result.getResult().forEach(onOperation);
       return result.getToken();
     }
@@ -2843,7 +2844,7 @@ public class ServerInstance extends NodeInstance {
   Filter<Operation> parseOperationsFilter(String filter) {
     if (filter.startsWith("toolInvocationId=")) {
       return new Filter<>(
-          ImmutableList.of(new ToolInvocationOperationsBounds(filter.split("=")[1])));
+          ImmutableList.of(new ToolInvocationExecutionsBounds(filter.split("=")[1])));
     }
     if (filter.equals("status=dispatched")) {
       return new Filter<>(
@@ -2939,7 +2940,7 @@ public class ServerInstance extends NodeInstance {
     // determine filter locations
     Iterator<Scannable<T>> iterator = filter.getBounds().iterator();
     while (pageSize > 0 && iterator.hasNext()) {
-      Scannable location = iterator.next();
+      Scannable<T> location = iterator.next();
       if (locationName == null) {
         locationName = location.getName();
       }

@@ -123,7 +123,7 @@ public class RedisShardBackplaneTest {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     RedisClient client = new RedisClient(jedis);
     DistributedState state = new DistributedState();
-    state.operations = mock(Operations.class);
+    state.executions = mock(Executions.class);
     state.prequeue = mock(BalancedRedisQueue.class);
     RedisShardBackplane backplane = createBackplane("prequeue-operation-test");
     backplane.start(client, state, "startTime/test:0000");
@@ -133,9 +133,9 @@ public class RedisShardBackplaneTest {
     Operation op = Operation.newBuilder().setName(opName).build();
     backplane.prequeue(executeEntry, op);
 
-    verify(state.operations, times(1))
+    verify(state.executions, times(1))
         .insert(eq(jedis), eq(opName), eq(RedisShardBackplane.operationPrinter.print(op)));
-    verifyNoMoreInteractions(state.operations);
+    verifyNoMoreInteractions(state.executions);
     OperationChange opChange = verifyChangePublished(backplane.executionChannel(opName), jedis);
     assertThat(opChange.hasReset()).isTrue();
     assertThat(opChange.getReset().getOperation().getName()).isEqualTo(opName);
@@ -158,12 +158,12 @@ public class RedisShardBackplaneTest {
   }
 
   @Test
-  public void requeueDispatchedOperationQueuesAndPublishes() throws IOException {
+  public void requeueDispatchedExecutionQueuesAndPublishes() throws IOException {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     RedisClient client = new RedisClient(jedis);
     DistributedState state = new DistributedState();
-    state.dispatchedOperations = mock(RedisHashMap.class);
-    state.operationQueue = mock(OperationQueue.class);
+    state.dispatchedExecutions = mock(RedisHashMap.class);
+    state.executionQueue = mock(ExecutionQueue.class);
     RedisShardBackplane backplane = createBackplane("requeue-operation-test");
     backplane.start(client, state, "startTime/test:0000");
 
@@ -172,17 +172,17 @@ public class RedisShardBackplaneTest {
         QueueEntry.newBuilder()
             .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName(opName).build())
             .build();
-    backplane.requeueDispatchedOperation(queueEntry);
+    backplane.requeueDispatchedExecution(queueEntry);
 
-    verify(state.dispatchedOperations, times(1)).remove(jedis, opName);
-    verifyNoMoreInteractions(state.dispatchedOperations);
-    verify(state.operationQueue, times(1))
+    verify(state.dispatchedExecutions, times(1)).remove(jedis, opName);
+    verifyNoMoreInteractions(state.dispatchedExecutions);
+    verify(state.executionQueue, times(1))
         .push(
             jedis,
             queueEntry.getPlatform().getPropertiesList(),
             JsonFormat.printer().print(queueEntry),
             queueEntry.getExecuteEntry().getExecutionPolicy().getPriority());
-    verifyNoMoreInteractions(state.operationQueue);
+    verifyNoMoreInteractions(state.executionQueue);
     OperationChange opChange = verifyChangePublished(backplane.executionChannel(opName), jedis);
     assertThat(opChange.hasReset()).isTrue();
     assertThat(opChange.getReset().getOperation().getName()).isEqualTo(opName);
@@ -200,9 +200,9 @@ public class RedisShardBackplaneTest {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     RedisClient client = new RedisClient(jedis);
     DistributedState state = new DistributedState();
-    state.dispatchedOperations = mock(RedisHashMap.class);
-    state.dispatchingOperations = mock(RedisMap.class);
-    state.operationQueue = mock(OperationQueue.class);
+    state.dispatchedExecutions = mock(RedisHashMap.class);
+    state.dispatchingExecutions = mock(RedisMap.class);
+    state.executionQueue = mock(ExecutionQueue.class);
     RedisShardBackplane backplane = createBackplane("requeue-operation-test");
     backplane.start(client, state, "startTime/test:0000");
 
@@ -217,10 +217,10 @@ public class RedisShardBackplaneTest {
             .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    when(state.operationQueue.dequeue(eq(jedis), any(List.class))).thenReturn(queueEntryJson);
-    when(state.operationQueue.removeFromDequeue(jedis, queueEntryJson)).thenReturn(true);
+    when(state.executionQueue.dequeue(eq(jedis), any(List.class))).thenReturn(queueEntryJson);
+    when(state.executionQueue.removeFromDequeue(jedis, queueEntryJson)).thenReturn(true);
     // PRE-ASSERT
-    when(state.dispatchedOperations.insertIfMissing(eq(jedis), eq(opName), any(String.class)))
+    when(state.dispatchedExecutions.insertIfMissing(eq(jedis), eq(opName), any(String.class)))
         .thenAnswer(
             args -> {
               // Extract the operation that was dispatched
@@ -243,16 +243,16 @@ public class RedisShardBackplaneTest {
     // ASSERT
     assertThat(readyForRequeue.getRequeueAttempts())
         .isEqualTo(REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE);
-    verify(state.operationQueue, times(1)).dequeue(eq(jedis), any(List.class));
-    verify(state.operationQueue, times(1)).removeFromDequeue(jedis, queueEntryJson);
-    verifyNoMoreInteractions(state.operationQueue);
-    verify(state.dispatchedOperations, times(1))
+    verify(state.executionQueue, times(1)).dequeue(eq(jedis), any(List.class));
+    verify(state.executionQueue, times(1)).removeFromDequeue(jedis, queueEntryJson);
+    verifyNoMoreInteractions(state.executionQueue);
+    verify(state.dispatchedExecutions, times(1))
         .insertIfMissing(
             eq(jedis), eq(queueEntry.getExecuteEntry().getOperationName()), any(String.class));
-    verifyNoMoreInteractions(state.dispatchedOperations);
-    verify(state.dispatchingOperations, times(1))
+    verifyNoMoreInteractions(state.dispatchedExecutions);
+    verify(state.dispatchingExecutions, times(1))
         .remove(jedis, queueEntry.getExecuteEntry().getOperationName());
-    verifyNoMoreInteractions(state.dispatchingOperations);
+    verifyNoMoreInteractions(state.dispatchingExecutions);
   }
 
   @Test
@@ -267,9 +267,9 @@ public class RedisShardBackplaneTest {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     RedisClient client = new RedisClient(jedis);
     DistributedState state = new DistributedState();
-    state.dispatchedOperations = mock(RedisHashMap.class);
-    state.dispatchingOperations = mock(RedisMap.class);
-    state.operationQueue = mock(OperationQueue.class);
+    state.dispatchedExecutions = mock(RedisHashMap.class);
+    state.dispatchingExecutions = mock(RedisMap.class);
+    state.executionQueue = mock(ExecutionQueue.class);
     RedisShardBackplane backplane = createBackplane("requeue-operation-test");
     backplane.start(client, state, "startTime/test:0000");
 
@@ -284,10 +284,10 @@ public class RedisShardBackplaneTest {
             .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    when(state.operationQueue.dequeue(eq(jedis), any(List.class))).thenReturn(queueEntryJson);
-    when(state.operationQueue.removeFromDequeue(jedis, queueEntryJson)).thenReturn(true);
+    when(state.executionQueue.dequeue(eq(jedis), any(List.class))).thenReturn(queueEntryJson);
+    when(state.executionQueue.removeFromDequeue(jedis, queueEntryJson)).thenReturn(true);
     // PRE-ASSERT
-    when(state.dispatchedOperations.insertIfMissing(eq(jedis), eq(opName), any(String.class)))
+    when(state.dispatchedExecutions.insertIfMissing(eq(jedis), eq(opName), any(String.class)))
         .thenAnswer(
             args -> {
               // Extract the operation that was dispatched
@@ -310,16 +310,16 @@ public class RedisShardBackplaneTest {
     // ASSERT
     assertThat(readyForRequeue.getRequeueAttempts())
         .isEqualTo(REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE);
-    verify(state.operationQueue, times(1)).dequeue(eq(jedis), any(List.class));
-    verify(state.operationQueue, times(1)).removeFromDequeue(jedis, queueEntryJson);
-    verifyNoMoreInteractions(state.operationQueue);
-    verify(state.dispatchedOperations, times(1))
+    verify(state.executionQueue, times(1)).dequeue(eq(jedis), any(List.class));
+    verify(state.executionQueue, times(1)).removeFromDequeue(jedis, queueEntryJson);
+    verifyNoMoreInteractions(state.executionQueue);
+    verify(state.dispatchedExecutions, times(1))
         .insertIfMissing(
             eq(jedis), eq(queueEntry.getExecuteEntry().getOperationName()), any(String.class));
-    verifyNoMoreInteractions(state.dispatchedOperations);
-    verify(state.dispatchingOperations, times(1))
+    verifyNoMoreInteractions(state.dispatchedExecutions);
+    verify(state.dispatchingExecutions, times(1))
         .remove(jedis, queueEntry.getExecuteEntry().getOperationName());
-    verifyNoMoreInteractions(state.dispatchingOperations);
+    verifyNoMoreInteractions(state.dispatchingExecutions);
   }
 
   @Test

@@ -89,9 +89,9 @@ public interface Backplane {
   void deregisterWorker(String hostName) throws IOException;
 
   /** Page all operations */
-  ScanResult<Operation> scanOperations(String cursor, int count) throws IOException;
+  ScanResult<Operation> scanExecutions(String cursor, int count) throws IOException;
 
-  ScanResult<Operation> scanOperations(String toolInvocationId, String cursor, int count)
+  ScanResult<Operation> scanExecutions(String toolInvocationId, String cursor, int count)
       throws IOException;
 
   /** Page all toolInvocations */
@@ -208,12 +208,12 @@ public interface Backplane {
   Map<Digest, Set<String>> getBlobDigestsWorkers(Iterable<Digest> blobDigests) throws IOException;
 
   /**
-   * Operations are stored in a hash map where the key is the name of the operation and the value is
-   * the actual Operation object.
+   * Executions are stored in a hash map where the key is the name of the execution and the value is
+   * a longrunning Operation object.
    *
-   * <p>Retrieves and returns an operation from the hash map.
+   * <p>Retrieves and returns an execution from the hash map.
    */
-  Operation getOperation(String operationName) throws IOException;
+  Operation getExecution(String executionName) throws IOException;
 
   /**
    * Operations are stored in a hash map where the key is the name of the operation and the value is
@@ -247,12 +247,12 @@ public interface Backplane {
   void queueing(String operationName) throws IOException;
 
   /**
-   * The state of operations is tracked in a series of lists representing the order in which the
+   * The state of executions is tracked in a series of lists representing the order in which the
    * work is to be processed (queued, dispatched, and completed).
    *
-   * <p>Updates a dispatchedOperation requeue_at and returns whether the operation is still valid.
+   * <p>Updates a dispatchedExecution requeue_at and returns whether the execution is still valid.
    */
-  boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
+  boolean pollExecution(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
       throws IOException;
 
   /** Complete an operation */
@@ -268,8 +268,8 @@ public interface Backplane {
   ScanResult<DispatchedOperation> scanDispatchedOperations(String cursor, int count)
       throws IOException;
 
-  /** Requeue a dispatched operation */
-  void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException;
+  /** Requeue a dispatched execution */
+  void requeueDispatchedExecution(QueueEntry queueEntry) throws IOException;
 
   void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException;
 

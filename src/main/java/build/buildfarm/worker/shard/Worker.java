@@ -632,7 +632,7 @@ public final class Worker extends LoggingMain {
         new ShardWorkerContext(
             configs.getWorker().getPublicName(),
             Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build(),
-            backplane::pollOperation,
+            backplane::pollExecution,
             configs.getWorker().getInputFetchStageWidth(),
             configs.getWorker().getExecuteStageWidth(),
             configs.getWorker().getInputFetchDeadline(),

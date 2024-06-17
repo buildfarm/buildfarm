@@ -28,12 +28,12 @@ import java.util.stream.Collectors;
 import redis.clients.jedis.UnifiedJedis;
 
 /**
- * @class OperationQueue
+ * @class ExecutionQueue
  * @brief The operation queue of the shard backplane.
  * @details The operation queue can be split into multiple queues according to platform execution
  *     information.
  */
-public class OperationQueue {
+public class ExecutionQueue {
   /**
    * @field maxQueueSize
    * @brief The maximum amount of elements that should be added to the queue.
@@ -62,7 +62,7 @@ public class OperationQueue {
    * @details Construct the operation queue with various provisioned redis queues.
    * @param queues Provisioned queues.
    */
-  public OperationQueue(List<ProvisionedRedisQueue> queues) {
+  public ExecutionQueue(List<ProvisionedRedisQueue> queues) {
     this.queues = queues;
     this.maxQueueSize = -1; // infinite size
   }
@@ -73,7 +73,7 @@ public class OperationQueue {
    * @param queues Provisioned queues.
    * @param maxQueueSize The maximum amount of elements that should be added to the queue.
    */
-  public OperationQueue(List<ProvisionedRedisQueue> queues, int maxQueueSize) {
+  public ExecutionQueue(List<ProvisionedRedisQueue> queues, int maxQueueSize) {
     this.queues = queues;
     this.maxQueueSize = maxQueueSize;
   }

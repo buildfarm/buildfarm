@@ -42,7 +42,7 @@ public class DistributedStateCreator {
     // Create containers that make up the backplane
     state.actionCache = createActionCache();
     state.prequeue = createPrequeue(jedis);
-    state.operationQueue = createOperationQueue(jedis);
+    state.executionQueue = createExecutionQueue(jedis);
     state.blockedActions = new RedisMap(configs.getBackplane().getActionBlacklistPrefix());
     state.blockedInvocations = new RedisMap(configs.getBackplane().getInvocationBlacklistPrefix());
     state.toolInvocations =
@@ -50,15 +50,15 @@ public class DistributedStateCreator {
             configs.getBackplane().getToolInvocationsPrefix(),
             configs.getBackplane().getMaxToolInvocationTimeout(),
             /* expireOnEach= */ false);
-    state.operations =
-        new Operations(
+    state.executions =
+        new Executions(
             state.toolInvocations,
-            configs.getBackplane().getOperationPrefix(),
+            configs.getBackplane().getOperationPrefix(), // FIXME change to Execution
             configs.getBackplane().getOperationExpire());
-    state.processingOperations = new RedisMap(configs.getBackplane().getProcessingPrefix());
-    state.dispatchingOperations = new RedisMap(configs.getBackplane().getDispatchingPrefix());
-    state.dispatchedOperations =
-        new RedisHashMap(configs.getBackplane().getDispatchedOperationsHashName());
+    state.processingExecutions = new RedisMap(configs.getBackplane().getProcessingPrefix());
+    state.dispatchingExecutions = new RedisMap(configs.getBackplane().getDispatchingPrefix());
+    state.dispatchedExecutions =
+        new RedisHashMap(configs.getBackplane().getDispatchedOperationsHashName()); // FIXME change to Executions
     state.executeWorkers =
         new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_execute");
     state.storageWorkers =
@@ -90,7 +90,7 @@ public class DistributedStateCreator {
         getQueueDecorator());
   }
 
-  private static OperationQueue createOperationQueue(UnifiedJedis jedis) {
+  private static ExecutionQueue createExecutionQueue(UnifiedJedis jedis) {
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
     // eligibility and placement of operations.
@@ -127,7 +127,7 @@ public class DistributedStateCreator {
       provisionedQueues.add(defaultQueue);
     }
 
-    return new OperationQueue(provisionedQueues.build(), configs.getBackplane().getMaxQueueDepth());
+    return new ExecutionQueue(provisionedQueues.build(), configs.getBackplane().getMaxQueueDepth());
   }
 
   static List<String> getQueueHashes(UnifiedJedis jedis, String queueName) {
