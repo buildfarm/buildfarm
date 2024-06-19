@@ -69,11 +69,11 @@ gate_lcov_results() {
 
     # get lcov results
     download_lcov
-    lcov_results=`$LCOV_TOOL --summary $traces 2>&1`
+    lcov_results=`./$LCOV_TOOL --summary $traces 2>&1`
 
     # extract our percentage numbers
-    local line_percentage=$(echo "$lcov_results" | tr '\n' ' ' | awk '{print $5}' | sed 's/.$//')
-    local function_percentage=$(echo "$lcov_results" | tr '\n' ' ' | awk '{print $11}' | sed 's/.$//')
+    local line_percentage=$(echo "$lcov_results" | grep '^\s*lines' | awk '{print $2}')
+    local function_percentage=$(echo "$lcov_results" | grep '^\s*functions' | awk '{print $2}')
     line_percentage=${line_percentage%.*}
     function_percentage=${function_percentage%.*}
 
