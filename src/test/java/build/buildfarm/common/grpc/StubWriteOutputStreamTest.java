@@ -164,7 +164,7 @@ public class StubWriteOutputStreamTest {
             /* autoflush= */ true);
 
     boolean callbackTimedOut = false;
-    try (OutputStream out =
+    try (OutputStream ignored =
         write.getOutput(
             1,
             MICROSECONDS,

@@ -84,7 +84,7 @@ public class ByteStreamHelperTest {
         .when(serviceImpl)
         .read(eq(readRequest), any(StreamObserver.class));
 
-    try (InputStream in =
+    try (InputStream ignored =
         ByteStreamHelper.newInput(
             resourceName,
             /* offset= */ 0,
