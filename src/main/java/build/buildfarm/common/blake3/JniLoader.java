@@ -66,6 +66,7 @@ public final class JniLoader {
    * @throws IOException if the resource cannot be extracted or loading the library fails for any
    *     other reason
    */
+  @SuppressWarnings("PMD.UseProperClassLoader")
   private static void loadLibrary(String resourceName) throws IOException {
     Path dir = null;
     Path tempFile = null;

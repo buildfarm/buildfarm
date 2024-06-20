@@ -33,6 +33,7 @@ public final class Classpath {
   }
 
   /** Finds all classes that live in or below the given package. */
+  @SuppressWarnings("PMD.UseProperClassLoader")
   public static Set<Class<?>> findClasses(String packageName) throws ClassPathException {
     Set<Class<?>> result = new LinkedHashSet<>();
     String packagePrefix = (packageName + '.').replace('/', '.');
