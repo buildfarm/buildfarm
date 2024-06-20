@@ -214,6 +214,7 @@ public class S3Bucket {
    * @param secretName The name where the secrets are stored.
    * @return AWS secrets for interacting with the bucket.
    */
+  @SuppressWarnings("PMD.StringInstantiation")
   private static AwsSecret getAwsSecret(String region, String secretName) {
     // create secret manager for fetching secrets
     AWSSecretsManager client = AWSSecretsManagerClientBuilder.standard().withRegion(region).build();
