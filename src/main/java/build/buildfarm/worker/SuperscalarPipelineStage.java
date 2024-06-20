@@ -201,6 +201,6 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
 
   @Override
   protected boolean isClaimed() {
-    return claims.size() > 0;
+    return !claims.isEmpty();
   }
 }
