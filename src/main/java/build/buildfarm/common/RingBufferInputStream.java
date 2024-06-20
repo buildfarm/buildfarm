@@ -30,6 +30,7 @@ public class RingBufferInputStream extends InputStream {
     buffer = new byte[size];
   }
 
+  @Override
   public synchronized void close() {
     closed = true;
     notify();

@@ -42,6 +42,7 @@ public class ByteStringWriteReader implements Runnable {
     completed = false;
   }
 
+  @Override
   public void run() {
     byte[] buffer = new byte[1024 * 16];
     int len;
