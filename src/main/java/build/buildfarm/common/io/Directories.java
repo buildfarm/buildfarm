@@ -111,7 +111,7 @@ public final class Directories {
   public static void remove(Path directory, FileStore fileStore) throws IOException {
     Files.walkFileTree(
         directory,
-        new SimpleFileVisitor<Path>() {
+        new SimpleFileVisitor<>() {
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
               throws IOException {
@@ -147,7 +147,7 @@ public final class Directories {
       throws IOException {
     Files.walkFileTree(
         directory,
-        new SimpleFileVisitor<Path>() {
+        new SimpleFileVisitor<>() {
           @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
             if (e != null) {

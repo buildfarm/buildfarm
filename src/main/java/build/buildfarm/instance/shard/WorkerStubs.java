@@ -34,15 +34,14 @@ import java.util.concurrent.TimeUnit;
 public final class WorkerStubs {
   private WorkerStubs() {}
 
-  @SuppressWarnings("rawtypes")
-  public static LoadingCache create(DigestUtil digestUtil, Duration timeout) {
+  public static LoadingCache<String, Instance> create(DigestUtil digestUtil, Duration timeout) {
     return CacheBuilder.newBuilder()
         .expireAfterAccess(10, TimeUnit.MINUTES)
         .removalListener(
             (RemovalListener<String, Instance>)
                 notification -> stopInstance(notification.getValue()))
         .build(
-            new CacheLoader<String, Instance>() {
+            new CacheLoader<>() {
               @SuppressWarnings("NullableProblems")
               @Override
               public Instance load(String worker) {

@@ -13,7 +13,7 @@ public class DequeueMatchSettings {
   private boolean acceptEverything; // deprecated
 
   private boolean allowUnmatched = false;
-  private List<Property> properties = new ArrayList();
+  private List<Property> properties = new ArrayList<>();
 
   public Platform getPlatform() {
     Platform.Builder platformBuilder = Platform.newBuilder();
@@ -28,7 +28,7 @@ public class DequeueMatchSettings {
   }
 
   public void setPlatform(Platform platform) {
-    ArrayList<Property> properties = new ArrayList();
+    ArrayList<Property> properties = new ArrayList<>();
     for (Platform.Property platformProperty : platform.getPropertiesList()) {
       Property property = new Property();
       property.setName(platformProperty.getName());

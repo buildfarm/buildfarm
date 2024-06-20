@@ -71,10 +71,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private final SettableFuture<Long> writeFuture = SettableFuture.create();
   private boolean wasReset = false;
 
-  @SuppressWarnings({"unchecked", "rawtypes", "Guava"})
+  @SuppressWarnings("Guava")
   private final Supplier<QueryWriteStatusResponse> writeStatus =
       Suppliers.memoize(
-          new Supplier() {
+          new Supplier<>() {
             @Override
             public QueryWriteStatusResponse get() {
               if (wasReset) {

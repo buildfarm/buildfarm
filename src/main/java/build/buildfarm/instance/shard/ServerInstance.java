@@ -255,7 +255,7 @@ public class ServerInstance extends NodeInstance {
   private final ScheduledExecutorService contextDeadlineScheduler =
       newSingleThreadScheduledExecutor();
   private final ExecutorService operationDeletionService = newSingleThreadExecutor();
-  private final BlockingQueue transformTokensQueue = new LinkedBlockingQueue(256);
+  private final BlockingQueue<Object> transformTokensQueue = new LinkedBlockingQueue<>(256);
   private final boolean useDenyList;
   private final Scannable<Operation> operationsList;
   private final Scannable<DispatchedOperation> dispatchedOperationsList;
@@ -475,7 +475,7 @@ public class ServerInstance extends NodeInstance {
                     ListenableFuture<Void> queueFuture = queue(executeEntry, poller, queueTimeout);
                     addCallback(
                         queueFuture,
-                        new FutureCallback<Void>() {
+                        new FutureCallback<>() {
                           @Override
                           public void onSuccess(Void result) {
                             log.log(Level.FINER, "successfully queued " + operationName);
@@ -900,7 +900,7 @@ public class ServerInstance extends NodeInstance {
     Stopwatch stopwatch = Stopwatch.createStarted();
     addCallback(
         workerMissingBlobsFuture,
-        new FutureCallback<Iterable<Digest>>() {
+        new FutureCallback<>() {
           @Override
           public void onSuccess(Iterable<Digest> missingDigests) {
             if (Iterables.isEmpty(missingDigests) || workers.isEmpty()) {
@@ -1277,7 +1277,7 @@ public class ServerInstance extends NodeInstance {
         onFailure(Status.NOT_FOUND.withDescription("No workers found.").asException());
       } else {
         Collections.shuffle(workersList, rand);
-        onQueue(new ArrayDeque<String>(workersList));
+        onQueue(new ArrayDeque<>(workersList));
       }
     }
 
@@ -1430,7 +1430,7 @@ public class ServerInstance extends NodeInstance {
     SettableFuture<Void> future = SettableFuture.create();
     Tree.Builder tree = Tree.newBuilder().setRootDigest(inputRoot);
     Set<Digest> digests = Sets.newConcurrentHashSet();
-    Queue<Digest> remaining = new ConcurrentLinkedQueue();
+    Queue<Digest> remaining = new ConcurrentLinkedQueue<>();
     remaining.offer(inputRoot);
     Context ctx = Context.current();
     TreeCallback callback =
@@ -1909,7 +1909,7 @@ public class ServerInstance extends NodeInstance {
     SettableFuture<Void> requeuedFuture = SettableFuture.create();
     addCallback(
         uploadedFuture,
-        new FutureCallback<QueuedOperationResult>() {
+        new FutureCallback<>() {
           @Override
           public void onSuccess(QueuedOperationResult result) {
             Operation queueOperation =
@@ -2511,7 +2511,7 @@ public class ServerInstance extends NodeInstance {
     // onQueue call?
     addCallback(
         queuedOperationCommittedFuture,
-        new FutureCallback<ProfiledQueuedOperationMetadata>() {
+        new FutureCallback<>() {
           @Override
           public void onSuccess(ProfiledQueuedOperationMetadata profiledQueuedMetadata) {
             QueuedOperationMetadata queuedOperationMetadata =

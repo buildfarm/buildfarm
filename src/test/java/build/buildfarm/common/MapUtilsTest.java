@@ -32,11 +32,10 @@ public class MapUtilsTest {
   // Function under test: incrementValue
   // Reason for testing: empty map goes to 1
   // Failure explanation: increment value not as expected
-  @SuppressWarnings("unchecked")
   @Test
   public void incrementValueEmptyToOne() throws Exception {
     // ARRANGE
-    Map<String, Integer> map = new HashMap();
+    Map<String, Integer> map = new HashMap<>();
 
     // ACT
     MapUtils.incrementValue(map, "foo");
@@ -49,11 +48,10 @@ public class MapUtilsTest {
   // Function under test: incrementValue
   // Reason for testing: empty map can be incremented
   // Failure explanation: incrementing not working as expected
-  @SuppressWarnings("unchecked")
   @Test
   public void incrementValueEmptyIncrementThree() throws Exception {
     // ARRANGE
-    Map<String, Integer> map = new HashMap();
+    Map<String, Integer> map = new HashMap<>();
 
     // ACT
     MapUtils.incrementValue(map, "foo");
@@ -68,11 +66,10 @@ public class MapUtilsTest {
   // Function under test: incrementValue
   // Reason for testing: nonempty map can be incremented
   // Failure explanation: incrementing not working as expected
-  @SuppressWarnings("unchecked")
   @Test
   public void incrementValueNonEmptyIncrement() throws Exception {
     // ARRANGE
-    Map<String, Integer> map = new HashMap();
+    Map<String, Integer> map = new HashMap<>();
 
     // ACT
     map.put("foo", 10);
@@ -86,11 +83,10 @@ public class MapUtilsTest {
   // Function under test: toString
   // Reason for testing: empty map can be printed
   // Failure explanation: empty map not printed as expected
-  @SuppressWarnings("unchecked")
   @Test
   public void toStringEmpty() throws Exception {
     // ARRANGE
-    Map<String, Integer> map = new HashMap();
+    Map<String, Integer> map = new HashMap<>();
 
     // ACT
     String result = MapUtils.toString(map);
@@ -102,11 +98,10 @@ public class MapUtilsTest {
   // Function under test: toString
   // Reason for testing: single element map can be printed
   // Failure explanation: map not printed as expected
-  @SuppressWarnings("unchecked")
   @Test
   public void toStringSingleElement() throws Exception {
     // ARRANGE
-    Map<String, Integer> map = new HashMap();
+    Map<String, Integer> map = new HashMap<>();
     map.put("foo", 1);
 
     // ACT
@@ -119,11 +114,10 @@ public class MapUtilsTest {
   // Function under test: toString
   // Reason for testing: multiple element map can be printed
   // Failure explanation: map not printed as expected
-  @SuppressWarnings("unchecked")
   @Test
   public void toStringMultiElement() throws Exception {
     // ARRANGE
-    Map<String, Integer> map = new HashMap();
+    Map<String, Integer> map = new HashMap<>();
     map.put("foo", 1);
     map.put("bar", 2);
     map.put("baz", 456);
@@ -141,7 +135,7 @@ public class MapUtilsTest {
   @Test
   public void envMapToListEmpty() throws Exception {
     // ARRANGE
-    Map<String, String> map = new HashMap();
+    Map<String, String> map = new HashMap<>();
 
     // ACT
     List<String> result = MapUtils.envMapToList(map);
@@ -156,7 +150,7 @@ public class MapUtilsTest {
   @Test
   public void envMapToListConversion() throws Exception {
     // ARRANGE
-    Map<String, String> map = new HashMap();
+    Map<String, String> map = new HashMap<>();
     map.put("KEY1", "VAL1");
     map.put("KEY2", "VAL2");
     map.put("KEY3", "VAL3");

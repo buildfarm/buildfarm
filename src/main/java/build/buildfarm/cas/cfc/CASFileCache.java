@@ -199,7 +199,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               1, MINUTES) // hopefully long enough for any of our file ops to take place and prevent
           // collision
           .build(
-              new CacheLoader<String, Lock>() {
+              new CacheLoader<>() {
                 @Override
                 public Lock load(String key) {
                   // should be sufficient for what we're doing
@@ -213,7 +213,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               (RemovalListener<BlobWriteKey, Write>)
                   notification -> notification.getValue().reset())
           .build(
-              new CacheLoader<BlobWriteKey, Write>() {
+              new CacheLoader<>() {
                 @SuppressWarnings("NullableProblems")
                 @Override
                 public Write load(BlobWriteKey key) {
@@ -230,7 +230,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     notification.getValue().setException(new IOException("write cancelled"));
                   })
           .build(
-              new CacheLoader<Digest, SettableFuture<Long>>() {
+              new CacheLoader<>() {
                 @SuppressWarnings("NullableProblems")
                 @Override
                 public SettableFuture<Long> load(Digest digest) {

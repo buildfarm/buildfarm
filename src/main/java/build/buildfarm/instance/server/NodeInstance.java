@@ -1577,7 +1577,7 @@ public abstract class NodeInstance implements Instance {
     SettableFuture<T> future = SettableFuture.create();
     Futures.addCallback(
         getBlobFuture(Compressor.Value.IDENTITY, digest, requestMetadata),
-        new FutureCallback<ByteString>() {
+        new FutureCallback<>() {
           @Override
           public void onSuccess(ByteString blob) {
             try {

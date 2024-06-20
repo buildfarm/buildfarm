@@ -639,7 +639,7 @@ class ShardWorkerContext implements WorkerContext {
     OutputDirectoryContext outputRoot = new OutputDirectoryContext();
     Files.walkFileTree(
         outputDirPath,
-        new SimpleFileVisitor<Path>() {
+        new SimpleFileVisitor<>() {
           OutputDirectoryContext currentDirectory = null;
           final Stack<OutputDirectoryContext> path = new Stack<>();
 

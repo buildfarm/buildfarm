@@ -38,13 +38,11 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   }
 
   private static class OperationQueueMatchListener implements MatchListener {
-    @SuppressWarnings("rawtypes")
-    private final InterruptingPredicate onMatch;
+    private final InterruptingPredicate<QueueEntry> onMatch;
 
     private static final QueueEntry queueEntry = null;
 
-    @SuppressWarnings("rawtypes")
-    OperationQueueMatchListener(InterruptingPredicate onMatch) {
+    OperationQueueMatchListener(InterruptingPredicate<QueueEntry> onMatch) {
       this.onMatch = onMatch;
     }
 
@@ -54,7 +52,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     @Override
     public void onWaitEnd() {}
 
-    @SuppressWarnings("unchecked")
     @Override
     public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
       return onMatch.testInterruptibly(queueEntry);

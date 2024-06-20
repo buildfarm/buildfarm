@@ -68,7 +68,7 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
   @SuppressWarnings("NullableProblems")
   @Override
   public Iterator<Path> iterator() {
-    return new Iterator<Path>() {
+    return new Iterator<>() {
       long counter;
 
       @Override
