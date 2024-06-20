@@ -2,7 +2,7 @@
 # Run from the root of repository.
 # This script will perform static analysis on all of the java source files.
 
-PMD_TOOL_URL=https://github.com/pmd/pmd/releases/download/pmd_releases%2F6.55.0/pmd-bin-6.55.0.zip
+PMD_TOOL_URL=https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.2.0/pmd-dist-7.2.0-bin.zip
 LOCAL_DOWNLOAD_NAME="pmd.zip"
 TOOL_FOLDER="pmd"
 
@@ -42,7 +42,7 @@ download_tool () {
 
 # The tool should return non-zero if there are violations
 run_static_analysis_checks () {
-    pmd/bin/run.sh pmd -R $STATIC_ANALYSIS_RULESET --format text --relativize-paths-with src --report-file $STATIC_ANALYSIS_REPORT_FILE --dir src
+    pmd/bin/pmd check -R $STATIC_ANALYSIS_RULESET --format text --threads 4 --relativize-paths-with src --report-file $STATIC_ANALYSIS_REPORT_FILE --dir src
 }
 
 analyze_static_analysis_results () {
@@ -60,7 +60,7 @@ analyze_static_analysis_results () {
 }
 
 run_code_duplication_check () {
-    pmd/bin/run.sh cpd --format $CODE_DUPLICATION_FORMAT --minimum-tokens $CODE_DUPLICATION_MIN_TOKENS --dir src/main src/test/java > $CODE_DUPLICATION_REPORT_FILE
+    pmd/bin/pmd cpd --format $CODE_DUPLICATION_FORMAT --minimum-tokens $CODE_DUPLICATION_MIN_TOKENS --dir src/main src/test/java > $CODE_DUPLICATION_REPORT_FILE
 }
 
 analyze_code_duplication_results () {
