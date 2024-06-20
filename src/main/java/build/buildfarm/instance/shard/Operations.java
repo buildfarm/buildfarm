@@ -21,8 +21,6 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.redis.OffsetScanner;
 import build.buildfarm.common.redis.RedisMap;
-import build.buildfarm.v1test.CompletedOperationMetadata;
-import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -49,8 +47,6 @@ public class Operations {
       JsonFormat.parser()
           .usingTypeRegistry(
               JsonFormat.TypeRegistry.newBuilder()
-                  .add(CompletedOperationMetadata.getDescriptor())
-                  .add(ExecutingOperationMetadata.getDescriptor())
                   .add(ExecuteOperationMetadata.getDescriptor())
                   .add(QueuedOperationMetadata.getDescriptor())
                   .add(PreconditionFailure.getDescriptor())
