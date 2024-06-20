@@ -9,7 +9,7 @@ TOOL_FOLDER="pmd"
 # Settings for static analysis checks
 RUN_STATIC_ANALYSIS_CHECKS=true
 STATIC_ANALYSIS_RULESET=".bazelci/static_analysis_checks.xml"
-STATIC_ANALYSIS_REPORT_FILE="$(mktemp -t static_analysis.txt)"
+STATIC_ANALYSIS_REPORT_FILE="$(mktemp -t static_analysis.txt.XXXX)"
 
 # Settings for code duplication detection
 RUN_CODE_DUPLICATION_CHECK=true
