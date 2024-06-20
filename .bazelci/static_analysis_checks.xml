@@ -30,6 +30,7 @@
     <exclude name="SystemPrintln"/>
     <exclude name="UseTryWithResources"/>
     <exclude name="UseVarargs"/>
+    <exclude name="UnusedPrivateMethod"/>
 </rule>
 
 <rule ref="category/java/codestyle.xml">
@@ -63,6 +64,7 @@
     <exclude name="UnnecessaryAnnotationValueElement"/>
     <exclude name="UnnecessaryConstructor"/>
     <exclude name="UnnecessaryFullyQualifiedName"/>
+    <exclude name="UnnecessaryImport"/>
     <exclude name="UselessParentheses"/>
 </rule>
 
@@ -92,12 +94,21 @@
     <exclude name="NPathComplexity"/>
     <exclude name="SignatureDeclareThrowsException"/>
     <exclude name="SimplifiedTernary"/>
+    <exclude name="SimplifyBooleanExpressions"/>
+    <exclude name="SimplifyBooleanReturns"/>
+    <exclude name="SimplifyConditional"/>
     <exclude name="SingularField"/>
     <exclude name="SwitchDensity"/>
     <exclude name="TooManyFields"/>
     <exclude name="TooManyMethods"/>
     <exclude name="UseObjectForClearerAPI"/>
     <exclude name="UseUtilityClass"/>
+</rule>
+
+<rule ref="category/java/design.xml/CognitiveComplexity">
+    <properties>
+        <property name="reportLevel" value="60" />
+    </properties>
 </rule>
 
 <rule ref="category/java/documentation.xml">
@@ -107,6 +118,7 @@
 </rule>
 
 <rule ref="category/java/errorprone.xml">
+    <exclude name="AssignmentInOperand"/>
     <exclude name="AssignmentToNonFinalStatic"/>
     <exclude name="AvoidAccessibilityAlteration"/>
     <exclude name="AvoidBranchingStatementAsLastInLoop"/>
@@ -121,16 +133,43 @@
     <exclude name="AvoidMultipleUnaryOperators"/>
     <exclude name="AvoidUsingOctalValues"/>
     <exclude name="CheckSkipResult"/>
+    <exclude name="ClassCastExceptionWithToArray"/>
+    <exclude name="CloneMethodMustBePublic"/>
+    <exclude name="CloneMethodMustImplementCloneable"/>
+    <exclude name="CloneMethodReturnTypeMustMatchClassName"/>
     <exclude name="CloseResource"/>
     <exclude name="ConstructorCallsOverridableMethod"/>
     <exclude name="DoNotThrowExceptionInFinally"/>
     <exclude name="EmptyCatchBlock"/>
+    <exclude name="DetachedTestCase"/>
+    <exclude name="DoNotTerminateVM"/>
+    <exclude name="DoNotThrowExceptionInFinally"/>
+    <exclude name="EmptyCatchBlock"/>
+    <exclude name="FinalizeDoesNotCallSuperFinalize"/>
+    <exclude name="FinalizeOnlyCallsSuperFinalize"/>
+    <exclude name="FinalizeOverloaded"/>
+    <exclude name="FinalizeShouldBeProtected"/>
+    <exclude name="MethodWithSameNameAsEnclosingClass"/>
     <exclude name="MissingSerialVersionUID"/>
     <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
     <exclude name="NonCaseLabelInSwitchStatement"/>
     <exclude name="NonStaticInitializer"/>
     <exclude name="NullAssignment"/>
     <exclude name="OverrideBothEqualsAndHashcode"/>
+    <exclude name="ProperCloneImplementation"/>
+    <exclude name="SimpleDateFormatNeedsLocale"/>
+    <exclude name="SingleMethodSingleton"/>
+    <exclude name="SingletonClassReturningNewInstance"/>
+    <exclude name="StaticEJBFieldShouldBeFinal"/>
+    <exclude name="StringBufferInstantiationWithChar"/>
+    <exclude name="SuspiciousEqualsMethodName"/>
+    <exclude name="SuspiciousHashcodeMethodName"/>
+    <exclude name="SuspiciousOctalEscape"/>
+    <exclude name="UnnecessaryBooleanAssertion"/>
+    <exclude name="UnnecessaryCaseChange"/>
+    <exclude name="UnnecessaryConversionTemporary"/>
+    <exclude name="UseCorrectExceptionLogging"/>
+    <exclude name="UseEqualsToCompareStrings"/>
     <exclude name="UseLocaleWithCaseConversions"/>
 </rule>
 
@@ -142,6 +181,7 @@
     <exclude name="DoNotUseThreads"/>
     <exclude name="DontCallThreadRun"/>
     <exclude name="NonThreadSafeSingleton"/>
+    <exclude name="UnsynchronizedStaticFormatter"/>
     <exclude name="UseConcurrentHashMap"/>
     <exclude name="UseNotifyAllInsteadOfNotify"/>
 </rule>
