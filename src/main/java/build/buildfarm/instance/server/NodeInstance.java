@@ -440,11 +440,11 @@ public abstract class NodeInstance implements Instance {
       return null;
     }
 
-    if ((!blob.isEmpty() && (long) 0 >= blob.size()) || count < 0) {
+    if ((!blob.isEmpty() && 0 >= blob.size()) || count < 0) {
       throw new IndexOutOfBoundsException();
     }
 
-    return blob.getData().substring((int) (long) 0, (int) (Math.min(count, blob.size())));
+    return blob.getData().substring(0, (int) (Math.min(count, blob.size())));
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
