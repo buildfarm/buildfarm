@@ -40,8 +40,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   private static class OperationQueueMatchListener implements MatchListener {
     private final InterruptingPredicate<QueueEntry> onMatch;
 
-    private static final QueueEntry queueEntry = null;
-
     OperationQueueMatchListener(InterruptingPredicate<QueueEntry> onMatch) {
       this.onMatch = onMatch;
     }
