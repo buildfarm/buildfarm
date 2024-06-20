@@ -418,7 +418,8 @@ class CASFileCacheTest {
     entry.after = entry;
     storage.put(nonexistentKey, entry);
     NoSuchFileException noSuchFileException = null;
-    try (InputStream in = fileCache.newInput(Compressor.Value.IDENTITY, nonexistentDigest, 0)) {
+    try (InputStream ignored =
+        fileCache.newInput(Compressor.Value.IDENTITY, nonexistentDigest, 0)) {
       fail("should not get here");
     } catch (NoSuchFileException e) {
       noSuchFileException = e;
@@ -658,7 +659,7 @@ class CASFileCacheTest {
               }
             });
     closer.start();
-    try (OutputStream secondOut = write.getOutput(1, SECONDS, () -> {})) {
+    try (OutputStream ignored = write.getOutput(1, SECONDS, () -> {})) {
       assertThat(writeClosed.get()).isTrue();
     }
     write.reset(); // ensure that the output stream is closed
@@ -909,7 +910,7 @@ class CASFileCacheTest {
     // state of CAS
     //   1024-byte key
 
-    AtomicReference<Throwable> exRef = new AtomicReference<>(null);
+    AtomicReference<Throwable> exRef = new AtomicReference(null);
     // 0 = not blocking
     // 1 = blocking
     // 2 = delegate write
