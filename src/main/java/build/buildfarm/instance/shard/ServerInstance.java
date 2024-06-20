@@ -1489,21 +1489,18 @@ public class ServerInstance extends NodeInstance {
     }
 
     BiFunction<Digest, Executor, CompletableFuture<Directory>> getCallback =
-        new BiFunction<Digest, Executor, CompletableFuture<Directory>>() {
-          @Override
-          public CompletableFuture<Directory> apply(Digest digest, Executor executor) {
-            log.log(
-                Level.FINER,
-                format(
-                    "transformQueuedOperation(%s): fetching directory %s",
-                    reason, DigestUtil.toString(directoryBlobDigest)));
+        (digest, executor) -> {
+          log.log(
+              Level.FINER,
+              format(
+                  "transformQueuedOperation(%s): fetching directory %s",
+                  reason, DigestUtil.toString(directoryBlobDigest)));
 
-            Supplier<ListenableFuture<Directory>> fetcher =
-                () ->
-                    notFoundNull(
-                        expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
-            return toCompletableFuture(fetcher.get());
-          }
+          Supplier<ListenableFuture<Directory>> fetcher =
+              () ->
+                  notFoundNull(
+                      expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
+          return toCompletableFuture(fetcher.get());
         };
 
     return toListenableFuture(directoryCache.get(directoryBlobDigest, getCallback));
@@ -1530,15 +1527,12 @@ public class ServerInstance extends NodeInstance {
   ListenableFuture<Command> expectCommand(
       Digest commandBlobDigest, RequestMetadata requestMetadata) {
     BiFunction<Digest, Executor, CompletableFuture<Command>> getCallback =
-        new BiFunction<Digest, Executor, CompletableFuture<Command>>() {
-          @Override
-          public CompletableFuture<Command> apply(Digest digest, Executor executor) {
-            Supplier<ListenableFuture<Command>> fetcher =
-                () ->
-                    notFoundNull(
-                        expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
-            return toCompletableFuture(fetcher.get());
-          }
+        (digest, executor) -> {
+          Supplier<ListenableFuture<Command>> fetcher =
+              () ->
+                  notFoundNull(
+                      expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
+          return toCompletableFuture(fetcher.get());
         };
 
     return toListenableFuture(commandCache.get(commandBlobDigest, getCallback));
@@ -1546,15 +1540,12 @@ public class ServerInstance extends NodeInstance {
 
   ListenableFuture<Action> expectAction(Digest actionBlobDigest, RequestMetadata requestMetadata) {
     BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
-        new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
-          @Override
-          public CompletableFuture<Action> apply(Digest digest, Executor executor) {
-            Supplier<ListenableFuture<Action>> fetcher =
-                () ->
-                    notFoundNull(
-                        expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
-            return toCompletableFuture(fetcher.get());
-          }
+        (digest, executor) -> {
+          Supplier<ListenableFuture<Action>> fetcher =
+              () ->
+                  notFoundNull(
+                      expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
+          return toCompletableFuture(fetcher.get());
         };
 
     return toListenableFuture(digestToActionCache.get(actionBlobDigest, getCallback));
