@@ -56,7 +56,7 @@ public final class OperationContext {
     this.queueEntry = queueEntry;
   }
 
-  public static class Builder {
+  public static final class Builder {
     private ExecuteResponse.Builder executeResponse;
     private Operation operation;
     private QueuedOperationMetadata.Builder metadata;

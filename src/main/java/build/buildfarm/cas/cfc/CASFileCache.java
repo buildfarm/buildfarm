@@ -3156,7 +3156,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  private static class SentinelEntry extends Entry {
+  private static final class SentinelEntry extends Entry {
     @Override
     public void unlink() {
       throw new UnsupportedOperationException("sentinal cannot be unlinked");

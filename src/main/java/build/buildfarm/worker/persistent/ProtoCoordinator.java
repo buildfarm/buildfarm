@@ -251,7 +251,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     }
   }
 
-  private class RequestTimeoutHandler extends TimerTask {
+  private final class RequestTimeoutHandler extends TimerTask {
     private final RequestCtx request;
 
     private RequestTimeoutHandler(RequestCtx request) {

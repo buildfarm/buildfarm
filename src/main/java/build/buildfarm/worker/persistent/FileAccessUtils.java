@@ -51,7 +51,7 @@ public final class FileAccessUtils {
   private static final ConcurrentHashMap<Path, PathLock> fileLocks = new ConcurrentHashMap<>();
 
   // Used here as a simple lock for locking "files" (paths)
-  private static class PathLock {
+  private static final class PathLock {
     // Not used elsewhere
     private PathLock() {}
   }

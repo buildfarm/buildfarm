@@ -71,7 +71,7 @@ public class RedisShardSubscriberTest {
   }
 
   @SuppressWarnings("PMD.TestClassWithoutTestCases")
-  private static class TestConnection extends Connection {
+  private static final class TestConnection extends Connection {
     private final Set<Rawable> subscriptions = Sets.newConcurrentHashSet();
     private final BlockingQueue<Runnable> pendingRequests = new LinkedBlockingQueue<>();
     private final BlockingQueue<Object> replyQueue = new LinkedBlockingQueue<>();

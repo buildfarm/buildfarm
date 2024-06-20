@@ -40,7 +40,7 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
   private ByteArrayInputStream inner;
   private final ZstdInputStreamNoFinalizer zis;
 
-  private static class ZstdDInBufferFactory extends BasePooledObjectFactory<ByteBuffer> {
+  private static final class ZstdDInBufferFactory extends BasePooledObjectFactory<ByteBuffer> {
     static int getBufferSize() {
       return (int) ZstdInputStreamNoFinalizer.recommendedDInSize();
     }
