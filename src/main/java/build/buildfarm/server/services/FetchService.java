@@ -90,18 +90,12 @@ public class FetchService extends FetchImplBase {
     FetchQualifiers qualifiers = parseQualifiers(request.getQualifiersList());
 
     expectedDigest = qualifiers.getDigest();
-    if (expectedDigest.equals(Digest.getDefaultInstance())) {
-      responseObserver.onError(
-          Status.INVALID_ARGUMENT
-              .withDescription(format("Missing qualifier '%s'", QUALIFIER_CHECKSUM_SRI))
-              .asException());
-      return;
-    }
 
     // TODO consider doing something with QUALIFIER_CANONICAL_ID
 
     Digest.Builder result = Digest.newBuilder();
-    if (instance.containsBlob(expectedDigest, result, requestMetadata)) {
+    if (!expectedDigest.equals(Digest.getDefaultInstance())
+        && instance.containsBlob(expectedDigest, result, requestMetadata)) {
       responseObserver.onNext(FetchBlobResponse.newBuilder().setBlobDigest(result.build()).build());
       responseObserver.onCompleted();
       return;

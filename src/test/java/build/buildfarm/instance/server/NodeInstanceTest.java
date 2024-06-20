@@ -73,6 +73,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.rpc.PreconditionFailure;
@@ -747,11 +748,13 @@ public class NodeInstanceTest {
     NodeInstance instance = new DummyServerInstance(contentAddressableStorage, null);
     RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
     Write write = mock(Write.class);
+    SettableFuture<Long> future = SettableFuture.create();
 
     FeedbackOutputStream writeCompleteOutputStream =
         new FeedbackOutputStream() {
           @Override
           public void write(int n) throws WriteCompleteException {
+            future.set((long) content.size());
             throw new WriteCompleteException();
           }
 
@@ -762,6 +765,7 @@ public class NodeInstanceTest {
         };
     when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
         .thenReturn(writeCompleteOutputStream);
+    when(write.getFuture()).thenReturn(future);
     when(contentAddressableStorage.getWrite(
             eq(Compressor.Value.IDENTITY), eq(contentDigest), any(UUID.class), eq(requestMetadata)))
         .thenReturn(write);
