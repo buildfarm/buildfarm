@@ -1328,6 +1328,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class NativeFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public NativeFileDirsIndexInMemoryCASFileCacheTest() throws IOException {
       super(createTempDirectory(), /* storeFileDirsIndexInMemory= */ true);
@@ -1342,6 +1343,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class NativeFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
     public NativeFileDirsIndexInSqliteCASFileCacheTest() throws IOException {
       super(createTempDirectory(), /* storeFileDirsIndexInMemory= */ false);
@@ -1356,6 +1358,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class OsXFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public OsXFileDirsIndexInMemoryCASFileCacheTest() {
       super(
@@ -1371,6 +1374,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class OsXFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
     public OsXFileDirsIndexInSqliteCASFileCacheTest() {
       super(
@@ -1386,6 +1390,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class UnixFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public UnixFileDirsIndexInMemoryCASFileCacheTest() {
       super(
@@ -1401,6 +1406,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class UnixFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
     public UnixFileDirsIndexInSqliteCASFileCacheTest() {
       super(
@@ -1416,6 +1422,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class WindowsFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public WindowsFileDirsIndexInMemoryCASFileCacheTest() {
       super(
@@ -1431,6 +1438,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class WindowsFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
     public WindowsFileDirsIndexInSqliteCASFileCacheTest() {
       super(
