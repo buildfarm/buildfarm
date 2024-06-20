@@ -65,6 +65,7 @@ public final class TracingMetadataUtils {
   /** GRPC interceptor to add logging metadata to the GRPC context. */
   public static class ServerHeadersInterceptor implements ServerInterceptor {
     @Override
+    @SuppressWarnings("PMD.GenericsNaming")
     public <ReqT, RespT> Listener<ReqT> interceptCall(
         ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
       RequestMetadata meta = requestMetadataFromHeaders(headers);
