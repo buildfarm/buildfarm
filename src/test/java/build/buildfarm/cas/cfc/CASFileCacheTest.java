@@ -25,6 +25,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
@@ -705,12 +706,9 @@ class CASFileCacheTest {
     // update entry with expired deadline
     storage.get(key).existsDeadline = Deadline.after(0, SECONDS);
 
-    try (InputStream in =
-        fileCache.newInput(Compressor.Value.IDENTITY, blob.getDigest(), /* offset= */ 0)) {
-      fail("should not get here");
-    } catch (NoSuchFileException e) {
-      // success
-    }
+    assertThrows(
+        NoSuchFileException.class,
+        () -> fileCache.newInput(Compressor.Value.IDENTITY, blob.getDigest(), /* offset= */ 0));
     assertThat(storage.containsKey(key)).isFalse();
   }
 
@@ -1207,14 +1205,9 @@ class CASFileCacheTest {
         };
     ByteString blob = ByteString.copyFromUtf8("Missing Entry");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
-    NoSuchFileException expected = null;
-    try (InputStream in =
-        undelegatedCAS.newInput(Compressor.Value.IDENTITY, blobDigest, /* offset= */ 0)) {
-      fail("should not get here");
-    } catch (NoSuchFileException e) {
-      expected = e;
-    }
-    assertThat(expected).isNotNull();
+    assertThrows(
+        NoSuchFileException.class,
+        () -> undelegatedCAS.newInput(Compressor.Value.IDENTITY, blobDigest, /* offset= */ 0));
   }
 
   @Test
