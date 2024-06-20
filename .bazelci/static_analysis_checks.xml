@@ -24,8 +24,6 @@
     <exclude name="JUnitTestsShouldIncludeAssert"/>
     <exclude name="LiteralsFirstInComparisons"/>
     <exclude name="LooseCoupling"/>
-    <exclude name="PositionLiteralsFirstInCaseInsensitiveComparisons"/>
-    <exclude name="PositionLiteralsFirstInComparisons"/>
     <exclude name="PreserveStackTrace"/>
     <exclude name="ReplaceEnumerationWithIterator"/>
     <exclude name="SwitchStmtsShouldHaveDefault"/>
@@ -37,10 +35,7 @@
 <rule ref="category/java/codestyle.xml">
     <exclude name="LongVariable"/> <!-- some of these long variable names are helpful -->
     <exclude name="UseUnderscoresInNumericLiterals"/> <!-- these underscores are deemed annoying -->
-    <exclude name="AbstractNaming"/>
     <exclude name="AtLeastOneConstructor"/>
-    <exclude name="AvoidFinalLocalVariable"/>
-    <exclude name="AvoidPrefixingMethodParameters"/>
     <exclude name="AvoidProtectedFieldInFinalClass"/>
     <exclude name="AvoidProtectedMethodInFinalClassNotExtending"/>
     <exclude name="CallSuperInConstructor"/>
@@ -48,12 +43,10 @@
     <exclude name="CommentDefaultAccessModifier"/>
     <exclude name="ConfusingTernary"/>
     <exclude name="ControlStatementBraces"/>
-    <exclude name="DefaultPackage"/>
     <exclude name="EmptyMethodInAbstractClassShouldBeAbstract"/>
     <exclude name="FieldDeclarationsShouldBeAtStartOfClass"/>
     <exclude name="FieldNamingConventions"/>
     <exclude name="FormalParameterNamingConventions"/>
-    <exclude name="GenericsNaming"/>
     <exclude name="LinguisticNaming"/>
     <exclude name="LocalInterfaceSessionNamingConvention"/>
     <exclude name="LocalVariableCouldBeFinal"/>
@@ -61,13 +54,11 @@
     <exclude name="MDBAndSessionBeanNamingConvention"/>
     <exclude name="MethodArgumentCouldBeFinal"/>
     <exclude name="MethodNamingConventions"/>
-    <exclude name="MIsLeadingVariableName"/>
     <exclude name="OnlyOneReturn"/>
     <exclude name="PrematureDeclaration"/>
     <exclude name="ShortClassName"/>
     <exclude name="ShortMethodName"/>
     <exclude name="ShortVariable"/>
-    <exclude name="SuspiciousConstantFieldName"/>
     <exclude name="TooManyStaticImports"/>
     <exclude name="UnnecessaryAnnotationValueElement"/>
     <exclude name="UnnecessaryConstructor"/>
@@ -89,9 +80,7 @@
     <exclude name="CyclomaticComplexity"/>
     <exclude name="DataClass"/>
     <exclude name="ExceptionAsFlowControl"/>
-    <exclude name="ExcessiveClassLength"/>
     <exclude name="ExcessiveImports"/>
-    <exclude name="ExcessiveMethodLength"/>
     <exclude name="ExcessiveParameterList"/>
     <exclude name="ExcessivePublicCount"/>
     <exclude name="GodClass"/>
@@ -99,16 +88,11 @@
     <exclude name="LawOfDemeter"/>
     <exclude name="LogicInversion"/>
     <exclude name="LoosePackageCoupling"/>
-    <exclude name="ModifiedCyclomaticComplexity"/>
-    <exclude name="NcssConstructorCount"/>
     <exclude name="NcssCount"/>
-    <exclude name="NcssMethodCount"/>
-    <exclude name="NcssTypeCount"/>
     <exclude name="NPathComplexity"/>
     <exclude name="SignatureDeclareThrowsException"/>
     <exclude name="SimplifiedTernary"/>
     <exclude name="SingularField"/>
-    <exclude name="StdCyclomaticComplexity"/>
     <exclude name="SwitchDensity"/>
     <exclude name="TooManyFields"/>
     <exclude name="TooManyMethods"/>
@@ -123,7 +107,6 @@
 </rule>
 
 <rule ref="category/java/errorprone.xml">
-    <exclude name="AssignmentInOperand"/>
     <exclude name="AssignmentToNonFinalStatic"/>
     <exclude name="AvoidAccessibilityAlteration"/>
     <exclude name="AvoidBranchingStatementAsLastInLoop"/>
@@ -140,21 +123,15 @@
     <exclude name="CheckSkipResult"/>
     <exclude name="CloseResource"/>
     <exclude name="ConstructorCallsOverridableMethod"/>
-    <exclude name="DataflowAnomalyAnalysis"/>
     <exclude name="DoNotThrowExceptionInFinally"/>
     <exclude name="EmptyCatchBlock"/>
-    <exclude name="EmptyIfStmt"/>
-    <exclude name="EmptyInitializer"/>
-    <exclude name="EmptyWhileStmt"/>
     <exclude name="MissingSerialVersionUID"/>
     <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
     <exclude name="NonCaseLabelInSwitchStatement"/>
     <exclude name="NonStaticInitializer"/>
     <exclude name="NullAssignment"/>
     <exclude name="OverrideBothEqualsAndHashcode"/>
-    <exclude name="ReturnEmptyArrayRatherThanNull"/>
     <exclude name="UseLocaleWithCaseConversions"/>
-    <exclude name="UseProperClassLoader"/>
 </rule>
 
 
