@@ -76,6 +76,7 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.net.URL;
 import build.buildfarm.common.resources.BlobInformation;
 import build.buildfarm.common.resources.DownloadBlobRequest;
@@ -617,12 +618,16 @@ public abstract class NodeInstance implements Instance {
     return iter.toNextPageToken();
   }
 
-  private interface ContentOutputStreamFactory {
-    OutputStream create(long contentLength) throws IOException;
+  private interface ContentWriteFactory {
+    Write create(Digest digest) throws IOException;
   }
 
-  private static void downloadUrl(
-      URL url, Map<String, String> headers, ContentOutputStreamFactory getContentOutputStream)
+  private static ListenableFuture<Digest> downloadUrl(
+      URL url,
+      String expectedHash,
+      Map<String, String> headers,
+      DigestUtil digestUtil,
+      ContentWriteFactory getContentWrite)
       throws IOException {
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
     // connect timeout?
@@ -647,10 +652,33 @@ public abstract class NodeInstance implements Instance {
       throw new IOException(message);
     }
 
-    try (InputStream in = connection.getInputStream();
-        OutputStream out = getContentOutputStream.create(contentLength)) {
-      ByteStreams.copy(in, out);
+    IOSupplier<InputStream> inSupplier;
+    if (expectedHash.isEmpty() || contentLength < 0) {
+      // not great, plenty risky for large objects
+      ByteString data;
+      try (InputStream in = connection.getInputStream()) {
+        data = ByteString.readFrom(connection.getInputStream());
+      }
+      if (expectedHash.isEmpty()) {
+        expectedHash = digestUtil.computeHash(data).toString();
+      }
+      contentLength = data.size();
+      inSupplier = () -> data.newInput();
+    } else {
+      inSupplier = connection::getInputStream;
     }
+    Digest digest = Digest.newBuilder().setHash(expectedHash).setSizeBytes(contentLength).build();
+
+    Write write = getContentWrite.create(digest);
+
+    try (InputStream in = inSupplier.get();
+        OutputStream out = write.getOutput(1, DAYS, () -> {})) {
+      ByteStreams.copy(in, out);
+    } catch (Write.WriteCompleteException e) {
+      // ignore - completed write transform below delivers early result, future should be done
+    }
+
+    return transform(write.getFuture(), committedSize -> digest, directExecutor());
   }
 
   @Override
@@ -677,29 +705,26 @@ public abstract class NodeInstance implements Instance {
       Digest expectedDigest,
       RequestMetadata requestMetadata) {
     for (URL url : urls) {
-      Digest.Builder actualDigestBuilder = expectedDigest.toBuilder();
       try {
         // some minor abuse here, we want the download to set our built digest size as side effect
-        downloadUrl(
+        return downloadUrl(
             url,
+            expectedDigest.getHash(),
             headers,
-            contentLength -> {
-              Digest actualDigest = actualDigestBuilder.setSizeBytes(contentLength).build();
-              if (expectedDigest.getSizeBytes() >= 0
-                  && expectedDigest.getSizeBytes() != contentLength) {
+            digestUtil,
+            actualDigest -> {
+              if (!expectedDigest.getHash().isEmpty()
+                  && expectedDigest.getSizeBytes() >= 0
+                  && expectedDigest.getSizeBytes() != actualDigest.getSizeBytes()) {
                 throw new DigestMismatchException(actualDigest, expectedDigest);
               }
               return getBlobWrite(
-                      Compressor.Value.IDENTITY,
-                      actualDigest,
-                      digestUtil.getDigestFunction(),
-                      UUID.randomUUID(),
-                      requestMetadata)
-                  .getOutput(1, DAYS, () -> {});
+                  Compressor.Value.IDENTITY,
+                  actualDigest,
+                  digestUtil.getDigestFunction(),
+                  UUID.randomUUID(),
+                  requestMetadata);
             });
-        return immediateFuture(actualDigestBuilder.build());
-      } catch (Write.WriteCompleteException e) {
-        return immediateFuture(actualDigestBuilder.build());
       } catch (Exception e) {
         log.log(Level.WARNING, "download attempt failed", e);
         // ignore?
