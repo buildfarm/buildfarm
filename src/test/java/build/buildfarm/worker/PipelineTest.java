@@ -170,7 +170,6 @@ public class PipelineTest {
                   pipeline.join();
                 } catch (InterruptedException e) {
                 }
-                return;
               })
           .get(1, TimeUnit.SECONDS);
     } catch (TimeoutException e) {
