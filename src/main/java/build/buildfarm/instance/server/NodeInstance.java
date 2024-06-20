@@ -1405,7 +1405,7 @@ public abstract class NodeInstance implements Instance {
   }
 
   // this deserves a real async execute, but not now
-  @SuppressWarnings("ConstantConditions")
+  @SuppressWarnings({"ConstantConditions", "PMD.UseDiamondOperator"})
   @Override
   public ListenableFuture<Void> execute(
       Digest actionDigest,
