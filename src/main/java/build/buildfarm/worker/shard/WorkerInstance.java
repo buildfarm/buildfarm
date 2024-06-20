@@ -38,8 +38,6 @@ import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.NodeInstance;
 import build.buildfarm.v1test.BackplaneStatus;
-import build.buildfarm.v1test.CompletedOperationMetadata;
-import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
@@ -296,34 +294,6 @@ public class WorkerInstance extends NodeInstance {
         log.log(
             Level.SEVERE,
             String.format("error unpacking queued operation metadata from %s", operation.getName()),
-            e);
-        return null;
-      }
-    } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
-      try {
-        return operation
-            .getMetadata()
-            .unpack(ExecutingOperationMetadata.class)
-            .getExecuteOperationMetadata();
-      } catch (InvalidProtocolBufferException e) {
-        log.log(
-            Level.SEVERE,
-            String.format(
-                "error unpacking executing operation metadata from %s", operation.getName()),
-            e);
-        return null;
-      }
-    } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
-      try {
-        return operation
-            .getMetadata()
-            .unpack(CompletedOperationMetadata.class)
-            .getExecuteOperationMetadata();
-      } catch (InvalidProtocolBufferException e) {
-        log.log(
-            Level.SEVERE,
-            String.format(
-                "error unpacking completed operation metadata from %s", operation.getName()),
             e);
         return null;
       }

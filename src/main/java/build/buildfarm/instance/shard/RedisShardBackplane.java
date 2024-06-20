@@ -40,10 +40,8 @@ import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.BackplaneStatus;
-import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
-import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTime;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -107,8 +105,6 @@ public class RedisShardBackplane implements Backplane {
       JsonFormat.printer()
           .usingTypeRegistry(
               JsonFormat.TypeRegistry.newBuilder()
-                  .add(CompletedOperationMetadata.getDescriptor())
-                  .add(ExecutingOperationMetadata.getDescriptor())
                   .add(ExecuteOperationMetadata.getDescriptor())
                   .add(QueuedOperationMetadata.getDescriptor())
                   .add(PreconditionFailure.getDescriptor())
@@ -1062,16 +1058,6 @@ public class RedisShardBackplane implements Backplane {
     if (queuedOperationMetadata != null) {
       return queuedOperationMetadata.getRequestMetadata();
     }
-    ExecutingOperationMetadata executingOperationMetadata =
-        maybeExecutingOperationMetadata(name, metadata);
-    if (executingOperationMetadata != null) {
-      return executingOperationMetadata.getRequestMetadata();
-    }
-    CompletedOperationMetadata completedOperationMetadata =
-        maybeCompletedOperationMetadata(name, metadata);
-    if (completedOperationMetadata != null) {
-      return completedOperationMetadata.getRequestMetadata();
-    }
     return RequestMetadata.getDefaultInstance();
   }
 
@@ -1081,30 +1067,6 @@ public class RedisShardBackplane implements Backplane {
         return metadata.unpack(QueuedOperationMetadata.class);
       } catch (InvalidProtocolBufferException e) {
         log.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
-      }
-    }
-    return null;
-  }
-
-  private static ExecutingOperationMetadata maybeExecutingOperationMetadata(
-      String name, Any metadata) {
-    if (metadata.is(ExecutingOperationMetadata.class)) {
-      try {
-        return metadata.unpack(ExecutingOperationMetadata.class);
-      } catch (InvalidProtocolBufferException e) {
-        log.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
-      }
-    }
-    return null;
-  }
-
-  private static CompletedOperationMetadata maybeCompletedOperationMetadata(
-      String name, Any metadata) {
-    if (metadata.is(CompletedOperationMetadata.class)) {
-      try {
-        return metadata.unpack(CompletedOperationMetadata.class);
-      } catch (InvalidProtocolBufferException e) {
-        log.log(Level.SEVERE, format("invalid completed operation metadata %s", name), e);
       }
     }
     return null;

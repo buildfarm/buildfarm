@@ -41,8 +41,6 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
-import build.buildfarm.v1test.CompletedOperationMetadata;
-import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -76,7 +74,6 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -192,42 +189,59 @@ class Cat {
     }
     if (result.hasExecutionMetadata()) {
       indentOut(indentLevel, "ExecutionMetadata:");
-      ExecutedActionMetadata executedActionMetadata = result.getExecutionMetadata();
-      indentOut(indentLevel + 1, "Worker: " + executedActionMetadata.getWorker());
+      printExecutedActionMetadata(result.getExecutionMetadata(), indentLevel + 1);
+    }
+  }
+
+  private static void printExecutedActionMetadata(
+      ExecutedActionMetadata metadata, int indentLevel) {
+    if (!metadata.getWorker().isEmpty()) {
+      indentOut(indentLevel, "Worker: " + metadata.getWorker());
+    }
+    // TODO switch to spans/stalls
+    if (metadata.hasQueuedTimestamp()) {
+      indentOut(indentLevel, "Queued At: " + Timestamps.toString(metadata.getQueuedTimestamp()));
+    }
+    if (metadata.hasWorkerStartTimestamp()) {
       indentOut(
-          indentLevel + 1,
-          "Queued At: " + Timestamps.toString(executedActionMetadata.getQueuedTimestamp()));
+          indentLevel, "Worker Start: " + Timestamps.toString(metadata.getWorkerStartTimestamp()));
+    }
+    if (metadata.hasInputFetchStartTimestamp()) {
       indentOut(
-          indentLevel + 1,
-          "Worker Start: " + Timestamps.toString(executedActionMetadata.getWorkerStartTimestamp()));
+          indentLevel,
+          "Input Fetch Start: " + Timestamps.toString(metadata.getInputFetchStartTimestamp()));
+    }
+    if (metadata.hasQueuedTimestamp()) {
       indentOut(
-          indentLevel + 1,
-          "Input Fetch Start: "
-              + Timestamps.toString(executedActionMetadata.getInputFetchStartTimestamp()));
-      indentOut(
-          indentLevel + 1,
+          indentLevel,
           "Input Fetch Completed: "
-              + Timestamps.toString(executedActionMetadata.getInputFetchCompletedTimestamp()));
+              + Timestamps.toString(metadata.getInputFetchCompletedTimestamp()));
+    }
+    if (metadata.hasExecutionStartTimestamp()) {
       indentOut(
-          indentLevel + 1,
-          "Execution Start: "
-              + Timestamps.toString(executedActionMetadata.getExecutionStartTimestamp()));
+          indentLevel,
+          "Execution Start: " + Timestamps.toString(metadata.getExecutionStartTimestamp()));
+    }
+    if (metadata.hasExecutionCompletedTimestamp()) {
       indentOut(
-          indentLevel + 1,
-          "Execution Completed: "
-              + Timestamps.toString(executedActionMetadata.getExecutionCompletedTimestamp()));
+          indentLevel,
+          "Execution Completed: " + Timestamps.toString(metadata.getExecutionCompletedTimestamp()));
+    }
+    if (metadata.hasOutputUploadStartTimestamp()) {
       indentOut(
-          indentLevel + 1,
-          "Output Upload Start: "
-              + Timestamps.toString(executedActionMetadata.getOutputUploadStartTimestamp()));
+          indentLevel,
+          "Output Upload Start: " + Timestamps.toString(metadata.getOutputUploadStartTimestamp()));
+    }
+    if (metadata.hasOutputUploadCompletedTimestamp()) {
       indentOut(
-          indentLevel + 1,
+          indentLevel,
           "Output Upload Completed: "
-              + Timestamps.toString(executedActionMetadata.getOutputUploadCompletedTimestamp()));
+              + Timestamps.toString(metadata.getOutputUploadCompletedTimestamp()));
+    }
+    if (metadata.hasWorkerCompletedTimestamp()) {
       indentOut(
-          indentLevel + 1,
-          "Worker Completed: "
-              + Timestamps.toString(executedActionMetadata.getWorkerCompletedTimestamp()));
+          indentLevel,
+          "Worker Completed: " + Timestamps.toString(metadata.getWorkerCompletedTimestamp()));
     }
   }
 
@@ -536,22 +550,11 @@ class Cat {
             operation.getMetadata().unpack(QueuedOperationMetadata.class);
         metadata = queuedOperationMetadata.getExecuteOperationMetadata();
         requestMetadata = queuedOperationMetadata.getRequestMetadata();
-      } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
-        ExecutingOperationMetadata executingMetadata =
-            operation.getMetadata().unpack(ExecutingOperationMetadata.class);
-        System.out.println("  Started At: " + new Date(executingMetadata.getStartedAt()));
-        System.out.println("  Executing On: " + executingMetadata.getExecutingOn());
-        metadata = executingMetadata.getExecuteOperationMetadata();
-        requestMetadata = executingMetadata.getRequestMetadata();
-      } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
-        CompletedOperationMetadata completedMetadata =
-            operation.getMetadata().unpack(CompletedOperationMetadata.class);
-        metadata = completedMetadata.getExecuteOperationMetadata();
-        requestMetadata = completedMetadata.getRequestMetadata();
       } else {
         metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
         requestMetadata = null;
       }
+      printExecutedActionMetadata(metadata.getPartialExecutionMetadata(), 1);
       System.out.println("  Stage: " + metadata.getStage());
       System.out.println("  Action: " + DigestUtil.toString(metadata.getActionDigest()));
       System.out.println("  Stdout Stream: " + metadata.getStdoutStreamName());

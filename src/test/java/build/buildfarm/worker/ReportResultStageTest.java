@@ -35,8 +35,8 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.ExecuteEntry;
-import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.collect.Iterables;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -93,7 +93,7 @@ public class ReportResultStageTest {
     Operation reportedOperation =
         Operation.newBuilder()
             .setName("reported")
-            .setMetadata(Any.pack(ExecutingOperationMetadata.getDefaultInstance()))
+            .setMetadata(Any.pack(QueuedOperationMetadata.getDefaultInstance()))
             .build();
     QueueEntry reportedEntry =
         QueueEntry.newBuilder()
@@ -129,7 +129,7 @@ public class ReportResultStageTest {
     Operation erroringOperation =
         Operation.newBuilder()
             .setName("erroring")
-            .setMetadata(Any.pack(ExecutingOperationMetadata.getDefaultInstance()))
+            .setMetadata(Any.pack(QueuedOperationMetadata.getDefaultInstance()))
             .build();
     Action action = Action.getDefaultInstance();
     Digest actionDigest = DIGEST_UTIL.compute(action);

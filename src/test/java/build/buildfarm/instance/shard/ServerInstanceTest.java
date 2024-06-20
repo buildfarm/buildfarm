@@ -73,10 +73,10 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.cache.CacheBuilder;
@@ -457,9 +457,9 @@ public class ServerInstanceTest {
     verify(mockBackplane, times(1)).putOperation(operationCaptor.capture(), eq(COMPLETED));
     Operation erroredOperation = operationCaptor.getValue();
     assertThat(erroredOperation.getDone()).isTrue();
-    CompletedOperationMetadata completedMetadata =
-        erroredOperation.getMetadata().unpack(CompletedOperationMetadata.class);
-    assertThat(completedMetadata.getExecuteOperationMetadata().getStage()).isEqualTo(COMPLETED);
+    QueuedOperationMetadata queuedMetadata =
+        erroredOperation.getMetadata().unpack(QueuedOperationMetadata.class);
+    assertThat(queuedMetadata.getExecuteOperationMetadata().getStage()).isEqualTo(COMPLETED);
     assertThat(erroredOperation.getResponse().unpack(ExecuteResponse.class))
         .isEqualTo(executeResponse);
   }
