@@ -5,8 +5,31 @@
 
 FORMAT_JAVA=true
 REMOVE_NEWLINES_AFTER_START_BRACKET=true
-JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/v1.22.0/google-java-format_linux-x86-64
-LOCAL_FORMATTER="./google-java-format_linux-x86-64"
+
+# Print an error such that it will surface in the context of buildkite
+print_error () {
+    >&2 echo "$1"
+    if [ -n "$BUILDKITE" ] ; then
+        buildkite-agent annotate "$1" --style 'error' --context 'ctx-error'
+    fi
+}
+
+# Get the operating system
+os=$(uname)
+
+# Get the machine architecture
+arch=$(uname -m)
+
+# Set the correct Google Java Formatter URL based on the operating system and architecture
+if [ "$os" == "Darwin" ] && [ "$arch" == "arm64" ]; then
+    JAVA_FORMATTER_URL="https://github.com/google/google-java-format/releases/download/v1.22.0/google-java-format_darwin-arm64"
+elif [ "$os" == "Linux" ] && [ "$arch" == "x86_64" ]; then
+    JAVA_FORMATTER_URL="https://github.com/google/google-java-format/releases/download/v1.22.0/google-java-format_linux-x86_64"
+else
+    print_error "Error: Unsupported operating system or architecture. See https://github.com/google/google-java-format/issues/1115"
+    exit 10
+fi
+LOCAL_FORMATTER="./google-java-format"
 
 if [ -z "$BAZEL" ]; then
   BAZEL=bazel
@@ -15,13 +38,6 @@ fi
 FORMAT_BUILD=true
 BUILDIFIER=//:buildifier
 
-# Print an error such that it will surface in the context of buildkite
-print_error () {
-    >&2 echo "$1"
-    if [ -v BUILDKITE ] ; then
-        buildkite-agent annotate "$1" --style 'error' --context 'ctx-error'
-    fi
-}
 
 handle_format_error_check () {
     if [ $? -eq 0 ]
