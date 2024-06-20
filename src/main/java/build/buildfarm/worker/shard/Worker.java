@@ -85,7 +85,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipal;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -643,7 +642,7 @@ public final class Worker extends LoggingMain {
             new EmptyInputStreamFactory(
                 new FailoverInputStreamFactory(
                     execFileSystem.getStorage(), remoteInputStreamFactory)),
-            Arrays.asList(configs.getWorker().getExecutionPolicies()),
+            configs.getWorker().getExecutionPolicies(),
             instance,
             Duration.newBuilder().setSeconds(configs.getDefaultActionTimeout()).build(),
             Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build(),
