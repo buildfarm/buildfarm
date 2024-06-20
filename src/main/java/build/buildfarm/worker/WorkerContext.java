@@ -42,6 +42,7 @@ import java.util.Map;
 
 public interface WorkerContext {
   interface IOResource extends AutoCloseable {
+    @Override
     void close() throws IOException;
 
     boolean isReferenced();
