@@ -524,7 +524,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return new ZstdCompressingInputStream(identity);
   }
 
-  @SuppressWarnings("ResultOfMethodCallIgnored")
+  @SuppressWarnings({"ResultOfMethodCallIgnored", "PMD.CompareObjectsWithEquals"})
   InputStream newLocalInput(Compressor.Value compressor, Digest digest, long offset)
       throws IOException {
     log.log(Level.FINER, format("getting input stream for %s", DigestUtil.toString(digest)));
@@ -549,7 +549,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           boolean removed = false;
           synchronized (this) {
             Entry removedEntry = safeStorageRemoval(key);
-            if (removedEntry == e) {
+            if (removedEntry == e) { // Intentional reference comparison
               unlinkEntry(removedEntry);
               removed = true;
             } else if (removedEntry != null) {
@@ -1775,8 +1775,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @GuardedBy("this")
+  @SuppressWarnings("PMD.CompareObjectsWithEquals")
   private Entry waitForLastUnreferencedEntry(long blobSizeInBytes) throws InterruptedException {
-    while (header.after == header) {
+    while (header.after == header) { // Intentional reference comparison
       int references = 0;
       int keys = 0;
       int min = -1;

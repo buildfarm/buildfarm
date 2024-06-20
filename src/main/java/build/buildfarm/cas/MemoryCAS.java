@@ -230,7 +230,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   private long size() {
     Entry e = header.before;
     long count = 0;
-    while (e != header) {
+    while (!e.equals(header)) {
       count++;
       e = e.before;
     }
@@ -273,7 +273,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
     sizeInBytes += blob.size();
 
-    while (sizeInBytes > maxSizeInBytes && header.after != header) {
+    while (sizeInBytes > maxSizeInBytes && !header.after.equals(header)) {
       expireEntry(header.after);
     }
 
