@@ -655,7 +655,7 @@ public abstract class NodeInstance implements Instance {
       // not great, plenty risky for large objects
       ByteString data;
       try (InputStream in = connection.getInputStream()) {
-        data = ByteString.readFrom(connection.getInputStream());
+        data = ByteString.readFrom(in);
       }
       if (expectedHash.isEmpty()) {
         expectedHash = digestUtil.computeHash(data).toString();
