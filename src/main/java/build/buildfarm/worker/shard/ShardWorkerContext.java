@@ -892,7 +892,9 @@ class ShardWorkerContext implements WorkerContext {
   String getOperationId(String operationName) {
     String[] components = operationName.split("/");
     Preconditions.checkState(components.length >= 3);
-    Preconditions.checkState(components[components.length - 2].equals("operations"));
+    String binding = components[components.length - 2];
+    // legacy
+    Preconditions.checkState(binding.equals("operations") || binding.equals("executions"));
     return components[components.length - 1];
   }
 
