@@ -80,7 +80,6 @@ public class RedisShardBackplaneTest {
         /* subscribeToBackplane= */ false,
         /* runFailsafeOperation= */ false,
         o -> o,
-        o -> o,
         mockJedisClusterFactory);
   }
 

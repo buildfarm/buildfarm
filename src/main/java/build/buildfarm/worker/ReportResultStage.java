@@ -153,6 +153,8 @@ public class ReportResultStage extends PipelineStage {
         .setOutputUploadCompletedTimestamp(completed);
 
     executionContext.executeResponse.getResultBuilder().setExecutionMetadata(executedAction);
+    // remove partial metadata in favor of result
+    executionContext.metadata.getExecuteOperationMetadataBuilder().clearPartialExecutionMetadata();
     ExecuteResponse executeResponse = executionContext.executeResponse.build();
 
     if (blacklist

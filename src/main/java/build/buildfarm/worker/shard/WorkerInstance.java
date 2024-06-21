@@ -299,16 +299,6 @@ public class WorkerInstance extends NodeInstance {
         .build();
   }
 
-  public Operation stripQueuedOperation(Operation operation) {
-    if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
-      operation =
-          operation.toBuilder()
-              .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
-              .build();
-    }
-    return operation;
-  }
-
   @Override
   protected Logger getLogger() {
     return log;
