@@ -117,7 +117,6 @@ public class RedisShardBackplane implements Backplane {
   private final boolean subscribeToBackplane;
   private final boolean runFailsafeOperation;
   private final Function<Operation, Operation> onPublish;
-  private final Function<Operation, Operation> onComplete;
   private final Supplier<UnifiedJedis> jedisClusterFactory;
 
   private @Nullable InterruptingRunnable onUnsubscribe = null;
@@ -139,15 +138,13 @@ public class RedisShardBackplane implements Backplane {
       String source,
       boolean subscribeToBackplane,
       boolean runFailsafeOperation,
-      Function<Operation, Operation> onPublish,
-      Function<Operation, Operation> onComplete)
+      Function<Operation, Operation> onPublish)
       throws ConfigurationException {
     this(
         source,
         subscribeToBackplane,
         runFailsafeOperation,
         onPublish,
-        onComplete,
         JedisClusterFactory.create(source));
   }
 
@@ -156,13 +153,11 @@ public class RedisShardBackplane implements Backplane {
       boolean subscribeToBackplane,
       boolean runFailsafeOperation,
       Function<Operation, Operation> onPublish,
-      Function<Operation, Operation> onComplete,
       Supplier<UnifiedJedis> jedisClusterFactory) {
     this.source = source;
     this.subscribeToBackplane = subscribeToBackplane;
     this.runFailsafeOperation = runFailsafeOperation;
     this.onPublish = onPublish;
-    this.onComplete = onComplete;
     this.jedisClusterFactory = jedisClusterFactory;
     recentExecuteWorkers =
         Suppliers.memoizeWithExpiration(
@@ -1012,11 +1007,6 @@ public class RedisShardBackplane implements Backplane {
     boolean queue = stage == ExecutionStage.Value.QUEUED;
     boolean complete = !queue && operation.getDone();
     boolean publish = !queue && stage != ExecutionStage.Value.UNKNOWN;
-
-    if (complete) {
-      // for filtering anything that shouldn't be stored
-      operation = onComplete.apply(operation);
-    }
 
     String json;
     try {

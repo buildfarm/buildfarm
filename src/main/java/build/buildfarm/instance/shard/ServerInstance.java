@@ -287,8 +287,7 @@ public class ServerInstance extends NodeInstance {
           identifier,
           /* subscribeToBackplane= */ true,
           configs.getServer().isRunFailsafeOperation(),
-          ServerInstance::stripOperation,
-          ServerInstance::stripQueuedOperation);
+          ServerInstance::stripOperation);
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
     }
@@ -2715,16 +2714,6 @@ public class ServerInstance extends NodeInstance {
       metadata = ExecuteOperationMetadata.getDefaultInstance();
     }
     return operation.toBuilder().setMetadata(Any.pack(metadata)).build();
-  }
-
-  private static Operation stripQueuedOperation(Operation operation) {
-    if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
-      operation =
-          operation.toBuilder()
-              .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
-              .build();
-    }
-    return operation;
   }
 
   @Override

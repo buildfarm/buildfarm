@@ -194,10 +194,6 @@ public final class Worker extends LoggingMain {
     return instance.stripOperation(operation);
   }
 
-  private Operation stripQueuedOperation(Operation operation) {
-    return instance.stripQueuedOperation(operation);
-  }
-
   private Server createServer(
       ServerBuilder<?> serverBuilder,
       @Nullable CASFileCache storage,
@@ -564,8 +560,7 @@ public final class Worker extends LoggingMain {
               identifier,
               /* subscribeToBackplane= */ false,
               /* runFailsafeOperation= */ false,
-              this::stripOperation,
-              this::stripQueuedOperation);
+              this::stripOperation);
       backplane.start(configs.getWorker().getPublicName());
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
