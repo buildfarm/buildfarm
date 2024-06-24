@@ -666,7 +666,7 @@ public final class Worker extends LoggingMain {
 
     removeWorker(configs.getWorker().getPublicName());
 
-    boolean skipLoad = configs.getWorker().getStorages().get(0).isSkipLoad();
+    boolean skipLoad = configs.getWorker().getStorages().getFirst().isSkipLoad();
     execFileSystem.start(
         (digests) -> addBlobsLocation(digests, configs.getWorker().getPublicName()), skipLoad);
 

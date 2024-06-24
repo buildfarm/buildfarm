@@ -115,7 +115,7 @@ public class BuildFarmServerIntegrationTest {
     Queue[] queues = new Queue[1];
     queues[0] = queue;
     configs.getBackplane().setQueues(queues);
-    configs.getWorker().getStorages().get(0).setType(MEMORY);
+    configs.getWorker().getStorages().getFirst().setType(MEMORY);
     String uniqueServerName = "in-process server for " + getClass();
     server = new BuildFarmServer();
     server.start(
@@ -139,7 +139,7 @@ public class BuildFarmServerIntegrationTest {
                 .addDigests(DigestUtil.toDigest(digest))
                 .setDigestFunction(digest.getDigestFunction())
                 .build());
-    BatchReadBlobsResponse.Response response = batchResponse.getResponsesList().get(0);
+    BatchReadBlobsResponse.Response response = batchResponse.getResponsesList().getFirst();
     com.google.rpc.Status status = response.getStatus();
     if (Code.forNumber(status.getCode()) == Code.NOT_FOUND) {
       return null;
@@ -333,9 +333,9 @@ public class BuildFarmServerIntegrationTest {
     assertThat(status.getCode()).isEqualTo(Code.FAILED_PRECONDITION.getNumber());
     assertThat(status.getDetailsCount()).isEqualTo(1);
     PreconditionFailure preconditionFailure =
-        status.getDetailsList().get(0).unpack(PreconditionFailure.class);
+        status.getDetailsList().getFirst().unpack(PreconditionFailure.class);
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
   }
 

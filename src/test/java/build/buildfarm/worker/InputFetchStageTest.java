@@ -122,7 +122,7 @@ public class InputFetchStageTest {
             any(Runnable.class),
             any(Deadline.class));
     verifyNoMoreInteractions(workerContext);
-    ExecutionContext executionContext = error.getExecutionContexts().get(0);
+    ExecutionContext executionContext = error.getExecutionContexts().getFirst();
     assertThat(executionContext).isEqualTo(badContext);
   }
 }

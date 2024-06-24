@@ -123,7 +123,7 @@ public class PersistentExecutor {
 
     WorkerInputs workerFiles = WorkerInputs.from(context, requestArgs);
 
-    Path binary = Paths.get(workerExecCmd.get(0));
+    Path binary = Paths.get(workerExecCmd.getFirst());
     if (!workerFiles.containsTool(binary) && !binary.isAbsolute()) {
       throw new IllegalArgumentException(
           "Binary wasn't a tool input nor an absolute path: " + binary);
@@ -257,7 +257,7 @@ public class PersistentExecutor {
   }
 
   private static String getExecutionName(ImmutableList<String> argsList) {
-    boolean isScalac = argsList.size() > 1 && argsList.get(0).endsWith("scalac/scalac");
+    boolean isScalac = argsList.size() > 1 && argsList.getFirst().endsWith("scalac/scalac");
     if (isScalac) {
       return SCALAC_EXEC_NAME;
     } else if (argsList.contains(JAVABUILDER_JAR)) {
