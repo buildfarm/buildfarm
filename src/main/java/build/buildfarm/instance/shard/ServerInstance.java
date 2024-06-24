@@ -3064,7 +3064,7 @@ public class ServerInstance extends NodeInstance {
       // If the query contains a single 'id' parameter it is used
       List<String> ids = parameters.get("id");
       if (ids.size() == 1) {
-        id = ids.get(0);
+        id = ids.getFirst();
       }
     }
 
