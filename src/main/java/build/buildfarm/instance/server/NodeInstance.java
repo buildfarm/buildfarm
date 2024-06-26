@@ -661,7 +661,7 @@ public abstract class NodeInstance implements Instance {
         expectedHash = digestUtil.computeHash(data).toString();
       }
       contentLength = data.size();
-      inSupplier = () -> data.newInput();
+      inSupplier = data::newInput;
     } else {
       inSupplier = connection::getInputStream;
     }

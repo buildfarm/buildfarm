@@ -910,7 +910,7 @@ class CASFileCacheTest {
     // state of CAS
     //   1024-byte key
 
-    AtomicReference<Throwable> exRef = new AtomicReference(null);
+    AtomicReference<Throwable> exRef = new AtomicReference<>(null);
     // 0 = not blocking
     // 1 = blocking
     // 2 = delegate write
