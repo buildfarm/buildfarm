@@ -218,7 +218,7 @@ public class WorkerTestUtils {
     List<Path> listedPaths = listFilesRec(root);
     for (Path filePath : listedPaths) {
       assertWithMessage("Path not match prefix of any expected file: " + filePath)
-          .that(expectedFiles.stream().anyMatch(p -> p.startsWith(p)))
+          .that(expectedFiles.stream().anyMatch(p -> p.startsWith(filePath)))
           .isTrue();
     }
     assertThat(listedPaths).containsAtLeastElementsIn(expectedFiles);
