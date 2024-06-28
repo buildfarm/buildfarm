@@ -15,20 +15,13 @@ print_error () {
 }
 
 # Get the operating system
-os=$(uname)
+os=$(uname | tr '[:upper:]' '[:lower:]')
 
 # Get the machine architecture
 arch=$(uname -m)
 
 # Set the correct Google Java Formatter URL based on the operating system and architecture
-if [ "$os" == "Darwin" ] && [ "$arch" == "arm64" ]; then
-    JAVA_FORMATTER_URL="https://github.com/google/google-java-format/releases/download/v1.22.0/google-java-format_darwin-arm64"
-elif [ "$os" == "Linux" ] && [ "$arch" == "x86_64" ]; then
-    JAVA_FORMATTER_URL="https://github.com/google/google-java-format/releases/download/v1.22.0/google-java-format_linux-x86_64"
-else
-    print_error "Error: Unsupported operating system or architecture. See https://github.com/google/google-java-format/issues/1115"
-    exit 10
-fi
+JAVA_FORMATTER_URL="https://github.com/google/google-java-format/releases/download/v1.22.0/google-java-format_${os}-${arch}"
 LOCAL_FORMATTER="./google-java-format"
 
 if [ -z "$BAZEL" ]; then
