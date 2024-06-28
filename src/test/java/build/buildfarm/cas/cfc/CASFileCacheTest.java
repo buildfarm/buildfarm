@@ -25,6 +25,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
@@ -68,6 +69,7 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -641,25 +643,12 @@ class CASFileCacheTest {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Digest digest = DIGEST_UTIL.compute(content);
 
-    AtomicBoolean writeClosed = new AtomicBoolean(false);
     Write write = getWrite(digest);
     OutputStream out = write.getOutput(1, SECONDS, () -> {});
-    // write is open and should block other output acquisition
-    Thread closer =
-        new Thread(
-            () -> {
-              try {
-                MICROSECONDS.sleep(1);
-                writeClosed.set(true);
-                out.close();
-              } catch (Exception e) {
-                throw new RuntimeException(e);
-              }
-            });
-    closer.start();
-    try (OutputStream secondOut = write.getOutput(1, SECONDS, () -> {})) {
-      assertThat(writeClosed.get()).isTrue();
-    }
+
+    assertThrows(StatusRuntimeException.class, () -> write.getOutput(1, SECONDS, () -> {}));
+    out.close();
+    assertThat(write.getOutput(1, SECONDS, () -> {})).isNotNull();
     write.reset(); // ensure that the output stream is closed
   }
 
