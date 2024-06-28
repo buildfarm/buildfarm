@@ -57,6 +57,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
@@ -928,6 +929,25 @@ public class RedisShardBackplane implements Backplane {
   public Map<Digest, Set<String>> getBlobDigestsWorkers(Iterable<Digest> blobDigests)
       throws IOException {
     return state.casWorkerMap.getMap(client, blobDigests);
+  }
+
+  @Override
+  public Map<String, Integer> updateCasReadCount(Map<Digest, Integer> casReadCountMap)
+      throws IOException {
+    return client.call(
+        jedis ->
+            state.casReadCount.incrementMembersScore(
+                jedis,
+                casReadCountMap.entrySet().stream()
+                    .collect(Collectors.toMap(e -> e.getKey().getHash(), Map.Entry::getValue))));
+  }
+
+  @Override
+  public int removeCasReadCountEntries(Iterable<Digest> digestsToBeRemoved) throws IOException {
+    return client.call(
+        jedis ->
+            state.casReadCount.removeMembers(
+                jedis, Iterables.transform(digestsToBeRemoved, Digest::getHash)));
   }
 
   public static WorkerChange parseWorkerChange(String workerChangeJson)

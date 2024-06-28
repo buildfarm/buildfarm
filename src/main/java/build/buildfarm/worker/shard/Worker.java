@@ -20,7 +20,9 @@ import static build.buildfarm.common.io.Utils.formatIOError;
 import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
@@ -49,6 +51,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.WorkerStubs;
+import build.buildfarm.metrics.cas.CASAccessMetricsRecorder;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.worker.CFCExecFileSystem;
@@ -91,6 +94,8 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
@@ -139,6 +144,8 @@ public final class Worker extends LoggingMain {
   private Backplane backplane;
   private LoadingCache<String, Instance> workerStubs;
   private AtomicBoolean released = new AtomicBoolean(true);
+  @Nullable private CASAccessMetricsRecorder casAccessMetricsRecorder;
+  @Nullable private ScheduledExecutorService casAccessMetricsScheduler;
 
   /**
    * The method will prepare the worker for graceful shutdown when the worker is ready. Note on
@@ -357,7 +364,8 @@ public final class Worker extends LoggingMain {
         throw new IllegalArgumentException("Invalid cas type specified");
       case MEMORY:
       case FUSE: // FIXME have FUSE refer to a name for storage backing, and topo
-        return new MemoryCAS(cas.getMaxSizeBytes(), this::onStoragePut, delegate);
+        return new MemoryCAS(
+            cas.getMaxSizeBytes(), this::onStoragePut, this::onReadComplete, delegate);
       case GRPC:
         checkState(delegate == null, "grpc cas cannot delegate");
         return createGrpcCAS(cas);
@@ -376,6 +384,7 @@ public final class Worker extends LoggingMain {
             accessRecorder,
             zstdBufferPool,
             this::onStoragePut,
+            this::onReadComplete,
             delegate == null ? this::onStorageExpire : (digests) -> {},
             delegate,
             delegateSkipLoad);
@@ -417,6 +426,9 @@ public final class Worker extends LoggingMain {
       if (configs.getWorker().getCapabilities().isCas()) {
         backplane.addBlobLocation(digest, configs.getWorker().getPublicName());
       }
+      if (configs.getBackplane().getCasMetrics().isEnabled() && casAccessMetricsRecorder != null) {
+        casAccessMetricsRecorder.recordWrite(digest);
+      }
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
@@ -430,6 +442,12 @@ public final class Worker extends LoggingMain {
       } catch (IOException e) {
         throw Status.fromThrowable(e).asRuntimeException();
       }
+    }
+  }
+
+  private void onReadComplete(Digest digest) {
+    if (configs.getBackplane().getCasMetrics().isEnabled() && casAccessMetricsRecorder != null) {
+      casAccessMetricsRecorder.recordRead(digest);
     }
   }
 
@@ -665,6 +683,19 @@ public final class Worker extends LoggingMain {
     execFileSystem.start(
         (digests) -> addBlobsLocation(digests, configs.getWorker().getPublicName()), skipLoad);
 
+    if (configs.getBackplane().getCasMetrics().isEnabled()) {
+      casAccessMetricsScheduler = newSingleThreadScheduledExecutor();
+      casAccessMetricsRecorder =
+          new CASAccessMetricsRecorder(
+              casAccessMetricsScheduler,
+              backplane,
+              java.time.Duration.ofSeconds(
+                  configs.getBackplane().getCasMetrics().getCasReadCountWindow()),
+              java.time.Duration.ofSeconds(
+                  configs.getBackplane().getCasMetrics().getCasReadCountUpdateInterval()));
+      casAccessMetricsRecorder.start();
+    }
+
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
@@ -737,6 +768,12 @@ public final class Worker extends LoggingMain {
       log.info("Stopping exec filesystem");
       execFileSystem.stop();
       execFileSystem = null;
+    }
+    if (casAccessMetricsRecorder != null) {
+      casAccessMetricsRecorder.stop();
+      if (!shutdownAndAwaitTermination(casAccessMetricsScheduler, 10, TimeUnit.SECONDS)) {
+        log.warning("could not shut down cas access metrics scheduler");
+      }
     }
     if (server != null) {
       log.info("Shutting down the server");

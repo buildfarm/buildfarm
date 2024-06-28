@@ -17,6 +17,7 @@ package build.buildfarm.instance.shard;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.RedisHashMap;
 import build.buildfarm.common.redis.RedisMap;
+import build.buildfarm.common.redis.RedisSortedSet;
 
 /**
  * @class DistributedState
@@ -127,4 +128,13 @@ public class DistributedState {
    *     and will refuse to run again.
    */
   public RedisMap blockedActions;
+
+  /**
+   * @field casReadCount
+   * @brief Maintains the read count for each CAS entry in a sorted set.
+   * @details This data structure tracks the number of times CAS entries are accessed, allowing us
+   *     to identify frequently accessed CAS entries. This information can be used to distribute hot
+   *     keys across multiple workers or decide which CAS entries to keep in memory etc.
+   */
+  public RedisSortedSet casReadCount;
 }

@@ -420,3 +420,25 @@ worker:
           - arg1
           - arg2
 ```
+
+### CAS Metrics
+
+
+| Configuration              | Accepted and _Default_ Values | Description                                                                |
+|----------------------------|-------------------------------|----------------------------------------------------------------------------|
+| enabled                    | boolean, _false_              | When enabled, saves CAS read count metrics to a Redis SortedSet.           |
+| casReadCountSetName        | String, _CasReadCount_        | Identifier for the SortedSet storing CAS read counts.                      |
+| casReadCountWindow         | Integer, _14400_              | The specific window of time considered for aggregating the CAS read count. |
+| casReadCountUpdateInterval | Integer, _900_                | The reasonable delay interval to update CAS read count.                    |
+
+
+Example:
+
+```yaml
+backplane:
+  casMetrics:
+    enabled: true
+    casReadCountSetName: "CasReadCount"
+    casReadCountWindow: 14400 # 4 hours
+    casReadCountUpdateInterval: 900 # 15 mins
+```

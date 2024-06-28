@@ -45,6 +45,7 @@ class ShardCASFileCache extends CASFileCache {
       Executor accessRecorder,
       FixedBufferPool zstdBufferPool,
       Consumer<Digest> onPut,
+      Consumer<Digest> onReadComplete,
       Consumer<Iterable<Digest>> onExpire,
       ContentAddressableStorage delegate,
       boolean delegateSkipLoad) {
@@ -62,6 +63,7 @@ class ShardCASFileCache extends CASFileCache {
         DEFAULT_DIRECTORIES_INDEX_NAME,
         zstdBufferPool,
         onPut,
+        onReadComplete,
         onExpire,
         delegate,
         delegateSkipLoad);

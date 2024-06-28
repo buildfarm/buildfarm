@@ -19,6 +19,7 @@ NATIVE_REDIS_TESTS = [
     "RedisQueueTest.java",
     "RedisPriorityQueueTest.java",
     "RedisHashMapTest.java",
+     "RedisSortedSetTest.java",
 ]
 
 java_test(

@@ -49,6 +49,7 @@ import lombok.extern.java.Log;
 public class MemoryCAS implements ContentAddressableStorage {
   private final long maxSizeInBytes;
   private final Consumer<Digest> onPut;
+  private final Consumer<Digest> onReadComplete;
 
   @GuardedBy("this")
   private final Map<String, Entry> storage;
@@ -63,13 +64,17 @@ public class MemoryCAS implements ContentAddressableStorage {
   private final Writes writes = new Writes(this);
 
   public MemoryCAS(long maxSizeInBytes) {
-    this(maxSizeInBytes, (digest) -> {}, /* delegate= */ null);
+    this(maxSizeInBytes, (digest) -> {}, /* onReadComplete=*/ (digest) -> {}, /* delegate=*/ null);
   }
 
   public MemoryCAS(
-      long maxSizeInBytes, Consumer<Digest> onPut, ContentAddressableStorage delegate) {
+      long maxSizeInBytes,
+      Consumer<Digest> onPut,
+      Consumer<Digest> onReadComplete,
+      ContentAddressableStorage delegate) {
     this.maxSizeInBytes = maxSizeInBytes;
     this.onPut = onPut;
+    this.onReadComplete = onReadComplete;
     this.delegate = delegate;
     sizeInBytes = 0;
     header.before = header.after = header;
@@ -223,6 +228,7 @@ public class MemoryCAS implements ContentAddressableStorage {
       return null;
     }
     e.recordAccess(header);
+    onReadComplete.accept(digest);
     return e;
   }
 
