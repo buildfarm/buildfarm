@@ -115,7 +115,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
     OperationStageDurations getAverageOfLastPeriod() {
       // creating a Timestamp representing now to trigger stale data throwing away
-      Timestamp now = Timestamps.fromMillis(System.currentTimeMillis());
+      Timestamp now = Timestamps.now();
       removeStaleData(now);
 
       // compute unweighted average of all buckets
