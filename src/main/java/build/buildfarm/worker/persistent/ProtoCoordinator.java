@@ -95,7 +95,6 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
 
               Files.write(initArgsLogFile, initArgs.toString().getBytes());
             }
-
             return new PersistentWorker(workerKey, workerExecDir);
           }
         };
