@@ -118,7 +118,7 @@ class Executor {
 
   private long runInterruptible(Stopwatch stopwatch, ResourceLimits limits)
       throws InterruptedException {
-    Timestamp executionStartTimestamp = Timestamps.fromMillis(System.currentTimeMillis());
+    Timestamp executionStartTimestamp = Timestamps.now();
 
     operationContext
         .metadata
