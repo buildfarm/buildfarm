@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker.persistent;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import build.bazel.remote.execution.v2.Command;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.util.WorkerTestUtils;
@@ -23,12 +25,12 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
-import com.google.devtools.build.lib.worker.WorkerProtocol.Input;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -71,10 +73,10 @@ public class ProtoCoordinatorTest {
 
     Path fsRoot = jimFsRoot();
     Path opRoot = fsRoot.resolve("opRoot");
-    assert (Files.notExists(opRoot));
+    assertThat(Files.notExists(opRoot)).isTrue();
     Files.createDirectory(opRoot);
 
-    assert (Files.exists(opRoot));
+    assertThat(Files.exists(opRoot)).isTrue();
 
     String treeRootDir = opRoot.toString();
     List<TreeFile> fileInputs =
@@ -92,8 +94,7 @@ public class ProtoCoordinatorTest {
 
     WorkerInputs workerFiles = WorkerInputs.from(ctx, requestArgs);
 
-    for (Map.Entry<Path, Input> entry : workerFiles.allInputs.entrySet()) {
-      Path file = entry.getKey();
+    for (Path file : workerFiles.allInputs.keySet()) {
       Files.createDirectories(file.getParent());
       Files.createFile(file);
     }
@@ -103,30 +104,35 @@ public class ProtoCoordinatorTest {
     Path workRoot = key.getExecRoot();
     Path toolsRoot = workRoot.resolve(PersistentWorker.TOOL_INPUT_SUBDIR);
 
+    // Assert: all Tools are copied into "/workRootsDir/*/tool_inputs"
+    assertThat(toolsRoot.toString()).startsWith(workRoot.toString());
     pc.copyToolInputsIntoWorkerToolRoot(key, workerFiles);
 
-    assert Files.exists(workRoot);
-    List<Path> expectedToolInputs = new ArrayList<>();
+    assertThat(Files.exists(workRoot)).isTrue();
+    assertThat(Files.exists(toolsRoot)).isTrue();
+    Set<Path> expectedToolInputs = new HashSet<>();
     for (TreeFile file : fileInputs) {
       if (file.isTool) {
         expectedToolInputs.add(toolsRoot.resolve(file.path));
       }
     }
-    WorkerTestUtils.assertFilesExistExactly(workRoot, expectedToolInputs);
+    assertThat(WorkerTestUtils.listFilesRec(workRoot))
+        .containsExactlyElementsIn(expectedToolInputs);
 
     List<Path> expectedOpRootFiles = new ArrayList<>();
-
-    // Check that we move specified output files (assuming they exist)
+    // Create some fake output files.
     for (String pathStr : ctx.outputFiles) {
       Path file = workRoot.resolve(pathStr);
       Files.createDirectories(file.getParent());
       Files.createFile(file);
       expectedOpRootFiles.add(opRoot.resolve(pathStr));
     }
-
     pc.moveOutputsToOperationRoot(ctx, workRoot);
 
-    // TODO: This is failing. Investigate if bad System under Test (SUT) or bad test.
-    // WorkerTestUtils.assertFilesExistExactly(opRoot, expectedOpRootFiles);
+    assertThat(WorkerTestUtils.listFilesRec(opRoot)).containsAtLeastElementsIn(expectedOpRootFiles);
+    // At this point, the only thing left in the `workRoot` should be the tools.
+    List<Path> workRootPaths = WorkerTestUtils.listFilesRec(workRoot);
+    assertThat(workRootPaths).containsAtLeastElementsIn(expectedToolInputs);
+    assertThat(workRootPaths).containsNoneIn(expectedOpRootFiles);
   }
 }
