@@ -227,10 +227,11 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @GuardedBy("this")
+  @SuppressWarnings("PMD.CompareObjectsWithEquals")
   private long size() {
     Entry e = header.before;
     long count = 0;
-    while (!e.equals(header)) {
+    while (e != header) {
       count++;
       e = e.before;
     }
@@ -261,6 +262,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     }
   }
 
+  @SuppressWarnings("PMD.CompareObjectsWithEquals")
   private synchronized boolean add(Blob blob, Runnable onExpiration) {
     Entry e = storage.get(blob.getDigest().getHash());
     if (e != null) {
@@ -273,7 +275,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
     sizeInBytes += blob.size();
 
-    while (sizeInBytes > maxSizeInBytes && !header.after.equals(header)) {
+    while (sizeInBytes > maxSizeInBytes && header.after != header) {
       expireEntry(header.after);
     }
 

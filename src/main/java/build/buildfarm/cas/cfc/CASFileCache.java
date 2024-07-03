@@ -1985,7 +1985,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return entry;
   }
 
-  @SuppressWarnings("NonAtomicOperationOnVolatileField")
+  @SuppressWarnings({"NonAtomicOperationOnVolatileField", "PMD.CompareObjectsWithEquals"})
   @GuardedBy("this")
   private ListenableFuture<Entry> expireEntry(long blobSizeInBytes, ExecutorService service)
       throws IOException, InterruptedException {
