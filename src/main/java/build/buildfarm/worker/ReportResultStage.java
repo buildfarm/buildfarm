@@ -147,7 +147,7 @@ public class ReportResultStage extends PipelineStage {
       return null;
     }
 
-    Timestamp completed = Timestamps.fromMillis(System.currentTimeMillis());
+    Timestamp completed = Timestamps.now();
     executedAction
         .setWorkerCompletedTimestamp(completed)
         .setOutputUploadCompletedTimestamp(completed);

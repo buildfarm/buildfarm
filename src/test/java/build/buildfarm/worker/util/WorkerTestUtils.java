@@ -15,8 +15,6 @@
 package build.buildfarm.worker.util;
 
 import static build.buildfarm.worker.util.InputsIndexer.BAZEL_TOOL_INPUT_MARKER;
-import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth.assertWithMessage;
 
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
@@ -178,6 +176,13 @@ public class WorkerTestUtils {
     return treeBuilder.build();
   }
 
+  /**
+   * Get a recursive list of all files in Path. It includes only files.
+   *
+   * @param root Where to start walking
+   * @return List of paths of all files reachable from <c>root</c>.
+   * @throws IOException if any file/directory is not visit-able.
+   */
   public static List<Path> listFilesRec(Path root) throws IOException {
     List<Path> filesFound = new ArrayList<>();
 
@@ -204,23 +209,10 @@ public class WorkerTestUtils {
 
           @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-            filesFound.add(dir);
             return FileVisitResult.CONTINUE;
           }
         });
 
     return filesFound;
-  }
-
-  // Check all expected files exist and that only they exist
-  public static void assertFilesExistExactly(Path root, List<Path> expectedFiles)
-      throws IOException {
-    List<Path> listedPaths = listFilesRec(root);
-    for (Path filePath : listedPaths) {
-      assertWithMessage("Path not match prefix of any expected file: " + filePath)
-          .that(expectedFiles.stream().anyMatch(p -> p.startsWith(p)))
-          .isTrue();
-    }
-    assertThat(listedPaths).containsAtLeastElementsIn(expectedFiles);
   }
 }

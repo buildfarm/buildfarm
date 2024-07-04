@@ -190,7 +190,7 @@ public class InputFetcher implements Runnable {
 
   @VisibleForTesting
   long fetchPolled(Stopwatch stopwatch) throws InterruptedException {
-    Timestamp inputFetchStart = Timestamps.fromMillis(System.currentTimeMillis());
+    Timestamp inputFetchStart = Timestamps.now();
 
     String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
     log.log(Level.FINER, format("fetching inputs: %s", operationName));

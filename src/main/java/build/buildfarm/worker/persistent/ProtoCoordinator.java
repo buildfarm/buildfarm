@@ -95,7 +95,6 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
 
               Files.write(initArgsLogFile, initArgs.toString().getBytes());
             }
-
             return new PersistentWorker(workerKey, workerExecDir);
           }
         };
@@ -107,7 +106,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     WorkerKey lock = keyLock(key);
     synchronized (lock) {
       try {
-        // Move tool inputs as needed
+        // Copy tool inputs as needed
         Path workToolRoot = key.getExecRoot().resolve(PersistentWorker.TOOL_INPUT_SUBDIR);
         for (Path opToolPath : workerFiles.opToolInputs) {
           Path workToolPath = workerFiles.relativizeInput(workToolRoot, opToolPath);

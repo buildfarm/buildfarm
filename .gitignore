@@ -19,5 +19,5 @@ bazel-*
 #CI tools
 unused_deps
 buildozer
-java_formatter.jar
+google-java-format
 lcov

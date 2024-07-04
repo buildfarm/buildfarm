@@ -170,7 +170,7 @@ public class MatchStage extends PipelineStage {
   }
 
   private OperationContext match(OperationContext operationContext) throws InterruptedException {
-    Timestamp workerStartTimestamp = Timestamps.fromMillis(System.currentTimeMillis());
+    Timestamp workerStartTimestamp = Timestamps.now();
 
     ExecuteEntry executeEntry = operationContext.queueEntry.getExecuteEntry();
     operationContext
