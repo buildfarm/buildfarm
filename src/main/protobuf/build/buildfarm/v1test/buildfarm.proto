@@ -568,6 +568,8 @@ message BlobWriteKey {
   string identifier = 2;
 
   build.bazel.remote.execution.v2.Compressor.Value compressor = 3;
+
+  build.bazel.remote.execution.v2.DigestFunction.Value digest_function = 4;
 }
 
 message OperationTimesBetweenStages {

@@ -80,6 +80,20 @@ java_library(
     ],
 )
 
+java_library(
+    name = "digestUtil",
+    srcs = ["DigestUtil.java"],
+    plugins = [":lombok"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/java/build/buildfarm/common/blake3",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:org_projectlombok_lombok",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+    ],
+)
+
 java_plugin(
     name = "lombok",
     generates_api = True,

@@ -17,6 +17,7 @@ package build.buildfarm.common.resources;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
+import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
@@ -308,6 +309,11 @@ public class ResourceParser {
     if (DIGEST_FUNCTIONS.containsKey(maybeDigestFunction)) {
       builder.setDigestFunction(DIGEST_FUNCTIONS.get(maybeDigestFunction));
       index.getAndIncrement();
+    } else {
+      // Infer the digest function based on the hash format
+      // Should go here when it's not BLAKE3
+      String hash = maybeDigestFunction;
+      builder.setDigestFunction(DigestUtil.HashFunction.forHash(hash).getDigestFunction());
     }
     String hash = segments[index.getAndIncrement()];
     String size = segments[index.getAndIncrement()];

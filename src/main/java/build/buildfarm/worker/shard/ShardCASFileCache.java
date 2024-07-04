@@ -16,15 +16,20 @@ package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import com.google.common.collect.Maps;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
@@ -87,5 +92,10 @@ class ShardCASFileCache extends CASFileCache {
   protected InputStream newExternalInput(Compressor.Value compressor, Digest digest, long offset)
       throws IOException {
     return inputStreamFactory.newInput(compressor, digest, offset);
+  }
+
+  @Override
+  public Write getWrite(Compressor.Value compression, Digest digest, UUID uuid, RequestMetadata requestMetadata) throws EntryLimitException {
+    return null;
   }
 }

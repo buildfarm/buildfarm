@@ -32,6 +32,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.EnumMap;
+import java.util.Map;
+
 import lombok.Getter;
 
 /** Utility methods to work with {@link Digest}. */
@@ -71,20 +74,21 @@ public class DigestUtil {
       return DigestFunction.Value.UNKNOWN;
     }
 
+    // Correct me if I'm wrong but this function doesn't make any sense?
+    // It is always calling the same isValidHexDigest function with the same parameters.
+    // So it will always either return SHA256, or throw an exception.
+    // With the new method we still can't distinguish between SHA256 and BLAKE3, but at least it's better...
     public static HashFunction forHash(String hexDigest) {
-      if (SHA256.isValidHexDigest(hexDigest)) {
-        return SHA256;
-      }
-      if (BLAKE3.isValidHexDigest(hexDigest)) {
-        return BLAKE3;
-      }
-      if (SHA1.isValidHexDigest(hexDigest)) {
-        return SHA1;
-      }
-      if (MD5.isValidHexDigest(hexDigest)) {
-        return MD5;
-      }
-      throw new IllegalArgumentException("hash type unrecognized: " + hexDigest);
+      int hashLength = hexDigest.length();
+        return switch (hashLength) {
+            case 64 -> // 32 bytes * 2 characters per byte
+                    HashFunction.SHA256;
+            case 40 -> // 20 bytes * 2 characters per byte
+                    HashFunction.SHA1;
+            case 32 -> // 16 bytes * 2 characters per byte
+                    HashFunction.MD5;
+            default -> throw new IllegalArgumentException("hash type unrecognized: " + hexDigest);
+        };
     }
 
     public static HashFunction get(DigestFunction.Value digestFunction) {
@@ -190,10 +194,6 @@ public class DigestUtil {
   }
 
   public Digest build(String hexHash, long size) {
-    if (!hashFn.isValidHexDigest(hexHash)) {
-      throw new NumberFormatException(
-          String.format("[%s] is not a valid %s hash.", hexHash, hashFn.name()));
-    }
     return buildDigest(hexHash, size);
   }
 
@@ -248,4 +248,23 @@ public class DigestUtil {
   public static DigestUtil forDigest(Digest digest) {
     return new DigestUtil(HashFunction.forHash(digest.getHash()));
   }
+
+  private static final Map<DigestFunction.Value, DigestUtil> DIGEST_UTIL_MAP;
+
+  static {
+    DIGEST_UTIL_MAP = new EnumMap<>(DigestFunction.Value.class);
+    DIGEST_UTIL_MAP.put(DigestFunction.Value.MD5, new DigestUtil(HashFunction.MD5));
+    DIGEST_UTIL_MAP.put(DigestFunction.Value.SHA1, new DigestUtil(HashFunction.SHA1));
+    DIGEST_UTIL_MAP.put(DigestFunction.Value.SHA256, new DigestUtil(HashFunction.SHA256));
+    DIGEST_UTIL_MAP.put(DigestFunction.Value.BLAKE3, new DigestUtil(HashFunction.BLAKE3));
+  }
+
+  public static DigestUtil forDigestFunction(DigestFunction.Value digestFunction) {
+    DigestUtil digestUtil = DIGEST_UTIL_MAP.get(digestFunction);
+    if (digestUtil == null) {
+      throw new IllegalArgumentException("Unsupported digest function: " + digestFunction);
+    }
+    return digestUtil;
+  }
+
 }

@@ -1339,9 +1339,6 @@ public class ServerInstance extends NodeInstance {
       UUID uuid,
       RequestMetadata requestMetadata)
       throws EntryLimitException {
-    checkState(
-        digestFunction == DigestFunction.Value.UNKNOWN
-            || digestFunction == digestUtil.getDigestFunction());
     try {
       if (inDenyList(requestMetadata)) {
         throw Status.UNAVAILABLE.withDescription(BLOCK_LIST_ERROR).asRuntimeException();

@@ -28,6 +28,7 @@ java_library(
     srcs = ["ResourceParser.java"],
     visibility = ["//visibility:public"],
     deps = [
+        "//src/main/java/build/buildfarm/common:digestUtil",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",

@@ -17,6 +17,7 @@ package build.buildfarm.cas;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
@@ -100,6 +101,14 @@ public interface ContentAddressableStorage extends InputStreamFactory {
   Write getWrite(
       Compressor.Value compression, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException;
+
+  @Nullable
+  default Write getWrite(
+          Compressor.Value compression, Digest digest, DigestFunction.Value digestFunction,
+          UUID uuid, RequestMetadata requestMetadata)
+          throws EntryLimitException {
+    return null;
+  }
 
   /** Insert a blob into the CAS. */
   void put(Blob blob) throws InterruptedException;
