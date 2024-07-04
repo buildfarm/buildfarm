@@ -64,7 +64,8 @@ public class MemoryCAS implements ContentAddressableStorage {
   private final Writes writes = new Writes(this);
 
   public MemoryCAS(long maxSizeInBytes) {
-    this(maxSizeInBytes, (digest) -> {}, /* onReadComplete=*/ (digest) -> {}, /* delegate=*/ null);
+    this(
+        maxSizeInBytes, (digest) -> {}, /* onReadComplete= */ (digest) -> {}, /* delegate= */ null);
   }
 
   public MemoryCAS(

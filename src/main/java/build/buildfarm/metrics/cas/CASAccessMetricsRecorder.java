@@ -169,7 +169,8 @@ public final class CASAccessMetricsRecorder {
 
     if (timeToUpdate >= casEntryReadCountUpdateInterval.toMillis()) {
       log.warning(
-          "Consider increasing the update interval: read count update time exceeds the update interval.");
+          "Consider increasing the update interval: read count update time exceeds the update"
+              + " interval.");
     }
   }
 

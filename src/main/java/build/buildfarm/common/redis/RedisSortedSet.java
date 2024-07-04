@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.UnifiedJedis;
@@ -17,7 +16,6 @@ import redis.clients.jedis.UnifiedJedis;
  * Therefore, two redis sets with the same name, would in fact be the same underlying redis sets.
  */
 public class RedisSortedSet {
-
   /**
    * The name is used by the redis cluster client to access the set data. If two set had the same
    * name, they would be instances of the same underlying redis set.

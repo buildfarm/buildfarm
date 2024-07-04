@@ -31,7 +31,6 @@ import org.mockito.Mockito;
 
 @RunWith(JUnit4.class)
 public class CASAccessMetricsRecorderTest {
-
   private CASAccessMetricsRecorder casAccessMetricsRecorder;
   private long delay;
   private long window;
