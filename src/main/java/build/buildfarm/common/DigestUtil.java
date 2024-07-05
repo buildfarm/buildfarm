@@ -33,7 +33,9 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import lombok.Getter;
 
@@ -164,6 +166,12 @@ public class DigestUtil {
 
   public DigestFunction.Value getDigestFunction() {
     return hashFn.getDigestFunction();
+  }
+
+  public static List<DigestFunction.Value> getSupportedDigestFunctions() {
+    return Stream.of(HashFunction.values())
+        .map(HashFunction::getDigestFunction)
+        .toList();
   }
 
   public Digest compute(Path file) throws IOException {

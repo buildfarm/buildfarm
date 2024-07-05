@@ -1898,7 +1898,7 @@ public abstract class NodeInstance implements Instance {
 
   protected CacheCapabilities getCacheCapabilities() {
     return CacheCapabilities.newBuilder()
-        .addAllDigestFunctions(Arrays.asList(DigestFunction.Value.BLAKE3, DigestFunction.Value.SHA256, DigestFunction.Value.SHA1, DigestFunction.Value.MD5))
+        .addAllDigestFunctions(DigestUtil.getSupportedDigestFunctions())
         .setActionCacheUpdateCapabilities(
             ActionCacheUpdateCapabilities.newBuilder().setUpdateEnabled(true))
         .setMaxBatchTotalSizeBytes(Size.mbToBytes(4))
