@@ -82,7 +82,7 @@ Why do we clean here? Since we're verifying re-execution and caching, this ensur
 To prove that we have placed something in the action cache, we need to do the following:
 
  * run `bazel clean`
- * run `bazel run --remote_cache=localhost:8980 :main`
+ * run `bazel run --remote_cache=grpc://localhost:8980 :main`
 
 This should now print statistics on the `processes` line that indicate that you've retrieved results from the cache for your actions:
 
