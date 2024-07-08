@@ -244,7 +244,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private volatile long unreferencedEntryCount = 0;
 
   private static final int MAX_ENTRIES = 10000;
-  private static final Cache<String, DigestFunction.Value> digest_to_function_map =
+  private static final Cache<String, DigestFunction.Value> digestToFunctionMap =
           Caffeine.newBuilder()
                   .expireAfterWrite(2, TimeUnit.MINUTES)
                   .maximumSize(MAX_ENTRIES)
@@ -378,7 +378,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     String hashComponent = components[0];
 
-    DigestUtil corrDigestUtil = DigestUtil.forDigestFunction(digest_to_function_map.getIfPresent(hashComponent));
+    DigestUtil corrDigestUtil = DigestUtil.forDigestFunction(digestToFunctionMap.getIfPresent(hashComponent));
     return corrDigestUtil.build(hashComponent, size);
   }
 
@@ -988,7 +988,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             // caller will be the exclusive owner of this write stream. all other requests
             // will block until it is returned via a close.
             // Map identifier to digest function
-            digest_to_function_map.put(key.getDigest().getHash(), key.getDigestFunction());
+            digestToFunctionMap.put(key.getDigest().getHash(), key.getDigestFunction());
             if (closedFuture != null) {
               try {
                 while (!closedFuture.isDone()) {
@@ -2869,7 +2869,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Path writePath = getPath(key).resolveSibling(writeKey);
     final long committedSize;
     HashingOutputStream hashOut;
-    DigestUtil corrDigestUtil = DigestUtil.forDigestFunction(digest_to_function_map.getIfPresent(key));
+    DigestUtil corrDigestUtil = DigestUtil.forDigestFunction(digestToFunctionMap.getIfPresent(key));
     if (!isReset && Files.exists(writePath)) {
       committedSize = Files.size(writePath);
       try (InputStream in = Files.newInputStream(writePath)) {
