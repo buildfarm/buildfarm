@@ -99,7 +99,7 @@ public class ContentAddressableStorageService
             directExecutor());
     addCallback(
         responseFuture,
-        new FutureCallback<FindMissingBlobsResponse.Builder>() {
+        new FutureCallback<>() {
           @Override
           public void onSuccess(FindMissingBlobsResponse.Builder builder) {
             try {
@@ -203,7 +203,7 @@ public class ContentAddressableStorageService
 
     addCallback(
         responseFuture,
-        new FutureCallback<BatchUpdateBlobsResponse>() {
+        new FutureCallback<>() {
           @Override
           public void onSuccess(BatchUpdateBlobsResponse response) {
             responseObserver.onNext(response);

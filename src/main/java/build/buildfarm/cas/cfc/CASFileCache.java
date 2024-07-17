@@ -199,7 +199,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               1, MINUTES) // hopefully long enough for any of our file ops to take place and prevent
           // collision
           .build(
-              new CacheLoader<String, Lock>() {
+              new CacheLoader<>() {
                 @Override
                 public Lock load(String key) {
                   // should be sufficient for what we're doing
@@ -213,7 +213,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               (RemovalListener<BlobWriteKey, Write>)
                   notification -> notification.getValue().reset())
           .build(
-              new CacheLoader<BlobWriteKey, Write>() {
+              new CacheLoader<>() {
                 @SuppressWarnings("NullableProblems")
                 @Override
                 public Write load(BlobWriteKey key) {
@@ -230,7 +230,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     notification.getValue().setException(new IOException("write cancelled"));
                   })
           .build(
-              new CacheLoader<Digest, SettableFuture<Long>>() {
+              new CacheLoader<>() {
                 @SuppressWarnings("NullableProblems")
                 @Override
                 public SettableFuture<Long> load(Digest digest) {
@@ -524,7 +524,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return new ZstdCompressingInputStream(identity);
   }
 
-  @SuppressWarnings("ResultOfMethodCallIgnored")
+  @SuppressWarnings({"ResultOfMethodCallIgnored", "PMD.CompareObjectsWithEquals"})
   InputStream newLocalInput(Compressor.Value compressor, Digest digest, long offset)
       throws IOException {
     log.log(Level.FINER, format("getting input stream for %s", DigestUtil.toString(digest)));
@@ -549,7 +549,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           boolean removed = false;
           synchronized (this) {
             Entry removedEntry = safeStorageRemoval(key);
-            if (removedEntry == e) {
+            if (removedEntry == e) { // Intentional reference comparison
               unlinkEntry(removedEntry);
               removed = true;
             } else if (removedEntry != null) {
@@ -1251,12 +1251,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
       return mutex;
     }
-
-    private synchronized void release(Path key) {
-      // prevents this lock from being exclusive to other accesses, since it
-      // must now be present
-      mutexes.remove(key);
-    }
   }
 
   private static final class FileEntryKey {
@@ -1781,8 +1775,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @GuardedBy("this")
+  @SuppressWarnings("PMD.CompareObjectsWithEquals")
   private Entry waitForLastUnreferencedEntry(long blobSizeInBytes) throws InterruptedException {
-    while (header.after == header) {
+    while (header.after == header) { // Intentional reference comparison
       int references = 0;
       int keys = 0;
       int min = -1;
@@ -1990,7 +1985,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return entry;
   }
 
-  @SuppressWarnings("NonAtomicOperationOnVolatileField")
+  @SuppressWarnings({"NonAtomicOperationOnVolatileField", "PMD.CompareObjectsWithEquals"})
   @GuardedBy("this")
   private ListenableFuture<Entry> expireEntry(long blobSizeInBytes, ExecutorService service)
       throws IOException, InterruptedException {
@@ -2964,7 +2959,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         out.close(); // should probably discharge here as well
 
         if (size > blobSizeInBytes) {
-          String hash = hashSupplier.get().toString();
+          String hash = hashSupplier.get();
           try {
             Files.delete(writePath);
           } finally {
@@ -2982,7 +2977,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
 
       void commit() throws IOException {
-        String hash = hashSupplier.get().toString();
+        String hash = hashSupplier.get();
         String fileName = writePath.getFileName().toString();
         if (!fileName.startsWith(hash)) {
           dischargeAndNotify(blobSizeInBytes);
@@ -3161,7 +3156,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  private static class SentinelEntry extends Entry {
+  private static final class SentinelEntry extends Entry {
     @Override
     public void unlink() {
       throw new UnsupportedOperationException("sentinal cannot be unlinked");

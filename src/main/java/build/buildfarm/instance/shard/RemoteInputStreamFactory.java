@@ -98,7 +98,11 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     }
   }
 
-  @SuppressWarnings({"ResultOfMethodCallIgnored", "StatementWithEmptyBody"})
+  @SuppressWarnings({
+    "ResultOfMethodCallIgnored",
+    "StatementWithEmptyBody",
+    "PMD.EmptyControlStatement"
+  })
   private InputStream fetchBlobFromRemoteWorker(
       Compressor.Value compressor,
       Digest blobDigest,

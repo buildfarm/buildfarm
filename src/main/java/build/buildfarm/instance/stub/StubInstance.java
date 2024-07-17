@@ -233,7 +233,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<ActionCacheBlockingStub> actionCacheBlockingStub =
       Suppliers.memoize(
-          new Supplier<ActionCacheBlockingStub>() {
+          new Supplier<>() {
             @Override
             public ActionCacheBlockingStub get() {
               return ActionCacheGrpc.newBlockingStub(channel);
@@ -243,7 +243,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<ActionCacheFutureStub> actionCacheFutureStub =
       Suppliers.memoize(
-          new Supplier<ActionCacheFutureStub>() {
+          new Supplier<>() {
             @Override
             public ActionCacheFutureStub get() {
               return ActionCacheGrpc.newFutureStub(channel);
@@ -253,7 +253,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<CapabilitiesBlockingStub> capsBlockingStub =
       Suppliers.memoize(
-          new Supplier<CapabilitiesBlockingStub>() {
+          new Supplier<>() {
             @Override
             public CapabilitiesBlockingStub get() {
               return CapabilitiesGrpc.newBlockingStub(channel);
@@ -263,7 +263,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<AdminBlockingStub> adminBlockingStub =
       Suppliers.memoize(
-          new Supplier<AdminBlockingStub>() {
+          new Supplier<>() {
             @Override
             public AdminBlockingStub get() {
               return AdminGrpc.newBlockingStub(channel);
@@ -273,7 +273,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<ContentAddressableStorageFutureStub> casFutureStub =
       Suppliers.memoize(
-          new Supplier<ContentAddressableStorageFutureStub>() {
+          new Supplier<>() {
             @Override
             public ContentAddressableStorageFutureStub get() {
               return ContentAddressableStorageGrpc.newFutureStub(channel);
@@ -283,7 +283,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<ContentAddressableStorageBlockingStub> casBlockingStub =
       Suppliers.memoize(
-          new Supplier<ContentAddressableStorageBlockingStub>() {
+          new Supplier<>() {
             @Override
             public ContentAddressableStorageBlockingStub get() {
               return ContentAddressableStorageGrpc.newBlockingStub(channel);
@@ -293,7 +293,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<ByteStreamStub> bsStub =
       Suppliers.memoize(
-          new Supplier<ByteStreamStub>() {
+          new Supplier<>() {
             @Override
             public ByteStreamStub get() {
               return ByteStreamGrpc.newStub(channel);
@@ -303,7 +303,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub =
       Suppliers.memoize(
-          new Supplier<ByteStreamBlockingStub>() {
+          new Supplier<>() {
             @Override
             public ByteStreamBlockingStub get() {
               return ByteStreamGrpc.newBlockingStub(channel);
@@ -313,7 +313,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<OperationsBlockingStub> operationsBlockingStub =
       Suppliers.memoize(
-          new Supplier<OperationsBlockingStub>() {
+          new Supplier<>() {
             @Override
             public OperationsBlockingStub get() {
               return OperationsGrpc.newBlockingStub(channel);
@@ -323,7 +323,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<OperationQueueBlockingStub> operationQueueBlockingStub =
       Suppliers.memoize(
-          new Supplier<OperationQueueBlockingStub>() {
+          new Supplier<>() {
             @Override
             public OperationQueueBlockingStub get() {
               return OperationQueueGrpc.newBlockingStub(channel);
@@ -333,7 +333,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<WorkerProfileBlockingStub> workerProfileBlockingStub =
       Suppliers.memoize(
-          new Supplier<WorkerProfileBlockingStub>() {
+          new Supplier<>() {
             @Override
             public WorkerProfileBlockingStub get() {
               return WorkerProfileGrpc.newBlockingStub(channel);
@@ -343,7 +343,7 @@ public class StubInstance implements Instance {
   @SuppressWarnings("Guava")
   private final Supplier<ShutDownWorkerBlockingStub> shutDownWorkerBlockingStub =
       Suppliers.memoize(
-          new Supplier<ShutDownWorkerBlockingStub>() {
+          new Supplier<>() {
             @Override
             public ShutDownWorkerBlockingStub get() {
               return ShutDownWorkerGrpc.newBlockingStub(channel);

@@ -61,7 +61,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
 
     addCallback(
         resultFuture,
-        new FutureCallback<ActionResult>() {
+        new FutureCallback<>() {
           final ServerCallStreamObserver<ActionResult> call =
               (ServerCallStreamObserver<ActionResult>) responseObserver;
 

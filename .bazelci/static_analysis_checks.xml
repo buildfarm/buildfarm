@@ -24,23 +24,19 @@
     <exclude name="JUnitTestsShouldIncludeAssert"/>
     <exclude name="LiteralsFirstInComparisons"/>
     <exclude name="LooseCoupling"/>
-    <exclude name="PositionLiteralsFirstInCaseInsensitiveComparisons"/>
-    <exclude name="PositionLiteralsFirstInComparisons"/>
     <exclude name="PreserveStackTrace"/>
     <exclude name="ReplaceEnumerationWithIterator"/>
     <exclude name="SwitchStmtsShouldHaveDefault"/>
     <exclude name="SystemPrintln"/>
     <exclude name="UseTryWithResources"/>
     <exclude name="UseVarargs"/>
+    <exclude name="UnusedPrivateMethod"/>
 </rule>
 
 <rule ref="category/java/codestyle.xml">
     <exclude name="LongVariable"/> <!-- some of these long variable names are helpful -->
     <exclude name="UseUnderscoresInNumericLiterals"/> <!-- these underscores are deemed annoying -->
-    <exclude name="AbstractNaming"/>
     <exclude name="AtLeastOneConstructor"/>
-    <exclude name="AvoidFinalLocalVariable"/>
-    <exclude name="AvoidPrefixingMethodParameters"/>
     <exclude name="AvoidProtectedFieldInFinalClass"/>
     <exclude name="AvoidProtectedMethodInFinalClassNotExtending"/>
     <exclude name="CallSuperInConstructor"/>
@@ -48,12 +44,10 @@
     <exclude name="CommentDefaultAccessModifier"/>
     <exclude name="ConfusingTernary"/>
     <exclude name="ControlStatementBraces"/>
-    <exclude name="DefaultPackage"/>
     <exclude name="EmptyMethodInAbstractClassShouldBeAbstract"/>
     <exclude name="FieldDeclarationsShouldBeAtStartOfClass"/>
     <exclude name="FieldNamingConventions"/>
     <exclude name="FormalParameterNamingConventions"/>
-    <exclude name="GenericsNaming"/>
     <exclude name="LinguisticNaming"/>
     <exclude name="LocalInterfaceSessionNamingConvention"/>
     <exclude name="LocalVariableCouldBeFinal"/>
@@ -61,17 +55,16 @@
     <exclude name="MDBAndSessionBeanNamingConvention"/>
     <exclude name="MethodArgumentCouldBeFinal"/>
     <exclude name="MethodNamingConventions"/>
-    <exclude name="MIsLeadingVariableName"/>
     <exclude name="OnlyOneReturn"/>
     <exclude name="PrematureDeclaration"/>
     <exclude name="ShortClassName"/>
     <exclude name="ShortMethodName"/>
     <exclude name="ShortVariable"/>
-    <exclude name="SuspiciousConstantFieldName"/>
     <exclude name="TooManyStaticImports"/>
     <exclude name="UnnecessaryAnnotationValueElement"/>
     <exclude name="UnnecessaryConstructor"/>
     <exclude name="UnnecessaryFullyQualifiedName"/>
+    <exclude name="UnnecessaryImport"/>
     <exclude name="UselessParentheses"/>
 </rule>
 
@@ -84,13 +77,12 @@
     <exclude name="AvoidThrowingNullPointerException"/>
     <exclude name="AvoidThrowingRawExceptionTypes"/>
     <exclude name="AvoidUncheckedExceptionsInSignatures"/>
+    <exclude name="CognitiveComplexity"/>
     <exclude name="CouplingBetweenObjects"/>
     <exclude name="CyclomaticComplexity"/>
     <exclude name="DataClass"/>
     <exclude name="ExceptionAsFlowControl"/>
-    <exclude name="ExcessiveClassLength"/>
     <exclude name="ExcessiveImports"/>
-    <exclude name="ExcessiveMethodLength"/>
     <exclude name="ExcessiveParameterList"/>
     <exclude name="ExcessivePublicCount"/>
     <exclude name="GodClass"/>
@@ -98,21 +90,25 @@
     <exclude name="LawOfDemeter"/>
     <exclude name="LogicInversion"/>
     <exclude name="LoosePackageCoupling"/>
-    <exclude name="ModifiedCyclomaticComplexity"/>
-    <exclude name="NcssConstructorCount"/>
     <exclude name="NcssCount"/>
-    <exclude name="NcssMethodCount"/>
-    <exclude name="NcssTypeCount"/>
     <exclude name="NPathComplexity"/>
     <exclude name="SignatureDeclareThrowsException"/>
     <exclude name="SimplifiedTernary"/>
+    <exclude name="SimplifyBooleanExpressions"/>
+    <exclude name="SimplifyBooleanReturns"/>
+    <exclude name="SimplifyConditional"/>
     <exclude name="SingularField"/>
-    <exclude name="StdCyclomaticComplexity"/>
     <exclude name="SwitchDensity"/>
     <exclude name="TooManyFields"/>
     <exclude name="TooManyMethods"/>
     <exclude name="UseObjectForClearerAPI"/>
     <exclude name="UseUtilityClass"/>
+</rule>
+
+<rule ref="category/java/design.xml/CognitiveComplexity">
+    <properties>
+        <property name="reportLevel" value="60" />
+    </properties>
 </rule>
 
 <rule ref="category/java/documentation.xml">
@@ -136,25 +132,45 @@
     <exclude name="AvoidLosingExceptionInformation"/>
     <exclude name="AvoidMultipleUnaryOperators"/>
     <exclude name="AvoidUsingOctalValues"/>
-    <exclude name="BeanMembersShouldSerialize"/>
     <exclude name="CheckSkipResult"/>
+    <exclude name="ClassCastExceptionWithToArray"/>
+    <exclude name="CloneMethodMustBePublic"/>
+    <exclude name="CloneMethodMustImplementCloneable"/>
+    <exclude name="CloneMethodReturnTypeMustMatchClassName"/>
     <exclude name="CloseResource"/>
     <exclude name="ConstructorCallsOverridableMethod"/>
-    <exclude name="DataflowAnomalyAnalysis"/>
     <exclude name="DoNotThrowExceptionInFinally"/>
     <exclude name="EmptyCatchBlock"/>
-    <exclude name="EmptyIfStmt"/>
-    <exclude name="EmptyInitializer"/>
-    <exclude name="EmptyWhileStmt"/>
+    <exclude name="DetachedTestCase"/>
+    <exclude name="DoNotTerminateVM"/>
+    <exclude name="DoNotThrowExceptionInFinally"/>
+    <exclude name="EmptyCatchBlock"/>
+    <exclude name="FinalizeDoesNotCallSuperFinalize"/>
+    <exclude name="FinalizeOnlyCallsSuperFinalize"/>
+    <exclude name="FinalizeOverloaded"/>
+    <exclude name="FinalizeShouldBeProtected"/>
+    <exclude name="MethodWithSameNameAsEnclosingClass"/>
     <exclude name="MissingSerialVersionUID"/>
     <exclude name="MissingStaticMethodInNonInstantiatableClass"/>
     <exclude name="NonCaseLabelInSwitchStatement"/>
     <exclude name="NonStaticInitializer"/>
     <exclude name="NullAssignment"/>
     <exclude name="OverrideBothEqualsAndHashcode"/>
-    <exclude name="ReturnEmptyArrayRatherThanNull"/>
+    <exclude name="ProperCloneImplementation"/>
+    <exclude name="SimpleDateFormatNeedsLocale"/>
+    <exclude name="SingleMethodSingleton"/>
+    <exclude name="SingletonClassReturningNewInstance"/>
+    <exclude name="StaticEJBFieldShouldBeFinal"/>
+    <exclude name="StringBufferInstantiationWithChar"/>
+    <exclude name="SuspiciousEqualsMethodName"/>
+    <exclude name="SuspiciousHashcodeMethodName"/>
+    <exclude name="SuspiciousOctalEscape"/>
+    <exclude name="UnnecessaryBooleanAssertion"/>
+    <exclude name="UnnecessaryCaseChange"/>
+    <exclude name="UnnecessaryConversionTemporary"/>
+    <exclude name="UseCorrectExceptionLogging"/>
+    <exclude name="UseEqualsToCompareStrings"/>
     <exclude name="UseLocaleWithCaseConversions"/>
-    <exclude name="UseProperClassLoader"/>
 </rule>
 
 
@@ -165,6 +181,7 @@
     <exclude name="DoNotUseThreads"/>
     <exclude name="DontCallThreadRun"/>
     <exclude name="NonThreadSafeSingleton"/>
+    <exclude name="UnsynchronizedStaticFormatter"/>
     <exclude name="UseConcurrentHashMap"/>
     <exclude name="UseNotifyAllInsteadOfNotify"/>
 </rule>

@@ -14,7 +14,7 @@ public class Queue {
 
   private String name;
   private boolean allowUnmatched = true;
-  private List<Property> properties = new ArrayList();
+  private List<Property> properties = new ArrayList<>();
 
   public Platform getPlatform() {
     Platform.Builder platformBuilder = Platform.newBuilder();

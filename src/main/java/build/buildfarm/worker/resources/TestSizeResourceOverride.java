@@ -21,6 +21,7 @@ package build.buildfarm.worker.resources;
  *     overloading users with various exec_properties for each resource, they could instead rely on
  *     the test size buckets which will assign good defaults.
  */
+@SuppressWarnings("PMD.TestClassWithoutTestCases")
 public class TestSizeResourceOverride {
   /**
    * @field coreMin

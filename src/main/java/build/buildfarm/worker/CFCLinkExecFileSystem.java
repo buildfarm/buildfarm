@@ -155,7 +155,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   private static Iterator<String> directoriesIterator(
       Digest digest, Map<Digest, Directory> directoriesIndex) {
     Directory root = directoriesIndex.get(digest);
-    return new Iterator<String>() {
+    return new Iterator<>() {
       boolean atEnd = root.getDirectoriesCount() == 0;
       Stack<String> path = new Stack<>();
       Stack<Iterator<DirectoryNode>> route = new Stack<>();

@@ -85,12 +85,10 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
             if (!Files.exists(initArgsLogFile)) {
               StringBuilder initArgs = new StringBuilder();
               for (String s : workerKey.getCmd()) {
-                initArgs.append(s);
-                initArgs.append('\n');
+                initArgs.append(s).append('\n');
               }
               for (String s : workerKey.getArgs()) {
-                initArgs.append(s);
-                initArgs.append('\n');
+                initArgs.append(s).append('\n');
               }
 
               Files.write(initArgsLogFile, initArgs.toString().getBytes());
@@ -251,7 +249,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     }
   }
 
-  private class RequestTimeoutHandler extends TimerTask {
+  private final class RequestTimeoutHandler extends TimerTask {
     private final RequestCtx request;
 
     private RequestTimeoutHandler(RequestCtx request) {

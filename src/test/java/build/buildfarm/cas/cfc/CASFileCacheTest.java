@@ -25,6 +25,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
@@ -99,6 +100,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.stubbing.Answer;
 
+@SuppressWarnings("PMD.TestClassWithoutTestCases")
 class CASFileCacheTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
@@ -417,7 +419,8 @@ class CASFileCacheTest {
     entry.after = entry;
     storage.put(nonexistentKey, entry);
     NoSuchFileException noSuchFileException = null;
-    try (InputStream in = fileCache.newInput(Compressor.Value.IDENTITY, nonexistentDigest, 0)) {
+    try (InputStream ignored =
+        fileCache.newInput(Compressor.Value.IDENTITY, nonexistentDigest, 0)) {
       fail("should not get here");
     } catch (NoSuchFileException e) {
       noSuchFileException = e;
@@ -657,7 +660,7 @@ class CASFileCacheTest {
               }
             });
     closer.start();
-    try (OutputStream secondOut = write.getOutput(1, SECONDS, () -> {})) {
+    try (OutputStream ignored = write.getOutput(1, SECONDS, () -> {})) {
       assertThat(writeClosed.get()).isTrue();
     }
     write.reset(); // ensure that the output stream is closed
@@ -703,12 +706,9 @@ class CASFileCacheTest {
     // update entry with expired deadline
     storage.get(key).existsDeadline = Deadline.after(0, SECONDS);
 
-    try (InputStream in =
-        fileCache.newInput(Compressor.Value.IDENTITY, blob.getDigest(), /* offset= */ 0)) {
-      fail("should not get here");
-    } catch (NoSuchFileException e) {
-      // success
-    }
+    assertThrows(
+        NoSuchFileException.class,
+        () -> fileCache.newInput(Compressor.Value.IDENTITY, blob.getDigest(), /* offset= */ 0));
     assertThat(storage.containsKey(key)).isFalse();
   }
 
@@ -908,7 +908,7 @@ class CASFileCacheTest {
     // state of CAS
     //   1024-byte key
 
-    AtomicReference<Throwable> exRef = new AtomicReference(null);
+    AtomicReference<Throwable> exRef = new AtomicReference<>(null);
     // 0 = not blocking
     // 1 = blocking
     // 2 = delegate write
@@ -1205,14 +1205,9 @@ class CASFileCacheTest {
         };
     ByteString blob = ByteString.copyFromUtf8("Missing Entry");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
-    NoSuchFileException expected = null;
-    try (InputStream in =
-        undelegatedCAS.newInput(Compressor.Value.IDENTITY, blobDigest, /* offset= */ 0)) {
-      fail("should not get here");
-    } catch (NoSuchFileException e) {
-      expected = e;
-    }
-    assertThat(expected).isNotNull();
+    assertThrows(
+        NoSuchFileException.class,
+        () -> undelegatedCAS.newInput(Compressor.Value.IDENTITY, blobDigest, /* offset= */ 0));
   }
 
   @Test
@@ -1244,6 +1239,7 @@ class CASFileCacheTest {
               }
             },
             "FirstRequest");
+    @SuppressWarnings("PMD.EmptyControlStatement")
     Thread write2 =
         new Thread(
             () -> {
@@ -1326,6 +1322,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class NativeFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public NativeFileDirsIndexInMemoryCASFileCacheTest() throws IOException {
       super(createTempDirectory(), /* storeFileDirsIndexInMemory= */ true);
@@ -1340,6 +1337,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class NativeFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
     public NativeFileDirsIndexInSqliteCASFileCacheTest() throws IOException {
       super(createTempDirectory(), /* storeFileDirsIndexInMemory= */ false);
@@ -1354,6 +1352,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class OsXFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public OsXFileDirsIndexInMemoryCASFileCacheTest() {
       super(
@@ -1369,6 +1368,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class OsXFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
     public OsXFileDirsIndexInSqliteCASFileCacheTest() {
       super(
@@ -1384,6 +1384,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class UnixFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public UnixFileDirsIndexInMemoryCASFileCacheTest() {
       super(
@@ -1399,6 +1400,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class UnixFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
     public UnixFileDirsIndexInSqliteCASFileCacheTest() {
       super(
@@ -1414,6 +1416,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class WindowsFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public WindowsFileDirsIndexInMemoryCASFileCacheTest() {
       super(
@@ -1429,6 +1432,7 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
+  @SuppressWarnings("PMD.TestClassWithoutTestCases")
   public static class WindowsFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
     public WindowsFileDirsIndexInSqliteCASFileCacheTest() {
       super(

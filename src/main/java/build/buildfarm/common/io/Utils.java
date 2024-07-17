@@ -52,7 +52,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.io.IOUtils;
 
 @Log
-public class Utils {
+public final class Utils {
   @SuppressWarnings("Guava")
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
@@ -207,10 +207,9 @@ public class Utils {
         path.getFileName().toString(), fileStatus, getFileKey(path, fileStatus));
   }
 
-  @SuppressWarnings({"unchecked", "rawtypes"})
   private static List<NamedFileKey> listNIOdirentSorted(Path path, FileStore fileStore)
       throws IOException {
-    List<NamedFileKey> dirents = new ArrayList();
+    List<NamedFileKey> dirents = new ArrayList<>();
     for (Path entry : listDir(path)) {
       dirents.add(pathToNamedFileKey(entry, fileStore));
     }

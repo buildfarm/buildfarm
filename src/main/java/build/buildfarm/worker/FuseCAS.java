@@ -298,7 +298,7 @@ public class FuseCAS extends FuseStubFS {
       try {
         return childrenFetcher.apply(this);
       } catch (InterruptedException | IOException e) {
-        return null;
+        return Map.of();
       }
     }
 

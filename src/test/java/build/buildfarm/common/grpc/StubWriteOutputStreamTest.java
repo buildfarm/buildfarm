@@ -150,6 +150,7 @@ public class StubWriteOutputStreamTest {
     assertThat(requests.get(2).getFinishWrite()).isTrue();
   }
 
+  @SuppressWarnings("PMD.EmptyControlStatement")
   @Test
   public void getOutputCallback() throws IOException {
     String resourceName = "reset-resource";
@@ -163,7 +164,7 @@ public class StubWriteOutputStreamTest {
             /* autoflush= */ true);
 
     boolean callbackTimedOut = false;
-    try (OutputStream out =
+    try (OutputStream ignored =
         write.getOutput(
             1,
             MICROSECONDS,

@@ -257,6 +257,7 @@ public final class BuildfarmConfigs {
     }
   }
 
+  @SuppressWarnings("PMD.ConfusingArgumentToVarargsMethod")
   private static ExecutionWrapperProperties createExecutionWrapperProperties(
       BuildfarmConfigs configs) {
     // Create a mapping from the execution wrappers to the features they enable.

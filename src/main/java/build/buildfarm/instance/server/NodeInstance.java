@@ -138,6 +138,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
@@ -440,11 +441,11 @@ public abstract class NodeInstance implements Instance {
       return null;
     }
 
-    if ((!blob.isEmpty() && (long) 0 >= blob.size()) || count < 0) {
+    if ((!blob.isEmpty() && 0 >= blob.size()) || count < 0) {
       throw new IndexOutOfBoundsException();
     }
 
-    return blob.getData().substring((int) (long) 0, (int) (Math.min(count, blob.size())));
+    return blob.getData().substring(0, (int) (Math.min(count, blob.size())));
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
@@ -661,7 +662,7 @@ public abstract class NodeInstance implements Instance {
         expectedHash = digestUtil.computeHash(data).toString();
       }
       contentLength = data.size();
-      inSupplier = () -> data.newInput();
+      inSupplier = data::newInput;
     } else {
       inSupplier = connection::getInputStream;
     }
@@ -1405,7 +1406,7 @@ public abstract class NodeInstance implements Instance {
   }
 
   // this deserves a real async execute, but not now
-  @SuppressWarnings("ConstantConditions")
+  @SuppressWarnings({"ConstantConditions"})
   @Override
   public ListenableFuture<Void> execute(
       Digest actionDigest,
@@ -1476,9 +1477,9 @@ public abstract class NodeInstance implements Instance {
 
     Futures.addCallback(
         actionResultFuture,
-        new FutureCallback<ActionResult>() {
-          @SuppressWarnings("ConstantConditions")
-          void onCompleted(@Nullable ActionResult actionResult) {
+        new FutureCallback<>() {
+
+          public void onSuccess(@Nullable ActionResult actionResult) {
             final ExecuteOperationMetadata nextMetadata;
             if (actionResult == null) {
               nextMetadata =
@@ -1515,18 +1516,12 @@ public abstract class NodeInstance implements Instance {
           }
 
           @Override
-          public void onSuccess(ActionResult actionResult) {
-            onCompleted(actionResult);
-          }
-
-          @SuppressWarnings("NullableProblems")
-          @Override
-          public void onFailure(Throwable t) {
+          public void onFailure(@Nonnull Throwable t) {
             log.log(
                 Level.WARNING,
                 format("action cache check of %s failed", DigestUtil.toString(actionDigest)),
                 t);
-            onCompleted(null);
+            onSuccess(null);
           }
         },
         directExecutor());
@@ -1577,7 +1572,7 @@ public abstract class NodeInstance implements Instance {
     SettableFuture<T> future = SettableFuture.create();
     Futures.addCallback(
         getBlobFuture(Compressor.Value.IDENTITY, digest, requestMetadata),
-        new FutureCallback<ByteString>() {
+        new FutureCallback<>() {
           @Override
           public void onSuccess(ByteString blob) {
             try {

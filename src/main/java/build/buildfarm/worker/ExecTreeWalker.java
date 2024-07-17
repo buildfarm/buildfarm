@@ -28,7 +28,7 @@ class ExecTreeWalker implements Closeable {
   }
 
   @Data
-  static class Event {
+  static final class Event {
     private final EventType type;
     private final Path path;
     private final BasicFileAttributes attributes;

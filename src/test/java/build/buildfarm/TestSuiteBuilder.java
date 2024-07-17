@@ -24,8 +24,9 @@ import junit.framework.TestCase;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 
+@SuppressWarnings("PMD.TestClassWithoutTestCases")
 final class TestSuiteBuilder {
-  private static class TestClassNameComparator implements Comparator<Class<?>> {
+  private static final class TestClassNameComparator implements Comparator<Class<?>> {
     @Override
     public int compare(Class<?> o1, Class<?> o2) {
       return o1.getName().compareTo(o2.getName());

@@ -40,7 +40,7 @@ import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
-public class Directories {
+public final class Directories {
   private static final Set<PosixFilePermission> writablePerms =
       PosixFilePermissions.fromString("rwxr-xr-x");
   private static final Set<PosixFilePermission> nonWritablePerms =
@@ -111,7 +111,7 @@ public class Directories {
   public static void remove(Path directory, FileStore fileStore) throws IOException {
     Files.walkFileTree(
         directory,
-        new SimpleFileVisitor<Path>() {
+        new SimpleFileVisitor<>() {
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
               throws IOException {
@@ -147,7 +147,7 @@ public class Directories {
       throws IOException {
     Files.walkFileTree(
         directory,
-        new SimpleFileVisitor<Path>() {
+        new SimpleFileVisitor<>() {
           @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
             if (e != null) {

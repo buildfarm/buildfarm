@@ -25,8 +25,7 @@ import lombok.Getter;
 public abstract class SuperscalarPipelineStage extends PipelineStage {
   @Getter protected final int width;
 
-  @SuppressWarnings("rawtypes")
-  protected final BlockingQueue claims;
+  protected final BlockingQueue<Object> claims;
 
   protected Set<String> operationNames = new HashSet<>();
 
@@ -35,7 +34,6 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
   // ensure that only a single claim waits for available slots for core count
   private final Object claimLock = new Object();
 
-  @SuppressWarnings("rawtypes")
   public SuperscalarPipelineStage(
       String name,
       WorkerContext workerContext,
@@ -44,7 +42,7 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
       int width) {
     super(name, workerContext, output, error);
     this.width = width;
-    claims = new ArrayBlockingQueue(width);
+    claims = new ArrayBlockingQueue<>(width);
   }
 
   protected abstract void interruptAll();
@@ -60,7 +58,7 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
 
   public Iterable<String> getOperationNames() {
     synchronized (operationNames) {
-      return new HashSet<String>(operationNames);
+      return new HashSet<>(operationNames);
     }
   }
 
@@ -203,6 +201,6 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
 
   @Override
   protected boolean isClaimed() {
-    return claims.size() > 0;
+    return !claims.isEmpty();
   }
 }

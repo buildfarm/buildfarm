@@ -45,7 +45,7 @@ import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
-public class Util {
+public final class Util {
   public static final Predicate<Status> SHARD_IS_RETRIABLE =
       st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.apply(st);
 
@@ -115,13 +115,13 @@ public class Util {
       RequestMetadata requestMetadata) {
     SettableFuture<Void> foundFuture = SettableFuture.create();
     AggregateCallback<String> foundCallback =
-        new AggregateCallback<String>(workerSet.size() + 1) {
+        new AggregateCallback<>(workerSet.size() + 1) {
           @Override
           public boolean complete() {
             return super.complete() && foundFuture.set(null);
           }
 
-          protected void fail(StatusRuntimeException e) {
+          private void fail(StatusRuntimeException e) {
             super.fail();
             foundFuture.setException(e);
           }
@@ -151,7 +151,7 @@ public class Util {
           digest,
           worker,
           instance,
-          new FutureCallback<Boolean>() {
+          new FutureCallback<>() {
             @Override
             public void onSuccess(Boolean found) {
               foundCallback.onSuccess(found ? worker : null);
@@ -179,7 +179,7 @@ public class Util {
         instance.findMissingBlobs(ImmutableList.of(digest), requestMetadata);
     addCallback(
         missingBlobsFuture,
-        new FutureCallback<Iterable<Digest>>() {
+        new FutureCallback<>() {
           @Override
           public void onSuccess(Iterable<Digest> missingDigests) {
             boolean found = Iterables.isEmpty(missingDigests);

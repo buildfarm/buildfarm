@@ -639,7 +639,7 @@ class ShardWorkerContext implements WorkerContext {
     OutputDirectoryContext outputRoot = new OutputDirectoryContext();
     Files.walkFileTree(
         outputDirPath,
-        new SimpleFileVisitor<Path>() {
+        new SimpleFileVisitor<>() {
           OutputDirectoryContext currentDirectory = null;
           final Stack<OutputDirectoryContext> path = new Stack<>();
 
@@ -649,7 +649,7 @@ class ShardWorkerContext implements WorkerContext {
             if (configs.getWorker().isCreateSymlinkOutputs() && attrs.isSymbolicLink()) {
               visitSymbolicLink(file);
             } else {
-              visitRegularFile(file, attrs);
+              visitRegularFile(file);
             }
             return FileVisitResult.CONTINUE;
           }
@@ -663,7 +663,7 @@ class ShardWorkerContext implements WorkerContext {
                     .build());
           }
 
-          private void visitRegularFile(Path file, BasicFileAttributes attrs) throws IOException {
+          private void visitRegularFile(Path file) throws IOException {
             Digest digest;
             try {
               // should we create symlink nodes in output?

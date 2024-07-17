@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import javax.naming.ConfigurationException;
 import lombok.Data;
@@ -38,7 +39,7 @@ public class Worker {
   private boolean allowBringYourOwnContainer = false;
   private boolean errorOperationRemainingResources = false;
   private int gracefulShutdownSeconds = 0;
-  private ExecutionPolicy[] executionPolicies = {};
+  private List<ExecutionPolicy> executionPolicies = Collections.emptyList();
   private SandboxSettings sandboxSettings = new SandboxSettings();
   private boolean createSymlinkOutputs = false;
   private int zstdBufferPoolSize = 2048; /* * ZSTD_DStreamInSize (current is 128k) == 256MiB */
@@ -50,12 +51,8 @@ public class Worker {
 
   private boolean errorOperationOutputSizeExceeded = false;
 
-  public ExecutionPolicy[] getExecutionPolicies() {
-    if (executionPolicies != null) {
-      return executionPolicies;
-    } else {
-      return new ExecutionPolicy[0];
-    }
+  public List<ExecutionPolicy> getExecutionPolicies() {
+    return executionPolicies;
   }
 
   public int getWorkerType() {

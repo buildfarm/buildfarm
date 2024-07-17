@@ -17,8 +17,9 @@ package build.buildfarm.common;
 import java.util.logging.LogManager;
 import javax.annotation.concurrent.GuardedBy;
 
+@SuppressWarnings("PMD.MutableStaticState")
 public class WaitingLogManager extends LogManager {
-  static WaitingLogManager instance = null;
+  private static WaitingLogManager instance = null;
 
   @GuardedBy("this")
   private boolean resetCalled = false;

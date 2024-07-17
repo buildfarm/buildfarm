@@ -34,7 +34,7 @@ class ExecTree {
                 }
               }
               case START_DIRECTORY -> {
-                var res = visitor.preVisitDirectory(ev.getPath(), ev.getAttributes());
+                FileVisitResult res = visitor.preVisitDirectory(ev.getPath(), ev.getAttributes());
 
                 // if SKIP_SIBLINGS and SKIP_SUBTREE is returned then
                 // there shouldn't be any more events for the current
@@ -45,7 +45,7 @@ class ExecTree {
                 yield res;
               }
               case END_DIRECTORY -> {
-                var res = visitor.postVisitDirectory(ev.getPath(), ev.getIoe());
+                FileVisitResult res = visitor.postVisitDirectory(ev.getPath(), ev.getIoe());
 
                 // SKIP_SIBLINGS is a no-op for postVisitDirectory
                 if (res == FileVisitResult.SKIP_SIBLINGS) {

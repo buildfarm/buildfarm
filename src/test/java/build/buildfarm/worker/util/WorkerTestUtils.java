@@ -188,7 +188,7 @@ public class WorkerTestUtils {
 
     Files.walkFileTree(
         root,
-        new FileVisitor<Path>() {
+        new FileVisitor<>() {
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
               throws IOException {

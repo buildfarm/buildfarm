@@ -87,7 +87,7 @@ public class GrpcCAS implements ContentAddressableStorage {
   @SuppressWarnings("Guava")
   private final Supplier<ContentAddressableStorageBlockingStub> casBlockingStub =
       Suppliers.memoize(
-          new Supplier<ContentAddressableStorageBlockingStub>() {
+          new Supplier<>() {
             @Override
             public ContentAddressableStorageBlockingStub get() {
               return ContentAddressableStorageGrpc.newBlockingStub(channel);
@@ -97,7 +97,7 @@ public class GrpcCAS implements ContentAddressableStorage {
   @SuppressWarnings("Guava")
   private final Supplier<ContentAddressableStorageFutureStub> casFutureStub =
       Suppliers.memoize(
-          new Supplier<ContentAddressableStorageFutureStub>() {
+          new Supplier<>() {
             @Override
             public ContentAddressableStorageFutureStub get() {
               return ContentAddressableStorageGrpc.newFutureStub(channel);
@@ -107,7 +107,7 @@ public class GrpcCAS implements ContentAddressableStorage {
   @SuppressWarnings("Guava")
   private final Supplier<ByteStreamStub> bsStub =
       Suppliers.memoize(
-          new Supplier<ByteStreamStub>() {
+          new Supplier<>() {
             @Override
             public ByteStreamStub get() {
               return ByteStreamGrpc.newStub(channel);

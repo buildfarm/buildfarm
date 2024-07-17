@@ -126,7 +126,7 @@ class Writes {
         CacheBuilder.newBuilder()
             .expireAfterWrite(writeExpiresAfter, TimeUnit.HOURS)
             .build(
-                new CacheLoader<BlobWriteKey, Instance>() {
+                new CacheLoader<>() {
                   @SuppressWarnings("NullableProblems")
                   @Override
                   public Instance load(BlobWriteKey key) {

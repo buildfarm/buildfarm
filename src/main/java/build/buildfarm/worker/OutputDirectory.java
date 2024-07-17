@@ -125,7 +125,7 @@ public class OutputDirectory {
             envVarOutputDirectoryEntries(envVars)));
   }
 
-  private static class Builder {
+  private static final class Builder {
     final Map<String, Builder> children = new HashMap<>();
     boolean isRecursive = false;
 

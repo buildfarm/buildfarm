@@ -53,6 +53,7 @@ public class PipelineStageTest {
     }
   }
 
+  @SuppressWarnings("PMD.EmptyControlStatement")
   @Test
   public void cancelTickInterruptsOperation() throws InterruptedException {
     PipelineStage output =

@@ -60,14 +60,14 @@ public class SandboxSettings {
    * @brief Additional paths the sandbox is allowed to write to.
    * @details Suggestions may include: /tmp, /dev/shm
    */
-  public List<String> additionalWritePaths = new ArrayList();
+  public List<String> additionalWritePaths = new ArrayList<>();
 
   /**
    * @field tmpFsPaths
    * @brief Additional paths the sandbox uses for tmpfs
    * @details Suggestions may include: /tmp
    */
-  public List<String> tmpFsPaths = new ArrayList();
+  public List<String> tmpFsPaths = new ArrayList<>();
 
   /**
    * @field selectForBlockNetwork

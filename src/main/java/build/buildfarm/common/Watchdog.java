@@ -33,6 +33,7 @@ public class Watchdog implements Runnable {
     pet();
   }
 
+  @Override
   @SuppressWarnings("CatchMayIgnoreException")
   public void run() {
     try {

@@ -29,7 +29,7 @@ import io.grpc.stub.MetadataUtils;
 import javax.annotation.Nullable;
 
 /** Utility functions to handle Metadata for remote Grpc calls. */
-public class TracingMetadataUtils {
+public final class TracingMetadataUtils {
   private TracingMetadataUtils() {}
 
   private static final Context.Key<RequestMetadata> CONTEXT_KEY =
@@ -65,6 +65,7 @@ public class TracingMetadataUtils {
   /** GRPC interceptor to add logging metadata to the GRPC context. */
   public static class ServerHeadersInterceptor implements ServerInterceptor {
     @Override
+    @SuppressWarnings("PMD.GenericsNaming")
     public <ReqT, RespT> Listener<ReqT> interceptCall(
         ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
       RequestMetadata meta = requestMetadataFromHeaders(headers);

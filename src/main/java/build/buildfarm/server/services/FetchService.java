@@ -78,7 +78,6 @@ public class FetchService extends FetchImplBase {
       FetchBlobRequest request,
       StreamObserver<FetchBlobResponse> responseObserver)
       throws InterruptedException {
-    Digest expectedDigest = null;
     RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
 
     if (request.getUrisCount() == 0) {
@@ -89,7 +88,7 @@ public class FetchService extends FetchImplBase {
 
     FetchQualifiers qualifiers = parseQualifiers(request.getQualifiersList());
 
-    expectedDigest = qualifiers.getDigest();
+    Digest expectedDigest = qualifiers.getDigest();
 
     // TODO consider doing something with QUALIFIER_CANONICAL_ID
 

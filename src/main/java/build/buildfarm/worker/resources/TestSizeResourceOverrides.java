@@ -22,6 +22,7 @@ package build.buildfarm.worker.resources;
  *     the test size buckets which will assign good defaults. This is an optional core setting
  *     strategy and it can be enabled / disabled.
  */
+@SuppressWarnings("PMD.TestClassWithoutTestCases")
 public class TestSizeResourceOverrides {
   /**
    * @field enabled
