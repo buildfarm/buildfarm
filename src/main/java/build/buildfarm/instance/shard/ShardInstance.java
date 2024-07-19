@@ -48,7 +48,6 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
@@ -1599,26 +1598,6 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected void validateCommand(
-      Command command,
-      Digest inputRootDigest,
-      Set<String> inputFiles,
-      Set<String> inputDirectories,
-      Map<Digest, Directory> directoriesIndex,
-      PreconditionFailure.Builder preconditionFailure) {
-    // Validating the match platform
-    Platform matchPlatform = getMatchPlatform(command);
-    Command queuedCommand = command.toBuilder().setPlatform(matchPlatform).build();
-    super.validateCommand(
-        queuedCommand,
-        inputRootDigest,
-        inputFiles,
-        inputDirectories,
-        directoriesIndex,
-        preconditionFailure);
-  }
-
-  @Override
   protected void validatePlatform(
       Platform platform, PreconditionFailure.Builder preconditionFailure) {
     int minCores = 0;
@@ -2239,37 +2218,6 @@ public class ShardInstance extends AbstractServerInstance {
         operationTransformService);
   }
 
-  /**
-   * Allow specifying an xcode to ensure we have the right version for a given action when provided
-   *
-   * <p>Bazel doesn't have a great way to set this client side today; See bazel issue 16866 and
-   * https://groups.google.com/g/bazel-discuss/c/kG11xW7Hvyk
-   */
-  private Platform getMatchPlatform(Command command) {
-    String xcodeEnvKey = "XCODE_VERSION_OVERRIDE";
-    String xcodeEnvValue = null;
-    for (EnvironmentVariable envVar : command.getEnvironmentVariablesList()) {
-      if (envVar.getName().equals(xcodeEnvKey)) {
-        xcodeEnvValue = envVar.getValue();
-      }
-    }
-
-    Platform basePlatform = command.getPlatform();
-    if (xcodeEnvValue == null) {
-      return basePlatform;
-    }
-
-    Platform.Builder matchPlatformBuilder = Platform.newBuilder();
-    for (Platform.Property p : basePlatform.getPropertiesList()) {
-      matchPlatformBuilder.addProperties(p);
-    }
-
-    matchPlatformBuilder.addProperties(
-        Property.newBuilder().setName("xcode").setValue(xcodeEnvValue).build());
-    Platform matchPlatform = matchPlatformBuilder.build();
-    return matchPlatform;
-  }
-
   private ListenableFuture<Void> transformAndQueue(
       ExecuteEntry executeEntry,
       Poller poller,
@@ -2418,14 +2366,12 @@ public class ShardInstance extends AbstractServerInstance {
                 profiledQueuedMetadata.getQueuedOperationMetadata();
             Operation queueOperation =
                 operation.toBuilder().setMetadata(Any.pack(queuedOperationMetadata)).build();
-
-            Platform matchPlatform =
-                getMatchPlatform(profiledQueuedMetadata.getQueuedOperation().getCommand());
             QueueEntry queueEntry =
                 QueueEntry.newBuilder()
                     .setExecuteEntry(executeEntry)
                     .setQueuedOperationDigest(queuedOperationMetadata.getQueuedOperationDigest())
-                    .setPlatform(matchPlatform)
+                    .setPlatform(
+                        profiledQueuedMetadata.getQueuedOperation().getCommand().getPlatform())
                     .build();
             try {
               ensureCanQueue(stopwatch);

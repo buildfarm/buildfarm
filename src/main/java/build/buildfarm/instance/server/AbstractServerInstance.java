@@ -1117,7 +1117,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @VisibleForTesting
-  protected void validateCommand(
+  void validateCommand(
       Command command,
       Digest inputRootDigest,
       Set<String> inputFiles,
