@@ -15,12 +15,15 @@
 package build.buildfarm.worker.cgroup;
 
 import static java.util.stream.Collectors.joining;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.common.collect.ImmutableList;
+import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import lombok.Getter;
@@ -86,16 +89,10 @@ public final class Group {
   }
 
   /** Returns true if no processes exist under the controller path */
-  private boolean killAllProcs(String controllerName) throws IOException {
-    List<Integer> pids = getPids(controllerName);
-    if (!pids.isEmpty()) {
-      // TODO check arg limits, exit status, etc
-      Runtime.getRuntime()
-          .exec("kill -SIGKILL " + pids.stream().map(Object::toString).collect(joining(" ")));
-      log.warning("Killed processes with PIDs: " + pids);
-      return false;
-    }
-    return true;
+  private void killAllProcs(List<Integer> pids) throws IOException {
+    // TODO check arg limits, exit status, etc
+    Runtime.getRuntime()
+        .exec("kill -SIGKILL " + pids.stream().map(Object::toString).collect(joining(" ")));
   }
 
   private List<Integer> getPids(String controllerName) throws IOException {
@@ -116,8 +113,18 @@ public final class Group {
 
   @SuppressWarnings({"StatementWithEmptyBody", "PMD.EmptyControlStatement"})
   public void killUntilEmpty(String controllerName) throws IOException {
-    while (!killAllProcs(controllerName))
-      ;
+    Deadline deadline = Deadline.after(1, SECONDS);
+    List<Integer> prevPids = new ArrayList<>();
+    for (List<Integer> pids = getPids(controllerName);
+        !pids.isEmpty();
+        pids = getPids(controllerName)) {
+      killAllProcs(pids);
+      if (deadline.isExpired() || !pids.containsAll(prevPids) || prevPids.containsAll(pids)) {
+        deadline = Deadline.after(1, SECONDS);
+        log.warning("Killed processes with PIDs: " + pids);
+      }
+      prevPids = pids;
+    }
   }
 
   void create(String controllerName) throws IOException {
