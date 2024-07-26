@@ -43,13 +43,13 @@ spec:
             - containerPort: 9090
               name: "metrics"
           livenessProbe:
-            httpGet:
-              path: /
-              port: metrics
+            grpc:
+              port: server-comm
+            initialDelaySeconds: 10
           readinessProbe:
-            httpGet:
-              path: /
-              port: metrics
+            grpc:
+              port: server-comm
+            initialDelaySeconds: 10
           resources:
             {{- toYaml .Values.server.resources | nindent 12 }}
           volumeMounts:
