@@ -20,6 +20,7 @@ import java.util.List;
 import javax.naming.ConfigurationException;
 import lombok.Data;
 import lombok.extern.java.Log;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
@@ -38,6 +39,7 @@ public final class BuildfarmConfigs {
   private Server server = new Server();
   private Backplane backplane = new Backplane();
   private Worker worker = new Worker();
+  private WebUI ui = new WebUI();
   private ExecutionWrappers executionWrappers = new ExecutionWrappers();
 
   private BuildfarmConfigs() {}
@@ -51,7 +53,7 @@ public final class BuildfarmConfigs {
 
   public static BuildfarmConfigs loadConfigs(Path configLocation) throws IOException {
     try (InputStream inputStream = Files.newInputStream(configLocation)) {
-      Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass()));
+      Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass(), new LoaderOptions()));
       buildfarmConfigs = yaml.load(inputStream);
       if (buildfarmConfigs == null) {
         throw new RuntimeException("Could not load configs from path: " + configLocation);

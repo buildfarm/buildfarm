@@ -75,7 +75,7 @@ tasks:
     - "..."
   rpm_builds:
     name: "Rpm Builds"
-    platform: centos7
+    platform: centos7_java11_devtoolset10
     shell_commands:
     - bazel build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
 
@@ -151,7 +151,7 @@ tasks:
     - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
     - export TEST_ARG1=--experimental_remote_grpc_log='./grpc.log'
     - export TEST_ARG2=--experimental_remote_grpc_log='./grpc2.log'
-    - export SHA1_TOOLS_REMOTE=9969ed6911aea04f7e896cd3958ea933547f933c
+    - export SHA1_TOOLS_REMOTE=eeddeff416118c86856fd76c95733307256dc855
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/cache_test.sh
 

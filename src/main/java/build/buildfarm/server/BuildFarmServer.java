@@ -29,6 +29,7 @@ import build.buildfarm.common.services.ContentAddressableStorageService;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
+import build.buildfarm.server.controllers.WebController;
 import build.buildfarm.server.services.ActionCacheService;
 import build.buildfarm.server.services.AdminService;
 import build.buildfarm.server.services.CapabilitiesService;
@@ -48,6 +49,8 @@ import io.prometheus.client.Counter;
 import java.io.File;
 import java.io.IOException;
 import java.security.Security;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.PostConstruct;
@@ -80,14 +83,18 @@ public class BuildFarmServer {
   private boolean stopping = false;
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
+  private ShardInstance createInstance()
+      throws IOException, ConfigurationException, InterruptedException {
+    return new ShardInstance(
+        configs.getServer().getName(),
+        configs.getServer().getSession() + "-" + configs.getServer().getName(),
+        new DigestUtil(configs.getDigestFunction()),
+        this::stop);
+  }
+
   public synchronized void start(ServerBuilder<?> serverBuilder, String publicName)
       throws IOException, ConfigurationException, InterruptedException {
-    instance =
-        new ShardInstance(
-            configs.getServer().getName(),
-            configs.getServer().getSession() + "-" + configs.getServer().getName(),
-            new DigestUtil(configs.getDigestFunction()),
-            this::stop);
+    instance = createInstance();
 
     healthStatusManager = new HealthStatusManager();
 
@@ -136,7 +143,9 @@ public class BuildFarmServer {
 
     checkState(!stopping, "must not call start after stop");
     instance.start(publicName);
+    WebController.setInstance((ShardInstance) instance);
     server.start();
+
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
     PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
@@ -197,6 +206,18 @@ public class BuildFarmServer {
 
   public static void main(String[] args) throws ConfigurationException {
     configs = BuildfarmConfigs.loadServerConfigs(args);
-    SpringApplication.run(BuildFarmServer.class, args);
+
+    // Configure Spring
+    SpringApplication app = new SpringApplication(BuildFarmServer.class);
+    Map<String, Object> springConfig = new HashMap<>();
+
+    // Disable Logback
+    System.setProperty("org.springframework.boot.logging.LoggingSystem", "none");
+
+    springConfig.put("ui.frontend.enable", configs.getUi().isEnable());
+    springConfig.put("server.port", configs.getUi().getPort());
+    app.setDefaultProperties(springConfig);
+
+    app.run(args);
   }
 }

@@ -53,7 +53,12 @@ public final class ContentAddressableStorages {
     ListMultimap<Digest, Runnable> onExpirations =
         synchronizedListMultimap(MultimapBuilder.hashKeys().arrayListValues().build());
 
-    return new GrpcCAS(configs.getServer().getName(), channel, byteStreamUploader, onExpirations);
+    return new GrpcCAS(
+        configs.getServer().getName(),
+        cas.isReadonly(),
+        channel,
+        byteStreamUploader,
+        onExpirations);
   }
 
   public static ContentAddressableStorage createFilesystemCAS(Cas config)

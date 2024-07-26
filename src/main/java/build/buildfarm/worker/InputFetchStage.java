@@ -100,8 +100,7 @@ public class InputFetchStage extends SuperscalarPipelineStage {
     OperationContext operationContext = take();
     Thread fetcher =
         new Thread(
-            new InputFetcher(workerContext, operationContext, this),
-            "InputFetchStage.input-fetcher");
+            new InputFetcher(workerContext, operationContext, this), "InputFetchStage.fetcher");
 
     synchronized (this) {
       fetchers.add(fetcher);
