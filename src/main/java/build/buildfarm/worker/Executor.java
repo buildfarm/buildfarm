@@ -271,7 +271,7 @@ class Executor {
         "Executor(claim)",
         operationContext.queueEntry,
         ExecutionStage.Value.EXECUTING,
-        () -> {},
+        Thread.currentThread()::interrupt,
         Deadline.after(10, DAYS));
 
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
