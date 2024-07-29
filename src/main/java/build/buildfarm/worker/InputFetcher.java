@@ -97,13 +97,12 @@ public class InputFetcher implements Runnable {
   }
 
   private long runInterruptibly(Stopwatch stopwatch) throws InterruptedException {
-    final Thread fetcherThread = Thread.currentThread();
     workerContext.resumePoller(
         operationContext.poller,
         "InputFetcher",
         operationContext.queueEntry,
         QUEUED,
-        fetcherThread::interrupt,
+        Thread.currentThread()::interrupt,
         Deadline.after(workerContext.getInputFetchDeadline(), SECONDS));
     try {
       return fetchPolled(stopwatch);
@@ -284,7 +283,7 @@ public class InputFetcher implements Runnable {
         "InputFetcher(claim)",
         operationContext.queueEntry,
         QUEUED,
-        () -> {},
+        Thread.currentThread()::interrupt,
         Deadline.after(10, DAYS));
 
     OperationContext fetchedOperationContext =
