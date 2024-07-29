@@ -29,6 +29,7 @@ import com.google.rpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
 import java.util.List;
 import java.util.UUID;
+import javax.annotation.Nullable;
 import net.jcip.annotations.ThreadSafe;
 
 @ThreadSafe
@@ -100,6 +101,8 @@ public interface ContentAddressableStorage extends InputStreamFactory {
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata);
 
+  /** Acquire a write associated with the blob, may return null if readonly */
+  @Nullable
   Write getWrite(
       Compressor.Value compression, Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException;

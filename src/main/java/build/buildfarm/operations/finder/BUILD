@@ -17,6 +17,7 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:com_googlecode_json_simple_json_simple",
         "@maven//:com_jayway_jsonpath_json_path",
         "@maven//:io_grpc_grpc_api",
         "@maven//:io_grpc_grpc_context",

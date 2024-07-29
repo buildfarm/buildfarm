@@ -135,7 +135,7 @@ class ShardWorkerContext implements WorkerContext {
     ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
     Platform matchPlatform =
         ExecutionPolicies.getMatchPlatform(
-            configs.getBackplane().getQueues()[0].getPlatform(), policies);
+            configs.getWorker().getDequeueMatchSettings().getPlatform(), policies);
     for (Platform.Property property : matchPlatform.getPropertiesList()) {
       provisions.put(property.getName(), property.getValue());
     }
@@ -278,7 +278,7 @@ class ShardWorkerContext implements WorkerContext {
     try {
       queueEntry =
           backplane.dispatchOperation(
-              configs.getBackplane().getQueues()[0].getPlatform().getPropertiesList());
+              configs.getWorker().getDequeueMatchSettings().getPlatform().getPropertiesList());
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {

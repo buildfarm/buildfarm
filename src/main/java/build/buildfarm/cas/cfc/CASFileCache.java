@@ -2230,7 +2230,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   public ListenableFuture<Path> putDirectory(
       Digest digest, Map<Digest, Directory> directoriesIndex, ExecutorService service) {
-
     // Claim lock.
     // Claim the directory path so no other threads try to create/delete it.
     Path path = getDirectoryPath(digest);
@@ -3331,7 +3330,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 fileEntryKey.getDigest(),
                 UUID.randomUUID(),
                 RequestMetadata.getDefaultInstance());
-        performCopy(write, e);
+        if (write != null) {
+          performCopy(write, e);
+        }
       }
     }
   }

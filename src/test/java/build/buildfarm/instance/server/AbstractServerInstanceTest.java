@@ -57,6 +57,7 @@ import build.buildfarm.common.Write.WriteCompleteException;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.net.URL;
 import build.buildfarm.instance.MatchListener;
+import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
@@ -79,6 +80,9 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -206,7 +210,27 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public FindOperationsResults findOperations(String filterPredicate) {
+    public FindOperationsResults findEnrichedOperations(String filterPredicate) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public EnrichedOperation findEnrichedOperation(String operationId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<Operation> findOperations(String filterPredicate) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Set<String> findOperationsByInvocationId(String invocationId) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Iterable<Map.Entry<String, String>> getOperations(Set<String> operationIds) {
       throw new UnsupportedOperationException();
     }
 

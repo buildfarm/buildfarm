@@ -1714,7 +1714,7 @@ public abstract class AbstractServerInstance implements Instance {
   public String listOperations(
       int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
     // todo(luxe): add proper pagination
-    FindOperationsResults results = findOperations(filter);
+    FindOperationsResults results = findEnrichedOperations(filter);
     if (results != null) {
       for (Map.Entry<String, EnrichedOperation> entry : results.operations.entrySet()) {
         operations.add(entry.getValue().operation);
@@ -1958,7 +1958,15 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public abstract CasIndexResults reindexCas();
 
-  public abstract FindOperationsResults findOperations(String filterPredicate);
+  public abstract FindOperationsResults findEnrichedOperations(String filterPredicate);
+
+  public abstract EnrichedOperation findEnrichedOperation(String operationId);
+
+  public abstract List<Operation> findOperations(String filterPredicate);
+
+  public abstract Set<String> findOperationsByInvocationId(String invocationId);
+
+  public abstract Iterable<Map.Entry<String, String>> getOperations(Set<String> operationIds);
 
   @Override
   public abstract void deregisterWorker(String workerName);

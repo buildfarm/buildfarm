@@ -28,6 +28,7 @@ public class Cas {
 
   // GRPC
   private String target;
+  private boolean readonly = false;
 
   // Metrics
   private boolean publishTtlMetric = false;
