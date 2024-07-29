@@ -129,6 +129,7 @@ public class MatchStage extends PipelineStage {
 
   @Override
   protected void iterate() throws InterruptedException {
+    start(); // clear any previous operation
     // stop matching and picking up any works if the worker is in graceful shutdown.
     if (inGracefulShutdown) {
       return;
@@ -140,7 +141,6 @@ public class MatchStage extends PipelineStage {
     }
     MatchOperationListener listener = new MatchOperationListener(operationContext, stopwatch);
     try {
-      start();
       workerContext.match(listener);
     } finally {
       if (!listener.wasMatched()) {
