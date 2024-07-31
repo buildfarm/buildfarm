@@ -32,12 +32,30 @@ class InvocationsCollector extends LinkedBlockingQueue<RequestMetadata> implemen
               .maximumSize(100)
               .<UUID, Boolean>build()
               .asMap());
+  private volatile boolean running = false;
 
   InvocationsCollector(ServerInstance instance) {
     this.instance = instance;
   }
 
+  @Override
+  public boolean add(RequestMetadata requestMetadata) {
+    if (running) {
+      return super.add(requestMetadata);
+    }
+    return false;
+  }
+
   public void run() {
+    running = true;
+    try {
+      loop();
+    } finally {
+      running = false;
+    }
+  }
+
+  private void loop() {
     for (; ; ) {
       RequestMetadata meta;
       try {
@@ -49,7 +67,7 @@ class InvocationsCollector extends LinkedBlockingQueue<RequestMetadata> implemen
 
       try {
         iterate(meta);
-      } catch (IOException e) {
+      } catch (Exception e) {
         log.log(
             WARNING,
             "error handling invocation "
