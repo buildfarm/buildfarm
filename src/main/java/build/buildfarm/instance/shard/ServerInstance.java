@@ -324,22 +324,18 @@ public class ServerInstance extends NodeInstance {
   void initializeCaches() {
     directoryCache =
         Caffeine.newBuilder()
-            .newBuilder()
             .maximumSize(configs.getServer().getCaches().getDirectoryCacheMaxEntries())
             .buildAsync();
     commandCache =
         Caffeine.newBuilder()
-            .newBuilder()
             .maximumSize(configs.getServer().getCaches().getCommandCacheMaxEntries())
             .buildAsync();
     digestToActionCache =
         Caffeine.newBuilder()
-            .newBuilder()
             .maximumSize(configs.getServer().getCaches().getDigestToActionCacheMaxEntries())
             .buildAsync();
     recentCacheServedExecutions =
         Caffeine.newBuilder()
-            .newBuilder()
             .maximumSize(configs.getServer().getCaches().getRecentServedExecutionsCacheMaxEntries())
             .build();
   }
