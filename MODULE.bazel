@@ -25,7 +25,7 @@ bazel_dep(name = "rules_proto", version = "6.0.0-rc2")
 # Test dependencies
 bazel_dep(
     name = "container_structure_test",
-    version = "1.16.0",
+    version = "1.19.1",
     dev_dependency = True,
 )
 
