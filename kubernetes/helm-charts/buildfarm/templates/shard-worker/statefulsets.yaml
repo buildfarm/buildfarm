@@ -52,7 +52,7 @@ spec:
             {{- toYaml .Values.shardWorker.extraEnv | nindent 12 }}
             {{- end }}
           ports:
-            - containerPort: 8981
+            - containerPort: 8982
               name: "worker-comm"
             - containerPort: 9090
               name: "metrics"
