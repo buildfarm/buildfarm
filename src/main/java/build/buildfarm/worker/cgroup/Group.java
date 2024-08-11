@@ -14,9 +14,11 @@
 
 package build.buildfarm.worker.cgroup;
 
-import static java.util.stream.Collectors.joining;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import jnr.constants.platform.Signal;
+import jnr.posix.POSIX;
+import jnr.posix.POSIXFactory;
 import com.google.common.collect.ImmutableList;
 import io.grpc.Deadline;
 import java.io.IOException;
@@ -33,6 +35,7 @@ import lombok.extern.java.Log;
 public final class Group {
   @Getter private static final Group root = new Group(/* name= */ null, /* parent= */ null);
   private static final Path rootPath = Paths.get("/sys/fs/cgroup");
+  private static final POSIX posix = POSIXFactory.getNativePOSIX();
 
   @Nullable private final String name;
   @Nullable private final Group parent;
@@ -90,9 +93,9 @@ public final class Group {
 
   /** Returns true if no processes exist under the controller path */
   private void killAllProcs(List<Integer> pids) throws IOException {
-    // TODO check arg limits, exit status, etc
-    Runtime.getRuntime()
-        .exec("kill -SIGKILL " + pids.stream().map(Object::toString).collect(joining(" ")));
+    for (int pid : pids) {
+      posix.kill(pid, Signal.SIGKILL.intValue());
+    }
   }
 
   private List<Integer> getPids(String controllerName) throws IOException {
