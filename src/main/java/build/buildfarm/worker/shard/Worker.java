@@ -651,7 +651,14 @@ public class Worker {
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
     PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
-    startFailsafeRegistration();
+
+    // An executor can also be used as storage worker as scheduler treats all new workers as storage workers
+    // TODO (Congt) Fix it upstream and revert it. 
+    if (configs.getWorker().getCapabilities().isCas()) {
+      startFailsafeRegistration();
+    } else {
+      log.log(INFO, "Skipping worker registration");
+    }
 
     // Listen for pipeline unhandled exceptions
     ExecutorService pipelineExceptionExecutor = newSingleThreadExecutor();
