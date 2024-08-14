@@ -30,6 +30,9 @@ import static redis.clients.jedis.Protocol.ResponseKeyword;
 
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.OperationChange;
+import build.buildfarm.v1test.ShardWorker;
+import build.buildfarm.v1test.WorkerChange;
+import build.buildfarm.v1test.WorkerType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
@@ -39,9 +42,13 @@ import com.google.common.collect.Sets;
 import com.google.common.truth.Correspondence;
 import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
@@ -178,7 +185,7 @@ public class RedisShardSubscriberTest {
 
   RedisShardSubscriber createSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers, Executor executor) {
-    return new RedisShardSubscriber(watchers, /* workers= */ null, "worker-channel", executor);
+    return new RedisShardSubscriber(watchers, /* workers= */ null, /*WorkerType.NONE*/ 0, "worker-channel", executor);
   }
 
   RedisShardSubscriber createSubscriber(ListMultimap<String, TimedWatchFuture> watchers) {
@@ -393,5 +400,41 @@ public class RedisShardSubscriberTest {
     RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 
     operationSubscriber.onMessage("invalid-operation-change", "not-json!#?");
+  }
+
+  @Test
+  public void addSupportedWorkerTypeOnWorkerChange() throws IOException {
+    Map<String, ShardWorker> workers = new HashMap<>();
+    int storageWorkerType = WorkerType.STORAGE.getNumber();
+    String workerChannel = "worker-channel";
+    RedisShardSubscriber operationSubscriber =
+      new RedisShardSubscriber(/* watchers */ null, workers, storageWorkerType, workerChannel, directExecutor());
+    String workerChangeJson =
+        JsonFormat.printer()
+            .print(
+                WorkerChange.newBuilder()
+                    .setName("execute-worker")
+                    .setAdd(WorkerChange.Add.newBuilder().setWorkerType(storageWorkerType).build())
+                    .build());
+    operationSubscriber.onMessage(workerChannel, workerChangeJson);
+    assertThat(workers.size()).isEqualTo(1);
+  }
+
+  @Test
+  public void ignoreUnsupportedWorkerTypeOnWorkerChange() throws IOException {
+    Map<String, ShardWorker> workers = new HashMap<>();
+    int workerType = WorkerType.STORAGE.getNumber();
+    String workerChannel = "worker-channel";
+    RedisShardSubscriber operationSubscriber =
+      new RedisShardSubscriber(/* watchers */ null, workers, workerType, workerChannel, directExecutor());
+    String workerChangeJson =
+        JsonFormat.printer()
+            .print(
+                WorkerChange.newBuilder()
+                    .setName("execute-worker")
+                    .setAdd(WorkerChange.Add.newBuilder().setWorkerType(WorkerType.EXECUTE.getNumber()).build())
+                    .build());
+    operationSubscriber.onMessage(workerChannel, workerChangeJson);
+    assertThat(workers.isEmpty()).isTrue();
   }
 }

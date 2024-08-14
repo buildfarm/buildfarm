@@ -281,6 +281,8 @@ message ShardWorker {
 message WorkerChange {
   message Add {
     google.protobuf.Timestamp effectiveAt = 1;
+
+    int32 worker_type = 2;
   }
 
   message Remove {
