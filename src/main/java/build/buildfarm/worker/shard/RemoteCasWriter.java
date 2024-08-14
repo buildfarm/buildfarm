@@ -81,8 +81,6 @@ public class RemoteCasWriter implements CasWriter {
     }
   }
 
-  private long writeToCasMember(Digest digest, InputStream in)
-      throws IOException, InterruptedException {
   private long writeToCasMember(Digest digest, DigestFunction.Value digestFunction, InputStream in)
       throws IOException, InterruptedException {
     // create a write for inserting into another CAS member.

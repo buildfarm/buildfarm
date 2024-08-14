@@ -110,7 +110,7 @@ public class PipelineTest {
     Pipeline pipeline = new Pipeline();
     TestStage stage = new TestStage("test");
     pipeline.add(stage, 1);
-    pipeline.start();
+    pipeline.start(null);
     pipeline.join();
   }
 
@@ -147,7 +147,7 @@ public class PipelineTest {
     Pipeline pipeline = new Pipeline();
     ContinueStage stage = new ContinueStage("test");
     pipeline.add(stage, 1);
-    pipeline.start();
+    pipeline.start(null);
 
     boolean didNotThrow = false;
     try {

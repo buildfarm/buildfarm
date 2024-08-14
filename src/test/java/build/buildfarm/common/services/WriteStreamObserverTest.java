@@ -115,6 +115,7 @@ public class WriteStreamObserverTest {
     when(instance.getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
+            eq(DigestFunction.Value.UNKNOWN),
             eq(uuid),
             any(RequestMetadata.class)))
         .thenReturn(write);
@@ -137,6 +138,7 @@ public class WriteStreamObserverTest {
         .getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
+            eq(DigestFunction.Value.UNKNOWN),
             eq(uuid),
             any(RequestMetadata.class));
     verifyNoInteractions(responseObserver);
