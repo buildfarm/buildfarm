@@ -2170,6 +2170,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             return null;
           });
     } catch (IOException e) {
+      // we can be here with a RejectedExecutionException
+      //   this is actually good because it was an UNKNOWN status before retries were exhausted
+      //   we retried repeatedly until we accidentally landed on one node that was stopped
+      //   but it was stopped on a BUNCH of workers at the same time...
+      // this means that we ran out of progressive retries on a single node
+      // realistically we should check the executors
+      // print out some logs associated with them
+      // otherwise we get an invalid failed precondition and the world is screwed
       out.cancel();
       log.log(
           Level.WARNING,
