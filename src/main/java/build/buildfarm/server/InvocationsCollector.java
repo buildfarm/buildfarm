@@ -46,6 +46,7 @@ class InvocationsCollector extends LinkedBlockingQueue<RequestMetadata> implemen
     return false;
   }
 
+  @Override
   public void run() {
     running = true;
     try {
