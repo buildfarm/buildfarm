@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import lombok.Data;
 import net.jcip.annotations.ThreadSafe;
@@ -66,7 +67,7 @@ public interface Backplane {
   void setOnUnsubscribe(InterruptingRunnable onUnsubscribe);
 
   /** Start the backplane's operation */
-  void start(String publicClientName) throws IOException;
+  void start(String publicClientName, Consumer<String> onWorkerRemoved) throws IOException;
 
   /** Stop the backplane's operation */
   void stop() throws InterruptedException;

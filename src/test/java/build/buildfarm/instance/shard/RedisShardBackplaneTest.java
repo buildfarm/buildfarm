@@ -101,8 +101,7 @@ public class RedisShardBackplaneTest {
     when(jedis.hdel(configs.getBackplane().getWorkersHashName() + "_storage", "foo"))
         .thenReturn(1L);
     RedisShardBackplane backplane = createBackplane("invalid-protobuf-worker-removed-test");
-    backplane.start("startTime/test:0000");
-
+    backplane.start("startTime/test:0000", name -> {});
     assertThat(backplane.getStorageWorkers()).isEmpty();
     verify(jedis, times(1)).hdel(configs.getBackplane().getWorkersHashName() + "_storage", "foo");
     ArgumentCaptor<String> changeCaptor = ArgumentCaptor.forClass(String.class);
@@ -141,7 +140,7 @@ public class RedisShardBackplaneTest {
     state.executions = mock(Executions.class);
     state.prequeue = mock(BalancedRedisQueue.class);
     RedisShardBackplane backplane = createBackplane("prequeue-operation-test");
-    backplane.start(client, state, "startTime/test:0000");
+    backplane.start(client, state, "startTime/test:0000", name -> {});
     DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     ByteString content = ByteString.copyFromUtf8("Action");
     Digest actionDigest = digestUtil.compute(content);
@@ -176,8 +175,7 @@ public class RedisShardBackplaneTest {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedis);
     RedisShardBackplane backplane = createBackplane("requeue-operation-test");
-    backplane.start("startTime/test:0000");
-
+    backplane.start("startTime/test:0000", name -> {});
     final String opName = "op";
     backplane.queueing(opName);
 
@@ -195,8 +193,7 @@ public class RedisShardBackplaneTest {
     state.dispatchedExecutions = mock(RedisHashMap.class);
     state.executionQueue = mock(ExecutionQueue.class);
     RedisShardBackplane backplane = createBackplane("requeue-operation-test");
-    backplane.start(client, state, "startTime/test:0000");
-
+    backplane.start(client, state, "startTime/test:0000", name -> {});
     final String opName = "op";
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
@@ -236,8 +233,7 @@ public class RedisShardBackplaneTest {
     state.dispatchingExecutions = mock(RedisMap.class);
     state.executionQueue = mock(ExecutionQueue.class);
     RedisShardBackplane backplane = createBackplane("requeue-operation-test");
-    backplane.start(client, state, "startTime/test:0000");
-
+    backplane.start(client, state, "startTime/test:0000", name -> {});
     // ARRANGE
     // Assume the operation queue is already populated with a first-time operation.
     // this means the operation's requeue amount will be 0.
@@ -316,8 +312,7 @@ public class RedisShardBackplaneTest {
     state.dispatchingExecutions = mock(RedisMap.class);
     state.executionQueue = mock(ExecutionQueue.class);
     RedisShardBackplane backplane = createBackplane("requeue-operation-test");
-    backplane.start(client, state, "startTime/test:0000");
-
+    backplane.start(client, state, "startTime/test:0000", name -> {});
     // ARRANGE
     // Assume the operation queue is already populated from a first re-queue.
     // this means the operation's requeue amount will be 1.
@@ -383,8 +378,7 @@ public class RedisShardBackplaneTest {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedis);
     RedisShardBackplane backplane = createBackplane("complete-operation-test");
-    backplane.start("startTime/test:0000");
-
+    backplane.start("startTime/test:0000", name -> {});
     final String opName = "op";
 
     backplane.completeOperation(opName);
@@ -399,8 +393,7 @@ public class RedisShardBackplaneTest {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedis);
     RedisShardBackplane backplane = createBackplane("delete-operation-test");
-    backplane.start("startTime/test:0000");
-
+    backplane.start("startTime/test:0000", name -> {});
     final String opName = "op";
 
     backplane.deleteOperation(opName);
@@ -422,8 +415,7 @@ public class RedisShardBackplaneTest {
     when(jedis.exists(invocationBlacklistKey)).thenReturn(true);
     when(mockJedisClusterFactory.get()).thenReturn(jedis);
     RedisShardBackplane backplane = createBackplane("invocation-blacklist-test");
-    backplane.start("startTime/test:0000");
-
+    backplane.start("startTime/test:0000", name -> {});
     assertThat(
             backplane.isBlacklisted(
                 RequestMetadata.newBuilder()
@@ -440,8 +432,7 @@ public class RedisShardBackplaneTest {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedis);
     RedisShardBackplane backplane = createBackplane("workers-starttime-test");
-    backplane.start("startTime/test:0000");
-
+    backplane.start("startTime/test:0000", name -> {});
     Set<String> workerNames = ImmutableSet.of("worker1", "worker2", "missing_worker");
 
     String storageWorkerKey = configs.getBackplane().getWorkersHashName() + "_storage";
@@ -466,7 +457,7 @@ public class RedisShardBackplaneTest {
     UnifiedJedis jedis = mock(UnifiedJedis.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedis);
     RedisShardBackplane backplane = createBackplane("digest-inserttime-test");
-    backplane.start("startTime/test:0000");
+    backplane.start("startTime/test:0000", name -> {});
     long ttl = 3600L;
     long expirationInSecs = configs.getBackplane().getCasExpire();
     when(jedis.ttl("ContentAddressableStorage:abc/0")).thenReturn(ttl);
@@ -490,7 +481,7 @@ public class RedisShardBackplaneTest {
     when(mockJedisClusterFactory.get()).thenReturn(jedis);
     when(jedis.hset(anyString(), anyString(), anyString())).thenReturn(1L);
     RedisShardBackplane backplane = createBackplane("add-worker-test");
-    backplane.start("addWorker/test:0000");
+    backplane.start("addWorker/test:0000", name -> {});
     backplane.addWorker(shardWorker);
     verify(jedis, times(1))
         .hset(

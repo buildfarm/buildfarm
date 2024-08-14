@@ -622,21 +622,21 @@ public final class Worker extends LoggingMain {
       throw new ConfigurationException("worker's public name should not be empty");
     }
 
+    workerStubs =
+        WorkerStubs.create(
+            Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build());
+
     if (SHARD.equals(configs.getBackplane().getType())) {
       backplane =
           new RedisShardBackplane(
               identifier,
-              /* subscribeToBackplane= */ false,
+              /* subscribeToBackplane= */ true,
               /* runFailsafeOperation= */ false,
               this::stripOperation);
-      backplane.start(configs.getWorker().getPublicName());
+      backplane.start(configs.getWorker().getPublicName(), workerStubs::invalidate);
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
     }
-
-    workerStubs =
-        WorkerStubs.create(
-            Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build());
 
     ExecutorService removeDirectoryService = BuildfarmExecutors.getRemoveDirectoryPool();
     ExecutorService accessRecorder = newSingleThreadExecutor();

@@ -456,7 +456,7 @@ public class RedisShardBackplane implements Backplane {
     return from.plusSeconds(10);
   }
 
-  private void startSubscriptionThread() {
+  private void startSubscriptionThread(Consumer<String> onWorkerRemoved) {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
@@ -467,6 +467,7 @@ public class RedisShardBackplane implements Backplane {
             storageWorkers,
             WorkerType.STORAGE.getNumber(),
             configs.getBackplane().getWorkerChannel(),
+            onWorkerRemoved,
             subscriberService);
 
     operationSubscription =
@@ -511,25 +512,30 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public void start(String clientPublicName) throws IOException {
+  public void start(String clientPublicName, Consumer<String> onWorkerRemoved) throws IOException {
     // Construct a single redis client to be used throughout the entire backplane.
     // We wish to avoid various synchronous and error handling issues that could occur when using
     // multiple clients.
-    start(new RedisClient(jedisClusterFactory.get()), clientPublicName);
+    start(new RedisClient(jedisClusterFactory.get()), clientPublicName, onWorkerRemoved);
   }
 
-  private void start(RedisClient client, String clientPublicName) throws IOException {
+  private void start(RedisClient client, String clientPublicName, Consumer<String> onWorkerRemoved)
+      throws IOException {
     // Create containers that make up the backplane
-    start(client, client.call(DistributedStateCreator::create), clientPublicName);
+    start(client, client.call(DistributedStateCreator::create), clientPublicName, onWorkerRemoved);
   }
 
   @VisibleForTesting
-  void start(RedisClient client, DistributedState state, String clientPublicName)
+  void start(
+      RedisClient client,
+      DistributedState state,
+      String clientPublicName,
+      Consumer<String> onWorkerRemoved)
       throws IOException {
     this.client = client;
     this.state = state;
     if (subscribeToBackplane) {
-      startSubscriptionThread();
+      startSubscriptionThread(onWorkerRemoved);
     }
     dequeueService = BuildfarmExecutors.getDequeuePool();
     if (runFailsafeOperation) {
@@ -1128,8 +1134,15 @@ public class RedisShardBackplane implements Backplane {
     return new ScanResult(tokenFromRedisCursor(scanResult.getCursor()), builder.build());
   }
 
+  private synchronized ExecutorService getDequeueService() {
+    if (dequeueService == null) {
+      dequeueService = BuildfarmExecutors.getDequeuePool();
+    }
+    return dequeueService;
+  }
+
   private ExecuteEntry deprequeueOperation(UnifiedJedis jedis) throws InterruptedException {
-    BalancedQueueEntry balancedQueueEntry = state.prequeue.take(jedis, dequeueService);
+    BalancedQueueEntry balancedQueueEntry = state.prequeue.take(jedis, getDequeueService());
     if (balancedQueueEntry == null) {
       return null;
     }
