@@ -7,24 +7,22 @@ public abstract class LoggingMain {
 
   protected abstract void onShutdown() throws InterruptedException;
 
-  class ShutdownThread extends Thread {
-    ShutdownThread(String applicationName) {
-      super(null, null, applicationName + "-Shutdown", 0);
-    }
-
-    @Override
-    public void run() {
-      try {
-        LoggingMain.this.onShutdown();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      } finally {
-        WaitingLogManager.release();
-      }
+  private void shutdown() {
+    try {
+      onShutdown();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } finally {
+      WaitingLogManager.release();
     }
   }
 
   protected LoggingMain(String applicationName) {
-    Runtime.getRuntime().addShutdownHook(new ShutdownThread(applicationName));
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                /* group=*/ null,
+                /* target=*/ this::shutdown,
+                /* name=*/ applicationName + "-Shutdown"));
   }
 }

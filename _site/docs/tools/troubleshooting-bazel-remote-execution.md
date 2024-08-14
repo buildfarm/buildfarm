@@ -11,7 +11,7 @@ A typical use case: Something works locally, but breaks when remote execution is
 
 ## bazel logging
 
-Use `bazel [build|run|test] --experimental_remote_grpc_log=<filename>` to produce a binary log of all of the grpc activity bazel performs during an invocation. This log is written to at the completion of each request, and may not contain a complete picture if a build is interrupted, or a request is currently ongoing.
+Use `bazel [build|run|test] --remote_grpc_log=<filename>` (`--experimental_remote_grpc_log=<filename>` if you are using bazel older than 6.0 release) to produce a binary log of all of the grpc activity bazel performs during an invocation. This log is written to at the completion of each request, and may not contain a complete picture if a build is interrupted, or a request is currently ongoing.
 
 ## Dumping the log
 

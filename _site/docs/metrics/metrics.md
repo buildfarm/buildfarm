@@ -100,6 +100,14 @@ The number of dispatched operations that have been requeued
 
 Gauge of the number of workers available
 
+**storage_worker_pool_size**
+
+Gauge of the number of storage workers available
+
+**execute_worker_pool_size**
+
+Gauge of the number of execute workers available.
+
 **queue_size**
 
 Gauge of the size of the queue (using a queue_name label for each individual queue)
@@ -123,6 +131,10 @@ Gauge for the number of operations in each stage (using a stage_name for each in
 **operation_status**
 
 Gauge for the completed operations status (using a status_code label for each individual GRPC code)
+
+**operation_exit_code**
+
+Gauge for the completed operations exit code (using a exit_code label for each individual execution exit code)
 
 **operation_worker**
 

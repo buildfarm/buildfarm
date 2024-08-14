@@ -36,12 +36,16 @@ import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.common.config.ExecutionWrapper;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.WorkerContext.IOResource;
+import build.buildfarm.worker.persistent.PersistentExecutor;
+import build.buildfarm.worker.persistent.WorkFilesContext;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DockerClientBuilder;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -199,7 +203,7 @@ class Executor {
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
-    log.log(Level.FINE, "Executor: Operation " + operation.getName() + " Executing command");
+    log.log(Level.FINER, "Executor: Operation " + operation.getName() + " Executing command");
 
     ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
     resultBuilder
@@ -291,7 +295,7 @@ class Executor {
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
     log.log(
-        Level.FINE,
+        Level.FINER,
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
             operationName, resultBuilder.getExitCode()));
@@ -309,7 +313,7 @@ class Executor {
         throw e;
       }
     } else {
-      log.log(Level.FINE, "Executor: Operation " + operationName + " Failed to claim output");
+      log.log(Level.FINER, "Executor: Operation " + operationName + " Failed to claim output");
       boolean wasInterrupted = Thread.interrupted();
       try {
         putError();
@@ -359,6 +363,9 @@ class Executor {
     } finally {
       boolean wasInterrupted = Thread.interrupted();
       try {
+        // Now that the execution has finished we can return any of the claims against local
+        // resources.
+        workerContext.returnLocalResources(operationContext.queueEntry);
         owner.releaseExecutor(
             operationName,
             limits.cpu.claimed,
@@ -424,14 +431,36 @@ class Executor {
     for (EnvironmentVariable environmentVariable : environmentVariables) {
       environment.put(environmentVariable.getName(), environmentVariable.getValue());
     }
-    for (Map.Entry<String, String> environmentVariable :
-        limits.extraEnvironmentVariables.entrySet()) {
-      environment.put(environmentVariable.getKey(), environmentVariable.getValue());
-    }
+    environment.putAll(limits.extraEnvironmentVariables);
 
     // allow debugging before an execution
     if (limits.debugBeforeExecution) {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
+    }
+
+    boolean usePersistentWorker =
+        !limits.persistentWorkerKey.isEmpty() && !limits.persistentWorkerCommand.isEmpty();
+
+    if (usePersistentWorker) {
+      log.fine(
+          "usePersistentWorker; got persistentWorkerCommand of : "
+              + limits.persistentWorkerCommand);
+
+      Tree execTree = operationContext.tree;
+
+      WorkFilesContext filesContext =
+          WorkFilesContext.fromContext(execDir, execTree, operationContext.command);
+
+      return PersistentExecutor.runOnPersistentWorker(
+          limits.persistentWorkerCommand,
+          filesContext,
+          operationName,
+          ImmutableList.copyOf(arguments),
+          ImmutableMap.copyOf(environment),
+          limits,
+          timeout,
+          PersistentExecutor.defaultWorkRootsDir,
+          resultBuilder);
     }
 
     // run the action under docker

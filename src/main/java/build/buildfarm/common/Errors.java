@@ -19,5 +19,8 @@ public final class Errors {
 
   public static final String VIOLATION_TYPE_INVALID = "INVALID";
 
+  public static final String MISSING_INPUT =
+      "A requested input (or the `Action` or its `Command`) was not found in the CAS.";
+
   private Errors() {}
 }

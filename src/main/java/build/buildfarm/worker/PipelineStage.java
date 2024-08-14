@@ -14,11 +14,13 @@
 
 package build.buildfarm.worker;
 
+import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import com.google.common.base.Stopwatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public abstract class PipelineStage implements Runnable {
   protected final String name;
@@ -30,6 +32,7 @@ public abstract class PipelineStage implements Runnable {
   private volatile boolean closed = false;
   private Thread tickThread = null;
   private boolean tickCancelledFlag = false;
+  private String operationName = null;
 
   PipelineStage(
       String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -39,28 +42,60 @@ public abstract class PipelineStage implements Runnable {
     this.error = error;
   }
 
-  private void runInterruptible() throws InterruptedException {
+  public String getName() {
+    return name;
+  }
+
+  protected void runInterruptible() throws InterruptedException {
     while (!output.isClosed() || isClaimed()) {
       iterate();
     }
   }
 
+  public @Nullable String getOperationName() {
+    return operationName;
+  }
+
   @Override
   public void run() {
-    try {
-      runInterruptible();
-    } catch (InterruptedException e) {
-      // ignore
-    } finally {
-      boolean wasInterrupted = Thread.interrupted();
+    boolean keepRunningStage = true;
+    while (keepRunningStage) {
       try {
-        close();
-      } finally {
-        if (wasInterrupted) {
-          Thread.currentThread().interrupt();
-        }
+        runInterruptible();
+
+        // If the run finishes without exception, the stage can also stop running.
+        keepRunningStage = false;
+
+      } catch (Exception e) {
+        keepRunningStage = decideTermination(e);
       }
     }
+
+    close();
+  }
+
+  /**
+   * @brief When the stage has an uncaught exception, this method determines whether the pipeline
+   *     stage should terminate.
+   * @details This is a customization of the pipeline stage to allow logging exceptions but keeping
+   *     the pipeline stage running.
+   * @return Whether the stage should terminate or continue running.
+   */
+  private boolean decideTermination(Exception e) {
+    // This is a normal way for the pipeline stage to terminate.
+    // If an interrupt is received, there is no reason to continue the pipeline stage.
+    if (e instanceof InterruptedException) {
+      getLogger()
+          .log(Level.INFO, String.format("%s::run(): stage terminated due to interrupt", name));
+      return false;
+    }
+
+    // On the other hand, this is an abnormal way for a pipeline stage to terminate.
+    // For robustness of the distributed system, we may want to log the error but continue the
+    // pipeline stage.
+    getLogger()
+        .log(Level.SEVERE, String.format("%s::run(): stage terminated due to exception", name), e);
+    return true;
   }
 
   public String name() {
@@ -90,7 +125,7 @@ public abstract class PipelineStage implements Runnable {
     Stopwatch stopwatch = Stopwatch.createUnstarted();
     try {
       operationContext = take();
-      logStart(operationContext.operation.getName());
+      start(operationContext.operation.getName());
       stopwatch.start();
       boolean valid = false;
       tickThread = Thread.currentThread();
@@ -124,35 +159,38 @@ public abstract class PipelineStage implements Runnable {
     }
     after(operationContext);
     long usecs = stopwatch.elapsed(MICROSECONDS);
-    logComplete(
-        operationContext.operation.getName(), usecs, stallUSecs, nextOperationContext != null);
+    complete(operationName, usecs, stallUSecs, nextOperationContext != null);
+    operationName = null;
   }
 
   private String logIterateId(String operationName) {
-    return String.format("%s::iterate(%s)", name, operationName);
+    return format("%s::iterate(%s)", name, operationName);
   }
 
-  protected void logStart() {
-    logStart("");
+  protected void start() {
+    start("");
   }
 
-  protected void logStart(String operationName) {
-    logStart(operationName, "Starting");
+  protected void start(String operationName) {
+    start(operationName, "Starting");
   }
 
-  protected void logStart(String operationName, String message) {
-    getLogger().log(Level.FINE, String.format("%s: %s", logIterateId(operationName), message));
+  protected void start(String operationName, String message) {
+    // TODO to unary stage
+    this.operationName = operationName;
+    getLogger().log(Level.FINER, format("%s: %s", logIterateId(operationName), message));
   }
 
-  protected void logComplete(String operationName, long usecs, long stallUSecs, boolean success) {
-    logComplete(operationName, usecs, stallUSecs, success ? "Success" : "Failed");
+  protected void complete(String operationName, long usecs, long stallUSecs, boolean success) {
+    complete(operationName, usecs, stallUSecs, success ? "Success" : "Failed");
   }
 
-  protected void logComplete(String operationName, long usecs, long stallUSecs, String status) {
+  protected void complete(String operationName, long usecs, long stallUSecs, String status) {
+    this.operationName = operationName;
     getLogger()
         .log(
-            Level.FINE,
-            String.format(
+            Level.FINER,
+            format(
                 "%s: %g ms (%g ms stalled) %s",
                 logIterateId(operationName), usecs / 1000.0f, stallUSecs / 1000.0f, status));
   }

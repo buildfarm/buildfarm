@@ -341,7 +341,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     long offset = request.getReadOffset();
     long limit = request.getReadLimit();
     log.log(
-        Level.FINER,
+        Level.FINEST,
         format("read resource_name=%s offset=%d limit=%d", resourceName, offset, limit));
 
     try {
@@ -356,7 +356,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       QueryWriteStatusRequest request, StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
     try {
-      log.log(Level.FINE, format("queryWriteStatus(%s)", resourceName));
+      log.log(Level.FINER, format("queryWriteStatus(%s)", resourceName));
       Write write = getWrite(resourceName);
       responseObserver.onNext(
           QueryWriteStatusResponse.newBuilder()
@@ -365,7 +365,7 @@ public class ByteStreamService extends ByteStreamImplBase {
               .build());
       responseObserver.onCompleted();
       log.log(
-          Level.FINE,
+          Level.FINER,
           format(
               "queryWriteStatus(%s) => committed_size = %d, complete = %s",
               resourceName, write.getCommittedSize(), write.isComplete()));

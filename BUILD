@@ -1,9 +1,8 @@
-load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
+load("@buildifier_prebuilt//:rules.bzl", "buildifier")
 load("@io_bazel_rules_docker//java:image.bzl", "java_image")
 load("@io_bazel_rules_docker//docker/package_managers:download_pkgs.bzl", "download_pkgs")
 load("@io_bazel_rules_docker//docker/package_managers:install_pkgs.bzl", "install_pkgs")
-load("@io_bazel_rules_docker//container:container.bzl", "container_image")
-load("@rules_oss_audit//oss_audit:java/oss_audit.bzl", "oss_audit")
+load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_push")
 load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 
@@ -138,25 +137,19 @@ java_image(
     ],
 )
 
-oss_audit(
-    name = "buildfarm-server-audit",
-    src = "//src/main/java/build/buildfarm:buildfarm-server",
-    tags = ["audit"],
-)
-
 # A worker image may need additional packages installed that are not in the base image.
 # We use download/install rules to extend an upstream image.
 # Download cgroup-tools so that the worker is able to restrict actions via control groups.
 download_pkgs(
     name = "worker_pkgs",
-    image_tar = "@ubuntu-bionic//image",
+    image_tar = "@ubuntu-mantic//image",
     packages = ["cgroup-tools"],
     tags = ["container"],
 )
 
 install_pkgs(
     name = "worker_pkgs_image",
-    image_tar = "@ubuntu-bionic//image",
+    image_tar = "@ubuntu-mantic//image",
     installables_tar = ":worker_pkgs.tar",
     installation_cleanup_commands = "rm -rf /var/lib/apt/lists/*",
     output_image_name = "worker_pkgs_image",
@@ -191,10 +184,26 @@ java_image(
     ],
 )
 
-oss_audit(
-    name = "buildfarm-shard-worker-audit",
-    src = "//src/main/java/build/buildfarm:buildfarm-shard-worker",
-    tags = ["audit"],
+# Below targets push public docker images to bazelbuild dockerhub.
+
+container_push(
+    name = "public_push_buildfarm-server",
+    format = "Docker",
+    image = ":buildfarm-server",
+    registry = "index.docker.io",
+    repository = "bazelbuild/buildfarm-server",
+    tag = "$(release_version)",
+    tags = ["container"],
+)
+
+container_push(
+    name = "public_push_buildfarm-worker",
+    format = "Docker",
+    image = ":buildfarm-shard-worker",
+    registry = "index.docker.io",
+    repository = "bazelbuild/buildfarm-worker",
+    tag = "$(release_version)",
+    tags = ["container"],
 )
 
 pkg_tar(

@@ -1,7 +1,15 @@
 package build.buildfarm.common.config;
 
 import com.google.common.base.Strings;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nullable;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
+import oshi.util.FileUtil;
+import redis.clients.jedis.util.JedisURIHelper;
 
 @Data
 public class Backplane {
@@ -32,12 +40,19 @@ public class Backplane {
   private String operationChannelPrefix = "OperationChannel";
   private String casPrefix = "ContentAddressableStorage";
   private int casExpire = 604800; // 1 Week
-  private boolean subscribeToBackplane = true;
-  private boolean runFailsafeOperation = true;
+  private int maxInvocationIdTimeout = 604800;
+
+  @Getter(AccessLevel.NONE)
+  private boolean subscribeToBackplane = true; // deprecated
+
+  @Getter(AccessLevel.NONE)
+  private boolean runFailsafeOperation = true; // deprecated
+
   private int maxQueueDepth = 100000;
   private int maxPreQueueDepth = 1000000;
   private boolean priorityQueue = false;
   private Queue[] queues = {};
+  private String redisCredentialFile;
   private String redisPassword;
   private int timeout = 10000;
   private String[] redisNodes = {};
@@ -47,13 +62,32 @@ public class Backplane {
   private boolean cacheCas = false;
   private long priorityPollIntervalMillis = 100;
 
-  public String getRedisUri() {
-    // use environment override (useful for containerized deployment)
-    if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
-      return System.getenv("REDIS_URI");
+  // These limited resources are shared across all workers.
+  // An example would be a limited number of seats to a license server.
+  private List<LimitedResource> resources = new ArrayList<>();
+
+  /**
+   * Look in several prioritized ways to get a Redis password:
+   *
+   * <ol>
+   *   <li>the password in the Redis URI (wherever that came from)
+   *   <li>The `redisPassword` from config YAML
+   *   <li>the `redisCredentialFile`.
+   * </ol>
+   *
+   * @return The redis password, or <c>null</c> if unset.
+   */
+  public @Nullable String getRedisPassword() {
+    URI redisProperUri = URI.create(getRedisUri());
+    if (!Strings.isNullOrEmpty(JedisURIHelper.getPassword(redisProperUri))) {
+      return JedisURIHelper.getPassword(redisProperUri);
     }
 
-    // use configured value
-    return redisUri;
+    if (!Strings.isNullOrEmpty(redisCredentialFile)) {
+      // Get the password from the config file.
+      return FileUtil.getStringFromFile(redisCredentialFile);
+    }
+
+    return Strings.emptyToNull(redisPassword);
   }
 }

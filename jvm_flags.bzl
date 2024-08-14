@@ -54,6 +54,12 @@ def ensure_accurate_metadata():
         "//config:windows": ["-Dsun.nio.fs.ensureAccurateMetadata=true"],
     })
 
+def add_opens_sun_nio_fs():
+    return select({
+        "//conditions:default": [],
+        "//config:windows": ["--add-opens java.base/sun.nio.fs=ALL-UNNAMED"],
+    })
+
 def server_telemetry():
     return select({
         "//config:open_telemetry": SERVER_TELEMETRY_JVM_FLAGS,
@@ -67,7 +73,7 @@ def worker_telemetry():
     })
 
 def server_jvm_flags():
-    return RECOMMENDED_JVM_FLAGS + DEFAULT_LOGGING_CONFIG + ensure_accurate_metadata() + server_telemetry()
+    return RECOMMENDED_JVM_FLAGS + DEFAULT_LOGGING_CONFIG + ensure_accurate_metadata() + add_opens_sun_nio_fs() + server_telemetry()
 
 def worker_jvm_flags():
-    return RECOMMENDED_JVM_FLAGS + DEFAULT_LOGGING_CONFIG + ensure_accurate_metadata() + worker_telemetry()
+    return RECOMMENDED_JVM_FLAGS + DEFAULT_LOGGING_CONFIG + ensure_accurate_metadata() + add_opens_sun_nio_fs() + worker_telemetry()

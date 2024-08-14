@@ -15,13 +15,16 @@
 package build.buildfarm.common.redis;
 
 import com.google.common.collect.ImmutableList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
+import redis.clients.jedis.util.SafeEncoder;
 
 /**
  * @class RedisNodeHashes
@@ -41,7 +44,7 @@ public class RedisNodeHashes {
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static List<String> getEvenlyDistributedHashes(JedisCluster jedis) {
     try {
-      List<List<Long>> slotRanges = getSlotRanges(jedis);
+      List<List<Long>> slotRanges = getNodeSlotRanges(jedis);
       ImmutableList.Builder hashTags = ImmutableList.builder();
       for (List<Long> slotRange : slotRanges) {
         // we can use any slot that is in range for the node.
@@ -66,7 +69,7 @@ public class RedisNodeHashes {
   public static List<String> getEvenlyDistributedHashesWithPrefix(
       JedisCluster jedis, String prefix) {
     try {
-      List<List<Long>> slotRanges = getSlotRanges(jedis);
+      List<List<Long>> slotRanges = getNodeSlotRanges(jedis);
       ImmutableList.Builder hashTags = ImmutableList.builder();
       for (List<Long> slotRange : slotRanges) {
         // we can use any slot that is in range for the node.
@@ -88,16 +91,22 @@ public class RedisNodeHashes {
    * @note Suggested return identifier: slotRanges.
    */
   @SuppressWarnings("unchecked")
-  private static List<List<Long>> getSlotRanges(JedisCluster jedis) {
+  private static List<List<Long>> getNodeSlotRanges(JedisCluster jedis) {
     // get slot information for each node
     List<Object> slots = getClusterSlots(jedis);
+    Set<String> nodes = new HashSet<>();
 
     // convert slot information into a list of slot ranges
     ImmutableList.Builder<List<Long>> slotRanges = ImmutableList.builder();
     for (Object slotInfoObj : slots) {
       List<Object> slotInfo = (List<Object>) slotInfoObj;
-      List<Long> slotNums = slotInfoToSlotRange(slotInfo);
-      slotRanges.add(slotNums);
+      List<Object> slotRangeNodes = (List<Object>) slotInfo.get(2);
+      // 2 is primary node id
+      String nodeId = (String) SafeEncoder.encode((byte[]) slotRangeNodes.get(2));
+      if (nodes.add(nodeId)) {
+        List<Long> slotNums = slotInfoToSlotRange(slotInfo);
+        slotRanges.add(slotNums);
+      }
     }
 
     return slotRanges.build();

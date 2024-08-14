@@ -70,9 +70,12 @@ public class Pipeline {
 
   /** Inform MatchStage to stop matching or picking up new Operations from queue. */
   public void stopMatchingOperations() {
-    for (PipelineStage stage : stageClosePriorities.keySet()) {
+    for (Map.Entry<PipelineStage, Thread> entry : stageThreads.entrySet()) {
+      PipelineStage stage = entry.getKey();
       if (stage instanceof MatchStage) {
-        ((MatchStage) stage).prepareForGracefulShutdown();
+        MatchStage matchStage = (MatchStage) stage;
+        matchStage.prepareForGracefulShutdown();
+        entry.getValue().interrupt();
         return;
       }
     }
@@ -143,15 +146,17 @@ public class Pipeline {
             }
           }
           if (stageToClose != null && !stageToClose.isClosed()) {
-            log.log(Level.FINE, "Closing stage at priority " + maxPriority);
+            log.log(Level.FINER, "Closing stage " + stageToClose + " at priority " + maxPriority);
             stageToClose.close();
           }
         }
+        boolean longStageWait = !closeStage;
         for (Map.Entry<PipelineStage, Thread> stageThread : stageThreads.entrySet()) {
           PipelineStage stage = stageThread.getKey();
           Thread thread = stageThread.getValue();
           try {
-            thread.join(closeStage ? 1 : 1000);
+            // 0 is wait forever, no instant wait
+            thread.join(longStageWait ? 1000 : 1);
           } catch (InterruptedException e) {
             if (!closeStage) {
               synchronized (this) {
@@ -166,7 +171,7 @@ public class Pipeline {
 
           if (!thread.isAlive()) {
             log.log(
-                Level.FINE,
+                Level.FINER,
                 "Stage "
                     + stage.name()
                     + " has exited at priority "
@@ -181,8 +186,8 @@ public class Pipeline {
                     + stageClosePriorities.get(stage));
             thread.interrupt();
           }
+          longStageWait = false;
         }
-        closeStage = false;
         for (PipelineStage stage : inactiveStages) {
           synchronized (this) {
             stageThreads.remove(stage);

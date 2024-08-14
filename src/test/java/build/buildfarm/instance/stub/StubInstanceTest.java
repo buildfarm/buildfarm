@@ -20,7 +20,8 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheImplBase;
@@ -64,6 +65,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -98,7 +100,7 @@ public class StubInstanceTest {
     fakeServer.awaitTermination();
   }
 
-  private Instance newStubInstance(String instanceName) {
+  private StubInstance newStubInstance(String instanceName) {
     return new StubInstance(
         instanceName,
         DIGEST_UTIL,
@@ -198,6 +200,38 @@ public class StubInstanceTest {
   }
 
   @Test
+  public void findMissingBlobsOverSizeLimitRecombines()
+      throws ExecutionException, InterruptedException {
+    AtomicReference<FindMissingBlobsRequest> reference = new AtomicReference<>();
+    serviceRegistry.addService(
+        new ContentAddressableStorageImplBase() {
+          @Override
+          public void findMissingBlobs(
+              FindMissingBlobsRequest request,
+              StreamObserver<FindMissingBlobsResponse> responseObserver) {
+            reference.set(request);
+            responseObserver.onNext(
+                FindMissingBlobsResponse.newBuilder()
+                    .addAllMissingBlobDigests(request.getBlobDigestsList())
+                    .build());
+            responseObserver.onCompleted();
+          }
+        });
+    StubInstance instance = newStubInstance("findMissingBlobs-test");
+    instance.maxRequestSize = 1024;
+    ImmutableList.Builder<Digest> builder = ImmutableList.builder();
+    // generates digest size * 1024 serialized size at least
+    for (int i = 0; i < 1024; i++) {
+      ByteString content = ByteString.copyFromUtf8("Hello, World! " + UUID.randomUUID());
+      builder.add(DIGEST_UTIL.compute(content));
+    }
+    ImmutableList<Digest> digests = builder.build();
+    assertThat(instance.findMissingBlobs(digests, RequestMetadata.getDefaultInstance()).get())
+        .containsExactlyElementsIn(digests);
+    instance.stop();
+  }
+
+  @Test
   public void outputStreamWrites() throws IOException, InterruptedException {
     AtomicReference<ByteString> writtenContent = new AtomicReference<>();
     serviceRegistry.addService(
@@ -287,7 +321,7 @@ public class StubInstanceTest {
     ImmutableList<Digest> digests =
         ImmutableList.of(DIGEST_UTIL.compute(first), DIGEST_UTIL.compute(last));
     assertThat(instance.putAllBlobs(blobs, RequestMetadata.getDefaultInstance()))
-        .containsAllIn(digests);
+        .containsAtLeastElementsIn(digests);
   }
 
   @Test
@@ -386,7 +420,7 @@ public class StubInstanceTest {
     assertThat(ioException).isNotNull();
     Status status = Status.fromThrowable(ioException);
     assertThat(status.getCode()).isEqualTo(Code.UNAVAILABLE);
-    verifyZeroInteractions(out);
+    verifyNoInteractions(out);
     instance.stop();
   }
 
@@ -458,7 +492,7 @@ public class StubInstanceTest {
     assertThat(ioException).isNotNull();
     Status status = Status.fromThrowable(ioException);
     assertThat(status.getCode()).isEqualTo(Code.DEADLINE_EXCEEDED);
-    verifyZeroInteractions(out);
+    verifyNoInteractions(out);
     instance.stop();
   }
 
@@ -477,7 +511,7 @@ public class StubInstanceTest {
     verify(mockBlobObserver, times(1)).setOnReadyHandler(onReadyCaptor.capture());
     // call it
     onReadyCaptor.getValue().run();
-    // verify zero interactions with mockRequestStream
-    verifyZeroInteractions(mockRequestStream);
+    // verify no more interactions with mockRequestStream
+    verifyNoMoreInteractions(mockRequestStream);
   }
 }

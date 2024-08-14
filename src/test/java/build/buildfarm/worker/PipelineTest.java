@@ -14,6 +14,11 @@
 
 package build.buildfarm.worker;
 
+import static com.google.common.truth.Truth.assertThat;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Logger;
 import lombok.extern.java.Log;
 import org.junit.Test;
@@ -70,5 +75,95 @@ public class PipelineTest {
         1);
     pipeline.start(null);
     pipeline.join();
+  }
+
+  // Create a test stage that exists because of an interrupt.
+  // This proves the stage can be interupted.
+  public class TestStage extends PipelineStage {
+    public TestStage(String name) {
+      super(name, null, null, null);
+    }
+
+    @Override
+    protected void runInterruptible() throws InterruptedException {
+      throw new InterruptedException("Interrupt");
+    }
+
+    @Override
+    public void put(OperationContext operationContext) throws InterruptedException {}
+
+    @Override
+    OperationContext take() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Logger getLogger() {
+      return log;
+    }
+  }
+
+  // This test demonstrates that the stage will end and the pipeline will finish because it was
+  // interrupted.
+  @Test
+  public void stageExitsOnInterrupt() throws InterruptedException {
+    Pipeline pipeline = new Pipeline();
+    TestStage stage = new TestStage("test");
+    pipeline.add(stage, 1);
+    pipeline.start();
+    pipeline.join();
+  }
+
+  // Create a test stage that doesn't exit because of an a non-interrupt exception.
+  // This proves the stage is robust enough continue running when experiencing an exception.
+  public class ContinueStage extends PipelineStage {
+    public ContinueStage(String name) {
+      super(name, null, null, null);
+    }
+
+    @Override
+    protected void runInterruptible() throws InterruptedException {
+      throw new RuntimeException("Exception");
+    }
+
+    @Override
+    public void put(OperationContext operationContext) throws InterruptedException {}
+
+    @Override
+    OperationContext take() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Logger getLogger() {
+      return log;
+    }
+  }
+
+  // This test demonstrates that the stage will NOT end and the pipeline will NOT finish because a
+  // non-interrupt exception was thrown.
+  @Test
+  public void stageContinuesOnException() throws InterruptedException {
+    Pipeline pipeline = new Pipeline();
+    ContinueStage stage = new ContinueStage("test");
+    pipeline.add(stage, 1);
+    pipeline.start();
+
+    boolean didNotThrow = false;
+    try {
+      CompletableFuture.runAsync(
+              () -> {
+                try {
+                  pipeline.join();
+                } catch (InterruptedException e) {
+                }
+                return;
+              })
+          .get(1, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      didNotThrow = true;
+    } catch (Exception e) {
+    }
+    assertThat(didNotThrow).isTrue();
   }
 }

@@ -1,0 +1,30 @@
+name: Build and Push Buildfarm Releases
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    if: github.repository == 'bazelbuild/bazel-buildfarm'
+    name: Build Buildfarm Images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: bazelbuild/setup-bazelisk@v2
+          
+      - name: Checkout
+        uses: actions/checkout@v3
+    
+      - name: Login to Bazelbuild Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
+          password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
+    
+      - name: Build Server Image
+        id: buildAndPushServerImage
+        run: bazel run public_push_buildfarm-server --define release_version=${{ github.event.release.tag_name }}
+    
+      - name: Build Worker Image
+        id: buildAndPushWorkerImage
+        run: bazel run public_push_buildfarm-worker --define release_version=${{ github.event.release.tag_name }}

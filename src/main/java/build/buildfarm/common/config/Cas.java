@@ -3,7 +3,9 @@ package build.buildfarm.common.config;
 import com.google.common.base.Strings;
 import java.nio.file.Path;
 import javax.naming.ConfigurationException;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
 
 @Data
 public class Cas {
@@ -30,8 +32,8 @@ public class Cas {
   private String target;
   private boolean readonly = false;
 
-  // Metrics
-  private boolean publishTtlMetric = false;
+  @Getter(AccessLevel.NONE)
+  private boolean publishTtlMetric = false; // deprecated
 
   public Path getValidPath(Path root) throws ConfigurationException {
     if (Strings.isNullOrEmpty(path)) {

@@ -1,0 +1,37 @@
+{{- if .Values.shardWorker.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-shard-worker
+  labels:
+    {{- include "buildfarm.labels" . | nindent 4 }}
+spec:
+  endpoints:
+    - port: "metrics"
+      {{- with .Values.shardWorker.serviceMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.shardWorker.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      honorLabels: true
+      path: {{ .Values.shardWorker.serviceMonitor.path }}
+      scheme: {{ .Values.shardWorker.serviceMonitor.scheme }}
+      {{- with .Values.shardWorker.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  jobLabel: "{{ .Release.Name }}"
+  selector:
+    matchLabels:
+      name: {{ include "buildfarm.fullname" . }}-shard-worker
+      {{- include "buildfarm.labels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  {{- with .Values.shardWorker.serviceMonitor.targetLabels }}
+  targetLabels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}

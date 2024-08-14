@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-shard-worker
+  labels:
+    name: {{ include "buildfarm.fullname" . }}-shard-worker
+    {{- include "buildfarm.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "buildfarm.fullname" . }}-shard-worker
+  {{- if .Values.shardWorker.autoscaling.enabled }}
+  replicas: {{ .Values.shardWorker.autoscaling.minReplicas }}
+  {{- else }}
+  replicas: {{ .Values.shardWorker.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      name: {{ include "buildfarm.fullname" . }}-shard-worker
+      {{- include "buildfarm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/worker-config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        name: {{ include "buildfarm.fullname" . }}-shard-worker
+        {{- include "buildfarm.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "buildfarm.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: buildfarm-worker
+          image: "{{ .Values.shardWorker.image.repository }}:{{ .Values.shardWorker.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.shardWorker.image.pullPolicy }}
+          args:
+            - /config/config.yml
+            - --public_name=$(POD_IP):8982
+          command:
+            - bash
+            - /app/build_buildfarm/buildfarm-shard-worker.binary
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            {{- if .Values.shardWorker.extraEnv }}
+            {{- toYaml .Values.shardWorker.extraEnv | nindent 12 }}
+            {{- end }}
+          ports:
+            - containerPort: 8981
+              name: "worker-comm"
+            - containerPort: 9090
+              name: "metrics"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: metrics
+          readinessProbe:
+            httpGet:
+              path: /
+              port: metrics
+          resources:
+            {{- toYaml .Values.shardWorker.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /config
+              name: config
+              readOnly: true
+            - mountPath: /tmp/worker
+              name: {{ include "buildfarm.fullname" . }}-shard-worker-data
+            {{- with .Values.shardWorker.extraVolumeMounts }}
+            {{- tpl (toYaml .) $ | nindent 12 -}}
+            {{- end }}
+
+      {{- with .Values.shardWorker.nodeSelector }}
+      nodeSelector:
+        {{- tpl (toYaml .) $ | nindent 8 -}}
+      {{- end }}
+
+      {{- with .Values.shardWorker.affinity }}
+      affinity:
+        {{- tpl (toYaml .) $ | nindent 8 -}}
+      {{- end }}
+
+      {{- with .Values.shardWorker.tolerations }}
+      tolerations:
+        {{- tpl (toYaml .) $ | nindent 8 -}}
+      {{- end }}
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: {{ include "buildfarm.fullname" . }}-config
+          name: config
+        {{- with .Values.shardWorker.extraVolumes }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
+        {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ include "buildfarm.fullname" . }}-shard-worker-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.shardWorker.storage.class }}
+        storageClassName: "{{ . }}"
+        {{- end }}
+        resources:
+          requests:
+            storage: "{{ .Values.shardWorker.storage.size }}"

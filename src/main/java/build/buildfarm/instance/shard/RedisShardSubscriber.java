@@ -20,6 +20,7 @@ import static java.lang.String.format;
 
 import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.v1test.OperationChange;
+import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
@@ -27,9 +28,10 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
 import java.time.Instant;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -59,13 +61,13 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   private final ListMultimap<String, TimedWatchFuture> watchers;
-  private final Set<String> workers;
+  private final Map<String, ShardWorker> workers;
   private final String workerChannel;
   private final Executor executor;
 
   RedisShardSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers,
-      Set<String> workers,
+      Map<String, ShardWorker> workers,
       String workerChannel,
       Executor executor) {
     this.watchers = watchers;
@@ -137,7 +139,7 @@ class RedisShardSubscriber extends JedisPubSub {
         new TimedWatchFuture(watcher) {
           @Override
           public void unwatch() {
-            log.log(Level.FINE, format("unwatching %s", channel));
+            log.log(Level.FINER, format("unwatching %s", channel));
             RedisShardSubscriber.this.unwatch(channel, this);
           }
         };
@@ -199,7 +201,7 @@ class RedisShardSubscriber extends JedisPubSub {
       @Nullable Instant expiresAt) {
     List<TimedWatchFuture> operationWatchers = watchers.get(channel);
     boolean observe = operation == null || operation.hasMetadata() || operation.getDone();
-    log.log(Level.FINE, format("onOperation %s: %s", channel, operation));
+    log.log(Level.FINER, format("onOperation %s: %s", channel, operation));
     synchronized (watchers) {
       ImmutableList.Builder<Consumer<Operation>> observers = ImmutableList.builder();
       for (TimedWatchFuture watchFuture : operationWatchers) {
@@ -215,7 +217,7 @@ class RedisShardSubscriber extends JedisPubSub {
         executor.execute(
             () -> {
               if (observe) {
-                log.log(Level.FINE, "observing " + operation);
+                log.log(Level.FINER, "observing " + operation);
                 observer.accept(operation);
               }
             });
@@ -250,23 +252,28 @@ class RedisShardSubscriber extends JedisPubSub {
                 workerChange.getName(), workerChange.getEffectiveAt()));
         break;
       case ADD:
-        addWorker(workerChange.getName());
+        addWorker(workerChange);
         break;
       case REMOVE:
-        removeWorker(workerChange.getName());
+        removeWorker(workerChange);
         break;
     }
   }
 
-  void addWorker(String worker) {
+  void addWorker(WorkerChange workerChange) {
     synchronized (workers) {
-      workers.add(worker);
+      workers.put(
+          workerChange.getName(),
+          ShardWorker.newBuilder()
+              .setEndpoint(workerChange.getName())
+              .setFirstRegisteredAt(Timestamps.toMillis(workerChange.getAdd().getEffectiveAt()))
+              .build());
     }
   }
 
-  boolean removeWorker(String worker) {
+  boolean removeWorker(WorkerChange workerChange) {
     synchronized (workers) {
-      return workers.remove(worker);
+      return workers.remove(workerChange.getName()) != null;
     }
   }
 

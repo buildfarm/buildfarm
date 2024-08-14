@@ -8,6 +8,7 @@ java_library(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@maven//:com_google_guava_guava",
         "@maven//:com_googlecode_json_simple_json_simple",
+        "@maven//:io_prometheus_simpleclient",
         "@maven//:org_apache_commons_commons_lang3",
     ],
 )

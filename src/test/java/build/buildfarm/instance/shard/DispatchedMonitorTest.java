@@ -22,7 +22,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.backplane.Backplane;
@@ -67,7 +67,7 @@ public class DispatchedMonitorTest {
 
     dispatchedMonitor.run();
     verify(backplane, atLeastOnce()).isStopped();
-    verifyZeroInteractions(requeuer);
+    verifyNoInteractions(requeuer);
   }
 
   @Test
@@ -78,7 +78,7 @@ public class DispatchedMonitorTest {
             ImmutableList.of(
                 DispatchedOperation.newBuilder().setRequeueAt(Long.MAX_VALUE).build()));
     dispatchedMonitor.iterate();
-    verifyZeroInteractions(requeuer);
+    verifyNoInteractions(requeuer);
   }
 
   @Test
@@ -123,7 +123,7 @@ public class DispatchedMonitorTest {
                     .build()));
     when(requeuer.apply(eq(queueEntry), any(Duration.class))).thenReturn(immediateFuture(null));
     dispatchedMonitor.iterate();
-    verifyZeroInteractions(requeuer);
+    verifyNoInteractions(requeuer);
   }
 
   @Test
@@ -132,7 +132,7 @@ public class DispatchedMonitorTest {
     when(backplane.getDispatchedOperations())
         .thenThrow(new IOException("transient error condition"));
     dispatchedMonitor.iterate();
-    verifyZeroInteractions(requeuer);
+    verifyNoInteractions(requeuer);
   }
 
   @Test

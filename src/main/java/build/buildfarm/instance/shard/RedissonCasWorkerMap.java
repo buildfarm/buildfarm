@@ -18,6 +18,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.redis.RedisClient;
 import com.google.common.collect.ImmutableMap;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -169,6 +170,12 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
     return cacheMap.get(key).readAll();
   }
 
+  @Override
+  public long insertTime(RedisClient client, Digest blobDigest) {
+    String key = cacheMapCasKey(blobDigest);
+    return Instant.now().getEpochSecond() - keyExpiration_s + cacheMap.get(key).remainTimeToLive();
+  }
+
   /**
    * @brief Get all of the key values as a map from the digests given.
    * @details If there are no workers for the digest, the key is left out of the returned map.
@@ -200,6 +207,14 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
    */
   public int size(RedisClient client) {
     return cacheMap.size();
+  }
+
+  @Override
+  public void setExpire(RedisClient client, Iterable<Digest> blobDigests) {
+    for (Digest blobDigest : blobDigests) {
+      String key = cacheMapCasKey(blobDigest);
+      cacheMap.expireKey(key, keyExpiration_s, TimeUnit.SECONDS);
+    }
   }
 
   /**

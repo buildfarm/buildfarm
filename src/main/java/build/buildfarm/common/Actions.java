@@ -71,7 +71,12 @@ public final class Actions {
       status.setCode(grpcStatus.getCode().value());
     }
 
-    return status.setMessage(t.getMessage()).build();
+    String message = t.getMessage();
+    if (message != null) {
+      status.setMessage(message);
+    }
+
+    return status.build();
   }
 
   public static boolean isRetriable(Status status) {

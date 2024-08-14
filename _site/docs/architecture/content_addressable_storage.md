@@ -38,9 +38,9 @@ This is the example presentation of a CAS in the memory instance available [here
 
 ```
 worker:
-  cas:
-    type: MEMORY
-    maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+  storages:
+    - type: MEMORY
+      maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
 ```
 
 ## GRPC
@@ -53,9 +53,11 @@ A grpc config example is available in the alternate instance specification in th
 server:
   name: shard
 worker:
-  cas:
-    type: GRPC
-    target:
+  storages:
+    - type: FILESYSTEM
+      path: "cache"
+    - type: GRPC
+      target:
 ```
 
 ## HTTP/1
@@ -89,11 +91,10 @@ The CASFileCache is also available on MemoryInstance servers, where it can repre
 
 ```
 worker:
-  cas:
-    type: FILESYSTEM
-    path: "cache"
-    maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
-    maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
+  storages:
+    - type: FILESYSTEM
+      path: "cache"
+      maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
 ```
 
 CASTest is a standalone tool to load the cache and print status information about it.

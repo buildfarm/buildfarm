@@ -3,14 +3,17 @@ defaultActionTimeout: 600
 maximumActionTimeout: 3600
 maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
 prometheusPort: 9090
+allowSymlinkTargetAbsolute: false
 server:
   instanceType: SHARD
   name: shard
   actionCacheReadOnly: false
   port: 8980
   grpcMetrics:
-    enabled: false
-    provideLatencyHistograms: false
+    enabled: true
+    provideLatencyHistograms: true
+    latencyBuckets: [0.001, 0.01, 0.1, 1, 5, 10, 20, 40, 60, +Infinity]
+    labelsToReport: []
   maxInboundMessageSizeBytes: 0
   maxInboundMetadataSize: 0
   casWriteTimeout: 3600
@@ -21,6 +24,7 @@ server:
   dispatchedMonitorIntervalSeconds: 1
   runOperationQueuer: true
   ensureOutputsPresent: false
+  runFailsafeOperation: true
   maxCpu: 0
   maxRequeueAttempts: 5
   useDenyList: true
@@ -29,6 +33,7 @@ server:
   recordBesEvents: false
   clusterId: local
   cloudRegion: us-east-1
+  gracefulShutdownSeconds: 0
   caches:
     directoryCacheMaxEntries: 10000
     commandCacheMaxEntries: 10000
@@ -37,7 +42,6 @@ server:
   admin:
     deploymentEnvironment: AWS
     clusterEndpoint: "grpc://localhost"
-    enableGracefulShutdown: false
   metrics:
     publisher: LOG
     logLevel: FINEST
@@ -70,13 +74,12 @@ backplane:
   operationChannelPrefix: "OperationChannel"
   casPrefix: "ContentAddressableStorage"
   casExpire: 604800 # 1 week
-  subscribeToBackplane: true
-  runFailsafeOperation: true
   maxQueueDepth: 100000
   maxPreQueueDepth: 1000000
   priorityQueue: false
   priorityPollIntervalMillis: 100
   timeout: 10000
+  maxInvocationIdTimeout: 604800
   maxAttempts: 20
   cacheCas: false
   queues:
@@ -93,6 +96,7 @@ worker:
   grpcMetrics:
     enabled: false
     provideLatencyHistograms: false
+    latencyBuckets: [0.001, 0.005, 0.01, 0.05, 0.075, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0]
   capabilities:
     cas: true
     execution: true
@@ -100,7 +104,6 @@ worker:
   inlineContentLimit: 1048567 # 1024 * 1024
   operationPollPeriod: 1
   dequeueMatchSettings:
-    acceptEverything: true
     allowUnmatched: false
   storages:
     - type: FILESYSTEM
@@ -110,24 +113,29 @@ worker:
       skipLoad: false
       hexBucketLevels: 0
       execRootCopyFallback: false
-      target:
-      publishTtlMetric: false
+    #- type: GRPC
+    #  target: "grpc://host:port"
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
   linkInputDirectories: true
-  realInputDirectories:
-    - "external"
+  linkedInputDirectories:
+    - "(?!external)[^/]+"
   execOwner:
   defaultMaxCores: 0
   limitGlobalExecution: false
   onlyMulticoreTests: false
   allowBringYourOwnContainer: false
   errorOperationRemainingResources: false
+  errorOperationOutputSizeExceeded: false
+  gracefulShutdownSeconds: 0
   sandboxSettings:
-    alwaysUse: false
+    alwaysUseSandbox: false
+    alwaysUseCgroups: false
+    alwaysUseTmpFs: false
     selectForBlockNetwork: false
     selectForTmpFs: false
+  createSymlinkOutputs: false
   executionPolicies:
     - name: test
       executionWrapper:

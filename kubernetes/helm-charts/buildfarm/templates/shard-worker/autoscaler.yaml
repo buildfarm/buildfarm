@@ -1,0 +1,21 @@
+{{- if .Values.shardWorker.autoscaling.enabled -}}
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-shard-worker
+  labels:
+    name: {{ include "buildfarm.fullname" . }}-shard-worker
+    {{- include "buildfarm.labels" . | nindent 4 }}
+  {{- with .Values.shardWorker.service.annotations }}
+  annotations:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  maxReplicas: {{ .Values.shardWorker.autoscaling.maxReplicas }}
+  minReplicas: {{ .Values.shardWorker.autoscaling.minReplicas }}
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name:  {{ include "buildfarm.fullname" . }}-shard-worker
+  targetCPUUtilizationPercentage: {{ .Values.shardWorker.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}

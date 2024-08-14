@@ -274,10 +274,14 @@ message ShardWorker {
   int64 expire_at = 2;
 
   int32 worker_type = 3;
+
+  int64 first_registered_at = 4;
 }
 
 message WorkerChange {
-  message Add {}
+  message Add {
+    google.protobuf.Timestamp effectiveAt = 1;
+  }
 
   message Remove {
     string source = 1;
@@ -444,7 +448,12 @@ message BackplaneStatus {
 
   DispatchedOperationsStatus dispatched_operations = 9;
 
+  // Maintained for backward compatibility.
   repeated string active_workers = 4;
+
+  repeated string active_storage_workers = 12;
+
+  repeated string active_execute_workers = 13;
 
   int64 cas_lookup_size = 5;
 
@@ -610,6 +619,8 @@ message StageInformation {
 
   // number of slots used for this stage
   int32 slots_used = 3;
+
+  repeated string operation_names = 4;
 }
 
 message WorkerProfileMessage {

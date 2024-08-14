@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
@@ -49,13 +50,13 @@ import lombok.extern.java.Log;
 
 @Log
 public class RemoteCasWriter implements CasWriter {
-  private final Set<String> workerSet;
+  private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
   private final Retrier retrier;
 
   public RemoteCasWriter(
-      Set<String> workerSet, LoadingCache<String, Instance> workerStubs, Retrier retrier) {
-    this.workerSet = workerSet;
+      Backplane backplane, LoadingCache<String, Instance> workerStubs, Retrier retrier) {
+    this.backplane = backplane;
     this.workerStubs = workerStubs;
     this.retrier = retrier;
   }
@@ -76,16 +77,19 @@ public class RemoteCasWriter implements CasWriter {
       Throwable cause = e.getCause();
       Throwables.throwIfInstanceOf(cause, IOException.class);
       Throwables.throwIfUnchecked(cause);
-      throw new RuntimeException(cause);
+      throw new IOException(cause);
     }
   }
 
+  private long writeToCasMember(Digest digest, InputStream in)
+      throws IOException, InterruptedException {
   private long writeToCasMember(Digest digest, DigestFunction.Value digestFunction, InputStream in)
       throws IOException, InterruptedException {
     // create a write for inserting into another CAS member.
     String workerName = getRandomWorker();
     Write write = getCasMemberWrite(digest, digestFunction, workerName);
 
+    write.reset();
     try {
       return streamIntoWriteFuture(in, write, digest).get();
     } catch (ExecutionException e) {
@@ -93,7 +97,7 @@ public class RemoteCasWriter implements CasWriter {
       Throwables.throwIfInstanceOf(cause, IOException.class);
       // prevent a discard of this frame
       Status status = Status.fromThrowable(cause);
-      throw status.asRuntimeException();
+      throw new IOException(status.asException());
     }
   }
 
@@ -123,25 +127,24 @@ public class RemoteCasWriter implements CasWriter {
       Throwable cause = e.getCause();
       Throwables.throwIfInstanceOf(cause, IOException.class);
       Throwables.throwIfUnchecked(cause);
-      throw new RuntimeException(cause);
+      throw new IOException(cause);
     }
   }
 
   private String getRandomWorker() throws IOException {
-    synchronized (workerSet) {
-      if (workerSet.isEmpty()) {
-        throw new RuntimeException("no available workers");
-      }
-      Random rand = new Random();
-      int index = rand.nextInt(workerSet.size());
-      // best case no allocation average n / 2 selection
-      Iterator<String> iter = workerSet.iterator();
-      String worker = null;
-      while (iter.hasNext() && index-- >= 0) {
-        worker = iter.next();
-      }
-      return worker;
+    Set<String> workerSet = backplane.getStorageWorkers();
+    if (workerSet.isEmpty()) {
+      throw new IOException("no available workers");
     }
+    Random rand = new Random();
+    int index = rand.nextInt(workerSet.size());
+    // best case no allocation average n / 2 selection
+    Iterator<String> iter = workerSet.iterator();
+    String worker = null;
+    while (iter.hasNext() && index-- >= 0) {
+      worker = iter.next();
+    }
+    return worker;
   }
 
   private Instance workerStub(String worker) {

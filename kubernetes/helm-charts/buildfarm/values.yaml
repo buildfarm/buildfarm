@@ -1,0 +1,190 @@
+# Default values for buildfarm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+config:
+  # see: https://github.com/bazelbuild/bazel-buildfarm/blob/main/examples/config.yml
+  digestFunction: SHA256
+  defaultActionTimeout: 600
+  maximumActionTimeout: 3600
+  maxEntrySizeBytes: "2147483648" # 2 * 1024 * 1024 * 1024
+  prometheusPort: 9090
+  backplane:
+    queues:
+        - name: "cpu"
+          allowUnmatched: true
+          properties:
+            - name: "min-cores"
+              value: "*"
+            - name: "max-cores"
+              value: "*"
+  server:
+    name: "shard"
+    recordBesEvents: true
+  worker:
+    port: 8982
+
+server:
+  image:
+    repository: bazelbuild/buildfarm-server
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: ""
+  replicaCount: 1
+  resources: { }
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+  service:
+    type: ClusterIP
+    port: 8980
+
+  ingress:
+    enabled: false
+    className: ""
+    annotations: { }
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+    hosts:
+      - host: chart-example.local
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls: [ ]
+    #  - secretName: chart-example-tls
+    #    hosts:
+    #      - chart-example.local
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  extraVolumes: []
+    # - name: additionalSecret
+    #   secret:
+    #   secretName: my-secret
+    #   defaultMode: 0600
+
+  extraVolumeMounts: []
+    # - name: customConfig
+    #   mountPath: /mnt/config
+    #   readOnly: true
+  extraEnv:
+  - name: JAVABIN
+    value: "/usr/bin/java"
+
+  serviceMonitor:
+    ## If true, a ServiceMonitor CRD is created for a prometheus operator
+    ## https://github.com/coreos/prometheus-operator
+    ##
+    enabled: false
+    path: /metrics
+    #  namespace: monitoring  (defaults to use the namespace this chart is deployed to)
+    labels: {}
+    interval: 1m
+    scheme: http
+    tlsConfig: {}
+    scrapeTimeout: 30s
+    relabelings: []
+    targetLabels: []
+
+shardWorker:
+  image:
+    repository: bazelbuild/buildfarm-worker
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: ""
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 50
+
+  resources: { }
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+  storage:
+    # the storage class for pv, leave empty will using default
+    class: ""
+    size: 50Gi
+
+  service:
+    type: ClusterIP
+    port: 8982
+
+  #nodeSelector: {}
+  #tolerations: []
+  #affinity: {}
+
+  #extraVolumes:
+  # - name: additionalSecret
+  #   secret:
+  #   secretName: my-secret
+  #   defaultMode: 0600
+
+  #extraVolumeMounts:
+  # - name: customConfig
+  #   mountPath: /mnt/config
+  #   readOnly: true
+
+  extraEnv:
+  - name: JAVABIN
+    value: "/usr/bin/java"
+
+  serviceMonitor:
+    ## If true, a ServiceMonitor CRD is created for a prometheus operator
+    ## https://github.com/coreos/prometheus-operator
+    ##
+    enabled: false
+    path: /metrics
+    #  namespace: monitoring  (defaults to use the namespace this chart is deployed to)
+    labels: {}
+    interval: 1m
+    scheme: http
+    tlsConfig: {}
+    scrapeTimeout: 30s
+    relabelings: []
+    targetLabels: []
+
+###################################
+## DATABASE | Embedded Redis
+###################################
+redis:
+  ## - set to `false` if using `externalRedis.*`
+  ##
+  enabled: true
+  auth:
+    enabled: false
+  replica:
+    replicaCount: 1
+
+externalRedis:
+  uri: "redis://localhost:6379"
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""

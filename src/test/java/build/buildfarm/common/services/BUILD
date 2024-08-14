@@ -16,6 +16,7 @@ java_test(
         "//src/test/java/build/buildfarm:test_runner",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_truth_truth",
         "@maven//:io_grpc_grpc_api",

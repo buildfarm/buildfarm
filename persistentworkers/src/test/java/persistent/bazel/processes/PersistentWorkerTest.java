@@ -16,6 +16,7 @@ import org.junit.runners.JUnit4;
 
 import persistent.bazel.client.PersistentWorker;
 import persistent.bazel.client.WorkerKey;
+import persistent.common.processes.JavaProcessWrapper;
 import persistent.testutil.ProcessUtils;
 import persistent.testutil.WorkerUtils;
 
@@ -55,7 +56,7 @@ public class PersistentWorkerTest {
     );
 
     ImmutableList<String> initCmd = ImmutableList.of(
-        "java",
+        JavaProcessWrapper.CURRENT_JVM_COMMAND,
         "-cp",
         jarPath.toString(),
         "adder.Adder",

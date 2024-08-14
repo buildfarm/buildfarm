@@ -5,59 +5,28 @@ buildfarm dependencies that can be imported into other WORKSPACE files
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
-RULES_JVM_EXTERNAL_TAG = "4.2"
-RULES_JVM_EXTERNAL_SHA = "cd1a77b7b02e8e008439ca76fd34f5b07aecb8c752961f9640dea15e9e5ba1ca"
-
 def archive_dependencies(third_party):
     return [
-        {
-            "name": "platforms",
-            "urls": [
-                "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.6/platforms-0.0.6.tar.gz",
-                "https://github.com/bazelbuild/platforms/releases/download/0.0.6/platforms-0.0.6.tar.gz",
-            ],
-            "sha256": "5308fc1d8865406a49427ba24a9ab53087f17f5266a7aabbfc28823f3916e1ca",
-        },
-        {
-            "name": "rules_jvm_external",
-            "strip_prefix": "rules_jvm_external-%s" % RULES_JVM_EXTERNAL_TAG,
-            "sha256": RULES_JVM_EXTERNAL_SHA,
-            "url": "https://github.com/bazelbuild/rules_jvm_external/archive/%s.zip" % RULES_JVM_EXTERNAL_TAG,
-        },
         {
             "name": "rules_pkg",
             "sha256": "8a298e832762eda1830597d64fe7db58178aa84cd5926d76d5b744d6558941c2",
             "url": "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.7.0/rules_pkg-0.7.0.tar.gz",
         },
 
-        # Kubernetes rules.  Useful for local development with tilt.
-        {
-            "name": "io_bazel_rules_k8s",
-            "strip_prefix": "rules_k8s-0.7",
-            "url": "https://github.com/bazelbuild/rules_k8s/archive/refs/tags/v0.7.tar.gz",
-            "sha256": "ce5b9bc0926681e2e7f2147b49096f143e6cbc783e71bc1d4f36ca76b00e6f4a",
-        },
-
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
         {
             "name": "com_google_protobuf",
-            "sha256": "dd513a79c7d7e45cbaeaf7655289f78fd6b806e52dbbd7018ef4e3cf5cff697a",
-            "strip_prefix": "protobuf-3.15.8",
-            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.15.8.zip"],
+            "sha256": "79082dc68d8bab2283568ce0be3982b73e19ddd647c2411d1977ca5282d2d6b3",
+            "strip_prefix": "protobuf-25.0",
+            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v25.0.zip"],
         },
-        {
-            "name": "com_github_bazelbuild_buildtools",
-            "sha256": "a02ba93b96a8151b5d8d3466580f6c1f7e77212c4eb181cba53eb2cae7752a23",
-            "strip_prefix": "buildtools-3.5.0",
-            "urls": ["https://github.com/bazelbuild/buildtools/archive/3.5.0.tar.gz"],
-        },
-
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "sha256": "78bf175f9a8fa23cda724bbef52ad9d0d555cdd1122bcb06484b91174f931239",
-            "strip_prefix": "grpc-java-1.54.1",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.54.1.zip"],
+            "sha256": "b8fb7ae4824fb5a5ae6e6fa26ffe2ad7ab48406fdeee54e8965a3b5948dd957e",
+            "strip_prefix": "grpc-java-1.56.1",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.56.1.zip"],
+            # Bzlmod: Waiting for https://github.com/bazelbuild/bazel-central-registry/issues/353
         },
         {
             "name": "rules_pkg",
@@ -66,14 +35,7 @@ def archive_dependencies(third_party):
                 "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.9.0/rules_pkg-0.9.0.tar.gz",
                 "https://github.com/bazelbuild/rules_pkg/releases/download/0.9.0/rules_pkg-0.9.0.tar.gz",
             ],
-        },
-        {
-            "name": "rules_license",
-            "sha256": "6157e1e68378532d0241ecd15d3c45f6e5cfd98fc10846045509fb2a7cc9e381",
-            "urls": [
-                "https://github.com/bazelbuild/rules_license/releases/download/0.0.4/rules_license-0.0.4.tar.gz",
-                "https://mirror.bazel.build/github.com/bazelbuild/rules_license/releases/download/0.0.4/rules_license-0.0.4.tar.gz",
-            ],
+            # Bzlmod : Waiting for >0.9.1 for https://github.com/bazelbuild/rules_pkg/pull/766 to be released
         },
 
         # The APIs that we implement.
@@ -95,28 +57,25 @@ def archive_dependencies(third_party):
             "strip_prefix": "remote-apis-636121a32fa7b9114311374e4786597d8e7a69f3",
             "url": "https://github.com/bazelbuild/remote-apis/archive/636121a32fa7b9114311374e4786597d8e7a69f3.zip",
         },
-        {
-            "name": "rules_cc",
-            "sha256": "3d9e271e2876ba42e114c9b9bc51454e379cbf0ec9ef9d40e2ae4cec61a31b40",
-            "strip_prefix": "rules_cc-0.0.6",
-            "url": "https://github.com/bazelbuild/rules_cc/releases/download/0.0.6/rules_cc-0.0.6.tar.gz",
-        },
 
         # Used to format proto files
         {
             "name": "com_grail_bazel_toolchain",
             "sha256": "b2d168315dd0785f170b2b306b86e577c36e812b8f8b05568f9403141f2c24dd",
             "strip_prefix": "toolchains_llvm-0.9",
-            "url": "https://github.com/grailbio/bazel-toolchain/archive/refs/tags/0.9.tar.gz",
+            "url": "https://github.com/bazel-contrib/toolchains_llvm/archive/refs/tags/0.9.tar.gz",
             "patch_args": ["-p1"],
             "patches": ["%s:clang_toolchain.patch" % third_party],
         },
+
+        # Used to build release container images
         {
             "name": "io_bazel_rules_docker",
             "sha256": "b1e80761a8a8243d03ebca8845e9cc1ba6c82ce7c5179ce2b295cd36f7e394bf",
             "urls": ["https://github.com/bazelbuild/rules_docker/releases/download/v0.25.0/rules_docker-v0.25.0.tar.gz"],
+            "patch_args": ["-p0"],
+            "patches": ["%s:docker_go_toolchain.patch" % third_party],
         },
-
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
         {
             "name": "bazel",
@@ -141,12 +100,6 @@ def archive_dependencies(third_party):
             "sha256": "03980702e8e9b757df68aa26493ca4e8573770f15dd8a6684de728b9cb8549f1",
             "strip_prefix": "TARDIS-f54fa4743e67763bb1ad77039b3d15be64e2e564",
             "url": "https://github.com/Unilang/TARDIS/archive/f54fa4743e67763bb1ad77039b3d15be64e2e564.zip",
-        },
-        {
-            "name": "rules_oss_audit",
-            "sha256": "02962810bcf82d0c66f929ccc163423f53773b8b154574ca956345523243e70d",
-            "strip_prefix": "rules_oss_audit-1b2690cefd5a960c181e0d89bf3c076294a0e6f4",
-            "url": "https://github.com/vmware/rules_oss_audit/archive/1b2690cefd5a960c181e0d89bf3c076294a0e6f4.zip",
         },
     ]
 
@@ -188,9 +141,9 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
     maybe(
         http_jar,
         "opentelemetry",
-        sha256 = "0523287984978c091be0d22a5c61f0bce8267eeafbbae58c98abaf99c9396832",
+        sha256 = "eccd069da36031667e5698705a6838d173d527a5affce6cc514a14da9dbf57d7",
         urls = [
-            "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.11.0/opentelemetry-javaagent.jar",
+            "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v1.28.0/opentelemetry-javaagent.jar",
         ],
     )
 

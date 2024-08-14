@@ -1,0 +1,37 @@
+{{- if .Values.server.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-server
+  labels:
+    {{- include "buildfarm.labels" . | nindent 4 }}
+spec:
+  endpoints:
+    - port: "metrics"
+      {{- with .Values.server.serviceMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.server.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      honorLabels: true
+      path: {{ .Values.server.serviceMonitor.path }}
+      scheme: {{ .Values.server.serviceMonitor.scheme }}
+      {{- with .Values.server.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  jobLabel: "{{ .Release.Name }}"
+  selector:
+    matchLabels:
+      name: {{ include "buildfarm.fullname" . }}-server
+      {{- include "buildfarm.labels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  {{- with .Values.server.serviceMonitor.targetLabels }}
+  targetLabels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

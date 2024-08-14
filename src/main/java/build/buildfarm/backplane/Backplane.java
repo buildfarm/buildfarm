@@ -98,6 +98,12 @@ public interface Backplane {
 
   Iterable<Map.Entry<String, String>> getOperations(Set<String> operationIds) throws IOException;
 
+  /** Returns a map of the worker name and its start time for given workers. */
+  Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames) throws IOException;
+
+  /** Returns the insert time epoch in seconds for the digest. */
+  long getDigestInsertTime(Digest blobDigest) throws IOException;
+
   /** Returns a set of the names of all active storage workers. */
   Set<String> getStorageWorkers() throws IOException;
 
@@ -276,4 +282,7 @@ public interface Backplane {
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
 
   GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) throws IOException;
+
+  /** Set expiry time for digests */
+  void updateDigestsExpiry(Iterable<Digest> digests) throws IOException;
 }

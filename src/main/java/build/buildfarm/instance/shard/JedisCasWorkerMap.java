@@ -20,6 +20,7 @@ import build.buildfarm.common.ScanCount;
 import build.buildfarm.common.redis.RedisClient;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import redis.clients.jedis.JedisClusterPipeline;
@@ -189,6 +190,12 @@ public class JedisCasWorkerMap implements CasWorkerMap {
     return client.call(jedis -> jedis.smembers(key));
   }
 
+  @Override
+  public long insertTime(RedisClient client, Digest blobDigest) throws IOException {
+    String key = redisCasKey(blobDigest);
+    return Instant.now().getEpochSecond() - keyExpiration_s + client.call(jedis -> jedis.ttl(key));
+  }
+
   /**
    * @brief Get all of the key values as a map from the digests given.
    * @details If there are no workers for the digest, the key is left out of the returned map.
@@ -225,6 +232,17 @@ public class JedisCasWorkerMap implements CasWorkerMap {
    */
   public int size(RedisClient client) throws IOException {
     return client.call(jedis -> ScanCount.get(jedis, name + ":*", 1000));
+  }
+
+  @Override
+  public void setExpire(RedisClient client, Iterable<Digest> blobDigests) throws IOException {
+    client.run(
+        jedis -> {
+          for (Digest blobDigest : blobDigests) {
+            String key = redisCasKey(blobDigest);
+            jedis.expire(key, keyExpiration_s);
+          }
+        });
   }
 
   /**
