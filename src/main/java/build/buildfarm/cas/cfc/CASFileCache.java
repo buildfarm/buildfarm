@@ -183,6 +183,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final ConcurrentMap<String, Entry> storage;
   private final Consumer<Digest> onPut;
   private final Consumer<Iterable<Digest>> onExpire;
+  private final Consumer<Digest> onReadComplete;
   private final Executor accessRecorder;
   private final ExecutorService expireService;
 
@@ -326,6 +327,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       String directoriesIndexDbName,
       FixedBufferPool zstdBufferPool,
       Consumer<Digest> onPut,
+      Consumer<Digest> onReadComplete,
       Consumer<Iterable<Digest>> onExpire,
       @Nullable ContentAddressableStorage delegate,
       boolean delegateSkipLoad) {
@@ -338,6 +340,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.accessRecorder = accessRecorder;
     this.storage = storage;
     this.onPut = onPut;
+    this.onReadComplete = onReadComplete;
     this.onExpire = onExpire;
     this.delegate = delegate;
     this.delegateSkipLoad = delegateSkipLoad;
@@ -705,6 +708,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         if (len < 0) {
           in.close();
           blobObserver.onCompleted();
+          onReadComplete.accept(digest);
         }
       }
     }

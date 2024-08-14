@@ -7,6 +7,7 @@ java_test(
     jvm_flags = ensure_accurate_metadata() + add_opens_sun_nio_fs(),
     test_class = "build.buildfarm.AllTests",
     deps = [
+        "//src/main/java/build/buildfarm/backplane",
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance/stub",

@@ -84,6 +84,11 @@ backplane:
   maxInvocationIdTimeout: 604800
   maxAttempts: 20
   cacheCas: false
+  casMetrics:
+    enabled: true
+    casReadCountSetName: "CasReadCount"
+    casReadCountWindow: 14400 # 4 hours
+    casReadCountUpdateInterval: 900 # 15 mins
   queues:
     - name: "cpu"
       allowUnmatched: true

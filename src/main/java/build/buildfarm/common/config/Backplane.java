@@ -41,6 +41,7 @@ public class Backplane {
   private String operationChannelPrefix = "OperationChannel";
   private String casPrefix = "ContentAddressableStorage";
   private int casExpire = 604800; // 1 Week
+  private CASMetrics casMetrics = new CASMetrics();
   private int maxInvocationIdTimeout = 604800;
 
   @Getter(AccessLevel.NONE)

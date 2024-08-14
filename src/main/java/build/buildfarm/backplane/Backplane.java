@@ -276,4 +276,20 @@ public interface Backplane {
 
   /** Set expiry time for digests */
   void updateDigestsExpiry(Iterable<Digest> digests) throws IOException;
+
+  /**
+   * Updates the read count for CAS entries based on the provided stream of digest and count.
+   *
+   * @param casReadCountMap A map of Digest and its corresponding read count.
+   * @return A Map containing the updated read counts for the specified CAS entries.
+   */
+  Map<String, Integer> updateCasReadCount(Map<Digest, Integer> casReadCountMap) throws IOException;
+
+  /**
+   * Removes the CAS read count entries from the storage.
+   *
+   * @param digestsToBeRemoved CAS entries for which each read count needs to be removed.
+   * @return total count of cas read count entries removed.
+   */
+  int removeCasReadCountEntries(Iterable<Digest> digestsToBeRemoved) throws IOException;
 }

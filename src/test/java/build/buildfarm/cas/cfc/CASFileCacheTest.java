@@ -162,6 +162,7 @@ class CASFileCacheTest {
             /* directoriesIndexDbName= */ ":memory:",
             /* zstdBufferPool= */ null,
             onPut,
+            /* onReadComplete= */ digest -> {},
             onExpire,
             delegate,
             /* delegateSkipLoad= */ false) {
@@ -1125,6 +1126,7 @@ class CASFileCacheTest {
             /* directoriesIndexDbName= */ ":memory:",
             /* zstdBufferPool= */ null,
             /* onPut= */ digest -> {},
+            /* onReadComplete= */ digest -> {},
             /* onExpire= */ digests -> {},
             /* delegate= */ null,
             /* delegateSkipLoad= */ false) {
@@ -1189,6 +1191,7 @@ class CASFileCacheTest {
             /* directoriesIndexDbName= */ ":memory:",
             /* zstdBufferPool= */ null,
             /* onPut= */ digest -> {},
+            /* onReadComplete= */ digest -> {},
             /* onExpire= */ digests -> {},
             /* delegate= */ null,
             /* delegateSkipLoad= */ false) {
