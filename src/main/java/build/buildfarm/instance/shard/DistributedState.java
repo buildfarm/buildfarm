@@ -17,6 +17,7 @@ package build.buildfarm.instance.shard;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.RedisHashMap;
 import build.buildfarm.common.redis.RedisMap;
+import build.buildfarm.common.redis.RedisSetMap;
 
 /**
  * @class DistributedState
@@ -60,55 +61,47 @@ public class DistributedState {
   public RedisMap actionCache;
 
   /**
-   * @field operationQueue
-   * @brief The queue that holds operations that are ready to be executed by the worker pool.
+   * @field executionQueue
+   * @brief The queue that holds executions that are ready to be executed by the worker pool.
    * @details The operation queue is actually made of multiple queues based on platform properties.
    *     There is a matching algorithm that decides how servers place items onto it, and how workers
    *     pop requests off of it.
    */
-  public OperationQueue operationQueue;
+  public ExecutionQueue executionQueue;
 
   /**
-   * @field operations
-   * @brief Operations involved in action execution on the system.
+   * @field executions
+   * @brief Action executions on the system.
    * @details We keep track of them in the distributed state to avoid them getting lost if a
    *     particular machine goes down. They should also exist for some period of time after a build
    *     invocation has finished so that developers can lookup the status of their build and
    *     information about the operations that ran.
    */
-  public Operations operations;
+  public Executions executions;
 
   /**
-   * @field processingOperations
-   * @brief Operations that are being processed from the prequeue to the operation queue.
+   * @field processingExecutions
+   * @brief Executions that are being processed from the prequeue to the operation queue.
    * @details We keep track of them in the distributed state to avoid them getting lost if a
    *     particular machine goes down.
    */
-  public RedisMap processingOperations;
+  public RedisMap processingExecutions;
 
   /**
-   * @field dispatchingOperations
-   * @brief Operations that are in the process of being dispatched from the operation queue.
+   * @field dispatchingExecutions
+   * @brief Executions that are in the process of being dispatched from the operation queue.
    * @details We keep track of them in the distributed state to avoid them getting lost if a
    *     particular machine goes down.
    */
-  public RedisMap dispatchingOperations;
+  public RedisMap dispatchingExecutions;
 
   /**
-   * @field dispatchedOperations
-   * @brief Operations that currently being executed.
+   * @field dispatchedExecutions
+   * @brief Executions that currently being executed.
    * @details We keep track of them here so they can be re-executed if the progress of the execution
    *     is lost.
    */
-  public RedisHashMap dispatchedOperations;
-
-  /**
-   * @field casWorkerMap
-   * @brief This map keeps track of which workers have which CAS blobs.
-   * @details Its the worker's responsibility to share this information to others. We do this to
-   *     inform other machines where to find CAS data.
-   */
-  public CasWorkerMap casWorkerMap;
+  public RedisHashMap dispatchedExecutions;
 
   /**
    * @field blockedInvocations
@@ -127,4 +120,10 @@ public class DistributedState {
    *     and will refuse to run again.
    */
   public RedisMap blockedActions;
+
+  public RedisSetMap toolInvocations;
+
+  public RedisSetMap correlatedInvocations;
+
+  public RedisSetMap correlatedInvocationsIndex;
 }

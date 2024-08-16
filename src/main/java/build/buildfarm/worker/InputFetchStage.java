@@ -36,7 +36,7 @@ public class InputFetchStage extends SuperscalarPipelineStage {
           .register();
 
   private final Set<Thread> fetchers = Sets.newHashSet();
-  private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
+  private final BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
 
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super("InputFetchStage", workerContext, output, error, workerContext.getInputFetchStageWidth());
@@ -48,13 +48,13 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   }
 
   @Override
-  public OperationContext take() throws InterruptedException {
+  public ExecutionContext take() throws InterruptedException {
     return takeOrDrain(queue);
   }
 
   @Override
-  public void put(OperationContext operationContext) throws InterruptedException {
-    queue.put(operationContext);
+  public void put(ExecutionContext executionContext) throws InterruptedException {
+    queue.put(executionContext);
   }
 
   synchronized int removeAndRelease(String operationName) {
@@ -92,22 +92,22 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   }
 
   @Override
-  protected int claimsRequired(OperationContext operationContext) {
+  protected int claimsRequired(ExecutionContext executionContext) {
     return 1;
   }
 
   @Override
   protected void iterate() throws InterruptedException {
-    OperationContext operationContext = take();
+    ExecutionContext executionContext = take();
     Thread fetcher =
         new Thread(
-            new InputFetcher(workerContext, operationContext, this), "InputFetchStage.fetcher");
+            new InputFetcher(workerContext, executionContext, this), "InputFetchStage.fetcher");
 
     synchronized (this) {
       fetchers.add(fetcher);
       int slotUsage = fetchers.size();
       inputFetchSlotUsage.set(slotUsage);
-      start(operationContext.queueEntry.getExecuteEntry().getOperationName(), getUsage(slotUsage));
+      start(executionContext.queueEntry.getExecuteEntry().getOperationName(), getUsage(slotUsage));
       fetcher.start();
     }
   }

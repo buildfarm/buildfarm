@@ -41,7 +41,12 @@ public class Backplane {
   private String operationChannelPrefix = "OperationChannel";
   private String casPrefix = "ContentAddressableStorage";
   private int casExpire = 604800; // 1 Week
-  private int maxInvocationIdTimeout = 604800;
+  private String correlatedInvocationsIndexPrefix = "CorrelatedInvocationsIndex";
+  private int maxCorrelatedInvocationsIndexTimeout = 3 * 24 * 60 * 60; // 3 Days
+  private String correlatedInvocationsPrefix = "CorrelatedInvocation";
+  private int maxCorrelatedInvocationsTimeout = 7 * 24 * 60 * 60; // 1 Week
+  private String toolInvocationsPrefix = "ToolInvocation";
+  private int maxToolInvocationTimeout = 604800;
 
   @Getter(AccessLevel.NONE)
   private boolean subscribeToBackplane = true; // deprecated

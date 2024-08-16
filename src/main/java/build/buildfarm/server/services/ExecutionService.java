@@ -36,6 +36,7 @@ import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
+import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -171,14 +172,14 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   @Override
   public void waitExecution(
       WaitExecutionRequest request, StreamObserver<Operation> responseObserver) {
-    String operationName = request.getName();
+    UUID executionId = instance.unbindExecutions(request.getName());
 
     ServerCallStreamObserver<Operation> serverCallStreamObserver =
         (ServerCallStreamObserver<Operation>) responseObserver;
     withCancellation(
         serverCallStreamObserver,
-        instance.watchOperation(
-            operationName,
+        instance.watchExecution(
+            executionId,
             createWatcher(serverCallStreamObserver, TracingMetadataUtils.fromCurrentContext())));
   }
 

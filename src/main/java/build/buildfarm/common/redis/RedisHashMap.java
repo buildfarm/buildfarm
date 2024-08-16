@@ -18,7 +18,7 @@ import com.google.common.collect.Iterables;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import redis.clients.jedis.PipelineBase;
+import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
@@ -104,7 +104,7 @@ public class RedisHashMap {
    * @param key The names of the keys.
    */
   public void remove(UnifiedJedis jedis, Iterable<String> keys) {
-    try (PipelineBase p = jedis.pipelined()) {
+    try (AbstractPipeline p = jedis.pipelined()) {
       for (String key : keys) {
         p.hdel(name, key);
       }

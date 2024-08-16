@@ -49,6 +49,9 @@ server:
     topic: test
     topicMaxConnections: 1000
     secretName: test
+  correlatedInvocationsIndexScopes: !!set
+    ? host
+    ? username
 backplane:
   type: SHARD
   redisUri: "redis://localhost:6379"
@@ -81,7 +84,11 @@ backplane:
   priorityQueue: false
   priorityPollIntervalMillis: 100
   timeout: 10000
-  maxInvocationIdTimeout: 604800
+  correlatedInvocationsIndexPrefix: CorrelatedInvocationsIndex
+  maxCorrelatedInvocationsIndexTimeout: 259200
+  correlatedInvocationsPrefix: CorrelatedInvocation
+  maxCorrelatedInvocationsTimeout: 604800
+  maxToolInvocationTimeout: 604800
   maxAttempts: 20
   cacheCas: false
   queues:

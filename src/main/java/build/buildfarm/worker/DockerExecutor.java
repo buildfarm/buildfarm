@@ -241,11 +241,11 @@ public class DockerExecutor {
   private static void copyOutputsOutOfContainer(
       DockerClient dockerClient, DockerExecutorSettings settings, String containerId)
       throws IOException {
-    for (String outputFile : settings.operationContext.command.getOutputFilesList()) {
+    for (String outputFile : settings.executionContext.command.getOutputFilesList()) {
       Path outputPath = settings.execDir.resolve(outputFile);
       copyFileOutOfContainer(dockerClient, containerId, outputPath);
     }
-    for (String outputDir : settings.operationContext.command.getOutputDirectoriesList()) {
+    for (String outputDir : settings.executionContext.command.getOutputDirectoriesList()) {
       Path outputDirPath = settings.execDir.resolve(outputDir);
       outputDirPath.toFile().mkdirs();
     }

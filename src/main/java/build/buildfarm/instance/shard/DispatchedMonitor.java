@@ -53,7 +53,7 @@ class DispatchedMonitor implements Runnable {
     this.intervalSeconds = intervalSeconds;
   }
 
-  private ListenableFuture<Void> requeueDispatchedOperation(DispatchedOperation o, long now) {
+  private ListenableFuture<Void> requeueDispatchedExecution(DispatchedOperation o, long now) {
     QueueEntry queueEntry = o.getQueueEntry();
     String operationName = queueEntry.getExecuteEntry().getOperationName();
 
@@ -88,7 +88,7 @@ class DispatchedMonitor implements Runnable {
       Consumer<ListenableFuture<Void>> onFuture) {
     // requeue all operations that are over their dispatched duration time
     if (now >= dispatchedOperation.getRequeueAt()) {
-      onFuture.accept(requeueDispatchedOperation(dispatchedOperation, now));
+      onFuture.accept(requeueDispatchedExecution(dispatchedOperation, now));
     }
   }
 

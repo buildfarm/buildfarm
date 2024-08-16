@@ -4,7 +4,6 @@ import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.redis.RedisClient;
 import com.github.fppt.jedismock.RedisServer;
 import com.github.fppt.jedismock.server.ServiceOptions;
 import java.io.IOException;
@@ -24,7 +23,7 @@ public class JedisCasWorkerMapTest {
   private static final String CAS_PREFIX = "ContentAddressableStorage";
 
   private RedisServer redisServer;
-  private RedisClient redisClient;
+  private JedisCluster jedis;
   private JedisCasWorkerMap jedisCasWorkerMap;
 
   @Before
@@ -33,12 +32,11 @@ public class JedisCasWorkerMapTest {
         RedisServer.newRedisServer(0, InetAddress.getByName("localhost"))
             .setOptions(ServiceOptions.defaultOptions().withClusterModeEnabled())
             .start();
-    redisClient =
-        new RedisClient(
-            new JedisCluster(
-                Collections.singleton(
-                    new HostAndPort(redisServer.getHost(), redisServer.getBindPort()))));
-    jedisCasWorkerMap = new JedisCasWorkerMap(CAS_PREFIX, 60);
+    jedis =
+        new JedisCluster(
+            Collections.singleton(
+                new HostAndPort(redisServer.getHost(), redisServer.getBindPort())));
+    jedisCasWorkerMap = new JedisCasWorkerMap(jedis, CAS_PREFIX, 60);
   }
 
   @Test
@@ -49,11 +47,11 @@ public class JedisCasWorkerMapTest {
     String casKey1 = CAS_PREFIX + ":" + DigestUtil.toString(testDigest1);
     String casKey2 = CAS_PREFIX + ":" + DigestUtil.toString(testDigest2);
 
-    redisClient.run(jedis -> jedis.sadd(casKey1, "worker1"));
-    jedisCasWorkerMap.setExpire(redisClient, Arrays.asList(testDigest1, testDigest2));
+    jedis.sadd(casKey1, "worker1");
+    jedisCasWorkerMap.setExpire(Arrays.asList(testDigest1, testDigest2));
 
-    assertThat((Long) redisClient.call(jedis -> jedis.ttl(casKey1))).isGreaterThan(0L);
-    assertThat((Long) redisClient.call(jedis -> jedis.ttl(casKey2))).isEqualTo(-2L);
+    assertThat(jedis.ttl(casKey1)).isGreaterThan(0);
+    assertThat(jedis.ttl(casKey2)).isEqualTo(-2);
   }
 
   @After

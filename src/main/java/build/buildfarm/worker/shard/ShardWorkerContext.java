@@ -248,18 +248,19 @@ class ShardWorkerContext implements WorkerContext {
           }
           if (!success) {
             log.log(
-                Level.INFO,
+                Level.WARNING,
                 format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
           } else {
             operationPollerCounter.inc();
             log.log(
-                Level.FINE, format("%s: poller: Completed Poll for %s: OK", name, operationName));
+                Level.FINEST, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
         () -> {
-          log.log(Level.FINE, format("%s: poller: Deadline expired for %s", name, operationName));
+          log.log(
+              Level.WARNING, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);
@@ -891,7 +892,9 @@ class ShardWorkerContext implements WorkerContext {
   String getOperationId(String operationName) {
     String[] components = operationName.split("/");
     Preconditions.checkState(components.length >= 3);
-    Preconditions.checkState(components[components.length - 2].equals("operations"));
+    String binding = components[components.length - 2];
+    // legacy
+    Preconditions.checkState(binding.equals("operations") || binding.equals("executions"));
     return components[components.length - 1];
   }
 

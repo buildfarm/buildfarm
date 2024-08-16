@@ -24,7 +24,7 @@ import build.buildfarm.v1test.Tree;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
 
-public final class OperationContext {
+public final class ExecutionContext {
   final ExecuteResponse.Builder executeResponse;
   final Operation operation;
   final QueuedOperationMetadata.Builder metadata;
@@ -35,7 +35,7 @@ public final class OperationContext {
   final Tree tree;
   final QueueEntry queueEntry;
 
-  private OperationContext(
+  private ExecutionContext(
       ExecuteResponse.Builder executeResponse,
       Operation operation,
       QueuedOperationMetadata.Builder metadata,
@@ -128,8 +128,8 @@ public final class OperationContext {
       return this;
     }
 
-    public OperationContext build() {
-      return new OperationContext(
+    public ExecutionContext build() {
+      return new ExecutionContext(
           executeResponse, operation, metadata, poller, execDir, action, command, tree, queueEntry);
     }
   }

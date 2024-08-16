@@ -89,7 +89,7 @@ public class WorkerInstanceTest {
 
   @Test(expected = StatusRuntimeException.class)
   public void getOperationThrowsOnSocketException() throws IOException, InterruptedException {
-    when(backplane.getOperation(any(String.class))).thenThrow(SocketException.class);
+    when(backplane.getExecution(any(String.class))).thenThrow(SocketException.class);
     instance.getOperation("op");
   }
 
@@ -117,6 +117,7 @@ public class WorkerInstanceTest {
   public void listOperationsIsUnsupported() {
     ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
     instance.listOperations(
+        /* name= */ "",
         /* pageSize= */ 0,
         /* pageToken= */ SENTINEL_PAGE_TOKEN,
         /* filter= */ "",

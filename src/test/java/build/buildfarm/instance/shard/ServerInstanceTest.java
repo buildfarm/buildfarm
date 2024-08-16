@@ -741,7 +741,7 @@ public class ServerInstanceTest {
 
     when(mockBackplane.propertiesEligibleForQueue(anyList())).thenReturn(true);
 
-    when(mockBackplane.getOperation(eq(operationName)))
+    when(mockBackplane.getExecution(eq(operationName)))
         .thenReturn(
             Operation.newBuilder()
                 .setName(operationName)
@@ -810,7 +810,7 @@ public class ServerInstanceTest {
   public void requeueSucceedsForValidOperation() throws Exception {
     String operationName = "valid-operation";
 
-    when(mockBackplane.getOperation(eq(operationName)))
+    when(mockBackplane.getExecution(eq(operationName)))
         .thenReturn(Operation.newBuilder().setName(operationName).build());
 
     Action action = createAction();
@@ -866,19 +866,20 @@ public class ServerInstanceTest {
   }
 
   @Test
-  public void watchOperationFutureIsDoneForCompleteOperation() throws IOException {
+  public void watchExecutionFutureIsDoneForCompleteOperation() throws IOException {
     Watcher watcher = mock(Watcher.class);
+    UUID completedExecution = UUID.randomUUID();
     Operation completedOperation =
         Operation.newBuilder()
-            .setName("completed-operation")
+            .setName(instance.bindExecutions(completedExecution))
             .setDone(true)
             .setMetadata(
                 Any.pack(ExecuteOperationMetadata.newBuilder().setStage(COMPLETED).build()))
             .build();
-    when(mockBackplane.getOperation(completedOperation.getName())).thenReturn(completedOperation);
-    ListenableFuture<Void> future = instance.watchOperation(completedOperation.getName(), watcher);
+    when(mockBackplane.getExecution(completedOperation.getName())).thenReturn(completedOperation);
+    ListenableFuture<Void> future = instance.watchExecution(completedExecution, watcher);
     assertThat(future.isDone()).isTrue();
-    verify(mockBackplane, times(1)).getOperation(completedOperation.getName());
+    verify(mockBackplane, times(1)).getExecution(completedOperation.getName());
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(watcher, times(1)).observe(operationCaptor.capture());
     Operation observedOperation = operationCaptor.getValue();
@@ -887,7 +888,7 @@ public class ServerInstanceTest {
   }
 
   @Test
-  public void watchOperationFutureIsErrorForObserveException()
+  public void watchExecutionFutureIsErrorForObserveException()
       throws IOException, InterruptedException {
     RuntimeException observeException = new RuntimeException();
     Watcher watcher = mock(Watcher.class);
@@ -897,15 +898,15 @@ public class ServerInstanceTest {
             })
         .when(watcher)
         .observe(any(Operation.class));
+    UUID errorObserveExecution = UUID.randomUUID();
     Operation errorObserveOperation =
         Operation.newBuilder()
-            .setName("error-observe-operation")
+            .setName(instance.bindExecutions(errorObserveExecution))
             .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder().build()))
             .build();
-    when(mockBackplane.getOperation(errorObserveOperation.getName()))
+    when(mockBackplane.getExecution(errorObserveOperation.getName()))
         .thenReturn(errorObserveOperation);
-    ListenableFuture<Void> future =
-        instance.watchOperation(errorObserveOperation.getName(), watcher);
+    ListenableFuture<Void> future = instance.watchExecution(errorObserveExecution, watcher);
     boolean caughtException = false;
     try {
       future.get();
@@ -917,17 +918,18 @@ public class ServerInstanceTest {
   }
 
   @Test
-  public void watchOperationCallsBackplaneForIncompleteOperation() throws IOException {
+  public void watchExecutionCallsBackplaneForIncompleteOperation() throws IOException {
     Watcher watcher = mock(Watcher.class);
+    UUID incompleteExecution = UUID.randomUUID();
     Operation incompleteOperation =
         Operation.newBuilder()
-            .setName("incomplete-operation")
+            .setName(instance.bindExecutions(incompleteExecution))
             .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder().build()))
             .build();
-    when(mockBackplane.getOperation(incompleteOperation.getName())).thenReturn(incompleteOperation);
-    instance.watchOperation(incompleteOperation.getName(), watcher);
-    verify(mockBackplane, times(1)).getOperation(incompleteOperation.getName());
-    verify(mockBackplane, times(1)).watchOperation(incompleteOperation.getName(), watcher);
+    when(mockBackplane.getExecution(incompleteOperation.getName())).thenReturn(incompleteOperation);
+    instance.watchExecution(incompleteExecution, watcher);
+    verify(mockBackplane, times(1)).getExecution(incompleteOperation.getName());
+    verify(mockBackplane, times(1)).watchExecution(incompleteOperation.getName(), watcher);
   }
 
   @Test

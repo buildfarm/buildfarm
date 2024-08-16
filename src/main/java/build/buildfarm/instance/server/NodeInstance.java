@@ -49,7 +49,6 @@ import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionCapabilities;
-import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputDirectory;
@@ -58,7 +57,6 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.PriorityCapabilities;
 import build.bazel.remote.execution.v2.PriorityCapabilities.PriorityRange;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
 import build.bazel.remote.execution.v2.SymlinkNode;
@@ -74,7 +72,6 @@ import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
-import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.net.URL;
@@ -82,6 +79,7 @@ import build.buildfarm.common.resources.BlobInformation;
 import build.buildfarm.common.resources.DownloadBlobRequest;
 import build.buildfarm.common.resources.ResourceParser;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.InstanceBase;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
@@ -138,13 +136,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 @Log
-public abstract class NodeInstance implements Instance {
-  private final String name;
+public abstract class NodeInstance extends InstanceBase {
   protected final ContentAddressableStorage contentAddressableStorage;
   protected final ActionCache actionCache;
   protected final OperationsMap outstandingOperations;
@@ -237,7 +233,7 @@ public abstract class NodeInstance implements Instance {
       OperationsMap completedOperations,
       Map<Digest, ByteString> activeBlobWrites,
       boolean ensureOutputsPresent) {
-    this.name = name;
+    super(name);
     this.digestUtil = digestUtil;
     this.contentAddressableStorage = contentAddressableStorage;
     this.actionCache = actionCache;
@@ -252,11 +248,6 @@ public abstract class NodeInstance implements Instance {
 
   @Override
   public void stop() throws InterruptedException {}
-
-  @Override
-  public String getName() {
-    return name;
-  }
 
   @Override
   public DigestUtil getDigestUtil() {
@@ -731,12 +722,6 @@ public abstract class NodeInstance implements Instance {
     }
     return immediateFailedFuture(new NoSuchFileException(expectedDigest.getHash()));
   }
-
-  protected String createOperationName(String id) {
-    return getName() + "/operations/" + id;
-  }
-
-  protected abstract Operation createOperation(ActionKey actionKey);
 
   private static void stringsUniqueAndSortedPrecondition(
       Iterable<String> strings,
@@ -1405,130 +1390,6 @@ public abstract class NodeInstance implements Instance {
     getLogger().info(message);
   }
 
-  // this deserves a real async execute, but not now
-  @SuppressWarnings({"ConstantConditions"})
-  @Override
-  public ListenableFuture<Void> execute(
-      Digest actionDigest,
-      boolean skipCacheLookup,
-      ExecutionPolicy executionPolicy,
-      ResultsCachePolicy resultsCachePolicy,
-      RequestMetadata requestMetadata,
-      Watcher watcher)
-      throws InterruptedException {
-    try {
-      validateActionDigest("execute", actionDigest, requestMetadata);
-    } catch (StatusException e) {
-      com.google.rpc.Status status = StatusProto.fromThrowable(e);
-      if (status == null) {
-        getLogger().log(Level.SEVERE, "no rpc status from exception", e);
-        status =
-            com.google.rpc.Status.newBuilder()
-                .setCode(Status.fromThrowable(e).getCode().value())
-                .build();
-      }
-      logFailedStatus(actionDigest, status);
-      Operation operation =
-          Operation.newBuilder()
-              .setDone(true)
-              .setMetadata(
-                  Any.pack(
-                      ExecuteOperationMetadata.newBuilder()
-                          .setStage(ExecutionStage.Value.COMPLETED)
-                          .build()))
-              .setResponse(Any.pack(ExecuteResponse.newBuilder().setStatus(status).build()))
-              .build();
-      try {
-        watcher.observe(operation);
-      } catch (Throwable t) {
-        return immediateFailedFuture(t);
-      }
-      return immediateFuture(null);
-    }
-
-    ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
-    Operation operation = createOperation(actionKey);
-
-    getLogger().info("Operation " + operation.getName() + " was created");
-
-    getLogger()
-        .info(
-            format(
-                "%s::execute(%s): %s",
-                getName(), DigestUtil.toString(actionDigest), operation.getName()));
-
-    putOperation(operation);
-
-    ListenableFuture<Void> watchFuture = watchOperation(operation.getName(), watcher);
-
-    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
-
-    Operation.Builder operationBuilder = operation.toBuilder();
-    final ListenableFuture<ActionResult> actionResultFuture;
-    final ExecuteOperationMetadata cacheCheckMetadata;
-    if (skipCacheLookup) {
-      actionResultFuture = immediateFuture(null);
-      cacheCheckMetadata = metadata;
-    } else {
-      cacheCheckMetadata = metadata.toBuilder().setStage(ExecutionStage.Value.CACHE_CHECK).build();
-      putOperation(operationBuilder.setMetadata(Any.pack(metadata)).build());
-      actionResultFuture = getActionResult(actionKey, requestMetadata);
-    }
-
-    Futures.addCallback(
-        actionResultFuture,
-        new FutureCallback<>() {
-
-          public void onSuccess(@Nullable ActionResult actionResult) {
-            final ExecuteOperationMetadata nextMetadata;
-            if (actionResult == null) {
-              nextMetadata =
-                  cacheCheckMetadata.toBuilder().setStage(ExecutionStage.Value.QUEUED).build();
-            } else {
-              nextMetadata =
-                  cacheCheckMetadata.toBuilder().setStage(ExecutionStage.Value.COMPLETED).build();
-              operationBuilder
-                  .setDone(true)
-                  .setResponse(
-                      Any.pack(
-                          ExecuteResponse.newBuilder()
-                              .setResult(actionResult)
-                              .setStatus(
-                                  com.google.rpc.Status.newBuilder()
-                                      .setCode(Code.OK.getNumber())
-                                      .build())
-                              .setCachedResult(true)
-                              .build()));
-            }
-
-            Operation nextOperation = operationBuilder.setMetadata(Any.pack(nextMetadata)).build();
-            /* TODO record file count/size for matching purposes? */
-
-            try {
-              if (!nextOperation.getDone()) {
-                updateOperationWatchers(
-                    nextOperation); // updates watchers initially for queued stage
-              }
-              putOperation(nextOperation);
-            } catch (InterruptedException e) {
-              // ignore
-            }
-          }
-
-          @Override
-          public void onFailure(@Nonnull Throwable t) {
-            log.log(
-                Level.WARNING,
-                format("action cache check of %s failed", DigestUtil.toString(actionDigest)),
-                t);
-            onSuccess(null);
-          }
-        },
-        directExecutor());
-
-    return watchFuture;
-  }
-
   protected static QueuedOperationMetadata maybeQueuedOperationMetadata(String name, Any metadata) {
     if (metadata.is(QueuedOperationMetadata.class)) {
       try {
@@ -1675,70 +1536,6 @@ public abstract class NodeInstance implements Instance {
   protected abstract boolean matchOperation(Operation operation) throws InterruptedException;
 
   protected abstract void enqueueOperation(Operation operation);
-
-  @Override
-  public boolean putOperation(Operation operation) throws InterruptedException {
-    String name = operation.getName();
-    if (isCancelled(operation)) {
-      if (outstandingOperations.remove(name) == null) {
-        throw new IllegalStateException(
-            format("Operation %s was not in outstandingOperations", name));
-      }
-      updateOperationWatchers(operation);
-      return true;
-    }
-    if (isExecuting(operation) && !outstandingOperations.contains(name)) {
-      return false;
-    }
-    if (isQueued(operation)) {
-      if (!matchOperation(operation)) {
-        enqueueOperation(operation);
-      }
-    } else {
-      updateOperationWatchers(operation);
-    }
-    return true;
-  }
-
-  /**
-   * per-operation lock factory/indexer method
-   *
-   * <p>the lock retrieved for an operation will guard against races during
-   * transfers/retrievals/removals
-   */
-  protected abstract Object operationLock();
-
-  protected void updateOperationWatchers(Operation operation) throws InterruptedException {
-    if (operation.getDone()) {
-      synchronized (operationLock()) {
-        completedOperations.put(operation.getName(), operation);
-        outstandingOperations.remove(operation.getName());
-      }
-    } else {
-      outstandingOperations.put(operation.getName(), operation);
-    }
-  }
-
-  @Override
-  public Operation getOperation(String name) {
-    synchronized (operationLock()) {
-      Operation operation = completedOperations.get(name);
-      if (operation == null) {
-        operation = outstandingOperations.get(name);
-      }
-      return operation;
-    }
-  }
-
-  @Override
-  public void deleteOperation(String name) {
-    synchronized (operationLock()) {
-      Operation deletedOperation = completedOperations.remove(name);
-      if (deletedOperation == null && outstandingOperations.contains(name)) {
-        throw new IllegalStateException();
-      }
-    }
-  }
 
   @Override
   public void cancelOperation(String name) throws InterruptedException {

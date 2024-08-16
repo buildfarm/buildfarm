@@ -136,7 +136,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         pathResult -> {
           Path path = pathResult.getPath();
           if (pathResult.isMissed()) {
-            log.fine(
+            log.finer(
                 String.format(
                     "putDirectory(%s, %s) created", execPath, DigestUtil.toString(digest)));
           }

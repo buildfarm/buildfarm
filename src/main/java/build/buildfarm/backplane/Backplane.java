@@ -19,6 +19,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ToolDetails;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Watcher;
@@ -36,6 +37,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import lombok.Data;
 import net.jcip.annotations.ThreadSafe;
 
@@ -86,7 +88,27 @@ public interface Backplane {
 
   void deregisterWorker(String hostName) throws IOException;
 
-  ScanResult<Operation> findOperationsByInvocationId(String invocationId, String cursor, int count)
+  /** Page all operations */
+  ScanResult<Operation> scanExecutions(String cursor, int count) throws IOException;
+
+  ScanResult<Operation> scanExecutions(String toolInvocationId, String cursor, int count)
+      throws IOException;
+
+  /** Page all toolInvocations */
+  ScanResult<String> scanToolInvocations(String cursor, int count) throws IOException;
+
+  ScanResult<String> scanToolInvocations(String correlatedInvocationsId, String cursor, int count)
+      throws IOException;
+
+  /** Page all correlatedInvocations */
+  ScanResult<String> scanCorrelatedInvocations(String cursor, int count) throws IOException;
+
+  ScanResult<String> scanCorrelatedInvocations(String scope, String value, String cursor, int count)
+      throws IOException;
+
+  ScanResult<String> scanCorrelatedInvocationIndexKeys(String cursor, int count) throws IOException;
+
+  ScanResult<String> scanCorrelatedInvocationIndexEntries(String cursor, int count, String keyMatch)
       throws IOException;
 
   /** Returns a map of the worker name and its start time for given workers. */
@@ -186,12 +208,12 @@ public interface Backplane {
   Map<Digest, Set<String>> getBlobDigestsWorkers(Iterable<Digest> blobDigests) throws IOException;
 
   /**
-   * Operations are stored in a hash map where the key is the name of the operation and the value is
-   * the actual Operation object.
+   * Executions are stored in a hash map where the key is the name of the execution and the value is
+   * a longrunning Operation object.
    *
-   * <p>Retrieves and returns an operation from the hash map.
+   * <p>Retrieves and returns an execution from the hash map.
    */
-  Operation getOperation(String operationName) throws IOException;
+  Operation getExecution(String executionName) throws IOException;
 
   /**
    * Operations are stored in a hash map where the key is the name of the operation and the value is
@@ -225,12 +247,12 @@ public interface Backplane {
   void queueing(String operationName) throws IOException;
 
   /**
-   * The state of operations is tracked in a series of lists representing the order in which the
+   * The state of executions is tracked in a series of lists representing the order in which the
    * work is to be processed (queued, dispatched, and completed).
    *
-   * <p>Updates a dispatchedOperation requeue_at and returns whether the operation is still valid.
+   * <p>Updates a dispatchedExecution requeue_at and returns whether the execution is still valid.
    */
-  boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
+  boolean pollExecution(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
       throws IOException;
 
   /** Complete an operation */
@@ -240,20 +262,14 @@ public interface Backplane {
   void deleteOperation(String operationName) throws IOException;
 
   /** Register a watcher for an operation */
-  ListenableFuture<Void> watchOperation(String operationName, Watcher watcher);
+  ListenableFuture<Void> watchExecution(String executionName, Watcher watcher);
 
   /** Page all dispatched operations */
-  ScanResult<DispatchedOperation> getDispatchedOperations(String cursor, int count)
+  ScanResult<DispatchedOperation> scanDispatchedOperations(String cursor, int count)
       throws IOException;
 
-  /** Page all operations */
-  ScanResult<Operation> getOperations(String cursor, int count) throws IOException;
-
-  /** Retrieve a set of known operations */
-  Iterable<Operation> getOperations(Iterable<String> operationIds) throws IOException;
-
-  /** Requeue a dispatched operation */
-  void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException;
+  /** Requeue a dispatched execution */
+  void requeueDispatchedExecution(QueueEntry queueEntry) throws IOException;
 
   void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException;
 
@@ -276,4 +292,15 @@ public interface Backplane {
 
   /** Set expiry time for digests */
   void updateDigestsExpiry(Iterable<Digest> digests) throws IOException;
+
+  void indexCorrelatedInvocationsId(
+      UUID correlatedInvocationsId, Map<String, List<String>> indexScopeValues) throws IOException;
+
+  void addToolInvocationId(
+      UUID toolInvocationId, UUID correlatedInvocationsId, ToolDetails toolDetails)
+      throws IOException;
+
+  void incrementRequestCounters(
+      String actionId, UUID toolInvocationId, String actionMnemonic, String targetId)
+      throws IOException;
 }

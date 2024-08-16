@@ -47,7 +47,7 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
 
   protected abstract void interruptAll();
 
-  protected abstract int claimsRequired(OperationContext operationContext);
+  protected abstract int claimsRequired(ExecutionContext executionContext);
 
   @Override
   public String getOperationName() {
@@ -78,16 +78,16 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     }
   }
 
-  synchronized void waitForReleaseOrCatastrophe(BlockingQueue<OperationContext> queue) {
+  synchronized void waitForReleaseOrCatastrophe(BlockingQueue<ExecutionContext> queue) {
     boolean interrupted = false;
     while (!catastrophic && isClaimed()) {
       if (output.isClosed()) {
         // interrupt the currently running threads, because they have nowhere to go
         interruptAll();
       }
-      OperationContext operationContext = queue.poll();
-      if (operationContext != null) {
-        releaseClaim(operationContext.operation.getName(), claimsRequired(operationContext));
+      ExecutionContext executionContext = queue.poll();
+      if (executionContext != null) {
+        releaseClaim(executionContext.operation.getName(), claimsRequired(executionContext));
       } else {
         try {
           wait(/* timeout= */ 10);
@@ -102,13 +102,13 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     }
   }
 
-  protected OperationContext takeOrDrain(BlockingQueue<OperationContext> queue)
+  protected ExecutionContext takeOrDrain(BlockingQueue<ExecutionContext> queue)
       throws InterruptedException {
     boolean interrupted = false;
     InterruptedException exception;
     try {
       while (!isClosed() && !output.isClosed()) {
-        OperationContext context = queue.poll(10, TimeUnit.MILLISECONDS);
+        ExecutionContext context = queue.poll(10, TimeUnit.MILLISECONDS);
         if (context != null) {
           return context;
         }
@@ -190,8 +190,8 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
   }
 
   @Override
-  public boolean claim(OperationContext operationContext) throws InterruptedException {
-    return claim(claimsRequired(operationContext));
+  public boolean claim(ExecutionContext executionContext) throws InterruptedException {
+    return claim(claimsRequired(executionContext));
   }
 
   @Override

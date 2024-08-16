@@ -195,7 +195,7 @@ public class BuildFarmServerIntegrationTest {
 
     // should appear in outstanding list
     ListOperationsRequest listRequest =
-        ListOperationsRequest.newBuilder().setName(INSTANCE_NAME + "/operations").build();
+        ListOperationsRequest.newBuilder().setName(INSTANCE_NAME + "/executions").build();
 
     OperationsGrpc.OperationsBlockingStub operationsStub =
         OperationsGrpc.newBlockingStub(inProcessChannel);

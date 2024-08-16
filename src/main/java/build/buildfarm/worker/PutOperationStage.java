@@ -41,13 +41,13 @@ public class PutOperationStage extends PipelineStage.NullStage {
   }
 
   @Override
-  public void put(OperationContext operationContext) throws InterruptedException {
-    onPut.acceptInterruptibly(operationContext.operation);
+  public void put(ExecutionContext executionContext) throws InterruptedException {
+    onPut.acceptInterruptibly(executionContext.operation);
     synchronized (this) {
-      if (operationContext.operation.getDone()) {
+      if (executionContext.operation.getDone()) {
         for (AverageTimeCostOfLastPeriod average : averagesWithinDifferentPeriods) {
           average.addOperation(
-              operationContext
+              executionContext
                   .metadata
                   .build()
                   .getExecuteOperationMetadata()

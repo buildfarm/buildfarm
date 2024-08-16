@@ -3,6 +3,7 @@ syntax = "proto3";
 package build.buildfarm.v1test;
 
 import "google/api/annotations.proto";
+import "google/api/client.proto";
 import "build/bazel/remote/execution/v2/remote_execution.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/duration.proto";
@@ -19,52 +20,52 @@ option java_outer_classname = "OperationQueueProto";
 service Admin {
   rpc TerminateHost(TerminateHostRequest) returns (google.rpc.Status) {
     option (google.api.http) = {
-      get : "/v1test/admin:terminateHost"
+      get: "/v1test/admin:terminateHost"
     };
   }
 
   rpc StopContainer(StopContainerRequest) returns (google.rpc.Status) {
     option (google.api.http) = {
-      get : "/v1test/admin:stopContainer"
+      get: "/v1test/admin:stopContainer"
     };
   }
 
   rpc GetHosts(GetHostsRequest) returns (GetHostsResult) {
     option (google.api.http) = {
-      get : "/v1test/admin:getHosts"
+      get: "/v1test/admin:getHosts"
     };
   }
 
   rpc GetClientStartTime(GetClientStartTimeRequest)
       returns (GetClientStartTimeResult) {
     option (google.api.http) = {
-      get : "/v1test/admin:getClientStartTime"
+      get: "/v1test/admin:getClientStartTime"
     };
   }
 
   rpc ScaleCluster(ScaleClusterRequest) returns (google.rpc.Status) {
     option (google.api.http) = {
-      get : "/v1test/admin:scaleCluster"
+      get: "/v1test/admin:scaleCluster"
     };
   }
 
   rpc ReindexCas(ReindexCasRequest) returns (ReindexCasRequestResults) {
     option (google.api.http) = {
-      get : "/v1test/admin:reindexCas"
+      get: "/v1test/admin:reindexCas"
     };
   }
 
   rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest)
       returns (ShutDownWorkerGracefullyRequestResults) {
     option (google.api.http) = {
-      get : "/v1test/admin:deregisterWorker"
+      get: "/v1test/admin:deregisterWorker"
     };
   }
 
   rpc DisableScaleInProtection(DisableScaleInProtectionRequest)
       returns (DisableScaleInProtectionRequestResults) {
     option (google.api.http) = {
-      get : "/v1test/admin:disableScaleInProtection"
+      get: "/v1test/admin:disableScaleInProtection"
     };
   }
 }
@@ -178,26 +179,26 @@ message ScaleClusterRequest {
 service OperationQueue {
   rpc Take(TakeOperationRequest) returns (QueueEntry) {
     option (google.api.http) = {
-      get : "/v1test/{instance_name=**}/operation:take"
+      get: "/v1test/{instance_name=**}/operation:take"
     };
   }
 
   rpc Put(google.longrunning.Operation) returns (google.rpc.Status) {
     option (google.api.http) = {
-      post : "/v1test/{instance_name=**}/operation:put"
-      body : "*"
+      post: "/v1test/{instance_name=**}/operation:put"
+      body: "*"
     };
   }
 
   rpc Poll(PollOperationRequest) returns (google.rpc.Status) {
     option (google.api.http) = {
-      get : "/v1test/{instance_name=**}/operation:poll"
+      get: "/v1test/{instance_name=**}/operation:poll"
     };
   }
 
   rpc Status(BackplaneStatusRequest) returns (BackplaneStatus) {
     option (google.api.http) = {
-      get : "/v1test/{instance_name=**}/operation:status"
+      get: "/v1test/{instance_name=**}/operation:status"
     };
   }
 }

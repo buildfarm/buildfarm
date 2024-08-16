@@ -9,6 +9,7 @@ proto_library(
     srcs = ["build/buildfarm/v1test/buildfarm.proto"],
     deps = [
         "@com_google_googleapis//google/api:annotations_proto",
+        "@com_google_googleapis//google/api:client_proto",
         "@com_google_googleapis//google/longrunning:operations_proto",
         "@com_google_googleapis//google/rpc:status_proto",
         "@com_google_protobuf//:duration_proto",
