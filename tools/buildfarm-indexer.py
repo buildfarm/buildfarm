@@ -1,5 +1,8 @@
+from redis import Redis
+from redis._compat import long
 from redis.client import Pipeline
 from rediscluster import RedisCluster
+from rediscluster.exceptions import RedisClusterException
 import sys
 
 def get_cas_page(r, cursor, count):
@@ -11,29 +14,66 @@ def get_cas_page(r, cursor, count):
 redis_host = None
 if len(sys.argv) > 1:
     redis_host = sys.argv[1]
+redis_port = 6379
+if len(sys.argv) > 2:
+    redis_port = int(sys.argv[2])
 if not redis_host:
     print ("usage: buildfarm-indexer.py <redis_host>")
     sys.exit(1)
 
-r = RedisCluster(startup_nodes=[{"host": redis_host, "port": 6379}], skip_full_coverage_check=True)
+class FakeNodes:
+    def __init__(self, name):
+        self.name = name
 
-nodes = r.connection_pool.nodes
+    def all_masters(self):
+        return [{"name": self.name}]
 
-slots = set(range(0, 16384))
+    def keyslot(self, any):
+        return ""
 
-node_key = 0
-node_keys = {}
-while slots:
-    node_key = node_key + 1
-    slot = nodes.keyslot(str(node_key))
-    if slot in slots:
-        slots.remove(slot)
-        node_keys[slot] = str(node_key)
+    def node_from_slot(self, slot):
+        return self.name
+
+class FakeStruct:
+    def __init__(self, v):
+        self.v = v
+
+    def __getitem__(self, i):
+        return self.v
+
+    def values(self):
+        return [self.v]
+
+try:
+    r = RedisCluster(startup_nodes=[{"host": redis_host, "port": redis_port}], skip_full_coverage_check=True)
+
+    nodes = r.connection_pool.nodes
+
+    slots = set(range(0, 16384))
+
+    node_key = 0
+    node_keys = {}
+    while slots:
+        node_key = node_key + 1
+        slot = nodes.keyslot(str(node_key))
+        if slot in slots:
+            slots.remove(slot)
+            node_keys[slot] = str(node_key)
+    get_connection_by_node = r.connection_pool.get_connection_by_node
+except RedisClusterException as e:
+    r = Redis(host=redis_host, port=redis_port)
+    nodes = FakeNodes("singleton")
+    node_keys = FakeStruct("")
+    get_connection_by_node = lambda n : r.connection_pool.get_connection("singleton", 0)
 
 # config f"{backplane.workersHashName}_storage"
 workers = r.hkeys("Workers_storage")
 
 worker_count = len(workers)
+
+if worker_count == 0:
+    print("Refusing to index 0 workers. Just flush the databases")
+    sys.exit(1)
 
 print ("%d workers" % worker_count)
 
@@ -50,10 +90,10 @@ oversized_cas_names = []
 def map_cas_page(r, count, method):
     cursors = {}
     conns = {}
-    for master_node in r.connection_pool.nodes.all_masters():
+    for master_node in nodes.all_masters():
         name = master_node["name"]
         cursors[name] = "0"
-        conns[name] = r.connection_pool.get_connection_by_node(master_node)
+        conns[name] = get_connection_by_node(master_node)
 
     print("Page Complete: %d %d total: %s" % (0, 0, ", ".join([name for name, cur in cursors.items() if cur != 0])))
 
@@ -75,7 +115,9 @@ def map_cas_page(r, count, method):
 
             raw_resp = conn.read_response()
 
-            cursor, resp = r._parse_scan(raw_resp)
+            # cursor, resp = r._parse_scan(raw_resp)
+            cursor, resp = raw_resp
+            cursor = long(cursor)
 
             if method(resp, conn, cursors, node):
                 cursors[node] = cursor
@@ -110,7 +152,7 @@ class Indexer:
             name = cas_names[i].decode()
             keyslot = nodes.keyslot(name)
             # have to do this if scans return keys from other slots because... redis
-            if r.connection_pool.nodes.node_from_slot(keyslot) == current:
+            if nodes.node_from_slot(keyslot) == current:
                 node_key = node_keys[keyslot]
                 set_key = "{%s}:intersecting-workers" % node_key
                 p.sinterstore(name, set_key, name)
