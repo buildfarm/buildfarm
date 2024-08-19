@@ -11,6 +11,7 @@ java_library(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//third_party/remote-apis:build_bazel_remote_asset_v1_remote_asset_java_grpc",
         "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@com_google_googleapis//google/bytestream:bytestream_java_grpc",
         "@com_google_googleapis//google/bytestream:bytestream_java_proto",
@@ -27,6 +28,7 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_projectlombok_lombok",
+        "@remoteapis//build/bazel/remote/asset/v1:remote_asset_java_proto",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

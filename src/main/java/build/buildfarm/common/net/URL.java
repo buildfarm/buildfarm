@@ -25,6 +25,10 @@ public class URL {
     this.url = url;
   }
 
+  public String getHost() {
+    return url.getHost();
+  }
+
   public URLConnection openConnection() throws IOException {
     return url.openConnection();
   }

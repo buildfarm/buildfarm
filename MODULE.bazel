@@ -86,6 +86,7 @@ maven.install(
                     # keep sorted
                     "com.fasterxml.jackson.core:jackson-databind:2.15.0",
                     "com.github.ben-manes.caffeine:caffeine:2.9.0",
+                    "com.github.cdjones32:java-netrc:1.0.1",
                     "com.github.docker-java:docker-java:3.3.3",
                     "com.github.docker-java:docker-java-api:3.3.3",
                     "com.github.docker-java:docker-java-core:3.3.3",
@@ -149,6 +150,7 @@ maven.install(
     lock_file = "//:maven_install.json",
     repositories = [
         "https://repo.maven.apache.org/maven2",
+        "https://jitpack.io",
     ],
     strict_visibility = True,
 )

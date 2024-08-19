@@ -13,6 +13,7 @@ java_library(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@com_google_googleapis//google/longrunning:longrunning_java_proto",
         "@com_google_googleapis//google/rpc:rpc_java_proto",
+        "@maven//:com_github_cdjones32_java_netrc",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
