@@ -62,16 +62,19 @@ class RedisShardSubscriber extends JedisPubSub {
 
   private final ListMultimap<String, TimedWatchFuture> watchers;
   private final Map<String, ShardWorker> workers;
+  private final int workerChangeTypeMask;
   private final String workerChannel;
   private final Executor executor;
 
   RedisShardSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers,
       Map<String, ShardWorker> workers,
+      int workerChangeTypeMask,
       String workerChannel,
       Executor executor) {
     this.watchers = watchers;
     this.workers = workers;
+    this.workerChangeTypeMask = workerChangeTypeMask;
     this.workerChannel = workerChannel;
     this.executor = executor;
   }
@@ -261,13 +264,16 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   void addWorker(WorkerChange workerChange) {
-    synchronized (workers) {
-      workers.put(
-          workerChange.getName(),
-          ShardWorker.newBuilder()
-              .setEndpoint(workerChange.getName())
-              .setFirstRegisteredAt(Timestamps.toMillis(workerChange.getAdd().getEffectiveAt()))
-              .build());
+    if ((workerChange.getAdd().getWorkerType() & workerChangeTypeMask) != 0) {
+      synchronized (workers) {
+        workers.put(
+            workerChange.getName(),
+            ShardWorker.newBuilder()
+                .setEndpoint(workerChange.getName())
+                .setWorkerType(workerChange.getAdd().getWorkerType())
+                .setFirstRegisteredAt(Timestamps.toMillis(workerChange.getAdd().getEffectiveAt()))
+                .build());
+      }
     }
   }
 
