@@ -16,9 +16,6 @@ package build.buildfarm.worker.cgroup;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import jnr.constants.platform.Signal;
-import jnr.posix.POSIX;
-import jnr.posix.POSIXFactory;
 import com.google.common.collect.ImmutableList;
 import io.grpc.Deadline;
 import java.io.IOException;
@@ -28,6 +25,9 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import jnr.constants.platform.Signal;
+import jnr.posix.POSIX;
+import jnr.posix.POSIXFactory;
 import lombok.Getter;
 import lombok.extern.java.Log;
 

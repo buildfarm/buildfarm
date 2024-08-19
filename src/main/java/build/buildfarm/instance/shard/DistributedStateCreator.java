@@ -58,7 +58,8 @@ public class DistributedStateCreator {
     state.processingExecutions = new RedisMap(configs.getBackplane().getProcessingPrefix());
     state.dispatchingExecutions = new RedisMap(configs.getBackplane().getDispatchingPrefix());
     state.dispatchedExecutions =
-        new RedisHashMap(configs.getBackplane().getDispatchedOperationsHashName()); // FIXME change to Executions
+        new RedisHashMap(
+            configs.getBackplane().getDispatchedOperationsHashName()); // FIXME change to Executions
     state.executeWorkers =
         new RedisHashMap(configs.getBackplane().getWorkersHashName() + "_execute");
     state.storageWorkers =

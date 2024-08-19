@@ -118,8 +118,7 @@ public class Executions {
         scanResult.getCursor(),
         newArrayList(
             transform(
-                executions.get(jedis, scanResult.getResult()),
-                entry -> parse(entry.getValue()))));
+                executions.get(jedis, scanResult.getResult()), entry -> parse(entry.getValue()))));
   }
 
   public ScanResult<Operation> scan(UnifiedJedis jedis, String cursor, int count) {

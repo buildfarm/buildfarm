@@ -185,7 +185,8 @@ public class RedisShardSubscriberTest {
 
   RedisShardSubscriber createSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers, Executor executor) {
-    return new RedisShardSubscriber(watchers, /* workers= */ null, WorkerType.NONE.getNumber(), "worker-channel", executor);
+    return new RedisShardSubscriber(
+        watchers, /* workers= */ null, WorkerType.NONE.getNumber(), "worker-channel", executor);
   }
 
   RedisShardSubscriber createSubscriber(ListMultimap<String, TimedWatchFuture> watchers) {
@@ -408,7 +409,8 @@ public class RedisShardSubscriberTest {
     int storageWorkerType = WorkerType.STORAGE.getNumber();
     String workerChannel = "worker-channel";
     RedisShardSubscriber operationSubscriber =
-      new RedisShardSubscriber(/* watchers */ null, workers, storageWorkerType, workerChannel, directExecutor());
+        new RedisShardSubscriber(
+            /* watchers */ null, workers, storageWorkerType, workerChannel, directExecutor());
     String workerChangeJson =
         JsonFormat.printer()
             .print(
@@ -426,13 +428,17 @@ public class RedisShardSubscriberTest {
     int workerType = WorkerType.STORAGE.getNumber();
     String workerChannel = "worker-channel";
     RedisShardSubscriber operationSubscriber =
-      new RedisShardSubscriber(/* watchers */ null, workers, workerType, workerChannel, directExecutor());
+        new RedisShardSubscriber(
+            /* watchers */ null, workers, workerType, workerChannel, directExecutor());
     String workerChangeJson =
         JsonFormat.printer()
             .print(
                 WorkerChange.newBuilder()
                     .setName("execute-worker")
-                    .setAdd(WorkerChange.Add.newBuilder().setWorkerType(WorkerType.EXECUTE.getNumber()).build())
+                    .setAdd(
+                        WorkerChange.Add.newBuilder()
+                            .setWorkerType(WorkerType.EXECUTE.getNumber())
+                            .build())
                     .build());
     operationSubscriber.onMessage(workerChannel, workerChangeJson);
     assertThat(workers.isEmpty()).isTrue();

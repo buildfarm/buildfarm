@@ -18,10 +18,10 @@ print_error () {
 os=$(uname | tr '[:upper:]' '[:lower:]')
 
 # Get the machine architecture
-arch=$(uname -m)
+arch=$(uname -m | tr '_' '-')
 
 # Set the correct Google Java Formatter URL based on the operating system and architecture
-JAVA_FORMATTER_URL="https://github.com/google/google-java-format/releases/download/v1.22.0/google-java-format_${os}-${arch}"
+JAVA_FORMATTER_URL="https://github.com/google/google-java-format/releases/download/v1.23.0/google-java-format_${os}-${arch}"
 LOCAL_FORMATTER="./google-java-format"
 
 if [ -z "$BAZEL" ]; then
