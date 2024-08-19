@@ -470,7 +470,11 @@ public class RedisShardBackplane implements Backplane {
     dequeueService = BuildfarmExecutors.getDequeuePool();
     subscriber =
         new RedisShardSubscriber(
-            watchers, storageWorkers, WorkerType.STORAGE.getNumber(), configs.getBackplane().getWorkerChannel(), subscriberService);
+            watchers,
+            storageWorkers,
+            WorkerType.STORAGE.getNumber(),
+            configs.getBackplane().getWorkerChannel(),
+            subscriberService);
 
     operationSubscription =
         new RedisShardSubscription(
@@ -1081,7 +1085,8 @@ public class RedisShardBackplane implements Backplane {
       throws IOException {
     redis.clients.jedis.resps.ScanResult<Operation> scanResult =
         client.call(
-            jedis -> state.executions.findByToolInvocationId(jedis, toolInvocationId, cursor, count));
+            jedis ->
+                state.executions.findByToolInvocationId(jedis, toolInvocationId, cursor, count));
     return new ScanResult<>(tokenFromRedisCursor(scanResult.getCursor()), scanResult.getResult());
   }
 
