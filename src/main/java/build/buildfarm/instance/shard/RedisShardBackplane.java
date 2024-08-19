@@ -470,7 +470,7 @@ public class RedisShardBackplane implements Backplane {
     dequeueService = BuildfarmExecutors.getDequeuePool();
     subscriber =
         new RedisShardSubscriber(
-            watchers, storageWorkers, configs.getBackplane().getWorkerChannel(), subscriberService);
+            watchers, storageWorkers, WorkerType.STORAGE.getNumber(), configs.getBackplane().getWorkerChannel(), subscriberService);
 
     operationSubscription =
         new RedisShardSubscription(
@@ -604,13 +604,18 @@ public class RedisShardBackplane implements Backplane {
   public void addWorker(ShardWorker shardWorker) throws IOException {
     String json = JsonFormat.printer().print(shardWorker);
     Timestamp effectiveAt = Timestamps.fromMillis(shardWorker.getFirstRegisteredAt());
+    WorkerChange.Add add =
+        WorkerChange.Add.newBuilder()
+            .setEffectiveAt(effectiveAt)
+            .setWorkerType(shardWorker.getWorkerType())
+            .build();
     String workerChangeJson =
         JsonFormat.printer()
             .print(
                 WorkerChange.newBuilder()
                     .setEffectiveAt(toTimestamp(Instant.now()))
                     .setName(shardWorker.getEndpoint())
-                    .setAdd(WorkerChange.Add.newBuilder().setEffectiveAt(effectiveAt).build())
+                    .setAdd(add)
                     .build());
     client.call(
         jedis -> {
