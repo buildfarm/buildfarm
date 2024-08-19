@@ -50,10 +50,12 @@ import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -619,6 +621,16 @@ class Cat {
     return 10;
   }
 
+  private static void fetch(Instance instance, Iterable<String> uris) throws Exception {
+    ListenableFuture<Digest> digest =
+        instance.fetchBlob(
+            uris,
+            ImmutableMap.of(),
+            /* expectedDigest= */ Digest.getDefaultInstance(),
+            RequestMetadata.getDefaultInstance());
+    System.out.println(DigestUtil.toString(digest.get()));
+  }
+
   private static void getWorkerProfile(Instance instance) {
     WorkerProfileMessage response = instance.getWorkerProfile();
     System.out.println("\nWorkerProfile:");
@@ -780,6 +792,18 @@ class Cat {
 
     public String name() {
       return getClass().getSimpleName();
+    }
+  }
+
+  static class Fetch extends CatCommand {
+    @Override
+    public String description() {
+      return "Request an url fetch via the assets API";
+    }
+
+    @Override
+    public void run(Instance instance, Iterable<String> args) throws Exception {
+      fetch(instance, args);
     }
   }
 
@@ -1113,6 +1137,7 @@ class Cat {
     new RETreeLayout(),
     new CatRECommand(),
     new CatDirectory(),
+    new Fetch(),
   };
 
   static void usage() {

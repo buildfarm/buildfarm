@@ -22,6 +22,7 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.common.Trees.enumerateTreeFileDigests;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.net.HttpHeaders.AUTHORIZATION;
 import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -88,6 +89,8 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
+import co.cdjones.security.auth.Credentials;
+import co.cdjones.security.auth.NetrcParser;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -120,7 +123,9 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.NoSuchFileException;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -612,6 +617,16 @@ public abstract class NodeInstance extends InstanceBase {
     Write create(Digest digest) throws IOException;
   }
 
+  private static void assignAuthorization(String host, HttpURLConnection connection) {
+    Credentials credentials = NetrcParser.getInstance().getCredentials(host);
+    if (credentials != null && !credentials.user().isEmpty() && !credentials.password().isEmpty()) {
+      String authorization = credentials.user() + ":" + credentials.password();
+      String basic =
+          Base64.getEncoder().encodeToString(authorization.getBytes(StandardCharsets.UTF_8));
+      connection.setRequestProperty(AUTHORIZATION, "Basic " + basic);
+    }
+  }
+
   private static ListenableFuture<Digest> downloadUrl(
       URL url,
       String expectedHash,
@@ -622,7 +637,7 @@ public abstract class NodeInstance extends InstanceBase {
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
     // connect timeout?
     // proxy?
-    // authenticator?
+    assignAuthorization(url.getHost(), connection);
     for (Map.Entry<String, String> entry : headers.entrySet()) {
       connection.setRequestProperty(entry.getKey(), entry.getValue());
     }

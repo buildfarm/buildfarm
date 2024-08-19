@@ -25,6 +25,9 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.lang.String.format;
 
+import build.bazel.remote.asset.v1.FetchBlobRequest;
+import build.bazel.remote.asset.v1.FetchGrpc;
+import build.bazel.remote.asset.v1.FetchGrpc.FetchFutureStub;
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheFutureStub;
@@ -270,6 +273,15 @@ public class StubInstance extends InstanceBase {
             }
           });
 
+  private final Supplier<FetchFutureStub> fetchFutureStub =
+      Suppliers.memoize(
+          new Supplier<>() {
+            @Override
+            public FetchFutureStub get() {
+              return FetchGrpc.newFutureStub(channel);
+            }
+          });
+
   @SuppressWarnings("Guava")
   private final Supplier<ContentAddressableStorageFutureStub> casFutureStub =
       Suppliers.memoize(
@@ -494,7 +506,20 @@ public class StubInstance extends InstanceBase {
       Map<String, String> headers,
       Digest expectedDigest,
       RequestMetadata requestMetadata) {
-    throw new UnsupportedOperationException();
+    FetchBlobRequest request = FetchBlobRequest.newBuilder().addAllUris(uris).build();
+
+    return transform(
+        deadlined(fetchFutureStub)
+            .withInterceptors(attachMetadataInterceptor(requestMetadata))
+            .fetchBlob(request),
+        response -> {
+          if (Code.forNumber(response.getStatus().getCode()) != Code.OK) {
+            throw StatusProto.toStatusRuntimeException(response.getStatus());
+          }
+          // other responses, uris, expirations, etc
+          return response.getBlobDigest();
+        },
+        directExecutor());
   }
 
   @Override
