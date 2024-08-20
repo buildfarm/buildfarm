@@ -131,8 +131,18 @@ public class RedisHashMap {
     return jedis.hkeys(name);
   }
 
-  public ScanResult<Map.Entry<String, String>> scan(UnifiedJedis jedis, String cursor, int count) {
-    return jedis.hscan(name, cursor, new ScanParams().count(count));
+  public ScanResult<Map.Entry<String, String>> scan(
+      UnifiedJedis jedis, String hashCursor, int count) {
+    // unlike full map search, we should have good scan key coherency
+    // avoid switching this around while trying to pad out the results
+    int scanCount = count * 2;
+    ScanParams scanParams = new ScanParams().count(scanCount);
+    return new OffsetScanner<Map.Entry<String, String>>() {
+      @Override
+      protected ScanResult<Map.Entry<String, String>> scan(String cursor, int remaining) {
+        return jedis.hscan(name, cursor, scanParams);
+      }
+    }.fill(hashCursor, count);
   }
 
   /**
