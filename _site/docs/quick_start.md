@@ -6,7 +6,19 @@ nav_order: 3
 
 # Quick Start
 
-Here we describe how to use bazel remote caching or remote execution with buildfarm. We'll start by creating a single workspace that can be used for both.
+Here we describe how to use bazel remote caching or remote execution with buildfarm. We will create a single client workspace that can be used for both.
+
+## Setup
+
+You can run this quick start on a single computer running nearly any flavor of linux. This computer is the localhost for the rest of the description.
+
+### Backplane
+
+Buildfarm requires a backplane to store information that is shared between cluster members. A [redis](https://redis.io) server can be used to meet this requirement.
+
+Download/Install a redis-server instance and run it on your localhost. The default redis port of 6379 will be used by the default buildfarm configs.
+
+## Workspace
 
 Let's start with a bazel workspace with a single file to compile into an executable:
 
@@ -68,7 +80,7 @@ INFO: 2 processes: 2 remote cache hit.
 
 ## Remote Execution (and caching)
 
-Now we will use buildfarm for remote execution with a minimal configuration - a single memory instance, with a host-colocated worker that can execute a single process at a time - via a bazel invocation on our workspace.
+Now we will use buildfarm for remote execution with a minimal configuration - a single memory instance, with a worker on the localhost that can execute a single process at a time - via a bazel invocation on our workspace.
 
 First, we should restart the buildfarm server to ensure that we get remote execution (this can also be forced from the client by using `--noremote_accept_cached`). From the buildfarm server prompt and directory:
 
@@ -107,7 +119,7 @@ To stop the containers, run:
 
 ## Buildfarm Manager
 
-You can now easily launch a new Buildfarm cluster locally or in AWS using an open sourced <a href="https://github.com/80degreeswest/bfmgr">Buildfarm Manager</a>.
+You can now easily launch a new Buildfarm cluster locally or in AWS using an open sourced [Buildfarm Manager](https://github.com/80degreeswest/bfmgr).
 
 ```
 wget https://github.com/80degreeswest/bfmgr/releases/download/1.0.7/bfmgr-1.0.7.jar

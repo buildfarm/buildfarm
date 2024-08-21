@@ -80,6 +80,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -1055,26 +1056,31 @@ public class ShardInstanceTest {
   @Test
   public void findMissingBlobsTest_ViaBackPlane() throws Exception {
 
-    Set<String> activeWorkers = new HashSet<>(Arrays.asList("worker1", "worker2", "worker3"));
-    Set<String> expiredWorker = new HashSet<>(Arrays.asList("workerX", "workerY", "workerZ"));
+    Set<String> activeWorkers = ImmutableSet.of("worker1", "worker2", "worker3");
+    Set<String> expiredWorkers = ImmutableSet.of("workerX", "workerY", "workerZ");
+    Set<String> imposterWorkers = ImmutableSet.of("imposter1", "imposter2", "imposter3");
 
     Set<Digest> availableDigests =
-        new HashSet<>(
-            Arrays.asList(
-                Digest.newBuilder().setHash("toBeFound1").setSizeBytes(1).build(),
-                Digest.newBuilder().setHash("toBeFound2").setSizeBytes(1).build(),
-                Digest.newBuilder().setHash("toBeFound3").setSizeBytes(1).build(),
-                // a copy is added in final digest list
-                Digest.newBuilder().setHash("toBeFoundDuplicate").setSizeBytes(1).build()));
+        ImmutableSet.of(
+            Digest.newBuilder().setHash("toBeFound1").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("toBeFound2").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("toBeFound3").setSizeBytes(1).build(),
+            // a copy is added in final digest list
+            Digest.newBuilder().setHash("toBeFoundDuplicate").setSizeBytes(1).build());
 
     Set<Digest> missingDigests =
-        new HashSet<>(
-            Arrays.asList(
-                Digest.newBuilder().setHash("missing1").setSizeBytes(1).build(),
-                Digest.newBuilder().setHash("missing2").setSizeBytes(1).build(),
-                Digest.newBuilder().setHash("missing3").setSizeBytes(1).build(),
-                // a copy is added in final digest list
-                Digest.newBuilder().setHash("missingDuplicate").setSizeBytes(1).build()));
+        ImmutableSet.of(
+            Digest.newBuilder().setHash("missing1").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("missing2").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("missing3").setSizeBytes(1).build(),
+            // a copy is added in final digest list
+            Digest.newBuilder().setHash("missingDuplicate").setSizeBytes(1).build());
+
+    Set<Digest> digestAvailableOnImposters =
+        ImmutableSet.of(
+            Digest.newBuilder().setHash("toBeFoundOnImposter1").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("toBeFoundOnImposter2").setSizeBytes(1).build(),
+            Digest.newBuilder().setHash("toBeFoundOnImposter3").setSizeBytes(1).build());
 
     Set<Digest> emptyDigests =
         new HashSet<>(
@@ -1087,6 +1093,7 @@ public class ShardInstanceTest {
             availableDigests,
             missingDigests,
             emptyDigests,
+            digestAvailableOnImposters,
             Arrays.asList(
                 Digest.newBuilder().setHash("toBeFoundDuplicate").setSizeBytes(1).build(),
                 Digest.newBuilder().setHash("missingDuplicate").setSizeBytes(1).build()));
@@ -1097,24 +1104,45 @@ public class ShardInstanceTest {
       digestAndWorkersMap.put(digest, getRandomSubset(activeWorkers));
     }
     for (Digest digest : missingDigests) {
-      digestAndWorkersMap.put(digest, getRandomSubset(expiredWorker));
+      digestAndWorkersMap.put(digest, getRandomSubset(expiredWorkers));
+    }
+    for (Digest digest : digestAvailableOnImposters) {
+      digestAndWorkersMap.put(digest, getRandomSubset(imposterWorkers));
     }
 
     BuildfarmConfigs buildfarmConfigs = instance.getBuildFarmConfigs();
     buildfarmConfigs.getServer().setFindMissingBlobsViaBackplane(true);
-    when(mockBackplane.getStorageWorkers()).thenReturn(activeWorkers);
+    Set<String> activeAndImposterWorkers =
+        Sets.newHashSet(Iterables.concat(activeWorkers, imposterWorkers));
+    when(mockBackplane.getStorageWorkers()).thenReturn(activeAndImposterWorkers);
     when(mockBackplane.getBlobDigestsWorkers(any(Iterable.class))).thenReturn(digestAndWorkersMap);
+
+    long serverStartTime = 1686951033L; // june 15th, 2023
+    Map<String, Long> workersStartTime = new HashMap<>();
+    for (String worker : activeAndImposterWorkers) {
+      workersStartTime.put(worker, serverStartTime);
+    }
+    when(mockBackplane.getWorkersStartTimeInEpochSecs(activeAndImposterWorkers))
+        .thenReturn(workersStartTime);
+    long oneDay = 86400L;
+    for (Digest digest : availableDigests) {
+      when(mockBackplane.getDigestInsertTime(digest)).thenReturn(serverStartTime + oneDay);
+    }
+    for (Digest digest : digestAvailableOnImposters) {
+      when(mockBackplane.getDigestInsertTime(digest)).thenReturn(serverStartTime - oneDay);
+    }
 
     Iterable<Digest> actualMissingDigests =
         instance.findMissingBlobs(allDigests, RequestMetadata.getDefaultInstance()).get();
+    Iterable<Digest> expectedMissingDigests =
+        Iterables.concat(missingDigests, digestAvailableOnImposters);
+
+    assertThat(actualMissingDigests).containsExactlyElementsIn(expectedMissingDigests);
 
     for (Digest digest : actualMissingDigests) {
       assertThat(digest).isNotIn(availableDigests);
       assertThat(digest).isNotIn(emptyDigests);
-      assertThat(digest).isIn(missingDigests);
-    }
-    for (Digest digest : missingDigests) {
-      assertThat(digest).isIn(actualMissingDigests);
+      assertThat(digest).isIn(expectedMissingDigests);
     }
 
     // reset BuildfarmConfigs
