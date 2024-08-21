@@ -58,11 +58,11 @@ spec:
               name: "metrics"
           livenessProbe:
             grpc:
-              port: 8981
+              port: 8982
             initialDelaySeconds: 10
           readinessProbe:
             grpc:
-              port: 8981
+              port: 8982
             initialDelaySeconds: 10
           resources:
             {{- toYaml .Values.shardWorker.resources | nindent 12 }}
