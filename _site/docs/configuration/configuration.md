@@ -52,31 +52,31 @@ worker:
 
 ### Server
 
-| Configuration                    | Accepted and _Default_ Values | Environment Var | Description                                                                                                                 |
-|----------------------------------|-------------------------------|-----------------|-----------------------------------------------------------------------------------------------------------------------------|
-| instanceType                     | _SHARD_                       |                 | Type of implementation (SHARD is the only one supported)                                                                    |
-| name                             | String, _shard_               |                 | Implementation name                                                                                                         |
-| publicName                       | String, _DERIVED:port_        | INSTANCE_NAME   | Host:port of the GRPC server, required to be accessible by all servers                                                      |
-| actionCacheReadOnly              | boolean, _false_              |                 | Allow/Deny writing to action cache                                                                                          |
-| port                             | Integer, _8980_               |                 | Listening port of the GRPC server                                                                                           |
-| bindAddress                      | String                        |                 | Listening address of the GRPC server, default for Java Grpc (all interface addresses) if unspecified                        |
-| casWriteTimeout                  | Integer, _3600_               |                 | CAS write timeout (seconds)                                                                                                 |
-| bytestreamTimeout                | Integer, _3600_               |                 | Byte Stream write timeout (seconds)                                                                                         |
-| sslCertificatePath               | String, _null_                |                 | Absolute path of the SSL certificate (if TLS used)                                                                          |
-| sslPrivateKeyPath                | String, _null_                |                 | Absolute path of the SSL private key (if TLS used)                                                                          |
-| runDispatchedMonitor             | boolean, _true_               |                 | Enable an agent to monitor the operation store to ensure that dispatched operations with expired worker leases are requeued |
-| dispatchedMonitorIntervalSeconds | Integer, _1_                  |                 | Dispatched monitor's lease expiration check interval (seconds)                                                              |
-| runOperationQueuer               | boolean, _true_               |                 | Acquire execute request entries cooperatively from an arrival queue on the backplane                                         |
-| ensureOutputsPresent             | boolean, _false_              |                 | Decide if all outputs are also present in the CAS. If any outputs are missing a cache miss is returned                      |
-| maxCpu                           | Integer, _0_                  |                 | Maximum number of CPU cores that any min/max-cores property may request (0 = unlimited)                                     |
-| maxRequeueAttempts               | Integer, _5_                  |                 | Maximum number of requeue attempts for an operation                                                                         |
-| useDenyList                      | boolean, _true_               |                 | Allow usage of a deny list when looking up actions and invocations (for cache only it is recommended to disable this check) |
-| grpcTimeout                      | Integer, _3600_               |                 | GRPC request timeout (seconds)                                                                                              |
-| executeKeepaliveAfterSeconds     | Integer, _60_                 |                 | Execute keep alive (seconds)                                                                                                |
-| recordBesEvents                  | boolean, _false_              |                 | Allow recording of BES events                                                                                               |
-| clusterId                        | String, _local_               |                 | Buildfarm cluster ID                                                                                                        |
-| cloudRegion                      | String, _us-east_1_           |                 | Deployment region in the cloud                                                                                              |
-| gracefulShutdownSeconds          | Integer, 0                    |                 | Time in seconds to allow for connections in flight to finish when shutdown signal is received                               |
+| Configuration                    | Accepted and _Default_ Values | Environment Var | Description                                                                                                                              |
+|----------------------------------|-------------------------------|-----------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| instanceType                     | _SHARD_                       |                 | Type of implementation (SHARD is the only one supported)                                                                                 |
+| name                             | String, _shard_               |                 | Implementation name                                                                                                                      |
+| publicName                       | String, _DERIVED:port_        | INSTANCE_NAME   | Host:port of the GRPC server, required to be accessible by all servers                                                                   |
+| actionCacheReadOnly              | boolean, _false_              |                 | Allow/Deny writing to action cache                                                                                                       |
+| port                             | Integer, _8980_               |                 | Listening port of the GRPC server                                                                                                        |
+| bindAddress                      | String                        |                 | Listening address of the GRPC server, default for Java Grpc (all interface addresses) if unspecified                                     |
+| casWriteTimeout                  | Integer, _3600_               |                 | CAS write timeout (seconds)                                                                                                              |
+| bytestreamTimeout                | Integer, _3600_               |                 | Byte Stream write timeout (seconds)                                                                                                      |
+| sslCertificatePath               | String, _null_                |                 | Absolute path of the SSL certificate (if TLS used)                                                                                       |
+| sslPrivateKeyPath                | String, _null_                |                 | Absolute path of the SSL private key (if TLS used)                                                                                       |
+| runDispatchedMonitor             | boolean, _true_               |                 | Enable an agent to monitor the operation store to ensure that dispatched operations with expired worker leases are requeued              |
+| dispatchedMonitorIntervalSeconds | Integer, _1_                  |                 | Dispatched monitor's lease expiration check interval (seconds)                                                                           |
+| runOperationQueuer               | boolean, _true_               |                 | Acquire execute request entries cooperatively from an arrival queue on the backplane                                                     |
+| ensureOutputsPresent             | boolean, _true_               |                 | Ensure ActionResult outputs are present in the CAS on ActionCache::GetActionResults. If any outputs are missing a cache miss is returned |
+| maxCpu                           | Integer, _0_                  |                 | Maximum number of CPU cores that any min/max-cores property may request (0 = unlimited)                                                  |
+| maxRequeueAttempts               | Integer, _5_                  |                 | Maximum number of requeue attempts for an operation                                                                                      |
+| useDenyList                      | boolean, _true_               |                 | Allow usage of a deny list when looking up actions and invocations (for cache only it is recommended to disable this check)              |
+| grpcTimeout                      | Integer, _3600_               |                 | GRPC request timeout (seconds)                                                                                                           |
+| executeKeepaliveAfterSeconds     | Integer, _60_                 |                 | Execute keep alive (seconds)                                                                                                             |
+| recordBesEvents                  | boolean, _false_              |                 | Allow recording of BES events                                                                                                            |
+| clusterId                        | String, _local_               |                 | Buildfarm cluster ID                                                                                                                     |
+| cloudRegion                      | String, _us-east_1_           |                 | Deployment region in the cloud                                                                                                           |
+| gracefulShutdownSeconds          | Integer, 0                    |                 | Time in seconds to allow for connections in flight to finish when shutdown signal is received                                            |
 
 
 Example:
