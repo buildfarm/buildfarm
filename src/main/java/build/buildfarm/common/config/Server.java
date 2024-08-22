@@ -29,7 +29,7 @@ public class Server {
   private int dispatchedMonitorIntervalSeconds = 1;
   private boolean runFailsafeOperation = true;
   private boolean runOperationQueuer = true;
-  private boolean ensureOutputsPresent = false;
+  private boolean ensureOutputsPresent = true;
   private int maxRequeueAttempts = 5;
   private boolean useDenyList = true;
   private long grpcTimeout = 3600;

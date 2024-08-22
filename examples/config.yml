@@ -24,7 +24,7 @@ server:
   runDispatchedMonitor: true
   dispatchedMonitorIntervalSeconds: 1
   runOperationQueuer: true
-  ensureOutputsPresent: false
+  ensureOutputsPresent: true
   runFailsafeOperation: true
   maxCpu: 0
   maxRequeueAttempts: 5

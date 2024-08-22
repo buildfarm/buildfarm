@@ -7,14 +7,22 @@ nav_order: 4
 
 # Builds Without The Bytes
 
-tl;dr: add `--build_request_id=https://host?ENSURE_OUTPUTS_PRESENT=true#$(uuidgen)`, to your BWOB bazel invocations, or enable `ensureOutputsPresent` in your config to set it globally.
+tl;dr: Buildfarm works by default with BwoB (--remote_download_outputs=[toplevel,minimal]) on bazel.
 
 As proposed in this [issue](https://github.com/bazelbuild/bazel/issues/6862) and the accompanying document, bazel endeavors to provide a mechanism to be 'content-light' for remote execution, using only content reference addresses to request action execution and construct successively dependent action definitions.
 
-Simply put, Builds Without The Bytes skips the download of action result artifacts until it needs them.
+Builds Without The Bytes skips the download of action result artifacts until it needs them.
 
-This puts BuildFarm in the uncomfortable position of never being able to expire any unique content associated with ActionResults, which is not something easily accomplished. It extends the required lifetime to some duration where bazel retains references, and if it encounters a situation where it either wants them, or to execute an action that depends upon them, and they are not available, it fails.
+Bazel now (>= 7) also applies a wall-clock ttl to every action result it downloads, depending upon current settings. See bazel documentation for the default.
 
-To combat this, you can provide some metadata to buildfarm that will help to limit (but will not remove the possibility of) failed builds.
+If this ttl has not expired, regardless of bazel daemon uptime, the remote cache will not be queried for an action result.
 
-Bazel presents a 'correlated_invocations_id' on every request to BuildFarm, including the GetActionResult request, which it uses to retrieve cached results. Since ActionResults are the long tail survivor of actions, being retained for much longer after one executes and produces its content, this represents the most likely position where content may have been removed, and a stale reference might be provided. BuildFarm recognizes this correlated_invocations_id and if it is a URI, can parse its query parameters for behavior control. One such control is ENSURE_OUTPUTS_PRESENT for the GetActionResult request - if this query value is the string "true", BuildFarm will make a silent FindMissingBlobs check for all of the outputs of an ActionResult before responding with it. If any are missing, BuildFarm will instead return code NOT_FOUND, inspiring the client to see a cache miss, and attempt a [remote] execution.
+The stored ActionResult also has no source - if you switch bazel `--remote_cache` or `--remote_executor` targets inside of the ttl, bazel will blindly assume the current target has ActionResult contents.
+
+If ActionResult contents expire on Buildfarm, when bazel requests them, it will fail, hopefully with the special REMOTE_CACHE_EVICTED (39) exit code.
+
+Buildfarm server configs now default to `ensureOutputsPresent: true`. When bazel requests an ActionResult, it will be NOT_FOUND (cache miss) unless all of its contents exist in the CAS. This also extends the lifetime of those contents (without shard loss) to the minimum ttl before expiration.
+
+With `ensureOutputsPresent: false`, there is also a mechanism to control this check on a per-request level.
+
+The REAPI presents a 'correlated_invocations_id' in the RequestMetadata settable on headers for every request to BuildFarm, including the GetActionResult request, which it uses to retrieve cached results. BuildFarm recognizes this correlated_invocations_id and if it is a URI, can parse its query parameters for behavior control. One such control is ENSURE_OUTPUTS_PRESENT for the GetActionResult request - if this query value is the string "true", BuildFarm will make a silent FindMissingBlobs check for all of the outputs of an ActionResult before responding with it. If any are missing, BuildFarm will instead return code NOT_FOUND, inspiring the client to see a cache miss, and attempt a [remote] execution.
