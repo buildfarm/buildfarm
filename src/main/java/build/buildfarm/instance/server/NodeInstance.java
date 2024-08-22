@@ -89,8 +89,6 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
-import co.cdjones.security.auth.Credentials;
-import co.cdjones.security.auth.NetrcParser;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -111,6 +109,7 @@ import com.google.protobuf.Parser;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
+import com.owteam.engUtils.netrc.Netrc;
 import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.StatusException;
@@ -143,6 +142,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import org.apache.http.auth.Credentials;
 
 @Log
 public abstract class NodeInstance extends InstanceBase {
@@ -154,6 +154,7 @@ public abstract class NodeInstance extends InstanceBase {
   protected final DigestUtil digestUtil;
   protected final boolean ensureOutputsPresent;
 
+  private static final Netrc NETRC_INSTANCE = Netrc.getInstance();
   public static final String ACTION_INPUT_ROOT_DIRECTORY_PATH = "";
 
   public static final String DUPLICATE_DIRENT =
@@ -618,9 +619,12 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   private static void assignAuthorization(String host, HttpURLConnection connection) {
-    Credentials credentials = NetrcParser.getInstance().getCredentials(host);
-    if (credentials != null && !credentials.user().isEmpty() && !credentials.password().isEmpty()) {
-      String authorization = credentials.user() + ":" + credentials.password();
+    Credentials credentials = NETRC_INSTANCE.getCredentials(host);
+    if (credentials != null
+        && !credentials.getUserPrincipal().getName().isEmpty()
+        && !credentials.getPassword().isEmpty()) {
+      String authorization =
+          credentials.getUserPrincipal().getName() + ":" + credentials.getPassword();
       String basic =
           Base64.getEncoder().encodeToString(authorization.getBytes(StandardCharsets.UTF_8));
       connection.setRequestProperty(AUTHORIZATION, "Basic " + basic);
