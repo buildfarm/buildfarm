@@ -86,7 +86,6 @@ maven.install(
                     # keep sorted
                     "com.fasterxml.jackson.core:jackson-databind:2.15.0",
                     "com.github.ben-manes.caffeine:caffeine:2.9.0",
-                    "com.github.cdjones32:java-netrc:1.0.1",
                     "com.github.docker-java:docker-java:3.3.3",
                     "com.github.docker-java:docker-java-api:3.3.3",
                     "com.github.docker-java:docker-java-core:3.3.3",
@@ -115,6 +114,7 @@ maven.install(
                     "com.google.protobuf:protobuf-java-util:3.19.1",
                     "com.google.truth:truth:1.4.2",
                     "com.googlecode.json-simple:json-simple:1.1.1",
+                    "com.owteam.engUtils:netrc:2.0.1",
                     "commons-io:commons-io:2.15.1",
                 ] + ["io.netty:netty-%s:4.1.108.Final" % module for module in IO_NETTY_MODULES] +
                 ["io.grpc:grpc-%s:1.62.2" % module for module in IO_GRPC_MODULES] + [
@@ -130,6 +130,7 @@ maven.install(
         "org.apache.commons:commons-compress:1.26.1",
         "org.apache.commons:commons-lang3:3.13.0",
         "org.apache.commons:commons-pool2:2.11.1",
+        "org.apache.httpcomponents:httpclient:4.5.14",
         "org.apache.tomcat:annotations-api:6.0.53",
         "org.bouncycastle:bcprov-jdk15on:1.70",
         "org.checkerframework:checker-qual:3.38.0",
@@ -150,7 +151,6 @@ maven.install(
     lock_file = "//:maven_install.json",
     repositories = [
         "https://repo.maven.apache.org/maven2",
-        "https://jitpack.io",
     ],
     strict_visibility = True,
 )
