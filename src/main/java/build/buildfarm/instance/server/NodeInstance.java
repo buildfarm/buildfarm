@@ -154,7 +154,6 @@ public abstract class NodeInstance extends InstanceBase {
   protected final DigestUtil digestUtil;
   protected final boolean ensureOutputsPresent;
 
-  private static final Netrc NETRC_INSTANCE = Netrc.getInstance();
   public static final String ACTION_INPUT_ROOT_DIRECTORY_PATH = "";
 
   public static final String DUPLICATE_DIRENT =
@@ -619,7 +618,7 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   private static void assignAuthorization(String host, HttpURLConnection connection) {
-    Credentials credentials = NETRC_INSTANCE.getCredentials(host);
+    Credentials credentials = Netrc.getInstance().getCredentials(host);
     if (credentials != null
         && !credentials.getUserPrincipal().getName().isEmpty()
         && !credentials.getPassword().isEmpty()) {
