@@ -6,7 +6,7 @@ nav_order: 6
 ---
 
 
-A Content Addressable Storage (CAS) is a collection of service endpoints which provide read and creation access to immutable binary large objects (blobs). The core service is declared in the [Remote Execution API](https://github.com/bazelbuild/remote-apis), and also requires presentation of the [ByteStream API](https://github.com/googleapis/googleapis/blob/main/google/bytestream/bytestream.proto) with specializations for resource names and behaviors.
+A Content Addressable Storage (CAS) is a collection of service endpoints which provide read and creation access to immutable binary large objects (blobs). The core service is declared in the [Remote Execution API](https://github.com/bazelbuild/remote-apis), and also requires presentation of the [ByteStream API](https://github.com/googleapis/googleapis/blob/master/google/bytestream/bytestream.proto) with specializations for resource names and behaviors.
 
 An entry in the CAS is a sequence of bytes whose computed digest via a hashing function constitutes its address. The address is specified as either a [Digest] message, or by the makeup of a resource name in ByteStream requests.
 
@@ -85,16 +85,6 @@ The worker's CAS file cache uses persistent disk storage. A strongly recommended
 
 Upon worker startup, the worker's cache instance is initialized in two phases. First, the root is scanned to store file information. Second, the existing directories are traversed to compute their validating identification.  Files will be automatically deleted if their file names are invalid for the cache, or if the configured cache size has been exceeded by previous files.
 
-Each Worker type's specification of the CASFileCache is unique. The memory worker defaults to CASFileCache with no option to change it, only configure its [root directory](https://github.com/bazelbuild/bazel-buildfarm/blob/main/examples/config.yml) and [configuration options](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/config.yml). The shard worker allows a more flexible specification, with delegates available of the other types to fall back on for CAS expansion, and [encapsulated CAS configs](https://github.com/bazelbuild/bazel-buildfarm/blob/85c3fdaf89fedc2faee1172fab01338777de79a1/examples/config.yml)
-
-The CASFileCache is also available on MemoryInstance servers, where it can represent a persistent file storage for a CAS. An example configuration for this is:
-
-```
-worker:
-  storages:
-    - type: FILESYSTEM
-      path: "cache"
-      maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
-```
+The shard worker allows a flexible specification, with delegates available of the other types to fall back on for CAS expansion, and [encapsulated CAS configs](https://github.com/bazelbuild/bazel-buildfarm/blob/main/examples/config.yml)
 
 CASTest is a standalone tool to load the cache and print status information about it.
