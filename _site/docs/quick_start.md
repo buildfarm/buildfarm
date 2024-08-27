@@ -37,7 +37,7 @@ int main( int argc, char *argv[] )
 
 `BUILD`:
 
-```starlark
+```python
 cc_binary(
     name = "main",
     srcs = ["main.cc"],
