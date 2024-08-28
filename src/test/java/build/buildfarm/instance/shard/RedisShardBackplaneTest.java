@@ -412,7 +412,8 @@ public class RedisShardBackplaneTest {
     JedisCluster jedisCluster = mock(JedisCluster.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
     when(jedisCluster.hset(anyString(), anyString(), anyString())).thenReturn(1L);
-    RedisShardBackplane backplane = createBackplane("add-worker-test");
+    backplane =
+            new RedisShardBackplane("digest-inserttime-test", o -> o, o -> o, mockJedisClusterFactory);
     backplane.start("addWorker/test:0000");
     backplane.addWorker(shardWorker);
     verify(jedisCluster, times(1))
