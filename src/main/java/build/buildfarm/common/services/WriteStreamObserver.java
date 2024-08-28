@@ -365,7 +365,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
                       "request resource_name %s does not match previous resource_name %s",
                       resourceName, name))
               .asException());
-    } else {
+    } else if (!write.isComplete()) {
       if (earliestOffset < 0 || offset < earliestOffset) {
         earliestOffset = offset;
       }
