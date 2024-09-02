@@ -34,6 +34,8 @@ spec:
           env:
             - name: CONFIG_PATH
               value: /config/config.yml
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0 -XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+HeapDumpOnOutOfMemoryError -Djava.util.logging.config.file=/server-log-props/logging.properties
             {{- if .Values.server.extraEnv }}
             {{- toYaml .Values.server.extraEnv | nindent 12 }}
             {{- end }}
@@ -56,6 +58,9 @@ spec:
             - mountPath: /config
               name: config
               readOnly: true
+            - mountPath: /server-log-props
+              name: server-log-props
+              readOnly: true
       {{- with .Values.server.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -73,3 +78,7 @@ spec:
             defaultMode: 420
             name: {{ include "buildfarm.fullname" . }}-config
           name: config
+        - configMap:
+            defaultMode: 420
+            name: {{ include "buildfarm.fullname" . }}-server-log-props
+          name: server-log-props
