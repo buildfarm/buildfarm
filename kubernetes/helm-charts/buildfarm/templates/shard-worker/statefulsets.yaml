@@ -43,6 +43,8 @@ spec:
           env:
             - name: CONFIG_PATH
               value: /config/config.yml
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0 -XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+HeapDumpOnOutOfMemoryError -Djava.util.logging.config.file=/shard-worker-log-props/logging.properties
             - name: POD_IP
               valueFrom:
                 fieldRef:
@@ -70,8 +72,8 @@ spec:
             - mountPath: /config
               name: config
               readOnly: true
-            - mountPath: /tmp/worker
-              name: {{ include "buildfarm.fullname" . }}-shard-worker-data
+            - mountPath: /shard-worker-log-props
+              name: shard-worker-log-props
             {{- with .Values.shardWorker.extraVolumeMounts }}
             {{- tpl (toYaml .) $ | nindent 12 -}}
             {{- end }}
@@ -95,6 +97,10 @@ spec:
             defaultMode: 420
             name: {{ include "buildfarm.fullname" . }}-config
           name: config
+        - configMap:
+            defaultMode: 420
+            name: {{ include "buildfarm.fullname" . }}-shard-worker-log-props
+          name: shard-worker-log-props
         {{- with .Values.shardWorker.extraVolumes }}
         {{- tpl (toYaml .) $ | nindent 8 }}
         {{- end }}
