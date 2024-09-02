@@ -26,3 +26,23 @@ data:
     worker:
       {{- toYaml . | nindent 6 }}
     {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-server-log-props
+data:
+  logging.properties: |-
+    {{- range $key, $value := .Values.server.loggingProperties }}
+    {{ $key }}={{ $value }}
+    {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-shard-worker-log-props
+data:
+  logging.properties: |-
+    {{- range $key, $value := .Values.shardWorker.loggingProperties }}
+    {{ $key }}={{ $value }}
+    {{- end }}
