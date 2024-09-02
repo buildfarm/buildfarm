@@ -98,6 +98,12 @@ server:
     relabelings: []
     targetLabels: []
 
+  loggingProperties:
+    handlers: java.util.logging.ConsoleHandler
+    java.util.logging.ConsoleHandler.level: INFO
+    java.util.logging.ConsoleHandler.formatter: java.util.logging.SimpleFormatter
+    java.util.logging.SimpleFormatter.format: '[%4$-7s] %2$s - %5$s %6$s %n'
+
 shardWorker:
   image:
     repository: bazelbuild/buildfarm-worker
@@ -172,6 +178,12 @@ shardWorker:
     scrapeTimeout: 30s
     relabelings: []
     targetLabels: []
+
+  loggingProperties:
+    handlers: java.util.logging.ConsoleHandler
+    java.util.logging.ConsoleHandler.level: INFO
+    java.util.logging.ConsoleHandler.formatter: java.util.logging.SimpleFormatter
+    java.util.logging.SimpleFormatter.format: '[%4$-7s] %2$s - %5$s %6$s %n'
 
 ###################################
 ## DATABASE | Embedded Redis
