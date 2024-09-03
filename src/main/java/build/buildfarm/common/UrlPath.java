@@ -72,6 +72,10 @@ public class UrlPath {
 
   public static Compressor.Value parseUploadBlobCompressor(String resourceName)
       throws InvalidResourceNameException {
-    return ResourceParser.parseUploadBlobRequest(resourceName).getBlob().getCompressor();
+    try {
+      return ResourceParser.parseUploadBlobRequest(resourceName).getBlob().getCompressor();
+    } catch (RuntimeException e) {
+      throw new InvalidResourceNameException(resourceName, e.getMessage(), e);
+    }
   }
 }

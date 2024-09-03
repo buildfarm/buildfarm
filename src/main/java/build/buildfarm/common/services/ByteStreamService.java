@@ -401,14 +401,14 @@ public class ByteStreamService extends ByteStreamImplBase {
 
       @Override
       public FeedbackOutputStream getOutput(
-          long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+          long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
           throws IOException {
         throw new IOException("cannot get output of blob write");
       }
 
       @Override
       public ListenableFuture<FeedbackOutputStream> getOutputFuture(
-          long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+          long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
         return immediateFailedFuture(new IOException("cannot get output of blob write"));
       }
 

@@ -14,6 +14,7 @@
 
 package build.buildfarm.cas;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -133,22 +134,23 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
 
   @Override
   public synchronized FeedbackOutputStream getOutput(
-      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     if (closedFuture == null || closedFuture.isDone()) {
       closedFuture = SettableFuture.create();
     }
+    checkState(offset == 0, "cannot position MemoryWriteOutputStream");
     return this;
   }
 
   @Override
   public synchronized ListenableFuture<FeedbackOutputStream> getOutputFuture(
-      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     if (closedFuture == null || closedFuture.isDone()) {
-      return immediateFuture(getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler));
+      return immediateFuture(getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler));
     }
     return transformAsync(
         closedFuture,
-        result -> getOutputFuture(deadlineAfter, deadlineAfterUnits, onReadyHandler),
+        result -> getOutputFuture(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler),
         directExecutor());
   }
 

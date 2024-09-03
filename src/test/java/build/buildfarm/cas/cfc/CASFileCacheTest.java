@@ -626,12 +626,12 @@ class CASFileCacheTest {
     AtomicBoolean notified = new AtomicBoolean(false);
     write.getFuture().addListener(() -> notified.set(true), directExecutor());
     assertThat(write.getCommittedSize()).isEqualTo(6);
-    try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
+    try (OutputStream out = write.getOutput(6, 1, SECONDS, () -> {})) {
       content.substring(6, 9).writeTo(out);
     }
     // ensure that we can continue via a full call to getOutput
     assertThat(write.getCommittedSize()).isEqualTo(9);
-    try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
+    try (OutputStream out = write.getOutput(9, 1, SECONDS, () -> {})) {
       content.substring(9).writeTo(out);
     }
     assertThat(notified.get()).isTrue();
@@ -731,14 +731,14 @@ class CASFileCacheTest {
 
     @Override
     public FeedbackOutputStream getOutput(
-        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+        long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
         throws IOException {
       throw new UnsupportedOperationException();
     }
 
     @Override
     public ListenableFuture<FeedbackOutputStream> getOutputFuture(
-        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+        long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
       throw new UnsupportedOperationException();
     }
 
@@ -772,7 +772,7 @@ class CASFileCacheTest {
 
           @Override
           public FeedbackOutputStream getOutput(
-              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+              long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
               throws IOException {
             canReset = true;
             throw new IOException(new InterruptedException());
@@ -830,7 +830,7 @@ class CASFileCacheTest {
 
           @Override
           public FeedbackOutputStream getOutput(
-              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+              long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
               throws IOException {
             completed = true;
             throw new IOException("indicates already complete");
@@ -936,7 +936,10 @@ class CASFileCacheTest {
             new NullWrite() {
               @Override
               public FeedbackOutputStream getOutput(
-                  long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+                  long offset,
+                  long deadlineAfter,
+                  TimeUnit deadlineAfterUnits,
+                  Runnable onReadyHandler)
                   throws IOException {
                 try {
                   while (writeState.get() != 1) {
@@ -946,7 +949,7 @@ class CASFileCacheTest {
                   throw new IOException(e);
                 }
                 writeState.getAndIncrement(); // move into output stream state
-                return super.getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler);
+                return super.getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler);
               }
             });
     Thread expiringThread =
@@ -1032,7 +1035,10 @@ class CASFileCacheTest {
 
           @Override
           public FeedbackOutputStream getOutput(
-              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+              long offset,
+              long deadlineAfter,
+              TimeUnit deadlineAfterUnits,
+              Runnable onReadyHandler) {
             return new FeedbackOutputStream() {
               int offset = 0;
 

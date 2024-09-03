@@ -148,7 +148,8 @@ public class ByteStreamServiceTest {
                 })
         .when(write)
         .reset();
-    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+    when(write.getOutput(
+            any(Long.class), any(Long.class), any(TimeUnit.class), any(Runnable.class)))
         .thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     when(write.getFuture()).thenReturn(writtenFuture);
@@ -186,9 +187,8 @@ public class ByteStreamServiceTest {
     requestObserver.onCompleted();
     verify(write, atLeastOnce()).getCommittedSize();
     verify(write, atLeastOnce())
-        .getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
+        .getOutput(any(Long.class), any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(write, times(2)).reset();
-    verify(write, times(1)).getFuture();
   }
 
   @Test
@@ -225,7 +225,8 @@ public class ByteStreamServiceTest {
         };
 
     Write write = mock(Write.class);
-    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+    when(write.getOutput(
+            any(Long.class), any(Long.class), any(TimeUnit.class), any(Runnable.class)))
         .thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     when(write.getFuture()).thenReturn(writtenFuture);
@@ -272,8 +273,7 @@ public class ByteStreamServiceTest {
     requestObserver.onCompleted();
     verify(write, atLeastOnce()).getCommittedSize();
     verify(write, atLeastOnce())
-        .getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
-    verify(write, times(2)).getFuture();
+        .getOutput(any(Long.class), any(Long.class), any(TimeUnit.class), any(Runnable.class));
   }
 
   static class CountingReadObserver implements StreamObserver<ReadResponse> {

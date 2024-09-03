@@ -112,7 +112,7 @@ public class ResourceParser {
     // `{instance_name}/uploads/{uuid}/blobs/{digest_function/}{hash}/{size}{/optional_metadata}` or
     // `{instance_name}/uploads/{uuid}/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}{/optional_metadata}`
     UploadBlobRequest.Builder builder = UploadBlobRequest.newBuilder();
-    builder.setInstanceName(asResourcePath(previousSegments(segments, index)));
+    builder.setInstanceName(asResourcePath(previousSegments(segments, index.intValue())));
     index.increment();
     builder.setUuid(segments[index.getAndIncrement()]);
     builder.setBlob(parseBlobInformation(segments, index));
@@ -208,7 +208,7 @@ public class ResourceParser {
     // Extract each of the following segments: `{instance_name}/blobs/{hash}/{size}` or
     // `{instance_name}/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}`
     DownloadBlobRequest.Builder builder = DownloadBlobRequest.newBuilder();
-    builder.setInstanceName(asResourcePath(previousSegments(segments, index)));
+    builder.setInstanceName(asResourcePath(previousSegments(segments, index.intValue())));
     builder.setBlob(parseBlobInformation(segments, index));
     return builder.build();
   }
@@ -346,8 +346,8 @@ public class ResourceParser {
    * @return Extracted segments from given index.
    * @note Suggested return identifier: extractedSegments.
    */
-  private static List<String> previousSegments(String[] segments, MutableInt index) {
-    return Arrays.asList(Arrays.copyOfRange(segments, 0, index.intValue()));
+  private static List<String> previousSegments(String[] segments, int index) {
+    return Arrays.asList(Arrays.copyOfRange(segments, 0, index));
   }
 
   /**

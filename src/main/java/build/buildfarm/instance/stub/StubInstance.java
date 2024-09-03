@@ -753,7 +753,7 @@ public class StubInstance extends InstanceBase {
         },
         compressor == Compressor.Value.IDENTITY
             ? digest.getSizeBytes()
-            : StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
+            : StubWriteOutputStream.COMPRESSED_EXPECTED_SIZE,
         /* autoflush= */ false,
         requestMetadata);
   }

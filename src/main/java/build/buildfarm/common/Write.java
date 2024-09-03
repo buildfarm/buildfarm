@@ -26,15 +26,28 @@ import java.util.concurrent.TimeUnit;
 
 // still toying with the idea of just making a Write implement a ListenableFuture
 public interface Write {
+  long COMPRESSED_EXPECTED_SIZE = -1l;
+
   long getCommittedSize();
 
   boolean isComplete();
 
   FeedbackOutputStream getOutput(
-      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException;
+      long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+      throws IOException;
+
+  default FeedbackOutputStream getOutput(
+      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
+    return getOutput(/* offset= */ 0l, deadlineAfter, deadlineAfterUnits, onReadyHandler);
+  }
 
   ListenableFuture<FeedbackOutputStream> getOutputFuture(
-      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler);
+      long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler);
+
+  default ListenableFuture<FeedbackOutputStream> getOutputFuture(
+      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+    return getOutputFuture(/* offset= */ 0l, deadlineAfter, deadlineAfterUnits, onReadyHandler);
+  }
 
   void reset();
 
@@ -61,7 +74,7 @@ public interface Write {
 
     @Override
     public FeedbackOutputStream getOutput(
-        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+        long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
       return new FeedbackOutputStream() {
         /** Discards the specified byte. */
         @Override
@@ -88,8 +101,8 @@ public interface Write {
 
     @Override
     public ListenableFuture<FeedbackOutputStream> getOutputFuture(
-        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
-      return immediateFuture(getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler));
+        long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      return immediateFuture(getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler));
     }
 
     @Override
@@ -145,16 +158,18 @@ public interface Write {
 
     @Override
     public FeedbackOutputStream getOutput(
-        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+        long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
         throws IOException {
+      committedSize = offset;
       return this;
     }
 
     @Override
     public ListenableFuture<FeedbackOutputStream> getOutputFuture(
-        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+        long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
       try {
-        return immediateFuture(getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler));
+        return immediateFuture(
+            getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler));
       } catch (IOException e) {
         return immediateFailedFuture(e);
       }

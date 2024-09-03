@@ -48,6 +48,7 @@ import java.util.function.Function;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
 
+/** This object cannot be reused beyond a single stream error. */
 @Log
 public class StubWriteOutputStream extends FeedbackOutputStream implements Write {
   public static final long UNLIMITED_EXPECTED_SIZE = Long.MAX_VALUE;
@@ -113,6 +114,13 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private TimeUnit deadlineAfterUnits = null;
   private Runnable onReadyHandler = null;
 
+  private static int chunkSize(long expectedSize) {
+    if (expectedSize == COMPRESSED_EXPECTED_SIZE) {
+      return CHUNK_SIZE;
+    }
+    return (int) Math.min(CHUNK_SIZE, expectedSize);
+  }
+
   @SuppressWarnings("Guava")
   public StubWriteOutputStream(
       Supplier<ByteStreamBlockingStub> bsBlockingStub,
@@ -127,7 +135,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     this.resourceName = resourceName;
     this.expectedSize = expectedSize;
     this.autoflush = autoflush;
-    buf = new byte[(int) Math.min(CHUNK_SIZE, expectedSize)];
+    buf = new byte[chunkSize(expectedSize)];
   }
 
   @Override
@@ -135,12 +143,13 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     StreamObserver<WriteRequest> finishedWriteObserver;
     boolean cancelled = false;
     if (!checkComplete()) {
-      boolean finishWrite = expectedSize == UNLIMITED_EXPECTED_SIZE;
+      boolean finishWrite =
+          expectedSize == COMPRESSED_EXPECTED_SIZE || expectedSize == UNLIMITED_EXPECTED_SIZE;
       if (finishWrite || offset != 0) {
         initiateWrite();
         flushSome(finishWrite);
       }
-      cancelled = !finishWrite && getCommittedSize() + offset != expectedSize;
+      cancelled = !finishWrite && writtenBytes + offset != expectedSize;
     }
     synchronized (this) {
       finishedWriteObserver = writeObserver;
@@ -158,7 +167,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private void flushSome(boolean finishWrite) {
     WriteRequest.Builder request =
         WriteRequest.newBuilder()
-            .setWriteOffset(getCommittedSize())
+            .setWriteOffset(writtenBytes)
             .setData(ByteString.copyFrom(buf, 0, offset))
             .setFinishWrite(finishWrite);
     if (!sentResourceName) {
@@ -183,13 +192,14 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   public void flush() throws IOException {
     if (!checkComplete() && offset != 0) {
       initiateWrite();
-      flushSome(getCommittedSize() + offset == expectedSize);
+      flushSome(writtenBytes + offset == expectedSize);
     }
   }
 
   private boolean checkComplete() throws IOException {
     try {
-      return writeFuture.isDone() && writeFuture.get() >= 0;
+      return writeFuture.isDone()
+          && (expectedSize == UNLIMITED_EXPECTED_SIZE || writeFuture.get() == expectedSize);
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       Throwables.throwIfUnchecked(cause);
@@ -266,7 +276,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     if (isComplete()) {
       throw new WriteCompleteException();
     }
-    if (getCommittedSize() + offset + len > expectedSize) {
+    if (expectedSize != COMPRESSED_EXPECTED_SIZE && writtenBytes + offset + len > expectedSize) {
       throw new IndexOutOfBoundsException("write would exceed expected size");
     }
     boolean lastFlushed = false;
@@ -277,7 +287,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
       offset += copyLen;
       off += copyLen;
       len -= copyLen;
-      if (offset == buf.length || getCommittedSize() + offset == expectedSize) {
+      if (offset == buf.length || writtenBytes + offset == expectedSize) {
         flush();
         lastFlushed = true;
       }
@@ -343,18 +353,23 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public FeedbackOutputStream getOutput(
-      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+    // should we be exclusive on return here?
+    // should we react to writeFuture.isDone()?
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.onReadyHandler = onReadyHandler;
+    this.offset = 0;
+    writtenBytes = offset;
+    wasReset = writtenBytes == 0;
     initiateWrite();
     return this;
   }
 
   @Override
   public ListenableFuture<FeedbackOutputStream> getOutputFuture(
-      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
-    return immediateFuture(getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler));
+      long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+    return immediateFuture(getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler));
   }
 
   @Override

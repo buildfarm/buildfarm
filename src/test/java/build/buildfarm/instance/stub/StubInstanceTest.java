@@ -322,6 +322,7 @@ public class StubInstanceTest {
         ImmutableList.of(DIGEST_UTIL.compute(first), DIGEST_UTIL.compute(last));
     assertThat(instance.putAllBlobs(blobs, RequestMetadata.getDefaultInstance()))
         .containsAtLeastElementsIn(digests);
+    instance.stop();
   }
 
   @Test

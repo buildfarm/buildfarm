@@ -78,6 +78,23 @@ java_binary(
 )
 
 java_binary(
+    name = "bf-upload",
+    srcs = ["Upload.java"],
+    main_class = "build.buildfarm.tools.Upload",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/grpc",
+        "//src/main/java/build/buildfarm/instance",
+        "//src/main/java/build/buildfarm/instance/stub",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:io_grpc_grpc_api",
+        "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
+    ],
+)
+
+java_binary(
     name = "bf-cat",
     srcs = ["Cat.java"],
     classpath_resources = [
