@@ -407,7 +407,6 @@ worker:
     - type: FILESYSTEM
       path: "cache"
       maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
-      maxEntrySizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
 ```
 
 This definition elides FILESYSTEM configuration with '...', will read-through an external GRPC CAS supporting the REAPI CAS Services into its storage, and will attempt to write expiring entries into the GRPC CAS (i.e. pushing new entries into the head of a worker LRU list will drop the entries from the tail into the GRPC CAS).
