@@ -98,8 +98,6 @@ public final class Utils {
               instance.getDigestUtil().getDigestFunction(),
               UUID.randomUUID(),
               requestMetadata);
-      // indicate that we know this write is novel
-      write.reset();
       Futures.addCallback(
           write.getFuture(),
           new FutureCallback<Long>() {

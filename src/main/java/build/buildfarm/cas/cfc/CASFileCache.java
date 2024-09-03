@@ -954,19 +954,23 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
           @Override
           public synchronized ListenableFuture<FeedbackOutputStream> getOutputFuture(
-              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+              long offset,
+              long deadlineAfter,
+              TimeUnit deadlineAfterUnits,
+              Runnable onReadyHandler) {
             if (closedFuture == null || closedFuture.isDone()) {
               try {
                 // this isn't great, and will block when there are multiple requesters
                 return immediateFuture(
-                    getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler));
+                    getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler));
               } catch (IOException e) {
                 return immediateFailedFuture(e);
               }
             }
             return transformAsync(
                 closedFuture,
-                result -> getOutputFuture(deadlineAfter, deadlineAfterUnits, onReadyHandler),
+                result ->
+                    getOutputFuture(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler),
                 directExecutor());
           }
 
@@ -977,7 +981,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
           @Override
           public synchronized FeedbackOutputStream getOutput(
-              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+              long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
               throws IOException {
             // caller will be the exclusive owner of this write stream. all other requests
             // will block until it is returned via a close.
@@ -993,6 +997,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 throw new IOException(e);
               }
             }
+            if (offset == 0) {
+              reset();
+            }
+            if (isComplete()) {
+              throw new WriteCompleteException();
+            }
+            checkState(
+                getCommittedSize() == offset,
+                format(
+                    "cannot position stream to %d, committed_size is %d",
+                    offset, getCommittedSize()));
             SettableFuture<Void> outClosedFuture = SettableFuture.create();
             Digest digest = key.getDigest();
             UniqueWriteOutputStream uniqueOut =

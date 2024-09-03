@@ -193,7 +193,7 @@ public class GrpcCASTest {
       writeContent.substring(0, 4).writeTo(writeOut);
     }
     Write finalWrite = cas.getWrite(Compressor.Value.IDENTITY, digest, uuid, requestMetadata);
-    try (OutputStream writeOut = finalWrite.getOutput(1, SECONDS, () -> {})) {
+    try (OutputStream writeOut = finalWrite.getOutput(4, 1, SECONDS, () -> {})) {
       writeContent.substring(4).writeTo(writeOut);
     }
     assertThat(content.get(1, TimeUnit.SECONDS)).isEqualTo(writeContent);

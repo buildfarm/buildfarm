@@ -32,6 +32,7 @@ import com.google.common.base.Suppliers;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
@@ -40,6 +41,7 @@ import io.grpc.util.MutableHandlerRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -131,7 +133,7 @@ public class StubWriteOutputStreamTest {
     String resourceName = "reset-resource";
     StubWriteOutputStream write =
         new StubWriteOutputStream(
-            Suppliers.ofInstance(ByteStreamGrpc.newBlockingStub(channel)),
+            /* bsBlockingStub= */ null,
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             resourceName,
             Functions.identity(),
@@ -140,23 +142,31 @@ public class StubWriteOutputStreamTest {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       content.writeTo(out);
-      write.reset();
+    }
+
+    // implicit reset with getOutput default offset of 0
+    try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       content.writeTo(out);
     }
     ArgumentCaptor<WriteRequest> writeRequestCaptor = ArgumentCaptor.forClass(WriteRequest.class);
-    verify(writeObserver, times(3)).onNext(writeRequestCaptor.capture());
+    verify(writeObserver, times(4)).onNext(writeRequestCaptor.capture());
     List<WriteRequest> requests = writeRequestCaptor.getAllValues();
-    assertThat(requests.get(0).getWriteOffset()).isEqualTo(requests.get(1).getWriteOffset());
-    assertThat(requests.get(2).getFinishWrite()).isTrue();
+    // request 0 - write at 0
+    // request 1 - finishWrite for close
+    // request 2 - write complete at 0
+    // request 3 - finishWrite for close
+    assertThat(requests.get(1).getFinishWrite()).isTrue();
+    assertThat(requests.get(0).getWriteOffset()).isEqualTo(requests.get(2).getWriteOffset());
+    assertThat(requests.get(3).getFinishWrite()).isTrue();
   }
 
   @SuppressWarnings("PMD.EmptyControlStatement")
   @Test
-  public void getOutputCallback() throws IOException {
+  public void getOutputCallback() throws Exception {
     String resourceName = "reset-resource";
     StubWriteOutputStream write =
         new StubWriteOutputStream(
-            Suppliers.ofInstance(ByteStreamGrpc.newBlockingStub(channel)),
+            /* bsBlockingStub= */ null,
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             resourceName,
             Functions.identity(),
@@ -174,8 +184,11 @@ public class StubWriteOutputStreamTest {
               } catch (InterruptedException e) {
               }
             })) {
-    } catch (Exception e) {
-      callbackTimedOut = true;
+      write.getFuture().get();
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof StatusRuntimeException sre) {
+        callbackTimedOut = Status.fromThrowable(sre).getCode() == Status.Code.DEADLINE_EXCEEDED;
+      }
     }
     assertThat(callbackTimedOut).isTrue();
   }

@@ -79,10 +79,10 @@ class Writes {
 
     @Override
     public FeedbackOutputStream getOutput(
-        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+        long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
         throws IOException {
       try {
-        return delegate.getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler);
+        return delegate.getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler);
       } catch (Exception e) {
         onInvalidation.run();
         throwIfInstanceOf(e, IOException.class);
@@ -93,10 +93,11 @@ class Writes {
 
     @Override
     public ListenableFuture<FeedbackOutputStream> getOutputFuture(
-        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+        long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
       // should be no reason to preserve exclusivity here
       try {
-        return immediateFuture(getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler));
+        return immediateFuture(
+            getOutput(offset, deadlineAfter, deadlineAfterUnits, onReadyHandler));
       } catch (IOException e) {
         return immediateFailedFuture(e);
       }

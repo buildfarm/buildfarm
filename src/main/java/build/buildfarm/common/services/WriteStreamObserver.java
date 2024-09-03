@@ -30,6 +30,7 @@ import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.WriteCompleteException;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
@@ -202,19 +203,21 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   @GuardedBy("this")
   private void initialize(WriteRequest request) throws InvalidResourceNameException {
     String resourceName = request.getResourceName();
-    compressor = parseUploadBlobCompressor(resourceName);
     if (resourceName.isEmpty()) {
       errorResponse(INVALID_ARGUMENT.withDescription("resource_name is empty").asException());
     } else {
+      compressor = parseUploadBlobCompressor(resourceName);
       name = resourceName;
       try {
         write = getWrite(resourceName);
+        boolean isReset = request.getWriteOffset() == 0;
+        boolean isComplete = write.getFuture().isDone() || expectedCommittedSize == 0;
         if (log.isLoggable(Level.FINEST)) {
           log.log(
               Level.FINEST,
               format(
                   "registering callback for %s: committed_size = %d (transient), complete = %s",
-                  resourceName, write.getCommittedSize(), write.isComplete()));
+                  resourceName, isReset ? 0 : write.getCommittedSize(), isComplete));
         }
         Futures.addCallback(
             write.getFuture(),
@@ -233,7 +236,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
               }
             },
             withCancellation.fixedContextExecutor(directExecutor()));
-        if (!write.isComplete()) {
+        if (!isComplete) {
           initialized = true;
           handleRequest(request);
         }
@@ -325,8 +328,8 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
-  private long getCommittedSizeForWrite() throws IOException {
-    getOutput(); // establish ownership for this output
+  private long getCommittedSizeForWrite(long offset) throws IOException {
+    getOutput(offset); // establish ownership for this output
     return write.getCommittedSize();
   }
 
@@ -338,14 +341,15 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
       if (offset == 0) {
         write.reset();
       }
-      committedSize = getCommittedSizeForWrite();
+      committedSize = getCommittedSizeForWrite(offset);
     } catch (IOException e) {
       if (errorResponse(e)) {
         logWriteActivity("querying", e);
       }
       return;
     }
-    if (offset != 0 && offset > committedSize) {
+    // might need a particular selection of 'if it has completed already' for compressed here
+    if (offset != 0 && offset > committedSize && compressor == Compressor.Value.IDENTITY) {
       // we are synchronized here for delivery, but not for asynchronous completion
       // of the write - if it has completed already, and that is the source of the
       // offset mismatch, perform nothing further and release sync to allow the
@@ -374,23 +378,27 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
       // to skip the data bytes until the committedSize. This is practical with our streams,
       // since they should be the same content between offset and committedSize
       int bytesToWrite = data.size();
-      if (bytesToWrite == 0 || committedSize - offset >= bytesToWrite) {
-        requestNextIfReady();
-      } else {
-        // constrained to be within bytesToWrite
-        bytesToWrite -= (int) (committedSize - offset);
-        int skipBytes = data.size() - bytesToWrite;
-        if (skipBytes != 0) {
-          data = data.substring(skipBytes);
+      // relying on other threads to close us out if the compressed stream has been closed early
+      if (compressor == Compressor.Value.IDENTITY
+          || committedSize != Write.COMPRESSED_EXPECTED_SIZE) {
+        if (bytesToWrite == 0 || committedSize - offset >= bytesToWrite) {
+          requestNextIfReady();
+        } else {
+          // constrained to be within bytesToWrite
+          bytesToWrite -= (int) (committedSize - offset);
+          int skipBytes = data.size() - bytesToWrite;
+          if (skipBytes != 0) {
+            data = data.substring(skipBytes);
+          }
+          log.log(
+              Level.FINEST,
+              format(
+                  "writing %d to %s at %d%s",
+                  bytesToWrite, name, offset, finishWrite ? " with finish_write" : ""));
+          writeData(offset, data);
+          requestCount++;
+          requestBytes += data.size();
         }
-        log.log(
-            Level.FINEST,
-            format(
-                "writing %d to %s at %d%s",
-                bytesToWrite, name, offset, finishWrite ? " with finish_write" : ""));
-        writeData(data);
-        requestCount++;
-        requestBytes += data.size();
       }
       if (finishWrite) {
         close();
@@ -402,7 +410,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private void close() {
     log.log(Level.FINEST, format("closing stream due to finishWrite for %s", name));
     try {
-      getOutput().close();
+      getOutput(Math.max(earliestOffset, 0l)).close();
     } catch (DigestMismatchException e) {
       errorResponse(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     } catch (IOException e) {
@@ -414,13 +422,15 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
-  private void writeData(ByteString data) throws EntryLimitException {
+  private void writeData(long offset, ByteString data) throws EntryLimitException {
     try {
-      data.writeTo(getOutput());
+      data.writeTo(getOutput(offset));
       requestNextIfReady();
       ioMetric.observe(data.size());
     } catch (EntryLimitException e) {
       throw e;
+    } catch (WriteCompleteException e) {
+      // ignore, write will be closed with future callback
     } catch (IOException e) {
       if (errorResponse(Status.fromThrowable(e).asException())) {
         log.log(Level.SEVERE, format("error writing data for %s", name), e);
@@ -445,7 +455,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   @GuardedBy("this")
   private void requestNextIfReady() {
     try {
-      requestNextIfReady(getOutput());
+      requestNextIfReady(getOutput(earliestOffset));
     } catch (IOException e) {
       if (errorResponse(Status.fromThrowable(e).asException())) {
         log.log(Level.SEVERE, format("error getting output stream for %s", name), e);
@@ -454,9 +464,10 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
-  private FeedbackOutputStream getOutput() throws IOException {
+  private FeedbackOutputStream getOutput(long offset) throws IOException {
     if (out == null) {
-      out = write.getOutput(deadlineAfter, deadlineAfterUnits, this::onNewlyReadyRequestNext);
+      out =
+          write.getOutput(offset, deadlineAfter, deadlineAfterUnits, this::onNewlyReadyRequestNext);
       if (out != null) {
         withCancellation.addListener(
             context -> {

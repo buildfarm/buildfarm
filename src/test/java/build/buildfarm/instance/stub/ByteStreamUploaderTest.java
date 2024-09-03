@@ -21,6 +21,7 @@ import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.hash.HashCode;
 import com.google.protobuf.ByteString;
+import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
@@ -77,14 +78,21 @@ public class ByteStreamUploaderTest {
             };
           }
         });
-    ByteStreamUploader uploader =
-        new ByteStreamUploader(
-            /* instanceName= */ null,
-            InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-            /* callCredentials= */ null,
-            /* callTimeoutSecs= */ 1,
-            NO_RETRIES);
-    Chunker chunker = Chunker.builder().setInput(ByteString.copyFromUtf8("Hello, World!")).build();
-    uploader.uploadBlob(HashCode.fromInt(42), chunker);
+    ManagedChannel channel =
+        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
+    try {
+      ByteStreamUploader uploader =
+          new ByteStreamUploader(
+              /* instanceName= */ null,
+              channel,
+              /* callCredentials= */ null,
+              /* callTimeoutSecs= */ 1,
+              NO_RETRIES);
+      Chunker chunker =
+          Chunker.builder().setInput(ByteString.copyFromUtf8("Hello, World!")).build();
+      uploader.uploadBlob(HashCode.fromInt(42), chunker);
+    } finally {
+      channel.shutdownNow();
+    }
   }
 }

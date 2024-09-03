@@ -6,6 +6,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -65,7 +66,7 @@ public class WriteStreamObserverTest {
                   return out;
                 })
         .when(write)
-        .getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
+        .getOutput(any(Long.class), any(Long.class), any(TimeUnit.class), any(Runnable.class));
     when(instance.getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
@@ -90,7 +91,8 @@ public class WriteStreamObserverTest {
             eq(DigestFunction.Value.UNKNOWN),
             eq(uuid),
             any(RequestMetadata.class));
-    verify(write, times(1)).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
+    verify(write, times(1))
+        .getOutput(any(Long.class), any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(out, times(1)).close();
     verifyNoInteractions(responseObserver);
   }
@@ -119,6 +121,10 @@ public class WriteStreamObserverTest {
             eq(uuid),
             any(RequestMetadata.class)))
         .thenReturn(write);
+    FeedbackOutputStream outputStream = mock(FeedbackOutputStream.class);
+    when(write.getOutput(
+            any(Long.class), any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+        .thenReturn(outputStream);
 
     WriteStreamObserver observer =
         context.call(
@@ -133,7 +139,6 @@ public class WriteStreamObserverTest {
     context.cancel(new RuntimeException("Cancelled by test"));
     future.setException(new IOException("test cancel"));
 
-    verify(write, times(1)).isComplete();
     verify(instance, times(1))
         .getBlobWrite(
             eq(Compressor.Value.IDENTITY),
@@ -142,5 +147,63 @@ public class WriteStreamObserverTest {
             eq(uuid),
             any(RequestMetadata.class));
     verifyNoInteractions(responseObserver);
+  }
+
+  @Test
+  public void noWriteOnAlreadyCompleted() throws Exception {
+    ByteString completed = ByteString.copyFromUtf8("Write already completed");
+    Digest completedDigest = DIGEST_UTIL.compute(completed);
+    UUID uuid = UUID.randomUUID();
+    Instance instance = mock(Instance.class);
+    Write write = mock(Write.class);
+    SettableFuture<Long> future = SettableFuture.create();
+    when(write.getFuture()).thenReturn(future);
+    when(write.isComplete()).thenAnswer((Answer<Boolean>) invocation -> future.isDone());
+    when(instance.getBlobWrite(
+            eq(Compressor.Value.ZSTD),
+            eq(completedDigest),
+            eq(DigestFunction.Value.UNKNOWN),
+            eq(uuid),
+            any(RequestMetadata.class)))
+        .thenReturn(write);
+    FeedbackOutputStream outputStream = mock(FeedbackOutputStream.class);
+    when(write.getOutput(
+            any(Long.class), any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+        .thenReturn(outputStream);
+    StreamObserver<WriteResponse> responseObserver = mock(StreamObserver.class);
+
+    // Mark write complete on getCommittedSize() call.
+    doAnswer(
+            invocation -> {
+              long committed = Write.COMPRESSED_EXPECTED_SIZE;
+              future.set(committed);
+              return committed;
+            })
+        .when(write)
+        .getCommittedSize();
+
+    UploadBlobRequest uploadBlobRequest =
+        UploadBlobRequest.newBuilder()
+            .setBlob(
+                BlobInformation.newBuilder()
+                    .setCompressor(Compressor.Value.ZSTD)
+                    .setDigest(completedDigest))
+            .setUuid(uuid.toString())
+            .build();
+    WriteStreamObserver observer =
+        new WriteStreamObserver(instance, 1, SECONDS, () -> {}, responseObserver);
+    observer.onNext(
+        WriteRequest.newBuilder()
+            .setResourceName(uploadResourceName(uploadBlobRequest))
+            .setData(completed)
+            .setFinishWrite(true)
+            .build());
+    observer.onCompleted();
+
+    // verify that write is not called on already completed write
+    verify(outputStream, never()).write(completed.toByteArray());
+    verify(responseObserver, times(1)).onNext(any(WriteResponse.class));
+    verify(responseObserver, times(1)).onCompleted();
+    verify(responseObserver, never()).onError(any(Throwable.class));
   }
 }
