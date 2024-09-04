@@ -76,6 +76,7 @@ spec:
               name: {{ include "buildfarm.fullname" . }}-shard-worker-data
             - mountPath: /shard-worker-log-props
               name: shard-worker-log-props
+              readOnly: true
             {{- with .Values.shardWorker.extraVolumeMounts }}
             {{- tpl (toYaml .) $ | nindent 12 -}}
             {{- end }}
