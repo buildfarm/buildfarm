@@ -72,6 +72,8 @@ spec:
             - mountPath: /config
               name: config
               readOnly: true
+            - mountPath: /tmp/worker
+              name: {{ include "buildfarm.fullname" . }}-shard-worker-data
             - mountPath: /shard-worker-log-props
               name: shard-worker-log-props
             {{- with .Values.shardWorker.extraVolumeMounts }}
