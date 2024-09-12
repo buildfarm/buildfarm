@@ -90,7 +90,7 @@ public class PersistentExecutor {
       Path workRootsDir,
       ActionResult.Builder resultBuilder)
       throws IOException {
-    //// Pull out persistent worker start command from the overall action request
+    // Pull out persistent worker start command from the overall action request
 
     log.log(Level.FINE, "executeCommandOnPersistentWorker[" + operationName + "]");
 
@@ -119,7 +119,7 @@ public class PersistentExecutor {
         ImmutableList.<String>builder().add(PERSISTENT_WORKER_FLAG).build();
     ImmutableList<String> requestArgs = argsList.subList(requestArgsIdx, argsList.size());
 
-    //// Make Key
+    // Make Key
 
     WorkerInputs workerFiles = WorkerInputs.from(context, requestArgs);
 
@@ -141,7 +141,7 @@ public class PersistentExecutor {
 
     coordinator.copyToolInputsIntoWorkerToolRoot(key, workerFiles);
 
-    //// Make request
+    // Make request
 
     // Inputs should be relative paths (if they are from operation root)
     ImmutableList.Builder<Input> reqInputsBuilder = ImmutableList.builder();
@@ -166,8 +166,8 @@ public class PersistentExecutor {
 
     RequestCtx requestCtx = new RequestCtx(request, context, workerFiles, timeout);
 
-    //// Run request
-    //// Required file operations (in/out) are the responsibility of the coordinator
+    // Run request
+    // Required file operations (in/out) are the responsibility of the coordinator
 
     log.log(Level.FINE, "Request with key: " + key);
     WorkResponse response;
@@ -196,7 +196,7 @@ public class PersistentExecutor {
               .build();
     }
 
-    //// Set results
+    // Set results
 
     String responseOut = response.getOutput();
     log.log(Level.FINE, "WorkResponse.output: " + responseOut);
