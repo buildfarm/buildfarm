@@ -14,11 +14,12 @@
 
 package build.buildfarm.worker.persistent;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static persistent.bazel.client.PersistentWorker.TOOL_INPUT_SUBDIR;
 
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
-import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -241,12 +242,15 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     }
   }
 
+  /**
+   * Start a timeout timer based on the request's timeout.
+   *
+   * @param request
+   */
   private void startTimeoutTimer(RequestCtx request) {
-    Duration timeout = request.timeout;
-    if (timeout != null) {
-      long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
-      timeoutScheduler.schedule(new RequestTimeoutHandler(request), timeoutNanos);
-    }
+    checkNotNull(request.timeout);
+    timeoutScheduler.schedule(
+        new RequestTimeoutHandler(request), Durations.toMillis(request.timeout));
   }
 
   private final class RequestTimeoutHandler extends TimerTask {
