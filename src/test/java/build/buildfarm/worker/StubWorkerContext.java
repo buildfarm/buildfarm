@@ -26,7 +26,6 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.instance.MatchListener;
-import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.worker.resources.ResourceLimits;
@@ -63,21 +62,6 @@ class StubWorkerContext implements WorkerContext {
 
   @Override
   public void match(MatchListener listener) throws InterruptedException {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public CASInsertionPolicy getFileCasPolicy() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public CASInsertionPolicy getStdoutCasPolicy() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public CASInsertionPolicy getStderrCasPolicy() {
     throw new UnsupportedOperationException();
   }
 

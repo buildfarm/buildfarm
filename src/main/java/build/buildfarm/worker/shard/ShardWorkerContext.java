@@ -54,7 +54,6 @@ import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
-import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.worker.ExecFileSystem;
@@ -406,21 +405,6 @@ class ShardWorkerContext implements WorkerContext {
 
   void deactivate(String operationName) {
     activeOperations.remove(operationName);
-  }
-
-  @Override
-  public CASInsertionPolicy getFileCasPolicy() {
-    return CASInsertionPolicy.ALWAYS_INSERT;
-  }
-
-  @Override
-  public CASInsertionPolicy getStdoutCasPolicy() {
-    return CASInsertionPolicy.ALWAYS_INSERT;
-  }
-
-  @Override
-  public CASInsertionPolicy getStderrCasPolicy() {
-    return CASInsertionPolicy.ALWAYS_INSERT;
   }
 
   @Override

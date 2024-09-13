@@ -516,20 +516,6 @@ message OperationRequestMetadata {
   string cluster_id = 6;
 }
 
-enum CASInsertionPolicy {
-  UNKNOWN = 0;
-
-  ALWAYS_INSERT = 1;
-
-  INSERT_ABOVE_LIMIT = 2;
-};
-
-enum ActionCacheAccessPolicy {
-  READ_AND_WRITE = 0;
-
-  READ_ONLY = 1;
-};
-
 message InstanceEndpoint {
   // target suitable for grpc channel creation: host:port is common
   string target = 1;
