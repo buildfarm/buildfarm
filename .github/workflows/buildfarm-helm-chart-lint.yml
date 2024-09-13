@@ -9,6 +9,9 @@ on:
 env:
   CHART_ROOT: kubernetes/helm-charts/buildfarm
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint Helm Chart
