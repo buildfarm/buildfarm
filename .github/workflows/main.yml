@@ -4,11 +4,15 @@ on:
   push:
     branches:
       - main
+permissions:
+  contents: read
 
 jobs:
   build_and_deploy:
     if: github.repository == 'bazelbuild/bazel-buildfarm'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
     steps:
       - uses: actions/checkout@v3
 
