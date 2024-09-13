@@ -26,7 +26,6 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.instance.MatchListener;
-import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.worker.resources.ResourceLimits;
@@ -63,12 +62,6 @@ public interface WorkerContext {
       Deadline deadline);
 
   void match(MatchListener listener) throws InterruptedException;
-
-  CASInsertionPolicy getFileCasPolicy();
-
-  CASInsertionPolicy getStdoutCasPolicy();
-
-  CASInsertionPolicy getStderrCasPolicy();
 
   DigestUtil getDigestUtil();
 

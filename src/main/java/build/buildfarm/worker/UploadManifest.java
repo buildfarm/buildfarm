@@ -25,7 +25,6 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.io.Dirent;
 import build.buildfarm.common.io.FileStatus;
 import build.buildfarm.instance.stub.Chunker;
-import build.buildfarm.v1test.CASInsertionPolicy;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.FileStore;
@@ -35,7 +34,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
 import lombok.Getter;
 
 /** FIXME move into worker implementation and implement 'fast add' with this for sharding */
@@ -129,27 +127,6 @@ public class UploadManifest {
   @SuppressWarnings("JavaDoc")
   public Map<Digest, Chunker> getDigestToChunkers() {
     return digestToChunkers;
-  }
-
-  public void addContent(
-      ByteString content,
-      CASInsertionPolicy policy,
-      Consumer<ByteString> setRaw,
-      Consumer<Digest> setDigest) {
-    boolean withinLimit = inlineContentBytes + content.size() <= inlineContentLimit;
-    if (withinLimit) {
-      setRaw.accept(content);
-      inlineContentBytes += content.size();
-    } else {
-      setRaw.accept(ByteString.EMPTY);
-    }
-    if (policy.equals(CASInsertionPolicy.ALWAYS_INSERT)
-        || (!withinLimit && policy.equals(CASInsertionPolicy.INSERT_ABOVE_LIMIT))) {
-      Digest digest = digestUtil.compute(content);
-      setDigest.accept(digest);
-      Chunker chunker = Chunker.builder().setInput(content).build();
-      digestToChunkers.put(digest, chunker);
-    }
   }
 
   private void addFile(Path file) throws IOException {
