@@ -29,14 +29,12 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
-import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
@@ -73,10 +71,6 @@ public class ContentAddressableStorageService
   public ContentAddressableStorageService(Instance instance) {
     this.instance = instance;
     this.writeDeadlineAfter = configs.getServer().getCasWriteTimeout();
-  }
-
-  String checkMessage(Digest digest, boolean found) {
-    return format(" (%s, %sfound)", DigestUtil.toString(digest), found ? "" : "not ");
   }
 
   @Override
