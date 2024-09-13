@@ -108,6 +108,22 @@ java_test(
 )
 
 java_test(
+    name = "RedisShardSubscriptionTest",
+    size = "small",
+    srcs = ["RedisShardSubscriptionTest.java"],
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/redis",
+        "//src/main/java/build/buildfarm/instance/shard",
+        "@maven//:com_github_fppt_jedis_mock",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_truth_truth",
+        "@maven//:org_mockito_mockito_core",
+        "@maven//:redis_clients_jedis",
+    ],
+)
+
+java_test(
     name = "ServerInstanceTest",
     size = "small",
     srcs = [
