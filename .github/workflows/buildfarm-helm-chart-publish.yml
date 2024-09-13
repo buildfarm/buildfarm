@@ -11,10 +11,15 @@ env:
   CHART_ROOT: ${{ github.workspace }}/kubernetes/helm-charts/buildfarm
   GHCR_REPO: ghcr.io/${{ github.repository_owner }}
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Lint, Package, and Release BuildFarm Helm Chart
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
