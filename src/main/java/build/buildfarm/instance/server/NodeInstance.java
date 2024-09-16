@@ -39,6 +39,7 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionCacheUpdateCapabilities;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CacheCapabilities;
 import build.bazel.remote.execution.v2.Command;
@@ -529,15 +530,26 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
+  public Iterable<Digest> putAllBlobs(
+      Iterable<BatchUpdateBlobsRequest.Request> requests,
+      DigestFunction.Value digestFunction,
+      RequestMetadata requestMetadata)
       throws IOException, InterruptedException {
     ImmutableList.Builder<Digest> blobDigestsBuilder = new ImmutableList.Builder<>();
     PutAllBlobsException exception = null;
-    for (ByteString blob : blobs) {
-      Digest digest = digestUtil.compute(blob);
+    for (BatchUpdateBlobsRequest.Request request : requests) {
+      Digest digest = request.getDigest();
       try {
         blobDigestsBuilder.add(
-            putBlob(this, Compressor.Value.IDENTITY, digest, blob, 1, SECONDS, requestMetadata));
+            putBlob(
+                this,
+                request.getCompressor(),
+                digest,
+                digestFunction,
+                request.getData(),
+                1,
+                SECONDS,
+                requestMetadata));
       } catch (StatusException e) {
         if (exception == null) {
           exception = new PutAllBlobsException();

@@ -31,6 +31,7 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
@@ -148,6 +149,7 @@ public class ContentAddressableStorageService
   private static Iterable<ListenableFuture<Response>> putAllBlobs(
       Instance instance,
       Iterable<Request> requests,
+      DigestFunction.Value digestFunction,
       long writeDeadlineAfter,
       TimeUnit writeDeadlineAfterUnits) {
     ImmutableList.Builder<ListenableFuture<Response>> responses = new ImmutableList.Builder<>();
@@ -158,6 +160,7 @@ public class ContentAddressableStorageService
               instance,
               request.getCompressor(),
               digest,
+              digestFunction,
               request.getData(),
               writeDeadlineAfter,
               writeDeadlineAfterUnits,
@@ -186,6 +189,7 @@ public class ContentAddressableStorageService
                         putAllBlobs(
                                 instance,
                                 batchRequest.getRequestsList(),
+                                batchRequest.getDigestFunction(),
                                 writeDeadlineAfter,
                                 TimeUnit.SECONDS)
                             .spliterator(),

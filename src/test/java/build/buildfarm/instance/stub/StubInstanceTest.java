@@ -27,6 +27,7 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheImplBase;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Compressor;
@@ -315,12 +316,17 @@ public class StubInstanceTest {
           }
         });
     Instance instance = newStubInstance("putAllBlobs-test");
-    ByteString first = ByteString.copyFromUtf8("first");
-    ByteString last = ByteString.copyFromUtf8("last");
-    ImmutableList<ByteString> blobs = ImmutableList.of(first, last);
-    ImmutableList<Digest> digests =
-        ImmutableList.of(DIGEST_UTIL.compute(first), DIGEST_UTIL.compute(last));
-    assertThat(instance.putAllBlobs(blobs, RequestMetadata.getDefaultInstance()))
+    ByteString firstData = ByteString.copyFromUtf8("first");
+    Request first =
+        Request.newBuilder().setDigest(DIGEST_UTIL.compute(firstData)).setData(firstData).build();
+    ByteString lastData = ByteString.copyFromUtf8("last");
+    Request last =
+        Request.newBuilder().setDigest(DIGEST_UTIL.compute(lastData)).setData(lastData).build();
+    ImmutableList<Request> requests = ImmutableList.of(first, last);
+    ImmutableList<Digest> digests = ImmutableList.of(first.getDigest(), last.getDigest());
+    assertThat(
+            instance.putAllBlobs(
+                requests, DIGEST_UTIL.getDigestFunction(), RequestMetadata.getDefaultInstance()))
         .containsAtLeastElementsIn(digests);
     instance.stop();
   }
