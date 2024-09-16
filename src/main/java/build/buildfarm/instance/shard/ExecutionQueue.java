@@ -14,6 +14,8 @@
 
 package build.buildfarm.instance.shard;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.redis.BalancedRedisQueue;
@@ -22,8 +24,10 @@ import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.QueueStatus;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import redis.clients.jedis.UnifiedJedis;
 
@@ -34,6 +38,10 @@ import redis.clients.jedis.UnifiedJedis;
  *     information.
  */
 public class ExecutionQueue {
+  private static final Duration START_TIMEOUT = Duration.ofSeconds(1);
+
+  private static final Duration MAX_TIMEOUT = Duration.ofSeconds(8);
+
   /**
    * @field maxQueueSize
    * @brief The maximum amount of elements that should be added to the queue.
@@ -183,6 +191,63 @@ public class ExecutionQueue {
     queue.offer(jedis, val, (double) priority);
   }
 
+  public String take(UnifiedJedis jedis, List<BalancedRedisQueue> queues, ExecutorService service)
+      throws InterruptedException {
+    // The conditions of this algorithm are as followed:
+    // - from a client's perspective we want to block indefinitely.
+    //   (so this function should not return null under any normal circumstances.)
+    // - from an implementation perspective however, we don't want to block indefinitely on any one
+    // internal queue.
+
+    // We choose a strategy that round-robins over the queues in different phases.
+    // 1. round-robin each queue with nonblocking calls for 1 cycle
+    // 2. switch to continuously round-robin blocking calls that exponentially increase their
+    // timeout after each full round
+    // 3. continue iterating over each queue at a maximally reached timeout.
+    // During all phases of this algorithm we want to be able to interrupt the thread.
+
+    // The fastest thing to do first, is round-robin over every queue with a nonblocking dequeue
+    // call.
+    // If none of the queues are able to dequeue.  We can move onto a different strategy.
+    // (a strategy in which the system appears to be under less load)
+    int startQueue = currentDequeueIndex;
+    // end this phase if we have done a full round-robin
+    boolean blocking = false;
+    // try each of the internal queues with exponential backoff
+    Duration currentTimeout = START_TIMEOUT;
+    while (true) {
+      final String val;
+      int index = roundRobinPopIndex(queues);
+      BalancedRedisQueue queue = queues.get(index);
+      if (blocking) {
+        val = queue.take(jedis, currentTimeout, service);
+      } else {
+        val = queue.poll(jedis);
+      }
+      // return if found
+      if (val != null) {
+        return val;
+      }
+
+      // not quite immediate yet...
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException();
+      }
+
+      if (currentDequeueIndex == startQueue) {
+        // advance timeout if blocking on queue and not at max each queue cycle
+        if (blocking) {
+          currentTimeout = currentTimeout.multipliedBy(2);
+          if (currentTimeout.compareTo(MAX_TIMEOUT) > 0) {
+            currentTimeout = MAX_TIMEOUT;
+          }
+        } else {
+          blocking = true;
+        }
+      }
+    }
+  }
+
   /**
    * @brief Pop element into internal dequeue and return value.
    * @details This pops the element from one queue atomically into an internal list called the
@@ -193,21 +258,15 @@ public class ExecutionQueue {
    * @return The value of the transfered element. null if the thread was interrupted.
    * @note Suggested return identifier: val.
    */
-  public String dequeue(UnifiedJedis jedis, List<Platform.Property> provisions)
+  public String dequeue(
+      UnifiedJedis jedis, List<Platform.Property> provisions, ExecutorService service)
       throws InterruptedException {
     // Select all matched queues, and attempt dequeuing via round-robin.
     List<BalancedRedisQueue> queues = chooseEligibleQueues(provisions);
+    checkState(!queues.isEmpty());
     // Keep iterating over matched queues until we find one that is non-empty and provides a
     // dequeued value.
-    for (int index = roundRobinPopIndex(queues); ; index = roundRobinPopIndex(queues)) {
-      if (Thread.currentThread().isInterrupted()) {
-        throw new InterruptedException();
-      }
-      String value = queues.get(index).poll(jedis);
-      if (value != null) {
-        return value;
-      }
-    }
+    return take(jedis, queues, service);
   }
 
   /**

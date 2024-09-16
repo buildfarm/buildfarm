@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -216,7 +217,8 @@ public class RedisShardBackplaneTest {
             .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    when(state.executionQueue.dequeue(eq(jedis), any(List.class))).thenReturn(queueEntryJson);
+    when(state.executionQueue.dequeue(eq(jedis), any(List.class), any(ExecutorService.class)))
+        .thenReturn(queueEntryJson);
     when(state.executionQueue.removeFromDequeue(jedis, queueEntryJson)).thenReturn(true);
     // PRE-ASSERT
     when(state.dispatchedExecutions.insertIfMissing(eq(jedis), eq(opName), any(String.class)))
@@ -242,7 +244,8 @@ public class RedisShardBackplaneTest {
     // ASSERT
     assertThat(readyForRequeue.getRequeueAttempts())
         .isEqualTo(REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE);
-    verify(state.executionQueue, times(1)).dequeue(eq(jedis), any(List.class));
+    verify(state.executionQueue, times(1))
+        .dequeue(eq(jedis), any(List.class), any(ExecutorService.class));
     verify(state.executionQueue, times(1)).removeFromDequeue(jedis, queueEntryJson);
     verifyNoMoreInteractions(state.executionQueue);
     verify(state.dispatchedExecutions, times(1))
@@ -283,7 +286,8 @@ public class RedisShardBackplaneTest {
             .setRequeueAttempts(STARTING_REQUEUE_AMOUNT)
             .build();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    when(state.executionQueue.dequeue(eq(jedis), any(List.class))).thenReturn(queueEntryJson);
+    when(state.executionQueue.dequeue(eq(jedis), any(List.class), any(ExecutorService.class)))
+        .thenReturn(queueEntryJson);
     when(state.executionQueue.removeFromDequeue(jedis, queueEntryJson)).thenReturn(true);
     // PRE-ASSERT
     when(state.dispatchedExecutions.insertIfMissing(eq(jedis), eq(opName), any(String.class)))
@@ -309,7 +313,8 @@ public class RedisShardBackplaneTest {
     // ASSERT
     assertThat(readyForRequeue.getRequeueAttempts())
         .isEqualTo(REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE);
-    verify(state.executionQueue, times(1)).dequeue(eq(jedis), any(List.class));
+    verify(state.executionQueue, times(1))
+        .dequeue(eq(jedis), any(List.class), any(ExecutorService.class));
     verify(state.executionQueue, times(1)).removeFromDequeue(jedis, queueEntryJson);
     verifyNoMoreInteractions(state.executionQueue);
     verify(state.dispatchedExecutions, times(1))
