@@ -156,7 +156,7 @@ public class ContentAddressableStorageService
       ListenableFuture<Digest> future =
           putBlobFuture(
               instance,
-              Compressor.Value.IDENTITY,
+              request.getCompressor(),
               digest,
               request.getData(),
               writeDeadlineAfter,
