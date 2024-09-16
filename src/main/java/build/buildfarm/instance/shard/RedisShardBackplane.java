@@ -462,7 +462,6 @@ public class RedisShardBackplane implements Backplane {
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     subscriberService = BuildfarmExecutors.getSubscriberPool();
-    dequeueService = BuildfarmExecutors.getDequeuePool();
     subscriber =
         new RedisShardSubscriber(
             watchers,
@@ -533,6 +532,7 @@ public class RedisShardBackplane implements Backplane {
     if (subscribeToBackplane) {
       startSubscriptionThread();
     }
+    dequeueService = BuildfarmExecutors.getDequeuePool();
     if (runFailsafeOperation) {
       startFailsafeOperationThread();
     }
@@ -1158,7 +1158,7 @@ public class RedisShardBackplane implements Backplane {
 
   private @Nullable QueueEntry dispatchOperation(
       UnifiedJedis jedis, List<Platform.Property> provisions) throws InterruptedException {
-    String queueEntryJson = state.executionQueue.dequeue(jedis, provisions);
+    String queueEntryJson = state.executionQueue.dequeue(jedis, provisions, dequeueService);
     if (queueEntryJson == null) {
       return null;
     }

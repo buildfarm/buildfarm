@@ -19,6 +19,7 @@ import static com.google.common.collect.Iterables.transform;
 import build.buildfarm.common.Queue;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.v1test.QueueStatus;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -194,24 +195,30 @@ public class BalancedRedisQueue {
 
   private <T> T getBlockingReply(Future<T> reply, Runnable onInterrupted)
       throws InterruptedException {
-    InterruptedException interruption = null;
-    for (; ; ) {
+    try {
+      return reply.get();
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      Throwables.throwIfUnchecked(cause);
+      throw new RuntimeException(cause);
+    } catch (InterruptedException e) {
       try {
-        return reply.get();
-      } catch (ExecutionException e) {
-        Throwable cause = e.getCause();
-        if (interruption != null) {
-          interruption.addSuppressed(cause);
-          Thread.currentThread().interrupt();
-          throw interruption;
-        }
-        throw new RuntimeException(cause);
-      } catch (InterruptedException e) {
-        interruption = e;
         Thread.interrupted();
-        reply.cancel(true);
         onInterrupted.run();
+        reply.cancel(true);
+      } finally {
+        Thread.currentThread().interrupt();
+        throw e;
       }
+    }
+  }
+
+  public String take(UnifiedJedis unified, Duration timeout, ExecutorService service)
+      throws InterruptedException {
+    String queueName = queues.get(roundRobinPopIndex());
+    try (Jedis jedis = getJedisFromKey(unified, queueName)) {
+      Queue<String> queue = queueDecorator.decorate(jedis, queueName);
+      return take(jedis, queue, timeout, service);
     }
   }
 
