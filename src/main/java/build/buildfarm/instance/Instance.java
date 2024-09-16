@@ -16,6 +16,7 @@ package build.buildfarm.instance;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
@@ -105,7 +106,10 @@ public interface Instance {
       RequestMetadata requestMetadata)
       throws EntryLimitException;
 
-  Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
+  Iterable<Digest> putAllBlobs(
+      Iterable<BatchUpdateBlobsRequest.Request> blobs,
+      DigestFunction.Value digestFunction,
+      RequestMetadata requestMetadata)
       throws IOException, IllegalArgumentException, InterruptedException;
 
   ListenableFuture<Digest> fetchBlob(

@@ -19,6 +19,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.FutureCallback;
@@ -81,6 +82,7 @@ public final class Utils {
       Instance instance,
       Compressor.Value compressor,
       Digest digest,
+      DigestFunction.Value digestFunction,
       ByteString data,
       long writeDeadlineAfter,
       TimeUnit writeDeadlineAfterUnits,
@@ -93,11 +95,7 @@ public final class Utils {
     try {
       Write write =
           instance.getBlobWrite(
-              compressor,
-              digest,
-              instance.getDigestUtil().getDigestFunction(),
-              UUID.randomUUID(),
-              requestMetadata);
+              compressor, digest, digestFunction, UUID.randomUUID(), requestMetadata);
       Futures.addCallback(
           write.getFuture(),
           new FutureCallback<Long>() {
@@ -127,6 +125,7 @@ public final class Utils {
       Instance instance,
       Compressor.Value compressor,
       Digest digest,
+      DigestFunction.Value digestFunction,
       ByteString blob,
       long writeDeadlineAfter,
       TimeUnit writeDeadlineAfterUnits,
@@ -137,6 +136,7 @@ public final class Utils {
               instance,
               compressor,
               digest,
+              digestFunction,
               blob,
               writeDeadlineAfter,
               writeDeadlineAfterUnits,

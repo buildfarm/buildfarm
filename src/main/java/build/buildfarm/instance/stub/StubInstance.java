@@ -466,18 +466,20 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata) {
+  public Iterable<Digest> putAllBlobs(
+      Iterable<Request> requests,
+      DigestFunction.Value digestFunction,
+      RequestMetadata requestMetadata) {
     long totalSize = 0;
-    ImmutableList.Builder<Request> requests = ImmutableList.builder();
-    for (ByteString blob : blobs) {
-      checkState(totalSize + blob.size() <= maxBatchUpdateBlobsSize);
-      requests.add(Request.newBuilder().setDigest(digestUtil.compute(blob)).setData(blob).build());
-      totalSize += blob.size();
+    for (Request request : requests) {
+      totalSize += request.getData().size();
+      checkState(totalSize <= maxBatchUpdateBlobsSize);
     }
     BatchUpdateBlobsRequest batchRequest =
         BatchUpdateBlobsRequest.newBuilder()
             .setInstanceName(getName())
-            .addAllRequests(requests.build())
+            .addAllRequests(requests)
+            .setDigestFunction(digestFunction)
             .build();
     BatchUpdateBlobsResponse batchResponse =
         deadlined(casBlockingStub)
