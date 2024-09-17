@@ -49,7 +49,7 @@ public abstract class InstanceBase implements Instance {
     }
     int bindingExecutionsLength = BINDING_EXECUTIONS.length();
     operationName = operationName.substring(bindingExecutionsLength);
-    if (operationName.charAt(bindingExecutionsLength) != '/') {
+    if (operationName.charAt(0) != '/') {
       // throw format?
       return null;
     }
