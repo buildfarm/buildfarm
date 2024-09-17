@@ -37,7 +37,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import lombok.Data;
 import net.jcip.annotations.ThreadSafe;
 
@@ -294,13 +293,14 @@ public interface Backplane {
   void updateDigestsExpiry(Iterable<Digest> digests) throws IOException;
 
   void indexCorrelatedInvocationsId(
-      UUID correlatedInvocationsId, Map<String, List<String>> indexScopeValues) throws IOException;
+      String correlatedInvocationsId, Map<String, List<String>> indexScopeValues)
+      throws IOException;
 
   void addToolInvocationId(
-      UUID toolInvocationId, UUID correlatedInvocationsId, ToolDetails toolDetails)
+      String toolInvocationId, String correlatedInvocationsId, ToolDetails toolDetails)
       throws IOException;
 
   void incrementRequestCounters(
-      String actionId, UUID toolInvocationId, String actionMnemonic, String targetId)
+      String actionId, String toolInvocationId, String actionMnemonic, String targetId)
       throws IOException;
 }

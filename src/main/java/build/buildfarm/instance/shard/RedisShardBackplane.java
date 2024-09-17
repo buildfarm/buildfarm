@@ -84,7 +84,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
@@ -1450,13 +1449,14 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public void indexCorrelatedInvocationsId(
-      UUID correlatedInvocationsId, Map<String, List<String>> indexScopeValues) throws IOException {
+      String correlatedInvocationsId, Map<String, List<String>> indexScopeValues)
+      throws IOException {
     client.run(
         jedis -> {
           for (Map.Entry<String, List<String>> entry : indexScopeValues.entrySet()) {
             for (String key : entry.getValue()) {
               state.correlatedInvocationsIndex.add(
-                  jedis, entry.getKey() + "=" + key, correlatedInvocationsId.toString());
+                  jedis, entry.getKey() + "=" + key, correlatedInvocationsId);
             }
           }
         });
@@ -1464,19 +1464,18 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public void addToolInvocationId(
-      UUID toolInvocationId, UUID correlatedInvocationsId, ToolDetails toolDetails)
+      String toolInvocationId, String correlatedInvocationsId, ToolDetails toolDetails)
       throws IOException {
     client.run(
         jedis -> {
-          state.correlatedInvocations.add(
-              jedis, correlatedInvocationsId.toString(), toolInvocationId.toString());
+          state.correlatedInvocations.add(jedis, correlatedInvocationsId, toolInvocationId);
           // TODO maybe index by toolDetails
         });
   }
 
   @Override
   public void incrementRequestCounters(
-      String actionId, UUID toolInvocationId, String actionMnemonic, String targetId) {
+      String actionId, String toolInvocationId, String actionMnemonic, String targetId) {
     // TODO count for each of these fields
   }
 }
