@@ -842,6 +842,7 @@ public class StubInstance extends InstanceBase {
   public ListenableFuture<Void> watchExecution(UUID executionId, Watcher watcher) {
     WaitExecutionRequest request =
         WaitExecutionRequest.newBuilder().setName(bindExecutions(executionId)).build();
+    System.out.println(request);
     SettableFuture<Void> result = SettableFuture.create();
     newExStub()
         .waitExecution(

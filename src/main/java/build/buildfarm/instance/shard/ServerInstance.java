@@ -104,6 +104,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
+import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -2997,12 +2998,33 @@ public class ServerInstance extends NodeInstance {
         .build();
   }
 
-  public UUID indexCorrelatedInvocations(URI uri) throws IOException {
+  public String indexCorrelatedInvocations(URI uri) throws IOException {
     // policy might not be right to apply outside of here
     // definitely correct for directing backplane though
     QueryStringDecoder decoder = new QueryStringDecoder(uri);
+    Map<String, List<String>> parameters = decoder.parameters();
     // FIXME could also be a part of the host, path, or query
-    UUID uuid = UUID.fromString(uri.getFragment());
+    String id = uri.getFragment();
+    if (Strings.isNullOrEmpty(id)) {
+      // If the query contains a single 'id' parameter it is used
+      List<String> ids = parameters.get("id");
+      if (ids.size() == 1) {
+        id = ids.get(0);
+      }
+    }
+
+    if (Strings.isNullOrEmpty(id)) {
+      // With no id at this point, we want to treat the path as the id
+      id = decoder.path();
+      if ("/".equals(id)) {
+        id = null;
+      }
+    }
+
+    // no unique distinction for this url exists, just use the original uri
+    if (Strings.isNullOrEmpty(id)) {
+      id = decoder.uri();
+    }
 
     // TODO stream() to select sub-map?
     // select the url params from selector
@@ -3033,20 +3055,20 @@ public class ServerInstance extends NodeInstance {
     }
 
     if (!indexScopeValues.isEmpty()) {
-      backplane.indexCorrelatedInvocationsId(uuid, indexScopeValues);
+      backplane.indexCorrelatedInvocationsId(id, indexScopeValues);
     }
 
-    return uuid;
+    return id;
   }
 
   public void addToolInvocationId(
-      UUID toolInvocationId, UUID correlatedInvocationsId, ToolDetails toolDetails)
+      String toolInvocationId, String correlatedInvocationsId, ToolDetails toolDetails)
       throws IOException {
     backplane.addToolInvocationId(toolInvocationId, correlatedInvocationsId, toolDetails);
   }
 
   public void addRequest(
-      String actionId, UUID toolInvocationId, String actionMnemonic, String targetId)
+      String actionId, String toolInvocationId, String actionMnemonic, String targetId)
       throws IOException {
     // TODO maybe track per server instance as well
     backplane.incrementRequestCounters(actionId, toolInvocationId, actionMnemonic, targetId);
