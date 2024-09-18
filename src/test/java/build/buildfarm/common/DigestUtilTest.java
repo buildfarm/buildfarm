@@ -75,6 +75,26 @@ public class DigestUtilTest {
         .isEqualTo("aa0e09c406dd0db1a3bb250216045e81644d26c961c0e8c34e8a0354476ca6d4");
   }
 
+  @Test
+  public void computesSha384Hash() {
+    ByteString content = ByteString.copyFromUtf8("bazel");
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA384);
+    Digest digest = digestUtil.compute(content);
+    assertThat(digest.getHash())
+        .isEqualTo(
+            "355937f5f95da9265b27ebf97992bb4db13130bad5796a11148f93c13ada3efb64ca0e4c3a7fec23bb130f26f789972d");
+  }
+
+  @Test
+  public void computesSha512Hash() {
+    ByteString content = ByteString.copyFromUtf8("bazel");
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA512);
+    Digest digest = digestUtil.compute(content);
+    assertThat(digest.getHash())
+        .isEqualTo(
+            "c0928504979921cab0fbca6211131a3f40a4a597b6299f902856e365b51c6b3278735123f53390f84576d4d57bf6b088a99b8d92720581c23d14754b089bb150");
+  }
+
   @Test(expected = IllegalArgumentException.class)
   public void unrecognizedHashFunctionThrows() {
     HashFunction.get(DigestFunction.Value.UNRECOGNIZED);
@@ -85,6 +105,8 @@ public class DigestUtilTest {
     assertThat(HashFunction.get(DigestFunction.Value.MD5)).isEqualTo(HashFunction.MD5);
     assertThat(HashFunction.get(DigestFunction.Value.SHA1)).isEqualTo(HashFunction.SHA1);
     assertThat(HashFunction.get(DigestFunction.Value.SHA256)).isEqualTo(HashFunction.SHA256);
+    assertThat(HashFunction.get(DigestFunction.Value.SHA384)).isEqualTo(HashFunction.SHA384);
+    assertThat(HashFunction.get(DigestFunction.Value.SHA512)).isEqualTo(HashFunction.SHA512);
   }
 
   @Test
@@ -95,6 +117,10 @@ public class DigestUtilTest {
         .isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.SHA1)).empty());
     assertThat(DigestUtil.forHash("SHA256").empty())
         .isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.SHA256)).empty());
+    assertThat(DigestUtil.forHash("SHA384").empty())
+        .isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.SHA384)).empty());
+    assertThat(DigestUtil.forHash("SHA512").empty())
+        .isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.SHA512)).empty());
   }
 
   @Test

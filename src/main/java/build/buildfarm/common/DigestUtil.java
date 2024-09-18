@@ -41,39 +41,33 @@ public class DigestUtil {
   @SuppressWarnings("ImmutableEnumChecker")
   public enum HashFunction {
     @SuppressWarnings("deprecation")
-    MD5(Hashing.md5()),
+    MD5(Hashing.md5(), DigestFunction.Value.MD5),
     @SuppressWarnings("deprecation")
-    SHA1(Hashing.sha1()),
-    SHA256(Hashing.sha256()),
-    BLAKE3(new Blake3HashFunction());
+    SHA1(Hashing.sha1(), DigestFunction.Value.SHA1),
+    SHA256(Hashing.sha256(), DigestFunction.Value.SHA256),
+    SHA384(Hashing.sha384(), DigestFunction.Value.SHA384),
+    SHA512(Hashing.sha512(), DigestFunction.Value.SHA512),
+    BLAKE3(new Blake3HashFunction(), DigestFunction.Value.BLAKE3);
 
     @Getter private final com.google.common.hash.HashFunction hash;
+    @Getter private final DigestFunction.Value digestFunction;
     final HashCode empty;
 
-    HashFunction(com.google.common.hash.HashFunction hash) {
+    HashFunction(com.google.common.hash.HashFunction hash, DigestFunction.Value digestFunction) {
       this.hash = hash;
+      this.digestFunction = digestFunction;
       empty = this.hash.newHasher().hash();
-    }
-
-    public DigestFunction.Value getDigestFunction() {
-      if (this == BLAKE3) {
-        return DigestFunction.Value.BLAKE3;
-      }
-      if (this == SHA256) {
-        return DigestFunction.Value.SHA256;
-      }
-      if (this == SHA1) {
-        return DigestFunction.Value.SHA1;
-      }
-      if (this == MD5) {
-        return DigestFunction.Value.MD5;
-      }
-      return DigestFunction.Value.UNKNOWN;
     }
 
     public static HashFunction forHash(String hexDigest) {
       if (SHA256.isValidHexDigest(hexDigest)) {
         return SHA256;
+      }
+      if (SHA384.isValidHexDigest(hexDigest)) {
+        return SHA256;
+      }
+      if (SHA512.isValidHexDigest(hexDigest)) {
+        return SHA512;
       }
       if (BLAKE3.isValidHexDigest(hexDigest)) {
         return BLAKE3;
@@ -97,6 +91,10 @@ public class DigestUtil {
           return BLAKE3;
         case SHA256:
           return SHA256;
+        case SHA384:
+          return SHA384;
+        case SHA512:
+          return SHA512;
         case SHA1:
           return SHA1;
         case MD5:
