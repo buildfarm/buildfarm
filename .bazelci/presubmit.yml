@@ -1,5 +1,5 @@
 ---
-buildifier: 6.4.0
+buildifier: 7.3.1
 tasks:
 
   # Linting jobs
