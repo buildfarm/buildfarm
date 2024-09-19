@@ -153,13 +153,18 @@ public class DequeueMatchEvaluator {
       return possibleMemories >= memBytesRequested;
     }
 
+    if (configs.getWorker().getDequeueMatchSettings().isAllowUnmatched()) {
+      // accept other properties not specified on the worker
+      return true;
+    }
+    
     // ensure exact matches
     if (workerProvisions.containsKey(property.getName())) {
       return workerProvisions.containsEntry(property.getName(), property.getValue())
           || workerProvisions.containsEntry(property.getName(), "*");
     }
 
-    // accept other properties not specified on the worker
-    return configs.getWorker().getDequeueMatchSettings().isAllowUnmatched();
+    
+    return false;
   }
 }
