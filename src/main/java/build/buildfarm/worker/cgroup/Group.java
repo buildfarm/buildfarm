@@ -14,17 +14,27 @@
 
 package build.buildfarm.worker.cgroup;
 
+import static com.google.common.base.Preconditions.*;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Streams;
 import io.grpc.Deadline;
+import java.io.File;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.*;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import jnr.constants.platform.Signal;
@@ -44,57 +54,97 @@ public final class Group {
   @Getter private final Cpu cpu;
   @Getter private final Mem mem;
 
-  @SuppressWarnings("NullableProblems")
-  private Group(String name, Group parent) {
+  protected static CGroupVersion VERSION = discoverCgroupVersion();
+
+  private static CGroupVersion discoverCgroupVersion() {
+    /* Try to figure out which version of CGroups is available. */
+    try {
+      List<String> allMounts = Files.readAllLines(Paths.get("/proc/mounts"));
+      for (String mount : allMounts) {
+        String[] split = mount.split("\\s+");
+        // split[0]: the block
+        // split[1]: mountpoint
+        // split[2]: fs type
+        checkState(split.length >= 3, "could not parse /proc/mounts");
+        if (split[2].contains("cgroup")) {
+          if (split[2].equals("cgroup2")) {
+            return CGroupVersion.CGROUPS_V2;
+          } else if (split[2].equals("cgroup")) {
+            return CGroupVersion.CGROUPS_V1;
+          }
+        }
+        // by this point, we haven't found any `cgroup` or `cgroup2` fs types.
+      }
+    } catch (IOException e) {
+      // TODO logging
+      return CGroupVersion.NONE;
+    }
+    // Give up.
+    return CGroupVersion.NONE;
+  }
+
+  private Group(@Nullable String name, @Nullable Group parent) {
     this.name = name;
     this.parent = parent;
     cpu = new Cpu(this);
     mem = new Mem(this);
   }
 
+  /**
+   * Construct a child group from this group.
+   *
+   * @param name Child CGroup name
+   * @return another Group.
+   */
   public Group getChild(String name) {
     return new Group(name, this);
   }
 
+  /**
+   * Get hierarchy of this cgroup and all parents.
+   *
+   * <p>This is for CGroups v2 only.
+   *
+   * @return
+   */
   public String getHierarchy() {
+    checkState(VERSION == CGroupVersion.CGROUPS_V2);
     /* is root */
     if (parent == null) {
-      return "";
+      return name;
     }
     /* parent is root */
     if (parent.getName() == null) {
       return getName();
     }
     /* is child of non-root parent */
-    return parent.getHierarchy() + "/" + getName();
+    return parent.getHierarchy() + File.separator + getName();
   }
 
+  /**
+   * Get hierarchy of this cgroup and all parents. Includes the controller name.
+   *
+   * <p>This is for CGroups v1 only.
+   *
+   * @param controllerName
+   * @return
+   */
   String getHierarchy(String controllerName) {
     if (parent != null) {
       return parent.getHierarchy(controllerName) + "/" + getName();
     }
-    return controllerName;
+    if (VERSION == CGroupVersion.CGROUPS_V2) {
+      return "";
+    } else {
+      return controllerName;
+    }
   }
 
-  /**
-   * Get the filesystem path to the given controller for <c>this</c> CGroup.
-   *
-   * <p>This is for CGroups v1. Starts with '/sys/fs/cgroup'.
-   *
-   * @param controllerName CGroup v1 Controller name, such as "cpu" or "mem".
-   * @return Filesystem path to the CGroup's controller.
-   */
   Path getPath(String controllerName) {
     return rootPath.resolve(getHierarchy(controllerName));
   }
 
-  /**
-   * Get the filesystem path to the given controller for <c>this</c> CGroup.
-   *
-   * <p>This is for CGroups v2. Starts with '/sys/fs/cgroup'.
-   *
-   * @return Filesystem path to the CGroup.
-   */
+  /* use for cgroups v2 */
   Path getPath() {
     return rootPath.resolve(getHierarchy());
   }
@@ -106,8 +156,15 @@ public final class Group {
    * @return <c>true</c> if there are any processes under control of the given controller name in
    *     this cgroup, <c>false</c> otherwise.
    */
+  @Deprecated
   boolean isEmpty(String controllerName) throws IOException {
+    checkState(VERSION == CGroupVersion.CGROUPS_V1);
     return getPids(controllerName).isEmpty();
+  }
+
+  boolean isEmpty() throws IOException {
+    checkState(VERSION == CGroupVersion.CGROUPS_V2);
+    return getPids().isEmpty();
   }
 
   /**
@@ -116,9 +173,8 @@ public final class Group {
    * @param processIds Process IDs to send a signal to
    */
   private void killAllProcesses(Iterable<Integer> processIds) {
-    for (int pid : processIds) {
-      posix.kill(pid, Signal.SIGKILL.intValue());
-    }
+    Streams.stream(processIds)
+        .forEach(processId -> posix.kill(processId, Signal.SIGKILL.intValue()));
   }
 
   /**
@@ -126,12 +182,23 @@ public final class Group {
    *
    * @param controllerName cgroup name, relative to cgroup root.
    * @return Set of process IDs or empty set if the CGroup is currently empty.
-   * @throws IOException if the CGroup process list cannot be read or parsed.
    */
   @VisibleForTesting
   @Nonnull
-  Set<Integer> getPids(String controllerName) throws IOException {
-    Path path = getPath(controllerName);
+  @Deprecated
+  Set<Integer> getPids(String controllerName) {
+    checkState(VERSION == CGroupVersion.CGROUPS_V1, "Only applicable for cgroups v1");
+    return getPids(getPath(controllerName));
+  }
+
+  @VisibleForTesting
+  @Nonnull
+  Set<Integer> getPids() {
+    checkState(VERSION == CGroupVersion.CGROUPS_V2, "Only applicable for cgroups v2");
+    return getPids(getPath());
+  }
+
+  private Set<Integer> getPids(Path path) {
     Path procs = path.resolve("cgroup.procs");
     try {
       return Files.readAllLines(procs).stream()
@@ -139,35 +206,141 @@ public final class Group {
           .collect(ImmutableSet.toImmutableSet());
     } catch (IOException e) {
       if (Files.exists(path)) {
-        throw e;
+        log.log(Level.WARNING, "Unable to get PIDs for Cgroup at {0}", procs);
       }
       // nonexistent controller path means no processes
       return ImmutableSet.of();
     }
   }
 
-  public void killUntilEmpty(String controllerName) throws IOException {
+  /* package */ void killUntilEmpty(@Nullable String controllerName) throws IOException {
+    if (VERSION == CGroupVersion.CGROUPS_V2) {
+      killUntilEmpty(this::getPids);
+    } else if (VERSION == CGroupVersion.CGROUPS_V1) {
+      // CGroups v1 below:
+      checkNotNull(controllerName, "Controller name is null");
+      killUntilEmpty(() -> getPids(controllerName));
+    } else if (VERSION == CGroupVersion.NONE) {
+      throw new RuntimeException("Cannot kill empty group without CGroups support!");
+    }
+  }
+
+  /**
+   * Kill all processes in this CGroup until they are terminated
+   *
+   * @throws IOException
+   */
+  void killUntilEmpty(@Nonnull Supplier<Set<Integer>> pidProvider) throws IOException {
     Deadline deadline = Deadline.after(1, SECONDS);
     Set<Integer> prevPids = new HashSet<>();
-    for (Set<Integer> pids = getPids(controllerName);
-        !pids.isEmpty();
-        pids = getPids(controllerName)) {
+    for (Set<Integer> pids = pidProvider.get(); !pids.isEmpty(); pids = pidProvider.get()) {
       killAllProcesses(pids);
       if (deadline.isExpired() || !pids.containsAll(prevPids) || prevPids.containsAll(pids)) {
         deadline = Deadline.after(1, SECONDS);
-        log.warning("Killed processes with PIDs: " + pids);
+        log.log(Level.FINE, "Killed processes with PIDs {0}", pids);
       }
       prevPids = pids;
     }
   }
 
-  void create(String controllerName) throws IOException {
+  static void ensureControllerIsEnabled(Path cgroupPath, Set<String> controllerNames)
+      throws IOException {
+    ensureControllerIsEnabled(cgroupPath, controllerNames, false);
+  }
+
+  /**
+   * For a given cgroup hierarchy path, ensure that the controller name is enabled. Otherwise, the
+   * limits are not enforced.
+   *
+   * @param cgroupPath
+   * @param controllerNames - example 'mem', 'cpu'
+   */
+  static void ensureControllerIsEnabled(
+      @Nonnull Path cgroupPath, @Nonnull Set<String> controllerNames, boolean setSubtreeControl)
+      throws IOException {
+    checkState(VERSION == CGroupVersion.CGROUPS_V2);
+    checkNotNull(cgroupPath, "cgroupPath is null");
+    checkNotNull(controllerNames, "Controller names is null");
+    checkArgument(!controllerNames.isEmpty(), "Controller names is empty and shouldn't be");
+    // set parent folder before we handle this one.
+    if (cgroupPath.equals(rootPath)) {
+      // Recursion sentinel.
+      return;
+    }
+    ensureControllerIsEnabled(cgroupPath.getParent(), controllerNames, true);
+    log.log(Level.FINE, "Ensuring controllers for {0}", cgroupPath);
+
+    // By now, all recursive parents of `cgroupPath` already have subcontrollers set.
+    // Finally, we make our new cgroup, if it doesn't exist.
+    if (!Files.exists(cgroupPath)) {
+      Files.createDirectory(cgroupPath);
+    }
+    if (setSubtreeControl) {
+      Path cgroupControllerPath = cgroupPath.resolve("cgroup.controllers");
+      while (!Files.exists(cgroupControllerPath)) {
+        /* busy loop */
+        log.log(Level.FINE, "Waiting for {0}", cgroupControllerPath);
+      }
+      Set<String> availableControllers =
+          Arrays.stream(Files.readString(cgroupControllerPath).split("\\s+"))
+              .collect(Collectors.toSet());
+      if (availableControllers.isEmpty()) {
+        throw new IllegalStateException(
+            "There are no controllers at all in CGroup at path " + cgroupPath);
+      }
+      if (!availableControllers.containsAll(controllerNames)) {
+        Set<String> desiredAndNotAvailable = new HashSet<>(controllerNames);
+        desiredAndNotAvailable.removeAll(controllerNames);
+        throw new IllegalStateException(
+            "Some controllers not enabled in CGroup at path "
+                + cgroupPath
+                + ". Only found "
+                + availableControllers
+                + ", missing "
+                + desiredAndNotAvailable);
+      }
+      Path cgroupSubtreeControlPath = cgroupPath.resolve("cgroup.subtree_control");
+      while (!Files.exists(cgroupSubtreeControlPath)) {
+        /* busy loop */
+        log.log(Level.FINE, "Waiting for {0}", cgroupSubtreeControlPath);
+      }
+      Set<String> alreadyEnabledControllers =
+          Arrays.stream(Files.readString(cgroupSubtreeControlPath).split("\\s+"))
+              .collect(Collectors.toSet());
+      if (!alreadyEnabledControllers.containsAll(controllerNames)) {
+        log.log(
+            Level.FINE,
+            "Adding "
+                + controllerNames
+                + " to cgroup sub controller at "
+                + cgroupSubtreeControlPath);
+        try (Writer out = new OutputStreamWriter(Files.newOutputStream(cgroupSubtreeControlPath))) {
+          for (String controllerName : controllerNames) {
+            out.write(String.format("+%s ", controllerName));
+          }
+        }
+      }
+    }
+  }
+
+  void create(@Nonnull String controllerName) throws IOException {
     /* root already has all controllers created */
     if (parent != null) {
       parent.create(controllerName);
-      Path path = getPath(controllerName);
-      if (!Files.exists(path)) {
-        Files.createDirectory(path);
+      if (VERSION == CGroupVersion.CGROUPS_V1) {
+        Path path = getPath(controllerName);
+        if (!Files.exists(path)) {
+          log.log(Level.FINE, "Creating Group " + getName() + " with controller=" + controllerName);
+          Files.createDirectory(path);
+        }
+      } else if (VERSION == CGroupVersion.CGROUPS_V2) {
+        // Write "cgroup.subtree_control" file with content like this:
+        // +<controller1_name> +<controller2_name>
+        // (if you wish to remove a controller, prefix with `-` instead of `+`)
+        Path cgroupPath = getPath();
+        checkState(cgroupPath.startsWith("/sys/fs/cgroup/"));
+        checkState(!cgroupPath.endsWith("/"));
+        ensureControllerIsEnabled(cgroupPath, Set.of(controllerName));
       }
     }
   }
