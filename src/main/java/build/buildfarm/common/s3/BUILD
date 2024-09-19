@@ -5,10 +5,10 @@ java_library(
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@maven//:com_amazonaws_aws_java_sdk_core",
-        "@maven//:com_amazonaws_aws_java_sdk_s3",
-        "@maven//:com_amazonaws_aws_java_sdk_secretsmanager",
-        "@maven//:com_fasterxml_jackson_core_jackson_databind",
-        "@maven//:org_projectlombok_lombok",
+        "@buildfarm_maven//:com_amazonaws_aws_java_sdk_core",
+        "@buildfarm_maven//:com_amazonaws_aws_java_sdk_s3",
+        "@buildfarm_maven//:com_amazonaws_aws_java_sdk_secretsmanager",
+        "@buildfarm_maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@buildfarm_maven//:org_projectlombok_lombok",
     ],
 )

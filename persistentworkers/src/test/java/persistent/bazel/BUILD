@@ -3,11 +3,11 @@ COMMON_DEPS = [
     "//persistentworkers/src/main/java/persistent/bazel:bazel-persistent-workers",
     "//persistentworkers/src/test/java/persistent/testutil:testutil",
     "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
-    "@maven//:com_google_guava_guava",
-    "@maven//:com_google_protobuf_protobuf_java",
-    "@maven//:com_google_truth_truth",
-    "@maven//:commons_io_commons_io",
-    "@maven//:org_mockito_mockito_core",
+    "@buildfarm_maven//:com_google_guava_guava",
+    "@buildfarm_maven//:com_google_protobuf_protobuf_java",
+    "@buildfarm_maven//:com_google_truth_truth",
+    "@buildfarm_maven//:commons_io_commons_io",
+    "@buildfarm_maven//:org_mockito_mockito_core",
 ]
 
 java_test(

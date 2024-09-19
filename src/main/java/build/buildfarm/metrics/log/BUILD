@@ -7,10 +7,10 @@ java_library(
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/metrics",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@buildfarm_maven//:com_google_guava_guava",
+        "@buildfarm_maven//:com_google_protobuf_protobuf_java_util",
+        "@buildfarm_maven//:org_projectlombok_lombok",
         "@googleapis//google/rpc:rpc_java_proto",
-        "@maven//:com_google_guava_guava",
-        "@maven//:com_google_protobuf_protobuf_java_util",
-        "@maven//:org_projectlombok_lombok",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

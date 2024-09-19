@@ -5,12 +5,12 @@ COMMON_DEPS = [
     "//src/main/java/build/buildfarm/common/redis",
     "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
     "//src/test/java/build/buildfarm:test_runner",
-    "@maven//:com_github_fppt_jedis_mock",
-    "@maven//:com_google_guava_guava",
-    "@maven//:com_google_truth_truth",
-    "@maven//:io_grpc_grpc_api",
-    "@maven//:org_mockito_mockito_core",
-    "@maven//:redis_clients_jedis",
+    "@buildfarm_maven//:com_github_fppt_jedis_mock",
+    "@buildfarm_maven//:com_google_guava_guava",
+    "@buildfarm_maven//:com_google_truth_truth",
+    "@buildfarm_maven//:io_grpc_grpc_api",
+    "@buildfarm_maven//:org_mockito_mockito_core",
+    "@buildfarm_maven//:redis_clients_jedis",
 ]
 
 NATIVE_REDIS_TESTS = [
