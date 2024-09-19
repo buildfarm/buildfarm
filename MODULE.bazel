@@ -82,6 +82,7 @@ COM_AWS_MODULES = [
 
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 maven.install(
+    name = "buildfarm_maven",
     artifacts = ["com.amazonaws:aws-java-sdk-%s:1.12.544" % module for module in COM_AWS_MODULES] + [
                     # keep sorted
                     "com.fasterxml.jackson.core:jackson-databind:2.15.0",
@@ -143,7 +144,7 @@ maven.install(
         "org.yaml:snakeyaml:2.2",
         "redis.clients:jedis:5.1.2",
     ],
-    fail_if_repin_required = True,  # TO RE-PIN: REPIN=1 bazel run @unpinned_maven//:pin
+    fail_if_repin_required = True,  # TO RE-PIN: REPIN=1 bazel run @unpinned_buildfarm_maven//:pin
     generate_compat_repositories = True,
     lock_file = "//:maven_install.json",
     repositories = [
@@ -155,6 +156,7 @@ maven.install(
 # Test only maven dependencies
 [
     maven.artifact(
+        name = "buildfarm_maven",
         testonly = True,
         artifact = artifact,
         group = group,
@@ -169,8 +171,8 @@ maven.install(
 
 use_repo(
     maven,
-    "maven",
-    "unpinned_maven",
+    "buildfarm_maven",
+    "unpinned_buildfarm_maven",
 )
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
