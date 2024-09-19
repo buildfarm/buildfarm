@@ -7,7 +7,7 @@ java_library(
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/metrics",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@com_google_googleapis//google/rpc:rpc_java_proto",
+        "@googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java_util",
         "@maven//:org_projectlombok_lombok",

@@ -20,7 +20,7 @@ java_library(
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@com_google_googleapis//google/rpc:rpc_java_proto",
+        "@googleapis//google/rpc:rpc_java_proto",
         "@io_grpc_grpc_proto//:health_java_proto",
         "@maven//:com_github_ben_manes_caffeine_caffeine",
         "@maven//:com_github_pcj_google_options",
