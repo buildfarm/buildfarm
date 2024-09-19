@@ -10,7 +10,7 @@ bazel_dep(name = "blake3", version = "1.5.1")
 bazel_dep(name = "buildifier_prebuilt", version = "6.4.0")
 bazel_dep(name = "gazelle", version = "0.35.0", repo_name = "bazel_gazelle")
 bazel_dep(name = "grpc-java", version = "1.64.0")
-bazel_dep(name = "googleapis", version = "0.0.0-20240326-1c8d509c5", repo_name = "com_google_googleapis")
+bazel_dep(name = "googleapis", version = "0.0.0-20240326-1c8d509c5")
 bazel_dep(name = "platforms", version = "0.0.8")
 bazel_dep(name = "protobuf", version = "23.1", repo_name = "com_google_protobuf")
 bazel_dep(name = "rules_cc", version = "0.0.9")
@@ -207,7 +207,7 @@ use_repo(
     "tini",
 )
 
-googleapis_switched_rules = use_extension("@com_google_googleapis//:extensions.bzl", "switched_rules")
+googleapis_switched_rules = use_extension("@googleapis//:extensions.bzl", "switched_rules")
 googleapis_switched_rules.use_languages(
     grpc = True,
     java = True,

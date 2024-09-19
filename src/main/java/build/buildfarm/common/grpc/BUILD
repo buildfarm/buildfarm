@@ -5,8 +5,8 @@ java_library(
     visibility = ["//visibility:public"],
     deps = [
         "//src/main/java/build/buildfarm/common",
-        "@com_google_googleapis//google/bytestream:bytestream_java_grpc",
-        "@com_google_googleapis//google/bytestream:bytestream_java_proto",
+        "@googleapis//google/bytestream:bytestream_java_grpc",
+        "@googleapis//google/bytestream:bytestream_java_proto",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",

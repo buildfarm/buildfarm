@@ -5,7 +5,7 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@com_google_googleapis//google/longrunning:longrunning_java_proto",
+        "@googleapis//google/longrunning:longrunning_java_proto",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_failureaccess",
         "@maven//:com_google_guava_guava",

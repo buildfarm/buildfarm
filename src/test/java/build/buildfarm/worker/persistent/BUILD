@@ -17,7 +17,7 @@ java_test(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "//src/test/java/build/buildfarm/worker/util:worker_test_utils",
-        "@com_google_googleapis//google/rpc:rpc_java_proto",
+        "@googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_jnr_jnr_constants",
         "@maven//:com_github_jnr_jnr_ffi",
         "@maven//:com_github_serceman_jnr_fuse",

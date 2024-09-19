@@ -7,11 +7,11 @@ proto_library(
     name = "resource_proto",
     srcs = ["resource.proto"],
     deps = [
-        "@com_google_googleapis//google/api:annotations_proto",
-        "@com_google_googleapis//google/longrunning:operations_proto",
-        "@com_google_googleapis//google/rpc:status_proto",
         "@com_google_protobuf//:duration_proto",
         "@com_google_protobuf//:timestamp_proto",
+        "@googleapis//google/api:annotations_proto",
+        "@googleapis//google/longrunning:operations_proto",
+        "@googleapis//google/rpc:status_proto",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_proto",
     ],
 )
@@ -30,8 +30,8 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@com_google_googleapis//google/longrunning:longrunning_java_proto",
-        "@com_google_googleapis//google/rpc:rpc_java_proto",
+        "@googleapis//google/longrunning:longrunning_java_proto",
+        "@googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_jnr_jnr_constants",
         "@maven//:com_github_jnr_jnr_ffi",
         "@maven//:com_github_jnr_jnr_posix",
