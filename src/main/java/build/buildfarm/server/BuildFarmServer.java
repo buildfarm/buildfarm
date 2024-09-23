@@ -222,6 +222,8 @@ public class BuildFarmServer extends LoggingMain {
         server = null;
       }
       throw e;
+    } catch (RuntimeException e) {
+      log.log(SEVERE, "error stopping instance", e);
     }
     if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
       log.warning("could not shut down keepalive scheduler");

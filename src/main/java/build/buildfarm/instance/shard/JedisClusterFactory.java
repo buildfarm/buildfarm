@@ -92,7 +92,7 @@ public class JedisClusterFactory {
    * @note Suggested return identifier: jedis.
    */
   public static UnifiedJedis createTest() throws Exception {
-    UnifiedJedis redis = JedisClusterFactory.create("test").get();
+    UnifiedJedis redis = create("test").get();
 
     // use the client to create an empty redis cluster
     // this will prevent any persistent data across test runs

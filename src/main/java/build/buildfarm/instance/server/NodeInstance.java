@@ -250,7 +250,7 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
-  public void start(String publicName) {}
+  public void start(String publicName) throws IOException {}
 
   @Override
   public void stop() throws InterruptedException {}

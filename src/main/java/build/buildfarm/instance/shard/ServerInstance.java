@@ -652,12 +652,10 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
-  public void start(String publicName) {
+  public void start(String publicName) throws IOException {
     stopped = false;
     try {
       backplane.start(publicName);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     } catch (RuntimeException e) {
       try {
         stop();
