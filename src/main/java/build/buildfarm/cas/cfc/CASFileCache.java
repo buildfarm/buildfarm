@@ -378,46 +378,22 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return digestUtil.build(hashComponent, size);
   }
 
-  /**
-   * Parses the given fileName and invokes the onKey method if successful
-   *
-   * <p>if size > 0, consider the filename invalid if it does not match
-   */
-  private FileEntryKey parseFileEntryKey(String fileName, long size, DigestUtil digestUtil) {
+  /** Parses the given fileName into a FileEntryKey or null if parsing failed */
+  private static @Nullable FileEntryKey parseFileEntryKey(
+      String fileName, long size, DigestUtil digestUtil) {
     String[] components = fileName.split("_");
-    if (components.length > 3) {
+    if (components.length != 1 && (components.length != 2 || !components[1].equals("exec"))) {
       return null;
     }
 
-    boolean isExecutable;
-    boolean hasSizeComponent;
-    Digest digest;
+    // 2 components at this point means executable
+    boolean isExecutable = components.length == 2;
     try {
-      // Can be legacy: <hash>_<size>[_exec]
-      // Or new: <hash>[_exec]
-      // Streamline when legacy is removed for #677
-      String hashComponent = components[0];
-      digest = digestUtil.build(hashComponent, size);
-      isExecutable = components[components.length - 1].equals("exec");
-      // must be executable for 3 fields
-      if (!isExecutable && components.length > 2) {
-        return null;
-      }
-      hasSizeComponent = components.length == (isExecutable ? 3 : 2);
-      long parsedSizeComponent = hasSizeComponent ? Long.parseLong(components[1]) : size;
-      if (size != parsedSizeComponent) {
-        return null;
-      }
+      Digest digest = digestUtil.build(components[0], size);
+      return new FileEntryKey(getKey(digest, isExecutable), size, isExecutable, digest);
     } catch (NumberFormatException e) {
       return null;
     }
-
-    return new FileEntryKey(
-        getKey(digest, isExecutable), size, isExecutable, digest, hasSizeComponent);
-  }
-
-  private FileEntryKey parseFileEntryKey(String fileName, long size) {
-    return parseFileEntryKey(fileName, size, digestUtil);
   }
 
   private boolean contains(
@@ -1273,14 +1249,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     private final long size;
     private final boolean isExecutable;
     private final Digest digest;
-    private final boolean legacy; // file is in old format name, should be renamed
 
-    FileEntryKey(String key, long size, boolean isExecutable, Digest digest, boolean legacy) {
+    FileEntryKey(String key, long size, boolean isExecutable, Digest digest) {
       this.key = key;
       this.size = size;
       this.isExecutable = isExecutable;
       this.digest = digest;
-      this.legacy = legacy;
     }
 
     String getKey() {
@@ -1297,10 +1271,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     Digest getDigest() {
       return digest;
-    }
-
-    boolean isLegacy() {
-      return legacy;
     }
   }
 
@@ -1527,7 +1497,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
       } else {
         // get the key entry from the file name.
-        FileEntryKey fileEntryKey = parseFileEntryKey(basename, stat.getSize());
+        FileEntryKey fileEntryKey = parseFileEntryKey(basename, stat.getSize(), digestUtil);
 
         // if key entry file name cannot be parsed, mark file for later deletion.
         if (fileEntryKey == null || stat.isReadOnlyExecutable() != fileEntryKey.isExecutable()) {
@@ -1537,10 +1507,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         } else {
           String key = fileEntryKey.getKey();
           Path keyPath = getPath(key);
-          // remove/refactor when #677 is closed
-          if (fileEntryKey.isLegacy()) {
-            Files.move(file, keyPath);
-          }
           // populate key it is not currently stored.
           Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
           Object fileKey = getFileKey(keyPath, stat);
@@ -1691,7 +1657,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return digestFilename(digest) + (isExecutable ? "_exec" : "");
   }
 
-  public String getKey(Digest digest, boolean isExecutable) {
+  public static String getKey(Digest digest, boolean isExecutable) {
     return getFileName(digest, isExecutable);
   }
 
@@ -2806,7 +2772,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                                 "CASFileCache::putImpl: expired key %s did not exist to delete",
                                 expiredKey));
                       }
-                      FileEntryKey fileEntryKey = parseFileEntryKey(expiredKey, expiredEntry.size);
+                      FileEntryKey fileEntryKey =
+                          parseFileEntryKey(expiredKey, expiredEntry.size, digestUtil);
                       if (fileEntryKey == null) {
                         log.log(Level.SEVERE, format("error parsing expired key %s", expiredKey));
                       } else if (storage.containsKey(
@@ -3237,7 +3204,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private void expireEntryFallback(Entry e) throws IOException {
     if (delegate != null) {
-      FileEntryKey fileEntryKey = parseFileEntryKey(e.key, e.size);
+      FileEntryKey fileEntryKey = parseFileEntryKey(e.key, e.size, digestUtil);
       if (fileEntryKey == null) {
         log.log(Level.SEVERE, format("error parsing expired key %s", e.key));
       } else {
