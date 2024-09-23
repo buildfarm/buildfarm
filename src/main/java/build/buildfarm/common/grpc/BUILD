@@ -3,6 +3,9 @@ java_library(
     srcs = glob(["*.java"]),
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
+    runtime_deps = [
+        "@maven//:org_slf4j_slf4j_simple",
+    ],
     deps = [
         "//src/main/java/build/buildfarm/common",
         "@googleapis//google/bytestream:bytestream_java_grpc",
