@@ -89,7 +89,7 @@ tasks:
   # Outside of this step, similar functionality may be tested with mocks.
   redis_unit_tests:
     name: "Redis Unit Tests"
-    platform: ubuntu2004
+    platform: ubuntu2204
     shell_commands:
     - ./.bazelci/redis_unit_tests.sh
 
