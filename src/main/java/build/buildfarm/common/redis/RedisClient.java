@@ -15,7 +15,6 @@
 package build.buildfarm.common.redis;
 
 import io.grpc.Status;
-import io.grpc.Status.Code;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.ConnectException;
@@ -75,8 +74,7 @@ public class RedisClient implements Closeable {
 
   private synchronized void throwIfClosed() throws IOException {
     if (closed) {
-      throw new IOException(
-          Status.UNAVAILABLE.withDescription("client is closed").asRuntimeException());
+      throw new IOException(Status.UNAVAILABLE.withDescription("client is closed").asException());
     }
   }
 
@@ -130,29 +128,33 @@ public class RedisClient implements Closeable {
       // this looks simply to me like a good opportunity to use UNAVAILABLE
       // we are technically not at RESOURCE_EXHAUSTED, this is a
       // persistent state which can exist long past the error
-      throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
+      throw new IOException(Status.UNAVAILABLE.withCause(e).asException());
     } catch (JedisConnectionException e) {
       if ((e.getMessage() != null && e.getMessage().equals("Unexpected end of stream."))
           || e.getCause() instanceof ConnectException) {
-        throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
+        throw new IOException(Status.UNAVAILABLE.withCause(e).asException());
       }
       Throwable cause = e;
-      Status status = Status.UNKNOWN;
-      while (status.getCode() == Code.UNKNOWN && cause != null) {
+      Status status = null;
+      while (status == null && cause != null) {
         String message = cause.getMessage() == null ? "" : cause.getMessage();
         if ((cause instanceof SocketException && cause.getMessage().equals("Connection reset"))
             || cause instanceof ConnectException
             || message.equals("Unexpected end of stream.")) {
-          status = Status.UNAVAILABLE;
+          status = Status.UNAVAILABLE.withDescription("RedisClient: " + e.getMessage());
         } else if (cause instanceof SocketTimeoutException) {
-          status = Status.DEADLINE_EXCEEDED;
+          status = Status.DEADLINE_EXCEEDED.withDescription(cause.getMessage());
         } else if (cause instanceof IOException) {
           throw (IOException) cause;
         } else {
           cause = cause.getCause();
         }
       }
-      throw new IOException(status.withCause(cause == null ? e : cause).asRuntimeException());
+      if (status == null) {
+        // JedisConnectionException generally means that we cannot reach the host
+        status = Status.UNAVAILABLE.withDescription("RedisClient: " + e.getMessage());
+      }
+      throw new IOException(status.withCause(cause == null ? e : cause).asException());
     }
   }
 }

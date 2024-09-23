@@ -14,6 +14,8 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.common.io.Utils.formatIOError;
+
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.RedisClient;
 import io.grpc.Status;
@@ -26,6 +28,7 @@ import java.util.logging.Level;
 import lombok.extern.java.Log;
 import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.exceptions.JedisException;
 
 @Log
 class RedisShardSubscription implements Runnable {
@@ -64,7 +67,7 @@ class RedisShardSubscription implements Runnable {
       switch (status.getCode()) {
         case DEADLINE_EXCEEDED:
         case UNAVAILABLE:
-          log.log(Level.WARNING, "failed to subscribe", e);
+          log.log(Level.WARNING, "failed to subscribe", formatIOError(e));
           /* ignore */
           break;
         default:
@@ -85,9 +88,16 @@ class RedisShardSubscription implements Runnable {
   }
 
   public void stop() {
-    // FIXME #1838 unsafe while not in subscription or already stopped
     if (stopped.compareAndSet(false, true)) {
-      subscriber.unsubscribe();
+      try {
+        subscriber.unsubscribe();
+      } catch (JedisException e) {
+        // subscriber validates with private member to determine connection status
+        // detect this condition and ignore it
+        if (!e.getMessage().endsWith(" is not connected to a Connection.")) {
+          throw e;
+        }
+      }
     }
   }
 

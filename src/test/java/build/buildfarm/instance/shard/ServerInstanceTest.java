@@ -147,7 +147,7 @@ public class ServerInstanceTest {
   @Mock Instance mockWorkerInstance;
 
   @Before
-  public void setUp() throws InterruptedException {
+  public void setUp() throws IOException, InterruptedException {
     MockitoAnnotations.initMocks(this);
     blobDigests = Maps.newHashMap();
     ActionCache actionCache = new ShardActionCache(10, mockBackplane, newDirectExecutorService());

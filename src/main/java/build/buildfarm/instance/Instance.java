@@ -60,7 +60,7 @@ public interface Instance {
 
   DigestUtil getDigestUtil();
 
-  void start(String publicName);
+  void start(String publicName) throws IOException;
 
   void stop() throws InterruptedException;
 
