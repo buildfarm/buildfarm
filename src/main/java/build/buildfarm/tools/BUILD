@@ -39,6 +39,7 @@ java_binary(
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@googleapis//google/bytestream:bytestream_java_grpc",
         "@googleapis//google/bytestream:bytestream_java_proto",
@@ -64,6 +65,7 @@ java_binary(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/grpc",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//google/bytestream:bytestream_java_grpc",
         "@googleapis//google/bytestream:bytestream_java_proto",
         "@maven//:com_google_guava_guava",
@@ -87,6 +89,7 @@ java_binary(
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java_util",
         "@maven//:io_grpc_grpc_api",

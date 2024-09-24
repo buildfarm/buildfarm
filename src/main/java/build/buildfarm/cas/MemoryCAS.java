@@ -20,10 +20,11 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
+import build.buildfarm.v1test.Digest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -77,7 +78,8 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public synchronized boolean contains(Digest digest, Digest.Builder result) {
+  public synchronized boolean contains(
+      Digest digest, build.bazel.remote.execution.v2.Digest.Builder result) {
     Entry entry = getEntry(digest);
     if (entry != null) {
       result.setHash(entry.key).setSizeBytes(entry.value.size());
@@ -87,19 +89,24 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) throws InterruptedException {
-    ImmutableList.Builder<Digest> builder = ImmutableList.builder();
+  public Iterable<build.bazel.remote.execution.v2.Digest> findMissingBlobs(
+      Iterable<build.bazel.remote.execution.v2.Digest> digests, DigestFunction.Value digestFunction)
+      throws InterruptedException {
+    ImmutableList.Builder<build.bazel.remote.execution.v2.Digest> builder = ImmutableList.builder();
     synchronized (this) {
       // incur access use of the digest
-      for (Digest digest : digests) {
-        if (digest.getSizeBytes() != 0 && !contains(digest, Digest.newBuilder())) {
+      for (build.bazel.remote.execution.v2.Digest digest : digests) {
+        if (digest.getSizeBytes() != 0
+            && !contains(
+                DigestUtil.fromDigest(digest, digestFunction),
+                build.bazel.remote.execution.v2.Digest.newBuilder())) {
           builder.add(digest);
         }
       }
     }
-    ImmutableList<Digest> missing = builder.build();
+    ImmutableList<build.bazel.remote.execution.v2.Digest> missing = builder.build();
     if (delegate != null && !missing.isEmpty()) {
-      return delegate.findMissingBlobs(missing);
+      return delegate.findMissingBlobs(missing, digestFunction);
     }
     return missing;
   }
@@ -110,7 +117,7 @@ public class MemoryCAS implements ContentAddressableStorage {
       throws IOException {
     checkArgument(compressor == Compressor.Value.IDENTITY);
     // implicit int bounds compare against size bytes
-    if (offset < 0 || offset > digest.getSizeBytes()) {
+    if (offset < 0 || offset > digest.getSize()) {
       throw new IndexOutOfBoundsException(
           String.format("%d is out of bounds for blob %s", offset, DigestUtil.toString(digest)));
     }
@@ -151,15 +158,20 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests) {
-    return immediateFuture(getAll(digests));
+  public ListenableFuture<List<Response>> getAllFuture(
+      Iterable<build.bazel.remote.execution.v2.Digest> digests,
+      DigestFunction.Value digestFunction) {
+    return immediateFuture(getAll(digests, digestFunction));
   }
 
-  synchronized List<Response> getAll(Iterable<Digest> digests) {
+  synchronized List<Response> getAll(
+      Iterable<build.bazel.remote.execution.v2.Digest> digests,
+      DigestFunction.Value digestFunction) {
     return getAll(
         digests,
+        digestFunction,
         (digest) -> {
-          Blob blob = get(digest);
+          Blob blob = get(DigestUtil.fromDigest(digest, digestFunction));
           if (blob == null) {
             return null;
           }
@@ -168,10 +180,12 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   public static List<Response> getAll(
-      Iterable<Digest> digests, Function<Digest, ByteString> blobGetter) {
+      Iterable<build.bazel.remote.execution.v2.Digest> digests,
+      DigestFunction.Value digestFunction,
+      Function<build.bazel.remote.execution.v2.Digest, ByteString> blobGetter) {
     ImmutableList.Builder<Response> responses = ImmutableList.builder();
-    for (Digest digest : digests) {
-      responses.add(getResponse(digest, blobGetter));
+    for (build.bazel.remote.execution.v2.Digest digest : digests) {
+      responses.add(getResponse(digest, digestFunction, blobGetter));
     }
     return responses.build();
   }
@@ -185,7 +199,10 @@ public class MemoryCAS implements ContentAddressableStorage {
     return status;
   }
 
-  public static Response getResponse(Digest digest, Function<Digest, ByteString> blobGetter) {
+  public static Response getResponse(
+      build.bazel.remote.execution.v2.Digest digest,
+      DigestFunction.Value digestFunction,
+      Function<build.bazel.remote.execution.v2.Digest, ByteString> blobGetter) {
     Response.Builder response = Response.newBuilder().setDigest(digest);
     try {
       ByteString blob = blobGetter.apply(digest);
@@ -195,7 +212,10 @@ public class MemoryCAS implements ContentAddressableStorage {
         response.setData(blob).setStatus(OK);
       }
     } catch (Throwable t) {
-      log.log(Level.SEVERE, "error getting " + DigestUtil.toString(digest), t);
+      log.log(
+          Level.SEVERE,
+          "error getting " + DigestUtil.toString(DigestUtil.fromDigest(digest, digestFunction)),
+          t);
       response.setStatus(statusFromThrowable(t));
     }
     return response.build();
@@ -203,7 +223,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @Override
   public Blob get(Digest digest) {
-    if (digest.getSizeBytes() == 0) {
+    if (digest.getSize() == 0) {
       throw new IllegalArgumentException("Cannot fetch empty blob");
     }
 
@@ -218,7 +238,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   private synchronized Entry getEntry(Digest digest) {
-    Entry e = storage.get(digest.getHash());
+    Entry e = storage.get(DigestUtil.toString(digest));
     if (e == null) {
       return null;
     }
@@ -252,7 +272,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @Override
   public void put(Blob blob, Runnable onExpiration) {
-    if (blob.getDigest().getSizeBytes() == 0) {
+    if (blob.getDigest().getSize() == 0) {
       throw new IllegalArgumentException("Cannot put empty blob");
     }
 
@@ -311,7 +331,8 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @GuardedBy("this")
   private void expireEntry(Entry e) {
-    Digest digest = DigestUtil.buildDigest(e.key, e.value.size());
+    Digest digest =
+        DigestUtil.buildDigest(e.key, e.value.size(), e.value.getDigest().getDigestFunction());
     log.log(Level.INFO, "MemoryLRUCAS: expiring " + DigestUtil.toString(digest));
     if (delegate != null) {
       try {
@@ -331,7 +352,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     }
     storage.remove(e.key);
     e.expire();
-    sizeInBytes -= digest.getSizeBytes();
+    sizeInBytes -= digest.getSize();
   }
 
   private static class Entry {

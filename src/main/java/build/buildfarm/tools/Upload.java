@@ -3,13 +3,13 @@ package build.buildfarm.tools;
 import static build.bazel.remote.execution.v2.Compressor.Value.ZSTD;
 import static build.buildfarm.common.grpc.Channels.createChannel;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.ZstdCompressingInputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.v1test.Digest;
 import com.google.common.io.ByteStreams;
 import com.google.protobuf.util.Durations;
 import io.grpc.ManagedChannel;
@@ -26,16 +26,12 @@ class Upload {
       throws Exception {
     ManagedChannel channel = createChannel(host);
     Instance instance =
-        new StubInstance(instanceName, "bf-upload", digestUtil, channel, Durations.fromDays(10));
+        new StubInstance(instanceName, "bf-upload", channel, Durations.fromDays(10));
 
     Digest digest = digestUtil.compute(path);
     Write write =
         instance.getBlobWrite(
-            ZSTD,
-            digest,
-            digestUtil.getDigestFunction(),
-            UUID.randomUUID(),
-            RequestMetadata.getDefaultInstance());
+            ZSTD, digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
     try (OutputStream out = write.getOutput(0l, 10, TimeUnit.DAYS, () -> {});
         InputStream in = new ZstdCompressingInputStream(Files.newInputStream(path))) {
       ByteStreams.copy(in, out);

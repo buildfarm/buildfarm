@@ -24,12 +24,12 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.Tree;
@@ -63,7 +63,7 @@ public class WorkerInstanceTest {
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    instance = new WorkerInstance("test", DIGEST_UTIL, backplane, storage);
+    instance = new WorkerInstance("test", backplane, storage);
   }
 
   @SuppressWarnings("unchecked")

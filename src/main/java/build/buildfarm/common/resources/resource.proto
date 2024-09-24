@@ -1,7 +1,9 @@
 syntax = "proto3";
 
 package build.buildfarm.common.resources;
+
 import "build/bazel/remote/execution/v2/remote_execution.proto";
+import "src/main/protobuf/build/buildfarm/v1test/buildfarm.proto";
 
 option java_multiple_files = true;
 
@@ -14,8 +16,8 @@ option java_multiple_files = true;
 // types based on the extraction of resource_name information.
 
 // The URI formats of uploading a blob:
-// `{instance_name}/uploads/{uuid}/blobs/{hash}/{size}{/optional_metadata}`
-// `{instance_name}/uploads/{uuid}/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}{/optional_metadata}`
+// `{instance_name}/uploads/{uuid}/blobs/{digest_function/}{hash}/{size}{/optional_metadata}`
+// `{instance_name}/uploads/{uuid}/compressed-blobs/{compressor}/{digest_function/}{uncompressed_hash}/{uncompressed_size}{/optional_metadata}`
 message UploadBlobRequest {
   string instance_name = 1;
 
@@ -27,8 +29,8 @@ message UploadBlobRequest {
 }
 
 // The URI formats of downloading a blob:
-// `{instance_name}/blobs/{hash}/{size}`
-// `{instance_name}/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}`
+// `{instance_name}/blobs/{digest_function/}{hash}/{size}`
+// `{instance_name}/compressed-blobs/{compressor}/{digest_function/}{uncompressed_hash}/{uncompressed_size}`
 message DownloadBlobRequest {
   string instance_name = 1;
 
@@ -46,14 +48,12 @@ message StreamOperationRequest {
 }
 
 // The blob portion of resource name URIs:
-// `/compressed-blobs/{compressor}/{uncompressed_hash}/{uncompressed_size}`
-// `/blobs/{hash}/{size}`
+// `/compressed-blobs/{compressor}/{digest_function/}{uncompressed_hash}/{uncompressed_size}`
+// `/blobs/{digest_function/}{hash}/{size}`
 message BlobInformation {
   build.bazel.remote.execution.v2.Compressor.Value compressor = 1;
 
-  build.bazel.remote.execution.v2.Digest digest = 2;
-
-  build.bazel.remote.execution.v2.DigestFunction.Value digest_function = 3;
+  build.buildfarm.v1test.Digest digest = 2;
 }
 
 message Resource {

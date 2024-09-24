@@ -16,12 +16,13 @@ package build.buildfarm.cas;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
+import build.buildfarm.v1test.Digest;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 import com.google.rpc.Code;
@@ -61,7 +62,7 @@ public interface ContentAddressableStorage extends InputStreamFactory {
     }
 
     public long size() {
-      return digest.getSizeBytes();
+      return digest.getSize();
     }
 
     public boolean isEmpty() {
@@ -75,16 +76,20 @@ public interface ContentAddressableStorage extends InputStreamFactory {
    * <p>If supported, a size_bytes of -1 may be used to look up the size of a digest A size
    * mismatch, if partial key selection is supported, may result in correction
    */
-  boolean contains(Digest digest, Digest.Builder result);
+  boolean contains(Digest digest, build.bazel.remote.execution.v2.Digest.Builder result);
 
   /** Indicates presence in the CAS for a sequence of digests. */
-  Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) throws InterruptedException;
+  Iterable<build.bazel.remote.execution.v2.Digest> findMissingBlobs(
+      Iterable<build.bazel.remote.execution.v2.Digest> digests, DigestFunction.Value digestFunction)
+      throws InterruptedException;
 
   /** Retrieve a value from the CAS. */
   Blob get(Digest digest);
 
   /** Retrieve a set of blobs from the CAS represented by a future. */
-  ListenableFuture<List<Response>> getAllFuture(Iterable<Digest> digests);
+  ListenableFuture<List<Response>> getAllFuture(
+      Iterable<build.bazel.remote.execution.v2.Digest> digests,
+      DigestFunction.Value digestFunction);
 
   /** Retrieve a value from the CAS by streaming content when ready */
   void get(

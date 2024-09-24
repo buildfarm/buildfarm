@@ -19,7 +19,6 @@ import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BackplaneStatusRequest;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
-import com.google.longrunning.Operation;
 import com.google.rpc.Code;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -39,22 +38,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       responseObserver.onCompleted();
     } catch (RuntimeException e) {
       responseObserver.onError(Status.fromThrowable(e).asException());
-    }
-  }
-
-  @Override
-  public void put(Operation operation, StreamObserver<com.google.rpc.Status> responseObserver) {
-    try {
-      boolean ok = instance.putAndValidateOperation(operation);
-      Code code = ok ? Code.OK : Code.INVALID_ARGUMENT;
-      responseObserver.onNext(com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build());
-      responseObserver.onCompleted();
-    } catch (IllegalStateException e) {
-      responseObserver.onNext(
-          com.google.rpc.Status.newBuilder().setCode(Code.FAILED_PRECONDITION.getNumber()).build());
-      responseObserver.onCompleted();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
     }
   }
 

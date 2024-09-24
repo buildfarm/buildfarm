@@ -29,8 +29,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -56,12 +58,15 @@ public class UtilTest {
 
     Digest digest = Digest.newBuilder().setHash("digest").setSizeBytes(1).build();
     ImmutableList<Digest> digests = ImmutableList.of(digest);
+    DigestFunction.Value digestFunction = DigestFunction.Value.SHA256;
 
     Instance foundInstance = mock(Instance.class);
-    when(foundInstance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
+    when(foundInstance.findMissingBlobs(
+            eq(digests), eq(digestFunction), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
     Instance missingInstance = mock(Instance.class);
-    when(missingInstance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
+    when(missingInstance.findMissingBlobs(
+            eq(digests), eq(digestFunction), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of(digest)));
 
     Backplane backplane = mock(Backplane.class);
@@ -76,21 +81,24 @@ public class UtilTest {
           }
           return null;
         };
+    build.buildfarm.v1test.Digest blobDigest = DigestUtil.fromDigest(digest, digestFunction);
     ListenableFuture<Set<String>> correctFuture =
         correctMissingBlob(
             backplane,
             workerSet,
             /* originalLocationSet= */ ImmutableSet.of(),
             workerInstanceFactory,
-            digest,
+            blobDigest,
             directExecutor(),
             RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(worker2Name, worker3Name));
-    verify(foundInstance, times(2)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
-    verify(missingInstance, times(1)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
+    verify(foundInstance, times(2))
+        .findMissingBlobs(eq(digests), eq(digestFunction), any(RequestMetadata.class));
+    verify(missingInstance, times(1))
+        .findMissingBlobs(eq(digests), eq(digestFunction), any(RequestMetadata.class));
     verify(backplane, times(1))
         .adjustBlobLocations(
-            eq(digest), eq(ImmutableSet.of(worker2Name, worker3Name)), eq(ImmutableSet.of()));
+            eq(blobDigest), eq(ImmutableSet.of(worker2Name, worker3Name)), eq(ImmutableSet.of()));
   }
 
   @Test
@@ -104,9 +112,10 @@ public class UtilTest {
             .setSizeBytes(1)
             .build();
     ImmutableList<Digest> digests = ImmutableList.of(digest);
+    DigestFunction.Value digestFunction = DigestFunction.Value.SHA256;
 
     Instance instance = mock(Instance.class);
-    when(instance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
+    when(instance.findMissingBlobs(eq(digests), eq(digestFunction), any(RequestMetadata.class)))
         .thenReturn(immediateFailedFuture(Status.INVALID_ARGUMENT.asRuntimeException()));
 
     Function<String, Instance> workerInstanceFactory =
@@ -116,13 +125,14 @@ public class UtilTest {
           }
           return null;
         };
+    build.buildfarm.v1test.Digest blobDigest = DigestUtil.fromDigest(digest, digestFunction);
     ListenableFuture<Set<String>> correctFuture =
         correctMissingBlob(
             backplane,
             workerSet,
             /* originalLocationSet= */ ImmutableSet.of(),
             workerInstanceFactory,
-            digest,
+            blobDigest,
             directExecutor(),
             RequestMetadata.getDefaultInstance());
     boolean caughtException = false;
@@ -133,7 +143,8 @@ public class UtilTest {
       Status status = Status.fromThrowable(e.getCause());
       assertThat(status.getCode()).isEqualTo(Code.INVALID_ARGUMENT);
     }
-    verify(instance, times(1)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
+    verify(instance, times(1))
+        .findMissingBlobs(eq(digests), eq(digestFunction), any(RequestMetadata.class));
     assertThat(caughtException).isTrue();
     verifyNoInteractions(backplane);
   }
@@ -147,13 +158,15 @@ public class UtilTest {
 
     Digest digest = Digest.newBuilder().setHash("digest").setSizeBytes(1).build();
     ImmutableList<Digest> digests = ImmutableList.of(digest);
+    DigestFunction.Value digestFunction = DigestFunction.Value.SHA256;
 
     Instance instance = mock(Instance.class);
-    when(instance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
+    when(instance.findMissingBlobs(eq(digests), eq(digestFunction), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
     Instance unavailableInstance = mock(Instance.class);
-    when(unavailableInstance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
+    when(unavailableInstance.findMissingBlobs(
+            eq(digests), eq(digestFunction), any(RequestMetadata.class)))
         .thenReturn(immediateFailedFuture(Status.UNAVAILABLE.asRuntimeException()));
 
     Function<String, Instance> workerInstanceFactory =
@@ -166,20 +179,24 @@ public class UtilTest {
           }
           return null;
         };
+    build.buildfarm.v1test.Digest blobDigest = DigestUtil.fromDigest(digest, digestFunction);
     ListenableFuture<Set<String>> correctFuture =
         correctMissingBlob(
             backplane,
             workerSet,
             /* originalLocationSet= */ ImmutableSet.of(),
             workerInstanceFactory,
-            digest,
+            blobDigest,
             directExecutor(),
             RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(workerName));
-    verify(instance, times(1)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
-    verify(unavailableInstance, times(1)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
+    verify(instance, times(1))
+        .findMissingBlobs(eq(digests), eq(digestFunction), any(RequestMetadata.class));
+    verify(unavailableInstance, times(1))
+        .findMissingBlobs(eq(digests), eq(digestFunction), any(RequestMetadata.class));
     verify(backplane, times(1))
-        .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
+        .adjustBlobLocations(
+            eq(blobDigest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
   }
 
   @Test
@@ -190,9 +207,10 @@ public class UtilTest {
 
     Digest digest = Digest.newBuilder().setHash("digest").setSizeBytes(1).build();
     ImmutableList<Digest> digests = ImmutableList.of(digest);
+    DigestFunction.Value digestFunction = DigestFunction.Value.SHA256;
 
     Instance instance = mock(Instance.class);
-    when(instance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
+    when(instance.findMissingBlobs(eq(digests), eq(digestFunction), any(RequestMetadata.class)))
         .thenReturn(immediateFailedFuture(Status.UNKNOWN.asRuntimeException()))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
@@ -203,19 +221,22 @@ public class UtilTest {
           }
           return null;
         };
+    build.buildfarm.v1test.Digest blobDigest = DigestUtil.fromDigest(digest, digestFunction);
     ListenableFuture<Set<String>> correctFuture =
         correctMissingBlob(
             backplane,
             workerSet,
             /* originalLocationSet= */ ImmutableSet.of(),
             workerInstanceFactory,
-            digest,
+            blobDigest,
             directExecutor(),
             RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(workerName));
-    verify(instance, times(2)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
+    verify(instance, times(2))
+        .findMissingBlobs(eq(digests), eq(digestFunction), any(RequestMetadata.class));
     verify(backplane, times(1))
-        .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
+        .adjustBlobLocations(
+            eq(blobDigest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
   }
 
   @Test
@@ -225,16 +246,19 @@ public class UtilTest {
 
     Digest digest = Digest.newBuilder().setHash("digest").setSizeBytes(1).build();
     ImmutableList<Digest> digests = ImmutableList.of(digest);
+    DigestFunction.Value digestFunction = DigestFunction.Value.SHA256;
 
     Instance instance = mock(Instance.class);
-    when(instance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
+    when(instance.findMissingBlobs(eq(digests), eq(digestFunction), any(RequestMetadata.class)))
         .thenReturn(immediateFailedFuture(Status.UNKNOWN.asRuntimeException()))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
+    build.buildfarm.v1test.Digest blobDigest = DigestUtil.fromDigest(digest, digestFunction);
     Backplane backplane = mock(Backplane.class);
     doThrow(new IOException("failed to adjustBlobLocations"))
         .when(backplane)
-        .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
+        .adjustBlobLocations(
+            eq(blobDigest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
 
     Function<String, Instance> workerInstanceFactory =
         worker -> {
@@ -249,12 +273,14 @@ public class UtilTest {
             workerSet,
             /* originalLocationSet= */ ImmutableSet.of(),
             workerInstanceFactory,
-            digest,
+            blobDigest,
             directExecutor(),
             RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(workerName));
-    verify(instance, times(2)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
+    verify(instance, times(2))
+        .findMissingBlobs(eq(digests), eq(digestFunction), any(RequestMetadata.class));
     verify(backplane, times(1))
-        .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
+        .adjustBlobLocations(
+            eq(blobDigest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
   }
 }

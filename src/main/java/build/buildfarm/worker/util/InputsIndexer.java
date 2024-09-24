@@ -18,6 +18,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.NodeProperty;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.v1test.Tree;
 import com.google.common.collect.ImmutableMap;
@@ -95,7 +96,7 @@ public class InputsIndexer {
   private ImmutableMap<Path, FileNode> getAllFiles() {
     if (files == null) {
       ImmutableMap.Builder<Path, FileNode> accumulator = ImmutableMap.builder();
-      Directory rootDir = proxyDirs.get(tree.getRootDigest());
+      Directory rootDir = proxyDirs.get(DigestUtil.toDigest(tree.getRootDigest()));
 
       Path fsRelative = fs.getPath(".");
       files = getFilesFromDir(fsRelative, rootDir, accumulator).build();

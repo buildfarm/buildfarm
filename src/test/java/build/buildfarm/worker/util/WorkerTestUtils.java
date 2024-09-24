@@ -17,13 +17,13 @@ package build.buildfarm.worker.util;
 import static build.buildfarm.worker.util.InputsIndexer.BAZEL_TOOL_INPUT_MARKER;
 
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.NodeProperties;
 import build.bazel.remote.execution.v2.NodeProperty;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.Tree;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -49,13 +49,14 @@ public class WorkerTestUtils {
       String filename, String content, NodeProperties nodeProperties) {
     return FileNode.newBuilder()
         .setName(filename)
-        .setDigest(DIGEST_UTIL.compute(ByteString.copyFromUtf8(content)))
+        .setDigest(DigestUtil.toDigest(DIGEST_UTIL.compute(ByteString.copyFromUtf8(content))))
         .setIsExecutable(false)
         .setNodeProperties(nodeProperties)
         .build();
   }
 
-  public static DirectoryNode makeDirNode(String dirname, Digest dirDigest) {
+  public static DirectoryNode makeDirNode(
+      String dirname, build.bazel.remote.execution.v2.Digest dirDigest) {
     // Pretty sure we don't need the actual hash for our testing purposes
     return DirectoryNode.newBuilder().setName(dirname).setDigest(dirDigest).build();
   }
@@ -167,7 +168,7 @@ public class WorkerTestUtils {
       String subDirName = entry.getKey();
       Directory subDir = entry.getValue().build();
       Digest subDirDigest = addDirToTree(treeBuilder, subDirName, subDir);
-      rootDirBuilder.addDirectories(makeDirNode(subDirName, subDirDigest));
+      rootDirBuilder.addDirectories(makeDirNode(subDirName, DigestUtil.toDigest(subDirDigest)));
     }
 
     Digest rootDirDigest = addDirToTree(treeBuilder, rootDirPath, rootDirBuilder.build());

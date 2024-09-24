@@ -16,7 +16,7 @@ package build.buildfarm.proxy.http;
 
 import static com.google.common.base.Preconditions.checkState;
 
-import build.buildfarm.common.UrlPath.InvalidResourceNameException;
+import build.buildfarm.common.resources.UrlPath.InvalidResourceNameException;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import io.grpc.stub.StreamObserver;
@@ -71,7 +71,12 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   public void onCompleted() {
     if (write != null) {
       write.onCompleted();
+    } else {
+      // we must return with a response lest we emit a grpc warning
+      // there can be no meaningful response at this point, as we
+      // have no idea what the size was
+      responseObserver.onNext(WriteResponse.getDefaultInstance());
+      responseObserver.onCompleted();
     }
-    responseObserver.onCompleted();
   }
 }

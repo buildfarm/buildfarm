@@ -10,11 +10,12 @@ import build.bazel.remote.asset.v1.FetchDirectoryRequest;
 import build.bazel.remote.asset.v1.FetchDirectoryResponse;
 import build.bazel.remote.asset.v1.FetchGrpc.FetchImplBase;
 import build.bazel.remote.asset.v1.Qualifier;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.FetchQualifiers;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FutureCallback;
@@ -53,10 +54,14 @@ public class FetchService extends FetchImplBase {
   }
 
   private static void parseQualifier(
-      String name, String value, FetchQualifiers.Builder fetchQualifiers) {
+      String name,
+      String value,
+      DigestFunction.Value digestFunction,
+      FetchQualifiers.Builder fetchQualifiers) {
     switch (name) {
       case QUALIFIER_CANONICAL_ID -> fetchQualifiers.setCanonicalId(value);
-      case QUALIFIER_CHECKSUM_SRI -> fetchQualifiers.setDigest(parseChecksumSRI(value));
+      case QUALIFIER_CHECKSUM_SRI ->
+          fetchQualifiers.setDigest(parseChecksumSRI(value, digestFunction));
       case String s when s.startsWith(QUALIFIER_HTTP_HEADER_PREFIX) ->
           fetchQualifiers.putHeaders(s.substring(QUALIFIER_HTTP_HEADER_PREFIX.length()), value);
       default -> {
@@ -65,10 +70,11 @@ public class FetchService extends FetchImplBase {
     }
   }
 
-  private static FetchQualifiers parseQualifiers(Iterable<Qualifier> qualifiers) {
+  private static FetchQualifiers parseQualifiers(
+      Iterable<Qualifier> qualifiers, DigestFunction.Value digestFunction) {
     FetchQualifiers.Builder fetchQualifiers = FetchQualifiers.newBuilder();
     for (Qualifier qualifier : qualifiers) {
-      parseQualifier(qualifier.getName(), qualifier.getValue(), fetchQualifiers);
+      parseQualifier(qualifier.getName(), qualifier.getValue(), digestFunction, fetchQualifiers);
     }
     return fetchQualifiers.build();
   }
@@ -86,13 +92,17 @@ public class FetchService extends FetchImplBase {
       return;
     }
 
-    FetchQualifiers qualifiers = parseQualifiers(request.getQualifiersList());
+    FetchQualifiers qualifiers =
+        parseQualifiers(
+            request.getQualifiersList(),
+            DigestFunction.Value.UNKNOWN /* request.getDigestFunction() */);
 
     Digest expectedDigest = qualifiers.getDigest();
 
     // TODO consider doing something with QUALIFIER_CANONICAL_ID
 
-    Digest.Builder result = Digest.newBuilder();
+    build.bazel.remote.execution.v2.Digest.Builder result =
+        build.bazel.remote.execution.v2.Digest.newBuilder();
     if (!expectedDigest.equals(Digest.getDefaultInstance())
         && instance.containsBlob(expectedDigest, result, requestMetadata)) {
       responseObserver.onNext(FetchBlobResponse.newBuilder().setBlobDigest(result.build()).build());
@@ -103,7 +113,7 @@ public class FetchService extends FetchImplBase {
     addCallback(
         instance.fetchBlob(
             request.getUrisList(), qualifiers.getHeadersMap(), expectedDigest, requestMetadata),
-        new FutureCallback<Digest>() {
+        new FutureCallback<>() {
           @Override
           public void onSuccess(Digest actualDigest) {
             log.log(
@@ -112,7 +122,9 @@ public class FetchService extends FetchImplBase {
                     "fetch blob succeeded: %s inserted into CAS",
                     DigestUtil.toString(actualDigest)));
             responseObserver.onNext(
-                FetchBlobResponse.newBuilder().setBlobDigest(actualDigest).build());
+                FetchBlobResponse.newBuilder()
+                    .setBlobDigest(DigestUtil.toDigest(actualDigest))
+                    .build());
             responseObserver.onCompleted();
           }
 
@@ -127,7 +139,8 @@ public class FetchService extends FetchImplBase {
         directExecutor());
   }
 
-  private static Digest parseChecksumSRI(String checksum) {
+  private static build.buildfarm.v1test.Digest parseChecksumSRI(
+      String checksum, DigestFunction.Value digestFunction) {
     String[] components = checksum.split("-");
     if (components.length != 2) {
       throw Status.INVALID_ARGUMENT
@@ -137,7 +150,22 @@ public class FetchService extends FetchImplBase {
     String hashFunction = components[0];
     String encodedDigest = components[1];
     DigestUtil digestUtil = DigestUtil.forHash(hashFunction.toUpperCase());
-    return digestUtil.build(BaseEncoding.base64().decode(encodedDigest), -1);
+    if (digestUtil == null) {
+      throw Status.INVALID_ARGUMENT
+          .withDescription(format("Unrecognized digest function '%s'", hashFunction))
+          .asRuntimeException();
+    }
+    if (digestFunction != DigestFunction.Value.UNKNOWN
+        && digestFunction != digestUtil.getDigestFunction()) {
+      throw Status.INVALID_ARGUMENT
+          .withDescription(
+              format(
+                  "Mismatched digest function '%s' and checksum.sri '%s'",
+                  digestFunction, hashFunction))
+          .asRuntimeException();
+    }
+    byte[] hash = BaseEncoding.base64().decode(encodedDigest);
+    return digestUtil.build(BaseEncoding.base16().lowerCase().encode(hash), -1);
   }
 
   @Override

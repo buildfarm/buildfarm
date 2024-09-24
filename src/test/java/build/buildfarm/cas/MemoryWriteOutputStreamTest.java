@@ -18,10 +18,10 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Write;
+import build.buildfarm.v1test.Digest;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
@@ -44,7 +44,7 @@ public class MemoryWriteOutputStreamTest {
     content.substring(0, 6).writeTo(write.getOutput(1, TimeUnit.SECONDS, () -> {}));
     writtenFuture.set(content);
     assertThat(write.isComplete()).isTrue();
-    assertThat(write.getCommittedSize()).isEqualTo(digest.getSizeBytes());
+    assertThat(write.getCommittedSize()).isEqualTo(digest.getSize());
     verifyNoInteractions(cas);
   }
 }

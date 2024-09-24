@@ -27,7 +27,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageImplBase;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
@@ -36,6 +35,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamServiceWriter;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
+import build.buildfarm.v1test.Digest;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
@@ -176,12 +176,12 @@ public class GrpcCASTest {
     String instanceName = "test";
     HashCode hash = HashCode.fromString(digest.getHash());
     String resourceName =
-        ByteStreamUploader.uploadResourceName(instanceName, uuid, hash, digest.getSizeBytes());
+        ByteStreamUploader.uploadResourceName(instanceName, uuid, hash, digest.getSize());
 
     // better test might just put a full gRPC CAS behind an in-process and validate state
     SettableFuture<ByteString> content = SettableFuture.create();
     serviceRegistry.addService(
-        new ByteStreamServiceWriter(resourceName, content, (int) digest.getSizeBytes()));
+        new ByteStreamServiceWriter(resourceName, content, (int) digest.getSize()));
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     GrpcCAS cas =
@@ -228,7 +228,11 @@ public class GrpcCASTest {
     // Mutable calls bindService, and clearInvocations is undesirable
     verify(casService, times(1)).bindService();
     Digest emptyDigest = Digest.getDefaultInstance();
-    assertThat(cas.findMissingBlobs(ImmutableList.of(emptyDigest))).isEmpty();
+    assertThat(
+            cas.findMissingBlobs(
+                ImmutableList.of(DigestUtil.toDigest(emptyDigest)),
+                emptyDigest.getDigestFunction()))
+        .isEmpty();
     verifyNoMoreInteractions(casService);
     verifyNoInteractions(onExpiration);
   }

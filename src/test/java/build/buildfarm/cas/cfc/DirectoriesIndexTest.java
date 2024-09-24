@@ -16,9 +16,9 @@ package build.buildfarm.cas.cfc;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.v1test.Digest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Configuration;

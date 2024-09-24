@@ -13,8 +13,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -23,6 +21,7 @@ import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.resources.BlobInformation;
 import build.buildfarm.common.resources.UploadBlobRequest;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.Digest;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.util.concurrent.SettableFuture;
@@ -70,7 +69,6 @@ public class WriteStreamObserverTest {
     when(instance.getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
-            eq(DigestFunction.Value.UNKNOWN),
             eq(uuid),
             any(RequestMetadata.class)))
         .thenReturn(write);
@@ -88,7 +86,6 @@ public class WriteStreamObserverTest {
         .getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
-            eq(DigestFunction.Value.UNKNOWN),
             eq(uuid),
             any(RequestMetadata.class));
     verify(write, times(1))
@@ -117,7 +114,6 @@ public class WriteStreamObserverTest {
     when(instance.getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
-            eq(DigestFunction.Value.UNKNOWN),
             eq(uuid),
             any(RequestMetadata.class)))
         .thenReturn(write);
@@ -143,7 +139,6 @@ public class WriteStreamObserverTest {
         .getBlobWrite(
             eq(Compressor.Value.IDENTITY),
             eq(cancelledDigest),
-            eq(DigestFunction.Value.UNKNOWN),
             eq(uuid),
             any(RequestMetadata.class));
     verifyNoInteractions(responseObserver);
@@ -160,11 +155,7 @@ public class WriteStreamObserverTest {
     when(write.getFuture()).thenReturn(future);
     when(write.isComplete()).thenAnswer((Answer<Boolean>) invocation -> future.isDone());
     when(instance.getBlobWrite(
-            eq(Compressor.Value.ZSTD),
-            eq(completedDigest),
-            eq(DigestFunction.Value.UNKNOWN),
-            eq(uuid),
-            any(RequestMetadata.class)))
+            eq(Compressor.Value.ZSTD), eq(completedDigest), eq(uuid), any(RequestMetadata.class)))
         .thenReturn(write);
     FeedbackOutputStream outputStream = mock(FeedbackOutputStream.class);
     when(write.getOutput(

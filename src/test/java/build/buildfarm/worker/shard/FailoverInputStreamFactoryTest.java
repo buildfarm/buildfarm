@@ -17,8 +17,8 @@ package build.buildfarm.worker.shard;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.v1test.Digest;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;

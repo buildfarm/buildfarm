@@ -15,7 +15,6 @@
 package build.buildfarm.backplane;
 
 import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -25,6 +24,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
@@ -119,6 +119,7 @@ public interface Backplane {
   /** Returns a set of the names of all active storage workers. */
   Set<String> getStorageWorkers() throws IOException;
 
+  // TODO this is just a namespace, but kind of jank for just digest function as a string...
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the digest of the action
    * result and the value is the actual ActionResult object.

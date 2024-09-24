@@ -16,7 +16,6 @@ package build.buildfarm.tools;
 
 import static build.buildfarm.common.grpc.Channels.createChannel;
 
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ShardWorkerOptions;
 import build.buildfarm.common.redis.RedisClient;
@@ -137,7 +136,6 @@ class WorkerProfile {
   @SuppressWarnings("BusyWait")
   private static void workerProfile(String[] args) throws IOException {
     Set<String> workers = null;
-    DigestUtil digestUtil = DigestUtil.forHash(args[2]);
     WorkerProfileMessage currentWorkerMessage;
     HashMap<String, Instance> workersToChannels = new HashMap<>();
     String type = args[1];
@@ -172,7 +170,6 @@ class WorkerProfile {
                 new StubInstance(
                     type,
                     "bf-workerprofile",
-                    digestUtil,
                     createChannel(workerStringTransformation(worker)),
                     Durations.fromMinutes(1)));
           }

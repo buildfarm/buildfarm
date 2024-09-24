@@ -14,9 +14,12 @@
 
 package build.buildfarm.common.resources;
 
+import static build.buildfarm.common.DigestUtil.OMITTED_DIGEST_FUNCTIONS;
+
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
+import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
@@ -151,10 +154,11 @@ public class ResourceParser {
   private static void addBlobResource(
       ImmutableList.Builder<String> resource, BlobInformation blob) {
     addCompressorName(resource, blob.getCompressor());
-    if (blob.getDigestFunction() != DigestFunction.Value.UNKNOWN) {
-      resource.add(blob.getDigestFunction().toString().toLowerCase());
+    DigestFunction.Value digestFunction = blob.getDigest().getDigestFunction();
+    if (!OMITTED_DIGEST_FUNCTIONS.contains(digestFunction)) {
+      resource.add(digestFunction.toString().toLowerCase());
     }
-    addDigestResource(resource, blob.getDigest());
+    addDigestResource(resource, DigestUtil.toDigest(blob.getDigest()));
   }
 
   /**
@@ -305,26 +309,16 @@ public class ResourceParser {
       builder.setCompressor(Compressor.Value.IDENTITY);
     }
     String maybeDigestFunction = segments[index.getValue()].toUpperCase();
+    DigestFunction.Value digestFunction = DigestFunction.Value.UNKNOWN;
     if (DIGEST_FUNCTIONS.containsKey(maybeDigestFunction)) {
-      builder.setDigestFunction(DIGEST_FUNCTIONS.get(maybeDigestFunction));
+      digestFunction = DIGEST_FUNCTIONS.get(maybeDigestFunction);
       index.getAndIncrement();
     }
     String hash = segments[index.getAndIncrement()];
     String size = segments[index.getAndIncrement()];
-    builder.setDigest(parseDigest(hash, size));
+    digestFunction = DigestUtil.inferDigestFunction(digestFunction, hash);
+    builder.setDigest(DigestUtil.buildDigest(hash, Long.parseLong(size), digestFunction));
     return builder.build();
-  }
-
-  /**
-   * @brief Parse digest information into type.
-   * @details Size interpreted as long.
-   * @param hash The extracted hash value.
-   * @param size The extracted hash size value.
-   * @return Parsed digest information.
-   * @note Suggested return identifier: digest.
-   */
-  private static Digest parseDigest(String hash, String size) {
-    return Digest.newBuilder().setHash(hash).setSizeBytes(Long.parseLong(size)).build();
   }
 
   /**

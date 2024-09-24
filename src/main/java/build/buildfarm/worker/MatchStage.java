@@ -19,6 +19,7 @@ import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
@@ -177,7 +178,7 @@ public class MatchStage extends PipelineStage {
     executionContext
         .metadata
         .getExecuteOperationMetadataBuilder()
-        .setActionDigest(executeEntry.getActionDigest())
+        .setActionDigest(DigestUtil.toDigest(executeEntry.getActionDigest()))
         .setStage(QUEUED)
         .setStdoutStreamName(executeEntry.getStdoutStreamName())
         .setStderrStreamName(executeEntry.getStderrStreamName())

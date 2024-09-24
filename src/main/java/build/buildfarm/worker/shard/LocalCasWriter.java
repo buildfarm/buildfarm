@@ -17,11 +17,10 @@ package build.buildfarm.worker.shard;
 import static java.util.concurrent.TimeUnit.DAYS;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.function.IOSupplier;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.worker.ExecFileSystem;
 import com.google.common.io.ByteStreams;
 import com.google.protobuf.ByteString;
@@ -41,13 +40,12 @@ class LocalCasWriter implements CasWriter {
   }
 
   @Override
-  public void write(Digest digest, DigestFunction.Value digestFunction, Path file)
-      throws IOException, InterruptedException {
+  public void write(Digest digest, Path file) throws IOException, InterruptedException {
     insertStream(digest, () -> Files.newInputStream(file));
   }
 
   @Override
-  public void insertBlob(Digest digest, DigestFunction.Value digestFunction, ByteString content)
+  public void insertBlob(Digest digest, ByteString content)
       throws IOException, InterruptedException {
     insertStream(digest, content::newInput);
   }

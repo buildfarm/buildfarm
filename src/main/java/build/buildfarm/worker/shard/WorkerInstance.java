@@ -18,7 +18,6 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
@@ -37,6 +36,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.server.NodeInstance;
 import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
@@ -71,11 +71,8 @@ public class WorkerInstance extends NodeInstance {
   private final Backplane backplane;
 
   public WorkerInstance(
-      String name,
-      DigestUtil digestUtil,
-      Backplane backplane,
-      ContentAddressableStorage contentAddressableStorage) {
-    super(name, digestUtil, contentAddressableStorage, null, null, null, null, false);
+      String name, Backplane backplane, ContentAddressableStorage contentAddressableStorage) {
+    super(name, contentAddressableStorage, null, null, null, null, false);
     this.backplane = backplane;
   }
 

@@ -18,10 +18,10 @@ import static build.buildfarm.common.grpc.Channels.createChannel;
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.collect.Multimaps.synchronizedListMultimap;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Cas;
 import build.buildfarm.instance.stub.ByteStreamUploader;
+import build.buildfarm.v1test.Digest;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import io.grpc.Channel;

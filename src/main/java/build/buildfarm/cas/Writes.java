@@ -18,11 +18,11 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.v1test.BlobWriteKey;
+import build.buildfarm.v1test.Digest;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.SettableFuture;
@@ -44,7 +44,7 @@ public class Writes {
   }
 
   Write get(Compressor.Value compressor, Digest digest, UUID uuid) {
-    if (digest.getSizeBytes() == 0) {
+    if (digest.getSize() == 0) {
       return new CompleteWrite(0);
     }
     return getNonEmpty(compressor, digest, uuid);
@@ -54,7 +54,7 @@ public class Writes {
     checkArgument(compressor == Compressor.Value.IDENTITY);
     Blob blob = storage.get(digest);
     if (blob != null) {
-      return new CompleteWrite(digest.getSizeBytes());
+      return new CompleteWrite(digest.getSize());
     }
     return get(BlobWriteKey.newBuilder().setDigest(digest).setIdentifier(uuid.toString()).build());
   }

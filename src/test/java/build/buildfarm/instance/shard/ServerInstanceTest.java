@@ -154,7 +154,6 @@ public class ServerInstanceTest {
     instance =
         new ServerInstance(
             "shard",
-            DIGEST_UTIL,
             mockBackplane,
             actionCache,
             /* runDispatchedMonitor= */ false,
@@ -193,7 +192,7 @@ public class ServerInstanceTest {
       throws Exception {
     Directory inputRoot = Directory.getDefaultInstance();
     ByteString inputRootBlob = inputRoot.toByteString();
-    Digest inputRootDigest = DIGEST_UTIL.compute(inputRootBlob);
+    build.buildfarm.v1test.Digest inputRootDigest = DIGEST_UTIL.compute(inputRootBlob);
     provideBlob(inputRootDigest, inputRootBlob);
 
     return createAction(provideAction, provideCommand, inputRootDigest, command);
@@ -201,7 +200,10 @@ public class ServerInstanceTest {
 
   @SuppressWarnings("unchecked")
   private Action createAction(
-      boolean provideAction, boolean provideCommand, Digest inputRootDigest, Command command)
+      boolean provideAction,
+      boolean provideCommand,
+      build.buildfarm.v1test.Digest inputRootDigest,
+      Command command)
       throws Exception {
     String workerName = "worker";
     when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
@@ -210,7 +212,12 @@ public class ServerInstanceTest {
     when(mockBackplane.getStorageWorkers()).thenReturn(workers);
 
     ByteString commandBlob = command.toByteString();
-    Digest commandDigest = DIGEST_UTIL.compute(commandBlob);
+    DigestFunction.Value digestFunction = inputRootDigest.getDigestFunction();
+    if (digestFunction == DigestFunction.Value.UNKNOWN) {
+      digestFunction = DIGEST_UTIL.getDigestFunction();
+    }
+    DigestUtil digestUtil = new DigestUtil(HashFunction.get(digestFunction));
+    build.buildfarm.v1test.Digest commandDigest = digestUtil.compute(commandBlob);
     if (provideCommand) {
       provideBlob(commandDigest, commandBlob);
       when(mockBackplane.getBlobLocationSet(eq(commandDigest))).thenReturn(workers);
@@ -222,20 +229,42 @@ public class ServerInstanceTest {
                   Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
                   return immediateFuture(
                       StreamSupport.stream(digests.spliterator(), false)
-                          .filter((digest) -> !blobDigests.containsKey(digest.getHash()))
+                          .filter(
+                              (digest) ->
+                                  digest.getSizeBytes() != 0
+                                      && !blobDigests.containsKey(digest.getHash()))
                           .collect(Collectors.toList()));
                 })
         .when(mockWorkerInstance)
-        .findMissingBlobs(any(Iterable.class), any(RequestMetadata.class));
+        .findMissingBlobs(
+            any(Iterable.class), any(DigestFunction.Value.class), any(RequestMetadata.class));
+
+    doAnswer(
+            (Answer<Void>)
+                invocation -> {
+                  StreamObserver<ByteString> blobObserver =
+                      (StreamObserver) invocation.getArguments()[4];
+                  blobObserver.onNext(ByteString.empty());
+                  blobObserver.onCompleted();
+                  return null;
+                })
+        .when(mockWorkerInstance)
+        .getBlob(
+            any(Compressor.Value.class),
+            eq(build.buildfarm.v1test.Digest.getDefaultInstance()),
+            any(Long.class),
+            any(Long.class),
+            any(ServerCallStreamObserver.class),
+            any(RequestMetadata.class));
 
     Action action =
         Action.newBuilder()
-            .setCommandDigest(commandDigest)
-            .setInputRootDigest(inputRootDigest)
+            .setCommandDigest(DigestUtil.toDigest(commandDigest))
+            .setInputRootDigest(DigestUtil.toDigest(inputRootDigest))
             .build();
 
     ByteString actionBlob = action.toByteString();
-    Digest actionDigest = DIGEST_UTIL.compute(actionBlob);
+    build.buildfarm.v1test.Digest actionDigest = DIGEST_UTIL.compute(actionBlob);
     if (provideAction) {
       provideBlob(actionDigest, actionBlob);
     }
@@ -258,13 +287,15 @@ public class ServerInstanceTest {
             eq(Compressor.Value.IDENTITY),
             eq(actionDigest),
             eq(0L),
-            eq(actionDigest.getSizeBytes()),
+            eq(actionDigest.getSize()),
             any(ServerCallStreamObserver.class),
             any(RequestMetadata.class));
     when(mockBackplane.getBlobLocationSet(eq(actionDigest)))
         .thenReturn(provideAction ? workers : ImmutableSet.of());
     when(mockWorkerInstance.findMissingBlobs(
-            eq(ImmutableList.of(actionDigest)), any(RequestMetadata.class)))
+            eq(ImmutableList.of(DigestUtil.toDigest(actionDigest))),
+            eq(actionDigest.getDigestFunction()),
+            any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
     return action;
@@ -273,7 +304,8 @@ public class ServerInstanceTest {
   @Test
   public void executeCallsPrequeueWithAction() throws IOException {
     when(mockBackplane.canPrequeue()).thenReturn(true);
-    Digest actionDigest = Digest.newBuilder().setHash("action").setSizeBytes(10).build();
+    build.buildfarm.v1test.Digest actionDigest =
+        build.buildfarm.v1test.Digest.newBuilder().setHash("action").setSize(10).build();
     Watcher mockWatcher = mock(Watcher.class);
     instance.execute(
         actionDigest,
@@ -292,7 +324,7 @@ public class ServerInstanceTest {
   @Test
   public void queueActionMissingErrorsOperation() throws Exception {
     Action action = createAction(false);
-    Digest actionDigest = DIGEST_UTIL.compute(action);
+    build.buildfarm.v1test.Digest actionDigest = DIGEST_UTIL.compute(action);
 
     ExecuteEntry executeEntry =
         ExecuteEntry.newBuilder()
@@ -344,10 +376,10 @@ public class ServerInstanceTest {
   public void queueActionFailsQueueEligibility() throws Exception {
     Directory inputRoot = Directory.newBuilder().build();
     ByteString inputRootContent = inputRoot.toByteString();
-    Digest inputRootDigest = DIGEST_UTIL.compute(inputRootContent);
+    build.buildfarm.v1test.Digest inputRootDigest = DIGEST_UTIL.compute(inputRootContent);
     provideBlob(inputRootDigest, inputRootContent);
     Action action = createAction(true, true, inputRootDigest, SIMPLE_COMMAND);
-    Digest actionDigest = DIGEST_UTIL.compute(action);
+    build.buildfarm.v1test.Digest actionDigest = DIGEST_UTIL.compute(action);
 
     ExecuteEntry executeEntry =
         ExecuteEntry.newBuilder()
@@ -404,7 +436,7 @@ public class ServerInstanceTest {
   @Test
   public void queueCommandMissingErrorsOperation() throws Exception {
     Action action = createAction(true, false);
-    Digest actionDigest = DIGEST_UTIL.compute(action);
+    build.buildfarm.v1test.Digest actionDigest = DIGEST_UTIL.compute(action);
 
     ExecuteEntry executeEntry =
         ExecuteEntry.newBuilder()
@@ -436,7 +468,11 @@ public class ServerInstanceTest {
             .addViolations(
                 Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
-                    .setSubject("blobs/" + DigestUtil.toString(action.getCommandDigest()))
+                    .setSubject(
+                        "blobs/"
+                            + DigestUtil.toString(
+                                DigestUtil.fromDigest(
+                                    action.getCommandDigest(), actionDigest.getDigestFunction())))
                     .setDescription(MISSING_COMMAND))
             .build();
     ExecuteResponse executeResponse =
@@ -467,17 +503,17 @@ public class ServerInstanceTest {
   @Test
   public void queueDirectoryMissingErrorsOperation() throws Exception {
     ByteString foo = ByteString.copyFromUtf8("foo");
-    Digest subdirDigest = DIGEST_UTIL.compute(foo);
+    Digest subdirDigest = DigestUtil.toDigest(DIGEST_UTIL.compute(foo));
     Directory inputRoot =
         Directory.newBuilder()
             .addDirectories(
                 DirectoryNode.newBuilder().setName("missing-subdir").setDigest(subdirDigest))
             .build();
     ByteString inputRootContent = inputRoot.toByteString();
-    Digest inputRootDigest = DIGEST_UTIL.compute(inputRootContent);
+    build.buildfarm.v1test.Digest inputRootDigest = DIGEST_UTIL.compute(inputRootContent);
     provideBlob(inputRootDigest, inputRootContent);
     Action action = createAction(true, true, inputRootDigest, SIMPLE_COMMAND);
-    Digest actionDigest = DIGEST_UTIL.compute(action);
+    build.buildfarm.v1test.Digest actionDigest = DIGEST_UTIL.compute(action);
 
     ExecuteEntry executeEntry =
         ExecuteEntry.newBuilder()
@@ -512,7 +548,11 @@ public class ServerInstanceTest {
             .addViolations(
                 Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
-                    .setSubject("blobs/" + DigestUtil.toString(subdirDigest))
+                    .setSubject(
+                        "blobs/"
+                            + DigestUtil.toString(
+                                DigestUtil.fromDigest(
+                                    subdirDigest, actionDigest.getDigestFunction())))
                     .setDescription("The directory `/missing-subdir` was not found in the CAS."))
             .build();
     ExecuteResponse executeResponse =
@@ -531,17 +571,17 @@ public class ServerInstanceTest {
   @Test
   public void queueOperationPutFailureCancelsOperation() throws Exception {
     Action action = createAction();
-    Digest actionDigest = DIGEST_UTIL.compute(action);
+    build.buildfarm.v1test.Digest actionDigest = DIGEST_UTIL.compute(action);
 
-    when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(RequestMetadata.class)))
+    when(mockWorkerInstance.findMissingBlobs(
+            any(Iterable.class), eq(actionDigest.getDigestFunction()), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
     doAnswer(answer((digest, uuid) -> new NullWrite()))
         .when(mockWorkerInstance)
         .getBlobWrite(
             any(Compressor.Value.class),
-            any(Digest.class),
-            any(DigestFunction.Value.class),
+            any(build.buildfarm.v1test.Digest.class),
             any(UUID.class),
             any(RequestMetadata.class));
 
@@ -595,7 +635,8 @@ public class ServerInstanceTest {
 
   @Test
   public void queueOperationCompletesOperationWithCachedActionResult() throws Exception {
-    ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder().setHash("test").build());
+    ActionKey actionKey =
+        DigestUtil.asActionKey(build.buildfarm.v1test.Digest.newBuilder().setHash("test").build());
     ExecuteEntry executeEntry =
         ExecuteEntry.newBuilder()
             .setOperationName("operation-with-cached-action-result")
@@ -637,8 +678,7 @@ public class ServerInstanceTest {
         .when(mockWorkerInstance)
         .getBlobWrite(
             any(Compressor.Value.class),
-            any(Digest.class),
-            any(DigestFunction.Value.class),
+            any(build.buildfarm.v1test.Digest.class),
             any(UUID.class),
             any(RequestMetadata.class));
 
@@ -662,7 +702,8 @@ public class ServerInstanceTest {
 
   @Test
   public void duplicateExecutionsServedFromCacheAreForcedToSkipLookup() throws Exception {
-    ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder().setHash("test").build());
+    ActionKey actionKey =
+        DigestUtil.asActionKey(build.buildfarm.v1test.Digest.newBuilder().setHash("test").build());
     ActionResult actionResult =
         ActionResult.newBuilder()
             .addOutputFiles(
@@ -677,7 +718,7 @@ public class ServerInstanceTest {
     when(mockBackplane.canPrequeue()).thenReturn(true);
     when(mockBackplane.getActionResult(actionKey)).thenReturn(actionResult);
 
-    Digest actionDigest = actionKey.getDigest();
+    build.buildfarm.v1test.Digest actionDigest = actionKey.getDigest();
     RequestMetadata requestMetadata =
         RequestMetadata.newBuilder()
             .setToolDetails(
@@ -736,8 +777,12 @@ public class ServerInstanceTest {
   public void requeueFailsOnMissingDirectory() throws Exception {
     String operationName = "missing-directory-operation";
 
-    Digest missingDirectoryDigest =
-        Digest.newBuilder().setHash("missing-directory").setSizeBytes(1).build();
+    build.buildfarm.v1test.Digest missingDirectoryDigest =
+        build.buildfarm.v1test.Digest.newBuilder()
+            .setHash("missing-directory")
+            .setSize(1)
+            .setDigestFunction(DIGEST_UTIL.getDigestFunction())
+            .build();
 
     when(mockBackplane.propertiesEligibleForQueue(anyList())).thenReturn(true);
 
@@ -749,8 +794,29 @@ public class ServerInstanceTest {
                     Any.pack(ExecuteOperationMetadata.newBuilder().setStage(QUEUED).build()))
                 .build());
 
+    // this test relies on the reconstruction of a missing QueuedOperation
+    // we must return missing for the digest requested
+    ByteString queuedOperationBlob = ByteString.copyFromUtf8("to-be-missing");
+    build.buildfarm.v1test.Digest queuedOperationDigest = DIGEST_UTIL.compute(queuedOperationBlob);
+    doAnswer(
+            (Answer<Void>)
+                invocation -> {
+                  StreamObserver<ByteString> blobObserver =
+                      (StreamObserver) invocation.getArguments()[4];
+                  blobObserver.onError(Status.NOT_FOUND.asException());
+                  return null;
+                })
+        .when(mockWorkerInstance)
+        .getBlob(
+            any(Compressor.Value.class),
+            eq(queuedOperationDigest),
+            any(Long.class),
+            any(Long.class),
+            any(ServerCallStreamObserver.class),
+            any(RequestMetadata.class));
+
     Action action = createAction(true, true, missingDirectoryDigest, SIMPLE_COMMAND);
-    Digest actionDigest = DIGEST_UTIL.compute(action);
+    build.buildfarm.v1test.Digest actionDigest = DIGEST_UTIL.compute(action);
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
             .setExecuteEntry(
@@ -758,6 +824,8 @@ public class ServerInstanceTest {
                     .setOperationName(operationName)
                     .setSkipCacheLookup(true)
                     .setActionDigest(actionDigest))
+            .setQueuedOperationDigest(
+                queuedOperationDigest) // missing, needs to recreate QueuedOperation
             .build();
     instance.requeueOperation(queueEntry, Durations.fromSeconds(60)).get();
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
@@ -784,8 +852,8 @@ public class ServerInstanceTest {
   }
 
   @SuppressWarnings("unchecked")
-  private void provideBlob(Digest digest, ByteString content) {
-    blobDigests.put(digest.getHash(), digest.getSizeBytes());
+  private void provideBlob(build.buildfarm.v1test.Digest digest, ByteString content) {
+    blobDigests.put(digest.getHash(), digest.getSize());
     // FIXME use better answer definitions, without indexes
     doAnswer(
             (Answer<Void>)
@@ -801,7 +869,7 @@ public class ServerInstanceTest {
             eq(Compressor.Value.IDENTITY),
             eq(digest),
             eq(0L),
-            eq(digest.getSizeBytes()),
+            eq(digest.getSize()),
             any(ServerCallStreamObserver.class),
             any(RequestMetadata.class));
   }
@@ -817,10 +885,10 @@ public class ServerInstanceTest {
     QueuedOperation queuedOperation =
         QueuedOperation.newBuilder().setAction(action).setCommand(SIMPLE_COMMAND).build();
     ByteString queuedOperationBlob = queuedOperation.toByteString();
-    Digest queuedOperationDigest = DIGEST_UTIL.compute(queuedOperationBlob);
+    build.buildfarm.v1test.Digest queuedOperationDigest = DIGEST_UTIL.compute(queuedOperationBlob);
     provideBlob(queuedOperationDigest, queuedOperationBlob);
 
-    Digest actionDigest = DIGEST_UTIL.compute(action);
+    build.buildfarm.v1test.Digest actionDigest = DIGEST_UTIL.compute(action);
     QueueEntry queueEntry =
         QueueEntry.newBuilder()
             .setExecuteEntry(
@@ -839,7 +907,10 @@ public class ServerInstanceTest {
     Digest digest = Digest.newBuilder().setHash("hash").setSizeBytes(1).build();
     Iterable<Digest> missingDigests =
         instance
-            .findMissingBlobs(ImmutableList.of(digest), RequestMetadata.getDefaultInstance())
+            .findMissingBlobs(
+                ImmutableList.of(digest),
+                DIGEST_UTIL.getDigestFunction(),
+                RequestMetadata.getDefaultInstance())
             .get();
     assertThat(missingDigests).containsExactly(digest);
   }
@@ -856,12 +927,17 @@ public class ServerInstanceTest {
     List<Digest> queryDigests = ImmutableList.of(digest);
     ArgumentMatcher<Iterable<Digest>> queryMatcher =
         (digests) -> Iterables.elementsEqual(digests, queryDigests);
-    when(mockWorkerInstance.findMissingBlobs(argThat(queryMatcher), any(RequestMetadata.class)))
+    when(mockWorkerInstance.findMissingBlobs(
+            argThat(queryMatcher), eq(DIGEST_UTIL.getDigestFunction()), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(queryDigests));
     Iterable<Digest> missingDigests =
-        instance.findMissingBlobs(queryDigests, RequestMetadata.getDefaultInstance()).get();
+        instance
+            .findMissingBlobs(
+                queryDigests, DIGEST_UTIL.getDigestFunction(), RequestMetadata.getDefaultInstance())
+            .get();
     verify(mockWorkerInstance, times(1))
-        .findMissingBlobs(argThat(queryMatcher), any(RequestMetadata.class));
+        .findMissingBlobs(
+            argThat(queryMatcher), eq(DIGEST_UTIL.getDigestFunction()), any(RequestMetadata.class));
     assertThat(missingDigests).containsExactly(digest);
   }
 
@@ -934,7 +1010,8 @@ public class ServerInstanceTest {
 
   @Test
   public void actionResultWatcherPropagatesNull() {
-    ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder().setHash("test").build());
+    ActionKey actionKey =
+        DigestUtil.asActionKey(build.buildfarm.v1test.Digest.newBuilder().setHash("test").build());
     Watcher mockWatcher = mock(Watcher.class);
     Watcher actionResultWatcher = instance.newActionResultWatcher(actionKey, mockWatcher);
 
@@ -945,7 +1022,8 @@ public class ServerInstanceTest {
 
   @Test
   public void actionResultWatcherDiscardsUncacheableResult() throws Exception {
-    ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder().setHash("test").build());
+    ActionKey actionKey =
+        DigestUtil.asActionKey(build.buildfarm.v1test.Digest.newBuilder().setHash("test").build());
     Watcher mockWatcher = mock(Watcher.class);
     Watcher actionResultWatcher = instance.newActionResultWatcher(actionKey, mockWatcher);
 
@@ -968,7 +1046,8 @@ public class ServerInstanceTest {
 
   @Test
   public void actionResultWatcherWritesThroughCachedResult() throws Exception {
-    ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder().setHash("test").build());
+    ActionKey actionKey =
+        DigestUtil.asActionKey(build.buildfarm.v1test.Digest.newBuilder().setHash("test").build());
     Watcher mockWatcher = mock(Watcher.class);
     Watcher actionResultWatcher = instance.newActionResultWatcher(actionKey, mockWatcher);
 
@@ -1022,9 +1101,9 @@ public class ServerInstanceTest {
     when(mockBackplane.getStorageWorkers()).thenReturn(workers);
 
     ByteString blob = ByteString.copyFromUtf8("blobOnWorker");
-    Digest actualDigest = DIGEST_UTIL.compute(blob);
-    Digest searchDigest = DIGEST_UTIL.build(actualDigest.getHash(), -1);
-    Iterable<Digest> searchDigests = ImmutableList.of(searchDigest);
+    build.buildfarm.v1test.Digest actualDigest = DIGEST_UTIL.compute(blob);
+    build.buildfarm.v1test.Digest searchDigest = DIGEST_UTIL.build(actualDigest.getHash(), -1);
+    Iterable<Digest> searchDigests = ImmutableList.of(DigestUtil.toDigest(searchDigest));
 
     doAnswer(
             (Answer<ListenableFuture<Iterable<Digest>>>)
@@ -1037,7 +1116,8 @@ public class ServerInstanceTest {
                           .collect(Collectors.toList()));
                 })
         .when(mockWorkerInstance)
-        .findMissingBlobs(any(Iterable.class), any(RequestMetadata.class));
+        .findMissingBlobs(
+            any(Iterable.class), any(DigestFunction.Value.class), any(RequestMetadata.class));
 
     ArgumentMatcher<Iterable<Digest>> searchMatcher =
         (digests) -> Iterables.elementsEqual(digests, searchDigests);
@@ -1046,19 +1126,21 @@ public class ServerInstanceTest {
     boolean containsBeforeAdding =
         instance.containsBlob(searchDigest, result, RequestMetadata.getDefaultInstance());
     verify(mockWorkerInstance, times(1))
-        .findMissingBlobs(argThat(searchMatcher), any(RequestMetadata.class));
+        .findMissingBlobs(
+            argThat(searchMatcher), any(DigestFunction.Value.class), any(RequestMetadata.class));
     assertThat(containsBeforeAdding).isFalse();
 
-    blobDigests.put(actualDigest.getHash(), actualDigest.getSizeBytes());
+    blobDigests.put(actualDigest.getHash(), actualDigest.getSize());
 
     result = Digest.newBuilder();
     boolean containsAfterAdding =
         instance.containsBlob(searchDigest, result, RequestMetadata.getDefaultInstance());
     verify(mockWorkerInstance, times(2))
-        .findMissingBlobs(argThat(searchMatcher), any(RequestMetadata.class));
+        .findMissingBlobs(
+            argThat(searchMatcher), any(DigestFunction.Value.class), any(RequestMetadata.class));
 
     assertThat(containsAfterAdding).isTrue();
-    assertThat(result.build()).isEqualTo(actualDigest);
+    assertThat(result.build()).isEqualTo(DigestUtil.toDigest(actualDigest));
 
     verify(mockBackplane, atLeastOnce()).getStorageWorkers();
     verify(mockInstanceLoader, atLeastOnce()).load(eq(workerName));
@@ -1069,6 +1151,7 @@ public class ServerInstanceTest {
     Set<String> activeWorkers = ImmutableSet.of("worker1", "worker2", "worker3");
     Set<String> expiredWorkers = ImmutableSet.of("workerX", "workerY", "workerZ");
     Set<String> imposterWorkers = ImmutableSet.of("imposter1", "imposter2", "imposter3");
+    DigestFunction.Value digestFunction = DigestFunction.Value.MURMUR3;
 
     Set<Digest> availableDigests =
         ImmutableSet.of(
@@ -1108,16 +1191,19 @@ public class ServerInstanceTest {
                 Digest.newBuilder().setHash("toBeFoundDuplicate").setSizeBytes(1).build(),
                 Digest.newBuilder().setHash("missingDuplicate").setSizeBytes(1).build()));
 
-    Map<Digest, Set<String>> digestAndWorkersMap = new HashMap<>();
+    Map<build.buildfarm.v1test.Digest, Set<String>> digestAndWorkersMap = new HashMap<>();
 
     for (Digest digest : availableDigests) {
-      digestAndWorkersMap.put(digest, getRandomSubset(activeWorkers));
+      digestAndWorkersMap.put(
+          DigestUtil.fromDigest(digest, digestFunction), getRandomSubset(activeWorkers));
     }
     for (Digest digest : missingDigests) {
-      digestAndWorkersMap.put(digest, getRandomSubset(expiredWorkers));
+      digestAndWorkersMap.put(
+          DigestUtil.fromDigest(digest, digestFunction), getRandomSubset(expiredWorkers));
     }
     for (Digest digest : digestAvailableOnImposters) {
-      digestAndWorkersMap.put(digest, getRandomSubset(imposterWorkers));
+      digestAndWorkersMap.put(
+          DigestUtil.fromDigest(digest, digestFunction), getRandomSubset(imposterWorkers));
     }
 
     BuildfarmConfigs buildfarmConfigs = instance.getBuildFarmConfigs();
@@ -1128,7 +1214,8 @@ public class ServerInstanceTest {
     when(mockBackplane.getStorageWorkers()).thenReturn(activeAndImposterWorkers);
     when(mockBackplane.getBlobDigestsWorkers(any(Iterable.class))).thenReturn(digestAndWorkersMap);
     when(mockInstanceLoader.load(anyString())).thenReturn(mockWorkerInstance);
-    when(mockWorkerInstance.findMissingBlobs(anyIterable(), any(RequestMetadata.class)))
+    when(mockWorkerInstance.findMissingBlobs(
+            anyIterable(), any(DigestFunction.Value.class), any(RequestMetadata.class)))
         .thenReturn(Futures.immediateFuture(new ArrayList<>()));
 
     long serverStartTime = 1686951033L; // june 15th, 2023
@@ -1140,22 +1227,28 @@ public class ServerInstanceTest {
         .thenReturn(workersStartTime);
     long oneDay = 86400L;
     for (Digest digest : availableDigests) {
-      when(mockBackplane.getDigestInsertTime(digest)).thenReturn(serverStartTime + oneDay);
+      when(mockBackplane.getDigestInsertTime(DigestUtil.fromDigest(digest, digestFunction)))
+          .thenReturn(serverStartTime + oneDay);
     }
     for (Digest digest : digestAvailableOnImposters) {
-      when(mockBackplane.getDigestInsertTime(digest)).thenReturn(serverStartTime - oneDay);
+      when(mockBackplane.getDigestInsertTime(DigestUtil.fromDigest(digest, digestFunction)))
+          .thenReturn(serverStartTime - oneDay);
     }
 
     Iterable<Digest> actualMissingDigests =
-        instance.findMissingBlobs(allDigests, RequestMetadata.getDefaultInstance()).get();
+        instance
+            .findMissingBlobs(allDigests, digestFunction, RequestMetadata.getDefaultInstance())
+            .get();
     Iterable<Digest> expectedMissingDigests =
         Iterables.concat(missingDigests, digestAvailableOnImposters);
 
     assertThat(actualMissingDigests).containsExactlyElementsIn(expectedMissingDigests);
     verify(mockWorkerInstance, atMost(3))
-        .findMissingBlobs(anyIterable(), any(RequestMetadata.class));
+        .findMissingBlobs(
+            anyIterable(), any(DigestFunction.Value.class), any(RequestMetadata.class));
     verify(mockWorkerInstance, atLeast(1))
-        .findMissingBlobs(anyIterable(), any(RequestMetadata.class));
+        .findMissingBlobs(
+            anyIterable(), any(DigestFunction.Value.class), any(RequestMetadata.class));
 
     for (Digest digest : actualMissingDigests) {
       assertThat(digest).isNotIn(availableDigests);

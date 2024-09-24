@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
@@ -51,7 +52,8 @@ public class ContentAddressableStorageServiceTest {
     StreamObserver<FindMissingBlobsResponse> responseObserver = mock(StreamObserver.class);
 
     when(instance.getName()).thenReturn("test");
-    when(instance.findMissingBlobs(any(Iterable.class), any(RequestMetadata.class)))
+    when(instance.findMissingBlobs(
+            any(Iterable.class), any(DigestFunction.Value.class), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
     service.findMissingBlobs(FindMissingBlobsRequest.getDefaultInstance(), responseObserver);
@@ -60,7 +62,9 @@ public class ContentAddressableStorageServiceTest {
     verify(responseObserver, times(1)).onCompleted();
     verifyNoMoreInteractions(responseObserver);
     verify(instance, times(1)).getName();
-    verify(instance, times(1)).findMissingBlobs(any(Iterable.class), any(RequestMetadata.class));
+    verify(instance, times(1))
+        .findMissingBlobs(
+            any(Iterable.class), any(DigestFunction.Value.class), any(RequestMetadata.class));
     verifyNoMoreInteractions(instance);
   }
 
@@ -73,7 +77,8 @@ public class ContentAddressableStorageServiceTest {
     StreamObserver<FindMissingBlobsResponse> responseObserver = mock(StreamObserver.class);
 
     when(instance.getName()).thenReturn("test");
-    when(instance.findMissingBlobs(any(Iterable.class), any(RequestMetadata.class)))
+    when(instance.findMissingBlobs(
+            any(Iterable.class), any(DigestFunction.Value.class), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
     doThrow(Status.CANCELLED.asRuntimeException())
         .when(responseObserver)
@@ -83,7 +88,9 @@ public class ContentAddressableStorageServiceTest {
 
     verify(responseObserver, times(1)).onNext(any(FindMissingBlobsResponse.class));
     verifyNoMoreInteractions(responseObserver);
-    verify(instance, times(1)).findMissingBlobs(any(Iterable.class), any(RequestMetadata.class));
+    verify(instance, times(1))
+        .findMissingBlobs(
+            any(Iterable.class), any(DigestFunction.Value.class), any(RequestMetadata.class));
     verifyNoMoreInteractions(instance);
   }
 

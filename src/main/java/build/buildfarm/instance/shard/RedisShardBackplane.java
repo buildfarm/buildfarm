@@ -21,7 +21,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
 import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
@@ -42,6 +41,7 @@ import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTime;

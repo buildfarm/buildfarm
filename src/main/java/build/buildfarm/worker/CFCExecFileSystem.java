@@ -30,12 +30,14 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.Dirent;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.worker.ExecDirException.ViolationException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -174,7 +176,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
 
   @SuppressWarnings("ConstantConditions")
   private ListenableFuture<Void> put(Digest digest, Path path, boolean isExecutable) {
-    if (digest.getSizeBytes() == 0) {
+    if (digest.getSize() == 0) {
       return listeningDecorator(fetchService)
           .submit(
               () -> {
@@ -187,7 +189,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
     return transformAsync(
         fileCache.put(digest, isExecutable, fetchService),
         (fileCachePath) -> {
-          if (digest.getSizeBytes() != 0) {
+          if (digest.getSize() != 0) {
             try {
               Files.copy(fileCachePath, path);
             } catch (IOException e) {
@@ -297,7 +299,11 @@ public class CFCExecFileSystem implements ExecFileSystem {
 
   @Override
   public Path createExecDir(
-      String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
+      String operationName,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
+      DigestFunction.Value digestFunction,
+      Action action,
+      Command command)
       throws IOException, InterruptedException {
     OutputDirectory outputDirectory = createOutputDirectory(command);
 
@@ -307,7 +313,8 @@ public class CFCExecFileSystem implements ExecFileSystem {
     log.log(Level.FINER, operationName + " walking execTree");
     ExecTree execTree = new ExecTree(directoriesIndex);
     ExecFileVisitor visitor = new ExecFileVisitor();
-    execTree.walk(execDir, action.getInputRootDigest(), visitor);
+    execTree.walk(
+        execDir, DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction), visitor);
 
     // TODO refactor into single future that produces all exceptions in a list
     Iterable<ListenableFuture<Void>> fetchedFutures = visitor.futures();

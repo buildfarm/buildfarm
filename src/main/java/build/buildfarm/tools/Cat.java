@@ -26,7 +26,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
@@ -38,9 +38,11 @@ import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -90,7 +92,7 @@ class Cat {
     System.out.println(capabilities);
   }
 
-  private static void printAction(ByteString actionBlob) {
+  private static void printAction(ByteString actionBlob, DigestFunction.Value digestFunction) {
     Action action;
     try {
       action = Action.parseFrom(actionBlob);
@@ -98,13 +100,20 @@ class Cat {
       System.out.println("Not an action");
       return;
     }
-    printAction(0, action);
+    printAction(0, action, digestFunction);
   }
 
-  private static void printAction(int level, Action action) {
-    indentOut(level, "Command Digest: Command " + DigestUtil.toString(action.getCommandDigest()));
+  private static void printAction(int level, Action action, DigestFunction.Value digestFunction) {
     indentOut(
-        level, "Input Root Digest: Directory " + DigestUtil.toString(action.getInputRootDigest()));
+        level,
+        "Command Digest: Command "
+            + DigestUtil.toString(
+                DigestUtil.fromDigest(action.getCommandDigest(), digestFunction)));
+    indentOut(
+        level,
+        "Input Root Digest: Directory "
+            + DigestUtil.toString(
+                DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction)));
     indentOut(level, "DoNotCache: " + (action.getDoNotCache() ? "true" : "false"));
     if (action.hasTimeout()) {
       indentOut(
@@ -152,7 +161,8 @@ class Cat {
   }
 
   @SuppressWarnings("ConstantConditions")
-  private static void printActionResult(ActionResult result, int indentLevel) {
+  private static void printActionResult(
+      ActionResult result, DigestFunction.Value digestFunction, int indentLevel) {
     for (OutputFile outputFile : result.getOutputFilesList()) {
       String attrs = "";
       if (outputFile.getIsExecutable()) {
@@ -167,7 +177,7 @@ class Cat {
               + outputFile.getPath()
               + attrs
               + " File "
-              + DigestUtil.toString(outputFile.getDigest()));
+              + DigestUtil.toString(DigestUtil.fromDigest(outputFile.getDigest(), digestFunction)));
     }
     for (OutputDirectory outputDirectory : result.getOutputDirectoriesList()) {
       indentOut(
@@ -175,20 +185,29 @@ class Cat {
           "Output Directory: "
               + outputDirectory.getPath()
               + " Directory "
-              + DigestUtil.toString(outputDirectory.getTreeDigest()));
+              + DigestUtil.toString(
+                  DigestUtil.fromDigest(outputDirectory.getTreeDigest(), digestFunction)));
     }
     indentOut(indentLevel, "Exit Code: " + result.getExitCode());
     if (!result.getStdoutRaw().isEmpty()) {
       indentOut(indentLevel, "Stdout: " + result.getStdoutRaw().toStringUtf8());
     }
     if (result.hasStdoutDigest()) {
-      indentOut(indentLevel, "Stdout Digest: " + DigestUtil.toString(result.getStdoutDigest()));
+      indentOut(
+          indentLevel,
+          "Stdout Digest: "
+              + DigestUtil.toString(
+                  DigestUtil.fromDigest(result.getStdoutDigest(), digestFunction)));
     }
     if (!result.getStderrRaw().isEmpty()) {
       indentOut(indentLevel, "Stderr: " + result.getStderrRaw().toStringUtf8());
     }
     if (result.hasStderrDigest()) {
-      indentOut(indentLevel, "Stderr Digest: " + DigestUtil.toString(result.getStderrDigest()));
+      indentOut(
+          indentLevel,
+          "Stderr Digest: "
+              + DigestUtil.toString(
+                  DigestUtil.fromDigest(result.getStderrDigest(), digestFunction)));
     }
     if (result.hasExecutionMetadata()) {
       indentOut(indentLevel, "ExecutionMetadata:");
@@ -248,17 +267,24 @@ class Cat {
     }
   }
 
-  private static void printFindMissing(Instance instance, Iterable<Digest> digests)
+  private static void printFindMissing(
+      Instance instance,
+      Iterable<build.bazel.remote.execution.v2.Digest> digests,
+      DigestFunction.Value digestFunction)
       throws ExecutionException, InterruptedException {
     Stopwatch stopwatch = Stopwatch.createStarted();
-    Iterable<Digest> missingDigests =
-        instance.findMissingBlobs(digests, RequestMetadata.getDefaultInstance()).get();
+    Iterable<build.bazel.remote.execution.v2.Digest> missingDigests =
+        instance
+            .findMissingBlobs(digests, digestFunction, RequestMetadata.getDefaultInstance())
+            .get();
     long elapsedMicros = stopwatch.elapsed(TimeUnit.MICROSECONDS);
 
     boolean missing = false;
-    for (Digest missingDigest : missingDigests) {
+    for (build.bazel.remote.execution.v2.Digest missingDigest : missingDigests) {
       System.out.printf(
-          "Missing: %s Took %gms%n", DigestUtil.toString(missingDigest), elapsedMicros / 1000.0f);
+          "Missing: %s Took %gms%n",
+          DigestUtil.toString(DigestUtil.fromDigest(missingDigest, digestFunction)),
+          elapsedMicros / 1000.0f);
       missing = true;
     }
     if (!missing) {
@@ -278,9 +304,9 @@ class Cat {
   }
 
   private static long computeDirectoryWeights(
-      Digest directoryDigest,
-      Map<Digest, Directory> directoriesIndex,
-      Map<Digest, Long> directoryWeights) {
+      build.bazel.remote.execution.v2.Digest directoryDigest,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
+      Map<build.bazel.remote.execution.v2.Digest, Long> directoryWeights) {
     long weight = directoryDigest.getSizeBytes();
     Directory directory = directoriesIndex.get(directoryDigest);
     if (directory != null) {
@@ -301,9 +327,10 @@ class Cat {
   private static void printTreeAt(
       int indentLevel,
       Directory directory,
-      Map<Digest, Directory> directoriesIndex,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
+      DigestFunction.Value digestFunction,
       long totalWeight,
-      Map<Digest, Long> directoryWeights) {
+      Map<build.bazel.remote.execution.v2.Digest, Long> directoryWeights) {
     for (DirectoryNode dirNode : directory.getDirectoriesList()) {
       Directory subDirectory = directoriesIndex.get(dirNode.getDigest());
       long weight = directoryWeights.get(dirNode.getDigest());
@@ -313,7 +340,13 @@ class Cat {
       if (subDirectory == null) {
         indentOut(indentLevel + 1, "DIRECTORY MISSING FROM CAS");
       } else {
-        printTreeAt(indentLevel + 1, subDirectory, directoriesIndex, totalWeight, directoryWeights);
+        printTreeAt(
+            indentLevel + 1,
+            subDirectory,
+            directoriesIndex,
+            digestFunction,
+            totalWeight,
+            directoryWeights);
       }
     }
     for (FileNode fileNode : directory.getFilesList()) {
@@ -323,7 +356,7 @@ class Cat {
               "%s%s %s",
               name,
               fileNode.getIsExecutable() ? "*" : "",
-              DigestUtil.toString(fileNode.getDigest()));
+              DigestUtil.toString(DigestUtil.fromDigest(fileNode.getDigest(), digestFunction)));
       indentOut(indentLevel, displayName);
     }
   }
@@ -335,12 +368,20 @@ class Cat {
     printTreeLayout(new ProxyDirectoriesIndex(tree.getDirectoriesMap()), tree.getRootDigest());
   }
 
-  private static void printTreeLayout(Map<Digest, Directory> directoriesIndex, Digest rootDigest) {
-    Map<Digest, Long> directoryWeights = Maps.newHashMap();
-    long totalWeight = computeDirectoryWeights(rootDigest, directoriesIndex, directoryWeights);
+  private static void printTreeLayout(
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex, Digest rootDigest) {
+    Map<build.bazel.remote.execution.v2.Digest, Long> directoryWeights = Maps.newHashMap();
+    long totalWeight =
+        computeDirectoryWeights(
+            DigestUtil.toDigest(rootDigest), directoriesIndex, directoryWeights);
 
     printTreeAt(
-        0, directoriesIndex.get(rootDigest), directoriesIndex, totalWeight, directoryWeights);
+        0,
+        directoriesIndex.get(DigestUtil.toDigest(rootDigest)),
+        directoriesIndex,
+        rootDigest.getDigestFunction(),
+        totalWeight,
+        directoryWeights);
   }
 
   private static Tree reTreeToTree(
@@ -369,7 +410,7 @@ class Cat {
     indentOut(level, "Directory (Root): " + rootDigest);
     for (Map.Entry<String, Directory> entry : tree.getDirectoriesMap().entrySet()) {
       System.out.println("Directory: " + entry.getKey());
-      printDirectory(1, entry.getValue());
+      printDirectory(1, entry.getValue(), rootDigest.getDigestFunction());
     }
   }
 
@@ -384,7 +425,7 @@ class Cat {
     System.out.println("QueuedOperation:");
     System.out.println(
         "  Action: " + DigestUtil.toString(digestUtil.compute(queuedOperation.getAction())));
-    printAction(2, queuedOperation.getAction());
+    printAction(2, queuedOperation.getAction(), digestUtil.getDigestFunction());
     System.out.println("  Command:");
     printCommand(2, queuedOperation.getCommand());
     System.out.println("  Tree:");
@@ -408,13 +449,14 @@ class Cat {
     for (Message message : messages.build()) {
       Digest digest = digestUtil.compute(message);
       try (OutputStream out =
-          Files.newOutputStream(blobs.resolve(digest.getHash() + "_" + digest.getSizeBytes()))) {
+          Files.newOutputStream(blobs.resolve(digest.getHash() + "_" + digest.getSize()))) {
         message.toByteString().writeTo(out);
       }
     }
   }
 
-  private static void printDirectory(ByteString directoryBlob) {
+  private static void printDirectory(
+      ByteString directoryBlob, DigestFunction.Value digestFunction) {
     Directory directory;
     try {
       directory = Directory.parseFrom(directoryBlob);
@@ -423,10 +465,11 @@ class Cat {
       return;
     }
 
-    printDirectory(0, directory);
+    printDirectory(0, directory, digestFunction);
   }
 
-  private static void printDirectory(int indentLevel, Directory directory) {
+  private static void printDirectory(
+      int indentLevel, Directory directory, DigestFunction.Value digestFunction) {
     boolean filesUnsorted = false;
     String last = "";
     for (FileNode fileNode : directory.getFilesList()) {
@@ -437,7 +480,10 @@ class Cat {
       }
       indentOut(
           indentLevel,
-          "File: " + displayName + " File " + DigestUtil.toString(fileNode.getDigest()));
+          "File: "
+              + displayName
+              + " File "
+              + DigestUtil.toString(DigestUtil.fromDigest(fileNode.getDigest(), digestFunction)));
       if (!filesUnsorted && last.compareTo(name) > 0) {
         filesUnsorted = true;
       } else {
@@ -456,7 +502,8 @@ class Cat {
           "Dir: "
               + directoryNode.getName()
               + " Directory "
-              + DigestUtil.toString(directoryNode.getDigest()));
+              + DigestUtil.toString(
+                  DigestUtil.fromDigest(directoryNode.getDigest(), digestFunction)));
       if (!directoriesUnsorted && last.compareTo(directoryNode.getName()) > 0) {
         directoriesUnsorted = true;
       } else {
@@ -535,11 +582,12 @@ class Cat {
     }
   }
 
-  private static void printExecuteResponse(ExecuteResponse response)
+  private static void printExecuteResponse(
+      ExecuteResponse response, DigestFunction.Value digestFunction)
       throws InvalidProtocolBufferException {
     printStatus(response.getStatus());
     if (Code.forNumber(response.getStatus().getCode()) == Code.OK) {
-      printActionResult(response.getResult(), 2);
+      printActionResult(response.getResult(), digestFunction, 2);
       System.out.println("  CachedResult: " + (response.getCachedResult() ? "true" : "false"));
     }
     // FIXME server_logs
@@ -550,6 +598,7 @@ class Cat {
     if (operation.getDone()) {
       System.out.println("Done");
     }
+    DigestFunction.Value digestFunction = DigestFunction.Value.UNKNOWN;
     try {
       ExecuteOperationMetadata metadata;
       RequestMetadata requestMetadata;
@@ -565,7 +614,11 @@ class Cat {
       printExecutedActionMetadata(metadata.getPartialExecutionMetadata(), 1);
       System.out.println("Metadata:");
       System.out.println("  Stage: " + metadata.getStage());
-      System.out.println("  Action: " + DigestUtil.toString(metadata.getActionDigest()));
+      // digestFunction = metadata.getDigestFunction();
+      System.out.println(
+          "  Action: "
+              + DigestUtil.toString(
+                  DigestUtil.fromDigest(metadata.getActionDigest(), digestFunction)));
       System.out.println("  Stdout Stream: " + metadata.getStdoutStreamName());
       System.out.println("  Stderr Stream: " + metadata.getStderrStreamName());
       if (requestMetadata != null) {
@@ -579,7 +632,8 @@ class Cat {
         case RESPONSE:
           System.out.println("Response:");
           try {
-            printExecuteResponse(operation.getResponse().unpack(ExecuteResponse.class));
+            printExecuteResponse(
+                operation.getResponse().unpack(ExecuteResponse.class), digestFunction);
           } catch (InvalidProtocolBufferException e) {
             System.out.println("  UNKNOWN RESPONSE TYPE: " + operation.getResponse());
           }
@@ -753,21 +807,19 @@ class Cat {
   }
 
   public static void main(String[] args) throws Exception {
-    if (args.length < 4) {
+    if (args.length < 3) {
       usage();
       System.exit(1);
     }
 
     String host = args[0];
     String instanceName = args[1];
-    DigestUtil digestUtil = DigestUtil.forHash(args[2]);
-    String type = args[3];
-    main(host, instanceName, digestUtil, type, Iterables.skip(Lists.newArrayList(args), 4));
+    String type = args[2];
+    main(host, instanceName, type, Iterables.skip(Lists.newArrayList(args), 3));
   }
 
   @SuppressWarnings("ThrowFromFinallyBlock")
-  private static void main(
-      String host, String instanceName, DigestUtil digestUtil, String type, Iterable<String> args)
+  private static void main(String host, String instanceName, String type, Iterable<String> args)
       throws Exception {
     ScheduledExecutorService service = newSingleThreadScheduledExecutor();
     Context.CancellableContext ctx =
@@ -775,7 +827,7 @@ class Cat {
             .withDeadlineAfter(deadlineSecondsForType(type), TimeUnit.SECONDS, service);
     Context prevContext = ctx.attach();
     try {
-      cancellableMain(host, instanceName, digestUtil, type, args);
+      cancellableMain(host, instanceName, type, args);
     } finally {
       ctx.cancel(null);
       ctx.detach(prevContext);
@@ -865,11 +917,17 @@ class Cat {
 
     @Override
     public void run(Instance instance, Iterable<String> args) throws Exception {
-      printFindMissing(
-          instance,
+      ImmutableList<Digest> digests =
           StreamSupport.stream(args.spliterator(), false)
               .map(DigestUtil::parseDigest)
-              .collect(Collectors.toList()));
+              .collect(ImmutableList.toImmutableList());
+
+      if (!digests.isEmpty()) {
+        printFindMissing(
+            instance,
+            Iterables.transform(digests, DigestUtil::toDigest),
+            digests.getFirst().getDigestFunction());
+      }
     }
   }
 
@@ -945,7 +1003,7 @@ class Cat {
               .getActionResult(DigestUtil.asActionKey(digest), RequestMetadata.getDefaultInstance())
               .get();
       if (actionResult != null) {
-        printActionResult(actionResult, 0);
+        printActionResult(actionResult, digest.getDigestFunction(), 0);
       } else {
         System.out.println("ActionResult not found for " + DigestUtil.toString(digest));
       }
@@ -1005,10 +1063,12 @@ class Cat {
       run(
           instance,
           getBlob(
-              instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance()));
+              instance, Compressor.Value.IDENTITY, digest, RequestMetadata.getDefaultInstance()),
+          digest.getDigestFunction());
     }
 
-    protected abstract void run(Instance instance, ByteString blob) throws Exception;
+    protected abstract void run(
+        Instance instance, ByteString blob, DigestFunction.Value digestFunction) throws Exception;
   }
 
   static class CatAction extends BlobCommand {
@@ -1023,8 +1083,8 @@ class Cat {
     }
 
     @Override
-    protected void run(Instance instance, ByteString blob) {
-      printAction(blob);
+    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction) {
+      printAction(blob, digestFunction);
     }
   }
 
@@ -1040,8 +1100,8 @@ class Cat {
     }
 
     @Override
-    protected void run(Instance instance, ByteString blob) {
-      printQueuedOperation(blob, instance.getDigestUtil());
+    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction) {
+      printQueuedOperation(blob, new DigestUtil(HashFunction.get(digestFunction)));
     }
   }
 
@@ -1053,8 +1113,9 @@ class Cat {
     }
 
     @Override
-    protected void run(Instance instance, ByteString blob) throws Exception {
-      dumpQueuedOperation(blob, instance.getDigestUtil());
+    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction)
+        throws Exception {
+      dumpQueuedOperation(blob, new DigestUtil(HashFunction.get(digestFunction)));
     }
   }
 
@@ -1065,9 +1126,11 @@ class Cat {
     }
 
     @Override
-    protected void run(Instance instance, ByteString blob) throws Exception {
+    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction)
+        throws Exception {
       printREDirectoryTree(
-          instance.getDigestUtil(), build.bazel.remote.execution.v2.Tree.parseFrom(blob));
+          new DigestUtil(HashFunction.get(digestFunction)),
+          build.bazel.remote.execution.v2.Tree.parseFrom(blob));
     }
   }
 
@@ -1078,9 +1141,11 @@ class Cat {
     }
 
     @Override
-    protected void run(Instance instance, ByteString blob) throws Exception {
+    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction)
+        throws Exception {
       printRETreeLayout(
-          instance.getDigestUtil(), build.bazel.remote.execution.v2.Tree.parseFrom(blob));
+          new DigestUtil(HashFunction.get(digestFunction)),
+          build.bazel.remote.execution.v2.Tree.parseFrom(blob));
     }
   }
 
@@ -1096,7 +1161,7 @@ class Cat {
     }
 
     @Override
-    protected void run(Instance instance, ByteString blob) {
+    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction) {
       printCommand(blob);
     }
   }
@@ -1113,8 +1178,8 @@ class Cat {
     }
 
     @Override
-    protected void run(Instance instance, ByteString blob) {
-      printDirectory(blob);
+    protected void run(Instance instance, ByteString blob, DigestFunction.Value digestFunction) {
+      printDirectory(blob, digestFunction);
     }
   }
 
@@ -1141,7 +1206,7 @@ class Cat {
   };
 
   static void usage() {
-    System.err.println("Usage: bf-cat <host:port> <instance-name> <digest-type> <type>");
+    System.err.println("Usage: bf-cat <host:port> <instance-name> <type>");
     System.err.println("\nRequest, retrieve, and display information related to REAPI services:");
     for (CatCommand command : commands) {
       System.err.printf("\t%s\t%s%n", command.name(), command.description());
@@ -1149,11 +1214,10 @@ class Cat {
   }
 
   private static void cancellableMain(
-      String host, String instanceName, DigestUtil digestUtil, String type, Iterable<String> args)
-      throws Exception {
+      String host, String instanceName, String type, Iterable<String> args) throws Exception {
     ManagedChannel channel = createChannel(host);
     Instance instance =
-        new StubInstance(instanceName, "bf-cat", digestUtil, channel, Durations.fromSeconds(10));
+        new StubInstance(instanceName, "bf-cat", channel, Durations.fromSeconds(10));
     // should do something to match caps against requested digests
     try {
       for (CatCommand command : commands) {

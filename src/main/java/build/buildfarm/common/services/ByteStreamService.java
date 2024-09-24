@@ -14,9 +14,9 @@
 
 package build.buildfarm.common.services;
 
-import static build.buildfarm.common.UrlPath.detectResourceOperation;
-import static build.buildfarm.common.UrlPath.parseBlobDigest;
 import static build.buildfarm.common.resources.ResourceParser.parseUploadBlobRequest;
+import static build.buildfarm.common.resources.UrlPath.detectResourceOperation;
+import static build.buildfarm.common.resources.UrlPath.parseBlobDigest;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static io.grpc.Status.INVALID_ARGUMENT;
 import static io.grpc.Status.NOT_FOUND;
@@ -24,10 +24,8 @@ import static io.grpc.Status.OUT_OF_RANGE;
 import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.EntryLimitException;
-import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.config.BuildfarmConfigs;
@@ -38,7 +36,9 @@ import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.resources.DownloadBlobRequest;
 import build.buildfarm.common.resources.ResourceParser;
 import build.buildfarm.common.resources.UploadBlobRequest;
+import build.buildfarm.common.resources.UrlPath.InvalidResourceNameException;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.Digest;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
@@ -241,8 +241,10 @@ public class ByteStreamService extends ByteStreamImplBase {
     ServerCallStreamObserver<ReadResponse> target =
         onErrorLogReadObserver(
             format(
-                "%s(%s)",
-                DigestUtil.toString(downloadBlobRequest.getBlob().getDigest()), instance.getName()),
+                "%s/%s(%s)",
+                downloadBlobRequest.getBlob().getDigest().getDigestFunction(),
+                DigestUtil.toString(downloadBlobRequest.getBlob().getDigest()),
+                instance.getName()),
             downloadBlobRequest.getBlob().getCompressor(),
             offset,
             (ServerCallStreamObserver<ReadResponse>) responseObserver);
@@ -265,7 +267,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
-    long available = downloadBlobRequest.getBlob().getDigest().getSizeBytes() - offset;
+    long available = downloadBlobRequest.getBlob().getDigest().getSize() - offset;
     if (available == 0) {
       responseObserver.onCompleted();
     } else if (available < 0) {
@@ -386,14 +388,16 @@ public class ByteStreamService extends ByteStreamImplBase {
     return new Write() {
       @Override
       public long getCommittedSize() {
-        return isComplete() ? digest.getSizeBytes() : 0;
+        return isComplete() ? digest.getSize() : 0;
       }
 
       @Override
       public boolean isComplete() {
         try {
           return instance.containsBlob(
-              digest, Digest.newBuilder(), TracingMetadataUtils.fromCurrentContext());
+              digest,
+              build.bazel.remote.execution.v2.Digest.newBuilder(),
+              TracingMetadataUtils.fromCurrentContext());
         } catch (InterruptedException e) {
           throw new RuntimeException("interrupted checking for completion", e);
         }
@@ -428,13 +432,12 @@ public class ByteStreamService extends ByteStreamImplBase {
       throws EntryLimitException {
     UploadBlobRequest request = parseUploadBlobRequest(resourceName);
     Digest digest = request.getBlob().getDigest();
-    if (digest.getSizeBytes() == 0) {
+    if (digest.getSize() == 0) {
       return new CompleteWrite(0);
     }
     return instance.getBlobWrite(
         request.getBlob().getCompressor(),
         digest,
-        request.getBlob().getDigestFunction(),
         UUID.fromString(request.getUuid()),
         TracingMetadataUtils.fromCurrentContext());
   }

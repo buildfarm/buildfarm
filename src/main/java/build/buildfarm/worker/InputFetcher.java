@@ -27,6 +27,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.FileNode;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.OperationFailer;
 import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -222,6 +223,7 @@ public class InputFetcher implements Runnable {
           workerContext.createExecDir(
               executionName,
               directoriesIndex,
+              executionContext.queueEntry.getExecuteEntry().getActionDigest().getDigestFunction(),
               queuedOperation.getAction(),
               queuedOperation.getCommand());
     } catch (IOException e) {
@@ -242,7 +244,8 @@ public class InputFetcher implements Runnable {
 
     /* tweak command executable used */
     String programName = queuedOperation.getCommand().getArguments(0);
-    Directory root = directoriesIndex.get(queuedOperation.getTree().getRootDigest());
+    Directory root =
+        directoriesIndex.get(DigestUtil.toDigest(queuedOperation.getTree().getRootDigest()));
     Command command =
         queuedOperation.getCommand().toBuilder()
             .clearArguments()
