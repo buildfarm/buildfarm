@@ -16,14 +16,15 @@ package build.buildfarm.worker.cgroup;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import jnr.constants.platform.Signal;
 import jnr.posix.POSIX;
@@ -91,37 +92,47 @@ public final class Group {
     return getPids(controllerName).size();
   }
 
-  /** Returns true if no processes exist under the controller path */
-  private void killAllProcs(List<Integer> pids) throws IOException {
-    for (int pid : pids) {
+  /**
+   * Send SIGKILL to some process IDs
+   *
+   * @param processIds Process IDs to send a signal to
+   */
+  private void killAllProcesses(Iterable<Integer> processIds) {
+    for (int pid : processIds) {
       posix.kill(pid, Signal.SIGKILL.intValue());
     }
   }
 
-  private List<Integer> getPids(String controllerName) throws IOException {
+  /**
+   * Get the list of Process IDs in a given CGroup by name.
+   *
+   * @param controllerName cgroup name, relative to cgroup root.
+   * @return Set of process IDs or empty set if the CGroup is currently empty.
+   * @throws IOException if the CGroup process list cannot be read or parsed.
+   */
+  private @Nonnull Set<Integer> getPids(String controllerName) throws IOException {
     Path path = getPath(controllerName);
     Path procs = path.resolve("cgroup.procs");
     try {
       return Files.readAllLines(procs).stream()
           .map(Integer::parseInt)
-          .collect(ImmutableList.toImmutableList());
+          .collect(ImmutableSet.toImmutableSet());
     } catch (IOException e) {
       if (Files.exists(path)) {
         throw e;
       }
       // nonexistent controller path means no processes
-      return ImmutableList.of();
+      return ImmutableSet.of();
     }
   }
 
-  @SuppressWarnings({"StatementWithEmptyBody", "PMD.EmptyControlStatement"})
   public void killUntilEmpty(String controllerName) throws IOException {
     Deadline deadline = Deadline.after(1, SECONDS);
-    List<Integer> prevPids = new ArrayList<>();
-    for (List<Integer> pids = getPids(controllerName);
+    Set<Integer> prevPids = new HashSet<>();
+    for (Set<Integer> pids = getPids(controllerName);
         !pids.isEmpty();
         pids = getPids(controllerName)) {
-      killAllProcs(pids);
+      killAllProcesses(pids);
       if (deadline.isExpired() || !pids.containsAll(prevPids) || prevPids.containsAll(pids)) {
         deadline = Deadline.after(1, SECONDS);
         log.warning("Killed processes with PIDs: " + pids);
