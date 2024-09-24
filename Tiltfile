@@ -25,7 +25,7 @@ def worker_deps():
   if USE_BAZEL_QUERY_TO_REBUILD:
     return bazel_sourcefile_deps('//:buildfarm-shard-worker.tar')
   return ()
-  
+
 def server_deps():
   if USE_BAZEL_QUERY_TO_REBUILD:
     return bazel_sourcefile_deps('//:buildfarm-shard-worker.tar')

@@ -102,7 +102,7 @@ the `WORKSPACE` file.
 
 Buildfarm can be used as an external repository for composition into a deployment of your choice.
 See also the documentation site in the [Worker Execution Environment](https://bazelbuild.github.io/bazel-buildfarm/docs/architecture/worker-execution-environment/) section.
- 
+
 Add the following to your `MODULE.bazel` to get access to buildfarm targets, filling in the `<COMMIT-SHA>` values:
 
 ```starlark

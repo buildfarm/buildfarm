@@ -5,8 +5,8 @@ based off Bazel's persistent workers implementation.
 
 ___
 
-We split persistent workers into two targets:  
-`persistentworkers/src/main/java/persistent/common:persistent-common`  
+We split persistent workers into two targets:
+`persistentworkers/src/main/java/persistent/common:persistent-common`
 `persistentworkers/src/main/java/persistent/bazel:bazel-persistent-workers`
 
 

@@ -23,10 +23,10 @@ print_error () {
 # Download tool if we don't already have it.
 download_tool () {
     if [ ! -d "$TOOL_FOLDER" ] ; then
-        
+
         #download tool
         wget -O $LOCAL_DOWNLOAD_NAME $TOOL_URL
-        
+
         #delete the zip and give tool common name.
         mkdir $TOOL_FOLDER;
         mv checkstyle.jar $TOOL_FOLDER;
@@ -62,7 +62,7 @@ main () {
         run_static_analysis_checks
         analyze_static_analysis_results
     fi;
-    
+
 }
 
 main

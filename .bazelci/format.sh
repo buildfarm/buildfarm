@@ -49,10 +49,10 @@ run_java_formatter () {
         wget -O $LOCAL_FORMATTER $JAVA_FORMATTER_URL
         chmod +x $LOCAL_FORMATTER
     fi
-    
+
      # Get all the files to format and format them
     files=$(find src/* -type f -name "*.java")
-    
+
     # Check whether any formatting changes need to be made.
     # This is intended to be done by the CI.
     if [[ "$@" == "--check" ]]

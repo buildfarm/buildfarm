@@ -20,14 +20,14 @@ extract_package_name_from_source() {
 }
 derive_package_name_from_file() {
         local package_name=$1
-        
+
         # remove path prefix
         package_name=${package_name#"src/main/java/"}
         package_name=${package_name#"src/test/java/"}
-        
+
         # remove file name
         package_name="${package_name%/*}"
-        
+
         # turn path substring into package
         package_name="${package_name////$'.'}"
         echo $package_name
