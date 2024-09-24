@@ -29,11 +29,11 @@ print_error () {
 # Download tool if we don't already have it.
 download_tool () {
     if [ ! -d "$TOOL_FOLDER" ] ; then
-        
+
         #download and extract tool
         wget -O $LOCAL_DOWNLOAD_NAME $PMD_TOOL_URL
         unzip $LOCAL_DOWNLOAD_NAME
-        
+
         #delete the zip and give tool common name.
         rm $LOCAL_DOWNLOAD_NAME
         mv pmd-* $TOOL_FOLDER;
@@ -93,7 +93,7 @@ main () {
         run_code_duplication_check
         analyze_code_duplication_results
     fi;
-    
+
 }
 
 main

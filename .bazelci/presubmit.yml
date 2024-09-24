@@ -122,7 +122,7 @@ tasks:
     - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/integration_test.sh
-  
+
   # Test the buildfarm deployment with the full config.
   # More issues can be caught when using the fully defined configuration file.
   integration_test_many_full_config:
