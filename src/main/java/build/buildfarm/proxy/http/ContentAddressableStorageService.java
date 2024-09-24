@@ -14,6 +14,7 @@
 
 package build.buildfarm.proxy.http;
 
+import static build.buildfarm.common.DigestUtil.optionalDigestFunction;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -22,15 +23,17 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import build.buildfarm.v1test.Digest;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
@@ -56,13 +59,23 @@ public class ContentAddressableStorageService
     this.treeMaxPageSize = treeMaxPageSize;
   }
 
+  private static String key(
+      build.bazel.remote.execution.v2.Digest digest, DigestFunction.Value digestFunction) {
+    Digest blobDigest = DigestUtil.fromDigest(digest, digestFunction);
+    return digestKey(blobDigest);
+  }
+
+  public static String digestKey(Digest digest) {
+    return optionalDigestFunction(digest.getDigestFunction()) + digest.getHash();
+  }
+
   @Override
   public void findMissingBlobs(
       FindMissingBlobsRequest request, StreamObserver<FindMissingBlobsResponse> responseObserver) {
     FindMissingBlobsResponse.Builder responseBuilder = FindMissingBlobsResponse.newBuilder();
     try {
-      for (Digest blobDigest : request.getBlobDigestsList()) {
-        if (!simpleBlobStore.containsKey(blobDigest.getHash())) {
+      for (build.bazel.remote.execution.v2.Digest blobDigest : request.getBlobDigestsList()) {
+        if (!simpleBlobStore.containsKey(key(blobDigest, request.getDigestFunction()))) {
           responseBuilder.addMissingBlobDigests(blobDigest);
         }
       }
@@ -84,9 +97,12 @@ public class ContentAddressableStorageService
     Function<com.google.rpc.Code, com.google.rpc.Status> statusForCode =
         (code) -> com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build();
     for (Request request : batchRequest.getRequestsList()) {
-      Digest digest = request.getDigest();
+      build.bazel.remote.execution.v2.Digest digest = request.getDigest();
       try {
-        simpleBlobStore.put(digest.getHash(), digest.getSizeBytes(), request.getData().newInput());
+        simpleBlobStore.put(
+            key(digest, batchRequest.getDigestFunction()),
+            digest.getSizeBytes(),
+            request.getData().newInput());
         responses.add(
             BatchUpdateBlobsResponse.Response.newBuilder()
                 .setDigest(digest)
@@ -125,11 +141,11 @@ public class ContentAddressableStorageService
     TokenizableIterator<DirectoryEntry> iter =
         new TreeIterator(
             (digest) -> {
-              ByteString.Output stream = ByteString.newOutput((int) digest.getSizeBytes());
+              ByteString.Output stream = ByteString.newOutput((int) digest.getSize());
               try {
                 return transform(
                         catching(
-                            simpleBlobStore.get(digest.getHash(), stream),
+                            simpleBlobStore.get(digestKey(digest), stream),
                             Exception.class,
                             (e) -> false,
                             directExecutor()),
@@ -179,7 +195,11 @@ public class ContentAddressableStorageService
     }
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
     String nextPageToken =
-        getTree(request.getRootDigest(), pageSize, request.getPageToken(), directories);
+        getTree(
+            DigestUtil.fromDigest(request.getRootDigest(), request.getDigestFunction()),
+            pageSize,
+            request.getPageToken(),
+            directories);
 
     responseObserver.onNext(
         GetTreeResponse.newBuilder()

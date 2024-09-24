@@ -32,7 +32,7 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageImplBase;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
@@ -43,6 +43,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Write;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance.ReadBlobInterchange;
+import build.buildfarm.v1test.Digest;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
@@ -103,29 +104,19 @@ public class StubInstanceTest {
 
   private StubInstance newStubInstance(String instanceName) {
     return new StubInstance(
-        instanceName,
-        DIGEST_UTIL,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build());
+        instanceName, InProcessChannelBuilder.forName(fakeServerName).directExecutor().build());
   }
 
   @Test
-  public void reflectsNameAndDigestUtil() {
+  public void reflectsName() {
     String test1Name = "test1";
-    ByteString test1Blob = ByteString.copyFromUtf8(test1Name);
-    DigestUtil test1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
-    Instance test1Instance = new StubInstance(test1Name, test1DigestUtil, /* channel= */ null);
+    Instance test1Instance = new StubInstance(test1Name, /* channel= */ null);
     assertThat(test1Instance.getName()).isEqualTo(test1Name);
-    assertThat(test1Instance.getDigestUtil().compute(test1Blob))
-        .isEqualTo(test1DigestUtil.compute(test1Blob));
 
     /* and once again to verify that those values change due to inputs */
     String test2Name = "test2";
-    ByteString test2Blob = ByteString.copyFromUtf8(test2Name);
-    DigestUtil test2DigestUtil = new DigestUtil(DigestUtil.HashFunction.MD5);
-    Instance test2Instance = new StubInstance(test2Name, test2DigestUtil, /* channel= */ null);
+    Instance test2Instance = new StubInstance(test2Name, /* channel= */ null);
     assertThat(test2Instance.getName()).isEqualTo(test2Name);
-    assertThat(test2Instance.getDigestUtil().compute(test2Blob))
-        .isEqualTo(test2DigestUtil.compute(test2Blob));
   }
 
   @Test
@@ -146,7 +137,8 @@ public class StubInstanceTest {
         .isNull();
     GetActionResultRequest request = reference.get();
     assertThat(request.getInstanceName()).isEqualTo(instance.getName());
-    assertThat(request.getActionDigest()).isEqualTo(actionKey.getDigest());
+    assertThat(DigestUtil.fromDigest(request.getActionDigest(), request.getDigestFunction()))
+        .isEqualTo(actionKey.getDigest());
     instance.stop();
   }
 
@@ -166,13 +158,13 @@ public class StubInstanceTest {
     String instanceName = "putActionResult-test";
     Instance instance = newStubInstance(instanceName);
     ActionKey actionKey =
-        DigestUtil.asActionKey(
-            Digest.newBuilder().setHash("action-digest").setSizeBytes(1).build());
+        DigestUtil.asActionKey(Digest.newBuilder().setHash("action-digest").setSize(1).build());
     ActionResult actionResult = ActionResult.getDefaultInstance();
     instance.putActionResult(actionKey, actionResult);
     UpdateActionResultRequest request = reference.get();
     assertThat(request.getInstanceName()).isEqualTo(instanceName);
-    assertThat(request.getActionDigest()).isEqualTo(actionKey.getDigest());
+    assertThat(DigestUtil.fromDigest(request.getActionDigest(), request.getDigestFunction()))
+        .isEqualTo(actionKey.getDigest());
     assertThat(request.getActionResult()).isEqualTo(actionResult);
     instance.stop();
   }
@@ -193,43 +185,62 @@ public class StubInstanceTest {
           }
         });
     Instance instance = newStubInstance("findMissingBlobs-test");
-    Iterable<Digest> digests =
-        ImmutableList.of(Digest.newBuilder().setHash("present").setSizeBytes(1).build());
-    assertThat(instance.findMissingBlobs(digests, RequestMetadata.getDefaultInstance()).get())
+    Iterable<build.bazel.remote.execution.v2.Digest> digests =
+        ImmutableList.of(
+            build.bazel.remote.execution.v2.Digest.newBuilder()
+                .setHash("present")
+                .setSizeBytes(1)
+                .build());
+    assertThat(
+            instance
+                .findMissingBlobs(
+                    digests, DigestFunction.Value.UNKNOWN, RequestMetadata.getDefaultInstance())
+                .get())
         .isEmpty();
     instance.stop();
+    assertThat(reference.get()).isNotNull();
   }
 
   @Test
   public void findMissingBlobsOverSizeLimitRecombines()
       throws ExecutionException, InterruptedException {
     AtomicReference<FindMissingBlobsRequest> reference = new AtomicReference<>();
+    StubInstance instance = newStubInstance("findMissingBlobs-test");
+    instance.maxRequestSize = 1024;
     serviceRegistry.addService(
         new ContentAddressableStorageImplBase() {
           @Override
           public void findMissingBlobs(
               FindMissingBlobsRequest request,
               StreamObserver<FindMissingBlobsResponse> responseObserver) {
-            reference.set(request);
-            responseObserver.onNext(
-                FindMissingBlobsResponse.newBuilder()
-                    .addAllMissingBlobDigests(request.getBlobDigestsList())
-                    .build());
-            responseObserver.onCompleted();
+            if (request.getBlobDigestsCount() < instance.maxRequestSize) {
+              // must have been split
+              reference.set(request);
+              responseObserver.onNext(
+                  FindMissingBlobsResponse.newBuilder()
+                      .addAllMissingBlobDigests(request.getBlobDigestsList())
+                      .build());
+              responseObserver.onCompleted();
+            } else {
+              responseObserver.onError(new RuntimeException());
+            }
           }
         });
-    StubInstance instance = newStubInstance("findMissingBlobs-test");
-    instance.maxRequestSize = 1024;
-    ImmutableList.Builder<Digest> builder = ImmutableList.builder();
+    ImmutableList.Builder<build.bazel.remote.execution.v2.Digest> builder = ImmutableList.builder();
     // generates digest size * 1024 serialized size at least
     for (int i = 0; i < 1024; i++) {
       ByteString content = ByteString.copyFromUtf8("Hello, World! " + UUID.randomUUID());
-      builder.add(DIGEST_UTIL.compute(content));
+      builder.add(DigestUtil.toDigest(DIGEST_UTIL.compute(content)));
     }
-    ImmutableList<Digest> digests = builder.build();
-    assertThat(instance.findMissingBlobs(digests, RequestMetadata.getDefaultInstance()).get())
+    ImmutableList<build.bazel.remote.execution.v2.Digest> digests = builder.build();
+    assertThat(
+            instance
+                .findMissingBlobs(
+                    digests, DIGEST_UTIL.getDigestFunction(), RequestMetadata.getDefaultInstance())
+                .get())
         .containsExactlyElementsIn(digests);
     instance.stop();
+    assertThat(reference.get()).isNotNull();
   }
 
   @Test
@@ -318,12 +329,19 @@ public class StubInstanceTest {
     Instance instance = newStubInstance("putAllBlobs-test");
     ByteString firstData = ByteString.copyFromUtf8("first");
     Request first =
-        Request.newBuilder().setDigest(DIGEST_UTIL.compute(firstData)).setData(firstData).build();
+        Request.newBuilder()
+            .setDigest(DigestUtil.toDigest(DIGEST_UTIL.compute(firstData)))
+            .setData(firstData)
+            .build();
     ByteString lastData = ByteString.copyFromUtf8("last");
     Request last =
-        Request.newBuilder().setDigest(DIGEST_UTIL.compute(lastData)).setData(lastData).build();
+        Request.newBuilder()
+            .setDigest(DigestUtil.toDigest(DIGEST_UTIL.compute(lastData)))
+            .setData(lastData)
+            .build();
     ImmutableList<Request> requests = ImmutableList.of(first, last);
-    ImmutableList<Digest> digests = ImmutableList.of(first.getDigest(), last.getDigest());
+    ImmutableList<build.bazel.remote.execution.v2.Digest> digests =
+        ImmutableList.of(first.getDigest(), last.getDigest());
     assertThat(
             instance.putAllBlobs(
                 requests, DIGEST_UTIL.getDigestFunction(), RequestMetadata.getDefaultInstance()))
@@ -411,7 +429,7 @@ public class StubInstanceTest {
     IOException ioException = null;
     Instance instance = newStubInstance("input-stream-non-deadline-exceeded");
     Digest unavailableDigest =
-        Digest.newBuilder().setHash("unavailable-blob-name").setSizeBytes(1).build();
+        Digest.newBuilder().setHash("unavailable-blob-name").setSize(1).build();
     try (InputStream in =
         instance.newBlobInput(
             Compressor.Value.IDENTITY,
@@ -455,7 +473,7 @@ public class StubInstanceTest {
         });
     Instance instance = newStubInstance("input-stream-stalled");
     ByteArrayOutputStream out = new ByteArrayOutputStream();
-    Digest delayedDigest = Digest.newBuilder().setHash("delayed-blob-name").setSizeBytes(1).build();
+    Digest delayedDigest = Digest.newBuilder().setHash("delayed-blob-name").setSize(1).build();
     try (InputStream in =
         instance.newBlobInput(
             Compressor.Value.IDENTITY,
@@ -483,7 +501,7 @@ public class StubInstanceTest {
     OutputStream out = mock(OutputStream.class);
     IOException ioException = null;
     Instance instance = newStubInstance("input-stream-deadline-exceeded");
-    Digest timeoutDigest = Digest.newBuilder().setHash("timeout-blob-name").setSizeBytes(1).build();
+    Digest timeoutDigest = Digest.newBuilder().setHash("timeout-blob-name").setSize(1).build();
     try (InputStream in =
         instance.newBlobInput(
             Compressor.Value.IDENTITY,

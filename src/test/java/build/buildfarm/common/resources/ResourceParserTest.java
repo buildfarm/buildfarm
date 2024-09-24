@@ -60,7 +60,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
     assertThat(request.getMetadata()).isEqualTo("");
   }
 
@@ -90,7 +90,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
     assertThat(request.getMetadata()).isEqualTo("");
   }
 
@@ -120,7 +120,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
     assertThat(request.getMetadata()).isEqualTo("metadata");
   }
 
@@ -150,7 +150,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
     assertThat(request.getMetadata()).isEqualTo("metadata");
   }
 
@@ -179,7 +179,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
     assertThat(request.getMetadata()).isEqualTo("");
   }
 
@@ -208,7 +208,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
     assertThat(request.getMetadata()).isEqualTo("this/metadata/is/multipart.cc");
   }
 
@@ -238,7 +238,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
     assertThat(request.getMetadata()).isEqualTo("this/metadata/is/multipart.cc");
   }
 
@@ -267,7 +267,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.ZSTD);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
     assertThat(request.getMetadata()).isEqualTo("this/metadata/is/multipart.cc");
   }
 
@@ -296,7 +296,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
     assertThat(request.getMetadata()).isEqualTo("this/metadata/is/multipart.cc");
   }
 
@@ -325,7 +325,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
     assertThat(request.getMetadata())
         .isEqualTo("this/has/keywords/blobs/compressed-blobs/operations");
   }
@@ -354,7 +354,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
   }
 
   // Function under test: getResourceType, parseDownloadBlobRequest
@@ -381,7 +381,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
   }
 
   // Function under test: getResourceType, parseDownloadBlobRequest
@@ -408,7 +408,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
   }
 
   // Function under test: getResourceType, parseDownloadBlobRequest
@@ -435,7 +435,7 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.ZSTD);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
   }
 
   // Function under test: getResourceType, parseDownloadBlobRequest
@@ -462,6 +462,6 @@ public class ResourceParserTest {
     assertThat(request.getBlob().getCompressor()).isEqualTo(Compressor.Value.IDENTITY);
     assertThat(request.getBlob().getDigest().getHash())
         .isEqualTo("0000000000000000000000000000000000000000000000000000000000000000");
-    assertThat(request.getBlob().getDigest().getSizeBytes()).isEqualTo(123);
+    assertThat(request.getBlob().getDigest().getSize()).isEqualTo(123);
   }
 }

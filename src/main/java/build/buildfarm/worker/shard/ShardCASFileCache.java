@@ -15,12 +15,11 @@
 package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
+import build.buildfarm.v1test.Digest;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,7 +39,6 @@ class ShardCASFileCache extends CASFileCache {
       int maxBucketLevels,
       boolean storeFileDirsIndexInMemory,
       boolean execRootFallback,
-      DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder,
       FixedBufferPool zstdBufferPool,
@@ -55,7 +53,6 @@ class ShardCASFileCache extends CASFileCache {
         maxBucketLevels,
         storeFileDirsIndexInMemory,
         execRootFallback,
-        digestUtil,
         expireService,
         accessRecorder,
         /* storage= */ Maps.newConcurrentMap(),

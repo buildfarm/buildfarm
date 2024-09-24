@@ -15,8 +15,8 @@
 package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.v1test.Digest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;

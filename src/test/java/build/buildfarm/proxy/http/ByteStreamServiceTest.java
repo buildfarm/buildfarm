@@ -23,9 +23,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.v1test.Digest;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
@@ -147,7 +147,7 @@ public class ByteStreamServiceTest {
     assertThat(response)
         .isEqualTo(
             QueryWriteStatusResponse.newBuilder()
-                .setCommittedSize(digest.getSizeBytes())
+                .setCommittedSize(digest.getSize())
                 .setComplete(true)
                 .build());
     verify(simpleBlobStore, times(1)).containsKey(eq(digest.getHash()));
@@ -194,7 +194,7 @@ public class ByteStreamServiceTest {
     call.request(1);
 
     verify(simpleBlobStore, times(1))
-        .put(eq(digest.getHash()), eq(digest.getSizeBytes()), any(InputStream.class));
+        .put(eq(digest.getHash()), eq(digest.getSize()), any(InputStream.class));
   }
 
   @Test
@@ -280,7 +280,7 @@ public class ByteStreamServiceTest {
     ArgumentCaptor<InputStream> inputStreamCaptor = ArgumentCaptor.forClass(InputStream.class);
 
     verify(simpleBlobStore, times(1))
-        .put(eq(digest.getHash()), eq(digest.getSizeBytes()), inputStreamCaptor.capture());
+        .put(eq(digest.getHash()), eq(digest.getSize()), inputStreamCaptor.capture());
     InputStream inputStream = inputStreamCaptor.getValue();
     assertThat(inputStream.available()).isEqualTo(helloWorld.size());
     byte[] data = new byte[helloWorld.size()];

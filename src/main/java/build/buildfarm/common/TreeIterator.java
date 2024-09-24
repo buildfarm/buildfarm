@@ -15,6 +15,7 @@
 package build.buildfarm.common;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.buildfarm.v1test.TreeIteratorToken;
@@ -32,21 +33,26 @@ import lombok.Getter;
 
 public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryEntry> {
   private final DirectoryFetcher directoryFetcher;
+  private final DigestFunction.Value digestFunction;
   private Deque<Digest> path;
   private final ArrayDeque<Digest> parentPath;
   private final Stack<Iterator<Digest>> pointers;
 
   @FunctionalInterface
   public interface DirectoryFetcher {
-    Directory fetch(Digest digest);
+    Directory fetch(build.buildfarm.v1test.Digest digest);
   }
 
-  public TreeIterator(DirectoryFetcher directoryFetcher, Digest rootDigest, String pageToken) {
+  public TreeIterator(
+      DirectoryFetcher directoryFetcher,
+      build.buildfarm.v1test.Digest rootDigest,
+      String pageToken) {
     this.directoryFetcher = directoryFetcher;
+    digestFunction = rootDigest.getDigestFunction();
     parentPath = new ArrayDeque<>();
     pointers = new Stack<>();
 
-    Iterator<Digest> iter = Iterators.singletonIterator(rootDigest);
+    Iterator<Digest> iter = Iterators.singletonIterator(DigestUtil.toDigest(rootDigest));
 
     // initial page token is empty
     if (!pageToken.isEmpty()) {
@@ -137,7 +143,7 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
     if (digest.getSizeBytes() == 0) {
       return Directory.getDefaultInstance();
     }
-    return directoryFetcher.fetch(digest);
+    return directoryFetcher.fetch(DigestUtil.fromDigest(digest, digestFunction));
   }
 
   private TreeIteratorToken parseToken(byte[] bytes) {

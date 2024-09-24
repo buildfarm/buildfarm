@@ -17,9 +17,11 @@ package build.buildfarm.worker.shard;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.FuseCAS;
 import java.io.IOException;
@@ -68,9 +70,14 @@ class FuseExecFileSystem implements ExecFileSystem {
 
   @Override
   public Path createExecDir(
-      String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
+      String operationName,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
+      DigestFunction.Value digestFunction,
+      Action action,
+      Command command)
       throws IOException, InterruptedException {
-    fuseCAS.createInputRoot(operationName, action.getInputRootDigest());
+    fuseCAS.createInputRoot(
+        operationName, DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction));
     return root.resolve(operationName);
   }
 

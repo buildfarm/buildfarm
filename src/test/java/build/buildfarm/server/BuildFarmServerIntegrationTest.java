@@ -36,7 +36,6 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteRequest;
@@ -53,6 +52,7 @@ import build.buildfarm.common.config.Queue;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
@@ -136,7 +136,8 @@ public class BuildFarmServerIntegrationTest {
         stub.batchReadBlobs(
             BatchReadBlobsRequest.newBuilder()
                 .setInstanceName(INSTANCE_NAME)
-                .addDigests(digest)
+                .addDigests(DigestUtil.toDigest(digest))
+                .setDigestFunction(digest.getDigestFunction())
                 .build());
     BatchReadBlobsResponse.Response response = batchResponse.getResponsesList().get(0);
     com.google.rpc.Status status = response.getStatus();
@@ -152,11 +153,13 @@ public class BuildFarmServerIntegrationTest {
   @Test
   public void findMissingBlobs() {
     DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
-    Iterable<Digest> digests = Collections.singleton(digestUtil.compute(content));
+    Iterable<build.bazel.remote.execution.v2.Digest> digests =
+        Collections.singleton(DigestUtil.toDigest(digestUtil.compute(content)));
     FindMissingBlobsRequest request =
         FindMissingBlobsRequest.newBuilder()
             .setInstanceName(INSTANCE_NAME)
             .addAllBlobDigests(digests)
+            .setDigestFunction(digestUtil.getDigestFunction())
             .build();
     ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub stub =
         ContentAddressableStorageGrpc.newBlockingStub(inProcessChannel);
@@ -173,7 +176,12 @@ public class BuildFarmServerIntegrationTest {
     BatchUpdateBlobsRequest request =
         BatchUpdateBlobsRequest.newBuilder()
             .setInstanceName(INSTANCE_NAME)
-            .addRequests(Request.newBuilder().setDigest(digest).setData(content).build())
+            .addRequests(
+                Request.newBuilder()
+                    .setDigest(DigestUtil.toDigest(digest))
+                    .setData(content)
+                    .build())
+            .setDigestFunction(digest.getDigestFunction())
             .build();
     ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub stub =
         ContentAddressableStorageGrpc.newBlockingStub(inProcessChannel);
@@ -182,7 +190,7 @@ public class BuildFarmServerIntegrationTest {
 
     Response expected =
         Response.newBuilder()
-            .setDigest(digest)
+            .setDigest(DigestUtil.toDigest(digest))
             .setStatus(com.google.rpc.Status.newBuilder().setCode(Code.OK.getNumber()).build())
             .build();
     assertThat(response.getResponsesList())
@@ -343,7 +351,10 @@ public class BuildFarmServerIntegrationTest {
     Directory root = Directory.getDefaultInstance();
     Digest rootBlobDigest = digestUtil.compute(root);
     Action action =
-        actionBuilder.setCommandDigest(commandDigest).setInputRootDigest(rootBlobDigest).build();
+        actionBuilder
+            .setCommandDigest(DigestUtil.toDigest(commandDigest))
+            .setInputRootDigest(DigestUtil.toDigest(rootBlobDigest))
+            .build();
     Digest actionDigest = digestUtil.compute(action);
     ByteStreamUploader uploader =
         new ByteStreamUploader(INSTANCE_NAME, inProcessChannel, null, 60, Retrier.NO_RETRIES);
@@ -361,7 +372,8 @@ public class BuildFarmServerIntegrationTest {
     ExecuteRequest executeRequest =
         ExecuteRequest.newBuilder()
             .setInstanceName(INSTANCE_NAME)
-            .setActionDigest(actionDigest)
+            .setActionDigest(DigestUtil.toDigest(actionDigest))
+            .setDigestFunction(actionDigest.getDigestFunction())
             .setSkipCacheLookup(true)
             .build();
 
@@ -377,7 +389,8 @@ public class BuildFarmServerIntegrationTest {
     GetActionResultRequest request =
         GetActionResultRequest.newBuilder()
             .setInstanceName(INSTANCE_NAME)
-            .setActionDigest(digestUtil.empty())
+            .setActionDigest(DigestUtil.toDigest(digestUtil.empty()))
+            .setDigestFunction(digestUtil.getDigestFunction())
             .build();
 
     ActionCacheGrpc.ActionCacheBlockingStub actionCacheStub =

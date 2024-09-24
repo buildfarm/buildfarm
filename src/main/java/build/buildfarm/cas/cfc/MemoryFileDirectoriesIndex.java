@@ -14,8 +14,8 @@
 
 package build.buildfarm.cas.cfc;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.v1test.Digest;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.HashSet;

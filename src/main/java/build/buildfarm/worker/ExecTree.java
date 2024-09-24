@@ -4,6 +4,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.worker.ExecTreeWalker.Event;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -18,10 +19,11 @@ class ExecTree {
     this.index = index;
   }
 
-  public Path walk(Path start, Digest digest, FileVisitor<? super Path> visitor)
+  public Path walk(
+      Path start, build.buildfarm.v1test.Digest digest, FileVisitor<? super Path> visitor)
       throws IOException {
-    try (ExecTreeWalker walker = new ExecTreeWalker(index)) {
-      Event ev = walker.walk(start, digest);
+    try (ExecTreeWalker walker = new ExecTreeWalker(index, digest.getDigestFunction())) {
+      Event ev = walker.walk(start, DigestUtil.toDigest(digest));
       do {
         FileVisitResult result =
             switch (ev.getType()) {

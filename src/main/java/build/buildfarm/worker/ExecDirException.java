@@ -19,9 +19,9 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static java.util.logging.Level.SEVERE;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.cfc.PutDirectoryException;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.v1test.Digest;
 import com.google.protobuf.Any;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;

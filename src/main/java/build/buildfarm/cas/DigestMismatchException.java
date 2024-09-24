@@ -14,8 +14,8 @@
 
 package build.buildfarm.cas;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.v1test.Digest;
 import java.io.IOException;
 import lombok.Getter;
 

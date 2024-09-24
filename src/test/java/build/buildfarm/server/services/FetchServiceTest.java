@@ -25,11 +25,11 @@ import static org.mockito.Mockito.verify;
 import build.bazel.remote.asset.v1.FetchBlobRequest;
 import build.bazel.remote.asset.v1.FetchBlobResponse;
 import build.bazel.remote.asset.v1.Qualifier;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.Digest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.BaseEncoding;
@@ -51,7 +51,7 @@ public class FetchServiceTest {
 
     ByteString content = ByteString.copyFromUtf8("Fetch Blob Content");
     Digest contentDigest = DIGEST_UTIL.compute(content);
-    Digest containsDigest = contentDigest.toBuilder().setSizeBytes(-1).build();
+    Digest containsDigest = contentDigest.toBuilder().setSize(-1).build();
 
     Iterable<String> uris =
         ImmutableList.of(
@@ -81,12 +81,16 @@ public class FetchServiceTest {
     doAnswer(
             (Answer<Boolean>)
                 invocation -> {
-                  Digest.Builder result = (Digest.Builder) invocation.getArguments()[1];
-                  result.mergeFrom(contentDigest);
+                  build.bazel.remote.execution.v2.Digest.Builder result =
+                      (build.bazel.remote.execution.v2.Digest.Builder) invocation.getArguments()[1];
+                  result.mergeFrom(DigestUtil.toDigest(contentDigest));
                   return true;
                 })
         .when(instance)
-        .containsBlob(eq(containsDigest), any(Digest.Builder.class), any(RequestMetadata.class));
+        .containsBlob(
+            eq(containsDigest),
+            any(build.bazel.remote.execution.v2.Digest.Builder.class),
+            any(RequestMetadata.class));
     StreamObserver<FetchBlobResponse> response = mock(StreamObserver.class);
     service.fetchBlob(request, response);
     verify(instance, never())
@@ -97,7 +101,10 @@ public class FetchServiceTest {
             any(RequestMetadata.class));
     verify(response, times(1)).onCompleted();
     verify(response, times(1))
-        .onNext(FetchBlobResponse.newBuilder().setBlobDigest(contentDigest).build());
+        .onNext(
+            FetchBlobResponse.newBuilder()
+                .setBlobDigest(DigestUtil.toDigest(contentDigest))
+                .build());
   }
 
   private String hashChecksumSRI(String hash) {

@@ -2,8 +2,8 @@ package build.buildfarm.instance.shard;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.v1test.Digest;
 import com.github.fppt.jedismock.RedisServer;
 import com.github.fppt.jedismock.server.ServiceOptions;
 import java.io.IOException;

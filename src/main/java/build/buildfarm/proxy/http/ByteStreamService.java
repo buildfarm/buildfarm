@@ -14,16 +14,17 @@
 
 package build.buildfarm.proxy.http;
 
-import static build.buildfarm.common.UrlPath.detectResourceOperation;
-import static build.buildfarm.common.UrlPath.parseBlobDigest;
-import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
+import static build.buildfarm.common.resources.UrlPath.detectResourceOperation;
+import static build.buildfarm.common.resources.UrlPath.parseBlobDigest;
+import static build.buildfarm.common.resources.UrlPath.parseUploadBlobDigest;
+import static build.buildfarm.proxy.http.ContentAddressableStorageService.digestKey;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
-import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.resources.Resource;
+import build.buildfarm.common.resources.UrlPath.InvalidResourceNameException;
+import build.buildfarm.v1test.Digest;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
@@ -53,7 +54,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
   private ListenableFuture<Boolean> getBlob(
       Digest blobDigest, long offset, long limit, OutputStream out) {
-    int size = (int) blobDigest.getSizeBytes();
+    int size = (int) blobDigest.getSize();
     if (offset < 0
         || size < 0
         || (size == 0 && offset > 0)
@@ -63,7 +64,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
 
     return simpleBlobStore.get(
-        blobDigest.getHash(),
+        digestKey(blobDigest),
         new SkipLimitOutputStream(out, offset, limit <= 0 ? size - offset : limit));
   }
 
@@ -144,12 +145,12 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   private Write findBlobWrite(String resourceName)
       throws IOException, InterruptedException, InvalidResourceNameException {
     Digest digest = parseUploadBlobDigest(resourceName);
-    if (!simpleBlobStore.containsKey(digest.getHash())) {
+    if (!simpleBlobStore.containsKey(digestKey(digest))) {
       return null;
     }
 
     return new CompleteWrite() {
-      final long committedSize = digest.getSizeBytes();
+      final long committedSize = digest.getSize();
 
       @Override
       public long getCommittedSize() {

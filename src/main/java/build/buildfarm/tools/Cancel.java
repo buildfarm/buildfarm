@@ -16,7 +16,6 @@ package build.buildfarm.tools;
 
 import static build.buildfarm.common.grpc.Channels.createChannel;
 
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import io.grpc.ManagedChannel;
@@ -25,10 +24,9 @@ class Cancel {
   public static void main(String[] args) throws Exception {
     String host = args[0];
     String instanceName = args[1];
-    DigestUtil digestUtil = DigestUtil.forHash(args[2]);
     ManagedChannel channel = createChannel(host);
-    Instance instance = new StubInstance(instanceName, digestUtil, channel);
-    for (int i = 3; i < args.length; i++) {
+    Instance instance = new StubInstance(instanceName, channel);
+    for (int i = 2; i < args.length; i++) {
       instance.cancelOperation(args[i]);
     }
     instance.stop();

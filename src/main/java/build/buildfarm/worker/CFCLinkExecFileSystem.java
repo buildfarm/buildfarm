@@ -24,12 +24,13 @@ import static java.util.Collections.synchronizedList;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.io.Directories;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.worker.ExecDirException.ViolationException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -65,8 +66,10 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   // indicate symlinking above for a set of matching paths
   private final Iterable<Pattern> linkedInputDirectories;
 
+  private final Map<Path, DigestFunction.Value> rootInputDigestFunction = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
-  private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
+  private final Map<Path, Iterable<build.bazel.remote.execution.v2.Digest>> rootInputDirectories =
+      new ConcurrentHashMap<>();
 
   public CFCLinkExecFileSystem(
       Path root,
@@ -93,7 +96,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   @SuppressWarnings("ConstantConditions")
   private ListenableFuture<Void> put(
       Digest digest, Path path, boolean isExecutable, Consumer<String> onKey) {
-    if (digest.getSizeBytes() == 0) {
+    if (digest.getSize() == 0) {
       return listeningDecorator(fetchService)
           .submit(
               () -> {
@@ -109,7 +112,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
           checkNotNull(key);
           // we saw null entries in the built immutable list without synchronization
           onKey.accept(key);
-          if (digest.getSizeBytes() != 0) {
+          if (digest.getSize() != 0) {
             try {
               Files.createLink(path, fileCachePath);
             } catch (IOException e) {
@@ -130,7 +133,9 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
 
   @SuppressWarnings("ConstantConditions")
   private ListenableFuture<Void> linkDirectory(
-      Path execPath, Digest digest, Map<Digest, Directory> directoriesIndex) {
+      Path execPath,
+      Digest digest,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex) {
     return transformAsync(
         fileCache.putDirectory(digest, directoriesIndex, fetchService),
         pathResult -> {
@@ -153,7 +158,8 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   }
 
   private static Iterator<String> directoriesIterator(
-      Digest digest, Map<Digest, Directory> directoriesIndex) {
+      build.bazel.remote.execution.v2.Digest digest,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex) {
     Directory root = directoriesIndex.get(digest);
     return new Iterator<>() {
       boolean atEnd = root.getDirectoriesCount() == 0;
@@ -173,7 +179,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         String name = next.getName();
         path.push(name);
         nextPath = String.join("/", path);
-        Digest digest = next.getDigest();
+        build.bazel.remote.execution.v2.Digest digest = next.getDigest();
         if (digest.getSizeBytes() != 0) {
           route.push(current);
           current = directoriesIndex.get(digest).getDirectoriesList().iterator();
@@ -191,7 +197,8 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   }
 
   private Set<String> linkedDirectories(
-      Map<Digest, Directory> directoriesIndex, Digest rootDigest) {
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
+      build.bazel.remote.execution.v2.Digest rootDigest) {
     // skip this search if all the directories are real
     if (linkInputDirectories) {
       ImmutableSet.Builder<String> builder = ImmutableSet.builder();
@@ -231,18 +238,23 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
 
   class LinkExecFileVisitor extends ExecFileVisitor {
     private final Set<Path> linkedDirectories; // only need contains
-    private final Map<Digest, Directory> index; // only need retrieve
+    private final Map<build.bazel.remote.execution.v2.Digest, Directory>
+        index; // only need retrieve
+    private final DigestFunction.Value digestFunction;
     private final OutputDirectory outputDirectoryRoot;
     private final Stack<OutputDirectory> outputDirectories = new Stack<>();
     private final List<String> inputFiles = synchronizedList(new ArrayList<>());
-    private final List<Digest> inputDirectories = synchronizedList(new ArrayList<>());
+    private final List<build.bazel.remote.execution.v2.Digest> inputDirectories =
+        synchronizedList(new ArrayList<>());
 
     LinkExecFileVisitor(
         Set<Path> linkedDirectories,
-        Map<Digest, Directory> index,
+        Map<build.bazel.remote.execution.v2.Digest, Directory> index,
+        DigestFunction.Value digestFunction,
         OutputDirectory outputDirectoryRoot) {
       this.linkedDirectories = linkedDirectories;
       this.index = index;
+      this.digestFunction = digestFunction;
       this.outputDirectoryRoot = outputDirectoryRoot;
     }
 
@@ -250,7 +262,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       return inputFiles;
     }
 
-    List<Digest> inputDirectories() {
+    List<build.bazel.remote.execution.v2.Digest> inputDirectories() {
       return inputDirectories;
     }
 
@@ -267,10 +279,12 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
             parentOutputDirectory != null ? parentOutputDirectory.getChild(name) : null;
       }
       if (outputDirectory == null && linkedDirectories.contains(dir)) {
-        Digest digest = (Digest) attrs.fileKey();
+        // this is scary, given the switch
+        build.bazel.remote.execution.v2.Digest digest =
+            (build.bazel.remote.execution.v2.Digest) attrs.fileKey();
         futures.add(
             transform(
-                linkDirectory(dir, digest, index),
+                linkDirectory(dir, DigestUtil.fromDigest(digest, digestFunction), index),
                 result -> {
                   inputDirectories.add(digest);
                   return result;
@@ -301,10 +315,18 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         ExecSymlinkAttributes symlinkAttrs = (ExecSymlinkAttributes) attrs;
         populate = putSymlink(file, symlinkAttrs.target());
       } else if (attrs.isRegularFile()) {
-        Digest digest = (Digest) attrs.fileKey();
+        // more scary
+        build.bazel.remote.execution.v2.Digest digest =
+            (build.bazel.remote.execution.v2.Digest) attrs.fileKey();
         ExecFileAttributes fileAttrs = (ExecFileAttributes) attrs;
         // mild risk here with inputFiles missing a key that was referenced...
-        populate = catchingPut(digest, root, file, fileAttrs.isExecutable(), inputFiles::add);
+        populate =
+            catchingPut(
+                DigestUtil.fromDigest(digest, digestFunction),
+                root,
+                file,
+                fileAttrs.isExecutable(),
+                inputFiles::add);
       } else {
         populate = immediateFailedFuture(new IOException("unknown file type for " + file));
         terminate = true;
@@ -316,9 +338,13 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
 
   @Override
   public Path createExecDir(
-      String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
+      String operationName,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
+      DigestFunction.Value digestFunction,
+      Action action,
+      Command command)
       throws IOException, InterruptedException {
-    Digest inputRootDigest = action.getInputRootDigest();
+    Digest inputRootDigest = DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction);
     OutputDirectory outputDirectory = createOutputDirectory(command);
 
     Path execDir = root().resolve(operationName);
@@ -331,14 +357,16 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
         linkInputDirectories
             ? ImmutableSet.copyOf(
                 Iterables.transform(
-                    linkedDirectories(directoriesIndex, inputRootDigest), execDir::resolve))
+                    linkedDirectories(directoriesIndex, DigestUtil.toDigest(inputRootDigest)),
+                    execDir::resolve))
             : ImmutableSet.of(); // does this work on windows with / separators?
 
     log.log(Level.FINER, operationName + " walking execTree");
     ExecTree execTree = new ExecTree(directoriesIndex);
     LinkExecFileVisitor visitor =
-        new LinkExecFileVisitor(linkedInputDirectories, directoriesIndex, outputDirectory);
-    execTree.walk(execDir, action.getInputRootDigest(), visitor);
+        new LinkExecFileVisitor(
+            linkedInputDirectories, directoriesIndex, digestFunction, outputDirectory);
+    execTree.walk(execDir, inputRootDigest, visitor);
     Iterable<ListenableFuture<Void>> fetchedFutures = visitor.futures();
     boolean success = false;
     try {
@@ -375,11 +403,13 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       success = true;
     } finally {
       if (!success) {
-        fileCache.decrementReferences(visitor.inputFiles(), visitor.inputDirectories());
+        fileCache.decrementReferences(
+            visitor.inputFiles(), visitor.inputDirectories(), digestFunction);
         Directories.remove(execDir, fileStore);
       }
     }
 
+    rootInputDigestFunction.put(execDir, digestFunction);
     rootInputFiles.put(execDir, visitor.inputFiles());
     rootInputDirectories.put(execDir, visitor.inputDirectories());
 
@@ -401,12 +431,15 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
 
   @Override
   public void destroyExecDir(Path execDir) throws IOException, InterruptedException {
+    DigestFunction.Value digestFunction = rootInputDigestFunction.remove(execDir);
     Iterable<String> inputFiles = rootInputFiles.remove(execDir);
-    Iterable<Digest> inputDirectories = rootInputDirectories.remove(execDir);
+    Iterable<build.bazel.remote.execution.v2.Digest> inputDirectories =
+        rootInputDirectories.remove(execDir);
     if (inputFiles != null || inputDirectories != null) {
       fileCache.decrementReferences(
           inputFiles == null ? ImmutableList.of() : inputFiles,
-          inputDirectories == null ? ImmutableList.of() : inputDirectories);
+          inputDirectories == null ? ImmutableList.of() : inputDirectories,
+          digestFunction);
     }
     super.destroyExecDir(execDir);
   }

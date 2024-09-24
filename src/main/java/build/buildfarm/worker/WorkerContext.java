@@ -18,9 +18,9 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
@@ -62,8 +62,6 @@ public interface WorkerContext {
 
   void match(MatchListener listener) throws InterruptedException;
 
-  DigestUtil getDigestUtil();
-
   List<ExecutionPolicy> getExecutionPolicies(String name);
 
   int getExecuteStageWidth();
@@ -88,13 +86,20 @@ public interface WorkerContext {
       throws IOException, InterruptedException;
 
   Path createExecDir(
-      String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
+      String operationName,
+      Map<Digest, Directory> directoriesIndex,
+      DigestFunction.Value digestFunction,
+      Action action,
+      Command command)
       throws IOException, InterruptedException;
 
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;
 
   void uploadOutputs(
-      Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Command command)
+      build.buildfarm.v1test.Digest actionDigest,
+      ActionResult.Builder resultBuilder,
+      Path actionRoot,
+      Command command)
       throws IOException, InterruptedException, StatusException;
 
   boolean putOperation(Operation operation) throws IOException, InterruptedException;

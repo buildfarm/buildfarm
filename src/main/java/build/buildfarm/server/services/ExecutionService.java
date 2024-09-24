@@ -18,17 +18,21 @@ import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.scheduleAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static java.lang.String.format;
 
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.metrics.MetricsPublisher;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
+import build.buildfarm.v1test.Digest;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
@@ -185,6 +189,17 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
   @Override
   public void execute(ExecuteRequest request, StreamObserver<Operation> responseObserver) {
+    Digest actionDigest =
+        DigestUtil.fromDigest(request.getActionDigest(), request.getDigestFunction());
+    if (actionDigest.getDigestFunction() == DigestFunction.Value.UNKNOWN) {
+      responseObserver.onError(
+          Status.INVALID_ARGUMENT
+              .withDescription(
+                  format(
+                      "digest %s did not match any known types", DigestUtil.toString(actionDigest)))
+              .asException());
+      return;
+    }
     ServerCallStreamObserver<Operation> serverCallStreamObserver =
         (ServerCallStreamObserver<Operation>) responseObserver;
     try {
@@ -192,7 +207,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       withCancellation(
           serverCallStreamObserver,
           instance.execute(
-              request.getActionDigest(),
+              actionDigest,
               request.getSkipCacheLookup(),
               request.getExecutionPolicy(),
               request.getResultsCachePolicy(),

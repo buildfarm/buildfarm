@@ -26,19 +26,18 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
-import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.common.config.Queue;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.MatchListener;
@@ -62,8 +61,6 @@ import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class ShardWorkerContextTest {
-  private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
-
   private BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
   @Mock private Backplane backplane;
@@ -89,7 +86,6 @@ public class ShardWorkerContextTest {
     configs.getBackplane().setQueues(queues);
 
     MockitoAnnotations.initMocks(this);
-    when(instance.getDigestUtil()).thenReturn(DIGEST_UTIL);
   }
 
   WorkerContext createTestContext() {
@@ -190,7 +186,9 @@ public class ShardWorkerContextTest {
     Files.createDirectories(actionRoot.resolve("foo/bar/baz"));
     Files.createFile(actionRoot.resolve("foo/bar/baz/quux"));
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    context.uploadOutputs(Digest.getDefaultInstance(), resultBuilder, actionRoot, command);
+    Digest actionDigest =
+        Digest.newBuilder().setDigestFunction(DigestFunction.Value.SHA256).build();
+    context.uploadOutputs(actionDigest, resultBuilder, actionRoot, command);
 
     ActionResult result = resultBuilder.build();
     OutputFile outputFile = Iterables.getOnlyElement(result.getOutputFilesList());

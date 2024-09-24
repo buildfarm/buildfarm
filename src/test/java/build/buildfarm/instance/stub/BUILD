@@ -11,6 +11,7 @@ java_test(
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@googleapis//google/bytestream:bytestream_java_grpc",

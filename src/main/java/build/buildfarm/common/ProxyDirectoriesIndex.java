@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 
+// this must only be used with a single DigestFunction.Value namespace
 public class ProxyDirectoriesIndex implements Map<Digest, Directory> {
   private final Map<String, Directory> directoriesIndex;
 
@@ -34,8 +35,8 @@ public class ProxyDirectoriesIndex implements Map<Digest, Directory> {
 
   @Override
   public boolean containsKey(Object key) {
-    if (key instanceof Digest) {
-      return directoriesIndex.containsKey(DigestUtil.toString((Digest) key));
+    if (key instanceof Digest digest) {
+      return directoriesIndex.containsKey(digest.getHash());
     }
     return false;
   }

@@ -44,7 +44,6 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CacheCapabilities;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -69,6 +68,7 @@ import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.ProxyDirectoriesIndex;
 import build.buildfarm.common.Size;
@@ -82,6 +82,7 @@ import build.buildfarm.common.resources.DownloadBlobRequest;
 import build.buildfarm.common.resources.ResourceParser;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.InstanceBase;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
@@ -140,6 +141,7 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
@@ -152,7 +154,6 @@ public abstract class NodeInstance extends InstanceBase {
   protected final OperationsMap outstandingOperations;
   protected final OperationsMap completedOperations;
   protected final Map<Digest, ByteString> activeBlobWrites;
-  protected final DigestUtil digestUtil;
   protected final boolean ensureOutputsPresent;
 
   public static final String ACTION_INPUT_ROOT_DIRECTORY_PATH = "";
@@ -232,7 +233,6 @@ public abstract class NodeInstance extends InstanceBase {
 
   public NodeInstance(
       String name,
-      DigestUtil digestUtil,
       ContentAddressableStorage contentAddressableStorage,
       ActionCache actionCache,
       OperationsMap outstandingOperations,
@@ -240,7 +240,6 @@ public abstract class NodeInstance extends InstanceBase {
       Map<Digest, ByteString> activeBlobWrites,
       boolean ensureOutputsPresent) {
     super(name);
-    this.digestUtil = digestUtil;
     this.contentAddressableStorage = contentAddressableStorage;
     this.actionCache = actionCache;
     this.outstandingOperations = outstandingOperations;
@@ -255,17 +254,16 @@ public abstract class NodeInstance extends InstanceBase {
   @Override
   public void stop() throws InterruptedException {}
 
-  @Override
-  public DigestUtil getDigestUtil() {
-    return digestUtil;
-  }
-
-  protected ListenableFuture<Iterable<Digest>> findMissingActionResultOutputs(
-      @Nullable ActionResult result, Executor executor, RequestMetadata requestMetadata) {
+  protected ListenableFuture<Iterable<build.bazel.remote.execution.v2.Digest>>
+      findMissingActionResultOutputs(
+          @Nullable ActionResult result,
+          DigestFunction.Value digestFunction,
+          Executor executor,
+          RequestMetadata requestMetadata) {
     if (result == null) {
       return immediateFuture(ImmutableList.of());
     }
-    ImmutableList.Builder<Digest> digests = ImmutableList.builder();
+    ImmutableList.Builder<build.bazel.remote.execution.v2.Digest> digests = ImmutableList.builder();
     digests.addAll(Iterables.transform(result.getOutputFilesList(), OutputFile::getDigest));
     // findMissingBlobs will weed out empties
     digests.add(result.getStdoutDigest());
@@ -281,7 +279,7 @@ public abstract class NodeInstance extends InstanceBase {
           v ->
               transform(
                   expect(
-                      directory.getTreeDigest(),
+                      DigestUtil.fromDigest(directory.getTreeDigest(), digestFunction),
                       build.bazel.remote.execution.v2.Tree.parser(),
                       executor,
                       requestMetadata),
@@ -294,7 +292,7 @@ public abstract class NodeInstance extends InstanceBase {
     }
     return transformAsync(
         digestsCompleteFuture,
-        v -> findMissingBlobs(digests.build(), requestMetadata),
+        v -> findMissingBlobs(digests.build(), digestFunction, requestMetadata),
         contextExecutor);
   }
 
@@ -315,11 +313,15 @@ public abstract class NodeInstance extends InstanceBase {
 
   @SuppressWarnings("ConstantConditions")
   protected ListenableFuture<ActionResult> ensureOutputsPresent(
-      ListenableFuture<ActionResult> resultFuture, RequestMetadata requestMetadata) {
-    ListenableFuture<Iterable<Digest>> missingOutputsFuture =
+      ListenableFuture<ActionResult> resultFuture,
+      DigestFunction.Value digestFunction,
+      RequestMetadata requestMetadata) {
+    ListenableFuture<Iterable<build.bazel.remote.execution.v2.Digest>> missingOutputsFuture =
         transformAsync(
             resultFuture,
-            result -> findMissingActionResultOutputs(result, directExecutor(), requestMetadata),
+            result ->
+                findMissingActionResultOutputs(
+                    result, digestFunction, directExecutor(), requestMetadata),
             directExecutor());
     return notFoundNullActionResult(
         transformAsync(
@@ -366,7 +368,10 @@ public abstract class NodeInstance extends InstanceBase {
       ActionKey actionKey, RequestMetadata requestMetadata) {
     ListenableFuture<ActionResult> result = checkNotNull(actionCache.get(actionKey));
     if (shouldEnsureOutputsPresent(ensureOutputsPresent, requestMetadata)) {
-      result = checkNotNull(ensureOutputsPresent(result, requestMetadata));
+      result =
+          checkNotNull(
+              ensureOutputsPresent(
+                  result, actionKey.getDigest().getDigestFunction(), requestMetadata));
     }
     return result;
   }
@@ -403,28 +408,26 @@ public abstract class NodeInstance extends InstanceBase {
   @Override
   public Write getBlobWrite(
       Compressor.Value compressor,
-      Digest digest,
-      DigestFunction.Value digestFunction,
+      build.buildfarm.v1test.Digest digest,
       UUID uuid,
       RequestMetadata requestMetadata)
       throws EntryLimitException {
-    Preconditions.checkState(
-        digestFunction == DigestFunction.Value.UNKNOWN
-            || digestFunction == digestUtil.getDigestFunction());
     return contentAddressableStorage.getWrite(compressor, digest, uuid, requestMetadata);
   }
 
   @Override
-  public ListenableFuture<List<Response>> getAllBlobsFuture(Iterable<Digest> digests) {
-    return contentAddressableStorage.getAllFuture(digests);
+  public ListenableFuture<List<Response>> getAllBlobsFuture(
+      Iterable<build.bazel.remote.execution.v2.Digest> digests,
+      DigestFunction.Value digestFunction) {
+    return contentAddressableStorage.getAllFuture(digests, digestFunction);
   }
 
   protected ByteString getBlob(Digest blobDigest) throws InterruptedException {
-    return getBlob(blobDigest, /* count= */ blobDigest.getSizeBytes());
+    return getBlob(blobDigest, /* count= */ blobDigest.getSize());
   }
 
   ByteString getBlob(Digest blobDigest, long count) throws IndexOutOfBoundsException {
-    if (blobDigest.getSizeBytes() == 0) {
+    if (blobDigest.getSize() == 0) {
       if (count >= 0) {
         return ByteString.EMPTY;
       } else {
@@ -448,7 +451,7 @@ public abstract class NodeInstance extends InstanceBase {
   protected ListenableFuture<ByteString> getBlobFuture(
       Compressor.Value compressor, Digest blobDigest, RequestMetadata requestMetadata) {
     return getBlobFuture(
-        compressor, blobDigest, /* count= */ blobDigest.getSizeBytes(), requestMetadata);
+        compressor, blobDigest, /* count= */ blobDigest.getSize(), requestMetadata);
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
@@ -524,32 +527,36 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
-  public boolean containsBlob(Digest digest, Digest.Builder result, RequestMetadata requestMetadata)
+  public boolean containsBlob(
+      Digest digest,
+      build.bazel.remote.execution.v2.Digest.Builder result,
+      RequestMetadata requestMetadata)
       throws InterruptedException {
     return contentAddressableStorage.contains(digest, result);
   }
 
   @Override
-  public Iterable<Digest> putAllBlobs(
+  public Iterable<build.bazel.remote.execution.v2.Digest> putAllBlobs(
       Iterable<BatchUpdateBlobsRequest.Request> requests,
       DigestFunction.Value digestFunction,
       RequestMetadata requestMetadata)
       throws IOException, InterruptedException {
-    ImmutableList.Builder<Digest> blobDigestsBuilder = new ImmutableList.Builder<>();
+    ImmutableList.Builder<build.bazel.remote.execution.v2.Digest> blobDigestsBuilder =
+        new ImmutableList.Builder<>();
     PutAllBlobsException exception = null;
     for (BatchUpdateBlobsRequest.Request request : requests) {
-      Digest digest = request.getDigest();
+      build.bazel.remote.execution.v2.Digest digest = request.getDigest();
       try {
-        blobDigestsBuilder.add(
+        Digest responseDigest =
             putBlob(
                 this,
                 request.getCompressor(),
-                digest,
-                digestFunction,
+                DigestUtil.fromDigest(digest, digestFunction),
                 request.getData(),
                 1,
                 SECONDS,
-                requestMetadata));
+                requestMetadata);
+        blobDigestsBuilder.add(DigestUtil.toDigest(responseDigest));
       } catch (StatusException e) {
         if (exception == null) {
           exception = new PutAllBlobsException();
@@ -575,14 +582,16 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
-  public ListenableFuture<Iterable<Digest>> findMissingBlobs(
-      Iterable<Digest> digests, RequestMetadata requestMetadata) {
+  public ListenableFuture<Iterable<build.bazel.remote.execution.v2.Digest>> findMissingBlobs(
+      Iterable<build.bazel.remote.execution.v2.Digest> digests,
+      DigestFunction.Value digestFunction,
+      RequestMetadata requestMetadata) {
     Thread findingThread = Thread.currentThread();
     Context.CancellationListener cancellationListener = (context) -> findingThread.interrupt();
     Context.current().addListener(cancellationListener, directExecutor());
     try {
-      ListenableFuture<Iterable<Digest>> future =
-          immediateFuture(contentAddressableStorage.findMissingBlobs(digests));
+      ListenableFuture<Iterable<build.bazel.remote.execution.v2.Digest>> future =
+          immediateFuture(contentAddressableStorage.findMissingBlobs(digests, digestFunction));
       Context.current().removeListener(cancellationListener);
       return future;
     } catch (InterruptedException e) {
@@ -595,10 +604,11 @@ public abstract class NodeInstance extends InstanceBase {
   protected abstract int getTreeMaxPageSize();
 
   protected abstract TokenizableIterator<DirectoryEntry> createTreeIterator(
-      String reason, Digest rootDigest, String pageToken);
+      String reason, build.buildfarm.v1test.Digest rootDigest, String pageToken);
 
   @Override
-  public String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
+  public String getTree(
+      build.buildfarm.v1test.Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
     tree.setRootDigest(rootDigest);
 
     if (pageSize == 0) {
@@ -687,7 +697,7 @@ public abstract class NodeInstance extends InstanceBase {
     } else {
       inSupplier = connection::getInputStream;
     }
-    Digest digest = Digest.newBuilder().setHash(expectedHash).setSizeBytes(contentLength).build();
+    Digest digest = digestUtil.build(expectedHash, contentLength);
 
     Write write = getContentWrite.create(digest);
 
@@ -731,19 +741,16 @@ public abstract class NodeInstance extends InstanceBase {
             url,
             expectedDigest.getHash(),
             headers,
-            digestUtil,
+            new DigestUtil(HashFunction.get(expectedDigest.getDigestFunction())),
             actualDigest -> {
               if (!expectedDigest.getHash().isEmpty()
-                  && expectedDigest.getSizeBytes() >= 0
-                  && expectedDigest.getSizeBytes() != actualDigest.getSizeBytes()) {
+                  && expectedDigest.getSize() >= 0
+                  && expectedDigest.getSize() != actualDigest.getSize()) {
+                // TODO digestFunction
                 throw new DigestMismatchException(actualDigest, expectedDigest);
               }
               return getBlobWrite(
-                  Compressor.Value.IDENTITY,
-                  actualDigest,
-                  digestUtil.getDigestFunction(),
-                  UUID.randomUUID(),
-                  requestMetadata);
+                  Compressor.Value.IDENTITY, actualDigest, UUID.randomUUID(), requestMetadata);
             });
       } catch (Exception e) {
         log.log(Level.WARNING, "download attempt failed", e);
@@ -795,9 +802,10 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   private static void enumerateActionInputDirectory(
+      DigestFunction.Value digestFunction,
       String directoryPath,
       Directory directory,
-      Map<Digest, Directory> directoriesIndex,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       Consumer<String> onInputFile,
       Consumer<String> onInputDirectory,
       PreconditionFailure.Builder preconditionFailure) {
@@ -807,7 +815,7 @@ public abstract class NodeInstance extends InstanceBase {
     while (!directoriesStack.isEmpty()) {
       DirectoryNode directoryNode = directoriesStack.pop();
       String directoryName = directoryNode.getName();
-      Digest directoryDigest = directoryNode.getDigest();
+      build.bazel.remote.execution.v2.Digest directoryDigest = directoryNode.getDigest();
       String subDirectoryPath =
           directoryPath.isEmpty() ? directoryName : (directoryPath + "/" + directoryName);
       onInputDirectory.accept(subDirectoryPath);
@@ -823,7 +831,9 @@ public abstract class NodeInstance extends InstanceBase {
         preconditionFailure
             .addViolationsBuilder()
             .setType(VIOLATION_TYPE_MISSING)
-            .setSubject("blobs/" + DigestUtil.toString(directoryDigest))
+            .setSubject(
+                "blobs/"
+                    + DigestUtil.toString(DigestUtil.fromDigest(directoryDigest, digestFunction)))
             .setDescription("The directory `/" + subDirectoryPath + "` was not found in the CAS.");
       } else {
         for (FileNode fileNode : subDirectory.getFilesList()) {
@@ -847,15 +857,16 @@ public abstract class NodeInstance extends InstanceBase {
 
   @VisibleForTesting
   public static void validateActionInputDirectory(
+      DigestFunction.Value digestFunction,
       String directoryPath,
       Directory directory,
-      Stack<Digest> pathDigests,
-      Set<Digest> visited,
-      Map<Digest, Directory> directoriesIndex,
+      Stack<build.bazel.remote.execution.v2.Digest> pathDigests,
+      Set<build.bazel.remote.execution.v2.Digest> visited,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       boolean allowSymlinkTargetAbsolute,
       Consumer<String> onInputFile,
       Consumer<String> onInputDirectory,
-      Consumer<Digest> onInputDigest,
+      Consumer<build.bazel.remote.execution.v2.Digest> onInputDigest,
       PreconditionFailure.Builder preconditionFailure) {
     Set<String> entryNames = new HashSet<>();
 
@@ -946,7 +957,7 @@ public abstract class NodeInstance extends InstanceBase {
       lastDirectoryName = directoryName;
       entryNames.add(directoryName);
 
-      Digest directoryDigest = directoryNode.getDigest();
+      build.bazel.remote.execution.v2.Digest directoryDigest = directoryNode.getDigest();
       if (pathDigests.contains(directoryDigest)) {
         preconditionFailure
             .addViolationsBuilder()
@@ -965,6 +976,7 @@ public abstract class NodeInstance extends InstanceBase {
             subDirectory = directoriesIndex.get(directoryDigest);
           }
           enumerateActionInputDirectory(
+              digestFunction,
               subDirectoryPath,
               subDirectory,
               directoriesIndex,
@@ -974,7 +986,7 @@ public abstract class NodeInstance extends InstanceBase {
         } else {
           validateActionInputDirectoryDigest(
               subDirectoryPath,
-              directoryDigest,
+              DigestUtil.fromDigest(directoryDigest, digestFunction),
               pathDigests,
               visited,
               directoriesIndex,
@@ -990,21 +1002,23 @@ public abstract class NodeInstance extends InstanceBase {
 
   private static void validateActionInputDirectoryDigest(
       String directoryPath,
+      // based on usage might want to make this bazel and pass function
       Digest directoryDigest,
-      Stack<Digest> pathDigests,
-      Set<Digest> visited,
-      Map<Digest, Directory> directoriesIndex,
+      Stack<build.bazel.remote.execution.v2.Digest> pathDigests,
+      Set<build.bazel.remote.execution.v2.Digest> visited,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       boolean allowSymlinkTargetAbsolute,
       Consumer<String> onInputFile,
       Consumer<String> onInputDirectory,
-      Consumer<Digest> onInputDigest,
+      Consumer<build.bazel.remote.execution.v2.Digest> onInputDigest,
       PreconditionFailure.Builder preconditionFailure) {
-    pathDigests.push(directoryDigest);
+    build.bazel.remote.execution.v2.Digest digest = DigestUtil.toDigest(directoryDigest);
+    pathDigests.push(digest);
     final Directory directory;
-    if (directoryDigest.getSizeBytes() == 0) {
+    if (digest.getSizeBytes() == 0) {
       directory = Directory.getDefaultInstance();
     } else {
-      directory = directoriesIndex.get(directoryDigest);
+      directory = directoriesIndex.get(digest);
     }
     if (directory == null) {
       preconditionFailure
@@ -1014,6 +1028,7 @@ public abstract class NodeInstance extends InstanceBase {
           .setDescription("The directory `/" + directoryPath + "` was not found in the CAS.");
     } else {
       validateActionInputDirectory(
+          directoryDigest.getDigestFunction(),
           directoryPath,
           directory,
           pathDigests,
@@ -1028,7 +1043,7 @@ public abstract class NodeInstance extends InstanceBase {
     pathDigests.pop();
     if (directory != null) {
       // missing directories are not visited and will appear in violations list each time
-      visited.add(directoryDigest);
+      visited.add(digest);
     }
   }
 
@@ -1055,21 +1070,25 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   private void validateInputs(
-      Iterable<Digest> inputDigests,
+      Iterable<build.bazel.remote.execution.v2.Digest> inputDigests,
+      DigestFunction.Value digestFunction,
       PreconditionFailure.Builder preconditionFailure,
       RequestMetadata requestMetadata)
       throws StatusException, InterruptedException {
     ListenableFuture<Void> result =
         transform(
-            findMissingBlobs(inputDigests, requestMetadata),
+            findMissingBlobs(inputDigests, digestFunction, requestMetadata),
             (missingBlobDigests) -> {
               preconditionFailure.addAllViolations(
                   StreamSupport.stream(missingBlobDigests.spliterator(), false)
                       .map(
-                          (digest) ->
+                          digest ->
                               Violation.newBuilder()
                                   .setType(VIOLATION_TYPE_MISSING)
-                                  .setSubject("blobs/" + DigestUtil.toString(digest))
+                                  .setSubject(
+                                      "blobs/"
+                                          + DigestUtil.toString(
+                                              DigestUtil.fromDigest(digest, digestFunction)))
                                   .setDescription(MISSING_INPUT)
                                   .build())
                       .collect(Collectors.toList()));
@@ -1111,21 +1130,27 @@ public abstract class NodeInstance extends InstanceBase {
       PreconditionFailure.Builder preconditionFailure,
       RequestMetadata requestMetadata)
       throws StatusException, InterruptedException {
+    DigestFunction.Value digestFunction =
+        queuedOperation.getTree().getRootDigest().getDigestFunction();
     if (!queuedOperation.hasAction()) {
+      log.warning("queued operation has no action");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("blobs/" + DigestUtil.toString(actionDigest))
           .setDescription(MISSING_ACTION);
     } else {
-      ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
+      ImmutableSet.Builder<build.bazel.remote.execution.v2.Digest> inputDigestsBuilder =
+          ImmutableSet.builder();
       validateAction(
+          digestFunction,
           queuedOperation.getAction(),
           queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
           new ProxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap()),
           inputDigestsBuilder::add,
           preconditionFailure);
-      validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
+      validateInputs(
+          inputDigestsBuilder.build(), digestFunction, preconditionFailure, requestMetadata);
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
   }
@@ -1136,7 +1161,7 @@ public abstract class NodeInstance extends InstanceBase {
     Action action = null;
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     ByteString actionBlob = null;
-    if (actionDigest.getSizeBytes() != 0) {
+    if (actionDigest.getSize() != 0) {
       actionBlob = getBlob(actionDigest);
     }
     if (actionBlob == null) {
@@ -1156,7 +1181,12 @@ public abstract class NodeInstance extends InstanceBase {
             .setDescription("Action " + DigestUtil.toString(actionDigest));
       }
       if (action != null) {
-        validateAction(operationName, action, preconditionFailure, requestMetadata);
+        validateAction(
+            operationName,
+            actionDigest.getDigestFunction(),
+            action,
+            preconditionFailure,
+            requestMetadata);
       }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
@@ -1165,28 +1195,42 @@ public abstract class NodeInstance extends InstanceBase {
   @SuppressWarnings("ConstantConditions")
   protected void validateAction(
       String operationName,
+      DigestFunction.Value digestFunction,
       Action action,
       PreconditionFailure.Builder preconditionFailure,
       RequestMetadata requestMetadata)
       throws InterruptedException, StatusException {
     ExecutorService service = newDirectExecutorService();
-    ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
+    ImmutableSet.Builder<build.bazel.remote.execution.v2.Digest> inputDigestsBuilder =
+        ImmutableSet.builder();
     Tree tree =
         getUnchecked(
-            getTreeFuture(operationName, action.getInputRootDigest(), service, requestMetadata));
+            getTreeFuture(
+                operationName,
+                DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction),
+                service,
+                requestMetadata));
     validateAction(
+        digestFunction,
         action,
-        getUnchecked(expect(action.getCommandDigest(), Command.parser(), service, requestMetadata)),
+        getUnchecked(
+            expect(
+                DigestUtil.fromDigest(action.getCommandDigest(), digestFunction),
+                Command.parser(),
+                service,
+                requestMetadata)),
         new ProxyDirectoriesIndex(tree.getDirectoriesMap()),
         inputDigestsBuilder::add,
         preconditionFailure);
-    validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
+    validateInputs(
+        inputDigestsBuilder.build(), digestFunction, preconditionFailure, requestMetadata);
   }
 
   protected void validateQueuedOperation(Digest actionDigest, QueuedOperation queuedOperation)
       throws StatusException {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     validateAction(
+        queuedOperation.getTree().getRootDigest().getDigestFunction(),
         queuedOperation.getAction(),
         queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
         new ProxyDirectoriesIndex(queuedOperation.getTree().getDirectoriesMap()),
@@ -1203,10 +1247,10 @@ public abstract class NodeInstance extends InstanceBase {
   @VisibleForTesting
   void validateCommand(
       Command command,
-      Digest inputRootDigest,
+      build.bazel.remote.execution.v2.Digest inputRootDigest,
       Set<String> inputFiles,
       Set<String> inputDirectories,
-      Map<Digest, Directory> directoriesIndex,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       PreconditionFailure.Builder preconditionFailure) {
     validatePlatform(command.getPlatform(), preconditionFailure);
 
@@ -1269,10 +1313,11 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   protected void validateAction(
+      DigestFunction.Value digestFunction,
       Action action,
       @Nullable Command command,
-      Map<Digest, Directory> directoriesIndex,
-      Consumer<Digest> onInputDigest,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
+      Consumer<build.bazel.remote.execution.v2.Digest> onInputDigest,
       PreconditionFailure.Builder preconditionFailure) {
     ImmutableSet.Builder<String> inputDirectoriesBuilder = ImmutableSet.builder();
     ImmutableSet.Builder<String> inputFilesBuilder = ImmutableSet.builder();
@@ -1283,7 +1328,7 @@ public abstract class NodeInstance extends InstanceBase {
             == SymlinkAbsolutePathStrategy.Value.ALLOWED;
     validateActionInputDirectoryDigest(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
-        action.getInputRootDigest(),
+        DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction),
         new Stack<>(),
         new HashSet<>(),
         directoriesIndex,
@@ -1297,7 +1342,10 @@ public abstract class NodeInstance extends InstanceBase {
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
-          .setSubject("blobs/" + DigestUtil.toString(action.getCommandDigest()))
+          .setSubject(
+              "blobs/"
+                  + DigestUtil.toString(
+                      DigestUtil.fromDigest(action.getCommandDigest(), digestFunction)))
           .setDescription(MISSING_COMMAND);
     } else {
       validateCommand(
@@ -1580,70 +1628,6 @@ public abstract class NodeInstance extends InstanceBase {
         com.google.rpc.Status.newBuilder().setCode(Code.CANCELLED.getNumber()).build());
   }
 
-  @Override
-  public boolean putAndValidateOperation(Operation operation) throws InterruptedException {
-    if (isQueued(operation)) {
-      return requeueOperation(operation);
-    }
-    return putOperation(operation);
-  }
-
-  @VisibleForTesting
-  public boolean requeueOperation(Operation operation) throws InterruptedException {
-    String name = operation.getName();
-    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
-    RequestMetadata requestMetadata = expectRequestMetadata(operation);
-    if (metadata == null) {
-      // ensure that watchers are notified
-      String message = format("Operation %s does not contain ExecuteOperationMetadata", name);
-      errorOperation(
-          operation,
-          requestMetadata,
-          com.google.rpc.Status.newBuilder()
-              .setCode(Code.INTERNAL.getNumber())
-              .setMessage(message)
-              .build());
-      return false;
-    }
-
-    if (metadata.getStage() != ExecutionStage.Value.QUEUED) {
-      // ensure that watchers are notified
-      String message = format("Operation %s stage is not QUEUED", name);
-      errorOperation(
-          operation,
-          requestMetadata,
-          com.google.rpc.Status.newBuilder()
-              .setCode(com.google.rpc.Code.INTERNAL.getNumber())
-              .setMessage(message)
-              .build());
-      return false;
-    }
-    Digest actionDigest = metadata.getActionDigest();
-    try {
-      validateActionDigest(name, actionDigest, requestMetadata);
-    } catch (StatusException e) {
-      com.google.rpc.Status status = StatusProto.fromThrowable(e);
-      if (status == null) {
-        getLogger().log(Level.SEVERE, "no rpc status from exception", e);
-        status =
-            com.google.rpc.Status.newBuilder()
-                .setCode(Status.fromThrowable(e).getCode().value())
-                .build();
-      }
-      logFailedStatus(actionDigest, status);
-      errorOperation(operation, requestMetadata, status);
-      return false;
-    }
-
-    getLogger()
-        .info(
-            format(
-                "%s::requeueOperation(%s): %s",
-                getName(), DigestUtil.toString(actionDigest), name));
-
-    return putOperation(operation);
-  }
-
   protected void errorOperation(
       Operation operation, RequestMetadata requestMetadata, com.google.rpc.Status status)
       throws InterruptedException {
@@ -1722,9 +1706,15 @@ public abstract class NodeInstance extends InstanceBase {
     return metadata.getStage() == stage;
   }
 
+  private Iterable<DigestFunction.Value> getDigestFunctions() {
+    return Stream.of(HashFunction.values())
+        .map(HashFunction::getDigestFunction)
+        .collect(ImmutableList.toImmutableList());
+  }
+
   protected CacheCapabilities getCacheCapabilities() {
     return CacheCapabilities.newBuilder()
-        .addDigestFunctions(digestUtil.getDigestFunction())
+        .addAllDigestFunctions(getDigestFunctions())
         .setActionCacheUpdateCapabilities(
             ActionCacheUpdateCapabilities.newBuilder().setUpdateEnabled(true))
         .setMaxBatchTotalSizeBytes(Size.mbToBytes(4))
@@ -1738,7 +1728,8 @@ public abstract class NodeInstance extends InstanceBase {
 
   protected ExecutionCapabilities getExecutionCapabilities() {
     return ExecutionCapabilities.newBuilder()
-        .setDigestFunction(digestUtil.getDigestFunction())
+        .setDigestFunction(DigestFunction.Value.BLAKE3)
+        .addAllDigestFunctions(getDigestFunctions())
         .setExecEnabled(true)
         .setExecutionPriorityCapabilities(
             PriorityCapabilities.newBuilder()

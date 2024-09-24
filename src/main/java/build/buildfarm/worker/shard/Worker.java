@@ -26,7 +26,6 @@ import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -34,6 +33,7 @@ import build.buildfarm.cas.MemoryCAS;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
@@ -51,6 +51,7 @@ import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.worker.CFCExecFileSystem;
 import build.buildfarm.worker.CFCLinkExecFileSystem;
@@ -134,7 +135,6 @@ public final class Worker extends LoggingMain {
 
   private Server server;
   private Path root;
-  private DigestUtil digestUtil;
   private ExecFileSystem execFileSystem;
   private Pipeline pipeline;
   private Backplane backplane;
@@ -276,7 +276,8 @@ public final class Worker extends LoggingMain {
           // needs some treatment for compressor
           if (offset == 0) {
             // extra computations
-            Blob blob = new Blob(content, digestUtil);
+            Blob blob =
+                new Blob(content, new DigestUtil(HashFunction.get(blobDigest.getDigestFunction())));
             // here's hoping that our digest matches...
             try {
               storage.put(blob);
@@ -381,7 +382,6 @@ public final class Worker extends LoggingMain {
             cas.getHexBucketLevels(),
             cas.isFileDirectoriesIndexInMemory(),
             cas.isExecRootCopyFallback(),
-            digestUtil,
             removeDirectoryService,
             accessRecorder,
             zstdBufferPool,
@@ -568,8 +568,6 @@ public final class Worker extends LoggingMain {
       throw new ConfigurationException("worker's public name should not be empty");
     }
 
-    digestUtil = new DigestUtil(configs.getDigestFunction());
-
     if (SHARD.equals(configs.getBackplane().getType())) {
       backplane =
           new RedisShardBackplane(
@@ -584,7 +582,6 @@ public final class Worker extends LoggingMain {
 
     workerStubs =
         WorkerStubs.create(
-            digestUtil,
             Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build());
 
     ExecutorService removeDirectoryService = BuildfarmExecutors.getRemoveDirectoryPool();
@@ -627,8 +624,7 @@ public final class Worker extends LoggingMain {
             fetchService,
             storage);
 
-    instance =
-        new WorkerInstance(configs.getWorker().getPublicName(), digestUtil, backplane, storage);
+    instance = new WorkerInstance(configs.getWorker().getPublicName(), backplane, storage);
 
     // Create the appropriate writer for the context
     CasWriter writer;

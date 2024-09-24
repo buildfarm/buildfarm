@@ -19,12 +19,12 @@ import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.Digest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -175,13 +175,16 @@ public final class Util {
       Instance instance,
       FutureCallback<Boolean> foundCallback,
       RequestMetadata requestMetadata) {
-    ListenableFuture<Iterable<Digest>> missingBlobsFuture =
-        instance.findMissingBlobs(ImmutableList.of(digest), requestMetadata);
+    ListenableFuture<Iterable<build.bazel.remote.execution.v2.Digest>> missingBlobsFuture =
+        instance.findMissingBlobs(
+            ImmutableList.of(DigestUtil.toDigest(digest)),
+            digest.getDigestFunction(),
+            requestMetadata);
     addCallback(
         missingBlobsFuture,
         new FutureCallback<>() {
           @Override
-          public void onSuccess(Iterable<Digest> missingDigests) {
+          public void onSuccess(Iterable<build.bazel.remote.execution.v2.Digest> missingDigests) {
             boolean found = Iterables.isEmpty(missingDigests);
             log.log(
                 Level.FINER,

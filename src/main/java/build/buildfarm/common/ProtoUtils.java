@@ -14,7 +14,7 @@
 
 package build.buildfarm.common;
 
-import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.protobuf.ByteString;

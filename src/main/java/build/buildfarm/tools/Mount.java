@@ -19,12 +19,12 @@ import static build.buildfarm.instance.Utils.getBlob;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.worker.FuseCAS;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
@@ -38,15 +38,10 @@ import java.util.Map;
 class Mount {
   @SuppressWarnings("BusyWait")
   public static void mount(
-      String host,
-      String instanceName,
-      DigestUtil digestUtil,
-      String root,
-      Digest inputRoot,
-      String name)
+      String host, String instanceName, String root, Digest inputRoot, String name)
       throws IOException, InterruptedException {
     ManagedChannel channel = createChannel(host);
-    Instance instance = new StubInstance(instanceName, digestUtil, channel);
+    Instance instance = new StubInstance(instanceName, channel);
 
     Path cwd = Paths.get(".");
 
@@ -95,18 +90,16 @@ class Mount {
 
   public static void main(String[] args) throws Exception {
     if (args.length != 6) {
-      System.err.println(
-          "Usage: bf-mount <endpoint> <instance-name> <digest-type> <root> <digest> <name>");
+      System.err.println("Usage: bf-mount <endpoint> <instance-name> <root> <digest> <name>");
       System.err.println("\nMount an REAPI directory specified by 'digest' at 'name' under 'root'");
       System.exit(1);
     }
 
     String host = args[0];
     String instanceName = args[1];
-    DigestUtil digestUtil = DigestUtil.forHash(args[2]);
-    String root = args[3];
-    Digest inputRoot = DigestUtil.parseDigest(args[4]);
-    String name = args[5];
-    mount(host, instanceName, digestUtil, root, inputRoot, name);
+    String root = args[2];
+    Digest inputRoot = DigestUtil.parseDigest(args[3]);
+    String name = args[4];
+    mount(host, instanceName, root, inputRoot, name);
   }
 }

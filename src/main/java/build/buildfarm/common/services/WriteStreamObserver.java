@@ -14,9 +14,9 @@
 
 package build.buildfarm.common.services;
 
-import static build.buildfarm.common.UrlPath.detectResourceOperation;
-import static build.buildfarm.common.UrlPath.parseUploadBlobCompressor;
-import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
+import static build.buildfarm.common.resources.UrlPath.detectResourceOperation;
+import static build.buildfarm.common.resources.UrlPath.parseUploadBlobCompressor;
+import static build.buildfarm.common.resources.UrlPath.parseUploadBlobDigest;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.grpc.Status.ABORTED;
@@ -28,11 +28,11 @@ import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.EntryLimitException;
-import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.WriteCompleteException;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.common.resources.UrlPath.InvalidResourceNameException;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
@@ -133,7 +133,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
       throws EntryLimitException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case UPLOAD_BLOB_REQUEST:
-        expectedCommittedSize = parseUploadBlobDigest(resourceName).getSizeBytes();
+        expectedCommittedSize = parseUploadBlobDigest(resourceName).getSize();
         return ByteStreamService.getUploadBlobWrite(instance, resourceName);
       case STREAM_OPERATION_REQUEST:
         return ByteStreamService.getOperationStreamWrite(instance, resourceName);
@@ -412,7 +412,8 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
     try {
       getOutput(Math.max(earliestOffset, 0l)).close();
     } catch (DigestMismatchException e) {
-      errorResponse(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
+      errorResponse(
+          Status.INVALID_ARGUMENT.withDescription(e.getMessage()).withCause(e).asException());
     } catch (IOException e) {
       if (errorResponse(Status.fromThrowable(e).asException())) {
         log.log(Level.SEVERE, format("error closing stream for %s", name), e);

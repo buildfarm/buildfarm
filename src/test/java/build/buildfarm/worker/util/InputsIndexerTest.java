@@ -17,13 +17,13 @@ package build.buildfarm.worker.util;
 import static build.buildfarm.worker.util.InputsIndexer.BAZEL_TOOL_INPUT_MARKER;
 import static com.google.common.truth.Truth.assertThat;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.NodeProperties;
 import build.bazel.remote.execution.v2.NodeProperty;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.Tree;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.worker.WorkerProtocol.Input;
@@ -58,7 +58,7 @@ public class InputsIndexerTest {
     Path arbitraryOpRoot = Paths.get(".");
 
     InputsIndexer indexer = new InputsIndexer(treeBuilder.build(), arbitraryOpRoot);
-    assertThat(indexer.proxyDirs.get(rootDirDigest)).isEqualTo(rootDir);
+    assertThat(indexer.proxyDirs.get(DigestUtil.toDigest(rootDirDigest))).isEqualTo(rootDir);
     assertThat(indexer.getAllInputs().size()).isEqualTo(0);
   }
 
@@ -74,7 +74,7 @@ public class InputsIndexerTest {
 
     Path arbitraryOpRoot = Paths.get("asdf");
     InputsIndexer indexer = new InputsIndexer(treeBuilder.build(), arbitraryOpRoot);
-    assertThat(indexer.proxyDirs.get(rootDirDigest)).isEqualTo(rootDir);
+    assertThat(indexer.proxyDirs.get(DigestUtil.toDigest(rootDirDigest))).isEqualTo(rootDir);
 
     Input myfileInput = makeInput(arbitraryOpRoot, myfile);
 
@@ -106,7 +106,7 @@ public class InputsIndexerTest {
         Directory.newBuilder()
             .addFiles(myfile)
             .addFiles(toolfile)
-            .addDirectories(makeDirNode(subDirName, subDirDigest))
+            .addDirectories(makeDirNode(subDirName, DigestUtil.toDigest(subDirDigest)))
             .build();
 
     Digest rootDirDigest = addDirToTree(treeBuilder, "my_root_dir", rootDir);
@@ -115,7 +115,7 @@ public class InputsIndexerTest {
     Path arbitraryOpRoot = Paths.get("asdf");
 
     InputsIndexer indexer = new InputsIndexer(treeBuilder.build(), arbitraryOpRoot);
-    assertThat(indexer.proxyDirs.get(rootDirDigest)).isEqualTo(rootDir);
+    assertThat(indexer.proxyDirs.get(DigestUtil.toDigest(rootDirDigest))).isEqualTo(rootDir);
     assertThat(indexer.proxyDirs.size()).isEqualTo(2);
 
     Input myfileInput = makeInput(arbitraryOpRoot, myfile);
@@ -149,13 +149,13 @@ public class InputsIndexerTest {
   FileNode makeFileNode(String filename, String content, NodeProperties nodeProperties) {
     return FileNode.newBuilder()
         .setName(filename)
-        .setDigest(DIGEST_UTIL.compute(ByteString.copyFromUtf8(content)))
+        .setDigest(DigestUtil.toDigest(DIGEST_UTIL.compute(ByteString.copyFromUtf8(content))))
         .setIsExecutable(false)
         .setNodeProperties(nodeProperties)
         .build();
   }
 
-  DirectoryNode makeDirNode(String dirname, Digest dirDigest) {
+  DirectoryNode makeDirNode(String dirname, build.bazel.remote.execution.v2.Digest dirDigest) {
     // Pretty sure we don't need the actual hash for our testing purposes
     return DirectoryNode.newBuilder().setName(dirname).setDigest(dirDigest).build();
   }

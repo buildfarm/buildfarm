@@ -14,9 +14,9 @@
 
 package build.buildfarm.instance.shard;
 
-import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.redis.ScanCount;
+import build.buildfarm.v1test.Digest;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Map;

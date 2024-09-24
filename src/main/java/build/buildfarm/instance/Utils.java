@@ -18,10 +18,9 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
+import build.buildfarm.v1test.Digest;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -82,20 +81,17 @@ public final class Utils {
       Instance instance,
       Compressor.Value compressor,
       Digest digest,
-      DigestFunction.Value digestFunction,
       ByteString data,
       long writeDeadlineAfter,
       TimeUnit writeDeadlineAfterUnits,
       RequestMetadata requestMetadata) {
-    if (digest.getSizeBytes() != data.size()) {
+    if (digest.getSize() != data.size()) {
       return immediateFailedFuture(
-          invalidDigestSize(digest.getSizeBytes(), data.size()).asRuntimeException());
+          invalidDigestSize(digest.getSize(), data.size()).asRuntimeException());
     }
     SettableFuture<Digest> future = SettableFuture.create();
     try {
-      Write write =
-          instance.getBlobWrite(
-              compressor, digest, digestFunction, UUID.randomUUID(), requestMetadata);
+      Write write = instance.getBlobWrite(compressor, digest, UUID.randomUUID(), requestMetadata);
       Futures.addCallback(
           write.getFuture(),
           new FutureCallback<Long>() {
@@ -125,7 +121,6 @@ public final class Utils {
       Instance instance,
       Compressor.Value compressor,
       Digest digest,
-      DigestFunction.Value digestFunction,
       ByteString blob,
       long writeDeadlineAfter,
       TimeUnit writeDeadlineAfterUnits,
@@ -136,7 +131,6 @@ public final class Utils {
               instance,
               compressor,
               digest,
-              digestFunction,
               blob,
               writeDeadlineAfter,
               writeDeadlineAfterUnits,

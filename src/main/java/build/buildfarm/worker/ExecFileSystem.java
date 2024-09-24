@@ -16,10 +16,11 @@ package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.v1test.Digest;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -40,7 +41,11 @@ public interface ExecFileSystem extends InputStreamFactory {
   ContentAddressableStorage getStorage();
 
   Path createExecDir(
-      String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
+      String operationName,
+      Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
+      DigestFunction.Value digestFunction,
+      Action action,
+      Command command)
       throws IOException, InterruptedException;
 
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;
@@ -97,9 +102,9 @@ public interface ExecFileSystem extends InputStreamFactory {
   }
 
   class ExecDigestAttributes extends ExecBaseAttributes {
-    private final Digest digest;
+    private final build.bazel.remote.execution.v2.Digest digest;
 
-    ExecDigestAttributes(Digest digest, ExecFileType type) {
+    ExecDigestAttributes(build.bazel.remote.execution.v2.Digest digest, ExecFileType type) {
       super(type);
       this.digest = digest;
     }
@@ -118,7 +123,7 @@ public interface ExecFileSystem extends InputStreamFactory {
   class ExecFileAttributes extends ExecDigestAttributes {
     private final boolean isExecutable;
 
-    ExecFileAttributes(Digest digest, boolean isExecutable) {
+    ExecFileAttributes(build.bazel.remote.execution.v2.Digest digest, boolean isExecutable) {
       super(digest, ExecFileType.FILE);
       this.isExecutable = isExecutable;
     }
@@ -152,7 +157,7 @@ public interface ExecFileSystem extends InputStreamFactory {
   }
 
   class ExecDirectoryAttributes extends ExecDigestAttributes {
-    ExecDirectoryAttributes(Digest digest) {
+    ExecDirectoryAttributes(build.bazel.remote.execution.v2.Digest digest) {
       super(digest, ExecFileType.DIRECTORY);
     }
   }

@@ -24,13 +24,13 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ServerInstance.WorkersCallback;
+import build.buildfarm.v1test.Digest;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Iterables;
