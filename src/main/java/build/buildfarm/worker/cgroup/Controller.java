@@ -87,22 +87,6 @@ abstract class Controller implements IOResource {
     }
   }
 
-  protected int readInt(String propertyName) throws IOException {
-    char[] data = new char[32];
-    Path path = getPath().resolve(propertyName);
-    int len;
-    try (Reader in = new InputStreamReader(Files.newInputStream(path))) {
-      len = in.read(data);
-    }
-    if (len < 0) {
-      throw new NumberFormatException("premature end of stream");
-    }
-    if (len == 0 || data[0] == '\n' || data[len - 1] != '\n') {
-      throw new NumberFormatException("invalid integer in '" + propertyName + "'");
-    }
-    return Integer.parseInt(String.copyValueOf(data, 0, len - 1));
-  }
-
   protected void writeLong(String propertyName, long value) throws IOException {
     Path path = getPath().resolve(propertyName);
     try (Writer out = new OutputStreamWriter(Files.newOutputStream(path))) {

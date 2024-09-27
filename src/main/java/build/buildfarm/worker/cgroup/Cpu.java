@@ -28,7 +28,7 @@ public class Cpu extends Controller {
 
   public int getShares() throws IOException {
     open();
-    return readInt("cpu.shares");
+    return readLong("cpu.shares");
   }
 
   public void setShares(int shares) throws IOException {
@@ -38,7 +38,7 @@ public class Cpu extends Controller {
 
   public int getCFSPeriod() throws IOException {
     open();
-    return readInt("cpu.cfs_period_us");
+    return readLong("cpu.cfs_period_us");
   }
 
   public void setCFSPeriod(int microseconds) throws IOException {
