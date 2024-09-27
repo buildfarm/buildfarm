@@ -16,6 +16,7 @@ package build.buildfarm.worker.cgroup;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import io.grpc.Deadline;
 import java.io.IOException;
@@ -38,7 +39,7 @@ public final class Group {
   private static final Path rootPath = Paths.get("/sys/fs/cgroup");
   private static final POSIX posix = POSIXFactory.getNativePOSIX();
 
-  @Nullable private final String name;
+  @Getter @Nullable private final String name;
   @Nullable private final Group parent;
   @Getter private final Cpu cpu;
   @Getter private final Mem mem;
@@ -53,11 +54,6 @@ public final class Group {
 
   public Group getChild(String name) {
     return new Group(name, this);
-  }
-
-  @SuppressWarnings("NullableProblems")
-  public String getName() {
-    return name;
   }
 
   public String getHierarchy() {
@@ -80,16 +76,38 @@ public final class Group {
     return controllerName;
   }
 
+  /**
+   * Get the filesystem path to the given controller for <c>this</c> CGroup.
+   *
+   * <p>This is for CGroups v1. Starts with '/sys/fs/cgroup'.
+   *
+   * @param controllerName CGroup v1 Controller name, such as "cpu" or "mem".
+   * @return Filesystem path to the CGroup's controller.
+   */
   Path getPath(String controllerName) {
     return rootPath.resolve(getHierarchy(controllerName));
   }
 
-  public boolean isEmpty(String controllerName) throws IOException {
-    return getProcCount(controllerName) == 0;
+  /**
+   * Get the filesystem path to the given controller for <c>this</c> CGroup.
+   *
+   * <p>This is for CGroups v2. Starts with '/sys/fs/cgroup'.
+   *
+   * @return Filesystem path to the CGroup.
+   */
+  Path getPath() {
+    return rootPath.resolve(getHierarchy());
   }
 
-  public int getProcCount(String controllerName) throws IOException {
-    return getPids(controllerName).size();
+  /**
+   * Determine if the controller is applied to any processes
+   *
+   * @param controllerName The CGroup v1 controller
+   * @return <c>true</c> if there are any processes under control of the given controller name in
+   *     this cgroup, <c>false</c> otherwise.
+   */
+  boolean isEmpty(String controllerName) throws IOException {
+    return getPids(controllerName).isEmpty();
   }
 
   /**
@@ -110,7 +128,9 @@ public final class Group {
    * @return Set of process IDs or empty set if the CGroup is currently empty.
    * @throws IOException if the CGroup process list cannot be read or parsed.
    */
-  private @Nonnull Set<Integer> getPids(String controllerName) throws IOException {
+  @VisibleForTesting
+  @Nonnull
+  Set<Integer> getPids(String controllerName) throws IOException {
     Path path = getPath(controllerName);
     Path procs = path.resolve("cgroup.procs");
     try {
