@@ -518,7 +518,7 @@ public final class Worker extends LoggingMain {
               @Override
               public void run() {
                 try {
-                  while (!server.isShutdown()) {
+                  while (server != null && !server.isShutdown()) {
                     registerIfExpired();
                     SECONDS.sleep(1);
                   }
