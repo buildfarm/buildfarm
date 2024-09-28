@@ -6,6 +6,7 @@ filegroup(
 
 java_library(
     name = "test_runner",
+    testonly = True,
     srcs = [
         "AllTests.java",
         "Classpath.java",
