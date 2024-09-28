@@ -19,7 +19,7 @@ bazel_dep(name = "rules_java", version = "7.4.0")
 bazel_dep(name = "rules_jvm_external", version = "6.0")
 bazel_dep(name = "rules_license", version = "1.0.0")
 bazel_dep(name = "rules_oci", version = "1.7.4")
-bazel_dep(name = "rules_pkg", version = "0.10.1")
+bazel_dep(name = "rules_pkg", version = "1.0.1")
 bazel_dep(name = "rules_proto", version = "6.0.0-rc2")
 
 # Test dependencies
