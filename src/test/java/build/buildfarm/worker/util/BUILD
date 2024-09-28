@@ -1,5 +1,6 @@
 java_library(
     name = "worker_test_utils",
+    testonly = True,
     srcs = ["WorkerTestUtils.java"],
     visibility = ["//src/test/java:__subpackages__"],
     deps = [
