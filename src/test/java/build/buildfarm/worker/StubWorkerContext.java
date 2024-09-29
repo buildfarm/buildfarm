@@ -205,9 +205,4 @@ class StubWorkerContext implements WorkerContext {
   public boolean shouldErrorOperationOnRemainingResources() {
     throw new UnsupportedOperationException();
   }
-
-  @Override
-  public void returnLocalResources(QueueEntry queueEntry) {
-    throw new UnsupportedOperationException();
-  }
 }

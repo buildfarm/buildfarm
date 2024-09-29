@@ -40,6 +40,7 @@ import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Cas;
 import build.buildfarm.common.config.GrpcMetrics;
+import build.buildfarm.common.function.InterruptingConsumer;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
@@ -55,6 +56,7 @@ import build.buildfarm.worker.CFCExecFileSystem;
 import build.buildfarm.worker.CFCLinkExecFileSystem;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.ExecuteActionStage;
+import build.buildfarm.worker.ExecutionContext;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.MatchStage;
@@ -194,6 +196,18 @@ public final class Worker extends LoggingMain {
     return instance.stripOperation(operation);
   }
 
+  private static class ReleaseClaimAndRequeueStage extends PutOperationStage {
+    public ReleaseClaimAndRequeueStage(InterruptingConsumer<Operation> requeue) {
+      super(requeue);
+    }
+
+    @Override
+    public void put(ExecutionContext executionContext) throws InterruptedException {
+      executionContext.claim.release();
+      super.put(executionContext);
+    }
+  }
+
   private Server createServer(
       ServerBuilder<?> serverBuilder,
       @Nullable CASFileCache storage,
@@ -217,9 +231,11 @@ public final class Worker extends LoggingMain {
       PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
       SuperscalarPipelineStage executeActionStage =
           new ExecuteActionStage(context, reportResultStage, errorStage);
+      PipelineStage releaseClaimAndRequeueStage = new ReleaseClaimAndRequeueStage(context::requeue);
       SuperscalarPipelineStage inputFetchStage =
-          new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
-      PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
+          new InputFetchStage(context, executeActionStage, releaseClaimAndRequeueStage);
+      PipelineStage matchStage =
+          new MatchStage(context, inputFetchStage, releaseClaimAndRequeueStage);
 
       pipeline.add(matchStage, 4);
       pipeline.add(inputFetchStage, 3);

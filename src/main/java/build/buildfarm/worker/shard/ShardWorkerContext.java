@@ -18,7 +18,7 @@ import static build.buildfarm.cas.ContentAddressableStorage.UNLIMITED_ENTRY_SIZE
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.worker.DequeueMatchEvaluator.shouldKeepOperation;
+import static build.buildfarm.worker.DequeueMatchEvaluator.acquireClaim;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 
@@ -63,8 +63,8 @@ import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
+import build.buildfarm.worker.resources.Claim;
 import build.buildfarm.worker.resources.LocalResourceSet;
-import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import build.buildfarm.worker.resources.ResourceDecider;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.annotations.VisibleForTesting;
@@ -288,8 +288,10 @@ class ShardWorkerContext implements WorkerContext {
   @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     QueueEntry queueEntry = takeEntryOffOperationQueue(listener);
-    if (queueEntry == null || shouldKeepOperation(matchProvisions, resourceSet, queueEntry)) {
-      listener.onEntry(queueEntry);
+    Claim claim = null;
+    if (queueEntry == null
+        || (claim = acquireClaim(matchProvisions, resourceSet, queueEntry.getPlatform())) != null) {
+      listener.onEntry(queueEntry, claim);
     } else {
       backplane.rejectOperation(queueEntry);
     }
@@ -322,11 +324,6 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public void returnLocalResources(QueueEntry queueEntry) {
-    LocalResourceSetUtils.releaseClaims(queueEntry.getPlatform(), resourceSet);
-  }
-
-  @Override
   public void match(MatchListener listener) throws InterruptedException {
     RetryingMatchListener dedupMatchListener =
         new RetryingMatchListener() {
@@ -348,27 +345,32 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
+          public boolean onEntry(@Nullable QueueEntry queueEntry, Claim claim)
+              throws InterruptedException {
             if (queueEntry == null) {
               matched = true;
-              return listener.onEntry(null);
+              return listener.onEntry(null, null);
             }
-            return onValidEntry(queueEntry);
+            return onValidEntry(queueEntry, claim);
           }
 
-          private boolean onValidEntry(QueueEntry queueEntry) throws InterruptedException {
+          private boolean onValidEntry(QueueEntry queueEntry, Claim claim)
+              throws InterruptedException {
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
+              claim.release();
               log.log(Level.WARNING, "matched duplicate operation " + operationName);
               return false;
             }
-            return onUniqueEntry(queueEntry);
+            return onUniqueEntry(queueEntry, claim);
           }
 
-          private boolean onUniqueEntry(QueueEntry queueEntry) throws InterruptedException {
+          private boolean onUniqueEntry(QueueEntry queueEntry, Claim claim)
+              throws InterruptedException {
             matched = true;
-            boolean success = listener.onEntry(queueEntry);
+            boolean success = listener.onEntry(queueEntry, claim);
             if (!success) {
+              claim.release();
               requeue(queueEntry.getExecuteEntry().getOperationName());
             }
             return success;

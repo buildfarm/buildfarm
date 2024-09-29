@@ -1,4 +1,4 @@
-// Copyright 2021 The Bazel Authors. All rights reserved.
+// Copyright 2024 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.resources;
 
-import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.worker.resources.Claim;
-import javax.annotation.Nullable;
-
-public interface MatchListener {
-  // start/end pair called for each wait period
-  void onWaitStart();
-
-  void onWaitEnd();
-
-  // returns false if this listener will not handle this match
-  boolean onEntry(@Nullable QueueEntry queueEntry, Claim resource) throws InterruptedException;
-
-  void onError(Throwable t);
+public interface Claim {
+  void release();
 }

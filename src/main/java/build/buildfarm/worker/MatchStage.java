@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.worker.resources.Claim;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
@@ -75,7 +76,8 @@ public class MatchStage extends PipelineStage {
 
     @SuppressWarnings("ConstantConditions")
     @Override
-    public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
+    public boolean onEntry(@Nullable QueueEntry queueEntry, Claim claim)
+        throws InterruptedException {
       if (queueEntry == null) {
         return false;
       }
@@ -89,6 +91,7 @@ public class MatchStage extends PipelineStage {
       executionContext =
           executionContext.toBuilder()
               .setQueueEntry(queueEntry)
+              .setClaim(claim)
               .setPoller(workerContext.createPoller("MatchStage", queueEntry, QUEUED))
               .build();
       return onOperationPolled();

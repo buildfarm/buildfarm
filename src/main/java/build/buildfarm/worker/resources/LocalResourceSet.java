@@ -16,6 +16,7 @@ package build.buildfarm.worker.resources;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.Semaphore;
 
 /**
@@ -34,4 +35,6 @@ public class LocalResourceSet {
    * @details Key is name, and value is current usage amount.
    */
   public Map<String, Semaphore> resources = new HashMap<>();
+
+  public Map<String, Queue<Integer>> poolResources = new HashMap<>();
 }
