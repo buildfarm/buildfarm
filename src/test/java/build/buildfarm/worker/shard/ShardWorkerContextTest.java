@@ -17,6 +17,7 @@ package build.buildfarm.worker.shard;
 import static build.buildfarm.common.config.Server.INSTANCE_TYPE.SHARD;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -42,6 +43,7 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.worker.resources.Claim;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -137,7 +139,7 @@ public class ShardWorkerContextTest {
         .thenReturn(null); // provide a match completion in failure case
     MatchListener listener = mock(MatchListener.class);
     context.match(listener);
-    verify(listener, times(1)).onEntry(queueEntry);
+    verify(listener, times(1)).onEntry(eq(queueEntry), any(Claim.class));
   }
 
   @Test
@@ -155,7 +157,7 @@ public class ShardWorkerContextTest {
         .thenReturn(null); // provide a match completion in failure case
     MatchListener listener = mock(MatchListener.class);
     context.match(listener);
-    verify(listener, never()).onEntry(queueEntry);
+    verify(listener, never()).onEntry(eq(queueEntry), any(Claim.class));
   }
 
   @Test
@@ -174,7 +176,7 @@ public class ShardWorkerContextTest {
         .thenReturn(null); // provide a match completion in failure case
     MatchListener listener = mock(MatchListener.class);
     context.match(listener);
-    verify(listener, times(1)).onEntry(queueEntry);
+    verify(listener, times(1)).onEntry(eq(queueEntry), any(Claim.class));
   }
 
   @Test

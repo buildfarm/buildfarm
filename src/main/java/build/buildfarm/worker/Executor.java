@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import static com.google.common.collect.Maps.transformValues;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.protobuf.util.Durations.add;
 import static com.google.protobuf.util.Durations.compare;
@@ -38,12 +39,14 @@ import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.persistent.PersistentExecutor;
 import build.buildfarm.worker.persistent.WorkFilesContext;
+import build.buildfarm.worker.resources.LocalResourceSetUtils.LocalResourceSetClaim;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DockerClientBuilder;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -58,10 +61,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
 
@@ -153,6 +158,14 @@ class Executor {
           ExecutionPolicies.forPlatform(
               executionContext.command.getPlatform(), workerContext::getExecutionPolicies);
     }
+    // since pools mandate injection of resources, each pool claim must require a policy
+    // could probably do this with just the properties and the pool resource sets, but this is
+    // faster
+    if (executionContext.claim instanceof LocalResourceSetClaim resourceSetClaim) {
+      for (String pool : Iterables.transform(resourceSetClaim.getPools(), Map.Entry::getKey)) {
+        policies = Iterables.concat(policies, workerContext.getExecutionPolicies("pool-" + pool));
+      }
+    }
 
     try {
       return executePolled(limits, policies, timeout, stopwatch);
@@ -187,6 +200,72 @@ class Executor {
     return timeout;
   }
 
+  private static final class Interpolator {
+    private final Iterable<?> value;
+
+    Interpolator(String value) {
+      this(ImmutableList.of(value));
+    }
+
+    Interpolator(Iterable<?> value) {
+      this.value = value;
+    }
+
+    void inject(Consumer<String> consumer) {
+      Iterables.transform(value, String::valueOf).forEach(consumer);
+    }
+  }
+
+  private static Map<String, Interpolator> createInterpolations(
+      LocalResourceSetClaim claim, Iterable<Property> properties) {
+    Map<String, Interpolator> interpolations = new HashMap<>();
+    if (claim != null) {
+      for (Map.Entry<String, List<Integer>> pool : claim.getPools()) {
+        List<Integer> ids = pool.getValue();
+        interpolations.put(pool.getKey(), new Interpolator(ids));
+        for (int i = 0; i < ids.size(); i++) {
+          interpolations.put(pool.getKey() + "-" + i, new Interpolator(String.valueOf(ids.get(i))));
+        }
+      }
+    }
+    interpolations.putAll(
+        transformValues(
+            uniqueIndex(properties, Property::getName),
+            property -> new Interpolator(property.getValue())));
+    return interpolations;
+  }
+
+  private static Iterable<String> transformWrapper(
+      ExecutionWrapper wrapper, Map<String, Interpolator> interpolations) {
+    ImmutableList.Builder<String> arguments = ImmutableList.builder();
+
+    arguments.add(wrapper.getPath());
+
+    if (wrapper.getArguments() != null) {
+      for (String argument : wrapper.getArguments()) {
+        // If the argument is of the form <propertyName>, substitute the value of
+        // the property from the platform specification.
+        if (!argument.equals("<>")
+            && argument.charAt(0) == '<'
+            && argument.charAt(argument.length() - 1) == '>') {
+          // substitute with matching interpolation
+          // if this property is not present, the wrapper is ignored
+          String name = argument.substring(1, argument.length() - 1);
+          Interpolator interpolator = interpolations.get(name);
+          if (interpolator == null) {
+            return ImmutableList.of();
+          }
+          interpolator.inject(arguments::add);
+        } else {
+          // If the argument isn't of the form <propertyName>, add the argument directly:
+          arguments.add(argument);
+        }
+      }
+    }
+
+    return arguments.build();
+  }
+
   private long executePolled(
       ResourceLimits limits,
       Iterable<ExecutionPolicy> policies,
@@ -208,9 +287,15 @@ class Executor {
     try (IOResource resource =
         workerContext.limitExecution(
             operationName, arguments, executionContext.command, workingDirectory)) {
+      // similar to the policy selection here
+      Map<String, Interpolator> interpolations =
+          createInterpolations(
+              (LocalResourceSetClaim) executionContext.claim,
+              executionContext.command.getPlatform().getPropertiesList());
+
       for (ExecutionPolicy policy : policies) {
         if (policy.getExecutionWrapper() != null) {
-          arguments.addAll(transformWrapper(policy.getExecutionWrapper()));
+          arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
         }
       }
 
@@ -352,7 +437,7 @@ class Executor {
       try {
         // Now that the execution has finished we can return any of the claims against local
         // resources.
-        workerContext.returnLocalResources(executionContext.queueEntry);
+        executionContext.claim.release();
         owner.releaseExecutor(
             operationName,
             limits.cpu.claimed,
@@ -365,39 +450,6 @@ class Executor {
         }
       }
     }
-  }
-
-  private Iterable<String> transformWrapper(ExecutionWrapper wrapper) {
-    ImmutableList.Builder<String> arguments = ImmutableList.builder();
-
-    Map<String, Property> properties =
-        uniqueIndex(executionContext.command.getPlatform().getPropertiesList(), Property::getName);
-
-    arguments.add(wrapper.getPath());
-
-    if (wrapper.getArguments() != null) {
-      for (String argument : wrapper.getArguments()) {
-        // If the argument is of the form <propertyName>, substitute the value of
-        // the property from the platform specification.
-        if (!argument.equals("<>")
-            && argument.charAt(0) == '<'
-            && argument.charAt(argument.length() - 1) == '>') {
-          // substitute with matching platform property content
-          // if this property is not present, the wrapper is ignored
-          String propertyName = argument.substring(1, argument.length() - 1);
-          Property property = properties.get(propertyName);
-          if (property == null) {
-            return ImmutableList.of();
-          }
-          arguments.add(property.getValue());
-        } else {
-          // If the argument isn't of the form <propertyName>, add the argument directly:
-          arguments.add(argument);
-        }
-      }
-    }
-
-    return arguments.build();
   }
 
   @SuppressWarnings("ConstantConditions")

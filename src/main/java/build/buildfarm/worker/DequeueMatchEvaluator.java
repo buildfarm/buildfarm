@@ -17,11 +17,12 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.worker.resources.Claim;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
+import javax.annotation.Nullable;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -47,42 +48,22 @@ public class DequeueMatchEvaluator {
    * @brief Decide whether the worker should keep the operation or put it back on the queue.
    * @details Compares the platform properties of the worker to the operation's platform properties.
    * @param workerProvisions The provisions of the worker.
-   * @param name Worker name.
    * @param resourceSet The limited resources that the worker has available.
    * @param queueEntry An entry recently removed from the queue.
-   * @return Whether or not the worker should accept or reject the queue entry.
+   * @return An acquired claim on resources, or null if the platform could not be satisfied or
+   *     resourced.
    * @note Overloaded.
-   * @note Suggested return identifier: shouldKeepOperation.
+   * @note Suggested return identifier: claim.
    */
   @SuppressWarnings("NullableProblems")
   @NotNull
-  public static boolean shouldKeepOperation(
-      SetMultimap<String, String> workerProvisions,
-      LocalResourceSet resourceSet,
-      QueueEntry queueEntry) {
-    return shouldKeepViaPlatform(workerProvisions, resourceSet, queueEntry.getPlatform());
-  }
-
-  /**
-   * @brief Decide whether the worker should keep the operation via platform or put it back on the
-   *     queue.
-   * @details Compares the platform properties of the worker to the platform properties of the
-   *     operation.
-   * @param workerProvisions The provisions of the worker.
-   * @param name Worker name.
-   * @param resourceSet The limited resources that the worker has available.
-   * @param platform The platforms of operation.
-   * @return Whether or not the worker should accept or reject the operation.
-   * @note Suggested return identifier: shouldKeepOperation.
-   */
-  @SuppressWarnings("NullableProblems")
-  @NotNull
-  private static boolean shouldKeepViaPlatform(
+  public static @Nullable Claim acquireClaim(
       SetMultimap<String, String> workerProvisions,
       LocalResourceSet resourceSet,
       Platform platform) {
-    return satisfiesProperties(workerProvisions, platform)
-        && LocalResourceSetUtils.claimResources(platform, resourceSet);
+    return satisfiesProperties(workerProvisions, resourceSet, platform)
+        ? LocalResourceSetUtils.claimResources(platform, resourceSet)
+        : null;
   }
 
   /**
@@ -97,9 +78,11 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean satisfiesProperties(
-      SetMultimap<String, String> workerProvisions, Platform platform) {
+      SetMultimap<String, String> workerProvisions,
+      LocalResourceSet resourceSet,
+      Platform platform) {
     for (Platform.Property property : platform.getPropertiesList()) {
-      if (!satisfiesProperty(workerProvisions, property)) {
+      if (!satisfiesProperty(workerProvisions, resourceSet, property)) {
         return false;
       }
     }
@@ -118,7 +101,9 @@ public class DequeueMatchEvaluator {
   @SuppressWarnings("NullableProblems")
   @NotNull
   private static boolean satisfiesProperty(
-      SetMultimap<String, String> workerProvisions, Platform.Property property) {
+      SetMultimap<String, String> workerProvisions,
+      LocalResourceSet resourceSet,
+      Platform.Property property) {
     // validate min cores
     if (property.getName().equals(ExecutionProperties.CORES)
         || property.getName().equals(ExecutionProperties.MIN_CORES)) {
@@ -157,6 +142,12 @@ public class DequeueMatchEvaluator {
     if (workerProvisions.containsKey(property.getName())) {
       return workerProvisions.containsEntry(property.getName(), property.getValue())
           || workerProvisions.containsEntry(property.getName(), "*");
+    }
+
+    // after provisions may insist that a resource has a value, check whether the resourceSet
+    // satisfies
+    if (LocalResourceSetUtils.satisfies(resourceSet, property)) {
+      return true;
     }
 
     // accept other properties not specified on the worker

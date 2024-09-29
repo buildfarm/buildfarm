@@ -14,8 +14,9 @@
 
 package build.buildfarm.worker.resources;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import build.bazel.remote.execution.v2.Platform;
-import build.buildfarm.v1test.QueueEntry;
 import java.util.concurrent.Semaphore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -32,20 +33,24 @@ public class LocalResourceSetUtilsTest {
   // Reason for testing: Show its okay to return claims that were never taken.
   // Failure explanation: can't return claims that were never taken.
   @Test
-  public void decideResourceLimitationsTestCoreSetting() throws Exception {
+  public void multipleClaimReleaseHasNoEffect() throws Exception {
     // ARRANGE
     LocalResourceSet resourceSet = new LocalResourceSet();
-    resourceSet.resources.put("FOO", new Semaphore(1));
+    Semaphore foo = new Semaphore(2);
+    foo.acquire(); // create room to put two resources back on if malfunctioning
+    resourceSet.resources.put("FOO", foo);
 
-    QueueEntry entry =
-        QueueEntry.newBuilder()
-            .setPlatform(
-                Platform.newBuilder()
-                    .addProperties(
-                        Platform.Property.newBuilder().setName("resource:FOO").setValue("10")))
+    Platform platform =
+        Platform.newBuilder()
+            .addProperties(Platform.Property.newBuilder().setName("resource:FOO").setValue("1"))
             .build();
 
     // ACT
-    LocalResourceSetUtils.releaseClaims(entry.getPlatform(), resourceSet);
+    Claim claim = LocalResourceSetUtils.claimResources(platform, resourceSet);
+    assertThat(foo.availablePermits()).isEqualTo(0);
+    claim.release();
+    assertThat(foo.availablePermits()).isEqualTo(1);
+    claim.release();
+    assertThat(foo.availablePermits()).isEqualTo(1);
   }
 }

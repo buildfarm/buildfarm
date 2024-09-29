@@ -21,6 +21,7 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.worker.resources.Claim;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
 
@@ -34,6 +35,7 @@ public final class ExecutionContext {
   final Command command;
   final Tree tree;
   final QueueEntry queueEntry;
+  public final Claim claim;
 
   private ExecutionContext(
       ExecuteResponse.Builder executeResponse,
@@ -44,7 +46,8 @@ public final class ExecutionContext {
       Action action,
       Command command,
       Tree tree,
-      QueueEntry queueEntry) {
+      QueueEntry queueEntry,
+      Claim claim) {
     this.executeResponse = executeResponse;
     this.operation = operation;
     this.metadata = metadata;
@@ -54,6 +57,7 @@ public final class ExecutionContext {
     this.command = command;
     this.tree = tree;
     this.queueEntry = queueEntry;
+    this.claim = claim;
   }
 
   public static final class Builder {
@@ -66,6 +70,7 @@ public final class ExecutionContext {
     private Command command;
     private Tree tree;
     private QueueEntry queueEntry;
+    private Claim claim;
 
     private Builder(
         ExecuteResponse.Builder executeResponse,
@@ -76,7 +81,8 @@ public final class ExecutionContext {
         Action action,
         Command command,
         Tree tree,
-        QueueEntry queueEntry) {
+        QueueEntry queueEntry,
+        Claim claim) {
       this.executeResponse = executeResponse;
       this.operation = operation;
       this.metadata = metadata;
@@ -86,6 +92,7 @@ public final class ExecutionContext {
       this.command = command;
       this.tree = tree;
       this.queueEntry = queueEntry;
+      this.claim = claim;
     }
 
     public Builder setOperation(Operation operation) {
@@ -128,9 +135,23 @@ public final class ExecutionContext {
       return this;
     }
 
+    public Builder setClaim(Claim claim) {
+      this.claim = claim;
+      return this;
+    }
+
     public ExecutionContext build() {
       return new ExecutionContext(
-          executeResponse, operation, metadata, poller, execDir, action, command, tree, queueEntry);
+          executeResponse,
+          operation,
+          metadata,
+          poller,
+          execDir,
+          action,
+          command,
+          tree,
+          queueEntry,
+          claim);
     }
   }
 
@@ -144,11 +165,21 @@ public final class ExecutionContext {
         /* action= */ null,
         /* command= */ null,
         /* tree= */ null,
-        /* queueEntry= */ null);
+        /* queueEntry= */ null,
+        /* claim= */ null);
   }
 
   public Builder toBuilder() {
     return new Builder(
-        executeResponse, operation, metadata, poller, execDir, action, command, tree, queueEntry);
+        executeResponse,
+        operation,
+        metadata,
+        poller,
+        execDir,
+        action,
+        command,
+        tree,
+        queueEntry,
+        claim);
   }
 }

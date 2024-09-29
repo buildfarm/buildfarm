@@ -26,6 +26,16 @@ import lombok.Data;
  */
 @Data
 public class LimitedResource {
+  public enum Type {
+    // default, depletes until 0 and denies scheduling until released
+    SEMAPHORE,
+
+    // creates a pool of numeric ids, and can be injected into execution wrappers
+    POOL,
+  }
+
+  private Type type = Type.SEMAPHORE;
+
   /**
    * @field name
    * @brief The name of the resource.
