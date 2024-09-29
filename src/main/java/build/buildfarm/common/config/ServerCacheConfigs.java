@@ -30,26 +30,26 @@ public class ServerCacheConfigs {
    * @brief The max number of entries that the directory cache will hold.
    * @details This will not dictate the max memory used.
    */
-  public long directoryCacheMaxEntries = 64 * 1024;
+  private long directoryCacheMaxEntries = 64 * 1024;
 
   /**
    * @field commandCacheMaxEntries
    * @brief The max number of entries that the command cache will hold.
    * @details This will not dictate the max memory used.
    */
-  public long commandCacheMaxEntries = 64 * 1024;
+  private long commandCacheMaxEntries = 64 * 1024;
 
   /**
    * @field digestToActionCacheMaxEntries
    * @brief The max number of entries that the digest-to-action cache will hold.
    * @details This will not dictate the max memory used.
    */
-  public long digestToActionCacheMaxEntries = 64 * 1024;
+  private long digestToActionCacheMaxEntries = 64 * 1024;
 
   /**
    * @field recentServedExecutionsCacheMaxEntries
    * @brief The max number of entries that the executions cache will hold.
    * @details This will not dictate the max memory used.
    */
-  public long recentServedExecutionsCacheMaxEntries = 64 * 1024;
+  private long recentServedExecutionsCacheMaxEntries = 64 * 1024;
 }

@@ -727,7 +727,7 @@ public class ResourceDeciderTest {
     // ARRANGE
     Command command = Command.newBuilder().build();
     SandboxSettings sandboxSettings = new SandboxSettings();
-    sandboxSettings.alwaysUseSandbox = true;
+    sandboxSettings.setAlwaysUseSandbox(true);
 
     // ACT
     ResourceLimits limits =
@@ -761,7 +761,7 @@ public class ResourceDeciderTest {
                             .setValue("true")))
             .build();
     SandboxSettings sandboxSettings = new SandboxSettings();
-    sandboxSettings.selectForBlockNetwork = true;
+    sandboxSettings.setSelectForBlockNetwork(true);
 
     // ACT
     ResourceLimits limits =
@@ -795,7 +795,7 @@ public class ResourceDeciderTest {
                             .setValue("true")))
             .build();
     SandboxSettings sandboxSettings = new SandboxSettings();
-    sandboxSettings.selectForBlockNetwork = true;
+    sandboxSettings.setSelectForBlockNetwork(true);
 
     // ACT
     ResourceLimits limits =
@@ -829,7 +829,7 @@ public class ResourceDeciderTest {
                             .setValue("true")))
             .build();
     SandboxSettings sandboxSettings = new SandboxSettings();
-    sandboxSettings.selectForTmpFs = true;
+    sandboxSettings.setSelectForTmpFs(true);
 
     // ACT
     ResourceLimits limits =
@@ -863,7 +863,7 @@ public class ResourceDeciderTest {
                             .setValue("true")))
             .build();
     SandboxSettings sandboxSettings = new SandboxSettings();
-    sandboxSettings.selectForTmpFs = true;
+    sandboxSettings.setSelectForTmpFs(true);
 
     // ACT
     ResourceLimits limits =
