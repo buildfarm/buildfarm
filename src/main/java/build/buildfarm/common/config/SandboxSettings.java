@@ -32,42 +32,42 @@ public class SandboxSettings {
    * @brief Whether or not to always use the sandbox when running actions.
    * @details It may be preferred to enforce sandbox usage than rely on client selection.
    */
-  public boolean alwaysUseSandbox = false;
+  private boolean alwaysUseSandbox = false;
 
   /**
    * @field alwaysUseAsNobody
    * @brief Whether or not to always use the as-nobody wrapper when running actions.
    * @details It may be preferred to enforce this wrapper instead of relying on client selection.
    */
-  public boolean alwaysUseAsNobody = false;
+  private boolean alwaysUseAsNobody = false;
 
   /**
    * @field alwaysUseCgroups
    * @brief Whether or not to use cgroups when sandboxing actions.
    * @details It may be preferred to enforce cgroup usage.
    */
-  public boolean alwaysUseCgroups = true;
+  private boolean alwaysUseCgroups = true;
 
   /**
    * @field alwaysUseTmpFs
    * @brief Whether or not to always use tmpfs when using the sandbox.
    * @details It may be preferred to enforce sandbox usage than rely on client selection.
    */
-  public boolean alwaysUseTmpFs = false;
+  private boolean alwaysUseTmpFs = false;
 
   /**
    * @field additionalWritePaths
    * @brief Additional paths the sandbox is allowed to write to.
    * @details Suggestions may include: /tmp, /dev/shm
    */
-  public List<String> additionalWritePaths = new ArrayList<>();
+  private List<String> additionalWritePaths = new ArrayList<>();
 
   /**
    * @field tmpFsPaths
    * @brief Additional paths the sandbox uses for tmpfs
    * @details Suggestions may include: /tmp
    */
-  public List<String> tmpFsPaths = new ArrayList<>();
+  private List<String> tmpFsPaths = new ArrayList<>();
 
   /**
    * @field selectForBlockNetwork
@@ -75,7 +75,7 @@ public class SandboxSettings {
    * @details Otherwise, there may be no alternative solution and the "block network" request will
    *     be ignored / implemented differently.
    */
-  public boolean selectForBlockNetwork = false;
+  private boolean selectForBlockNetwork = false;
 
   /**
    * @field selectForTmpFs
@@ -83,5 +83,5 @@ public class SandboxSettings {
    * @details Otherwise, there may be no alternative solution and the "tmpfs" request will be
    *     ignored / implemented differently.
    */
-  public boolean selectForTmpFs = false;
+  private boolean selectForTmpFs = false;
 }

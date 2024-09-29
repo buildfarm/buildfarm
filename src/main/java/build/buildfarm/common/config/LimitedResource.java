@@ -32,12 +32,12 @@ public class LimitedResource {
    * @details This should correspond to the platform property's key name:
    *     resources:<resoucename>:<amount>
    */
-  public String name;
+  private String name;
 
   /**
    * @field amount
    * @brief The total amount of the resource that's available for use during execution.
    * @details As a counting semaphore, this amount becomes the limit.
    */
-  public int amount = 1;
+  private int amount = 1;
 }

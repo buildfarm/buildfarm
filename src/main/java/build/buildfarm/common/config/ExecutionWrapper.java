@@ -4,6 +4,6 @@ import lombok.Data;
 
 @Data
 public class ExecutionWrapper {
-  String path;
-  String[] arguments = new String[0];
+  private String path;
+  private String[] arguments = new String[0];
 }
