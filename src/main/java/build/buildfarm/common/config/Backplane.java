@@ -2,8 +2,6 @@ package build.buildfarm.common.config;
 
 import com.google.common.base.Strings;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -74,10 +72,6 @@ public class Backplane {
   private int maxAttempts = 20;
   private boolean cacheCas = false;
   private long priorityPollIntervalMillis = 100;
-
-  // These limited resources are shared across all workers.
-  // An example would be a limited number of seats to a license server.
-  private List<LimitedResource> resources = new ArrayList<>();
 
   /**
    * @return The redis username, or <c>null</c> if unset.
