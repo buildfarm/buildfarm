@@ -57,7 +57,6 @@ import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.GetCapabilitiesRequest;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
-import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
@@ -80,7 +79,6 @@ import build.buildfarm.common.resources.ResourceParser;
 import build.buildfarm.common.resources.UploadBlobRequest;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.InstanceBase;
-import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
 import build.buildfarm.v1test.BackplaneStatus;
@@ -92,13 +90,11 @@ import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
-import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import build.buildfarm.v1test.ShutDownWorkerGrpc.ShutDownWorkerBlockingStub;
-import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerListRequest;
@@ -794,39 +790,6 @@ public class StubInstance extends InstanceBase {
       RequestMetadata metadata,
       Watcher watcher) {
     throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void match(Platform platform, MatchListener listener) throws InterruptedException {
-    throwIfStopped();
-    TakeOperationRequest request =
-        TakeOperationRequest.newBuilder().setInstanceName(getName()).setPlatform(platform).build();
-    boolean complete = false;
-    while (!complete) {
-      listener.onWaitStart();
-      try {
-        QueueEntry queueEntry;
-        try {
-          queueEntry = deadlined(operationQueueBlockingStub).take(request);
-        } finally {
-          listener.onWaitEnd();
-        }
-        listener.onEntry(queueEntry);
-        complete = true;
-      } catch (Exception e) {
-        Status status = Status.fromThrowable(e);
-        if (status.getCode() == Status.Code.CANCELLED && Thread.currentThread().isInterrupted()) {
-          InterruptedException intEx = new InterruptedException();
-          intEx.addSuppressed(e);
-          throw intEx;
-        }
-        if (status.getCode() != Status.Code.DEADLINE_EXCEEDED) {
-          listener.onError(e);
-          complete = true;
-        }
-        // ignore DEADLINE_EXCEEDED to prevent long running request behavior
-      }
-    }
   }
 
   @Override

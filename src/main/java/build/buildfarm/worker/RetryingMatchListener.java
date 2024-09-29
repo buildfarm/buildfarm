@@ -14,8 +14,6 @@
 
 package build.buildfarm.worker;
 
-import build.buildfarm.instance.MatchListener;
-
 public interface RetryingMatchListener extends MatchListener {
   boolean isMatched();
 }

@@ -1563,10 +1563,6 @@ public abstract class NodeInstance extends InstanceBase {
     return null;
   }
 
-  protected abstract boolean matchOperation(Operation operation) throws InterruptedException;
-
-  protected abstract void enqueueOperation(Operation operation);
-
   @Override
   public void cancelOperation(String name) throws InterruptedException {
     Operation operation = getOperation(name);

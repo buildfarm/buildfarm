@@ -30,10 +30,10 @@ import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.worker.MatchListener;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
@@ -161,11 +161,6 @@ public class WorkerInstanceTest {
         /* resultsCachePolicy= */ null,
         /* requestMetadata= */ null,
         /* watcher= */ null);
-  }
-
-  @Test(expected = UnsupportedOperationException.class)
-  public void matchIsUnsupported() throws InterruptedException {
-    instance.match(/* platform= */ null, /* listener= */ null);
   }
 
   @Test(expected = UnsupportedOperationException.class)

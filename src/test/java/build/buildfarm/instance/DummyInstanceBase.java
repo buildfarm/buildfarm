@@ -8,7 +8,6 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
@@ -161,11 +160,6 @@ class DummyInstanceBase extends InstanceBase {
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
       Watcher operationObserver) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void match(Platform platform, MatchListener listener) {
     throw new UnsupportedOperationException();
   }
 

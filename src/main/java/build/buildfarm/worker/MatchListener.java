@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance;
+package build.buildfarm.worker;
 
 import build.buildfarm.v1test.QueueEntry;
 import javax.annotation.Nullable;
