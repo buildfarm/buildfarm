@@ -86,7 +86,6 @@ import build.buildfarm.common.function.CountingConsumer;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.Filter;
 import build.buildfarm.instance.server.NodeInstance;
 import build.buildfarm.v1test.BackplaneStatus;
@@ -2621,11 +2620,6 @@ public class ServerInstance extends NodeInstance {
   }
 
   @Override
-  public void match(Platform platform, MatchListener listener) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public BackplaneStatus backplaneStatus() {
     try {
       return backplane.backplaneStatus();
@@ -2643,18 +2637,6 @@ public class ServerInstance extends NodeInstance {
         throw Status.fromThrowable(e).asRuntimeException();
       }
     }
-    throw new UnsupportedOperationException();
-  }
-
-  protected boolean matchOperation(Operation operation) {
-    throw new UnsupportedOperationException();
-  }
-
-  protected void enqueueOperation(Operation operation) {
-    throw new UnsupportedOperationException();
-  }
-
-  protected Object operationLock() {
     throw new UnsupportedOperationException();
   }
 

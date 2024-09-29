@@ -44,7 +44,6 @@ import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputDirectory;
-import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.SymlinkNode;
@@ -62,7 +61,6 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.WriteCompleteException;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.net.URL;
-import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -142,27 +140,12 @@ public class NodeInstanceTest {
     }
 
     @Override
-    protected boolean matchOperation(Operation operation) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    protected void enqueueOperation(Operation operation) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
     public GetClientStartTimeResult getClientStartTime(GetClientStartTimeRequest request) {
       throw new UnsupportedOperationException();
     }
 
     @Override
     public ListenableFuture<Void> watchExecution(UUID executionId, Watcher watcher) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void match(Platform platform, MatchListener listener) {
       throw new UnsupportedOperationException();
     }
 

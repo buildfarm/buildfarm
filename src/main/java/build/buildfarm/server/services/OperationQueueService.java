@@ -14,20 +14,14 @@
 
 package build.buildfarm.server.services;
 
-import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BackplaneStatusRequest;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
-import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.TakeOperationRequest;
-import com.google.common.base.Throwables;
 import com.google.longrunning.Operation;
 import com.google.rpc.Code;
 import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
@@ -35,60 +29,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
   public OperationQueueService(Instance instance) {
     this.instance = instance;
-  }
-
-  private static class OperationQueueMatchListener implements MatchListener {
-    private final InterruptingPredicate<QueueEntry> onMatch;
-
-    OperationQueueMatchListener(InterruptingPredicate<QueueEntry> onMatch) {
-      this.onMatch = onMatch;
-    }
-
-    @Override
-    public void onWaitStart() {}
-
-    @Override
-    public void onWaitEnd() {}
-
-    @Override
-    public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
-      return onMatch.testInterruptibly(queueEntry);
-    }
-
-    @Override
-    public void onError(Throwable t) {
-      Throwables.throwIfUnchecked(t);
-      throw new RuntimeException(t);
-    }
-  }
-
-  private InterruptingPredicate<QueueEntry> createOnMatch(
-      Instance instance, StreamObserver<QueueEntry> responseObserver) {
-    return (queueEntry) -> {
-      try {
-        responseObserver.onNext(queueEntry);
-        responseObserver.onCompleted();
-        return true;
-      } catch (StatusRuntimeException e) {
-        Status status = Status.fromThrowable(e);
-        if (status.getCode() != Status.Code.CANCELLED) {
-          responseObserver.onError(e);
-        }
-      }
-      instance.putOperation(instance.getOperation(queueEntry.getExecuteEntry().getOperationName()));
-      return false;
-    };
-  }
-
-  @Override
-  public void take(TakeOperationRequest request, StreamObserver<QueueEntry> responseObserver) {
-    try {
-      instance.match(
-          request.getPlatform(),
-          new OperationQueueMatchListener(createOnMatch(instance, responseObserver)));
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
   }
 
   @Override

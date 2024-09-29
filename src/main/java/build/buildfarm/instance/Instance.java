@@ -23,7 +23,6 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
@@ -131,8 +130,6 @@ public interface Instance {
       RequestMetadata requestMetadata,
       Watcher operationObserver)
       throws InterruptedException;
-
-  void match(Platform platform, MatchListener listener) throws InterruptedException;
 
   BackplaneStatus backplaneStatus();
 

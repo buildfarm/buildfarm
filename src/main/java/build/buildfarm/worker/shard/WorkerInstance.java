@@ -35,13 +35,13 @@ import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
-import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.NodeInstance;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.worker.MatchListener;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -199,11 +199,6 @@ public class WorkerInstance extends NodeInstance {
   }
 
   @Override
-  public void match(Platform platform, MatchListener listener) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public BackplaneStatus backplaneStatus() {
     throw new UnsupportedOperationException();
   }
@@ -221,16 +216,6 @@ public class WorkerInstance extends NodeInstance {
 
   @Override
   public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  protected boolean matchOperation(Operation operation) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  protected void enqueueOperation(Operation operation) {
     throw new UnsupportedOperationException();
   }
 
