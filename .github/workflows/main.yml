@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   build_and_deploy:
-    if: github.repository == 'bazelbuild/bazel-buildfarm'
+    if: github.repository == 'buildfarm/buildfarm'
     runs-on: ubuntu-latest
     permissions:
       pages: write
