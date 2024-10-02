@@ -87,14 +87,15 @@ class RedisShardSubscription implements Runnable {
     }
   }
 
-  public void stop() {
+  public void stop() throws JedisException{
     if (stopped.compareAndSet(false, true)) {
       try {
         subscriber.unsubscribe();
       } catch (JedisException e) {
-        // subscriber validates with private member to determine connection status
-        // detect this condition and ignore it
-        if (!e.getMessage().endsWith(" is not connected to a Connection.")) {
+        // If stop() is called before a connection is established, log and throw the exception
+        if (e.getMessage().endsWith(" is not connected to a Connection.")) {
+          log.log(Level.SEVERE, "RedisShardSubscription::stop called but no connection is established. " +
+                  "Subscription is now in 'Stopped' state and cannot subscribe.");
           throw e;
         }
       }

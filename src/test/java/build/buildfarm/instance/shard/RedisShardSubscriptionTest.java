@@ -33,6 +33,7 @@ import java.util.function.Consumer;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.UnifiedJedis;
@@ -107,7 +108,6 @@ public class RedisShardSubscriptionTest {
     Thread thread = new Thread(subscription);
     thread.start();
 
-    // FIXME if we stop before we are subscribed, this hangs
     subscribed.get();
     subscription.stop();
 
@@ -115,6 +115,60 @@ public class RedisShardSubscriptionTest {
 
     verifyNoInteractions(onUnsubscribe);
     verify(onReset, times(1)).accept(jedis);
+  }
+
+  @Test
+  public void exceptionOnStopWhenNotSubscribed() throws Exception {
+    SettableFuture<Void> broken = SettableFuture.create();
+    RedisServer server =
+            RedisServer.newRedisServer()
+                    .setOptions(
+                            ServiceOptions.withInterceptor(
+                                    (state, roName, params) -> {
+                                        if (roName.equalsIgnoreCase("subscribe") && !broken.isDone()) {
+                                            broken.set(null);
+                                            return MockExecutor.breakConnection(state);
+                                        }
+                                        return MockExecutor.proceed(state, roName, params);
+                                    }))
+                    .start();
+    SettableFuture<Void> subscribed = SettableFuture.create();
+    JedisPubSub subscriber =
+            new JedisPubSub() {
+                @Override
+                public void onSubscribe(String channel, int subscribedChannels) {
+                    subscribed.set(null);
+                }
+            };
+    InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
+    Consumer<UnifiedJedis> onReset = mock(Consumer.class);
+    List<String> subscriptions = ImmutableList.of("test");
+    UnifiedJedis jedis = new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
+
+    RedisShardSubscription subscription =
+            new RedisShardSubscription(
+                    subscriber, onUnsubscribe, onReset, () -> subscriptions, new RedisClient(jedis));
+
+    Thread thread = new Thread(subscription);
+    thread.start();
+
+    try {
+        subscription.stop();
+    } catch (JedisException e) {
+        assert e.getMessage().endsWith(" is not connected to a Connection.");
+    }
+
+    thread.join();
+
+    verifyNoInteractions(onUnsubscribe);
+    verifyNoInteractions(onReset);
+
+    //Subscription does not complete
+    assert !subscriber.isSubscribed();
+    //"subscribed" future is never set because onSubscribe() is never called
+    assert !subscribed.isDone() && !subscribed.isCancelled();
+
+    subscribed.cancel(true);
   }
 
   @Test
