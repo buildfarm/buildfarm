@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    if: github.repository == 'bazelbuild/bazel-buildfarm'
+    if: github.repository == 'buildfarm/buildfarm'
     name: Build Buildfarm Images
     runs-on: ubuntu-latest
     steps:

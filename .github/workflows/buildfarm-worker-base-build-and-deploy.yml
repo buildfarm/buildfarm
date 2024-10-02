@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    if: github.repository == 'bazelbuild/bazel-buildfarm'
+    if: github.repository == 'buildfarm/buildfarm'
     name: Build Base Buildfarm Worker Image
     runs-on: ubuntu-latest
     steps:
