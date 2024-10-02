@@ -2,7 +2,7 @@ Name:           buildfarm-server
 Version:        1.10.0
 Release:        0
 Summary:        Bazel Buildfarm Server
-URL:            https://github.com/bazelbuild/bazel-buildfarm
+URL:            https://github.com/buildfarm/buildfarm
 
 License:        Apache License, v2.0
 

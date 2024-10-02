@@ -3,7 +3,7 @@
 
 directories:
   .
-  -bazel-bazel-buildfarm
+  -bazel-buildfarm
   -bazel-bin
   -bazel-genfiles
   -bazel-out

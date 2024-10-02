@@ -1,20 +1,20 @@
-# Bazel Buildfarm
+# Buildfarm
 
 ![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=main)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/bazelbuild/bazel-buildfarm/badge)](https://securityscorecards.dev/viewer/?uri=github.com/bazelbuild/bazel-buildfarm)
-![GitHub License](https://img.shields.io/github/license/bazelbuild/bazel-buildfarm)
-![GitHub Release](https://img.shields.io/github/v/release/bazelbuild/bazel-buildfarm)
-![Docker Pulls](https://img.shields.io/docker/pulls/bazelbuild/buildfarm-server)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/buildfarm/buildfarm/badge)](https://securityscorecards.dev/viewer/?uri=github.com/buildfarm/buildfarm)
+![GitHub License](https://img.shields.io/github/license/buildfarm/buildfarm)
+![GitHub Release](https://img.shields.io/github/v/release/buildfarm/buildfarm)
+![Docker Pulls](https://img.shields.io/docker/pulls/buildfarm/buildfarm-server)
 
 
-This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
+This repository hosts a [remote caching and execution](https://github.com/bazelbuild/remote-apis) system, compatible with the build systems [Bazel](https://bazel.build), buck2, pants, and more.
 
 Background information on the status of caching and remote execution in bazel can be
 found in the [bazel documentation](https://docs.bazel.build/versions/master/remote-caching.html).
 
 File issues here for bugs or feature requests, and ask questions via build team [slack](https://join.slack.com/t/buildteamworld/shared_invite/zt-4zy8f5j5-KwiJuBoAAUorB_mdQHwF7Q) in the #buildfarm channel.
 
-[Buildfarm Docs](https://bazelbuild.github.io/bazel-buildfarm/)
+[Buildfarm Docs](https://buildfarm.github.io/buildfarm/)
 
 ## Usage
 
@@ -39,7 +39,7 @@ $ bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- <logfile> <co
 Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $PWD/examples/config.minimal.yml
 ```
 **`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
-**`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
+**`configfile`** has to be in [yaml format](https://buildfarm.github.io/buildfarm/docs/configuration).
 
 ### Bazel Buildfarm Worker
 
@@ -52,7 +52,7 @@ Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm
 
 ```
 **`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
-**`configfile`** has to be in [yaml format](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration).
+**`configfile`** has to be in [yaml format](https://buildfarm.github.io/buildfarm/docs/configuration).
 
 ### Bazel Client
 
@@ -101,7 +101,7 @@ the `WORKSPACE` file.
 ### Deployments
 
 Buildfarm can be used as an external repository for composition into a deployment of your choice.
-See also the documentation site in the [Worker Execution Environment](https://bazelbuild.github.io/bazel-buildfarm/docs/architecture/worker-execution-environment/) section.
+See also the documentation site in the [Worker Execution Environment](https://buildfarm.github.io/buildfarm/docs/architecture/worker-execution-environment/) section.
 
 Add the following to your `MODULE.bazel` to get access to buildfarm targets, filling in the `<COMMIT-SHA>` values:
 
@@ -110,7 +110,7 @@ bazel_dep(name = "build_buildfarm")
 git_override(
     module_name = "build_buildfarm",
     commit = "<COMMIT-SHA>",
-    remote = "https://github.com/bazelbuild/bazel-buildfarm.git",
+    remote = "https://github.com/buildfarm/buildfarm.git",
 )
 
 # Transitive!
@@ -165,6 +165,6 @@ helm install \
   -n bazel-buildfarm \
   --create-namespace \
   bazel-buildfarm \
-  oci://ghcr.io/bazelbuild/buildfarm \
+  oci://ghcr.io/buildfarm/buildfarm \
   --version "0.2.4"
 ```

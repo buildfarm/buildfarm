@@ -12,4 +12,4 @@ The site is rendered with jeykll.  To see changes locally run:
  - bundle install
  - jekyll serve
 
-You should see a local URL like: http://127.0.0.1:4000/bazel-buildfarm/
+You should see a local URL like: http://127.0.0.1:4000/buildfarm/

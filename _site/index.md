@@ -12,7 +12,7 @@ permalink: /
 Remote Execution
 {: .fs-6 .fw-300 }
 
-[Get started now](https://bazelbuild.github.io/bazel-buildfarm/docs/quick_start/){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 } [View it on GitHub](https://github.com/bazelbuild/bazel-buildfarm){: .btn .fs-5 .mb-4 .mb-md-0 }
+[Get started now](https://buildfarm.github.io/buildfarm/docs/quick_start/){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 } [View it on GitHub](https://github.com/buildfarm/buildfarm){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 

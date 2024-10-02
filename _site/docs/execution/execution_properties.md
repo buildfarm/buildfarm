@@ -6,7 +6,7 @@ nav_order: 4
 ---
 
 This page contains all of the [execution properties](https://docs.bazel.build/versions/master/be/common-definitions.html#common.exec_properties) supported by Buildfarm.
-Users can also customize buildfarm to understand additional properties that are not listed here (This is often done when configuring the [Operation Queue](https://github.com/bazelbuild/bazel-buildfarm/wiki/Operation-Queue)).
+Users can also customize buildfarm to understand additional properties that are not listed here (This is often done when configuring the [Operation Queue](https://github.com/buildfarm/buildfarm/wiki/Operation-Queue)).
 
 
 ## Core Selection:
@@ -134,7 +134,7 @@ PASS
 
 
 ## Additional Information
-Custom properties can also be added to buildfarm's configuration in order to facilitate queue matching (see [Platform Queues](https://github.com/bazelbuild/bazel-buildfarm/wiki/Shard-Platform-Operation-Queue)).
+Custom properties can also be added to buildfarm's configuration in order to facilitate queue matching (see [Platform Queues](https://github.com/buildfarm/buildfarm/wiki/Shard-Platform-Operation-Queue)).
 
 Please note that not all execution properties may be relevant to you or the best option depending on your build client.
 For example, some execution properties were created to facilitate behavior before bazel had a better solution in place.

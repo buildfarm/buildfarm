@@ -7,7 +7,7 @@ fullnameOverride: ""
 imagePullSecrets: []
 
 config:
-  # see: https://github.com/bazelbuild/bazel-buildfarm/blob/main/examples/config.yml
+  # see: https://github.com/buildfarm/buildfarm/blob/main/examples/config.yml
   digestFunction: SHA256
   defaultActionTimeout: 600
   maximumActionTimeout: 3600

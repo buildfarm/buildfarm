@@ -5,7 +5,7 @@ parent: Architecture
 nav_order: 5
 ---
 
-ActionCache is a service that can be used to query whether a defined action has already been executed and, if so, download its result. The service API is defined in the [Remote Execution API](https://github.com/bazelbuild/remote-apis). `ActionCache` service would require [`ContentAddressableStorage`](https://github.com/bazelbuild/bazel-buildfarm/wiki/ContentAddressableStorage) service to store file data.
+ActionCache is a service that can be used to query whether a defined action has already been executed and, if so, download its result. The service API is defined in the [Remote Execution API](https://github.com/bazelbuild/remote-apis). `ActionCache` service would require [`ContentAddressableStorage`](https://github.com/buildfarm/buildfarm/wiki/ContentAddressableStorage) service to store file data.
 
 An `Action` encapsulates all the information required to execute an action. Such information includes the command, input tree containing subdirectory/file tree, environment variables, platform information. All the information will contribute to the digest computation of an `Action` so that execution of an `Action` multiple times will produce the same output. With this, hash of an `Action` can be used as a key to cached `ActionResult`, which store result and output of an `Action` after an `Action` is completed. `ActionResult`s can be populated in `ActionCache` service after `Action`s get completed by an `Execution` service. They can also come from a local Bazel client that has executed the `Action`s and put the `ActionResults` into the cache by using the `UpdateActionCache` method. In other words, The `ActionCache` service can be used without using/implementing the `Execution` service.
 

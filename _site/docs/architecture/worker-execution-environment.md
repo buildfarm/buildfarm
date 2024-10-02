@@ -82,7 +82,7 @@ http_archive(
     name = "build_buildfarm",
     strip_prefix = "bazel-buildfarm-%s" % BUILDFARM_EXTERNAL_COMMIT,
     sha256 = BUILDFARM_EXTERNAL_SHA256,
-    url = "https://github.com/bazelbuild/bazel-buildfarm/archive/%s.zip" % BUILDFARM_EXTERNAL_COMMIT,
+    url = "https://github.com/buildfarm/buildfarm/archive/%s.zip" % BUILDFARM_EXTERNAL_COMMIT,
 )
 
 load("@build_buildfarm//:deps.bzl", "buildfarm_dependencies")

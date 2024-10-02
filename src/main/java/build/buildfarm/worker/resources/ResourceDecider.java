@@ -230,7 +230,7 @@ public final class ResourceDecider {
     // bazelbuild/bazel-toolchains provides container images that start with "docker://".
     // However, docker is unable to fetch images that have this as a prefix in the URI.
     // Our solution is to remove the prefix when we see it.
-    // https://github.com/bazelbuild/bazel-buildfarm/issues/1060
+    // https://github.com/buildfarm/buildfarm/issues/1060
     limits.containerSettings.containerImage =
         StringUtils.removeStart(limits.containerSettings.containerImage, "docker://");
 

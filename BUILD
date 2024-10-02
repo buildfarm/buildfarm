@@ -25,7 +25,7 @@ ARCH = [
 ]
 
 DEFAULT_IMAGE_LABELS = {
-    "org.opencontainers.image.source": "https://github.com/bazelbuild/bazel-buildfarm",
+    "org.opencontainers.image.source": "https://github.com/buildfarm/buildfarm",
 }
 
 DEFAULT_PACKAGE_DIR = "app/build_buildfarm"

@@ -13,4 +13,4 @@ metadataTest:
       isRegex: true
   labels:
     - key: "org.opencontainers.image.source"
-      value: "https://github.com/bazelbuild/bazel-buildfarm"
+      value: "https://github.com/buildfarm/buildfarm"

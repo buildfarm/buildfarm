@@ -9,7 +9,7 @@ nav_order: 2
 
 Workers have two major roles in Buildfarm: Execution and CAS Shard. Either of these options can be disabled, though a worker with both disabled provides no value.
 
-Regardless of role, a worker must have a local FILESYSTEM type [storage](https://bazelbuild.github.io/bazel-buildfarm/docs/configuration/configuration/#worker-cas) to retain content. This storage serves both as a resident LRU cache for Execution I/O, and the local storage for a CAS Shard. Workers can delegate to successive storage declarations (FILESYSTEM or GRPC), with read-through or expiration waterfall if configured, but only the first storage entry will be used for Executions.
+Regardless of role, a worker must have a local FILESYSTEM type [storage](https://buildfarm.github.io/buildfarm/docs/configuration/configuration/#worker-cas) to retain content. This storage serves both as a resident LRU cache for Execution I/O, and the local storage for a CAS Shard. Workers can delegate to successive storage declarations (FILESYSTEM or GRPC), with read-through or expiration waterfall if configured, but only the first storage entry will be used for Executions.
 
 ## Execution
 

@@ -395,7 +395,7 @@ public class ExecutionQueue {
         "There are no eligible queues for the provided execution requirements. One solution to is"
             + " to configure a provision queue with no requirements which would be eligible to all"
             + " operations. See"
-            + " https://bazelbuild.github.io/bazel-buildfarm/docs/architecture/queues/"
+            + " https://buildfarm.github.io/buildfarm/docs/architecture/queues/"
             + " for details. "
             + eligibilityResults);
   }

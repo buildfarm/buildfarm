@@ -34,7 +34,7 @@ Since these implementations vary in complexity and storage semantics, a common i
 
 The memory CAS implementation is extremely simple in design, constituting a maximum size with LRU eviction policy. Entry eviction is a registrable event for use as a storage for the delegated ActionCache, and Writes may be completed asynchronously by concurrent independent upload completion of an entry.
 
-This is the example presentation of a CAS in the memory instance available [here](https://github.com/bazelbuild/bazel-buildfarm/blob/main/examples/config.yml), but for reference, specification in any `cas_config` field for server or worker will enable the creation of a unique instance.
+This is the example presentation of a CAS in the memory instance available [here](https://github.com/buildfarm/buildfarm/blob/main/examples/config.yml), but for reference, specification in any `cas_config` field for server or worker will enable the creation of a unique instance.
 
 ```
 worker:
@@ -47,7 +47,7 @@ worker:
 
 This is a CAS which completely mirrors a target CAS for all requests, useful as a proxy to be embedded in a full Instance declaration.
 
-A grpc config example is available in the alternate instance specification in the memory server example [here](https://github.com/bazelbuild/bazel-buildfarm/blob/main/examples/config.yml). For reference:
+A grpc config example is available in the alternate instance specification in the memory server example [here](https://github.com/buildfarm/buildfarm/blob/main/examples/config.yml). For reference:
 
 ```
 server:
@@ -74,7 +74,7 @@ And will result in a listening grpc service on port 8081 on all interfaces, rela
 
 A sharded CAS leverages multiple Worker CAS retention and proxies requests to hosts with isolated CAS shards. These shards register their participation and entry presentation on a ShardBackplane. The backplane maintains a mapping of addresses to the nodes which host them. The sharded CAS is an aggregated proxy for its members, performing each function with fallback as appropriate; FindMissingBlobs requests are cycled through the shards, reducing a list of missing entries, Writes select a target node at random, Reads attempt a request on each advertised shard for an entry with failover on NOT_FOUND or transient grpc error. Reads are optimistic, given that a blob would not be requested that was not expected to be found, the sharded CAS will failover on complete absence of a blob to a whole cluster search for an entry.
 
-A shard CAS is the default for the Shard Instance type, with its required [backplane specification](https://github.com/bazelbuild/bazel-buildfarm/blob/main/examples/config.minimal.yml). Since functionality between Shard CAS, AC, and Execution are mixed in here, the definition is somewhat cluttered, with efforts to refine specific aspects of it underway.
+A shard CAS is the default for the Shard Instance type, with its required [backplane specification](https://github.com/buildfarm/buildfarm/blob/main/examples/config.minimal.yml). Since functionality between Shard CAS, AC, and Execution are mixed in here, the definition is somewhat cluttered, with efforts to refine specific aspects of it underway.
 
 ## Worker CAS
 
@@ -85,6 +85,6 @@ The worker's CAS file cache uses persistent disk storage. A strongly recommended
 
 Upon worker startup, the worker's cache instance is initialized in two phases. First, the root is scanned to store file information. Second, the existing directories are traversed to compute their validating identification.  Files will be automatically deleted if their file names are invalid for the cache, or if the configured cache size has been exceeded by previous files.
 
-The shard worker allows a flexible specification, with delegates available of the other types to fall back on for CAS expansion, and [encapsulated CAS configs](https://github.com/bazelbuild/bazel-buildfarm/blob/main/examples/config.yml)
+The shard worker allows a flexible specification, with delegates available of the other types to fall back on for CAS expansion, and [encapsulated CAS configs](https://github.com/buildfarm/buildfarm/blob/main/examples/config.yml)
 
 CASTest is a standalone tool to load the cache and print status information about it.

@@ -7,7 +7,7 @@ nav_order: 1
 
 # Instance Types
 
-These are the supported instance types selectable for concrete definition of an instance declared for servers in config. The types here are implementations of the [Instance](https://github.com/bazelbuild/bazel-buildfarm/blob/main/src/main/java/build/buildfarm/instance/Instance.java) interface.
+These are the supported instance types selectable for concrete definition of an instance declared for servers in config. The types here are implementations of the [Instance](https://github.com/buildfarm/buildfarm/blob/main/src/main/java/build/buildfarm/instance/Instance.java) interface.
 
 ## Memory
 
