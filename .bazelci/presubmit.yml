@@ -178,9 +178,3 @@ tasks:
     - export EXECUTION_STAGE_WIDTH=10
     - export TEST_ARG1=--experimental_remote_cache_compression
     - ./.bazelci/integration_test.sh
-
-  buildfarm_admin_test:
-    name: "BF Admin Test"
-    platform: ubuntu1804
-    shell_commands:
-    - ./.bazelci/test_bfadmin.sh
