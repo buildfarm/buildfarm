@@ -1,6 +1,8 @@
 package build.buildfarm.common;
 
 import java.time.Duration;
+import java.util.function.Supplier;
+import redis.clients.jedis.AbstractPipeline;
 
 public interface Queue<E> {
   // java.util.BlockingQueue-ish
@@ -16,6 +18,8 @@ public interface Queue<E> {
 
   // java.util.Collection
   long size();
+
+  Supplier<Long> size(AbstractPipeline pipeline);
 
   // maybe switch to iterator?
   void visit(StringVisitor visitor);

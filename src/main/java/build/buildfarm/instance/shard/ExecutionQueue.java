@@ -25,10 +25,11 @@ import build.buildfarm.v1test.QueueStatus;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.UnifiedJedis;
 
 /**
@@ -137,6 +138,17 @@ public class ExecutionQueue {
   public long size(UnifiedJedis jedis) {
     // the accumulated size of all of the queues
     return queues.stream().mapToInt(i -> (int) i.queue().size(jedis)).sum();
+  }
+
+  public Supplier<Long> size(AbstractPipeline pipeline) {
+    List<Supplier<Long>> sizes =
+        queues.stream().map(q -> q.queue().size(pipeline)).collect(Collectors.toList());
+    return new Supplier<>() {
+      @Override
+      public Long get() {
+        return sizes.stream().map(Supplier::get).mapToLong(Long::longValue).sum();
+      }
+    };
   }
 
   /**
@@ -277,32 +289,21 @@ public class ExecutionQueue {
    * @note Overloaded.
    * @note Suggested return identifier: status.
    */
-  public OperationQueueStatus status(UnifiedJedis jedis) {
-    // get properties
-    List<QueueStatus> provisions = new ArrayList<>();
-    for (ProvisionedRedisQueue provisionedQueue : queues) {
-      provisions.add(provisionedQueue.queue().status(jedis));
-    }
-
-    // build proto
-    return OperationQueueStatus.newBuilder()
-        .setSize(size(jedis))
-        .addAllProvisions(provisions)
-        .build();
-  }
-
-  /**
-   * @brief Get status information about the queue.
-   * @details Helpful for understanding the current load on the queue and how elements are balanced.
-   * @param jedis Jedis cluster client.
-   * @param provisions Provisions used to select an eligible queue.
-   * @return The current status of the queue.
-   * @note Overloaded.
-   * @note Suggested return identifier: status.
-   */
-  public QueueStatus status(UnifiedJedis jedis, List<Platform.Property> provisions) {
-    BalancedRedisQueue queue = chooseEligibleQueue(provisions);
-    return queue.status(jedis);
+  public Supplier<OperationQueueStatus> status(AbstractPipeline pipeline) {
+    Supplier<Long> size = size(pipeline);
+    List<Supplier<QueueStatus>> provisions =
+        queues.stream()
+            .map(provisionedQueue -> provisionedQueue.queue().status(pipeline))
+            .collect(Collectors.toList());
+    return new Supplier<>() {
+      @Override
+      public OperationQueueStatus get() {
+        return OperationQueueStatus.newBuilder()
+            .setSize(size.get())
+            .addAllProvisions(provisions.stream().map(Supplier::get).collect(Collectors.toList()))
+            .build();
+      }
+    };
   }
 
   /**

@@ -20,7 +20,9 @@ import com.google.common.collect.ImmutableList;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import java.util.function.Supplier;
 import lombok.Getter;
+import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Jedis;
 
 /**
@@ -210,6 +212,10 @@ public class RedisPriorityQueue implements Queue<String> {
    */
   public long size() {
     return jedis.zcard(name);
+  }
+
+  public Supplier<Long> size(AbstractPipeline pipeline) {
+    return pipeline.zcard(name);
   }
 
   /**
