@@ -28,7 +28,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class GroupTest {
-
   @Test
   public void testHierarchy() {
     Group g = Group.getRoot().getChild("c1");

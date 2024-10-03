@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import redis.clients.jedis.AbstractPipeline;
+import redis.clients.jedis.Response;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.params.ScanParams;
 import redis.clients.jedis.resps.ScanResult;
@@ -119,6 +120,10 @@ public class RedisHashMap {
    */
   public long size(UnifiedJedis jedis) {
     return jedis.hlen(name);
+  }
+
+  public Response<Long> size(AbstractPipeline pipeline) {
+    return pipeline.hlen(name);
   }
 
   /**

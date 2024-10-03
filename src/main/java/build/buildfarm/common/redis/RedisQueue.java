@@ -21,6 +21,8 @@ import build.buildfarm.common.Queue;
 import build.buildfarm.common.StringVisitor;
 import java.time.Duration;
 import java.util.List;
+import java.util.function.Supplier;
+import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Jedis;
 
 /**
@@ -160,6 +162,10 @@ public class RedisQueue implements Queue<String> {
    */
   public long size() {
     return jedis.llen(name);
+  }
+
+  public Supplier<Long> size(AbstractPipeline pipeline) {
+    return pipeline.llen(name);
   }
 
   /**

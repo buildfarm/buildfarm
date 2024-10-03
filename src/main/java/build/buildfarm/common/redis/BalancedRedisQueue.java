@@ -29,8 +29,11 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Getter;
+import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Connection;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
@@ -376,10 +379,25 @@ public class BalancedRedisQueue {
     return size(sizes(unified));
   }
 
+  public Supplier<Long> size(AbstractPipeline pipeline) {
+    // the accumulated size of all of the queues
+    List<Supplier<Long>> sizes = sizes(pipeline);
+    return new Supplier<>() {
+      @Override
+      public Long get() {
+        return sizes.stream().map(Supplier::get).mapToLong(Long::longValue).sum();
+      }
+    };
+  }
+
   private long size(UnifiedJedis unified, String queue) {
     try (Jedis jedis = getJedisFromKey(unified, queue)) {
       return queueDecorator.decorate(jedis, queue).size();
     }
+  }
+
+  private List<Supplier<Long>> sizes(AbstractPipeline pipeline) {
+    return queues.stream().map(queue -> size(pipeline, queue)).collect(Collectors.toList());
   }
 
   private Iterable<Long> sizes(UnifiedJedis unified) {
@@ -393,16 +411,25 @@ public class BalancedRedisQueue {
    * @return The current status of the queue.
    * @note Suggested return identifier: status.
    */
-  public QueueStatus status(UnifiedJedis unified) {
-    // get properties
-    Iterable<Long> sizes = sizes(unified);
+  private Supplier<Long> size(AbstractPipeline pipeline, String queue) {
+    // prevent non-pipeline access via the map and supply a pipeline destination
+    return queueDecorator.decorate(null, queue).size(pipeline);
+  }
 
-    // build proto
-    return QueueStatus.newBuilder()
-        .setName(RedisHashtags.hashedName(name, originalHashtag))
-        .setSize(size(sizes))
-        .addAllInternalSizes(sizes)
-        .build();
+  public Supplier<QueueStatus> status(AbstractPipeline pipeline) {
+    List<Supplier<Long>> sizeSuppliers = sizes(pipeline);
+
+    return new Supplier<>() {
+      @Override
+      public QueueStatus get() {
+        List<Long> sizes = sizeSuppliers.stream().map(Supplier::get).collect(Collectors.toList());
+        return QueueStatus.newBuilder()
+            .setName(RedisHashtags.hashedName(name, originalHashtag))
+            .setSize(sizes.stream().mapToLong(Long::longValue).sum())
+            .addAllInternalSizes(sizes)
+            .build();
+      }
+    };
   }
 
   /**

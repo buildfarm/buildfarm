@@ -33,7 +33,7 @@ public class RedisClient implements Closeable {
 
   @FunctionalInterface
   public interface JedisContext<T> {
-    T run(UnifiedJedis jedis) throws JedisException;
+    T run(UnifiedJedis jedis) throws IOException, JedisException;
   }
 
   @FunctionalInterface

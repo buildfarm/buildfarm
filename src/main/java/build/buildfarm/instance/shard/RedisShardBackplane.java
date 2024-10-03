@@ -95,6 +95,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import lombok.extern.java.Log;
+import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.UnifiedJedis;
 
 @Log
@@ -1406,19 +1407,26 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public BackplaneStatus backplaneStatus() throws IOException {
+    return client.call(this::backplaneStatus);
+  }
+
+  private BackplaneStatus backplaneStatus(UnifiedJedis jedis) throws IOException {
     Set<String> executeWorkers = getExecuteWorkers();
     Set<String> storageWorkers = getStorageWorkers();
-    OperationQueueStatus operationQueueStatus =
-        client.call(jedis -> state.executionQueue.status(jedis));
-    QueueStatus prequeueStatus = client.call(jedis -> state.prequeue.status(jedis));
-    return BackplaneStatus.newBuilder()
-        .addAllActiveExecuteWorkers(executeWorkers)
-        .addAllActiveStorageWorkers(storageWorkers)
-        .addAllActiveWorkers(Sets.union(executeWorkers, storageWorkers))
-        .setDispatchedSize(client.call(jedis -> state.dispatchedExecutions.size(jedis)))
-        .setOperationQueue(operationQueueStatus)
-        .setPrequeue(prequeueStatus)
-        .build();
+    try (AbstractPipeline pipeline = jedis.pipelined()) {
+      Supplier<QueueStatus> prequeue = state.prequeue.status(pipeline);
+      Supplier<OperationQueueStatus> operationQueue = state.executionQueue.status(pipeline);
+      Supplier<Long> dispatchedSize = state.dispatchedExecutions.size(pipeline);
+      pipeline.sync();
+      return BackplaneStatus.newBuilder()
+          .addAllActiveExecuteWorkers(executeWorkers)
+          .addAllActiveStorageWorkers(storageWorkers)
+          .addAllActiveWorkers(Sets.union(executeWorkers, storageWorkers))
+          .setPrequeue(prequeue.get())
+          .setOperationQueue(operationQueue.get())
+          .setDispatchedSize(dispatchedSize.get())
+          .build();
+    }
   }
 
   @SuppressWarnings("ConstantConditions")
