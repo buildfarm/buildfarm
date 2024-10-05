@@ -1,16 +1,13 @@
 package persistent.common;
 
-
-import java.io.IOException;
-
 import com.google.common.base.Throwables;
-
+import java.io.IOException;
 import org.apache.commons.pool2.BaseKeyedPooledObjectFactory;
-import org.apache.commons.pool2.impl.GenericKeyedObjectPool;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 
 /**
  * Pool based on Apache Commons, ripped from Bazel as usual
+ *
  * @param <K>
  * @param <V>
  */
