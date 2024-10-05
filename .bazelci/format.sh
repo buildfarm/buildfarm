@@ -51,7 +51,7 @@ run_java_formatter () {
     fi
 
      # Get all the files to format and format them
-    files=$(find src/* -type f -name "*.java")
+    files=$(find src/* persistentworkers/* -type f -name "*.java")
 
     # Check whether any formatting changes need to be made.
     # This is intended to be done by the CI.
