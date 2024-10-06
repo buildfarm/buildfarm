@@ -3,21 +3,8 @@ backplane:
   queues:
     - name: "cpu"
       properties:
-        - name: "min-cores"
-          value: "*"
-        - name: "max-cores"
-          value: "*"
-        - name: "persistentWorkerKey"
-          value: "*"
-        - name: "persistentWorkerCommand"
-          value: "*"
+        - name: "*"
 worker:
   publicName: "localhost:8981"
   dequeueMatchSettings:
     allowUnmatched: true
-    properties:
-      - name: "persistentWorkerKey"
-        value: "*"
-      - name: "persistentWorkerCommand"
-        value: "*"
-
