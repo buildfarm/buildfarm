@@ -54,6 +54,9 @@ public final class Group {
   @Getter private final Cpu cpu;
   @Getter private final Mem mem;
 
+  @SuppressWarnings(
+      "PMD.MutableStaticState") // Unit tests set this. When CGroups v1 support is gone, this will
+  // go away, too.
   protected static CGroupVersion VERSION = discoverCgroupVersion();
 
   private static CGroupVersion discoverCgroupVersion() {
