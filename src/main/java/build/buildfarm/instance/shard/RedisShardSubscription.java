@@ -87,7 +87,7 @@ class RedisShardSubscription implements Runnable {
     }
   }
 
-  public void stop() throws JedisException {
+  public void stop() {
     if (stopped.compareAndSet(false, true)) {
       try {
         subscriber.unsubscribe();
@@ -98,8 +98,8 @@ class RedisShardSubscription implements Runnable {
               Level.SEVERE,
               "RedisShardSubscription::stop called but no connection is established. "
                   + "Subscription is now in 'Stopped' state and cannot subscribe.");
-          throw e;
         }
+        throw e;
       }
     }
   }
