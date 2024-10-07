@@ -16,8 +16,6 @@ package build.buildfarm.common.grpc;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.AsyncCallable;
@@ -34,6 +32,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 
 /**
  * Supports execution with retries on particular gRPC Statuses. The retrier is ThreadSafe.
@@ -186,10 +185,10 @@ public class Retrier {
       };
 
   @SuppressWarnings("Guava")
-  public static final Predicate<Status> RETRY_ALL = Predicates.alwaysTrue();
+  public static final Predicate<Status> RETRY_ALL = status -> true;
 
   @SuppressWarnings("Guava")
-  public static final Predicate<Status> RETRY_NONE = Predicates.alwaysFalse();
+  public static final Predicate<Status> RETRY_NONE = status -> false;
 
   public static final Retrier NO_RETRIES = new Retrier(Backoff.NO_RETRIES, RETRY_NONE);
 
@@ -218,7 +217,7 @@ public class Retrier {
 
   /** Returns {@code true} if the {@link Status} is retriable. */
   public boolean isRetriable(Status s) {
-    return isRetriable.apply(s);
+    return isRetriable.test(s);
   }
 
   /**
@@ -246,7 +245,7 @@ public class Retrier {
           Thread.currentThread().interrupt();
           throw new InterruptedException();
         }
-        if (delay < 0 || !isRetriable.apply(st)) {
+        if (delay < 0 || !isRetriable.test(st)) {
           throw new RetryException(st.asRuntimeException(), backoff.getRetryAttempts());
         }
         sleep(delay);
@@ -292,7 +291,7 @@ public class Retrier {
   private <T> ListenableFuture<T> onExecuteAsyncFailure(
       Exception t, AsyncCallable<T> call, Backoff backoff) {
     long waitMillis = backoff.nextDelayMillis();
-    if (waitMillis >= 0 && isRetriable.apply(Status.fromThrowable(t))) {
+    if (waitMillis >= 0 && isRetriable.test(Status.fromThrowable(t))) {
       try {
         return Futures.scheduleAsync(
             () -> executeAsync(call, backoff), waitMillis, TimeUnit.MILLISECONDS, retryScheduler);

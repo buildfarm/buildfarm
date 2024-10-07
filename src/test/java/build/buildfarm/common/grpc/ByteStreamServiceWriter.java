@@ -81,7 +81,7 @@ public class ByteStreamServiceWriter extends ByteStreamImplBase {
 
     @Override
     public void onError(Throwable t) {
-      if (!DEFAULT_IS_RETRIABLE.apply(Status.fromThrowable(t))) {
+      if (!DEFAULT_IS_RETRIABLE.test(Status.fromThrowable(t))) {
         content.setException(t);
       }
     }

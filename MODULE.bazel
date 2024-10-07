@@ -12,7 +12,7 @@ bazel_dep(name = "gazelle", version = "0.39.0")
 bazel_dep(name = "grpc-java", version = "1.64.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20240326-1c8d509c5")
 bazel_dep(name = "platforms", version = "0.0.10")
-bazel_dep(name = "protobuf", version = "23.1", repo_name = "com_google_protobuf")
+bazel_dep(name = "protobuf", version = "29.0-rc1", repo_name = "com_google_protobuf")
 bazel_dep(name = "rules_cc", version = "0.0.10")
 bazel_dep(name = "rules_go", version = "0.50.1")
 bazel_dep(name = "rules_java", version = "7.12.0")
@@ -30,13 +30,13 @@ bazel_dep(
 )
 
 # TODO: remove this after https://github.com/bazelbuild/remote-apis/pull/293 is merged
-bazel_dep(name = "remoteapis", version = "eb433accc6a666b782ea4b787eb598e5c3d27c93")
+bazel_dep(name = "bazel_remote_apis", version = "6777112ef7defa6705b1ebd2831d6c7efeb12ba2", repo_name = "remoteapis")
 archive_override(
-    module_name = "remoteapis",
-    integrity = "sha256-68wzxNAkPZ49/zFwPYQ5z9MYbgxoeIEazKJ24+4YqIQ=",
-    strip_prefix = "remote-apis-eb433accc6a666b782ea4b787eb598e5c3d27c93",
+    module_name = "bazel_remote_apis",
+    integrity = "sha256-PTtx9Vz9LjLvvUhv/n4QnksoD19BfqoFssrb3QvxcSE=",
+    strip_prefix = "remote-apis-6777112ef7defa6705b1ebd2831d6c7efeb12ba2",
     urls = [
-        "https://github.com/bazelbuild/remote-apis/archive/eb433accc6a666b782ea4b787eb598e5c3d27c93.zip",
+        "https://github.com/bazelbuild/remote-apis/archive/6777112ef7defa6705b1ebd2831d6c7efeb12ba2.zip",
     ],
 )
 
@@ -106,7 +106,7 @@ maven.install(
                     "com.google.errorprone:error_prone_annotations:2.27.0",
                     "com.google.errorprone:error_prone_core:2.27.0",
                     "com.google.guava:failureaccess:1.0.2",
-                    "com.google.guava:guava:33.1.0-jre",
+                    "com.google.guava:guava:33.2.1-jre",
                     "com.google.j2objc:j2objc-annotations:2.8",
                     "com.google.protobuf:protobuf-java:3.19.1",
                     "com.google.protobuf:protobuf-java-util:3.19.1",
