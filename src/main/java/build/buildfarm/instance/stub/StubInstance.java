@@ -108,7 +108,6 @@ import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Functions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -524,7 +523,7 @@ public class StubInstance extends InstanceBase {
   public Write getOperationStreamWrite(String name) {
     return getWrite(
         name,
-        Functions.identity(),
+        e -> e,
         StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
         /* autoflush= */ true,
         RequestMetadata.getDefaultInstance());

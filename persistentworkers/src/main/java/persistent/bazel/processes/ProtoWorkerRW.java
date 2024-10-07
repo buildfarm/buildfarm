@@ -8,7 +8,7 @@ import java.util.function.Supplier;
 
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
-import com.google.protobuf.GeneratedMessageV3;
+import com.google.protobuf.GeneratedMessage;
 
 import org.apache.commons.io.IOUtils;
 
@@ -68,7 +68,7 @@ public class ProtoWorkerRW {
     return readResponse(readStream);
   }
 
-  public static <R extends GeneratedMessageV3> void writeTo(R req, OutputStream outputStream) throws IOException {
+  public static <R extends GeneratedMessage> void writeTo(R req, OutputStream outputStream) throws IOException {
     try {
       req.writeDelimitedTo(outputStream);
     } finally {
