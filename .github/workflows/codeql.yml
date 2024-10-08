@@ -18,12 +18,8 @@ jobs:
     permissions:
       security-events: write
 
-    strategy:
-      matrix:
-        language: ["java-kotlin"]
-
     steps:
-      - uses: bazel-contrib/setup-bazel@0.8.1
+      - uses: bazel-contrib/setup-bazel@0.9.0
         with:
           # Avoid downloading Bazel every time.
           bazelisk-cache: true
@@ -31,20 +27,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: manual
-
       - name: Build java
         # Note: Bazel requires specific args to do the build with a little caching as possible. Kind of the anthesis of Bazel's philosophy,
         # But codeql wants to observe all the compilation.
         # See also: https://docs.github.com/en/enterprise-cloud@latest/code-security/codeql-cli/getting-started-with-the-codeql-cli/preparing-your-code-for-codeql-analysis#specifying-build-commands
         run: |
-          bazel build --spawn_strategy=local --nouse_action_cache --noremote_accept_cached --noremote_upload_local_results //src/main/java/build/buildfarm:buildfarm-server //src/main/java/build/buildfarm:buildfarm-shard-worker
-          bazel shutdown
-
-      - uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{ matrix.language }}"
+          echo "vvv BAZEL --version vvv"
+          bazel --version
+          echo "^^^ BAZEL --version ^^^"
+          echo "vvv BAZEL VERSION vvv"
+          bazel version
+          echo "^^^ BAZEL VERSION ^^^"
