@@ -19,7 +19,6 @@ java_test(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "//third_party/remote-apis:build_bazel_remote_execution_v2_remote_execution_java_grpc",
-        "@com_google_protobuf//:protobuf_java",
         "@googleapis//google/bytestream:bytestream_java_grpc",
         "@googleapis//google/bytestream:bytestream_java_proto",
         "@googleapis//google/longrunning:longrunning_java_grpc",
@@ -37,6 +36,7 @@ java_test(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:me_dinowernli_java_grpc_prometheus",
         "@maven//:org_mockito_mockito_core",
+        "@protobuf//:protobuf_java",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_java_proto",
     ],
 )

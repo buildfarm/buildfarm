@@ -9,9 +9,9 @@ def archive_dependencies(third_party):
         # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
         {
             "name": "bazel",
-            "sha256": "06d3dbcba2286d45fc6479a87ccc649055821fc6da0c3c6801e73da780068397",
-            "strip_prefix": "bazel-6.0.0",
-            "urls": ["https://github.com/bazelbuild/bazel/archive/refs/tags/6.0.0.tar.gz"],
+            "sha256": "de54ed570e59445246bed5f44c16863ca83646c9cbd0ceaf4ca1e4ce9581f805",
+            "strip_prefix": "bazel-7.3.2",
+            "urls": ["https://github.com/bazelbuild/bazel/archive/refs/tags/7.3.2.tar.gz"],
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
         },
@@ -48,22 +48,6 @@ def _buildfarm_extension_impl(_ctx):
         name = "tini",
         sha256 = "12d20136605531b09a2c2dac02ccee85e1b874eb322ef6baf7561cd93f93c855",
         urls = ["https://github.com/krallin/tini/releases/download/v0.18.0/tini"],
-    )
-
-    if not native.existing_rule("com_github_grpc_grpc"):
-        http_archive(
-            name = "com_github_grpc_grpc",
-            strip_prefix = "grpc-1.46.0",
-            sha256 = "67423a4cd706ce16a88d1549297023f0f9f0d695a96dd684adc21e67b021f9bc",
-            urls = [
-                "https://github.com/grpc/grpc/archive/v1.46.0.tar.gz",
-            ],
-        )
-    http_archive(
-        name = "io_grpc_grpc_proto",
-        sha256 = "729ac127a003836d539ed9da72a21e094aac4c4609e0481d6fc9e28a844e11af",
-        strip_prefix = "grpc-proto-4f245d272a28a680606c0739753506880cf33b5f",
-        urls = ["https://github.com/grpc/grpc-proto/archive/4f245d272a28a680606c0739753506880cf33b5f.zip"],
     )
 
 build_deps = module_extension(

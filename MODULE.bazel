@@ -5,22 +5,22 @@ module(
     repo_name = "build_buildfarm",
 )
 
-bazel_dep(name = "bazel_skylib", version = "1.6.1")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "blake3", version = "1.5.1.bcr.1")
 bazel_dep(name = "buildifier_prebuilt", version = "7.3.1")
 bazel_dep(name = "gazelle", version = "0.39.0")
-bazel_dep(name = "grpc-java", version = "1.64.0")
-bazel_dep(name = "googleapis", version = "0.0.0-20240326-1c8d509c5")
+bazel_dep(name = "grpc-java", version = "1.66.0")
+bazel_dep(name = "googleapis", version = "0.0.0-20240819-fe8ba054a")
+bazel_dep(name = "grpc-proto", version = "0.0.0-20240627-ec30f58", repo_name = "io_grpc_grpc_proto")
 bazel_dep(name = "platforms", version = "0.0.10")
-bazel_dep(name = "protobuf", version = "29.0-rc1", repo_name = "com_google_protobuf")
+bazel_dep(name = "protobuf", version = "29.0-rc1")
 bazel_dep(name = "rules_cc", version = "0.0.10")
 bazel_dep(name = "rules_go", version = "0.50.1")
 bazel_dep(name = "rules_java", version = "7.12.0")
-bazel_dep(name = "rules_jvm_external", version = "6.0")
+bazel_dep(name = "rules_jvm_external", version = "6.4")
 bazel_dep(name = "rules_license", version = "1.0.0")
 bazel_dep(name = "rules_oci", version = "1.7.4")
 bazel_dep(name = "rules_pkg", version = "1.0.1")
-bazel_dep(name = "rules_proto", version = "6.0.0-rc2")
 
 # Test dependencies
 bazel_dep(
@@ -99,15 +99,15 @@ maven.install(
                     "com.github.pcj:google-options:1.0.0",
                     "com.github.serceman:jnr-fuse:0.5.7",
                     "com.google.api.grpc:proto-google-common-protos:2.29.0",
-                    "com.google.auth:google-auth-library-credentials:1.19.0",
-                    "com.google.auth:google-auth-library-oauth2-http:1.19.0",
+                    "com.google.auth:google-auth-library-credentials:1.23.0",
+                    "com.google.auth:google-auth-library-oauth2-http:1.23.0",
                     "com.google.code.findbugs:jsr305:3.0.2",
-                    "com.google.code.gson:gson:2.10.1",
-                    "com.google.errorprone:error_prone_annotations:2.27.0",
-                    "com.google.errorprone:error_prone_core:2.27.0",
+                    "com.google.code.gson:gson:2.11.0",
+                    "com.google.errorprone:error_prone_annotations:2.28.0",
+                    "com.google.errorprone:error_prone_core:2.28.0",
                     "com.google.guava:failureaccess:1.0.2",
                     "com.google.guava:guava:33.2.1-jre",
-                    "com.google.j2objc:j2objc-annotations:2.8",
+                    "com.google.j2objc:j2objc-annotations:3.0.0",
                     "com.google.protobuf:protobuf-java:3.19.1",
                     "com.google.protobuf:protobuf-java-util:3.19.1",
                     "com.googlecode.json-simple:json-simple:1.1.1",
@@ -214,11 +214,13 @@ build_deps = use_extension("//:extensions.bzl", "build_deps")
 use_repo(
     build_deps,
     "bazel",
-    "io_grpc_grpc_proto",
     "opentelemetry",
     "skip_sleep",
     "tini",
 )
+
+# this is *only* required for bazel and should not be used in our repository
+bazel_dep(name = "rules_proto", version = "6.0.0-rc2")
 
 googleapis_switched_rules = use_extension("@googleapis//:extensions.bzl", "switched_rules")
 googleapis_switched_rules.use_languages(
