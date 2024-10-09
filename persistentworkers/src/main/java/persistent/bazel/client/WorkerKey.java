@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.SortedMap;
 import lombok.Getter;
+import lombok.ToString;
 
 /**
  * Based off of copy-pasting from Bazel's WorkerKey. Comments also ripped off, credits to the Bazel
@@ -15,18 +16,19 @@ import lombok.Getter;
  *
  * <p>Data container that uniquely identifies a kind of worker process.
  */
+@ToString(onlyExplicitlyIncluded = true)
 public final class WorkerKey {
 
-  @Getter private final ImmutableList<String> cmd;
+  @Getter @ToString.Include private final ImmutableList<String> cmd;
 
-  @Getter private final ImmutableList<String> args;
+  @Getter @ToString.Include private final ImmutableList<String> args;
 
-  @Getter private final ImmutableMap<String, String> env;
+  @Getter @ToString.Include private final ImmutableMap<String, String> env;
 
-  @Getter private final Path execRoot;
+  @Getter @ToString.Include private final Path execRoot;
 
   /** Mnemonic of the worker; but we don't actually have the real action mnemonic */
-  @Getter private final String mnemonic;
+  @Getter @ToString.Include private final String mnemonic;
 
   /**
    * These are used during validation whether a worker is still usable. They are not used to
@@ -124,27 +126,5 @@ public final class WorkerKey {
     // Use the string representation of the protocolFormat because the hash of the same enum value
     // can vary across instances.
     return Objects.hash(cmd, args, env, execRoot, mnemonic, cancellable, sandboxed);
-  }
-
-  // Not as cool as using Bazel CommandFailureUtils
-  @Override
-  public String toString() {
-    return "WorkerKey("
-        + "\n\t"
-        + "cmd="
-        + cmd
-        + ",\n\t"
-        + "args="
-        + args
-        + ",\n\t"
-        + "env="
-        + env
-        + ",\n\t"
-        + "mnemonic="
-        + mnemonic
-        + ",\n\t"
-        + "execRoot="
-        + execRoot.toAbsolutePath()
-        + "\n)";
   }
 }
