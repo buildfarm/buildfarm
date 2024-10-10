@@ -86,7 +86,9 @@ public class MatchStage extends PipelineStage {
       executionContext
           .metadata
           .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
-          .setRequestMetadata(queueEntry.getExecuteEntry().getRequestMetadata());
+          .setRequestMetadata(queueEntry.getExecuteEntry().getRequestMetadata())
+          .getExecuteOperationMetadataBuilder()
+          .setDigestFunction(queueEntry.getExecuteEntry().getActionDigest().getDigestFunction());
 
       Preconditions.checkState(poller == null);
       executionContext =
