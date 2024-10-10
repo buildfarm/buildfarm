@@ -38,6 +38,13 @@ class RedisShardSubscription implements Runnable {
   private final Supplier<List<String>> subscriptions;
   private final RedisClient client;
   private final AtomicBoolean stopped = new AtomicBoolean(false);
+  private final AtomicBoolean attemptingSubscripton = new AtomicBoolean(false);
+
+  private enum SubscriptionAction {
+    STOP,
+    START_SUBSCRIBE,
+    COMPLETE_SUBSCRIBE
+  }
 
   RedisShardSubscription(
       JedisPubSub subscriber,
@@ -52,11 +59,33 @@ class RedisShardSubscription implements Runnable {
     this.client = client;
   }
 
+  private synchronized void manageState(SubscriptionAction update) {
+    switch (update) {
+      case STOP:
+        stopped.set(true);
+        break;
+      case START_SUBSCRIBE:
+        if (!stopped.get()) {
+          attemptingSubscripton.set(true);
+        }
+        break;
+      case COMPLETE_SUBSCRIBE:
+        attemptingSubscripton.set(false);
+        break;
+    }
+  }
+
   private void subscribe(UnifiedJedis jedis, boolean isReset) {
     if (isReset) {
       onReset.accept(jedis);
     }
-    jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
+    manageState(SubscriptionAction.START_SUBSCRIBE);
+    if (attemptingSubscripton.get()) {
+      jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
+      manageState(SubscriptionAction.COMPLETE_SUBSCRIBE);
+    } else {
+      log.log(Level.SEVERE, "Cannot subscribe, RedisShardSubscription is in 'stopped' state");
+    }
   }
 
   private void iterate(boolean isReset) throws IOException {
@@ -88,7 +117,8 @@ class RedisShardSubscription implements Runnable {
   }
 
   public void stop() {
-    if (stopped.compareAndSet(false, true)) {
+    manageState(SubscriptionAction.STOP);
+    if (attemptingSubscripton.get()) {
       try {
         subscriber.unsubscribe();
       } catch (JedisException e) {
@@ -100,7 +130,23 @@ class RedisShardSubscription implements Runnable {
                   + "Subscription is now in 'Stopped' state and cannot subscribe.");
         }
         throw e;
+      } finally {
+        if (attemptingSubscripton.get()) {
+          try {
+            Thread.sleep(10);
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+          stop();
+        }
       }
+    }
+    // No attempt to subscribe, alert the user and return
+    else {
+      log.log(
+          Level.SEVERE,
+          "RedisShardSubscription::stop called but no connection is established. "
+              + "Subscription is now in 'Stopped' state and cannot subscribe.");
     }
   }
 
@@ -116,7 +162,7 @@ class RedisShardSubscription implements Runnable {
         Thread.currentThread().interrupt();
       }
     } finally {
-      stopped.set(true);
+      manageState(SubscriptionAction.STOP);
     }
   }
 }

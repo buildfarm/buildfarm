@@ -15,6 +15,8 @@
 package build.buildfarm.instance.shard;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -93,11 +95,18 @@ public class RedisShardSubscriptionTest {
         new JedisPubSub() {
           @Override
           public void onSubscribe(String channel, int subscribedChannels) {
-            subscribed.set(null);
+            System.out.println("onSubscribe called");
           }
         };
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
+    doAnswer(
+            invocation -> {
+              subscribed.set(null);
+              return null;
+            })
+        .when(onReset)
+        .accept(any(UnifiedJedis.class));
     List<String> subscriptions = ImmutableList.of("test");
     UnifiedJedis jedis = new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
 
