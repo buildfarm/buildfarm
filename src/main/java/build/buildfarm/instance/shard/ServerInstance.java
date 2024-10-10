@@ -1741,7 +1741,7 @@ public class ServerInstance extends NodeInstance {
         .setStdoutStreamName(executeEntry.getStdoutStreamName())
         .setStderrStreamName(executeEntry.getStderrStreamName())
         .setStage(stage)
-        // .setDigestFunction(executeEntry.getActionDigest().getDigestFunction())
+        .setDigestFunction(executeEntry.getActionDigest().getDigestFunction())
         .build();
   }
 
@@ -2244,7 +2244,7 @@ public class ServerInstance extends NodeInstance {
               .setActionDigest(DigestUtil.toDigest(actionDigest))
               .setStdoutStreamName(stdoutStreamName)
               .setStderrStreamName(stderrStreamName)
-              // .setDigestFunction(actionDigest.getDigestFunction())
+              .setDigestFunction(actionDigest.getDigestFunction())
               .build();
       Operation operation =
           Operation.newBuilder().setName(executionName).setMetadata(Any.pack(metadata)).build();
@@ -2337,7 +2337,7 @@ public class ServerInstance extends NodeInstance {
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(DigestUtil.toDigest(actionKey.getDigest()))
             .setStage(ExecutionStage.Value.COMPLETED)
-            // .setDigestFunction(actionKey.getDigest().getDigestFunction())
+            .setDigestFunction(actionKey.getDigest().getDigestFunction())
             .build();
 
     Operation completedOperation =
@@ -2362,7 +2362,7 @@ public class ServerInstance extends NodeInstance {
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(DigestUtil.toDigest(actionKey.getDigest()))
             .setStage(ExecutionStage.Value.CACHE_CHECK)
-            // .setDigestFunction(actionKey.getDigest().getDigestFunction())
+            .setDigestFunction(actionKey.getDigest().getDigestFunction())
             .build();
     try {
       backplane.putOperation(
@@ -2424,7 +2424,7 @@ public class ServerInstance extends NodeInstance {
             .setActionDigest(DigestUtil.toDigest(actionDigest))
             .setStdoutStreamName(executeEntry.getStdoutStreamName())
             .setStderrStreamName(executeEntry.getStderrStreamName())
-            // .setDigestFunction(actionDigest.getDigestFunction())
+            .setDigestFunction(actionDigest.getDigestFunction())
             .build();
     Operation operation =
         Operation.newBuilder()
