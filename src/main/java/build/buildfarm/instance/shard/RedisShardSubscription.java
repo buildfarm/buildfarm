@@ -38,7 +38,9 @@ class RedisShardSubscription implements Runnable {
   private final Supplier<List<String>> subscriptions;
   private final RedisClient client;
   private final AtomicBoolean stopped = new AtomicBoolean(false);
-  private final AtomicBoolean attemptingSubscripton = new AtomicBoolean(false);
+  private final AtomicBoolean attemptingSubscription = new AtomicBoolean(false);
+
+  public static final int STOP_RETRY_WAIT_PERIOD = 10;
 
   private enum SubscriptionAction {
     STOP,
@@ -66,11 +68,11 @@ class RedisShardSubscription implements Runnable {
         break;
       case START_SUBSCRIBE:
         if (!stopped.get()) {
-          attemptingSubscripton.set(true);
+          attemptingSubscription.set(true);
         }
         break;
       case COMPLETE_SUBSCRIBE:
-        attemptingSubscripton.set(false);
+        attemptingSubscription.set(false);
         break;
     }
   }
@@ -80,7 +82,7 @@ class RedisShardSubscription implements Runnable {
       onReset.accept(jedis);
     }
     manageState(SubscriptionAction.START_SUBSCRIBE);
-    if (attemptingSubscripton.get()) {
+    if (attemptingSubscription.get()) {
       jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
       manageState(SubscriptionAction.COMPLETE_SUBSCRIBE);
     } else {
@@ -130,13 +132,13 @@ class RedisShardSubscription implements Runnable {
       }
       throw e;
     } finally {
-      if (attemptingSubscripton.get()) {
+      if (attemptingSubscription.get()) {
         try {
-          Thread.sleep(10);
+          Thread.sleep(STOP_RETRY_WAIT_PERIOD);
+          stop();
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          log.log(Level.SEVERE, "Stop interrupted. Subscription may not be terminated.");
         }
-        stop();
       }
     }
   }
