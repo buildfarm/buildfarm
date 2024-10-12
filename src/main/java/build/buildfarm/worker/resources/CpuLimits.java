@@ -15,6 +15,7 @@
 package build.buildfarm.worker.resources;
 
 import java.util.ArrayList;
+import lombok.ToString;
 
 /**
  * @class CpuLimits
@@ -29,6 +30,7 @@ import java.util.ArrayList;
  *     restrictions will ultimately encourage action writers to implement their actions more
  *     efficiently or opt for local execution as an alternative.
  */
+@ToString
 public class CpuLimits {
   /**
    * @field limit

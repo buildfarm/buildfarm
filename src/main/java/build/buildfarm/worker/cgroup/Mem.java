@@ -22,7 +22,7 @@ public class Mem extends Controller {
   }
 
   @Override
-  public String getName() {
+  public String getControllerName() {
     return "memory";
   }
 
