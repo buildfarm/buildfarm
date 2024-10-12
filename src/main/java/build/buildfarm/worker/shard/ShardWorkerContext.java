@@ -120,6 +120,7 @@ class ShardWorkerContext implements WorkerContext {
   private final int inputFetchDeadline;
   private final int inputFetchStageWidth;
   private final int executeStageWidth;
+  private final int reportResultStageWidth;
   private final Backplane backplane;
   private final ExecFileSystem execFileSystem;
   private final InputStreamFactory inputStreamFactory;
@@ -159,6 +160,7 @@ class ShardWorkerContext implements WorkerContext {
       OperationPoller operationPoller,
       int inputFetchStageWidth,
       int executeStageWidth,
+      int reportResultStageWidth,
       int inputFetchDeadline,
       Backplane backplane,
       ExecFileSystem execFileSystem,
@@ -181,6 +183,7 @@ class ShardWorkerContext implements WorkerContext {
     this.operationPoller = operationPoller;
     this.inputFetchStageWidth = inputFetchStageWidth;
     this.executeStageWidth = executeStageWidth;
+    this.reportResultStageWidth = reportResultStageWidth;
     this.inputFetchDeadline = inputFetchDeadline;
     this.backplane = backplane;
     this.execFileSystem = execFileSystem;
@@ -418,6 +421,11 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public int getInputFetchDeadline() {
     return inputFetchDeadline;
+  }
+
+  @Override
+  public int getReportResultStageWidth() {
+    return reportResultStageWidth;
   }
 
   @Override

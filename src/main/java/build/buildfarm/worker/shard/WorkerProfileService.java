@@ -36,7 +36,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private final PipelineStage matchStage;
   private final SuperscalarPipelineStage inputFetchStage;
   private final SuperscalarPipelineStage executeActionStage;
-  private final PipelineStage reportResultStage;
+  private final SuperscalarPipelineStage reportResultStage;
   private final PutOperationStage completeStage;
   private final Backplane backplane;
 
@@ -45,7 +45,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
       PipelineStage matchStage,
       SuperscalarPipelineStage inputFetchStage,
       SuperscalarPipelineStage executeActionStage,
-      PipelineStage reportResultStage,
+      SuperscalarPipelineStage reportResultStage,
       PutOperationStage completeStage,
       Backplane backplane) {
     super();
@@ -101,10 +101,9 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     // produce: slots that are not consistent with operations, operations
     // in multiple stages even in reverse due to claim progress
     // in short: this is for monitoring, not for guaranteed consistency checks
-    String reportResultOperation = reportResultStage.getOperationName();
     String matchOperation = matchStage.getOperationName();
     replyBuilder
-        .addStages(unaryStageInformation(reportResultStage.getName(), reportResultOperation))
+        .addStages(superscalarStageInformation(reportResultStage))
         .addStages(superscalarStageInformation(executeActionStage))
         .addStages(superscalarStageInformation(inputFetchStage))
         .addStages(unaryStageInformation(matchStage.getName(), matchOperation));

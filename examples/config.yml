@@ -127,6 +127,7 @@ worker:
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
+  reportResultStageWidth: 1
   linkExecFileSystem: true
   linkInputDirectories: true
   linkedInputDirectories:

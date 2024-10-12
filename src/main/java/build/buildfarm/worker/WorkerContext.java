@@ -70,6 +70,8 @@ public interface WorkerContext {
 
   int getInputFetchDeadline();
 
+  int getReportResultStageWidth();
+
   boolean hasDefaultActionTimeout();
 
   boolean hasMaximumActionTimeout();

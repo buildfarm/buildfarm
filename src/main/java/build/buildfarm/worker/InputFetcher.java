@@ -309,7 +309,7 @@ public class InputFetcher implements Runnable {
       String executionName = executionContext.queueEntry.getExecuteEntry().getOperationName();
       log.log(Level.FINER, "InputFetcher: Execution " + executionName + " Failed to claim output");
 
-      owner.error().put(executionContext);
+      owner.error().put(fetchedExecutionContext);
     }
   }
 
