@@ -383,10 +383,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return null;
     }
 
-    if (components.length == 1) {
-      return DigestUtil.forHash(components[0]);
+    if (components.length == 2) {
+      // contains hash and "dir"
+      return DigestUtil.parseHash(components[0]);
     }
-    return DigestUtil.parseHash(components[0]);
+    // contains expected digest function, hash, and "dir"
+    return DigestUtil.forHash(components[0]);
   }
 
   /** Parses the given fileName into a FileEntryKey or null if parsing failed */
