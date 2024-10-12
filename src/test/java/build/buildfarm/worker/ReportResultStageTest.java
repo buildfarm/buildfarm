@@ -109,12 +109,15 @@ public class ReportResultStageTest {
             .setExecDir(Paths.get("reported-operation-path"))
             .setPoller(mock(Poller.class))
             .build();
+    when(context.getReportResultStageWidth()).thenReturn(1);
     when(context.putOperation(any(Operation.class))).thenReturn(true);
 
     PipelineStage reportResultStage = new ReportResultStage(context, output, /* error= */ null);
+    reportResultStage.claim(reportedContext);
     reportResultStage.put(reportedContext);
     reportResultStage.run();
     verify(context, times(1)).destroyExecDir(reportedContext.execDir);
+    verify(context, times(1)).getReportResultStageWidth();
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(context, times(2)).putOperation(operationCaptor.capture());
     Operation completeOperation = Iterables.getLast(operationCaptor.getAllValues());
@@ -149,6 +152,7 @@ public class ReportResultStageTest {
             .setExecDir(Paths.get("erroring-operation-path"))
             .setPoller(mock(Poller.class))
             .build();
+    when(context.getReportResultStageWidth()).thenReturn(1);
     when(context.putOperation(any(Operation.class))).thenReturn(true);
     Status erroredStatus =
         Status.newBuilder().setCode(Code.FAILED_PRECONDITION.getNumber()).build();
@@ -161,8 +165,10 @@ public class ReportResultStageTest {
             eq(Command.getDefaultInstance()));
 
     PipelineStage reportResultStage = new ReportResultStage(context, output, /* error= */ null);
+    reportResultStage.claim(erroringContext);
     reportResultStage.put(erroringContext);
     reportResultStage.run();
+    verify(context, times(1)).getReportResultStageWidth();
     verify(context, times(1)).destroyExecDir(erroringContext.execDir);
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(context, times(2)).putOperation(operationCaptor.capture());

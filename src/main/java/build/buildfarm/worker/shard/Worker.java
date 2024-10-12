@@ -121,6 +121,11 @@ public final class Worker extends LoggingMain {
           .name("input_fetch_slots_total")
           .help("Total input fetch slots configured on worker.")
           .register();
+  private static final Gauge reportResultSlotsTotal =
+      Gauge.build()
+          .name("report_result_slots_total")
+          .help("Total report result slots configured on worker.")
+          .register();
 
   private static final int shutdownWaitTimeInSeconds = 10;
 
@@ -228,7 +233,8 @@ public final class Worker extends LoggingMain {
       PutOperationStage completeStage =
           new PutOperationStage(operation -> context.deactivate(operation.getName()));
       PipelineStage errorStage = completeStage; /* new ErrorStage(); */
-      PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
+      SuperscalarPipelineStage reportResultStage =
+          new ReportResultStage(context, completeStage, errorStage);
       SuperscalarPipelineStage executeActionStage =
           new ExecuteActionStage(context, reportResultStage, errorStage);
       PipelineStage releaseClaimAndRequeueStage = new ReleaseClaimAndRequeueStage(context::requeue);
@@ -642,6 +648,7 @@ public final class Worker extends LoggingMain {
             backplane::pollExecution,
             configs.getWorker().getInputFetchStageWidth(),
             configs.getWorker().getExecuteStageWidth(),
+            configs.getWorker().getReportResultStageWidth(),
             configs.getWorker().getInputFetchDeadline(),
             backplane,
             execFileSystem,
@@ -680,6 +687,7 @@ public final class Worker extends LoggingMain {
     healthCheckMetric.labels("start").inc();
     executionSlotsTotal.set(configs.getWorker().getExecuteStageWidth());
     inputFetchSlotsTotal.set(configs.getWorker().getInputFetchStageWidth());
+    reportResultSlotsTotal.set(configs.getWorker().getReportResultStageWidth());
 
     log.log(INFO, String.format("%s initialized", identifier));
   }

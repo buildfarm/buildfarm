@@ -80,6 +80,11 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
+  public int getReportResultStageWidth() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public int getInputFetchDeadline() {
     throw new UnsupportedOperationException();
   }
