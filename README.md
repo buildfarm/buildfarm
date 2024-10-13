@@ -165,6 +165,6 @@ helm install \
   -n bazel-buildfarm \
   --create-namespace \
   bazel-buildfarm \
-  oci://ghcr.io/buildfarm/buildfarm \
+  oci://ghcr.io/bazelbuild/buildfarm \
   --version "0.2.4"
 ```
