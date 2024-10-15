@@ -21,6 +21,7 @@ import build.buildfarm.common.redis.RedisClient;
 import io.grpc.Status;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -40,7 +41,8 @@ class RedisShardSubscription implements Runnable {
   private final AtomicBoolean stopped = new AtomicBoolean(false);
   private final AtomicBoolean attemptingSubscription = new AtomicBoolean(false);
 
-  public static final int STOP_RETRY_WAIT_PERIOD = 10;
+  public static final int SUBSCRIBE_POLL_PERIOD = 1;
+  public static final int SUBSCRIBE_POLL_TIMEOUT = 1000;
 
   private enum SubscriptionAction {
     STOP,
@@ -121,6 +123,24 @@ class RedisShardSubscription implements Runnable {
   public void stop() {
     manageState(SubscriptionAction.STOP);
     try {
+      int i = 0;
+      while (attemptingSubscription.get() && !subscriber.isSubscribed()) {
+        i++;
+        try {
+          TimeUnit.MILLISECONDS.sleep(SUBSCRIBE_POLL_PERIOD);
+        } catch (InterruptedException intEx) {
+          log.log(
+              Level.SEVERE,
+              "Call to stop subscription was interrupted before unsubscribing. "
+                  + "JedisPubSub subscriber is still active");
+        }
+
+        if (i > SUBSCRIBE_POLL_TIMEOUT) {
+          throw new UnsubscribeTimeoutException(
+              "Call to stop subscription timed out while waiting for JedisPubSub::subscribe to"
+                  + " complete. Subscriber is still active.");
+        }
+      }
       subscriber.unsubscribe();
     } catch (JedisException e) {
       // If stop() is called before a connection is established, log and throw the exception
@@ -131,15 +151,6 @@ class RedisShardSubscription implements Runnable {
                 + "Subscription is now in 'Stopped' state and cannot subscribe.");
       }
       throw e;
-    } finally {
-      if (attemptingSubscription.get()) {
-        try {
-          Thread.sleep(STOP_RETRY_WAIT_PERIOD);
-          stop();
-        } catch (InterruptedException e) {
-          log.log(Level.SEVERE, "Stop interrupted. Subscription may not be terminated.");
-        }
-      }
     }
   }
 
