@@ -256,6 +256,26 @@ public class BalancedRedisQueue {
     }
   }
 
+  public BalancedQueueEntry takeAny(UnifiedJedis unified, Duration timeout, ExecutorService service)
+      throws InterruptedException {
+    // consider duration / queues.size() timeouts
+    Duration queueTimeout = timeout.dividedBy(queues.size());
+    int startIndex = currentPopQueue;
+    int currentIndex = roundRobinPopIndex();
+    do {
+      String queueName = queues.get(currentIndex);
+      try (Jedis jedis = getJedisFromKey(unified, queueName)) {
+        Queue<String> queue = queueDecorator.decorate(jedis, queueName);
+        String item = take(jedis, queue, queueTimeout, service);
+        if (item != null) {
+          return new BalancedQueueEntry(queueName, item);
+        }
+      }
+      currentIndex = roundRobinPopIndex();
+    } while (currentIndex != startIndex);
+    return null;
+  }
+
   /**
    * @brief Pop element into internal dequeue and return value.
    * @details This pops the element from one queue atomically into an internal list called the
@@ -351,6 +371,24 @@ public class BalancedRedisQueue {
       }
       return new BalancedQueueEntry(queue, value);
     }
+  }
+
+  // BalancedQueue -> BalancedRedisQueue
+  // make into decorated pattern
+  public @Nullable BalancedQueueEntry pollAny(UnifiedJedis unified) throws InterruptedException {
+    int startIndex = currentPopQueue;
+    int currentIndex = roundRobinPopIndex();
+    do {
+      String queueName = queues.get(currentIndex);
+      try (Jedis jedis = getJedisFromKey(unified, queueName)) {
+        String item = queueDecorator.decorate(jedis, queueName).poll();
+        if (item != null) {
+          return new BalancedQueueEntry(queueName, item);
+        }
+      }
+      currentIndex = roundRobinPopIndex();
+    } while (currentIndex != startIndex);
+    return null;
   }
 
   /**
