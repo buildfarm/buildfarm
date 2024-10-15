@@ -274,9 +274,9 @@ public class ExecutionQueue {
       int index = roundRobinPopIndex(queues);
       BalancedRedisQueue queue = queues.get(index);
       if (blocking) {
-        balancedQueueEntry = queue.take(jedis, currentTimeout, service);
+        balancedQueueEntry = queue.takeAny(jedis, currentTimeout, service);
       } else {
-        balancedQueueEntry = queue.poll(jedis);
+        balancedQueueEntry = queue.pollAny(jedis);
       }
       // return if found
       if (balancedQueueEntry != null) {
