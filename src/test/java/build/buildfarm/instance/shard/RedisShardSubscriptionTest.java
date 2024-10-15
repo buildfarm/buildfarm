@@ -91,8 +91,7 @@ public class RedisShardSubscriptionTest {
                     }))
             .start();
     SettableFuture<Void> subscribed = SettableFuture.create();
-    JedisPubSub subscriber =
-        new JedisPubSub() {};
+    JedisPubSub subscriber = new JedisPubSub() {};
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
     doAnswer(
