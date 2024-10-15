@@ -21,6 +21,7 @@ import build.buildfarm.common.redis.RedisClient;
 import io.grpc.Status;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -38,6 +39,16 @@ class RedisShardSubscription implements Runnable {
   private final Supplier<List<String>> subscriptions;
   private final RedisClient client;
   private final AtomicBoolean stopped = new AtomicBoolean(false);
+  private final AtomicBoolean attemptingSubscription = new AtomicBoolean(false);
+
+  public static final int SUBSCRIBE_POLL_PERIOD = 1;
+  public static final int SUBSCRIBE_POLL_TIMEOUT = 1000;
+
+  private enum SubscriptionAction {
+    STOP,
+    START_SUBSCRIBE,
+    COMPLETE_SUBSCRIBE
+  }
 
   RedisShardSubscription(
       JedisPubSub subscriber,
@@ -52,11 +63,33 @@ class RedisShardSubscription implements Runnable {
     this.client = client;
   }
 
+  private synchronized void manageState(SubscriptionAction update) {
+    switch (update) {
+      case STOP:
+        stopped.set(true);
+        break;
+      case START_SUBSCRIBE:
+        if (!stopped.get()) {
+          attemptingSubscription.set(true);
+        }
+        break;
+      case COMPLETE_SUBSCRIBE:
+        attemptingSubscription.set(false);
+        break;
+    }
+  }
+
   private void subscribe(UnifiedJedis jedis, boolean isReset) {
     if (isReset) {
       onReset.accept(jedis);
     }
-    jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
+    manageState(SubscriptionAction.START_SUBSCRIBE);
+    if (attemptingSubscription.get()) {
+      jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
+      manageState(SubscriptionAction.COMPLETE_SUBSCRIBE);
+    } else {
+      log.log(Level.SEVERE, "Cannot subscribe, RedisShardSubscription is in 'stopped' state");
+    }
   }
 
   private void iterate(boolean isReset) throws IOException {
@@ -88,16 +121,36 @@ class RedisShardSubscription implements Runnable {
   }
 
   public void stop() {
-    if (stopped.compareAndSet(false, true)) {
-      try {
-        subscriber.unsubscribe();
-      } catch (JedisException e) {
-        // subscriber validates with private member to determine connection status
-        // detect this condition and ignore it
-        if (!e.getMessage().endsWith(" is not connected to a Connection.")) {
-          throw e;
+    manageState(SubscriptionAction.STOP);
+    try {
+      int i = 0;
+      while (attemptingSubscription.get() && !subscriber.isSubscribed()) {
+        i++;
+        try {
+          TimeUnit.MILLISECONDS.sleep(SUBSCRIBE_POLL_PERIOD);
+        } catch (InterruptedException intEx) {
+          log.log(
+              Level.SEVERE,
+              "Call to stop subscription was interrupted before unsubscribing. "
+                  + "JedisPubSub subscriber is still active");
+        }
+
+        if (i > SUBSCRIBE_POLL_TIMEOUT) {
+          throw new UnsubscribeTimeoutException(
+              "Call to stop subscription timed out while waiting for JedisPubSub::subscribe to"
+                  + " complete. Subscriber is still active.");
         }
       }
+      subscriber.unsubscribe();
+    } catch (JedisException e) {
+      // If stop() is called before a connection is established, log and throw the exception
+      if (e.getMessage().endsWith(" is not connected to a Connection.")) {
+        log.log(
+            Level.SEVERE,
+            "RedisShardSubscription::stop called but no connection is established. "
+                + "Subscription is now in 'Stopped' state and cannot subscribe.");
+      }
+      throw e;
     }
   }
 
@@ -113,7 +166,7 @@ class RedisShardSubscription implements Runnable {
         Thread.currentThread().interrupt();
       }
     } finally {
-      stopped.set(true);
+      manageState(SubscriptionAction.STOP);
     }
   }
 }
