@@ -1628,6 +1628,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           List<NamedFileKey> childDirent = listDirentSorted(entryPath, fileStore);
           Directory dir =
               computeDirectory(digestUtil, entryPath, childDirent, fileKeys, inputsBuilder);
+          if (dir == null) {
+            return null;
+          }
           b.addDirectoriesBuilder()
               .setName(name)
               .setDigest(DigestUtil.toDigest(digestUtil.compute(dir)));
@@ -1641,7 +1644,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         } else {
           // non-empty file
           inputsBuilder.add(e.key);
-          Digest digest = CASFileCache.keyToDigest(e.key, e.size, digestUtil);
+          Digest digest;
+          try {
+            digest = CASFileCache.keyToDigest(e.key, e.size, digestUtil);
+          } catch (NumberFormatException mismatchEx) {
+            // inspire directory deletion for mismatched hash
+            return null;
+          }
           boolean isExecutable = e.key.endsWith("_exec");
           b.addFilesBuilder()
               .setName(name)
