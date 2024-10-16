@@ -4,6 +4,7 @@ backplane:
     - name: "cpu"
       properties:
         - name: "*"
+          value: "*"
 worker:
   publicName: "localhost:8981"
   dequeueMatchSettings:
