@@ -12,6 +12,7 @@ java_library(
         "@googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_oshi_oshi_core",
         "@maven//:com_github_pcj_google_options",
+        "@maven//:com_google_auth_google_auth_library_oauth2_http",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
