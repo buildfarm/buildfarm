@@ -535,7 +535,7 @@ class Executor {
       String message;
       if (t != null) {
         message =
-            "Cannot run program \"" + processBuilder.command().get(0) + "\": " + t.getMessage();
+            "Cannot run program \"" + processBuilder.command().getFirst() + "\": " + t.getMessage();
       } else {
         message = e.getMessage();
       }

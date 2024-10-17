@@ -356,7 +356,7 @@ public abstract class NodeInstance extends InstanceBase {
       return decoder
           .parameters()
           .getOrDefault("ENSURE_OUTPUTS_PRESENT", ImmutableList.of("false"))
-          .get(0)
+          .getFirst()
           .equals("true");
     } catch (URISyntaxException e) {
       return false;

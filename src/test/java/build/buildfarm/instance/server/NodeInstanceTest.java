@@ -253,7 +253,7 @@ public class NodeInstanceTest {
         preconditionFailure);
 
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("/: foo");
     assertThat(violation.getDescription()).isEqualTo(DUPLICATE_DIRENT);
@@ -315,7 +315,7 @@ public class NodeInstanceTest {
         preconditionFailure);
 
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("/: foo > bar");
     assertThat(violation.getDescription()).isEqualTo(DIRECTORY_NOT_SORTED);
@@ -352,7 +352,7 @@ public class NodeInstanceTest {
         preconditionFailure);
 
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("/: foo");
     assertThat(violation.getDescription()).isEqualTo(DUPLICATE_DIRENT);
@@ -389,7 +389,7 @@ public class NodeInstanceTest {
         preconditionFailure);
 
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("/: foo > bar");
     assertThat(violation.getDescription()).isEqualTo(DIRECTORY_NOT_SORTED);
@@ -417,7 +417,7 @@ public class NodeInstanceTest {
         preconditionFailure);
 
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("/: foo -> /root/secret");
     assertThat(violation.getDescription()).isEqualTo(SYMLINK_TARGET_ABSOLUTE);
@@ -450,7 +450,7 @@ public class NodeInstanceTest {
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("foo");
     assertThat(violation.getDescription()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
@@ -467,7 +467,7 @@ public class NodeInstanceTest {
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("foo");
     assertThat(violation.getDescription()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
@@ -484,7 +484,7 @@ public class NodeInstanceTest {
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("foo");
     assertThat(violation.getDescription()).isEqualTo(OUTPUT_FILE_IS_OUTPUT_ANCESTOR);
@@ -504,7 +504,7 @@ public class NodeInstanceTest {
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo(INVALID_COMMAND);
     assertThat(violation.getDescription()).isEqualTo("argument list is empty");
@@ -524,7 +524,7 @@ public class NodeInstanceTest {
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo(INVALID_COMMAND);
     assertThat(violation.getDescription()).isEqualTo("working directory is absolute");
@@ -545,7 +545,7 @@ public class NodeInstanceTest {
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo(INVALID_COMMAND);
     assertThat(violation.getDescription()).isEqualTo("working directory is not an input directory");
@@ -589,7 +589,7 @@ public class NodeInstanceTest {
     String missingSubject = "blobs/" + DigestUtil.toString(missingDirectoryDigest);
     String missingFmt = "The directory `/%s` was not found in the CAS.";
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(2);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_MISSING);
     assertThat(violation.getSubject()).isEqualTo(missingSubject);
     assertThat(violation.getDescription()).isEqualTo(String.format(missingFmt, "bar"));
@@ -658,7 +658,7 @@ public class NodeInstanceTest {
     String missingSubject = "blobs/" + DigestUtil.toString(missingDirectoryDigest);
     String missingFmt = "The directory `/%s` was not found in the CAS.";
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(2);
-    Violation violation = preconditionFailure.getViolationsList().get(0);
+    Violation violation = preconditionFailure.getViolationsList().getFirst();
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_MISSING);
     assertThat(violation.getSubject()).isEqualTo(missingSubject);
     assertThat(violation.getDescription()).isEqualTo(String.format(missingFmt, "bar/quux"));

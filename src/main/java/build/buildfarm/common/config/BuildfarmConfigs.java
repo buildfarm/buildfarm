@@ -143,7 +143,7 @@ public final class BuildfarmConfigs {
       throw new ConfigurationException("A valid path to a configuration file must be provided.");
     }
 
-    return Paths.get(residue.get(0));
+    return Paths.get(residue.getFirst());
   }
 
   private static void adjustServerConfigs(BuildfarmConfigs configs) {

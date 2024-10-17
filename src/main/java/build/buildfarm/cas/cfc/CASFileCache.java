@@ -626,7 +626,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return decoder
           .parameters()
           .getOrDefault("THROUGH", ImmutableList.of("false"))
-          .get(0)
+          .getFirst()
           .equals("true");
     } catch (URISyntaxException e) {
       return false;

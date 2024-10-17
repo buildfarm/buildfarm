@@ -54,7 +54,7 @@ public class RedisNodeHashes {
         for (List<List<Long>> slotRanges : nodeSlotRanges) {
           // we can use any slot that is in range for the node.
           // in this case, we will use the first slot in the first range.
-          hashTags.add(RedisSlotToHash.correlate(slotRanges.get(0).get(0)));
+          hashTags.add(RedisSlotToHash.correlate(slotRanges.getFirst().getFirst()));
         }
         return hashTags.build();
       } catch (JedisException e) {
