@@ -3,9 +3,9 @@ backplane:
   queues:
     - name: "cpu"
       properties:
-        - name: "min-cores"
-          value: "*"
-        - name: "max-cores"
+        - name: "*"
           value: "*"
 worker:
   publicName: "localhost:8981"
+  dequeueMatchSettings:
+    allowUnmatched: true
