@@ -1,12 +1,11 @@
 package persistent.common;
 
 import java.io.IOException;
-
 import persistent.common.CtxAround.Id;
 
 /**
- * Manages worker lifetimes and acts as the mediator between executors and workers.
- * It also manages pre-work initialization and post-work cleanup.
+ * Manages worker lifetimes and acts as the mediator between executors and workers. It also manages
+ * pre-work initialization and post-work cleanup.
  *
  * @param <K> worker key type
  * @param <I> request type
@@ -16,7 +15,14 @@ import persistent.common.CtxAround.Id;
  * @param <CO> response with extra context/info
  * @param <P> pool type
  */
-public abstract class Coordinator<K, I, O, W extends Worker<I, O>, CI extends CtxAround<I>, CO extends CtxAround<O>, P extends  ObjectPool<K, W>> {
+public abstract class Coordinator<
+    K,
+    I,
+    O,
+    W extends Worker<I, O>,
+    CI extends CtxAround<I>,
+    CO extends CtxAround<O>,
+    P extends ObjectPool<K, W>> {
 
   protected final P workerPool;
 
@@ -40,16 +46,16 @@ public abstract class Coordinator<K, I, O, W extends Worker<I, O>, CI extends Ct
   public abstract CO postWorkCleanup(O response, W worker, CI request) throws IOException;
 
   public static <K, I, O, W extends Worker<I, O>> SimpleCoordinator<K, I, O, W> simple(
-      ObjectPool<K, W> workerPool
-  ) {
+      ObjectPool<K, W> workerPool) {
     return new SimpleCoordinator<>(workerPool);
   }
 
   /**
-   * A Coordinator which doesn't have any extra metadata for the request and response types
-   * Its pool type is also filled in as an ObjectPool interface
+   * A Coordinator which doesn't have any extra metadata for the request and response types Its pool
+   * type is also filled in as an ObjectPool interface
    */
-  public static class SimpleCoordinator<K, I, O, W extends Worker<I, O>> extends Coordinator<K, I, O, W, Id<I>, Id<O>, ObjectPool<K, W>> {
+  public static class SimpleCoordinator<K, I, O, W extends Worker<I, O>>
+      extends Coordinator<K, I, O, W, Id<I>, Id<O>, ObjectPool<K, W>> {
 
     public SimpleCoordinator(ObjectPool<K, W> workerPool) {
       super(workerPool);
