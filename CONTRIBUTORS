@@ -1,16 +1,11 @@
 # People who have agreed to one of the CLAs and can contribute patches.
 # The AUTHORS file lists the copyright holders; this file
-# lists people.  For example, Uber employees are listed here
-# but not in AUTHORS, because Uber holds the copyright.
-#
-# https://developers.google.com/open-source/cla/individual
-# https://developers.google.com/open-source/cla/corporate
+# lists people.  For example, Aurora employees are listed here
+# but not in AUTHORS, because Aurora holds the copyright.
 #
 # Names should be added to this file as:
 #     Name <email address>
 
-George Gensure <ggensure@uber.com>
 Yuriy Belenitsky <yuriyb@aurora.tech>
-Trevor Hickey <thickey@aurora.tech>
 Jacob Mou <jianqium@aurora.tech>
 Jason Schroeder <jschroeder@salesforce.com>
