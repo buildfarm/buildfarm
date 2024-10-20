@@ -13,7 +13,6 @@ import lombok.Getter;
 
 /**
  * Based off of copy-pasting from Bazel's WorkerKey.
- * Comments also ripped off, credits to the Bazel Authors.
  * Has less dependencies, but only ProtoBuf and non-multiplex support.
  *
  * Data container that uniquely identifies a kind of worker process.
