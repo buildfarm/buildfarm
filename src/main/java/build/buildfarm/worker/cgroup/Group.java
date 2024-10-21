@@ -24,7 +24,6 @@ import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Streams;
 import io.grpc.Deadline;
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -127,7 +126,7 @@ public final class Group {
       return getName();
     }
     /* is child of non-root parent */
-    return parent.getHierarchy() + File.separator + getName();
+    return parent.getHierarchy() + "/" + getName();
   }
 
   /**
