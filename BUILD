@@ -17,6 +17,7 @@ cc_binary(
 )
 
 exports_files([
+    "cgexec-wrapper",
     "delay.sh",
     "macos-wrapper.sh",
 ])

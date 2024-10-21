@@ -17,37 +17,44 @@ package build.buildfarm.worker.cgroup;
 import java.io.IOException;
 
 public class Cpu extends Controller {
+
+  private final int CPU_GRANULARITY = 100_000; // microseconds (μS)
+
   Cpu(Group group) {
     super(group);
   }
 
   @Override
-  public String getName() {
+  public String getControllerName() {
     return "cpu";
   }
 
+  @Deprecated(forRemoval = true)
   public int getShares() throws IOException {
     open();
     return readLong("cpu.shares");
   }
 
+  /**
+   * Represents how much CPU shares are allocated. Note - this method does nothing for CGroups v2.
+   * All processes get equal weight.
+   *
+   * @param shares
+   * @throws IOException
+   */
+  @Deprecated
   public void setShares(int shares) throws IOException {
     open();
-    writeInt("cpu.shares", shares);
+    // TODO what to do for cgroups v2?
   }
 
-  public int getCFSPeriod() throws IOException {
+  /**
+   * Set the maximum number of cores.
+   *
+   * @param cpuCores whole cores. 1 == 1 CPU core.
+   */
+  public void setMaxCpu(int cpuCores) throws IOException {
     open();
-    return readLong("cpu.cfs_period_us");
-  }
-
-  public void setCFSPeriod(int microseconds) throws IOException {
-    open();
-    writeInt("cpu.cfs_period_us", microseconds);
-  }
-
-  public void setCFSQuota(int microseconds) throws IOException {
-    open();
-    writeInt("cpu.cfs_quota_us", microseconds);
+    writeIntPair("cpu.max", cpuCores * CPU_GRANULARITY, CPU_GRANULARITY);
   }
 }
