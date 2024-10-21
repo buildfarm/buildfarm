@@ -17,37 +17,58 @@ package build.buildfarm.worker.cgroup;
 import java.io.IOException;
 
 public class Cpu extends Controller {
+
+  private static final int CPU_GRANULARITY = 100_000; // microseconds (μS)
+
   Cpu(Group group) {
     super(group);
   }
 
   @Override
-  public String getName() {
+  public String getControllerName() {
     return "cpu";
   }
 
+  @Deprecated(forRemoval = true)
   public int getShares() throws IOException {
     open();
     return readLong("cpu.shares");
   }
 
+  /**
+   * Represents how much CPU shares are allocated. Note - this method does nothing for CGroups v2.
+   * All processes get equal weight.
+   *
+   * @param shares
+   * @throws IOException
+   */
+  @Deprecated
   public void setShares(int shares) throws IOException {
-    open();
-    writeInt("cpu.shares", shares);
+    if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
+      open();
+      writeInt("cpu.shares", shares);
+    }
   }
 
-  public int getCFSPeriod() throws IOException {
+  /**
+   * Set the maximum number of cores.
+   *
+   * @param cpuCores whole cores. 1 == 1 CPU core.
+   */
+  public void setMaxCpu(int cpuCores) throws IOException {
     open();
-    return readLong("cpu.cfs_period_us");
+    if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
+      writeIntPair("cpu.max", cpuCores * CPU_GRANULARITY, CPU_GRANULARITY);
+    } else if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
+      setCFSPeriodAndQuota(CPU_GRANULARITY, cpuCores * CPU_GRANULARITY);
+    }
   }
 
-  public void setCFSPeriod(int microseconds) throws IOException {
-    open();
-    writeInt("cpu.cfs_period_us", microseconds);
-  }
-
-  public void setCFSQuota(int microseconds) throws IOException {
-    open();
-    writeInt("cpu.cfs_quota_us", microseconds);
+  // CGroups v1
+  @Deprecated(forRemoval = true)
+  private void setCFSPeriodAndQuota(int periodMicroseconds, int quotaMicroseconds)
+      throws IOException {
+    writeInt("cpu.cfs_period_us", periodMicroseconds);
+    writeInt("cpu.cfs_quota_us", quotaMicroseconds);
   }
 }
