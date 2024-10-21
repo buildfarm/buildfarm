@@ -273,7 +273,6 @@ public final class Group {
       return;
     }
     ensureControllerIsEnabled(cgroupPath.getParent(), controllerNames, true);
-    log.log(Level.FINE, "Ensuring controllers for {0}", cgroupPath);
 
     // By now, all recursive parents of `cgroupPath` already have subcontrollers set.
     // Finally, we make our new cgroup, if it doesn't exist.
