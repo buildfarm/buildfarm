@@ -23,7 +23,10 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
+import java.util.logging.Level;
+import lombok.extern.java.Log;
 
+@Log
 abstract class Controller implements IOResource {
   protected final Group group;
 
@@ -33,15 +36,19 @@ abstract class Controller implements IOResource {
     this.group = group;
   }
 
-  public abstract String getName();
+  public abstract String getControllerName();
 
   protected final Path getPath() {
-    return group.getPath(getName());
+    if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
+      return group.getPath();
+    } else {
+      return group.getPath(getControllerName());
+    }
   }
 
   protected final void open() throws IOException {
     if (!opened) {
-      group.create(getName());
+      group.create(getControllerName());
       opened = true;
     }
   }
@@ -58,7 +65,7 @@ abstract class Controller implements IOResource {
     Path path = getPath();
     boolean exists = true;
     while (exists) {
-      group.killUntilEmpty(getName());
+      group.killUntilEmpty(getControllerName());
       try {
         Files.delete(path);
         exists = false;
@@ -75,7 +82,7 @@ abstract class Controller implements IOResource {
   @Override
   public boolean isReferenced() {
     try {
-      return !group.isEmpty(getName());
+      return !group.isEmpty(getControllerName());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -95,6 +102,7 @@ abstract class Controller implements IOResource {
 
   protected void writeInt(String propertyName, int value) throws IOException {
     Path path = getPath().resolve(propertyName);
+    log.log(Level.FINE, "Writing " + propertyName + "=" + value + " to " + path);
     try (Writer out = new OutputStreamWriter(Files.newOutputStream(path))) {
       out.write(String.format("%d\n", value));
     }

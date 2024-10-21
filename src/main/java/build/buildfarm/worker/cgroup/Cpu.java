@@ -22,32 +22,50 @@ public class Cpu extends Controller {
   }
 
   @Override
-  public String getName() {
+  public String getControllerName() {
     return "cpu";
   }
 
+  @Deprecated(forRemoval = true)
   public int getShares() throws IOException {
     open();
     return readLong("cpu.shares");
   }
 
+  /**
+   * Represents how much CPU shares are allocated. Note - this method does nothing for CGroups v2.
+   * All processes get equal weight.
+   *
+   * @param shares
+   * @throws IOException
+   */
+  @Deprecated
   public void setShares(int shares) throws IOException {
-    open();
-    writeInt("cpu.shares", shares);
+    if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
+      open();
+      writeInt("cpu.shares", shares);
+    }
   }
 
-  public int getCFSPeriod() throws IOException {
+  /**
+   * Set the maximum number of cores.
+   *
+   * @param cpuCores whole cores. 1 == 1 CPU core.
+   */
+  public void setMaxCpu(int cpuCores) throws IOException {
     open();
-    return readLong("cpu.cfs_period_us");
+    if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
+      writeInt("cpu.max", cpuCores * 100000);
+    } else if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
+      setCFSPeriodAndQuota(100000, cpuCores * 100000);
+    }
   }
 
-  public void setCFSPeriod(int microseconds) throws IOException {
-    open();
-    writeInt("cpu.cfs_period_us", microseconds);
-  }
-
-  public void setCFSQuota(int microseconds) throws IOException {
-    open();
-    writeInt("cpu.cfs_quota_us", microseconds);
+  // CGroups v1
+  @Deprecated(forRemoval = true)
+  private void setCFSPeriodAndQuota(int periodMicroseconds, int quotaMicroseconds)
+      throws IOException {
+    writeInt("cpu.cfs_period_us", periodMicroseconds);
+    writeInt("cpu.cfs_quota_us", quotaMicroseconds);
   }
 }
