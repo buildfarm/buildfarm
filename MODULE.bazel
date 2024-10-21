@@ -12,6 +12,7 @@ bazel_dep(name = "gazelle", version = "0.39.1")
 bazel_dep(name = "grpc-java", version = "1.66.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20240819-fe8ba054a")
 bazel_dep(name = "grpc-proto", version = "0.0.0-20240627-ec30f58", repo_name = "io_grpc_grpc_proto")
+bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.1")
 bazel_dep(name = "platforms", version = "0.0.10")
 bazel_dep(name = "protobuf", version = "29.0-rc1")
 bazel_dep(name = "rules_cc", version = "0.0.10")
@@ -193,9 +194,15 @@ oci.pull(
     digest = "sha256:303223fbebbd1095df7299707ed8b0a51be5c0a7eee78292fc65ee2201c2e138",  # tag: lunar
     image = "index.docker.io/bazelbuild/buildfarm-worker-base",
 )
+oci.pull(
+    name = "arm64v8_ubuntu_noble",
+    digest = "sha256:ff76263744ad49ac8eab9e0744043957daf23166be9ee7f16e499a8c5bedd28a",  # tag: noble
+    image = "index.docker.io/bazelbuild/buildfarm-worker-base-arm64",
+)
 use_repo(
     oci,
     "amazon_corretto_java_image_base",
+    "arm64v8_ubuntu_noble",
     "ubuntu_lunar",
 )
 
@@ -217,6 +224,7 @@ use_repo(
     "opentelemetry",
     "skip_sleep",
     "tini",
+    "tini_arm64v8",
 )
 
 # this is *only* required for bazel and should not be used in our repository

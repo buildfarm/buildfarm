@@ -49,6 +49,11 @@ def _buildfarm_extension_impl(_ctx):
         sha256 = "12d20136605531b09a2c2dac02ccee85e1b874eb322ef6baf7561cd93f93c855",
         urls = ["https://github.com/krallin/tini/releases/download/v0.18.0/tini"],
     )
+    http_file(
+        name = "tini_arm64v8",
+        sha256 = "7c5463f55393985ee22357d976758aaaecd08defb3c5294d353732018169b019",
+        urls = ["https://github.com/krallin/tini/releases/download/v0.18.0/tini-arm64"],
+    )
 
 build_deps = module_extension(
     implementation = _buildfarm_extension_impl,
