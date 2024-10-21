@@ -104,6 +104,13 @@ abstract class Controller implements IOResource {
     }
   }
 
+  protected void writeIntPair(String propertyName, int value, int value2) throws IOException {
+    Path path = getPath().resolve(propertyName);
+    try (Writer out = new OutputStreamWriter(Files.newOutputStream(path))) {
+      out.write(String.format("%d %d\n", value, value2));
+    }
+  }
+
   protected void writeLong(String propertyName, long value) throws IOException {
     Path path = getPath().resolve(propertyName);
     try (Writer out = new OutputStreamWriter(Files.newOutputStream(path))) {
