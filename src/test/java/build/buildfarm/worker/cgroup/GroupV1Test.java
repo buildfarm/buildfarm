@@ -1,4 +1,4 @@
-// Copyright 2024 The Buildfarm Authors. All rights reserved.
+// Copyright 2024 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,25 +15,30 @@
 package build.buildfarm.worker.cgroup;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Set;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
+/** These test CGroups v1 behavior. When CGroups v1 is no longer supported, delete these tests. */
 @RunWith(JUnit4.class)
-public class GroupTest {
+public class GroupV1Test {
+
+  @Before
+  public void setup() {
+    Group.VERSION = CGroupVersion.CGROUPS_V1;
+  }
+
   @Test
   public void testHierarchy() {
     Group g = Group.getRoot().getChild("c1");
     assertThat(g).isNotNull();
-    assertThat(g.getHierarchy()).isEqualTo("c1");
-    assertThat(g.getChild("c2").getHierarchy()).isEqualTo("c1/c2");
     assertThat(g.getHierarchy("cpu")).isEqualTo("cpu/c1");
   }
 
@@ -47,19 +52,11 @@ public class GroupTest {
   }
 
   @Test
-  public void testGetPath() {
-    Group g = Group.getRoot().getChild("c1");
-    assertThat(g.getPath()).isEqualTo(Path.of("/sys/fs/cgroup/c1"));
-
-    Group g2 = g.getChild("c2");
-    assertThat(g2.getPath()).isEqualTo(Path.of("/sys/fs/cgroup/c1/c2"));
-  }
-
-  @Test
   public void testIsEmpty() throws IOException {
     Group mockGroup = spy(Group.getRoot().getChild("c1"));
-    when(mockGroup.getPids(anyString())).thenReturn(Set.of(7, 8, 9));
+    String myController = "cpu";
+    when(mockGroup.getPids(myController)).thenReturn(Set.of(7, 8, 9));
 
-    assertThat(mockGroup.isEmpty("cpu")).isFalse();
+    assertThat(mockGroup.isEmpty(myController)).isFalse();
   }
 }
