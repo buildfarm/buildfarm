@@ -20,8 +20,8 @@ buildifier(
 # additional dependencies alongside the buildfarm agents.
 ARCH = [
     # keep sorted
-    # "aarch64", # TODO
     "amd64",
+    "arm64v8",
 ]
 
 DEFAULT_IMAGE_LABELS = {
@@ -46,9 +46,13 @@ DEFAULT_PACKAGE_DIR = "app/build_buildfarm"
 # operating systems.  We make a best effort and ensure they all work in the below images.
 pkg_tar(
     name = "execution_wrappers",
-    srcs = [
+    srcs = select({
+        "@platforms//cpu:arm": [],
+        "//conditions:default": [
+            ":exec-wrapper-helpers",
+        ],
+    }) + [
         ":exec-wrapper-files",
-        ":exec-wrapper-helpers",
     ],
     package_dir = DEFAULT_PACKAGE_DIR,
     tags = ["container"],
@@ -76,6 +80,18 @@ pkg_files(
 )
 
 pkg_files(
+    name = "tini.binary-arm64v8",
+    srcs = ["@tini_arm64v8//file"],
+    attributes = pkg_attributes(
+        mode = "0555",
+    ),
+    renames = {
+        "@tini_arm64v8//file": "tini",
+    },
+    tags = ["container"],
+)
+
+pkg_files(
     name = "opentelemetry-javaagent",
     srcs = ["@opentelemetry//jar"],
     attributes = pkg_attributes(
@@ -98,14 +114,18 @@ cc_binary(
 
 pkg_files(
     name = "exec-wrapper-files",
-    srcs = [
+    srcs = select({
+        "@platforms//cpu:arm": [],
+        "//conditions:default": [
+            "@skip_sleep",
+            # The delay wrapper is only intended to be used with the "skip_sleep" wrapper.
+            "delay.sh",
+        ],
+    }) + [
+        "macos-wrapper.sh",
         ":as-nobody",
         "@bazel//src/main/tools:linux-sandbox",
         "@bazel//src/main/tools:process-wrapper",
-        "@skip_sleep",
-        # The delay wrapper is only intended to be used with the "skip_sleep" wrapper.
-        "delay.sh",
-        "macos-wrapper.sh",
     ],
     attributes = pkg_attributes(
         mode = "0555",
@@ -129,6 +149,12 @@ pkg_files(
 pkg_tar(
     name = "layer_tini_amd64",
     srcs = [":tini.binary"],
+    tags = ["container"],
+)
+
+pkg_tar(
+    name = "layer_tini_arm64v8",
+    srcs = [":tini.binary-arm64v8"],
     tags = ["container"],
 )
 
@@ -217,6 +243,31 @@ oci_image(
     ],
 )
 
+oci_image(
+    name = "buildfarm-worker_linux_arm64v8",
+    base = "@arm64v8_ubuntu_noble",
+    entrypoint = [
+        # do not sort
+        "/tini",
+        "--",
+        "java",
+        "-jar",
+        "/" + DEFAULT_PACKAGE_DIR + "/buildfarm-shard-worker_deploy.jar",
+    ],
+    env = ":env_worker",
+    labels = DEFAULT_IMAGE_LABELS,
+    tags = ["container"],
+    tars = [
+        # do not sort
+        ":layer_tini_arm64v8",
+        ":layer_logging_config",
+        ":layer_minimal_config",
+        ":execution_wrappers",
+        ":telemetry_tools",
+        ":layer_buildfarm_worker",
+    ],
+)
+
 [
     oci_image_index(
         name = "buildfarm-%s" % image,
@@ -246,9 +297,9 @@ oci_image(
         ),
         # Below targets push public docker images to bazelbuild dockerhub.
         oci_push(
-            name = "public_push_buildfarm-%s" % image,
+            name = "public_push_buildfarm-%s-%s" % (image, arch),
             image = ":buildfarm-%s" % image,
-            repository = "index.docker.io/bazelbuild/buildfarm-%s" % image,
+            repository = "index.docker.io/bazelbuild/buildfarm-%s-%s" % (image, arch),
             # Specify the tag with `bazel run public_push_buildfarm-server public_push_buildfarm-worker -- --tag latest`
             tags = ["container"],
         ),
