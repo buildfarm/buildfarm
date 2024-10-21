@@ -61,6 +61,9 @@ spec:
             - mountPath: /server-log-props
               name: server-log-props
               readOnly: true
+            {{- with .Values.server.extraVolumeMounts }}
+            {{- tpl (toYaml .) $ | nindent 12 -}}
+            {{- end }}
       {{- with .Values.server.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -82,3 +85,6 @@ spec:
             defaultMode: 420
             name: {{ include "buildfarm.fullname" . }}-server-log-props
           name: server-log-props
+        {{- with .Values.server.extraVolumes }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
+        {{- end }}
