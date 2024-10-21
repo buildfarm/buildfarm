@@ -554,7 +554,6 @@ class Executor {
     }
     long startNanoTime = System.nanoTime();
     Process process;
-    log.log(Level.FINE, "executing " + processBuilder);
     try {
       process = ProcessUtils.threadSafeStart(processBuilder);
       process.getOutputStream().close();
