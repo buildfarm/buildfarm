@@ -42,7 +42,6 @@ class RedisShardSubscription implements Runnable {
   private final AtomicBoolean attemptingSubscription = new AtomicBoolean(false);
 
   public static final int SUBSCRIBE_POLL_PERIOD = 1;
-  public static final int SUBSCRIBE_POLL_TIMEOUT = 1000;
 
   private enum SubscriptionAction {
     STOP,
@@ -120,12 +119,11 @@ class RedisShardSubscription implements Runnable {
     }
   }
 
-  public void stop() {
+  public void stop(long timeoutMillis) {
     manageState(SubscriptionAction.STOP);
     try {
-      int i = 0;
+      long startTimeMillis = System.currentTimeMillis();
       while (attemptingSubscription.get() && !subscriber.isSubscribed()) {
-        i++;
         try {
           TimeUnit.MILLISECONDS.sleep(SUBSCRIBE_POLL_PERIOD);
         } catch (InterruptedException intEx) {
@@ -135,7 +133,7 @@ class RedisShardSubscription implements Runnable {
                   + "JedisPubSub subscriber is still active");
         }
 
-        if (i > SUBSCRIBE_POLL_TIMEOUT) {
+        if (System.currentTimeMillis() - startTimeMillis > timeoutMillis) {
           throw new UnsubscribeTimeoutException(
               "Call to stop subscription timed out while waiting for JedisPubSub::subscribe to"
                   + " complete. Subscriber is still active.");
@@ -152,6 +150,10 @@ class RedisShardSubscription implements Runnable {
       }
       throw e;
     }
+  }
+
+  public void stop() {
+    stop(1000);
   }
 
   @Override
