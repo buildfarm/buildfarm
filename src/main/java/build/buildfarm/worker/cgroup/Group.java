@@ -17,6 +17,7 @@ package build.buildfarm.worker.cgroup;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Verify.verify;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -48,7 +49,7 @@ import lombok.extern.java.Log;
 @Log
 public final class Group {
   @Getter private static final Group root = new Group(/* name= */ null, /* parent= */ null);
-  private static final Path rootPath = Path.of("/sys/fs/cgroup");
+  private static final Path rootPath = getSelfCgroup();
   private static final POSIX posix = POSIXFactory.getNativePOSIX();
 
   private static final String CGROUP_CONTROLLERS = "cgroup.controllers";
@@ -91,6 +92,24 @@ public final class Group {
     return CGroupVersion.NONE;
   }
 
+  static Path getSelfCgroup() {
+    try {
+      String myCgroup = Files.readString(Paths.get("/proc/self/cgroup"));
+      // This always starts with "0::" for CGroups v2.
+      if (myCgroup.startsWith("0::")) {
+        VERSION = CGroupVersion.CGROUPS_V2;
+
+        return Path.of("/sys/fs/cgroup", myCgroup.substring(3).trim());
+      } else {
+        // TODO CGroups v1.
+        return null;
+      }
+    } catch (IOException ioe) {
+      log.log(Level.SEVERE, "Cannot read my own cgroup!", ioe);
+      return Paths.get("/sys/fs/cgroup");
+    }
+  }
+
   private Group(@Nullable String name, @Nullable Group parent) {
     this.name = name;
     this.parent = parent;
@@ -119,7 +138,7 @@ public final class Group {
     checkState(VERSION == CGroupVersion.CGROUPS_V2);
     /* is root */
     if (parent == null) {
-      return name;
+      return "";
     }
     /* parent is root */
     if (parent.getName() == null) {
@@ -221,6 +240,32 @@ public final class Group {
     }
   }
 
+  /**
+   * Move some processes into this CGroup.
+   *
+   * @param pids
+   * @see <a
+   *     href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#organizing-processes-and-threads">Organizing
+   *     Processes and Threads</a>
+   */
+  void adoptPids(Iterable<Integer> pids) {
+    Path path = getPath().resolve("cgroup.procs");
+    verify(Files.exists(path), "cgroup procs doesn't exist");
+    // Only one process can be migrated on a single write(2) call.
+    for (Integer pid : pids) {
+      try {
+        try (Writer out = new OutputStreamWriter(Files.newOutputStream(path))) {
+          out.write(String.format("%d\n", pid));
+        }
+      } catch (IOException e) {
+        log.log(
+            Level.WARNING,
+            "process ID " + pid + " could not be moved to CGroup " + getPath() + "; continuing",
+            e);
+      }
+    }
+  }
+
   /* package */ void killUntilEmpty(@Nullable String controllerName) throws IOException {
     if (VERSION == CGroupVersion.CGROUPS_V2) {
       killUntilEmpty(this::getPids);
@@ -267,11 +312,14 @@ public final class Group {
       @Nonnull Path cgroupPath, @Nonnull Set<String> controllerNames, boolean setSubtreeControl)
       throws IOException {
     checkState(VERSION == CGroupVersion.CGROUPS_V2);
-    checkNotNull(cgroupPath, "cgroupPath is null");
+    if (cgroupPath == null) {
+      return;
+    }
+    // checkNotNull(cgroupPath, "cgroupPath is null");
     checkNotNull(controllerNames, "Controller names is null");
     checkArgument(!controllerNames.isEmpty(), "Controller names is empty and shouldn't be");
     // set parent folder before we handle this one.
-    if (cgroupPath.equals(rootPath)) {
+    if (cgroupPath.equals(rootPath.getParent())) {
       // Recursion sentinel.
       return;
     }
@@ -286,7 +334,7 @@ public final class Group {
       Path cgroupControllerPath = cgroupPath.resolve(CGROUP_CONTROLLERS);
       while (!Files.exists(cgroupControllerPath)) {
         /* busy loop */
-        log.log(Level.FINE, "Waiting for {0}", cgroupControllerPath);
+        log.log(Level.SEVERE, "Waiting for {0}", cgroupControllerPath);
       }
       Set<String> availableControllers =
           Arrays.stream(Files.readString(cgroupControllerPath).split("\\s+"))
@@ -314,6 +362,7 @@ public final class Group {
       Set<String> alreadyEnabledControllers =
           Arrays.stream(Files.readString(cgroupSubtreeControlPath).split("\\s+"))
               .collect(Collectors.toSet());
+      log.log(Level.FINE, "Existing sub_tree control: {0}", alreadyEnabledControllers);
       if (!alreadyEnabledControllers.containsAll(controllerNames)) {
         log.log(
             Level.FINE,
@@ -332,6 +381,17 @@ public final class Group {
 
   void create(@Nonnull String controllerName) throws IOException {
     /* root already has all controllers created */
+    if (!root.isEmpty()) {
+      Group evacuation = root.getChild("evacuation");
+      if (Files.exists(evacuation.getPath())) {
+        // Clean it up.
+        Files.delete(evacuation.getPath());
+      }
+      Files.createDirectory(evacuation.getPath());
+      evacuation.adoptPids(root.getPids());
+      verify(root.isEmpty(), "tried to evacuate root cgroup but there were processes remaining");
+      ensureControllerIsEnabled(root.getPath(), Set.of("cpu", "memory"), true);
+    }
     if (parent != null) {
       parent.create(controllerName);
       if (VERSION == CGroupVersion.CGROUPS_V1) {

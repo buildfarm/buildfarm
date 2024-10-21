@@ -44,8 +44,8 @@ public class Cpu extends Controller {
    */
   @Deprecated
   public void setShares(int shares) throws IOException {
+    open();
     if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
-      open();
       writeInt("cpu.shares", shares);
     }
   }
