@@ -17,6 +17,9 @@ package build.buildfarm.worker.cgroup;
 import java.io.IOException;
 
 public class Cpu extends Controller {
+
+  private final int CPU_GRANULARITY = 100_000; // microseconds (μS)
+
   Cpu(Group group) {
     super(group);
   }
@@ -55,9 +58,9 @@ public class Cpu extends Controller {
   public void setMaxCpu(int cpuCores) throws IOException {
     open();
     if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
-      writeInt("cpu.max", cpuCores * 100000);
+      writeIntPair("cpu.max", cpuCores * CPU_GRANULARITY, CPU_GRANULARITY);
     } else if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
-      setCFSPeriodAndQuota(100000, cpuCores * 100000);
+      setCFSPeriodAndQuota(CPU_GRANULARITY, cpuCores * CPU_GRANULARITY);
     }
   }
 
