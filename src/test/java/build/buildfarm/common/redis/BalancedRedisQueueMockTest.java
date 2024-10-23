@@ -25,7 +25,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.Queue;
-import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.Visitor;
+import build.buildfarm.common.redis.BalancedRedisQueue.BalancedQueueEntry;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -80,7 +81,7 @@ public class BalancedRedisQueueMockTest {
         new BalancedRedisQueue("test", ImmutableList.of("test"), this::subQueueDecorate);
 
     // ACT
-    Boolean success = queue.removeFromDequeue(redis, "baz");
+    Boolean success = queue.removeFromDequeue(redis, new BalancedQueueEntry("test", "baz"));
 
     // ASSERT
     assertThat(success).isFalse();
@@ -98,7 +99,7 @@ public class BalancedRedisQueueMockTest {
         new BalancedRedisQueue("test", ImmutableList.of("test"), this::subQueueDecorate);
 
     // ACT
-    Boolean success = queue.removeFromDequeue(redis, "bar");
+    Boolean success = queue.removeFromDequeue(redis, new BalancedQueueEntry("test", "bar"));
 
     // ASSERT
     assertThat(success).isTrue();
@@ -118,10 +119,10 @@ public class BalancedRedisQueueMockTest {
         new BalancedRedisQueue("test", ImmutableList.of("test"), this::subQueueDecorate);
 
     // ACT
-    String val = queue.take(redis, service);
+    BalancedQueueEntry entry = queue.take(redis, service);
 
     // ASSERT
-    assertThat(val).isEqualTo("foo");
+    assertThat(entry.getValue()).isEqualTo("foo");
     service.shutdown();
     assertThat(service.awaitTermination(1, SECONDS)).isTrue();
   }
@@ -141,10 +142,10 @@ public class BalancedRedisQueueMockTest {
     ExecutorService service = newSingleThreadExecutor();
 
     // ACT
-    String val = queue.take(redis, service);
+    BalancedQueueEntry entry = queue.take(redis, service);
 
     // ASSERT
-    assertThat(val).isEqualTo("foo");
+    assertThat(entry.getValue()).isEqualTo("foo");
     service.shutdown();
     assertThat(service.awaitTermination(1, SECONDS)).isTrue();
   }
@@ -247,14 +248,14 @@ public class BalancedRedisQueueMockTest {
     // MOCK
     doAnswer(
             invocation -> {
-              StringVisitor visitor = invocation.getArgument(0);
+              Visitor<String> visitor = invocation.getArgument(0);
               for (int i = 1; i <= 8; i++) {
                 visitor.visit("element " + i);
               }
               return null;
             })
         .when(subQueue)
-        .visit(any(StringVisitor.class));
+        .visit(any(Visitor.class));
 
     // ARRANGE
     BalancedRedisQueue queue =
@@ -262,10 +263,10 @@ public class BalancedRedisQueueMockTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    StringVisitor visitor =
-        new StringVisitor() {
-          public void visit(String entry) {
-            visited.add(entry);
+    Visitor<BalancedQueueEntry> visitor =
+        new Visitor<>() {
+          public void visit(BalancedQueueEntry entry) {
+            visited.add(entry.getValue());
           }
         };
     queue.visit(redis, visitor);
@@ -291,14 +292,14 @@ public class BalancedRedisQueueMockTest {
     // MOCK
     doAnswer(
             invocation -> {
-              StringVisitor visitor = invocation.getArgument(0);
+              Visitor<String> visitor = invocation.getArgument(0);
               for (int i = 1; i <= 8; i++) {
                 visitor.visit("element " + i);
               }
               return null;
             })
         .when(subQueue)
-        .visitDequeue(any(StringVisitor.class));
+        .visitDequeue(any(Visitor.class));
 
     // ARRANGE
     BalancedRedisQueue queue =
@@ -306,10 +307,10 @@ public class BalancedRedisQueueMockTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    StringVisitor visitor =
-        new StringVisitor() {
-          public void visit(String entry) {
-            visited.add(entry);
+    Visitor<BalancedQueueEntry> visitor =
+        new Visitor<>() {
+          public void visit(BalancedQueueEntry entry) {
+            visited.add(entry.getValue());
           }
         };
     queue.visitDequeue(redis, visitor);

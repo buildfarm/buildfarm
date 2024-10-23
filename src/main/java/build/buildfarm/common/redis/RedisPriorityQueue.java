@@ -15,7 +15,7 @@
 package build.buildfarm.common.redis;
 
 import build.buildfarm.common.Queue;
-import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.Visitor;
 import com.google.common.collect.ImmutableList;
 import java.time.Clock;
 import java.time.Duration;
@@ -225,7 +225,7 @@ public class RedisPriorityQueue implements Queue<String> {
    * @note Overloaded.
    */
   @Override
-  public void visit(StringVisitor visitor) {
+  public void visit(Visitor<String> visitor) {
     visit(name, visitor);
   }
 
@@ -235,7 +235,7 @@ public class RedisPriorityQueue implements Queue<String> {
    * @param visitor A visitor for each visited element in the queue.
    */
   @Override
-  public void visitDequeue(StringVisitor visitor) {
+  public void visitDequeue(Visitor<String> visitor) {
     int listPageSize = 10000;
     int index = 0;
     int nextIndex = listPageSize;
@@ -258,7 +258,7 @@ public class RedisPriorityQueue implements Queue<String> {
    * @param visitor A visitor for each visited element in the queue.
    * @note Overloaded.
    */
-  private void visit(String queueName, StringVisitor visitor) {
+  private void visit(String queueName, Visitor<String> visitor) {
     int listPageSize = 10000;
     int index = 0;
     int nextIndex = listPageSize;

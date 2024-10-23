@@ -22,9 +22,9 @@ public interface Queue<E> {
   Supplier<Long> size(AbstractPipeline pipeline);
 
   // maybe switch to iterator?
-  void visit(StringVisitor visitor);
+  void visit(Visitor<String> visitor);
 
-  void visitDequeue(StringVisitor visitor);
+  void visitDequeue(Visitor<String> visitor);
 
   boolean removeFromDequeue(E e);
 }

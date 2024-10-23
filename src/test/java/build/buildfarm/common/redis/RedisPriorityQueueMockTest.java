@@ -21,7 +21,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.Visitor;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -295,8 +295,8 @@ public class RedisPriorityQueueMockTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    StringVisitor visitor =
-        new StringVisitor() {
+    Visitor<String> visitor =
+        new Visitor<>() {
           public void visit(String entry) {
             visited.add(entry);
           }
@@ -338,8 +338,8 @@ public class RedisPriorityQueueMockTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    StringVisitor visitor =
-        new StringVisitor() {
+    Visitor<String> visitor =
+        new Visitor<>() {
           public void visit(String entry) {
             visited.add(entry);
           }
