@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 import static redis.clients.jedis.args.ListDirection.LEFT;
 import static redis.clients.jedis.args.ListDirection.RIGHT;
 
-import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.Visitor;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import org.junit.Before;
@@ -113,7 +113,7 @@ public class RedisQueueMockTest {
   }
 
   private void verifyVisitLRange(
-      String name, StringVisitor visitor, int listPageSize, Iterable<String> entries) {
+      String name, Visitor<String> visitor, int listPageSize, Iterable<String> entries) {
     int pageCount = listPageSize;
     int index = 0;
     int nextIndex = listPageSize;
@@ -138,7 +138,7 @@ public class RedisQueueMockTest {
     int listPageSize = 3;
     RedisQueue queue = new RedisQueue(redis, "test", listPageSize);
     arrangeVisitLRange("test", listPageSize, VISIT_ENTRIES);
-    StringVisitor visitor = mock(StringVisitor.class);
+    Visitor<String> visitor = mock(Visitor.class);
 
     queue.visit(visitor);
 
@@ -150,7 +150,7 @@ public class RedisQueueMockTest {
     int listPageSize = 3;
     RedisQueue queue = new RedisQueue(redis, "test", listPageSize);
     arrangeVisitLRange(queue.getDequeueName(), listPageSize, VISIT_ENTRIES);
-    StringVisitor visitor = mock(StringVisitor.class);
+    Visitor<String> visitor = mock(Visitor.class);
 
     queue.visitDequeue(visitor);
 

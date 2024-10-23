@@ -17,18 +17,25 @@ package build.buildfarm.instance.shard;
 import static com.google.common.base.Preconditions.checkState;
 
 import build.bazel.remote.execution.v2.Platform;
-import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.Visitor;
 import build.buildfarm.common.redis.BalancedRedisQueue;
+import build.buildfarm.common.redis.BalancedRedisQueue.BalancedQueueEntry;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.v1test.OperationQueueStatus;
+import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueueStatus;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
+import lombok.Data;
+import lombok.extern.java.Log;
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.UnifiedJedis;
 
@@ -38,10 +45,25 @@ import redis.clients.jedis.UnifiedJedis;
  * @details The operation queue can be split into multiple queues according to platform execution
  *     information.
  */
+@Log
 public class ExecutionQueue {
   private static final Duration START_TIMEOUT = Duration.ofSeconds(1);
 
   private static final Duration MAX_TIMEOUT = Duration.ofSeconds(8);
+
+  @Data
+  public static final class ExecutionQueueEntry {
+    private final BalancedRedisQueue queue;
+    private final BalancedQueueEntry balancedQueueEntry;
+    private final QueueEntry queueEntry;
+
+    ExecutionQueueEntry(
+        BalancedRedisQueue queue, BalancedQueueEntry balancedQueueEntry, QueueEntry queueEntry) {
+      this.queue = queue;
+      this.balancedQueueEntry = balancedQueueEntry;
+      this.queueEntry = queueEntry;
+    }
+  }
 
   /**
    * @field maxQueueSize
@@ -87,15 +109,34 @@ public class ExecutionQueue {
     this.maxQueueSize = maxQueueSize;
   }
 
+  private static Visitor<BalancedQueueEntry> createExecutionQueueVisitor(
+      UnifiedJedis jedis, BalancedRedisQueue queue, Visitor<ExecutionQueueEntry> visitor) {
+    return new Visitor<>() {
+      @Override
+      public void visit(BalancedQueueEntry balancedQueueEntry) {
+        String entry = balancedQueueEntry.getValue();
+        QueueEntry.Builder queueEntry = QueueEntry.newBuilder();
+        try {
+          JsonFormat.parser().merge(entry, queueEntry);
+          visitor.visit(new ExecutionQueueEntry(queue, balancedQueueEntry, queueEntry.build()));
+        } catch (InvalidProtocolBufferException e) {
+          log.log(Level.SEVERE, "invalid QueueEntry json: " + entry, e);
+          queue.removeFromDequeue(jedis, balancedQueueEntry);
+        }
+      }
+    };
+  }
+
   /**
    * @brief Visit each element in the dequeue.
    * @details Enacts a visitor over each element in the dequeue.
    * @param jedis Jedis cluster client.
    * @param visitor A visitor for each visited element in the queue.
    */
-  public void visitDequeue(UnifiedJedis jedis, StringVisitor visitor) {
+  public void visitDequeue(UnifiedJedis jedis, Visitor<ExecutionQueueEntry> visitor) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
-      provisionedQueue.queue().visitDequeue(jedis, visitor);
+      BalancedRedisQueue queue = provisionedQueue.queue();
+      queue.visitDequeue(jedis, createExecutionQueueVisitor(jedis, queue, visitor));
     }
   }
 
@@ -107,13 +148,8 @@ public class ExecutionQueue {
    * @return Whether or not the value was removed.
    * @note Suggested return identifier: wasRemoved.
    */
-  public boolean removeFromDequeue(UnifiedJedis jedis, String val) {
-    for (ProvisionedRedisQueue provisionedQueue : queues) {
-      if (provisionedQueue.queue().removeFromDequeue(jedis, val)) {
-        return true;
-      }
-    }
-    return false;
+  public static boolean removeFromDequeue(UnifiedJedis jedis, ExecutionQueueEntry entry) {
+    return entry.getQueue().removeFromDequeue(jedis, entry.getBalancedQueueEntry());
   }
 
   /**
@@ -122,9 +158,10 @@ public class ExecutionQueue {
    * @param jedis Jedis cluster client.
    * @param visitor A visitor for each visited element in the queue.
    */
-  public void visit(UnifiedJedis jedis, StringVisitor visitor) {
+  public void visit(UnifiedJedis jedis, Visitor<ExecutionQueueEntry> visitor) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
-      provisionedQueue.queue().visit(jedis, visitor);
+      BalancedRedisQueue queue = provisionedQueue.queue();
+      queue.visit(jedis, createExecutionQueueVisitor(jedis, queue, visitor));
     }
   }
 
@@ -203,7 +240,8 @@ public class ExecutionQueue {
     queue.offer(jedis, val, (double) priority);
   }
 
-  public String take(UnifiedJedis jedis, List<BalancedRedisQueue> queues, ExecutorService service)
+  public ExecutionQueueEntry take(
+      UnifiedJedis jedis, List<BalancedRedisQueue> queues, ExecutorService service)
       throws InterruptedException {
     // The conditions of this algorithm are as followed:
     // - from a client's perspective we want to block indefinitely.
@@ -228,17 +266,26 @@ public class ExecutionQueue {
     // try each of the internal queues with exponential backoff
     Duration currentTimeout = START_TIMEOUT;
     while (true) {
-      final String val;
+      final BalancedQueueEntry balancedQueueEntry;
       int index = roundRobinPopIndex(queues);
       BalancedRedisQueue queue = queues.get(index);
       if (blocking) {
-        val = queue.take(jedis, currentTimeout, service);
+        balancedQueueEntry = queue.take(jedis, currentTimeout, service);
       } else {
-        val = queue.poll(jedis);
+        balancedQueueEntry = queue.poll(jedis);
       }
       // return if found
-      if (val != null) {
-        return val;
+      if (balancedQueueEntry != null) {
+        try {
+          QueueEntry.Builder queueEntryBuilder = QueueEntry.newBuilder();
+          JsonFormat.parser().merge(balancedQueueEntry.getValue(), queueEntryBuilder);
+          QueueEntry queueEntry = queueEntryBuilder.build();
+
+          return new ExecutionQueueEntry(queue, balancedQueueEntry, queueEntry);
+        } catch (InvalidProtocolBufferException e) {
+          queue.removeFromDequeue(jedis, balancedQueueEntry);
+          log.log(Level.SEVERE, "error parsing queue entry", e);
+        }
       }
 
       // not quite immediate yet...
@@ -270,7 +317,7 @@ public class ExecutionQueue {
    * @return The value of the transfered element. null if the thread was interrupted.
    * @note Suggested return identifier: val.
    */
-  public String dequeue(
+  public ExecutionQueueEntry dequeue(
       UnifiedJedis jedis, List<Platform.Property> provisions, ExecutorService service)
       throws InterruptedException {
     // Select all matched queues, and attempt dequeuing via round-robin.

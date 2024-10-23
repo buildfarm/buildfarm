@@ -15,15 +15,14 @@
 package build.buildfarm.common;
 
 /**
- * @class StringVisitor
- * @brief A string visitor.
- * @details Used to visit strings in a generic context.
+ * @class Visitor
+ * @brief A type visitor.
+ * @details Used to visit types in a generic context.
  */
-public abstract class StringVisitor {
+public interface Visitor<T> {
   /**
    * @brief The visit interface to be implemented.
-   * @details Inherited classes but implement visit.
-   * @param str The visited string.
+   * @param value The visited value.
    */
-  public abstract void visit(String str);
+  void visit(T t);
 }
