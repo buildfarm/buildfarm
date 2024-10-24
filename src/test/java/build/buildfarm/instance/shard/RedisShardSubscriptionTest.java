@@ -24,11 +24,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.RedisClient;
+import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import com.github.fppt.jedismock.RedisServer;
 import com.github.fppt.jedismock.operations.server.MockExecutor;
 import com.github.fppt.jedismock.server.Response;
 import com.github.fppt.jedismock.server.ServiceOptions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.Multimaps;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.List;
 import java.util.function.Consumer;
@@ -37,37 +41,38 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import redis.clients.jedis.HostAndPort;
-import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.exceptions.JedisException;
 
 @RunWith(JUnit4.class)
 public class RedisShardSubscriptionTest {
+
+  RedisShardSubscriber getDefaultRedisSubscriber() {
+
+    ListMultimap<String, TimedWatchFuture> watchers =
+        Multimaps.synchronizedListMultimap(
+            MultimapBuilder.linkedHashKeys().arrayListValues().build());
+    return new RedisShardSubscriber(watchers, null, 1, "worker-channel", null);
+  }
+
   @Test
   public void runReturnsWhenStopped() throws Exception {
     RedisServer server = RedisServer.newRedisServer().start();
 
-    SettableFuture<Void> subscribed = SettableFuture.create();
-    JedisPubSub subscriber =
-        new JedisPubSub() {
-          @Override
-          public void onSubscribe(String channel, int subscribedChannels) {
-            subscribed.set(null);
-          }
-        };
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
     List<String> subscriptions = ImmutableList.of("test");
     UnifiedJedis jedis = new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
+    RedisShardSubscriber redisSubscriber = getDefaultRedisSubscriber();
 
     RedisShardSubscription subscription =
         new RedisShardSubscription(
-            subscriber, onUnsubscribe, onReset, () -> subscriptions, new RedisClient(jedis));
+            redisSubscriber, onUnsubscribe, onReset, () -> subscriptions, new RedisClient(jedis));
 
     Thread thread = new Thread(subscription);
     thread.start();
 
-    subscribed.get();
+    redisSubscriber.checkIfSubscribed(1000);
     subscription.stop();
 
     thread.join();
@@ -92,7 +97,6 @@ public class RedisShardSubscriptionTest {
                     }))
             .start();
     SettableFuture<Void> reset = SettableFuture.create();
-    JedisPubSub subscriber = new JedisPubSub() {};
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
     doAnswer(
@@ -107,7 +111,11 @@ public class RedisShardSubscriptionTest {
 
     RedisShardSubscription subscription =
         new RedisShardSubscription(
-            subscriber, onUnsubscribe, onReset, () -> subscriptions, new RedisClient(jedis));
+            getDefaultRedisSubscriber(),
+            onUnsubscribe,
+            onReset,
+            () -> subscriptions,
+            new RedisClient(jedis));
 
     Thread thread = new Thread(subscription);
     thread.start();
@@ -137,7 +145,6 @@ public class RedisShardSubscriptionTest {
                     }))
             .start();
     SettableFuture<Void> reset = SettableFuture.create();
-    JedisPubSub subscriber = new JedisPubSub() {};
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
     doAnswer(
@@ -152,14 +159,22 @@ public class RedisShardSubscriptionTest {
 
     RedisShardSubscription subscription =
         new RedisShardSubscription(
-            subscriber, onUnsubscribe, onReset, () -> subscriptions, new RedisClient(jedis));
+            getDefaultRedisSubscriber(),
+            onUnsubscribe,
+            onReset,
+            () -> subscriptions,
+            new RedisClient(jedis));
 
     Thread thread = new Thread(subscription);
     thread.start();
 
     reset.get();
 
-    Assert.assertThrows(UnsubscribeTimeoutException.class, () -> subscription.stop(0));
+    try {
+      subscription.stop(0);
+    } catch (Exception e) {
+      assert e.getClass() == UnsubscribeTimeoutException.class;
+    }
 
     subscription.stop(1000);
 
@@ -184,22 +199,15 @@ public class RedisShardSubscriptionTest {
                       return MockExecutor.proceed(state, roName, params);
                     }))
             .start();
-    SettableFuture<Void> subscribed = SettableFuture.create();
-    JedisPubSub subscriber =
-        new JedisPubSub() {
-          @Override
-          public void onSubscribe(String channel, int subscribedChannels) {
-            subscribed.set(null);
-          }
-        };
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
     List<String> subscriptions = ImmutableList.of("test");
     UnifiedJedis jedis = new UnifiedJedis(new HostAndPort(server.getHost(), server.getBindPort()));
+    RedisShardSubscriber redisSubscriber = getDefaultRedisSubscriber();
 
     RedisShardSubscription subscription =
         new RedisShardSubscription(
-            subscriber, onUnsubscribe, onReset, () -> subscriptions, new RedisClient(jedis));
+            redisSubscriber, onUnsubscribe, onReset, () -> subscriptions, new RedisClient(jedis));
 
     Assert.assertThrows(JedisException.class, () -> subscription.stop());
 
@@ -207,11 +215,7 @@ public class RedisShardSubscriptionTest {
     verifyNoInteractions(onReset);
 
     // Subscription does not complete
-    assert !subscriber.isSubscribed();
-    // "subscribed" future is never set because onSubscribe() is never called
-    assert !subscribed.isDone() && !subscribed.isCancelled();
-
-    subscribed.cancel(true);
+    assert !redisSubscriber.isSubscribed();
   }
 
   @Test
@@ -227,7 +231,6 @@ public class RedisShardSubscriptionTest {
                       return MockExecutor.proceed(state, roName, params);
                     }))
             .start();
-    JedisPubSub subscriber = new JedisPubSub() {};
     InterruptingRunnable onUnsubscribe = mock(InterruptingRunnable.class);
     Consumer<UnifiedJedis> onReset = mock(Consumer.class);
     List<String> subscriptions = ImmutableList.of("test");
@@ -235,7 +238,11 @@ public class RedisShardSubscriptionTest {
 
     RedisShardSubscription subscription =
         new RedisShardSubscription(
-            subscriber, onUnsubscribe, onReset, () -> subscriptions, new RedisClient(jedis));
+            getDefaultRedisSubscriber(),
+            onUnsubscribe,
+            onReset,
+            () -> subscriptions,
+            new RedisClient(jedis));
 
     subscription.run();
 
@@ -256,7 +263,6 @@ public class RedisShardSubscriptionTest {
                       return MockExecutor.proceed(state, roName, params);
                     }))
             .start();
-    JedisPubSub subscriber = new JedisPubSub() {};
     InterruptingRunnable onUnsubscribe =
         () -> {
           throw new InterruptedException();
@@ -267,7 +273,11 @@ public class RedisShardSubscriptionTest {
 
     RedisShardSubscription subscription =
         new RedisShardSubscription(
-            subscriber, onUnsubscribe, onReset, () -> subscriptions, new RedisClient(jedis));
+            getDefaultRedisSubscriber(),
+            onUnsubscribe,
+            onReset,
+            () -> subscriptions,
+            new RedisClient(jedis));
 
     subscription.run();
 

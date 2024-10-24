@@ -25,6 +25,7 @@ import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
@@ -32,7 +33,10 @@ import com.google.protobuf.util.Timestamps;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
@@ -65,6 +69,7 @@ class RedisShardSubscriber extends JedisPubSub {
   private final int workerChangeTypeMask;
   private final String workerChannel;
   private final Executor executor;
+  private final SettableFuture<Void> subscribed = SettableFuture.create();
 
   RedisShardSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers,
@@ -295,7 +300,9 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   @Override
-  public void onSubscribe(String channel, int subscribedChannels) {}
+  public void onSubscribe(String channel, int subscribedChannels) {
+    subscribed.set(null);
+  }
 
   @Override
   public void onUnsubscribe(String channel, int subscribedChannels) {
@@ -306,6 +313,14 @@ class RedisShardSubscriber extends JedisPubSub {
     for (TimedWatchFuture watchFuture : operationWatchers) {
       watchFuture.complete();
     }
+
+    subscribed.set(null);
+  }
+
+  public Boolean checkIfSubscribed(long timeoutMillis)
+      throws ExecutionException, InterruptedException, TimeoutException {
+    subscribed.get(timeoutMillis, TimeUnit.MILLISECONDS);
+    return Boolean.TRUE;
   }
 
   private String[] placeholderChannel() {
