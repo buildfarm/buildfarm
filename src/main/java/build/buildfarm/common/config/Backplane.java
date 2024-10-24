@@ -74,9 +74,25 @@ public class Backplane {
   private long priorityPollIntervalMillis = 100;
 
   /**
+   * Look in several prioritized ways to get a Redis username:
+   *
+   * <ol>
+   *   <li>the password in the Redis URI (wherever that came from)
+   *   <li>The `redisUsername` from config YAML
+   * </ol>
+   *
    * @return The redis username, or <c>null</c> if unset.
    */
   public @Nullable String getRedisUsername() {
+    String r = getRedisUri();
+    if (r != null) {
+      URI redisProperUri = URI.create(r);
+      String username = JedisURIHelper.getUser(redisProperUri);
+      if (!Strings.isNullOrEmpty(username)) {
+        return username;
+      }
+    }
+
     return Strings.emptyToNull(redisUsername);
   }
 
