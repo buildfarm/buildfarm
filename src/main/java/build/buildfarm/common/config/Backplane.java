@@ -74,6 +74,26 @@ public class Backplane {
   private long priorityPollIntervalMillis = 100;
 
   /**
+   * This function is used to print the URI in logs.
+   *
+   * @return The redis URI but the password will be hidden, or <c>null</c> if unset.
+   */
+  public @Nullable String getRedisUriMasked() {
+    String uri = getRedisUri();
+    if (uri == null) {
+      return null;
+    }
+    URI redisProperUri = URI.create(uri);
+
+    String password = JedisURIHelper.getPassword(redisProperUri);
+    if (Strings.isNullOrEmpty(password)) {
+      return uri;
+    }
+
+    return uri.replace(password, "<HIDDEN>");
+  }
+
+  /**
    * @return The redis username, or <c>null</c> if unset.
    */
   public @Nullable String getRedisUsername() {
