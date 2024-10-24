@@ -55,6 +55,7 @@ class RedisShardSubscription implements Runnable {
 
   private final AtomicReference<SubscriptionState> subscriptionState =
       new AtomicReference<>(SubscriptionState.NOT_SUBSCRIBED);
+  private static final long DEFAULT_STOP_TIMEOUT = 1000;
 
   RedisShardSubscription(
       RedisShardSubscriber subscriber,
@@ -176,7 +177,7 @@ class RedisShardSubscription implements Runnable {
   }
 
   public void stop() {
-    stop(1000);
+    stop(DEFAULT_STOP_TIMEOUT);
   }
 
   @Override
