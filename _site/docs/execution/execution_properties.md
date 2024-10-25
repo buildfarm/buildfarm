@@ -132,6 +132,22 @@ PASS
 ### `debug-after-execution`
 **description:** Runs the execution, but fails it afterward with important debug information on how the execution was performed.
 
+## Execution Flow:
+
+This is a special set of action mnemonics (*not* Platform properties) that can be used to test the flow of actions through the execution segments (prequeue/queue)
+In all of these cases, the buildfarm agent which observes the operation at the halt state will deliver a `done` operation with no further processing.
+
+### `buildfarm:halt-on-execute`
+
+Server halts execution after receiving the execute request. This is the earliest possible halt after creating the operation.
+
+### `buildfarm:halt-on-deprequeue`
+
+Server which removes the prequeue entry halts execution. This guarantees flow through the prequeue infrastructure.
+
+### `buildfarm:halt-on-dequeue`
+
+Worker which removes the queue entry halts execution. This guarantees flow through the queue and match.
 
 ## Additional Information
 Custom properties can also be added to buildfarm's configuration in order to facilitate queue matching (see [Queues](https://buildfarm.github.io/buildfarm/docs/architecture/queues/)).
