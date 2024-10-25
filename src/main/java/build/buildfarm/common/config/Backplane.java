@@ -83,14 +83,18 @@ public class Backplane {
     if (uri == null) {
       return null;
     }
-    URI redisProperUri = URI.create(uri);
-
-    String password = JedisURIHelper.getPassword(redisProperUri);
-    if (Strings.isNullOrEmpty(password)) {
+    try {
+      URI redisProperUri = URI.create(uri);
+      String password = JedisURIHelper.getPassword(redisProperUri);
+      if (Strings.isNullOrEmpty(password)) {
+        return uri;
+      }
+      return uri.replace(password, "<HIDDEN>");
+    } catch (ArrayIndexOutOfBoundsException e) {
+      // JedisURIHelper.getPassword did not find the password (e.g. only username in
+      // uri.getUserInfo)
       return uri;
     }
-
-    return uri.replace(password, "<HIDDEN>");
   }
 
   /**
@@ -116,9 +120,14 @@ public class Backplane {
     if (r == null) {
       return null;
     }
-    URI redisProperUri = URI.create(r);
-    if (!Strings.isNullOrEmpty(JedisURIHelper.getPassword(redisProperUri))) {
-      return JedisURIHelper.getPassword(redisProperUri);
+    try {
+      URI redisProperUri = URI.create(r);
+      if (!Strings.isNullOrEmpty(JedisURIHelper.getPassword(redisProperUri))) {
+        return JedisURIHelper.getPassword(redisProperUri);
+      }
+    } catch (ArrayIndexOutOfBoundsException e) {
+      // JedisURIHelper.getPassword did not find the password (e.g. only username in
+      // uri.getUserInfo)
     }
 
     if (!Strings.isNullOrEmpty(redisCredentialFile)) {
