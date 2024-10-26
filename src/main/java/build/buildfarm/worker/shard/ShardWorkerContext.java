@@ -76,6 +76,7 @@ import com.google.common.collect.SetMultimap;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Deadline;
 import io.grpc.Status;
@@ -422,12 +423,12 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public boolean hasDefaultActionTimeout() {
-    return defaultActionTimeout.getSeconds() > 0 || defaultActionTimeout.getNanos() > 0;
+    return Durations.isPositive(defaultActionTimeout);
   }
 
   @Override
   public boolean hasMaximumActionTimeout() {
-    return maximumActionTimeout.getSeconds() > 0 || maximumActionTimeout.getNanos() > 0;
+    return Durations.isPositive(maximumActionTimeout);
   }
 
   @Override
