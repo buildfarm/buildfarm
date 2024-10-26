@@ -239,7 +239,8 @@ public final class BuildfarmConfigs {
     // use environment override (useful for containerized deployment)
     if (!Strings.isNullOrEmpty(System.getenv("REDIS_URI"))) {
       configs.getBackplane().setRedisUri(System.getenv("REDIS_URI"));
-      log.info(String.format("RedisUri modified to %s", configs.getBackplane().getRedisUri()));
+      log.info(
+          String.format("RedisUri modified to %s", configs.getBackplane().getRedisUriMasked()));
     }
   }
 
