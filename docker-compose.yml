@@ -1,0 +1,34 @@
+services:
+  redis:
+    image: redis:7.2.4
+    ports:
+      - 6379:6379
+  configure-redis:
+    depends_on:
+      - redis
+    image: redis:7.2.4
+    command: redis-cli -h redis config set stop-writes-on-bgsave-error no
+  server:
+    depends_on:
+      - redis
+    build:
+      context: .
+      dockerfile: Dockerfile.buildfarm
+      target: server
+    volumes:
+      - ./examples:/examples
+    command: buildfarm-server /examples/config.docker-compose.yml
+    ports:
+      - 8980:8980
+  worker:
+    depends_on:
+      - redis
+    build:
+      context: .
+      dockerfile: Dockerfile.buildfarm
+      target: worker-build
+    volumes:
+      - ./examples:/examples
+    command: buildfarm-shard-worker /examples/config.docker-compose.yml
+    ports:
+      - 8981:8981
