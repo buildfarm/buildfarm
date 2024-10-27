@@ -38,6 +38,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class DigestUtilTest {
   private static final ByteString bazelContent = ByteString.copyFromUtf8("bazel");
+  private static final ByteString empty = ByteString.empty();
+
   private static final String bazelMd5Hash = "24ef4c36ec66c15ef9f0c96fe27c0e0b";
   private static final String bazelSha1Hash = "287d5d65c10a8609e9c504c81f650b0e1669a824";
   private static final String bazelSha256Hash =
@@ -62,53 +64,74 @@ public class DigestUtilTest {
   }
 
   @Test
-  public void builtDigestMatchesFields() {
-    DigestUtil digestUtil = new DigestUtil(HashFunction.MD5);
-    Digest digest = digestUtil.build(bazelMd5Hash, bazelContent.size());
-    assertThat(digest.getHash()).isEqualTo(bazelMd5Hash);
-    assertThat(digest.getSize()).isEqualTo(bazelContent.size());
-  }
-
-  @Test
   public void computesMd5Hash() {
-    DigestUtil digestUtil = new DigestUtil(HashFunction.MD5);
-    Digest digest = digestUtil.compute(bazelContent);
-    assertThat(digest.getHash()).isEqualTo(bazelMd5Hash);
+    assertDigestMatches(HashFunction.MD5, bazelContent, bazelMd5Hash);
   }
 
   @Test
   public void computesSha1Hash() {
-    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA1);
-    Digest digest = digestUtil.compute(bazelContent);
-    assertThat(digest.getHash()).isEqualTo(bazelSha1Hash);
+    assertDigestMatches(HashFunction.SHA1, bazelContent, bazelSha1Hash);
   }
 
   @Test
   public void computesSha256Hash() {
-    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
-    Digest digest = digestUtil.compute(bazelContent);
-    assertThat(digest.getHash()).isEqualTo(bazelSha256Hash);
+    assertDigestMatches(HashFunction.SHA256, bazelContent, bazelSha256Hash);
   }
 
   @Test
   public void computesSha384Hash() {
-    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA384);
-    Digest digest = digestUtil.compute(bazelContent);
-    assertThat(digest.getHash()).isEqualTo(bazelSha384Hash);
+    assertDigestMatches(HashFunction.SHA384, bazelContent, bazelSha384Hash);
   }
 
   @Test
   public void computesSha512Hash() {
-    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA512);
-    Digest digest = digestUtil.compute(bazelContent);
-    assertThat(digest.getHash()).isEqualTo(bazelSha512Hash);
+    assertDigestMatches(HashFunction.SHA512, bazelContent, bazelSha512Hash);
   }
 
   @Test
-  public void computeEmptyIsDefault() {
-    DigestUtil digestUtil = new DigestUtil(HashFunction.BLAKE3);
-    Digest digest = digestUtil.compute(ByteString.empty());
-    assertThat(digest == Digest.getDefaultInstance()).isTrue();
+  public void emptyDigestsAreUnique() {
+    // Different digests of EMPTY should not be the same Digest.
+    DigestUtil blake3Digest = new DigestUtil(HashFunction.BLAKE3);
+    DigestUtil sha256Empty = new DigestUtil(HashFunction.SHA256);
+
+    assertThat(blake3Digest.compute(empty)).isNotEqualTo(sha256Empty.compute(empty));
+  }
+
+  @Test
+  public void emptyShaDigests() {
+    // Test vectors from: https://www.di-mgt.com.au/sha_testvectors.html
+    assertDigestMatches(HashFunction.SHA1, empty, "da39a3ee5e6b4b0d3255bfef95601890afd80709");
+    assertDigestMatches(
+        HashFunction.SHA256,
+        empty,
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    assertDigestMatches(
+        HashFunction.SHA384,
+        empty,
+        "38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b");
+    assertDigestMatches(
+        HashFunction.SHA512,
+        empty,
+        "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e");
+  }
+
+  @Test
+  public void emptyMD5Digests() {
+    assertDigestMatches(HashFunction.MD5, empty, "d41d8cd98f00b204e9800998ecf8427e");
+  }
+
+  @Test
+  public void emptyBlake3Digests() {
+    assertDigestMatches(
+        HashFunction.BLAKE3,
+        empty,
+        "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262");
+  }
+
+  private void assertDigestMatches(HashFunction function, ByteString bs, String expectedDigest) {
+    Digest digest = new DigestUtil(function).compute(bs);
+    assertThat(digest.getHash()).isEqualTo(expectedDigest);
+    assertThat(digest.getSize()).isEqualTo(bs.size());
   }
 
   @Test(expected = IllegalArgumentException.class)
@@ -123,6 +146,7 @@ public class DigestUtilTest {
     assertThat(HashFunction.get(DigestFunction.Value.SHA256)).isEqualTo(HashFunction.SHA256);
     assertThat(HashFunction.get(DigestFunction.Value.SHA384)).isEqualTo(HashFunction.SHA384);
     assertThat(HashFunction.get(DigestFunction.Value.SHA512)).isEqualTo(HashFunction.SHA512);
+    assertThat(HashFunction.get(DigestFunction.Value.BLAKE3)).isEqualTo(HashFunction.BLAKE3);
   }
 
   @Test

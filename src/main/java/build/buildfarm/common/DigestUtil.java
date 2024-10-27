@@ -18,7 +18,7 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.buildfarm.common.blake3.Blake3HashFunction;
 import build.buildfarm.v1test.Digest;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.hash.Funnels;
 import com.google.common.hash.HashCode;
@@ -35,6 +35,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.Getter;
 
 /** Utility methods to work with {@link Digest}. */
@@ -57,14 +58,27 @@ public class DigestUtil {
           DigestFunction.Value.SHA384,
           DigestFunction.Value.SHA512);
 
-  public static final Map<DigestFunction.Value, Digest> empty =
-      ImmutableMap.of(
-          DigestFunction.Value.MD5, DigestUtil.forHash("MD5").compute(ByteString.empty()),
-          DigestFunction.Value.SHA1, DigestUtil.forHash("SHA1").compute(ByteString.empty()),
-          DigestFunction.Value.SHA256, DigestUtil.forHash("SHA256").compute(ByteString.empty()),
-          DigestFunction.Value.SHA384, DigestUtil.forHash("SHA384").compute(ByteString.empty()),
-          DigestFunction.Value.SHA512, DigestUtil.forHash("SHA512").compute(ByteString.empty()),
-          DigestFunction.Value.BLAKE3, DigestUtil.forHash("BLAKE3").compute(ByteString.empty()));
+  /*
+   * pre-compute hashes for 0-length blobs.
+   */
+  protected static final Map<DigestFunction.Value, Digest> empty =
+      ImmutableSet.of(
+              DigestFunction.Value.MD5,
+              DigestFunction.Value.SHA1,
+              DigestFunction.Value.SHA256,
+              DigestFunction.Value.SHA384,
+              DigestFunction.Value.SHA512,
+              DigestFunction.Value.BLAKE3)
+          .stream()
+          .collect(
+              Collectors.toMap(
+                  Functions.identity(),
+                  (DigestFunction.Value digestFunction) ->
+                      buildDigest(
+                          computeHash(HashFunction.get(digestFunction), ByteString.empty())
+                              .toString(),
+                          0,
+                          digestFunction)));
 
   /** Type of hash function to use for digesting blobs. */
   // The underlying HashFunctions are immutable and thread safe.
@@ -192,6 +206,10 @@ public class DigestUtil {
   }
 
   public HashCode computeHash(ByteString blob) {
+    return computeHash(this.hashFn, blob);
+  }
+
+  private static HashCode computeHash(HashFunction hashFn, ByteString blob) {
     Hasher hasher = hashFn.getHash().newHasher();
     try {
       blob.writeTo(Funnels.asOutputStream(hasher));
@@ -202,8 +220,8 @@ public class DigestUtil {
   }
 
   public Digest compute(ByteString blob) {
-    if (blob.size() == 0) {
-      return Digest.getDefaultInstance();
+    if (blob.isEmpty()) {
+      return empty();
     }
     return buildDigest(computeHash(blob).toString(), blob.size(), getDigestFunction());
   }
