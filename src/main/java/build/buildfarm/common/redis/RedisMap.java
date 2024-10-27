@@ -130,6 +130,10 @@ public class RedisMap {
     jedis.del(createKeyName(key));
   }
 
+  public void remove(AbstractPipeline pipeline, String key) {
+    pipeline.del(createKeyName(key));
+  }
+
   /**
    * @brief Remove multiple keys from the map.
    * @details Done via pipeline.

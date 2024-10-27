@@ -27,4 +27,6 @@ public interface Queue<E> {
   void visitDequeue(Visitor<String> visitor);
 
   boolean removeFromDequeue(E e);
+
+  void removeFromDequeue(AbstractPipeline pipeline, E e);
 }

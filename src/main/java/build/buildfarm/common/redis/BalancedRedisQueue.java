@@ -205,6 +205,12 @@ public class BalancedRedisQueue {
     return false;
   }
 
+  public void removeFromDequeue(AbstractPipeline pipeline, BalancedQueueEntry balancedQueueEntry) {
+    queueDecorator
+        .decorate(null, balancedQueueEntry.getQueue())
+        .removeFromDequeue(pipeline, balancedQueueEntry.getValue());
+  }
+
   private String take(Jedis jedis, Queue<String> queue, Duration timeout, ExecutorService service)
       throws InterruptedException {
     return interruptibleRequest(() -> queue.take(timeout), jedis::disconnect, service);
