@@ -76,6 +76,10 @@ public class RedisHashMap {
     return jedis.hsetnx(name, key, value) == 1;
   }
 
+  public Response<Long> insertIfMissing(AbstractPipeline jedis, String key, String value) {
+    return jedis.hsetnx(name, key, value);
+  }
+
   /**
    * @brief Checks whether key exists
    * @details True if key exists. False if it does not.

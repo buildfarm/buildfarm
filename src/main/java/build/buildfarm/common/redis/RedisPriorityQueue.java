@@ -138,6 +138,11 @@ public class RedisPriorityQueue implements Queue<String> {
     return jedis.lrem(getDequeueName(), -1, val) != 0;
   }
 
+  @Override
+  public void removeFromDequeue(AbstractPipeline pipeline, String val) {
+    pipeline.lrem(getDequeueName(), -1, val);
+  }
+
   /**
    * @brief Remove all elements that match from queue.
    * @details Removes all matching elements from the queue and specifies whether it was removed.

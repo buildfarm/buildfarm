@@ -152,6 +152,10 @@ public class ExecutionQueue {
     return entry.getQueue().removeFromDequeue(jedis, entry.getBalancedQueueEntry());
   }
 
+  public static void removeFromDequeue(AbstractPipeline pipeline, ExecutionQueueEntry entry) {
+    entry.getQueue().removeFromDequeue(pipeline, entry.getBalancedQueueEntry());
+  }
+
   /**
    * @brief Visit each element in the queue.
    * @details Enacts a visitor over each element in the queue.

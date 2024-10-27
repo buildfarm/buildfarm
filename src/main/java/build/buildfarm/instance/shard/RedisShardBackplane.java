@@ -1163,7 +1163,8 @@ public class RedisShardBackplane implements Backplane {
     QueueEntry queueEntry = executionQueueEntry.getQueueEntry();
     String executionName = queueEntry.getExecuteEntry().getOperationName();
     Operation operation = keepaliveExecution(executionName);
-    publishReset(jedis, operation);
+    AbstractPipeline pipeline = jedis.pipelined();
+    publishReset(pipeline, operation);
 
     long requeueAt =
         System.currentTimeMillis() + configs.getBackplane().getDispatchingTimeoutMillis();
@@ -1172,14 +1173,15 @@ public class RedisShardBackplane implements Backplane {
     try {
       String dispatchedOperationJson = JsonFormat.printer().print(o);
 
-      state.dispatchedExecutions.insertIfMissing(jedis, executionName, dispatchedOperationJson);
+      state.dispatchedExecutions.insertIfMissing(pipeline, executionName, dispatchedOperationJson);
     } catch (InvalidProtocolBufferException e) {
       log.log(Level.SEVERE, "error printing dispatched operation", e);
       // very unlikely, printer would have to fail
     }
 
-    state.executionQueue.removeFromDequeue(jedis, executionQueueEntry);
-    state.dispatchingExecutions.remove(jedis, executionName);
+    state.executionQueue.removeFromDequeue(pipeline, executionQueueEntry);
+    state.dispatchingExecutions.remove(pipeline, executionName);
+    pipeline.close();
 
     // Return an entry so that if it needs re-queued, it will have the correct "requeue attempts".
     return queueEntry.toBuilder().setRequeueAttempts(queueEntry.getRequeueAttempts() + 1).build();
