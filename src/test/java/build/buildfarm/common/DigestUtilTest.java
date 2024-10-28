@@ -105,10 +105,11 @@ public class DigestUtilTest {
   }
 
   @Test
-  public void computeEmptyIsDefault() {
+  public void computeEmptyIsCachedEmpty() {
     DigestUtil digestUtil = new DigestUtil(HashFunction.BLAKE3);
     Digest digest = digestUtil.compute(ByteString.empty());
-    assertThat(digest == Digest.getDefaultInstance()).isTrue();
+    // reference comparison
+    assertThat(digest == digestUtil.empty()).isTrue();
   }
 
   @Test(expected = IllegalArgumentException.class)
