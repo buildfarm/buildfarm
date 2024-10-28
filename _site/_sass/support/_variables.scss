@@ -133,12 +133,13 @@ $border-color: $grey-lt-100 !default;
 $gutter-spacing: $sp-6 !default;
 $gutter-spacing-sm: $sp-4 !default;
 $nav-width: 264px !default;
-$nav-width-md: 264px !default;
+$nav-width-md: 248px !default;
 $nav-list-item-height: $sp-6 !default;
 $nav-list-item-height-sm: $sp-8 !default;
 $nav-list-expander-right: true;
-$content-width: 100% !default;
+$content-width: 800px !default;
 $header-height: 60px !default;
+$search-results-width: $content-width - $nav-width !default;
 $transition-duration: 400ms;
 
 //
@@ -149,6 +150,6 @@ $media-queries: (
   xs: 320px,
   sm: 500px,
   md: $content-width,
-  lg: $content-width,
-  xl: $content-width,
+  lg: $content-width + $nav-width,
+  xl: 1400px,
 ) !default;

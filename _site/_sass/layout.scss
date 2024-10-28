@@ -26,14 +26,11 @@
 .main {
   @include mq(md) {
     position: relative;
-    max-width: $content-width;
     margin-left: $nav-width-md;
   }
 
   @include mq(lg) {
-    margin-left: calc(
-      (100% - #{$nav-width + $content-width}) / 2 + #{$nav-width}
-    );
+    margin-left: $nav-width;
   }
 }
 
@@ -49,6 +46,7 @@
 }
 
 .main-header {
+  @include container;
   z-index: 0;
   display: none;
   background-color: $sidebar-color;
