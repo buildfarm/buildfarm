@@ -1,7 +1,7 @@
 Name:           buildfarm-worker
 Version:        1.10.0
 Release:        0
-Summary:        Bazel Buildfarm Worker
+Summary:        Buildfarm Worker
 URL:            https://github.com/buildfarm/buildfarm
 
 License:        Apache License, v2.0
