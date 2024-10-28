@@ -1,19 +1,16 @@
 package persistent.bazel.processes;
 
+import com.google.common.collect.ImmutableList;
+import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
+import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
-
-import com.google.common.collect.ImmutableList;
-import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
-import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
-
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
 import persistent.bazel.client.PersistentWorker;
 import persistent.bazel.client.WorkerKey;
 import persistent.common.processes.JavaProcessWrapper;
@@ -23,13 +20,12 @@ import persistent.testutil.WorkerUtils;
 @RunWith(JUnit4.class)
 public class PersistentWorkerTest {
 
-  static WorkResponse sendAddRequest(PersistentWorker worker, Path stdErrLog, int x, int y) throws IOException {
+  static WorkResponse sendAddRequest(PersistentWorker worker, Path stdErrLog, int x, int y)
+      throws IOException {
     ImmutableList<String> arguments = ImmutableList.of(String.valueOf(x), String.valueOf(y));
 
-    WorkRequest request = WorkRequest.newBuilder()
-        .addAllArguments(arguments)
-        .setRequestId(0)
-        .build();
+    WorkRequest request =
+        WorkRequest.newBuilder().addAllArguments(arguments).setRequestId(0).build();
 
     WorkResponse response;
     try {
@@ -49,19 +45,17 @@ public class PersistentWorkerTest {
 
     String filename = "adder-bin_deploy.jar";
 
-    Path jarPath = ProcessUtils.retrieveFileResource(
-        getClass().getClassLoader(),
-        filename,
-        workDir.resolve(filename)
-    );
+    Path jarPath =
+        ProcessUtils.retrieveFileResource(
+            getClass().getClassLoader(), filename, workDir.resolve(filename));
 
-    ImmutableList<String> initCmd = ImmutableList.of(
-        JavaProcessWrapper.CURRENT_JVM_COMMAND,
-        "-cp",
-        jarPath.toString(),
-        "adder.Adder",
-        "--persistent_worker"
-    );
+    ImmutableList<String> initCmd =
+        ImmutableList.of(
+            JavaProcessWrapper.CURRENT_JVM_COMMAND,
+            "-cp",
+            jarPath.toString(),
+            "adder.Adder",
+            "--persistent_worker");
 
     WorkerKey key = WorkerUtils.emptyWorkerKey(workDir, initCmd);
 
