@@ -1,6 +1,6 @@
 apiVersion: v2
 name: buildfarm
-description: A Helm chart for bazel buildfarm
+description: A Helm chart for buildfarm
 
 # A chart can be either an 'application' or a 'library' chart.
 #

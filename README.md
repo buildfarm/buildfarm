@@ -29,7 +29,7 @@ $ docker run -d --rm --name buildfarm-redis -p 6379:6379 redis:7.2.4
 redis-cli config set stop-writes-on-bgsave-error no
 ```
 
-### Bazel Buildfarm Server
+### Buildfarm Server
 
 Run via
 
@@ -41,7 +41,7 @@ Ex: bazelisk run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=
 **`logfile`** has to be in the [standard java util logging format](https://docs.oracle.com/cd/E57471_01/bigData.100/data_processing_bdd/src/rdp_logging_config.html) and passed as a --jvm_flag=-Dlogging.config=file:
 **`configfile`** has to be in [yaml format](https://buildfarm.github.io/buildfarm/docs/configuration).
 
-### Bazel Buildfarm Worker
+### Buildfarm Worker
 
 Run via
 
