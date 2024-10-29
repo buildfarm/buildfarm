@@ -4,7 +4,7 @@
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/buildfarm/buildfarm/badge)](https://securityscorecards.dev/viewer/?uri=github.com/buildfarm/buildfarm)
 ![GitHub License](https://img.shields.io/github/license/buildfarm/buildfarm)
 ![GitHub Release](https://img.shields.io/github/v/release/buildfarm/buildfarm)
-![Docker Pulls](https://img.shields.io/docker/pulls/buildfarm/buildfarm-server)
+![Docker Pulls](https://img.shields.io/docker/pulls/bazelbuild/buildfarm-server)
 
 
 This repository hosts a [remote caching and execution](https://github.com/bazelbuild/remote-apis) system, compatible with the build systems [Bazel](https://bazel.build), buck2, pants, and more.
