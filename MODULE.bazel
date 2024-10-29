@@ -5,6 +5,7 @@ module(
     repo_name = "build_buildfarm",
 )
 
+bazel_dep(name = "aspect_bazel_lib", version = "2.9.3")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "blake3", version = "1.5.4")
 bazel_dep(name = "buildifier_prebuilt", version = "7.3.1")
@@ -39,6 +40,14 @@ archive_override(
     urls = [
         "https://github.com/bazelbuild/remote-apis/archive/6777112ef7defa6705b1ebd2831d6c7efeb12ba2.zip",
     ],
+)
+
+toolchains = use_extension("@hermetic_cc_toolchain//toolchain:ext.bzl", "toolchains")
+use_repo(toolchains, "zig_sdk")
+
+register_toolchains(
+    "@zig_sdk//toolchain:linux_amd64_gnu.2.31",
+    "@zig_sdk//toolchain:linux_arm64_gnu.2.31",
 )
 
 IO_NETTY_MODULES = [
@@ -178,7 +187,6 @@ oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 
 # Server base image
 oci.pull(
-    # This is a multi-arch image!
     name = "amazon_corretto_java_image_base",
     digest = "sha256:f0e6040a09168500a1e96d02fef42a26176aaec8e0f136afba081366cb98e2f6",  # tag:21 as of today.
     image = "public.ecr.aws/amazoncorretto/amazoncorretto",
@@ -190,20 +198,18 @@ oci.pull(
 
 # Worker base image
 oci.pull(
-    name = "ubuntu_lunar",
-    digest = "sha256:303223fbebbd1095df7299707ed8b0a51be5c0a7eee78292fc65ee2201c2e138",  # tag: lunar
+    name = "ubuntu_noble",  # aka 24
+    digest = "sha256:f18e19d1329c0df38dd5f6bfd931c7764fa1e3acf6b3280da62015a338805ce8",  # tag: noble
     image = "index.docker.io/bazelbuild/buildfarm-worker-base",
-)
-oci.pull(
-    name = "arm64v8_ubuntu_noble",
-    digest = "sha256:ff76263744ad49ac8eab9e0744043957daf23166be9ee7f16e499a8c5bedd28a",  # tag: noble
-    image = "index.docker.io/bazelbuild/buildfarm-worker-base-arm64",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64",
+    ],
 )
 use_repo(
     oci,
     "amazon_corretto_java_image_base",
-    "arm64v8_ubuntu_noble",
-    "ubuntu_lunar",
+    "ubuntu_noble",
 )
 
 # https://github.com/bazelbuild/rules_python/pull/713#issuecomment-1885628496
