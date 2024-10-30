@@ -34,6 +34,29 @@ public class BackplaneTest {
   }
 
   @Test
+  public void testRedisUsernameFromUri() {
+    Backplane b = new Backplane();
+    b.setRedisUri("redis://user1:pass1@redisHost.redisDomain");
+    assertThat(b.getRedisUsername()).isEqualTo("user1");
+  }
+
+  @Test
+  public void testRedisUsernamePriorities() {
+    Backplane b = new Backplane();
+    b.setRedisUri("redis://user1:pass1@redisHost.redisDomain");
+    b.setRedisUsername("user2");
+    assertThat(b.getRedisUsername()).isEqualTo("user1");
+
+    b.setRedisUri("redis://redisHost.redisDomain");
+    b.setRedisUsername("user2");
+    assertThat(b.getRedisUsername()).isEqualTo("user2");
+
+    b.setRedisUri("redis://:pass1@redisHost.redisDomain");
+    b.setRedisUsername("user2");
+    assertThat(b.getRedisUsername()).isEqualTo("user2");
+  }
+
+  @Test
   public void testRedisPasswordFromUri() {
     Backplane b = new Backplane();
     String testRedisUri = "redis://user:pass1@redisHost.redisDomain";
