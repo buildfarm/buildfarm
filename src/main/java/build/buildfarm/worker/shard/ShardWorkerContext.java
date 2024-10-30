@@ -28,14 +28,11 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
-import build.bazel.remote.execution.v2.SymlinkNode;
-import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CommandUtils;
+import build.buildfarm.common.DigestPath;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -50,6 +47,7 @@ import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ExecutionPolicy;
+import build.buildfarm.common.function.IOConsumer;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
@@ -68,7 +66,6 @@ import build.buildfarm.worker.resources.Claim;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.ResourceDecider;
 import build.buildfarm.worker.resources.ResourceLimits;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -87,17 +84,12 @@ import io.prometheus.client.Counter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
@@ -573,36 +565,6 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
-  @VisibleForTesting
-  static class OutputDirectoryContext {
-    private final List<FileNode> files = new ArrayList<>();
-    private final List<DirectoryNode> directories = new ArrayList<>();
-    private final List<SymlinkNode> symlinks = new ArrayList<>();
-
-    void addFile(FileNode fileNode) {
-      files.add(fileNode);
-    }
-
-    void addDirectory(DirectoryNode directoryNode) {
-      directories.add(directoryNode);
-    }
-
-    void addSymlink(SymlinkNode symlinkNode) {
-      symlinks.add(symlinkNode);
-    }
-
-    Directory toDirectory() {
-      files.sort(Comparator.comparing(FileNode::getName));
-      directories.sort(Comparator.comparing(DirectoryNode::getName));
-      symlinks.sort(Comparator.comparing(SymlinkNode::getName));
-      return Directory.newBuilder()
-          .addAllFiles(files)
-          .addAllDirectories(directories)
-          .addAllSymlinks(symlinks)
-          .build();
-    }
-  }
-
   private void uploadOutputDirectory(
       ActionResult.Builder resultBuilder,
       DigestUtil digestUtil,
@@ -628,108 +590,27 @@ class ShardWorkerContext implements WorkerContext {
       return;
     }
 
-    Tree.Builder treeBuilder = Tree.newBuilder();
-    OutputDirectoryContext outputRoot = new OutputDirectoryContext();
-    Files.walkFileTree(
-        outputDirPath,
-        new SimpleFileVisitor<>() {
-          OutputDirectoryContext currentDirectory = null;
-          final Stack<OutputDirectoryContext> path = new Stack<>();
-
-          @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-              throws IOException {
-            if (configs.getWorker().isCreateSymlinkOutputs() && attrs.isSymbolicLink()) {
-              visitSymbolicLink(file);
-            } else {
-              visitRegularFile(file);
-            }
-            return FileVisitResult.CONTINUE;
+    IOConsumer<DigestPath> fileObserver =
+        digestPath -> {
+          Digest digest = digestPath.digest();
+          try {
+            insertFile(digest, digestPath.path());
+          } catch (InterruptedException e) {
+            throw new IOException(e);
+          } catch (EntryLimitException e) {
+            preconditionFailure
+                .addViolationsBuilder()
+                .setType(entrySizeViolationType)
+                .setSubject("blobs/" + DigestUtil.toString(digest))
+                .setDescription(
+                    "An output could not be uploaded because it exceeded "
+                        + "the maximum size of an entry");
           }
-
-          private void visitSymbolicLink(Path file) throws IOException {
-            // TODO convert symlinks with absolute targets within execution root to relative ones
-            currentDirectory.addSymlink(
-                SymlinkNode.newBuilder()
-                    .setName(file.getFileName().toString())
-                    .setTarget(Files.readSymbolicLink(file).toString())
-                    .build());
-          }
-
-          private void visitRegularFile(Path file) throws IOException {
-            Digest digest;
-            try {
-              // should we create symlink nodes in output?
-              // is buildstream trying to execute in a specific container??
-              // can get to NSFE for nonexistent symlinks
-              // can fail outright for a symlink to a directory
-              digest = digestUtil.compute(file);
-            } catch (NoSuchFileException e) {
-              log.log(
-                  Level.SEVERE,
-                  format(
-                      "error visiting file %s under output dir %s",
-                      outputDirPath.relativize(file), outputDirPath.toAbsolutePath()),
-                  e);
-              return;
-            }
-
-            // should we cast to PosixFilePermissions and do gymnastics there for executable?
-
-            // TODO symlink per revision proposal
-            currentDirectory.addFile(
-                FileNode.newBuilder()
-                    .setName(file.getFileName().toString())
-                    .setDigest(DigestUtil.toDigest(digest))
-                    .setIsExecutable(Files.isExecutable(file))
-                    .build());
-            try {
-              insertFile(digest, file);
-            } catch (InterruptedException e) {
-              throw new IOException(e);
-            } catch (EntryLimitException e) {
-              preconditionFailure
-                  .addViolationsBuilder()
-                  .setType(entrySizeViolationType)
-                  .setSubject("blobs/" + DigestUtil.toString(digest))
-                  .setDescription(
-                      "An output could not be uploaded because it exceeded the maximum size of an"
-                          + " entry");
-            }
-          }
-
-          @Override
-          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-            path.push(currentDirectory);
-            if (dir.equals(outputDirPath)) {
-              currentDirectory = outputRoot;
-            } else {
-              currentDirectory = new OutputDirectoryContext();
-            }
-            return FileVisitResult.CONTINUE;
-          }
-
-          @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
-            OutputDirectoryContext parentDirectory = path.pop();
-            Directory directory = currentDirectory.toDirectory();
-            if (parentDirectory == null) {
-              treeBuilder.setRoot(directory);
-            } else {
-              parentDirectory.addDirectory(
-                  DirectoryNode.newBuilder()
-                      .setName(dir.getFileName().toString())
-                      // FIXME make one digestUtil for all
-                      .setDigest(DigestUtil.toDigest(digestUtil.compute(directory)))
-                      .build());
-              treeBuilder.addChildren(directory);
-            }
-            currentDirectory = parentDirectory;
-            return FileVisitResult.CONTINUE;
-          }
-        });
-    Tree tree = treeBuilder.build();
-    ByteString treeBlob = tree.toByteString();
+        };
+    TreeWalker treeWalker =
+        new TreeWalker(configs.getWorker().isCreateSymlinkOutputs(), digestUtil, fileObserver);
+    Files.walkFileTree(outputDirPath, treeWalker);
+    ByteString treeBlob = treeWalker.getTree().toByteString();
     Digest treeDigest = digestUtil.compute(treeBlob);
     insertBlob(treeDigest, treeBlob);
     resultBuilder

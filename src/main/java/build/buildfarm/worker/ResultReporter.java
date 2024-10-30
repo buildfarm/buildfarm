@@ -84,10 +84,10 @@ class ResultReporter implements Runnable {
       boolean wasInterrupted = Thread.interrupted();
       // allow release to occur without interrupted state
       try {
-        owner.releaseResultReporter(
-            executionName, stopwatch.elapsed(MICROSECONDS), stallUSecs, success);
         after(executionContext);
       } finally {
+        owner.releaseResultReporter(
+            executionName, stopwatch.elapsed(MICROSECONDS), stallUSecs, success);
         if (wasInterrupted) {
           Thread.currentThread().interrupt();
         }

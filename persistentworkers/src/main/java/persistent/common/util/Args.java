@@ -30,9 +30,7 @@ public class Args {
   }
 
   public static List<String> readAllLines(String fileArg) throws IOException {
-    String file = isArgsFile(fileArg)
-        ? fileArg.substring(1)
-        : fileArg;
+    String file = isArgsFile(fileArg) ? fileArg.substring(1) : fileArg;
 
     return Files.readAllLines(Paths.get(file));
   }
