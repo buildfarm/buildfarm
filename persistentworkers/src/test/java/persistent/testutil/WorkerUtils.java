@@ -1,12 +1,10 @@
 package persistent.testutil;
 
-import java.nio.file.Path;
-
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.hash.HashCode;
-
+import java.nio.file.Path;
 import persistent.bazel.client.WorkerKey;
 
 public class WorkerUtils {
@@ -21,7 +19,6 @@ public class WorkerUtils {
         HashCode.fromInt(0),
         ImmutableSortedMap.of(),
         false,
-        false
-    );
+        false);
   }
 }

@@ -2,23 +2,21 @@ package persistent.common;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 import org.apache.commons.pool2.BaseKeyedPooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 
 /**
- * A Supervisor is an ObjectFactory with default `wrap` and `destroyObject` overrides,
- * and abstract `create` and `validateObject` methods.
- * <p>
- * An aside: Why does an ObjectFactory do more than create the object?
+ * A Supervisor is an ObjectFactory with default `wrap` and `destroyObject` overrides, and abstract
+ * `create` and `validateObject` methods.
+ *
+ * <p>An aside: Why does an ObjectFactory do more than create the object?
  *
  * @param <K>
  * @param <V> must be a Destructable
  */
 public abstract class CommonsSupervisor<K, V extends Destructable>
-    extends BaseKeyedPooledObjectFactory<K, V>
-    implements Supervisor<K, V, PooledObject<V>> {
+    extends BaseKeyedPooledObjectFactory<K, V> implements Supervisor<K, V, PooledObject<V>> {
 
   private static final Logger logger = Logger.getLogger(CommonsSupervisor.class.getName());
 
