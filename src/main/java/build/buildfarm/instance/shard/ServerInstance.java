@@ -2237,7 +2237,7 @@ public class ServerInstance extends NodeInstance {
               .setRequestMetadata(requestMetadata)
               .setStdoutStreamName(stdoutStreamName)
               .setStderrStreamName(stderrStreamName)
-              .setQueuedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()))
+              .setQueuedTimestamp(Timestamps.now())
               .build();
       ExecuteOperationMetadata metadata =
           ExecuteOperationMetadata.newBuilder()
