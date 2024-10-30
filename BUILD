@@ -1,5 +1,5 @@
 load("@buildifier_prebuilt//:rules.bzl", "buildifier")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_image_index", "oci_push", "oci_tarball")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_image_index", "oci_load", "oci_push")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
@@ -238,7 +238,7 @@ oci_image(
 ######
 [
     [
-        oci_tarball(
+        oci_load(
             name = "tarball_%s_%s" % (image, arch),
             image = ":buildfarm-%s_linux_%s" % (image, arch),
             repo_tags = ["buildfarm-%s:%s" % (image, arch)],
