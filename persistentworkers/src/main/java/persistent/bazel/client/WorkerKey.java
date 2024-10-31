@@ -127,26 +127,4 @@ public final class WorkerKey {
     // can vary across instances.
     return Objects.hash(cmd, args, env, execRoot, mnemonic, cancellable, sandboxed);
   }
-
-  // Not as cool as using Bazel CommandFailureUtils
-  @Override
-  public String toString() {
-    return "WorkerKey("
-        + "\n\t"
-        + "cmd="
-        + cmd
-        + ",\n\t"
-        + "args="
-        + args
-        + ",\n\t"
-        + "env="
-        + env
-        + ",\n\t"
-        + "mnemonic="
-        + mnemonic
-        + ",\n\t"
-        + "execRoot="
-        + execRoot.toAbsolutePath()
-        + "\n)";
-  }
 }
