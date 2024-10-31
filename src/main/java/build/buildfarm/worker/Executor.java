@@ -365,7 +365,7 @@ class Executor {
         .metadata
         .getExecuteOperationMetadataBuilder()
         .getPartialExecutionMetadataBuilder()
-        .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
+        .setExecutionCompletedTimestamp(Timestamps.now());
     putOperation(/* ignoreFailure= */ true);
 
     log.log(

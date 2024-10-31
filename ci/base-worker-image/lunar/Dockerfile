@@ -1,6 +1,6 @@
 # A minimal container for building a base worker image.
 # Buildfarm public releases are build using this image as a starting point.
-FROM ubuntu:23.04
+FROM ubuntu:lunar-20231128
 
 RUN apt-get update
 RUN apt-get -y install openjdk-21-jdk build-essential libfuse2 cgroup-tools

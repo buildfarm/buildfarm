@@ -67,7 +67,7 @@ public class Backplane {
    */
   private String redisCertificateAuthorityFile;
 
-  private int timeout = 10000;
+  private int timeout = 10000; // Milliseconds
   private String[] redisNodes = {};
   private int maxAttempts = 20;
   private boolean cacheCas = false;

@@ -51,7 +51,7 @@ import lombok.extern.java.Log;
 @Log
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private final Instance instance;
-  private final long keepaliveAfter;
+  private final long keepaliveAfter; /* Seconds */
   private final ScheduledExecutorService keepaliveScheduler;
   private final MetricsPublisher metricsPublisher;
 

@@ -235,8 +235,7 @@ public class InputFetcher implements Runnable {
         log.log(Level.SEVERE, format("error creating exec dir for %s", executionName), e);
       }
       // populate the inputFetch complete to know how long it took before error
-      executedAction.setInputFetchCompletedTimestamp(
-          Timestamps.fromMillis(System.currentTimeMillis()));
+      executedAction.setInputFetchCompletedTimestamp(Timestamps.now());
       failOperation(executedAction.build(), status.build());
       return 0;
     }
@@ -253,8 +252,7 @@ public class InputFetcher implements Runnable {
             .addAllArguments(Iterables.skip(queuedOperation.getCommand().getArgumentsList(), 1))
             .build();
 
-    executedAction.setInputFetchCompletedTimestamp(
-        Timestamps.fromMillis(System.currentTimeMillis()));
+    executedAction.setInputFetchCompletedTimestamp(Timestamps.now());
     putOperation();
 
     // we are now responsible for destroying the exec dir if anything goes wrong
