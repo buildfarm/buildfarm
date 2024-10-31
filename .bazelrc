@@ -29,3 +29,7 @@ common --lockfile_mode=off
 # It's off because we have mac/windows/linux developers who may not have access
 # to all three to update the platform-specific bits of the lockfile.
 
+
+build:linux --sandbox_add_mount_pair=/tmp
+build:macos --sandbox_add_mount_pair=/var/tmp
+build:windows --sandbox_add_mount_pair=C:\Temp

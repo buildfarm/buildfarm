@@ -5,6 +5,7 @@ module(
     repo_name = "build_buildfarm",
 )
 
+bazel_dep(name = "aspect_bazel_lib", version = "2.9.3")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "blake3", version = "1.5.4")
 bazel_dep(name = "buildifier_prebuilt", version = "7.3.1")
@@ -12,6 +13,7 @@ bazel_dep(name = "gazelle", version = "0.39.1")
 bazel_dep(name = "grpc-java", version = "1.66.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20240819-fe8ba054a")
 bazel_dep(name = "grpc-proto", version = "0.0.0-20240627-ec30f58", repo_name = "io_grpc_grpc_proto")
+bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.1")
 bazel_dep(name = "platforms", version = "0.0.10")
 bazel_dep(name = "protobuf", version = "29.0-rc1")
 bazel_dep(name = "rules_cc", version = "0.0.10")
@@ -38,6 +40,14 @@ archive_override(
     urls = [
         "https://github.com/bazelbuild/remote-apis/archive/6777112ef7defa6705b1ebd2831d6c7efeb12ba2.zip",
     ],
+)
+
+toolchains = use_extension("@hermetic_cc_toolchain//toolchain:ext.bzl", "toolchains")
+use_repo(toolchains, "zig_sdk")
+
+register_toolchains(
+    "@zig_sdk//toolchain:linux_amd64_gnu.2.31",
+    "@zig_sdk//toolchain:linux_arm64_gnu.2.31",
 )
 
 IO_NETTY_MODULES = [
@@ -177,7 +187,6 @@ oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 
 # Server base image
 oci.pull(
-    # This is a multi-arch image!
     name = "amazon_corretto_java_image_base",
     digest = "sha256:f0e6040a09168500a1e96d02fef42a26176aaec8e0f136afba081366cb98e2f6",  # tag:21 as of today.
     image = "public.ecr.aws/amazoncorretto/amazoncorretto",
@@ -189,14 +198,18 @@ oci.pull(
 
 # Worker base image
 oci.pull(
-    name = "ubuntu_lunar",
-    digest = "sha256:303223fbebbd1095df7299707ed8b0a51be5c0a7eee78292fc65ee2201c2e138",  # tag: lunar
+    name = "ubuntu_noble",  # aka 24
+    digest = "sha256:f18e19d1329c0df38dd5f6bfd931c7764fa1e3acf6b3280da62015a338805ce8",  # tag: noble
     image = "index.docker.io/bazelbuild/buildfarm-worker-base",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64",
+    ],
 )
 use_repo(
     oci,
     "amazon_corretto_java_image_base",
-    "ubuntu_lunar",
+    "ubuntu_noble",
 )
 
 # https://github.com/bazelbuild/rules_python/pull/713#issuecomment-1885628496
@@ -217,6 +230,7 @@ use_repo(
     "opentelemetry",
     "skip_sleep",
     "tini",
+    "tini_arm64v8",
 )
 
 # this is *only* required for bazel and should not be used in our repository
