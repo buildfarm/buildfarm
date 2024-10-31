@@ -26,24 +26,8 @@ jobs:
 
       - name: Build Server Image
         id: buildAndPushServerImage
-        run: bazel run public_push_buildfarm-server-amd64 -- --tag ${{ github.event.release.tag_name }}
+        run: bazel run //container:public_push_buildfarm-server -- --tag ${{ github.event.release.tag_name }}
 
       - name: Build Worker Image
         id: buildAndPushWorkerImage
-        run: bazel run public_push_buildfarm-worker-amd64 -- --tag ${{ github.event.release.tag_name }}
-
-      - name: Build Server Image
-        id: buildAndPushServerImage
-        run: |
-          bazel run public_push_buildfarm-server-arm64v8 -- \
-            --tag ${{ github.event.release.tag_name }} \
-            --platforms=@hermetic_cc_toolchain//toolchain/platform:linux_arm64 \
-            --extra_toolchains @hermetic_cc_toolchain//toolchain/toolchain:linux_arm64_gnu.2.38
-
-      - name: Build Worker Image
-        id: buildAndPushWorkerImage
-        run: |
-          bazel run public_push_buildfarm-worker-arm64v8 -- \
-            --tag ${{ github.event.release.tag_name }} \
-            --platforms=@hermetic_cc_toolchain//toolchain/platform:linux_arm64 \
-            --extra_toolchains @hermetic_cc_toolchain//toolchain/toolchain:linux_arm64_gnu.2.38
+        run: bazel run //container:public_push_buildfarm-worker -- --tag ${{ github.event.release.tag_name }}
