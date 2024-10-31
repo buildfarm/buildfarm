@@ -196,6 +196,7 @@ oci_image(
         ":telemetry_tools",
         ":layer_buildfarm_server",
     ],
+    visibility = ["//container:__subpackages__"],
 )
 
 oci_image(
@@ -221,6 +222,7 @@ oci_image(
         ":telemetry_tools",
         ":layer_buildfarm_worker",
     ],
+    visibility = ["//container:__subpackages__"],
 )
 
 multiarch_oci_image(
@@ -232,23 +234,3 @@ multiarch_oci_image(
     name = "buildfarm-worker",
     image = ":_buildfarm-worker.image",
 )
-
-######
-# Helpers to write to the local Docker Desktop's registry
-# Usage: `bazel run //:tarball_server_amd64 && docker run --rm buildfarm-server:amd64`
-######
-# [
-#     [
-#         oci_load(
-#             name = "tarball_%s_%s" % (image, arch),
-#             image = ":_buildfarm-%s.image" % (image, arch),
-#             repo_tags = ["buildfarm-%s:%s" % (image, arch)],
-#             tags = ["container"],
-#         ),
-#     ]
-#     for arch in ["amd64", "arm64"]
-#     for image in [
-#         "server",
-#         "worker",
-#     ]
-# ]
