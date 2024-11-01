@@ -2,7 +2,31 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
+    ":approveMajorUpdates",
+    ":label(dependencies)",
     ":semanticCommitType(chore)",
-    ":label(dependencies)"
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "prConcurrentLimit": 10,
+  "packageRules": [
+    {
+      "groupName": "Bazel",
+      "matchManagers": ["bazel"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": "true"
+    },
+    {
+      "groupName": "tini",
+      "description": "tini x86_64 and arm64v8",
+      "matchManagers": ["http_file"],
+      "matchPackageNames": ["tini*"]
+    },
+    {
+      "groupName": "rules_proto",
+      "description": "disable rules_proto as it's transitive and Buildfarm does not use it",
+      "matchPackageNames": ["rules_proto"],
+      "enabled": false
+    }
   ]
 }
