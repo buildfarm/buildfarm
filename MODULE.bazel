@@ -234,7 +234,7 @@ use_repo(
 )
 
 # this is *only* required for bazel and should not be used in our repository
-bazel_dep(name = "rules_proto", version = "6.0.0-rc2")
+bazel_dep(name = "rules_proto", version = "6.0.2")
 
 googleapis_switched_rules = use_extension("@googleapis//:extensions.bzl", "switched_rules")
 googleapis_switched_rules.use_languages(
