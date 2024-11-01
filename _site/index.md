@@ -6,7 +6,7 @@ description: "Buildfarm"
 permalink: /
 ---
 
-![Buildfarm]({{site.url}}{{site.baseurl}}/assets/images/buildfarm-logo.png)
+![Buildfarm]({{site.url}}{{site.baseurl}}/assets/images/buildfarm-logo.png =200x)
 {: .fs-9 }
 
 Remote Caching and Execution Service
