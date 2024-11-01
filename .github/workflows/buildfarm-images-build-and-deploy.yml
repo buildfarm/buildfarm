@@ -27,8 +27,8 @@ jobs:
 
       - name: Build Server Image
         id: buildAndPushServerImage
-        run: bazel run public_push_buildfarm-server -- --tag latest
+        run: bazel run //container:public_push_buildfarm-server -- --tag latest
 
       - name: Build Worker Image
         id: buildAndPushWorkerImage
-        run: bazel run public_push_buildfarm-worker -- --tag latest
+        run: bazel run //container:public_push_buildfarm-worker -- --tag latest
