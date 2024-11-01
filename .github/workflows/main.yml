@@ -14,7 +14,7 @@ jobs:
     permissions:
       pages: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       # Use GitHub Actions' cache to cache dependencies on servers
       - uses: actions/cache@v4
