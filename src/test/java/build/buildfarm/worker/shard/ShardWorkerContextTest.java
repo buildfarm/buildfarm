@@ -135,8 +135,10 @@ public class ShardWorkerContextTest {
         .thenReturn(queueEntry)
         .thenReturn(null); // provide a match completion in failure case
     MatchListener listener = mock(MatchListener.class);
+    when(listener.onWaitStart()).thenReturn(true);
     context.match(listener);
     verify(listener, times(1)).onEntry(eq(queueEntry), any(Claim.class));
+    verify(listener, times(1)).onWaitStart();
   }
 
   @Test
@@ -172,8 +174,10 @@ public class ShardWorkerContextTest {
         .thenReturn(queueEntry)
         .thenReturn(null); // provide a match completion in failure case
     MatchListener listener = mock(MatchListener.class);
+    when(listener.onWaitStart()).thenReturn(true);
     context.match(listener);
     verify(listener, times(1)).onEntry(eq(queueEntry), any(Claim.class));
+    verify(listener, times(1)).onWaitStart();
   }
 
   @Test
