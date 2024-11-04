@@ -14,6 +14,8 @@
 
 package build.buildfarm.common.grpc;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
@@ -33,8 +35,10 @@ public final class Channels {
       target = target.substring(GRPC_URL_PREFIX.length());
       negotiationType = NegotiationType.PLAINTEXT;
     }
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(negotiationType);
-    return builder.build();
+    return NettyChannelBuilder.forTarget(target)
+        .negotiationType(negotiationType)
+        .keepAliveTime(300, SECONDS)
+        .keepAliveTimeout(10, SECONDS)
+        .build();
   }
 }
