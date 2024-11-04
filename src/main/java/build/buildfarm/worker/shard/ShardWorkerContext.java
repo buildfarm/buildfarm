@@ -291,7 +291,10 @@ class ShardWorkerContext implements WorkerContext {
 
   private @Nullable QueueEntry takeEntryOffOperationQueue(MatchListener listener)
       throws IOException, InterruptedException {
-    listener.onWaitStart();
+    if (!listener.onWaitStart()) {
+      // match listener can signal completion here
+      return null;
+    }
     QueueEntry queueEntry = null;
     try {
       queueEntry =
@@ -327,8 +330,8 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public void onWaitStart() {
-            listener.onWaitStart();
+          public boolean onWaitStart() {
+            return listener.onWaitStart();
           }
 
           @Override

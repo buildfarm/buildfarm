@@ -20,7 +20,8 @@ import javax.annotation.Nullable;
 
 public interface MatchListener {
   // start/end pair called for each wait period
-  void onWaitStart();
+  // if this returns false, the wait does not begin, and onEntry will be called with 'null'
+  boolean onWaitStart();
 
   void onWaitEnd();
 

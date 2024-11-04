@@ -64,8 +64,9 @@ public class MatchStage extends PipelineStage {
     }
 
     @Override
-    public void onWaitStart() {
+    public boolean onWaitStart() {
       waitStart = stopwatch.elapsed(MICROSECONDS);
+      return !inGracefulShutdown;
     }
 
     @Override
@@ -79,6 +80,10 @@ public class MatchStage extends PipelineStage {
     @Override
     public boolean onEntry(@Nullable QueueEntry queueEntry, Claim claim)
         throws InterruptedException {
+      if (inGracefulShutdown) {
+        throw new InterruptedException();
+      }
+
       if (queueEntry == null) {
         return false;
       }
