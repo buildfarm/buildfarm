@@ -166,6 +166,10 @@ public class StubInstance extends InstanceBase {
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
   private boolean isStopped = false;
+
+  @GuardedBy("this")
+  private Runnable onStopped;
+
   private final long maxBatchUpdateBlobsSize = Size.mbToBytes(3);
 
   @VisibleForTesting long maxRequestSize = Size.mbToBytes(4);
@@ -213,6 +217,16 @@ public class StubInstance extends InstanceBase {
 
   public Channel getChannel() {
     return channel;
+  }
+
+  public void setOnStopped(Runnable onStopped) {
+    if (isStopped) {
+      onStopped.run();
+    } else {
+      synchronized (this) {
+        this.onStopped = onStopped;
+      }
+    }
   }
 
   // no deadline for this
@@ -375,6 +389,14 @@ public class StubInstance extends InstanceBase {
     if (retryService != null && !shutdownAndAwaitTermination(retryService, 10, TimeUnit.SECONDS)) {
       log.log(Level.SEVERE, format("Could not shut down retry service for %s", identifier));
     }
+    Runnable onStopped = () -> {};
+    synchronized (this) {
+      if (this.onStopped != null) {
+        onStopped = this.onStopped;
+        this.onStopped = null;
+      }
+    }
+    onStopped.run();
   }
 
   private void throwIfStopped() {
