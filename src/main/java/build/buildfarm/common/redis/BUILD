@@ -6,7 +6,7 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:io_grpc_grpc_api",
