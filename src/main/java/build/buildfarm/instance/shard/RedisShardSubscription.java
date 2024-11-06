@@ -72,6 +72,12 @@ class RedisShardSubscription implements Runnable {
   }
 
   class SubscriptionAutoCloseable implements AutoCloseable {
+    public void initiateSubscription() {
+      SettableFuture subscribeFuture = SettableFuture.create();
+      subscriber.setSubscribeFuture(subscribeFuture);
+      manageState(SubscriptionAction.START_SUBSCRIBE);
+    }
+
     @Override
     public void close() {
       subscriber.setSubscribeFuture(null);
@@ -113,9 +119,9 @@ class RedisShardSubscription implements Runnable {
     }
 
     try (SubscriptionAutoCloseable subscriptionAutoCloseable = new SubscriptionAutoCloseable()) {
-      SettableFuture subscribeFuture = SettableFuture.create();
-      subscriber.setSubscribeFuture(subscribeFuture);
-      manageState(SubscriptionAction.START_SUBSCRIBE);
+
+      subscriptionAutoCloseable.initiateSubscription();
+
       if (subscriptionState.get() == SubscriptionState.SUBSCRIBING) {
         jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
       } else {
