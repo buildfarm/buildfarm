@@ -69,7 +69,7 @@ class RedisShardSubscriber extends JedisPubSub {
   private final int workerChangeTypeMask;
   private final String workerChannel;
   private final Executor executor;
-  private final SettableFuture<Void> subscribed = SettableFuture.create();
+  private SettableFuture<Void> subscribeFuture = null;
 
   RedisShardSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers,
@@ -301,7 +301,9 @@ class RedisShardSubscriber extends JedisPubSub {
 
   @Override
   public void onSubscribe(String channel, int subscribedChannels) {
-    subscribed.set(null);
+    if (subscribeFuture != null) {
+      subscribeFuture.set(null);
+    }
   }
 
   @Override
@@ -313,14 +315,19 @@ class RedisShardSubscriber extends JedisPubSub {
     for (TimedWatchFuture watchFuture : operationWatchers) {
       watchFuture.complete();
     }
+  }
 
-    subscribed.set(null);
+  public void setSubscribeFuture(SettableFuture future) {
+    this.subscribeFuture = future;
   }
 
   public Boolean checkIfSubscribed(long timeoutMillis)
       throws ExecutionException, InterruptedException, TimeoutException {
-    subscribed.get(timeoutMillis, TimeUnit.MILLISECONDS);
-    return Boolean.TRUE;
+    if (subscribeFuture != null) {
+      subscribeFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
+      return Boolean.TRUE;
+    }
+    return Boolean.FALSE;
   }
 
   private String[] placeholderChannel() {

@@ -68,11 +68,15 @@ public class RedisShardSubscriptionTest {
     RedisShardSubscription subscription =
         new RedisShardSubscription(
             redisSubscriber, onUnsubscribe, onReset, () -> subscriptions, new RedisClient(jedis));
+    final long subscribeCheckTime = 100;
 
     Thread thread = new Thread(subscription);
     thread.start();
 
-    redisSubscriber.checkIfSubscribed(1000);
+    while (!redisSubscriber.checkIfSubscribed(subscribeCheckTime)) {
+      Thread.yield();
+    }
+
     subscription.stop();
 
     thread.join();

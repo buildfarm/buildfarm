@@ -18,6 +18,7 @@ import static build.buildfarm.common.io.Utils.formatIOError;
 
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.RedisClient;
+import com.google.common.util.concurrent.SettableFuture;
 import io.grpc.Status;
 import java.io.IOException;
 import java.util.List;
@@ -102,16 +103,21 @@ class RedisShardSubscription implements Runnable {
     if (isReset) {
       onReset.accept(jedis);
     }
-    manageState(SubscriptionAction.START_SUBSCRIBE);
-    if (subscriptionState.get() == SubscriptionState.SUBSCRIBING) {
-      jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
-      manageState(SubscriptionAction.END_SUBSCRIPTION);
-    } else {
-      log.log(
-          Level.SEVERE,
-          "Cannot subscribe, RedisShardSubscription is in 'stopped' state "
-              + subscriptionState.get().name());
-      manageState(SubscriptionAction.END_SUBSCRIPTION);
+
+    try {
+      SettableFuture subscribeFuture = SettableFuture.create();
+      subscriber.setSubscribeFuture(subscribeFuture);
+      manageState(SubscriptionAction.START_SUBSCRIBE);
+      if (subscriptionState.get() == SubscriptionState.SUBSCRIBING) {
+        jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
+      } else {
+        log.log(
+            Level.SEVERE,
+            "Cannot subscribe, RedisShardSubscription is in 'stopped' state "
+                + subscriptionState.get().name());
+      }
+    } finally {
+      subscriber.setSubscribeFuture(null);
     }
   }
 
@@ -124,12 +130,13 @@ class RedisShardSubscription implements Runnable {
         case DEADLINE_EXCEEDED:
         case UNAVAILABLE:
           log.log(Level.WARNING, "failed to subscribe", formatIOError(e));
-          manageState(SubscriptionAction.END_SUBSCRIPTION);
           /* ignore */
           break;
         default:
           throw e;
       }
+    } finally {
+      manageState(SubscriptionAction.END_SUBSCRIPTION);
     }
   }
 
