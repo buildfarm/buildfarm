@@ -7,7 +7,7 @@ java_test(
     deps = [
         "//src/main/java/build/buildfarm/common/resources",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "@googleapis//google/bytestream:bytestream_java_proto",
         "@googleapis//google/rpc:rpc_java_proto",

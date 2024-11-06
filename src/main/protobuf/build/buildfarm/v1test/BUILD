@@ -1,12 +1,12 @@
 load("@grpc-java//:java_grpc_library.bzl", "java_grpc_library")
+load("@protobuf//bazel:java_proto_library.bzl", "java_proto_library")
 load("@protobuf//bazel:proto_library.bzl", "proto_library")
-load("@rules_java//java:defs.bzl", "java_proto_library")
 
 package(default_visibility = ["//visibility:public"])
 
 proto_library(
-    name = "build_buildfarm_v1test_buildfarm_proto",
-    srcs = ["build/buildfarm/v1test/buildfarm.proto"],
+    name = "buildfarm_proto",
+    srcs = ["buildfarm.proto"],
     deps = [
         "@googleapis//google/api:annotations_proto",
         "@googleapis//google/api:client_proto",
@@ -19,9 +19,9 @@ proto_library(
 )
 
 java_proto_library(
-    name = "build_buildfarm_v1test_buildfarm_java_proto",
+    name = "buildfarm_java_proto",
     deps = [
-        ":build_buildfarm_v1test_buildfarm_proto",
+        ":buildfarm_proto",
         "@googleapis//google/longrunning:operations_proto",
         "@googleapis//google/rpc:status_proto",
         "@remoteapis//build/bazel/remote/execution/v2:remote_execution_proto",
@@ -29,9 +29,7 @@ java_proto_library(
 )
 
 java_grpc_library(
-    name = "build_buildfarm_v1test_buildfarm_java_grpc",
-    srcs = [":build_buildfarm_v1test_buildfarm_proto"],
-    deps = [
-        ":build_buildfarm_v1test_buildfarm_java_proto",
-    ],
+    name = "buildfarm_java_grpc",
+    srcs = [":buildfarm_proto"],
+    deps = [":buildfarm_java_proto"],
 )

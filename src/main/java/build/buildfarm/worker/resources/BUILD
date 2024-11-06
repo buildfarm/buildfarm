@@ -7,7 +7,7 @@ java_library(
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/instance",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_googlecode_json_simple_json_simple",

@@ -10,7 +10,7 @@ java_library(
         "//src/main/java/build/buildfarm/common/resources",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/java/build/buildfarm/instance",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@googleapis//google/longrunning:longrunning_java_proto",
         "@googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_google_code_findbugs_jsr305",
