@@ -10,7 +10,7 @@ bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "blake3", version = "1.5.4")
 bazel_dep(name = "buildifier_prebuilt", version = "7.3.1")
 bazel_dep(name = "gazelle", version = "0.39.1")
-bazel_dep(name = "grpc-java", version = "1.66.0")
+bazel_dep(name = "grpc-java", version = "1.67.1")
 bazel_dep(name = "googleapis", version = "0.0.0-20240819-fe8ba054a")
 bazel_dep(name = "grpc-proto", version = "0.0.0-20240627-ec30f58", repo_name = "io_grpc_grpc_proto")
 bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.1")
@@ -234,7 +234,7 @@ use_repo(
 )
 
 # this is *only* required for bazel and should not be used in our repository
-bazel_dep(name = "rules_proto", version = "6.0.0-rc2")
+bazel_dep(name = "rules_proto", version = "6.0.2")
 
 googleapis_switched_rules = use_extension("@googleapis//:extensions.bzl", "switched_rules")
 googleapis_switched_rules.use_languages(

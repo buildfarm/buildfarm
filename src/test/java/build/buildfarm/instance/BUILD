@@ -6,7 +6,7 @@ java_test(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "@googleapis//google/longrunning:longrunning_java_proto",
         "@maven//:com_google_guava_guava",
