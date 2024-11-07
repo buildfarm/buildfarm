@@ -13,13 +13,13 @@ jobs:
     name: Build Buildfarm Images
     runs-on: ubuntu-latest
     steps:
-      - uses: bazelbuild/setup-bazelisk@v3
+      - uses: bazelbuild/setup-bazelisk@b39c379c82683a5f25d34f0d062761f62693e0b2 # v3
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Login to Bazelbuild Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
         with:
           username: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
           password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}

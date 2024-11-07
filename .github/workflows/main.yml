@@ -14,10 +14,10 @@ jobs:
     permissions:
       pages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       # Use GitHub Actions' cache to cache dependencies on servers
-      - uses: actions/cache@v4
+      - uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4
         with:
           path: vendor/bundle
           key: ${{ runner.os }}-gems-${{ hashFiles('**/Gemfile.lock') }}
@@ -25,7 +25,7 @@ jobs:
             ${{ runner.os }}-gems-
 
       # Use GitHub Deploy Action to build and deploy to Github
-      - uses: jeffreytse/jekyll-deploy-action@v0.6.0
+      - uses: jeffreytse/jekyll-deploy-action@c1329290ab1cf2df48661ec1bea92e1d6990025b # v0.6.0
         with:
           provider: 'github'
           token: ${{ secrets.GH_TOKEN }} # It's your Personal Access Token(PAT)
