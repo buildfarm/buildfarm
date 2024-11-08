@@ -209,7 +209,11 @@ oci.pull(
 use_repo(
     oci,
     "amazon_corretto_java_image_base",
+    "amazon_corretto_java_image_base_linux_amd64",
+    "amazon_corretto_java_image_base_linux_arm64_v8",
     "ubuntu_noble",
+    "ubuntu_noble_linux_amd64",
+    "ubuntu_noble_linux_arm64",
 )
 
 # https://github.com/bazelbuild/rules_python/pull/713#issuecomment-1885628496
