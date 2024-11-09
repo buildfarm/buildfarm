@@ -3113,14 +3113,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         throw new IllegalStateException(
             "entry " + key + " has " + referenceCount + " references and is being incremented...");
       }
-      log.log(
-          Level.FINEST,
-          "incrementing references to "
-              + key
-              + " from "
-              + referenceCount
-              + " to "
-              + (referenceCount + 1));
       if (referenceCount == 0) {
         if (!isLinked()) {
           throw new IllegalStateException(
@@ -3143,14 +3135,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         throw new IllegalStateException(
             "entry " + key + " has 0 references and is being decremented...");
       }
-      log.log(
-          Level.FINEST,
-          "decrementing references to "
-              + key
-              + " from "
-              + referenceCount
-              + " to "
-              + (referenceCount - 1));
       if (--referenceCount == 0) {
         addBefore(header);
         return true;
