@@ -16,7 +16,7 @@ package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.Compressor;
 import build.buildfarm.cas.ContentAddressableStorage;
-import build.buildfarm.cas.cfc.CASFileCache;
+import build.buildfarm.cas.cfc.DirectoryEntryCFC;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import build.buildfarm.v1test.Digest;
@@ -28,7 +28,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
-class ShardCASFileCache extends CASFileCache {
+class ShardCASFileCache extends DirectoryEntryCFC {
   private final InputStreamFactory inputStreamFactory;
 
   ShardCASFileCache(
@@ -37,8 +37,6 @@ class ShardCASFileCache extends CASFileCache {
       long maxSizeInBytes,
       long maxEntrySizeInBytes,
       int maxBucketLevels,
-      boolean storeFileDirsIndexInMemory,
-      boolean execRootFallback,
       ExecutorService expireService,
       Executor accessRecorder,
       FixedBufferPool zstdBufferPool,
@@ -51,12 +49,9 @@ class ShardCASFileCache extends CASFileCache {
         maxSizeInBytes,
         maxEntrySizeInBytes,
         maxBucketLevels,
-        storeFileDirsIndexInMemory,
-        execRootFallback,
         expireService,
         accessRecorder,
         /* storage= */ Maps.newConcurrentMap(),
-        DEFAULT_DIRECTORIES_INDEX_NAME,
         zstdBufferPool,
         onPut,
         onExpire,

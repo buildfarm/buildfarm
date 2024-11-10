@@ -434,8 +434,6 @@ public final class Worker extends LoggingMain {
             configs.getMaxEntrySizeBytes(), // TODO make this a configurable value for each cas
             // delegate level
             cas.getHexBucketLevels(),
-            cas.isFileDirectoriesIndexInMemory(),
-            cas.isExecRootCopyFallback(),
             removeDirectoryService,
             accessRecorder,
             zstdBufferPool,
