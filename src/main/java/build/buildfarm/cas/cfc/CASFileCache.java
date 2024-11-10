@@ -38,7 +38,6 @@ import static java.nio.file.StandardOpenOption.CREATE;
 import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
-import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Compressor;
@@ -476,7 +475,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     if (Files.exists(getPath(e.key))) {
-      e.existsDeadline = Deadline.after(10, SECONDS);
+      e.existsDeadline = Deadline.after(10, HOURS);
       return true;
     }
     return false;
@@ -1542,7 +1541,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         } else {
           String key = fileEntryKey.key();
           // populate key if it is not currently stored.
-          Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
+          Entry e = new Entry(key, size, Deadline.after(10, HOURS));
           checkState(storage.put(e.key, e) == null, key);
           onStartPut.accept(fileEntryKey.digest());
           synchronized (this) {
@@ -2582,7 +2581,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           throw e;
         }
 
-        Entry entry = new Entry(key, blobSizeInBytes, Deadline.after(10, SECONDS));
+        Entry entry = new Entry(key, blobSizeInBytes, Deadline.after(10, HOURS));
 
         Entry existingEntry = null;
         boolean inserted = false;
