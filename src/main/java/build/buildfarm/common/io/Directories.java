@@ -45,8 +45,41 @@ public final class Directories {
       PosixFilePermissions.fromString("rwxr-xr-x");
   private static final Set<PosixFilePermission> nonWritablePerms =
       PosixFilePermissions.fromString("r-xr-xr-x");
+  private static final Set<PosixFilePermission> readOnlyPerms =
+      PosixFilePermissions.fromString("r--r--r--");
 
   private Directories() {}
+
+  private static void makeUnwritable(Path path, FileStore fileStore) throws IOException {
+    if (fileStore.supportsFileAttributeView("posix")) {
+      Files.setPosixFilePermissions(
+          path, Files.isExecutable(path) ? nonWritablePerms : readOnlyPerms);
+    } else if (fileStore.supportsFileAttributeView("acl")) {
+      // windows, we hope
+      UserPrincipal authenticatedUsers =
+          path.getFileSystem()
+              .getUserPrincipalLookupService()
+              .lookupPrincipalByName("Authenticated Users");
+      AclEntry entry =
+          AclEntry.newBuilder()
+              .setType(AclEntryType.DENY)
+              .setPrincipal(authenticatedUsers)
+              .setPermissions(
+                  AclEntryPermission.WRITE_ACL,
+                  AclEntryPermission.WRITE_ATTRIBUTES,
+                  AclEntryPermission.WRITE_DATA,
+                  AclEntryPermission.WRITE_NAMED_ATTRS,
+                  AclEntryPermission.WRITE_OWNER)
+              .build();
+
+      AclFileAttributeView view = Files.getFileAttributeView(path, AclFileAttributeView.class);
+      List<AclEntry> acl = view.getAcl();
+      acl.add(0, entry);
+      view.setAcl(acl);
+    } else {
+      throw new UnsupportedOperationException("no recognized attribute view");
+    }
+  }
 
   private static void makeWritable(Path dir, boolean writable, FileStore fileStore)
       throws IOException {
@@ -139,15 +172,26 @@ public final class Directories {
   }
 
   @FunctionalInterface
-  public interface DirectoryConsumer {
-    void accept(Path dir) throws IOException;
+  public interface PathConsumer {
+    void accept(Path path) throws IOException;
   }
 
-  private static void forAllPostDirs(Path directory, DirectoryConsumer onPostVisit)
-      throws IOException {
+  private static void forAllPostDirs(Path directory, PathConsumer onPostVisit) throws IOException {
+    forAllPostDirsAndFiles(directory, path -> {}, onPostVisit);
+  }
+
+  private static void forAllPostDirsAndFiles(
+      Path directory, PathConsumer onFileVisit, PathConsumer onPostVisit) throws IOException {
     Files.walkFileTree(
         directory,
         new SimpleFileVisitor<>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            onFileVisit.accept(file);
+            return FileVisitResult.CONTINUE;
+          }
+
           @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
             if (e != null) {
@@ -161,6 +205,14 @@ public final class Directories {
 
   public static void disableAllWriteAccess(Path directory, FileStore fileStore) throws IOException {
     forAllPostDirs(directory, dir -> makeWritable(dir, false, fileStore));
+  }
+
+  public static void disableAllFileWriteAccess(Path directory, FileStore fileStore)
+      throws IOException {
+    forAllPostDirsAndFiles(
+        directory,
+        file -> makeUnwritable(file, fileStore),
+        dir -> makeWritable(dir, false, fileStore));
   }
 
   public static void enableAllWriteAccess(Path directory, FileStore fileStore) throws IOException {
