@@ -149,7 +149,7 @@ class CASFileCacheTest {
     storage = Maps.newConcurrentMap();
     expireService = newSingleThreadExecutor();
     fileCache =
-        new CASFileCache(
+        new LegacyDirectoryCFC(
             root,
             /* maxSizeInBytes= */ 1024,
             /* maxEntrySizeInBytes= */ 1024,
@@ -1148,7 +1148,7 @@ class CASFileCacheTest {
   @Test
   public void copyExternalInputRetries() throws Exception {
     CASFileCache flakyExternalCAS =
-        new CASFileCache(
+        new LegacyDirectoryCFC(
             root,
             /* maxSizeInBytes= */ 1024,
             /* maxEntrySizeInBytes= */ 1024,
@@ -1211,7 +1211,7 @@ class CASFileCacheTest {
   @Test
   public void newInputThrowsNoSuchFileExceptionWithoutDelegate() throws Exception {
     ContentAddressableStorage undelegatedCAS =
-        new CASFileCache(
+        new LegacyDirectoryCFC(
             root,
             /* maxSizeInBytes= */ 1024,
             /* maxEntrySizeInBytes= */ 1024,
