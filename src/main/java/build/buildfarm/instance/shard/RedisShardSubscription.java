@@ -71,20 +71,6 @@ class RedisShardSubscription implements Runnable {
     this.client = client;
   }
 
-  class SubscriptionAutoCloseable implements AutoCloseable {
-    public void initiateSubscription() {
-      SettableFuture subscribeFuture = SettableFuture.create();
-      subscriber.setSubscribeFuture(subscribeFuture);
-      manageState(SubscriptionAction.START_SUBSCRIBE);
-    }
-
-    @Override
-    public void close() {
-      subscriber.setSubscribeFuture(null);
-      manageState(SubscriptionAction.END_SUBSCRIPTION);
-    }
-  }
-
   private synchronized void manageState(SubscriptionAction update) {
     SubscriptionState currentState = subscriptionState.get();
     switch (update) {
@@ -118,9 +104,10 @@ class RedisShardSubscription implements Runnable {
       onReset.accept(jedis);
     }
 
-    try (SubscriptionAutoCloseable subscriptionAutoCloseable = new SubscriptionAutoCloseable()) {
-
-      subscriptionAutoCloseable.initiateSubscription();
+    try {
+      SettableFuture subscribeFuture = SettableFuture.create();
+      subscriber.setSubscribeFuture(subscribeFuture);
+      manageState(SubscriptionAction.START_SUBSCRIBE);
 
       if (subscriptionState.get() == SubscriptionState.SUBSCRIBING) {
         jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
@@ -130,6 +117,9 @@ class RedisShardSubscription implements Runnable {
             "Cannot subscribe, RedisShardSubscription is in 'stopped' state "
                 + subscriptionState.get().name());
       }
+    } finally {
+      subscriber.setSubscribeFuture(null);
+      manageState(SubscriptionAction.END_SUBSCRIPTION);
     }
   }
 
