@@ -517,7 +517,7 @@ public class RedisShardBackplane implements Backplane {
 
   private void start(RedisClient client, String clientPublicName) throws IOException {
     // Create containers that make up the backplane
-    start(client, client.call(jedis -> DistributedStateCreator.create(jedis)), clientPublicName);
+    start(client, client.call(DistributedStateCreator::create), clientPublicName);
   }
 
   @VisibleForTesting
