@@ -14,13 +14,10 @@
 
 package build.buildfarm.worker;
 
-import com.google.common.collect.Sets;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
+import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
 
 @Log
@@ -35,12 +32,13 @@ public class ReportResultStage extends SuperscalarPipelineStage {
           .help("Report result stall time in ms.")
           .register();
 
-  private final Set<Thread> reporters = Sets.newHashSet();
-  private final BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
+  @GuardedBy("this")
+  private int slotUsage;
 
   public ReportResultStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super(
         "ReportResultStage",
+        "reporter",
         workerContext,
         output,
         error,
@@ -52,22 +50,9 @@ public class ReportResultStage extends SuperscalarPipelineStage {
     return log;
   }
 
-  @Override
-  public ExecutionContext take() throws InterruptedException {
-    return takeOrDrain(queue);
-  }
-
-  @Override
-  public void put(ExecutionContext executionContext) throws InterruptedException {
-    queue.put(executionContext);
-  }
-
   synchronized int removeAndRelease(String operationName) {
-    if (!reporters.remove(Thread.currentThread())) {
-      throw new IllegalStateException("tried to remove unknown reporter thread");
-    }
     releaseClaim(operationName, 1);
-    int slotUsage = reporters.size();
+    slotUsage--;
     reportResultSlotUsage.set(slotUsage);
     return slotUsage;
   }
@@ -85,18 +70,6 @@ public class ReportResultStage extends SuperscalarPipelineStage {
   }
 
   @Override
-  public int getSlotUsage() {
-    return reporters.size();
-  }
-
-  @Override
-  protected synchronized void interruptAll() {
-    for (Thread reporter : reporters) {
-      reporter.interrupt();
-    }
-  }
-
-  @Override
   protected int claimsRequired(ExecutionContext executionContext) {
     return 1;
   }
@@ -104,17 +77,14 @@ public class ReportResultStage extends SuperscalarPipelineStage {
   @Override
   protected void iterate() throws InterruptedException {
     ExecutionContext executionContext = take();
-    Thread reporter =
-        new Thread(
-            new ResultReporter(workerContext, executionContext, this),
-            "ReportResultStage.reporter");
+    ResultReporter reporter =
+        new ResultReporter(workerContext, executionContext, this, pollerExecutor);
 
     synchronized (this) {
-      reporters.add(reporter);
-      int slotUsage = reporters.size();
+      slotUsage++;
       reportResultSlotUsage.set(slotUsage);
       start(executionContext.queueEntry.getExecuteEntry().getOperationName(), getUsage(slotUsage));
-      reporter.start();
+      executor.execute(reporter);
     }
   }
 }

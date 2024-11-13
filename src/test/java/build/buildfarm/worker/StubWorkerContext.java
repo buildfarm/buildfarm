@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 class StubWorkerContext implements WorkerContext {
   @Override
@@ -44,7 +45,8 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage) {
+  public Poller createPoller(
+      String name, QueueEntry queueEntry, ExecutionStage.Value stage, Executor executor) {
     throw new UnsupportedOperationException();
   }
 
@@ -55,7 +57,8 @@ class StubWorkerContext implements WorkerContext {
       QueueEntry queueEntry,
       ExecutionStage.Value stage,
       Runnable onFailure,
-      Deadline deadline) {
+      Deadline deadline,
+      Executor executor) {
     throw new UnsupportedOperationException();
   }
 

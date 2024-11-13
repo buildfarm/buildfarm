@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 public interface WorkerContext {
   interface IOResource extends AutoCloseable {
@@ -50,7 +51,8 @@ public interface WorkerContext {
 
   boolean shouldErrorOperationOnRemainingResources();
 
-  Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage);
+  Poller createPoller(
+      String name, QueueEntry queueEntry, ExecutionStage.Value stage, Executor executor);
 
   void resumePoller(
       Poller poller,
@@ -58,7 +60,8 @@ public interface WorkerContext {
       QueueEntry queueEntry,
       ExecutionStage.Value stage,
       Runnable onFailure,
-      Deadline deadline);
+      Deadline deadline,
+      Executor executor);
 
   void match(MatchListener listener) throws InterruptedException;
 
