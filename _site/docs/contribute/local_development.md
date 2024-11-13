@@ -76,3 +76,7 @@ Now, you should have something like this, and you can now run / debug Buildfarm
 Server from inside of IntelliJ, just like any other program:
 
 ![IntelliJ Buildfarm Server run configuration]({{site.url}}{{site.baseurl}}/assets/images/intellij-server-run-config.png)
+
+## Committing
+
+Please [sign your commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits) and please use [pre-commit](https://pre-commit.com/#3-install-the-git-hook-scripts) before committing. This will help you avoid style drift in Java and Yaml files.
