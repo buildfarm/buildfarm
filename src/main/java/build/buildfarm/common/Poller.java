@@ -53,10 +53,8 @@ public class Poller {
     private void waitForNextDeadline() {
       try {
         Duration waitTime = getWaitTime();
-        if (waitTime.getSeconds() != 0 || waitTime.getNanos() != 0) {
-          wait(
-              waitTime.getSeconds() * 1000 + waitTime.getNanos() / 1000000,
-              waitTime.getNanos() % 1000000);
+        if (Durations.isPositive(waitTime)) {
+          wait(Durations.toMillis(waitTime), waitTime.getNanos() % 1000000);
         }
       } catch (InterruptedException e) {
         running = false;
@@ -88,8 +86,8 @@ public class Poller {
   }
 
   public Poller(Duration period) {
-    checkState(period.getSeconds() > 0 || period.getNanos() >= 1000);
-    periodMicros = period.getSeconds() * 1000000 + period.getNanos() / 1000;
+    checkState(Durations.toMicros(period) >= 1);
+    periodMicros = Durations.toMicros(period);
     periodDeadline = Deadline.after(periodMicros, MICROSECONDS);
   }
 
