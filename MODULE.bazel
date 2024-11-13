@@ -5,7 +5,7 @@ module(
     repo_name = "build_buildfarm",
 )
 
-bazel_dep(name = "aspect_bazel_lib", version = "2.9.3")
+bazel_dep(name = "aspect_bazel_lib", version = "2.9.4")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "blake3", version = "1.5.4")
 bazel_dep(name = "buildifier_prebuilt", version = "7.3.1")
@@ -16,9 +16,9 @@ bazel_dep(name = "grpc-proto", version = "0.0.0-20240627-ec30f58", repo_name = "
 bazel_dep(name = "hermetic_cc_toolchain", version = "3.1.1")
 bazel_dep(name = "platforms", version = "0.0.10")
 bazel_dep(name = "protobuf", version = "29.0-rc2.bcr.1")
-bazel_dep(name = "rules_cc", version = "0.0.13")
+bazel_dep(name = "rules_cc", version = "0.1.0")
 bazel_dep(name = "rules_go", version = "0.50.1")
-bazel_dep(name = "rules_java", version = "8.3.1")
+bazel_dep(name = "rules_java", version = "8.3.2")
 bazel_dep(name = "rules_jvm_external", version = "6.5")
 bazel_dep(name = "rules_license", version = "1.0.0")
 bazel_dep(name = "rules_oci", version = "2.0.1")

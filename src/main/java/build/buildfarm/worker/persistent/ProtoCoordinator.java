@@ -37,9 +37,13 @@ import persistent.bazel.client.WorkerKey;
 import persistent.bazel.client.WorkerSupervisor;
 
 /**
- * Responsible for: 1) Initializing a new Worker's file environment correctly 2) pre-request
- * requirements, e.g. ensuring tool input files 3) post-response requirements, i.e. putting output
- * files in the right place
+ * Responsible for:
+ *
+ * <ol>
+ *   <li>Initializing a new Worker's file environment correctly
+ *   <li>pre-request requirements, e.g. ensuring tool input files
+ *   <li>post-response requirements, i.e. putting output files in the right place
+ * </ol>
  */
 @Log
 public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, CommonsWorkerPool> {
@@ -64,7 +68,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     super(workerPool);
   }
 
-  public ProtoCoordinator(WorkerSupervisor supervisor, int maxWorkersPerKey) {
+  private ProtoCoordinator(WorkerSupervisor supervisor, int maxWorkersPerKey) {
     super(new CommonsWorkerPool(supervisor, maxWorkersPerKey));
   }
 
