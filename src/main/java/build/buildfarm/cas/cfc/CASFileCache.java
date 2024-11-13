@@ -290,23 +290,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return size;
   }
 
-  public static class CacheScanResults {
-    public List<Path> computeDirs = Collections.emptyList();
-    public List<Path> deleteFiles = Collections.emptyList();
-    public Map<Object, Entry> fileKeys = Collections.emptyMap();
-  }
+  public record CacheScanResults(
+      List<Path> computeDirs, List<Path> deleteFiles, Map<Object, Entry> fileKeys) {}
 
-  public static class CacheLoadResults {
-    public boolean loadSkipped;
-    public CacheScanResults scan = new CacheScanResults();
-    public List<Path> invalidDirectories = Collections.emptyList();
-  }
+  public record CacheLoadResults(
+      boolean loadSkipped, CacheScanResults scan, List<Path> invalidDirectories) {}
 
-  public static class StartupCacheResults {
-    public Path cacheDirectory;
-    public CacheLoadResults load;
-    public Duration startupTime;
-  }
+  public record StartupCacheResults(
+      Path cacheDirectory, CacheLoadResults load, Duration startupTime) {}
 
   public static class IncompleteBlobException extends IOException {
     IncompleteBlobException(Path writePath, String key, long committed, long expected) {
@@ -1342,8 +1333,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     log.log(Level.INFO, "Initializing cache at: " + root);
     Instant startTime = Instant.now();
 
-    CacheLoadResults loadResults = new CacheLoadResults();
-    loadResults.loadSkipped = skipLoad;
+    CacheLoadResults loadResults =
+        new CacheLoadResults(
+            skipLoad,
+            new CacheScanResults(
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyMap()),
+            Collections.emptyList());
 
     // Load the cache
     if (!skipLoad) {
@@ -1386,31 +1381,26 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     prometheusMetricsThread.start();
 
     // return information about the cache startup.
-    StartupCacheResults startupResults = new StartupCacheResults();
-    startupResults.cacheDirectory = root;
-    startupResults.load = loadResults;
-    startupResults.startupTime = startupTime;
-    return startupResults;
+    return new StartupCacheResults(root, loadResults, startupTime);
   }
 
   private CacheLoadResults loadCache(
       Consumer<Digest> onStartPut, ExecutorService removeDirectoryService)
       throws IOException, InterruptedException {
-    CacheLoadResults results = new CacheLoadResults();
 
     // Phase 1: Scan
     // build scan cache results by analyzing each file on the root.
-    results.scan = scanRoot(onStartPut);
-    logCacheScanResults(results.scan);
-    deleteInvalidFileContent(results.scan.deleteFiles, removeDirectoryService);
+    CacheScanResults scan = scanRoot(onStartPut);
+    logCacheScanResults(scan);
+    deleteInvalidFileContent(scan.deleteFiles, removeDirectoryService);
 
     // Phase 2: Compute
     // recursively construct all directory structures.
-    results.invalidDirectories = computeDirectories(results.scan);
-    logComputeDirectoriesResults(results.invalidDirectories);
-    deleteInvalidFileContent(results.invalidDirectories, removeDirectoryService);
+    List<Path> invalidDirectories = computeDirectories(scan);
+    logComputeDirectoriesResults(invalidDirectories);
+    deleteInvalidFileContent(invalidDirectories, removeDirectoryService);
 
-    return results;
+    return new CacheLoadResults(false, scan, invalidDirectories);
   }
 
   private void deleteInvalidFileContent(List<Path> files, ExecutorService removeDirectoryService) {
@@ -1485,12 +1475,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     joinThreads(pool, "Scanning Cache Root...");
 
     // log information from scanning cache root.
-    CacheScanResults cacheScanResults = new CacheScanResults();
-    cacheScanResults.computeDirs = computeDirsBuilder.build();
-    cacheScanResults.deleteFiles = deleteFilesBuilder.build();
-    cacheScanResults.fileKeys = fileKeysBuilder.build();
-
-    return cacheScanResults;
+    return new CacheScanResults(
+        computeDirsBuilder.build(), deleteFilesBuilder.build(), fileKeysBuilder.build());
   }
 
   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
@@ -2316,16 +2302,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return false;
   }
 
-  @Getter
-  public static class PathResult {
-    private final Path path;
-    private final boolean isMissed;
-
-    public PathResult(Path path, boolean isMissed) {
-      this.path = path;
-      this.isMissed = isMissed;
-    }
-  }
+  public record PathResult(Path path, boolean isMissed) {}
 
   @SuppressWarnings("ConstantConditions")
   private ListenableFuture<PathResult> putDirectorySynchronized(
