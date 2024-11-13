@@ -19,8 +19,6 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.junit.Assert.fail;
 
 import com.google.longrunning.Operation;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
 import lombok.extern.java.Log;
 import org.junit.Test;
@@ -41,27 +39,12 @@ public class SuperscalarPipelineStageTest {
         PipelineStage output,
         PipelineStage error,
         int width) {
-      super(name, workerContext, output, error, width);
+      super(name, "executor", workerContext, output, error, width);
     }
 
     @Override
     public Logger getLogger() {
       return log;
-    }
-
-    @Override
-    public void put(ExecutionContext executionContext) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    ExecutionContext take() throws InterruptedException {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    protected void interruptAll() {
-      throw new UnsupportedOperationException();
     }
 
     @Override
@@ -125,7 +108,6 @@ public class SuperscalarPipelineStageTest {
         ExecutionContext.newBuilder()
             .setOperation(Operation.newBuilder().setName("operation-in-queue").build())
             .build();
-    BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
     PipelineStage output = new PipelineStageTest.StubPipelineStage("unclosed-sink");
     PipelineStage stage =
         new AbstractSuperscalarPipelineStage("queue-claimed", output, /* width= */ 3) {
@@ -133,14 +115,9 @@ public class SuperscalarPipelineStageTest {
           protected int claimsRequired(ExecutionContext executionContext) {
             return 2;
           }
-
-          @Override
-          public ExecutionContext take() throws InterruptedException {
-            return takeOrDrain(queue);
-          }
         };
     stage.claim(context);
-    queue.put(context);
+    stage.put(context);
 
     stage.close();
     try {

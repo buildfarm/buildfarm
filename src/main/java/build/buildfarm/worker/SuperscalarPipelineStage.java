@@ -18,16 +18,21 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import lombok.Getter;
 
 public abstract class SuperscalarPipelineStage extends PipelineStage {
+  private final BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
+  protected Set<String> operationNames = new HashSet<>();
   @Getter protected final int width;
 
   protected final BlockingQueue<Object> claims;
 
-  protected Set<String> operationNames = new HashSet<>();
+  protected final ThreadPoolExecutor executor;
+  protected final ThreadPoolExecutor pollerExecutor;
 
   private volatile boolean catastrophic = false;
 
@@ -36,6 +41,7 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
 
   public SuperscalarPipelineStage(
       String name,
+      String executorName,
       WorkerContext workerContext,
       PipelineStage output,
       PipelineStage error,
@@ -43,9 +49,24 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     super(name, workerContext, output, error);
     this.width = width;
     claims = new ArrayBlockingQueue<>(width);
-  }
+    executor =
+        new ThreadPoolExecutor(
+            width,
+            width,
+            0L,
+            TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(),
+            Thread.ofPlatform().name(String.format("%s.%s", name, executorName)).factory());
 
-  protected abstract void interruptAll();
+    pollerExecutor =
+        new ThreadPoolExecutor(
+            width,
+            width,
+            0L,
+            TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(),
+            Thread.ofPlatform().name(String.format("%s.%s", name, "poller")).factory());
+  }
 
   protected abstract int claimsRequired(ExecutionContext executionContext);
 
@@ -54,7 +75,9 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     throw new UnsupportedOperationException("use getOperationNames on superscalar stages");
   }
 
-  public abstract int getSlotUsage();
+  public int getSlotUsage() {
+    return executor.getActiveCount();
+  }
 
   public Iterable<String> getOperationNames() {
     synchronized (operationNames) {
@@ -83,7 +106,7 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     while (!catastrophic && isClaimed()) {
       if (output.isClosed()) {
         // interrupt the currently running threads, because they have nowhere to go
-        interruptAll();
+        executor.shutdownNow();
       }
       ExecutionContext executionContext = queue.poll();
       if (executionContext != null) {
@@ -102,8 +125,18 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
     }
   }
 
-  protected ExecutionContext takeOrDrain(BlockingQueue<ExecutionContext> queue)
-      throws InterruptedException {
+  @Override
+  public void put(ExecutionContext executionContext) throws InterruptedException {
+    while (!isClosed() && !output.isClosed()) {
+      if (queue.offer(executionContext, 10, TimeUnit.MILLISECONDS)) {
+        return;
+      }
+    }
+    throw new InterruptedException("stage closed");
+  }
+
+  @Override
+  public ExecutionContext take() throws InterruptedException {
     boolean interrupted = false;
     InterruptedException exception;
     try {
@@ -202,5 +235,33 @@ public abstract class SuperscalarPipelineStage extends PipelineStage {
   @Override
   protected boolean isClaimed() {
     return !claims.isEmpty();
+  }
+
+  @Override
+  public void close() {
+    super.close();
+    executor.shutdown();
+    // might want to move this to actual teardown of the stage
+    boolean interrupted = false;
+    try {
+      if (!executor.awaitTermination(1, TimeUnit.MINUTES)) {
+        getLogger().severe("executor did not terminate");
+      }
+    } catch (InterruptedException e) {
+      getLogger().severe("executor await shutdown interrupted");
+      interrupted = Thread.interrupted() || true;
+    }
+    pollerExecutor.shutdownNow();
+    try {
+      if (!pollerExecutor.awaitTermination(1, TimeUnit.MINUTES)) {
+        getLogger().severe("pollerExecutor did not terminate");
+      }
+    } catch (InterruptedException e) {
+      getLogger().severe("executor await shutdown interrupted");
+      interrupted = true;
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
   }
 }

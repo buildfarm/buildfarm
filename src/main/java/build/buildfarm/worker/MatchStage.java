@@ -16,7 +16,9 @@ package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static java.lang.String.format;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
 
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.DigestUtil;
@@ -32,6 +34,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -40,6 +43,7 @@ import lombok.extern.java.Log;
 @Log
 public class MatchStage extends PipelineStage {
   private boolean inGracefulShutdown = false;
+  private ExecutorService pollerExecutor = newSingleThreadExecutor();
 
   public MatchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super("MatchStage", workerContext, output, error);
@@ -95,7 +99,8 @@ public class MatchStage extends PipelineStage {
           executionContext.toBuilder()
               .setQueueEntry(queueEntry)
               .setClaim(claim)
-              .setPoller(workerContext.createPoller("MatchStage", queueEntry, QUEUED))
+              .setPoller(
+                  workerContext.createPoller("MatchStage", queueEntry, QUEUED, pollerExecutor))
               .build();
       return onOperationPolled();
     }
@@ -219,5 +224,19 @@ public class MatchStage extends PipelineStage {
   @Override
   public void put(ExecutionContext operation) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void close() {
+    super.close();
+    pollerExecutor.shutdownNow();
+    try {
+      if (!pollerExecutor.awaitTermination(1, MINUTES)) {
+        log.severe("pollerExecutor did not terminate");
+      }
+    } catch (InterruptedException e) {
+      log.severe("pollerExecutor await shutdown interrupted");
+      Thread.currentThread().interrupt();
+    }
   }
 }

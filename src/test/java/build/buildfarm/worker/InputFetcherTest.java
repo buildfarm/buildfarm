@@ -21,6 +21,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
@@ -50,6 +51,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -113,7 +115,8 @@ public class InputFetcherTest {
           }
         };
     InputFetchStage owner = new InputFetchStage(workerContext, /* output= */ null, error);
-    InputFetcher inputFetcher = new InputFetcher(workerContext, executionContext, owner);
+    Executor executor = mock(Executor.class);
+    InputFetcher inputFetcher = new InputFetcher(workerContext, executionContext, owner, executor);
     inputFetcher.fetchPolled(/* stopwatch= */ null);
     Operation failedOperation = checkNotNull(failedOperationRef.get());
     verify(error, times(1)).put(any(ExecutionContext.class));
@@ -136,5 +139,6 @@ public class InputFetcherTest {
             .isTrue();
       }
     }
+    verifyNoMoreInteractions(executor);
   }
 }

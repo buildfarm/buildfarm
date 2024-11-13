@@ -50,6 +50,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
@@ -59,13 +60,18 @@ public class InputFetcher implements Runnable {
   private final WorkerContext workerContext;
   private final ExecutionContext executionContext;
   private final InputFetchStage owner;
+  private final Executor pollerExecutor;
   private boolean success = false;
 
   InputFetcher(
-      WorkerContext workerContext, ExecutionContext executionContext, InputFetchStage owner) {
+      WorkerContext workerContext,
+      ExecutionContext executionContext,
+      InputFetchStage owner,
+      Executor pollerExecutor) {
     this.workerContext = workerContext;
     this.executionContext = executionContext;
     this.owner = owner;
+    this.pollerExecutor = pollerExecutor;
   }
 
   private List<String> validateQueuedOperation(QueuedOperation queuedOperation) {
@@ -104,7 +110,8 @@ public class InputFetcher implements Runnable {
         executionContext.queueEntry,
         QUEUED,
         Thread.currentThread()::interrupt,
-        Deadline.after(workerContext.getInputFetchDeadline(), SECONDS));
+        Deadline.after(workerContext.getInputFetchDeadline(), SECONDS),
+        pollerExecutor);
     try {
       return fetchPolled(stopwatch);
     } finally {
@@ -285,7 +292,8 @@ public class InputFetcher implements Runnable {
         executionContext.queueEntry,
         QUEUED,
         Thread.currentThread()::interrupt,
-        Deadline.after(10, DAYS));
+        Deadline.after(10, DAYS),
+        pollerExecutor);
 
     ExecutionContext fetchedExecutionContext =
         executionContext.toBuilder()

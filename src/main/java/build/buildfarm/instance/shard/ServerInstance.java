@@ -36,6 +36,7 @@ import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -184,6 +185,8 @@ public class ServerInstance extends NodeInstance {
 
   private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
 
+  private static final int TRANSFORM_TOKENS = 256;
+
   // Prometheus metrics
   private static final Counter executionSuccess =
       Counter.build().name("execution_success").help("Execution success.").register();
@@ -265,7 +268,9 @@ public class ServerInstance extends NodeInstance {
   private final ScheduledExecutorService contextDeadlineScheduler =
       newSingleThreadScheduledExecutor();
   private final ExecutorService operationDeletionService = newSingleThreadExecutor();
-  private final BlockingQueue<Object> transformTokensQueue = new LinkedBlockingQueue<>(256);
+  private final BlockingQueue<Object> transformTokensQueue =
+      new LinkedBlockingQueue<>(TRANSFORM_TOKENS);
+  private final ExecutorService transformPollerExecutor;
   private final boolean useDenyList;
   private final Scannable<Operation> indexKeys;
   private final Scannable<Operation> operations;
@@ -484,6 +489,8 @@ public class ServerInstance extends NodeInstance {
     }
 
     if (runOperationQueuer) {
+      transformPollerExecutor = newFixedThreadPool(TRANSFORM_TOKENS);
+
       operationQueuer =
           new Thread(
               new Runnable() {
@@ -518,7 +525,8 @@ public class ServerInstance extends NodeInstance {
                         return !stopping && !stopped;
                       },
                       () -> {},
-                      Deadline.after(5, MINUTES));
+                      Deadline.after(5, MINUTES),
+                      transformPollerExecutor);
                   try {
                     log.log(Level.FINER, "queueing " + operationName);
                     ListenableFuture<Void> queueFuture = queue(executeEntry, poller, queueTimeout);
@@ -602,6 +610,7 @@ public class ServerInstance extends NodeInstance {
               });
     } else {
       operationQueuer = null;
+      transformPollerExecutor = null;
     }
 
     prometheusMetricsThread =
@@ -681,6 +690,7 @@ public class ServerInstance extends NodeInstance {
     if (operationQueuer != null) {
       operationQueuer.interrupt();
       operationQueuer.join();
+      transformPollerExecutor.shutdown();
     }
     if (dispatchedMonitor != null) {
       dispatchedMonitor.interrupt();
@@ -710,6 +720,12 @@ public class ServerInstance extends NodeInstance {
     operationTransformService.shutdownNow();
     if (!actionCacheFetchService.awaitTermination(10, SECONDS)) {
       log.log(Level.SEVERE, "Could not shut down action cache fetch service");
+    }
+    if (transformPollerExecutor != null) {
+      transformPollerExecutor.shutdownNow();
+      if (!transformPollerExecutor.awaitTermination(10, SECONDS)) {
+        log.log(Level.SEVERE, "Could not shut down transform poller service");
+      }
     }
     actionCacheFetchService.shutdownNow();
     workerStubs.invalidateAll();

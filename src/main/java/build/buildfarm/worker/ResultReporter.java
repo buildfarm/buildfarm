@@ -39,6 +39,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
 import java.io.IOException;
 import java.nio.channels.ClosedByInterruptException;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
 
@@ -47,13 +48,18 @@ class ResultReporter implements Runnable {
   private final WorkerContext workerContext;
   private final ExecutionContext executionContext;
   private final ReportResultStage owner;
+  private final Executor pollerExecutor;
   private boolean success = false;
 
   ResultReporter(
-      WorkerContext workerContext, ExecutionContext executionContext, ReportResultStage owner) {
+      WorkerContext workerContext,
+      ExecutionContext executionContext,
+      ReportResultStage owner,
+      Executor pollerExecutor) {
     this.workerContext = workerContext;
     this.executionContext = executionContext;
     this.owner = owner;
+    this.pollerExecutor = pollerExecutor;
   }
 
   @Override
@@ -102,7 +108,8 @@ class ResultReporter implements Runnable {
         executionContext.queueEntry,
         EXECUTING,
         Thread.currentThread()::interrupt,
-        Deadline.after(60, SECONDS));
+        Deadline.after(60, SECONDS),
+        pollerExecutor);
     try {
       return reportPolled(stopwatch);
     } finally {

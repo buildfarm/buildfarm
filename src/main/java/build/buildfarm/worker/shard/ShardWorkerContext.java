@@ -91,6 +91,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
@@ -217,9 +218,10 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage) {
+  public Poller createPoller(
+      String name, QueueEntry queueEntry, ExecutionStage.Value stage, Executor executor) {
     Poller poller = new Poller(operationPollPeriod);
-    resumePoller(poller, name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
+    resumePoller(poller, name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS), executor);
     return poller;
   }
 
@@ -230,7 +232,8 @@ class ShardWorkerContext implements WorkerContext {
       QueueEntry queueEntry,
       ExecutionStage.Value stage,
       Runnable onFailure,
-      Deadline deadline) {
+      Deadline deadline,
+      Executor executor) {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     poller.resume(
         () -> {
@@ -259,7 +262,8 @@ class ShardWorkerContext implements WorkerContext {
               Level.WARNING, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
-        deadline);
+        deadline,
+        executor);
   }
 
   private ByteString getBlob(Digest digest) throws IOException, InterruptedException {

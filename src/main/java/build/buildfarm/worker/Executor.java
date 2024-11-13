@@ -77,14 +77,19 @@ class Executor {
   private final WorkerContext workerContext;
   private final ExecutionContext executionContext;
   private final ExecuteActionStage owner;
+  private final java.util.concurrent.Executor pollerExecutor;
   private int exitCode = INCOMPLETE_EXIT_CODE;
   private boolean wasErrored = false;
 
   Executor(
-      WorkerContext workerContext, ExecutionContext executionContext, ExecuteActionStage owner) {
+      WorkerContext workerContext,
+      ExecutionContext executionContext,
+      ExecuteActionStage owner,
+      java.util.concurrent.Executor pollerExecutor) {
     this.workerContext = workerContext;
     this.executionContext = executionContext;
     this.owner = owner;
+    this.pollerExecutor = pollerExecutor;
   }
 
   // ensure that only one error put attempt occurs
@@ -150,7 +155,8 @@ class Executor {
         executionContext.queueEntry,
         ExecutionStage.Value.EXECUTING,
         Thread.currentThread()::interrupt,
-        pollDeadline);
+        pollDeadline,
+        pollerExecutor);
 
     Iterable<ExecutionPolicy> policies = new ArrayList<>();
     if (limits.useExecutionPolicies) {
@@ -357,7 +363,8 @@ class Executor {
         executionContext.queueEntry,
         ExecutionStage.Value.EXECUTING,
         Thread.currentThread()::interrupt,
-        Deadline.after(10, DAYS));
+        Deadline.after(10, DAYS),
+        pollerExecutor);
 
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
