@@ -19,7 +19,9 @@ import static com.google.common.base.Preconditions.checkState;
 
 import build.buildfarm.common.config.Backplane;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.redis.Cluster;
 import build.buildfarm.common.redis.GoogleCredentialProvider;
+import build.buildfarm.common.redis.Pooled;
 import build.buildfarm.common.redis.RedisSSL;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
@@ -40,7 +42,6 @@ import redis.clients.jedis.ConnectionPoolConfig;
 import redis.clients.jedis.DefaultJedisClientConfig;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.exceptions.JedisClusterOperationException;
 import redis.clients.jedis.params.ScanParams;
@@ -155,15 +156,12 @@ public class JedisClusterFactory {
       Set<HostAndPort> hostAndPorts,
       DefaultJedisClientConfig jedisClientConfig,
       ConnectionPoolConfig poolConfig) {
+    int maxAttempts = Integer.max(5, configs.getBackplane().getMaxAttempts());
     try {
-      return new JedisCluster(
-          hostAndPorts,
-          jedisClientConfig,
-          Integer.max(5, configs.getBackplane().getMaxAttempts()),
-          poolConfig);
+      return new Cluster(hostAndPorts, jedisClientConfig, maxAttempts, poolConfig);
     } catch (JedisClusterOperationException e) {
       // probably not a cluster
-      return new JedisPooled(poolConfig, Iterables.getOnlyElement(hostAndPorts), jedisClientConfig);
+      return new Pooled(poolConfig, Iterables.getOnlyElement(hostAndPorts), jedisClientConfig);
     }
   }
 

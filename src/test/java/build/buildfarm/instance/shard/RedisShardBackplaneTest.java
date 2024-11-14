@@ -29,6 +29,8 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Queue;
 import build.buildfarm.common.redis.BalancedRedisQueue;
+import build.buildfarm.common.redis.Cluster;
+import build.buildfarm.common.redis.ClusterPipeline;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.RedisHashMap;
 import build.buildfarm.common.redis.RedisMap;
@@ -51,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 import org.junit.Before;
@@ -62,7 +65,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import redis.clients.jedis.AbstractPipeline;
-import redis.clients.jedis.PipelineBase;
 import redis.clients.jedis.UnifiedJedis;
 
 @RunWith(JUnit4.class)
@@ -207,9 +209,9 @@ public class RedisShardBackplaneTest {
     int REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE = 1;
 
     // create a backplane
-    PipelineBase pipeline = mock(PipelineBase.class);
-    UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.pipelined()).thenReturn(pipeline);
+    ClusterPipeline pipeline = mock(ClusterPipeline.class);
+    Cluster jedis = mock(Cluster.class);
+    when(jedis.pipelined(any(Executor.class))).thenReturn(pipeline);
     RedisClient client = new RedisClient(jedis);
     DistributedState state = new DistributedState();
     state.dispatchedExecutions = mock(RedisHashMap.class);
@@ -256,7 +258,7 @@ public class RedisShardBackplaneTest {
     QueueEntry readyForRequeue = backplane.dispatchOperation(ImmutableList.of());
 
     // ASSERT
-    verify(jedis, times(1)).pipelined();
+    verify(jedis, times(1)).pipelined(any(Executor.class));
     OperationChange opChange = verifyChangePublished(backplane.executionChannel(opName), pipeline);
     assertThat(opChange.hasReset()).isTrue();
     assertThat(opChange.getReset().getOperation().getName()).isEqualTo(opName);
@@ -287,9 +289,9 @@ public class RedisShardBackplaneTest {
     int REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE = 2;
 
     // create a backplane
-    PipelineBase pipeline = mock(PipelineBase.class);
-    UnifiedJedis jedis = mock(UnifiedJedis.class);
-    when(jedis.pipelined()).thenReturn(pipeline);
+    ClusterPipeline pipeline = mock(ClusterPipeline.class);
+    Cluster jedis = mock(Cluster.class);
+    when(jedis.pipelined(any(Executor.class))).thenReturn(pipeline);
     RedisClient client = new RedisClient(jedis);
     DistributedState state = new DistributedState();
     state.dispatchedExecutions = mock(RedisHashMap.class);
@@ -336,7 +338,7 @@ public class RedisShardBackplaneTest {
     QueueEntry readyForRequeue = backplane.dispatchOperation(ImmutableList.of());
 
     // ASSERT
-    verify(jedis, times(1)).pipelined();
+    verify(jedis, times(1)).pipelined(any(Executor.class));
     OperationChange opChange = verifyChangePublished(backplane.executionChannel(opName), pipeline);
     assertThat(opChange.hasReset()).isTrue();
     assertThat(opChange.getReset().getOperation().getName()).isEqualTo(opName);
