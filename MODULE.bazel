@@ -50,82 +50,67 @@ register_toolchains(
     "@zig_sdk//toolchain:linux_arm64_gnu.2.31",
 )
 
-IO_NETTY_MODULES = [
-    # keep sorted
-    "buffer",
-    "codec",
-    "codec-http",
-    "codec-http2",
-    "codec-socks",
-    "common",
-    "handler",
-    "handler-proxy",
-    "resolver",
-    "transport",
-    "transport-classes-epoll",
-    "transport-classes-kqueue",
-    "transport-native-epoll",
-    "transport-native-kqueue",
-    "transport-native-unix-common",
-]
-
-IO_GRPC_MODULES = [
-    # keep sorted
-    "api",
-    "auth",
-    "context",
-    "core",
-    "netty",
-    "netty-shaded",
-    "protobuf",
-    "services",
-    "stub",
-    "testing",
-]
-
-COM_AWS_MODULES = [
-    # keep sorted
-    "core",
-    "s3",
-    "secretsmanager",
-]
-
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 maven.install(
-    artifacts = ["com.amazonaws:aws-java-sdk-%s:1.12.544" % module for module in COM_AWS_MODULES] + [
-                    # keep sorted
-                    "com.fasterxml.jackson.core:jackson-databind:2.15.0",
-                    "com.github.ben-manes.caffeine:caffeine:2.9.0",
-                    "com.github.docker-java:docker-java:3.3.3",
-                    "com.github.docker-java:docker-java-api:3.3.3",
-                    "com.github.docker-java:docker-java-core:3.3.3",
-                    "com.github.jnr:jffi:1.3.11",
-                    "com.github.jnr:jffi:jar:native:1.3.11",
-                    "com.github.jnr:jnr-constants:0.10.4",
-                    "com.github.jnr:jnr-ffi:2.2.14",
-                    "com.github.jnr:jnr-posix:3.1.17",
-                    "com.github.luben:zstd-jni:1.5.5-7",
-                    "com.github.oshi:oshi-core:6.4.5",
-                    "com.github.pcj:google-options:1.0.0",
-                    "com.github.serceman:jnr-fuse:0.5.7",
-                    "com.google.api.grpc:proto-google-common-protos:2.29.0",
-                    "com.google.auth:google-auth-library-credentials:1.23.0",
-                    "com.google.auth:google-auth-library-oauth2-http:1.23.0",
-                    "com.google.code.findbugs:jsr305:3.0.2",
-                    "com.google.code.gson:gson:2.11.0",
-                    "com.google.errorprone:error_prone_annotations:2.28.0",
-                    "com.google.errorprone:error_prone_core:2.28.0",
-                    "com.google.guava:failureaccess:1.0.2",
-                    "com.google.guava:guava:33.2.1-jre",
-                    "com.google.j2objc:j2objc-annotations:3.0.0",
-                    "com.google.protobuf:protobuf-java:3.19.1",
-                    "com.google.protobuf:protobuf-java-util:3.19.1",
-                    "com.googlecode.json-simple:json-simple:1.1.1",
-                    "com.owteam.engUtils:netrc:2.0.1",
-                    "commons-io:commons-io:2.15.1",
-                ] + ["io.netty:netty-%s:4.1.108.Final" % module for module in IO_NETTY_MODULES] +
-                ["io.grpc:grpc-%s:1.62.2" % module for module in IO_GRPC_MODULES] + [
+    artifacts = [
         # keep sorted
+        "com.amazonaws:aws-java-sdk-core",  # Version is specified via the BOM below
+        "com.amazonaws:aws-java-sdk-s3",
+        "com.amazonaws:aws-java-sdk-secretsmanager",
+        "com.fasterxml.jackson.core:jackson-databind:2.15.0",
+        "com.github.ben-manes.caffeine:caffeine:2.9.0",
+        "com.github.docker-java:docker-java:3.3.3",
+        "com.github.docker-java:docker-java-api:3.3.3",
+        "com.github.docker-java:docker-java-core:3.3.3",
+        "com.github.jnr:jffi:1.3.11",
+        "com.github.jnr:jffi:jar:native:1.3.11",
+        "com.github.jnr:jnr-constants:0.10.4",
+        "com.github.jnr:jnr-ffi:2.2.14",
+        "com.github.jnr:jnr-posix:3.1.17",
+        "com.github.luben:zstd-jni:1.5.5-7",
+        "com.github.oshi:oshi-core:6.4.5",
+        "com.github.pcj:google-options:1.0.0",
+        "com.github.serceman:jnr-fuse:0.5.7",
+        "com.google.api.grpc:proto-google-common-protos:2.29.0",
+        "com.google.auth:google-auth-library-credentials:1.23.0",
+        "com.google.auth:google-auth-library-oauth2-http:1.23.0",
+        "com.google.code.findbugs:jsr305:3.0.2",
+        "com.google.code.gson:gson:2.11.0",
+        "com.google.errorprone:error_prone_annotations:2.28.0",
+        "com.google.errorprone:error_prone_core:2.28.0",
+        "com.google.guava:failureaccess:1.0.2",
+        "com.google.guava:guava:33.2.1-jre",
+        "com.google.j2objc:j2objc-annotations:3.0.0",
+        "com.google.protobuf:protobuf-java:3.19.1",
+        "com.google.protobuf:protobuf-java-util:3.19.1",
+        "com.googlecode.json-simple:json-simple:1.1.1",
+        "com.owteam.engUtils:netrc:2.0.1",
+        "commons-io:commons-io:2.15.1",
+        "io.grpc:grpc-api",  # Version is specified via the BOM below
+        "io.grpc:grpc-auth",
+        "io.grpc:grpc-context",
+        "io.grpc:grpc-core",
+        "io.grpc:grpc-netty",
+        "io.grpc:grpc-netty-shaded",
+        "io.grpc:grpc-protobuf",
+        "io.grpc:grpc-services",
+        "io.grpc:grpc-stub",
+        "io.grpc:grpc-testing",
+        "io.netty:netty-buffer",  # Version is specified via the BOM below
+        "io.netty:netty-codec",
+        "io.netty:netty-codec-http",
+        "io.netty:netty-codec-http2",
+        "io.netty:netty-codec-socks",
+        "io.netty:netty-common",
+        "io.netty:netty-handler",
+        "io.netty:netty-handler-proxy",
+        "io.netty:netty-resolver",
+        "io.netty:netty-transport",
+        "io.netty:netty-transport-classes-epoll",
+        "io.netty:netty-transport-classes-kqueue",
+        "io.netty:netty-transport-native-epoll",
+        "io.netty:netty-transport-native-kqueue",
+        "io.netty:netty-transport-native-unix-common",
         "io.prometheus:simpleclient:0.16.0",
         "io.prometheus:simpleclient_hotspot:0.16.0",
         "io.prometheus:simpleclient_httpserver:0.16.0",
@@ -153,12 +138,19 @@ maven.install(
         "org.yaml:snakeyaml:2.2",
         "redis.clients:jedis:5.1.2",
     ],
+    boms = [
+        # keep sorted
+        "com.amazonaws:aws-java-sdk-bom:1.12.544",
+        "io.grpc:grpc-bom:1.62.2",
+        "io.netty:netty-bom:4.1.108.Final",
+    ],
     fail_if_repin_required = True,  # TO RE-PIN: REPIN=1 bazel run @unpinned_maven//:pin
     generate_compat_repositories = True,
     lock_file = "//:maven_install.json",
     repositories = [
         "https://repo.maven.apache.org/maven2",
     ],
+    resolver = "maven",
     strict_visibility = True,
 )
 
