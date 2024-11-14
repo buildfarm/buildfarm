@@ -11,6 +11,7 @@ java_library(
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:io_grpc_grpc_api",
+        "@maven//:org_apache_commons_commons_pool2",
         "@maven//:org_projectlombok_lombok",
         "@maven//:org_redisson_redisson",
         "@maven//:redis_clients_jedis",

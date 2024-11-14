@@ -40,6 +40,7 @@ import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue.BalancedQueueEntry;
 import build.buildfarm.common.redis.RedisClient;
+import build.buildfarm.common.redis.Unified;
 import build.buildfarm.instance.shard.ExecutionQueue.ExecutionQueueEntry;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.BackplaneStatus;
@@ -128,6 +129,7 @@ public class RedisShardBackplane implements Backplane {
   private RedisShardSubscription operationSubscription = null;
   private ExecutorService subscriberService = null;
   private ExecutorService dequeueService = null;
+  private ExecutorService pipelineExecutor = null;
   private @Nullable RedisClient client = null;
 
   private Deadline storageWorkersDeadline = null;
@@ -532,6 +534,7 @@ public class RedisShardBackplane implements Backplane {
     if (runFailsafeOperation) {
       startFailsafeOperationThread();
     }
+    pipelineExecutor = BuildfarmExecutors.getPipelinePool();
 
     // Record client start time
     client.call(
@@ -552,6 +555,14 @@ public class RedisShardBackplane implements Backplane {
         subscriptionThread.join();
       }
       log.log(Level.FINER, "subscriptionThread has been stopped");
+    }
+    if (pipelineExecutor != null) {
+      pipelineExecutor.shutdown();
+      if (pipelineExecutor.awaitTermination(10, SECONDS)) {
+        log.log(Level.FINER, "pipelineExecutor has been stopped");
+      } else {
+        log.log(Level.WARNING, "pipelineExecutor has not stopped");
+      }
     }
     if (dequeueService != null) {
       dequeueService.shutdown();
@@ -1163,25 +1174,30 @@ public class RedisShardBackplane implements Backplane {
     QueueEntry queueEntry = executionQueueEntry.getQueueEntry();
     String executionName = queueEntry.getExecuteEntry().getOperationName();
     Operation operation = keepaliveExecution(executionName);
-    AbstractPipeline pipeline = jedis.pipelined();
-    publishReset(pipeline, operation);
+    Unified unified = (Unified) jedis;
+    try (AbstractPipeline pipeline = unified.pipelined(pipelineExecutor)) {
+      publishReset(pipeline, operation);
 
-    long requeueAt =
-        System.currentTimeMillis() + configs.getBackplane().getDispatchingTimeoutMillis();
-    DispatchedOperation o =
-        DispatchedOperation.newBuilder().setQueueEntry(queueEntry).setRequeueAt(requeueAt).build();
-    try {
-      String dispatchedOperationJson = JsonFormat.printer().print(o);
+      long requeueAt =
+          System.currentTimeMillis() + configs.getBackplane().getDispatchingTimeoutMillis();
+      DispatchedOperation o =
+          DispatchedOperation.newBuilder()
+              .setQueueEntry(queueEntry)
+              .setRequeueAt(requeueAt)
+              .build();
+      try {
+        String dispatchedOperationJson = JsonFormat.printer().print(o);
 
-      state.dispatchedExecutions.insertIfMissing(pipeline, executionName, dispatchedOperationJson);
-    } catch (InvalidProtocolBufferException e) {
-      log.log(Level.SEVERE, "error printing dispatched operation", e);
-      // very unlikely, printer would have to fail
+        state.dispatchedExecutions.insertIfMissing(
+            pipeline, executionName, dispatchedOperationJson);
+      } catch (InvalidProtocolBufferException e) {
+        log.log(Level.SEVERE, "error printing dispatched operation", e);
+        // very unlikely, printer would have to fail
+      }
+
+      state.executionQueue.removeFromDequeue(pipeline, executionQueueEntry);
+      state.dispatchingExecutions.remove(pipeline, executionName);
     }
-
-    state.executionQueue.removeFromDequeue(pipeline, executionQueueEntry);
-    state.dispatchingExecutions.remove(pipeline, executionName);
-    pipeline.close();
 
     // Return an entry so that if it needs re-queued, it will have the correct "requeue attempts".
     return queueEntry.toBuilder().setRequeueAttempts(queueEntry.getRequeueAttempts() + 1).build();
@@ -1390,9 +1406,10 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private BackplaneStatus backplaneStatus(UnifiedJedis jedis) throws IOException {
+    Unified unified = (Unified) jedis;
     Set<String> executeWorkers = getExecuteWorkers();
     Set<String> storageWorkers = getStorageWorkers();
-    try (AbstractPipeline pipeline = jedis.pipelined()) {
+    try (AbstractPipeline pipeline = unified.pipelined(pipelineExecutor)) {
       Supplier<QueueStatus> prequeue = state.prequeue.status(pipeline);
       Supplier<OperationQueueStatus> operationQueue = state.executionQueue.status(pipeline);
       Supplier<Long> dispatchedSize = state.dispatchedExecutions.size(pipeline);

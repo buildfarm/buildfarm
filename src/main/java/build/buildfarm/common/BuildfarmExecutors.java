@@ -65,6 +65,13 @@ public class BuildfarmExecutors {
         new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
+  public static ExecutorService getPipelinePool() {
+    int nThreads = 8;
+    String threadNameFormat = "pipeline-pool-%d";
+    return Executors.newFixedThreadPool(
+        nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
+  }
+
   public static ListeningExecutorService getTransformServicePool() {
     int nThreads = 24;
     String threadNameFormat = "transform-service-pool-%d";
