@@ -8,7 +8,7 @@
     "docker:pinDigests",
     "helpers:pinGitHubActionDigests"
   ],
-  "prConcurrentLimit": 10,
+  "prConcurrentLimit": 2,
   "packageRules": [
     {
       "groupName": "Bazel",
