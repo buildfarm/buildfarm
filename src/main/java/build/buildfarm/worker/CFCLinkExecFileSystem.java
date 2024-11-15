@@ -139,7 +139,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     return transformAsync(
         fileCache.putDirectory(digest, directoriesIndex, fetchService),
         pathResult -> {
-          Path path = pathResult.getPath();
+          Path path = pathResult.path();
           if (pathResult.isMissed()) {
             log.finer(
                 String.format(
