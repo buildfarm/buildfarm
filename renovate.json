@@ -8,24 +8,42 @@
     "docker:pinDigests",
     "helpers:pinGitHubActionDigests"
   ],
-  "prConcurrentLimit": 10,
+  "prConcurrentLimit": 2,
   "packageRules": [
     {
       "groupName": "Bazel",
-      "matchManagers": ["bazel"],
-      "matchUpdateTypes": ["patch", "minor"],
-      "automerge": "true"
+      "matchManagers": [
+        "bazel"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "automerge": true
     },
     {
       "groupName": "tini",
       "description": "tini x86_64 and arm64v8",
-      "matchPackageNames": ["tini*"]
+      "matchPackageNames": [
+        "tini*"
+      ]
     },
     {
       "groupName": "rules_proto",
       "description": "disable rules_proto as it's transitive and Buildfarm does not use it",
-      "matchPackageNames": ["rules_proto"],
+      "matchPackageNames": [
+        "rules_proto"
+      ],
       "enabled": false
+    },
+    {
+      "groupName": "Maven deps",
+      "description": "Maven dependencies need to be pinned by 'REPIN=1 bazelisk run @maven//:pin && git add maven_install.json && git commit' to pass CI, then they can be auto-merged after approval",
+      "matchManagers": [
+        "maven"
+      ],
+      "dependencyDashboardApproval": true,
+      "automerge": true
     }
   ]
 }
