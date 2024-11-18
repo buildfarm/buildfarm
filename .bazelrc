@@ -22,6 +22,10 @@ test --test_tag_filters=-redis,-integration
 # https://buildkite.com/bazel/bazelisk-plus-incompatible-flags
 common --incompatible_disallow_empty_glob
 
+# Stop recompiling protoc.
+# https://fzakaria.com/2024/10/23/bazel-knowledge-mind-your-path.html
+build --incompatible_strict_action_env
+
 common --enable_bzlmod
 
 # See also https://bazel.build/external/lockfile.
