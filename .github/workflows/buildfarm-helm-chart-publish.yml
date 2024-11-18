@@ -1,10 +1,9 @@
----
 name: Package and Publish Helm Chart
 
 on:
   push:
     tags:
-      - 'helm/*'
+    - helm/*
 
 env:
   CHART_NAME: buildfarm
@@ -21,43 +20,43 @@ jobs:
     permissions:
       packages: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - id: get-chart-ver
-        name: Extracting Helm Chart Version from Tag
-        run: |
-          set -ex
-          echo "chart_ver=$(echo $GITHUB_REF | cut -d / -f 4)" >> $GITHUB_OUTPUT
-      - id: set-chart-yaml-version
-        name: Etching Helm Chart Version into Chart.yaml for Packaging
-        run: |
-          set -ex
-          echo setting Chart version to \
-            "${{ steps.get-chart-ver.outputs.chart_ver }}" \
-            in ${CHART_ROOT}/Chart.yaml
-          yq -i \
-            '.version |= "${{ steps.get-chart-ver.outputs.chart_ver }}"' \
-            ${CHART_ROOT}/Chart.yaml
-      - id: helm-lint
-        name: Helm Chart Lint
-        run: |-
-          set -ex
-          helm dep up "${CHART_ROOT}"
-          helm lint "${CHART_ROOT}"
-      - id: helm-bundle-push
-        name: Helm Chart Bundle and Push
-        run: |-
-          set -e
-          echo ${{ secrets.GITHUB_TOKEN }} | \
-            helm registry \
-              login "${GHCR_REPO}" \
-              --username "${{ github.repository_owner }}" \
-              --password-stdin
-          set -ex
-          helm dep up "${CHART_ROOT}"
-          helm package "${CHART_ROOT}"
-          export CHART_BUNDLE="${CHART_NAME}-${{ steps.get-chart-ver.outputs.chart_ver }}.tgz"
-          ls -l "${CHART_BUNDLE}"
-          helm push \
-            "${CHART_BUNDLE}" \
-            "oci://${GHCR_REPO}"
+    - name: Checkout
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4
+    - id: get-chart-ver
+      name: Extracting Helm Chart Version from Tag
+      run: |
+        set -ex
+        echo "chart_ver=$(echo $GITHUB_REF | cut -d / -f 4)" >> $GITHUB_OUTPUT
+    - id: set-chart-yaml-version
+      name: Etching Helm Chart Version into Chart.yaml for Packaging
+      run: |
+        set -ex
+        echo setting Chart version to \
+          "${{ steps.get-chart-ver.outputs.chart_ver }}" \
+          in ${CHART_ROOT}/Chart.yaml
+        yq -i \
+          '.version |= "${{ steps.get-chart-ver.outputs.chart_ver }}"' \
+          ${CHART_ROOT}/Chart.yaml
+    - id: helm-lint
+      name: Helm Chart Lint
+      run: |-
+        set -ex
+        helm dep up "${CHART_ROOT}"
+        helm lint "${CHART_ROOT}"
+    - id: helm-bundle-push
+      name: Helm Chart Bundle and Push
+      run: |-
+        set -e
+        echo ${{ secrets.GITHUB_TOKEN }} | \
+          helm registry \
+            login "${GHCR_REPO}" \
+            --username "${{ github.repository_owner }}" \
+            --password-stdin
+        set -ex
+        helm dep up "${CHART_ROOT}"
+        helm package "${CHART_ROOT}"
+        export CHART_BUNDLE="${CHART_NAME}-${{ steps.get-chart-ver.outputs.chart_ver }}.tgz"
+        ls -l "${CHART_BUNDLE}"
+        helm push \
+          "${CHART_BUNDLE}" \
+          "oci://${GHCR_REPO}"

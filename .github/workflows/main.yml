@@ -3,7 +3,7 @@ name: Build and Deploy to Github Pages
 on:
   push:
     branches:
-      - main
+    - main
 permissions:
   contents: read
 
@@ -14,27 +14,27 @@ jobs:
     permissions:
       pages: write
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4
 
       # Use GitHub Actions' cache to cache dependencies on servers
-      - uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4
-        with:
-          path: vendor/bundle
-          key: ${{ runner.os }}-gems-${{ hashFiles('**/Gemfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-gems-
+    - uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a   # v4
+      with:
+        path: vendor/bundle
+        key: ${{ runner.os }}-gems-${{ hashFiles('**/Gemfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-gems-
 
       # Use GitHub Deploy Action to build and deploy to Github
-      - uses: jeffreytse/jekyll-deploy-action@c1329290ab1cf2df48661ec1bea92e1d6990025b # v0.6.0
-        with:
-          provider: 'github'
-          token: ${{ secrets.GH_TOKEN }} # It's your Personal Access Token(PAT)
-          repository: ''             # Default is current repository
-          branch: 'gh-pages'         # Default is gh-pages for github provider
-          jekyll_src: '_site'        # Default is root directory
-          jekyll_cfg: '_config.yml'  # Default is _config.yml
-          jekyll_baseurl: ''         # Default is according to _config.yml
-          bundler_ver: '>=0'         # Default is latest bundler version
-          cname: ''                  # Default is to not use a cname
-          actor: ''                  # Default is the GITHUB_ACTOR
-          pre_build_commands: ''     # Installing additional dependencies (Arch Linux)
+    - uses: jeffreytse/jekyll-deploy-action@c1329290ab1cf2df48661ec1bea92e1d6990025b   # v0.6.0
+      with:
+        provider: github
+        token: ${{ secrets.GH_TOKEN }}   # It's your Personal Access Token(PAT)
+        repository: ''               # Default is current repository
+        branch: gh-pages             # Default is gh-pages for github provider
+        jekyll_src: _site            # Default is root directory
+        jekyll_cfg: _config.yml      # Default is _config.yml
+        jekyll_baseurl: ''           # Default is according to _config.yml
+        bundler_ver: '>=0'           # Default is latest bundler version
+        cname: ''                    # Default is to not use a cname
+        actor: ''                    # Default is the GITHUB_ACTOR
+        pre_build_commands: ''       # Installing additional dependencies (Arch Linux)

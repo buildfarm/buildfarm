@@ -373,7 +373,7 @@ The dequeueMatchSettings may also further limit executions to contain "resource:
 The default resource type is SEMAPHORE.
 The expected use case is that a resource is _internally_ allocated and managed by an execution, and the exhaustion prevents executions from starting which would block or fault if they could not consume the resource. Common examples include licensed software with tokens, and this mechanism can work for singleton resources like one gpu on a worker.
 
-The POOL resource type is intended for _externally_ defined resource allotment. The Integer range _[0,amount)_ will be created in a pool of free ids provided to 
+The POOL resource type is intended for _externally_ defined resource allotment. The Integer range _[0,amount)_ will be created in a pool of free ids provided to
 The common use case here is multiple gpus on a system, where the concurrent execution on all gpus can take place, but each execution completion frees a different gpu that must be targetted with, for example, the CUDA_VISIBLE_DEVICES env var. The pool takes a resource out of a queue of available ids, and replaces it in the queue when the execution is complete.
 Since externally defined resources need to be injected into an execution, the depletion of a pool resource applies an automatic execution policy, named 'pool-<name>', and supplies transformations for both '<_name_>' - expanded to all ids in multiple arguments, or '<_name_-_N_>' for 0-N addressable ids, up to the amount requested. Subsequent literal arguments can provide a delimiter for the wrapper.
 
