@@ -59,9 +59,9 @@ maven.install(
         "com.amazonaws:aws-java-sdk-secretsmanager",
         "com.fasterxml.jackson.core:jackson-databind:2.18.1",
         "com.github.ben-manes.caffeine:caffeine:2.9.3",
-        "com.github.docker-java:docker-java:3.3.3",
-        "com.github.docker-java:docker-java-api:3.3.3",
-        "com.github.docker-java:docker-java-core:3.3.3",
+        "com.github.docker-java:docker-java",
+        "com.github.docker-java:docker-java-api",
+        "com.github.docker-java:docker-java-core",
         "com.github.jnr:jffi:1.3.11",
         "com.github.jnr:jffi:jar:native:1.3.11",
         "com.github.jnr:jnr-constants:0.10.4",
@@ -141,6 +141,7 @@ maven.install(
     boms = [
         # keep sorted
         "com.amazonaws:aws-java-sdk-bom:1.12.544",
+        "com.github.docker-java:docker-java-bom:3.3.3",
         "io.grpc:grpc-bom:1.62.2",
         "io.netty:netty-bom:4.1.108.Final",
     ],
