@@ -260,6 +260,12 @@ public final class Worker extends LoggingMain {
     }
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getWorker().getGrpcMetrics());
     serverBuilder.intercept(new ServerHeadersInterceptor(meta -> {}));
+    if (configs.getServer().getMaxInboundMessageSizeBytes() != 0) {
+      serverBuilder.maxInboundMessageSize(configs.getServer().getMaxInboundMessageSizeBytes());
+    }
+    if (configs.getServer().getMaxInboundMetadataSize() != 0) {
+      serverBuilder.maxInboundMetadataSize(configs.getServer().getMaxInboundMetadataSize());
+    }
     return serverBuilder.build();
   }
 

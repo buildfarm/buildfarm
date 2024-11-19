@@ -1,35 +1,34 @@
----
 buildifier: 7.3.1
 tasks:
 
   # Linting jobs
   format_check:
-    name: "Code Format"
+    name: Code Format
     platform: ubuntu2204
     shell_commands:
     - ./.bazelci/format.sh --check
   package_layout:
-    name: "Package Layout"
+    name: Package Layout
     platform: ubuntu2204
     shell_commands:
     - ./.bazelci/package_name_check.sh
   java_unused_deps_check:
-    name: "Java Unused Dependencies"
+    name: Java Unused Dependencies
     platform: ubuntu2204
     shell_commands:
     - ./.bazelci/unused_deps.sh --check
   static_analysis_check:
-    name: "Static Analysis"
+    name: Static Analysis
     platform: ubuntu2204
     shell_commands:
     - ./.bazelci/static_analyze.sh
   checkstyle:
-    name: "Check Style"
+    name: Check Style
     platform: ubuntu2204
     shell_commands:
     - ./.bazelci/run_checkstyle.sh
   code_coverage:
-    name: "Code Coverage"
+    name: Code Coverage
     platform: ubuntu2204
     shell_commands:
     - export BUILDFARM_SKIP_COVERAGE_HOST=true
@@ -38,49 +37,49 @@ tasks:
 
   # Typical unit tests that run across a variety of operating systems.
   ubuntu2204:
-    name: "Unit Tests"
+    name: Unit Tests
     build_targets:
-    - "..."
+    - '...'
     build_flags:
-    - "--build_tag_filters=-container"
+    - --build_tag_filters=-container
     test_flags:
-    - "--test_tag_filters=-integration,-redis"
+    - --test_tag_filters=-integration,-redis
     test_targets:
-    - "..."
+    - '...'
   ubuntu2004:
-    name: "Unit Tests"
+    name: Unit Tests
     build_targets:
-    - "..."
+    - '...'
     build_flags:
-    - "--build_tag_filters=-container"
+    - --build_tag_filters=-container
     test_flags:
-    - "--test_tag_filters=-integration,-redis"
+    - --test_tag_filters=-integration,-redis
     test_targets:
-    - "..."
+    - '...'
   macos:
-    name: "Unit Tests"
+    name: Unit Tests
     build_flags:
-    - "--cxxopt=-std=c++14"
-    - "--build_tag_filters=-container"
+    - --cxxopt=-std=c++14
+    - --build_tag_filters=-container
     build_targets:
-    - "..."
+    - '...'
     test_flags:
-    - "--test_tag_filters=-container,-integration,-redis"
+    - --test_tag_filters=-container,-integration,-redis
     test_targets:
-    - "..."
+    - '...'
   windows:
-    name: "Unit Tests"
+    name: Unit Tests
     build_flags:
-    - "--build_tag_filters=-container"
+    - --build_tag_filters=-container
     build_targets:
-    - "..."
+    - '...'
     test_flags:
-    - "--@rules_jvm_external//settings:stamp_manifest=False"
-    - "--test_tag_filters=-container,-integration,-redis"
+    - --@rules_jvm_external//settings:stamp_manifest=False
+    - --test_tag_filters=-container,-integration,-redis
     test_targets:
-    - "..."
+    - '...'
   rpm_builds:
-    name: "Rpm Builds"
+    name: Rpm Builds
     platform: centos7_java11_devtoolset10
     shell_commands:
     - bazel build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
@@ -88,7 +87,7 @@ tasks:
   # This will run unit tests that integrate with redis.
   # Outside of this step, similar functionality may be tested with mocks.
   redis_unit_tests:
-    name: "Redis Unit Tests"
+    name: Redis Unit Tests
     platform: ubuntu2004
     shell_commands:
     - ./.bazelci/redis_unit_tests.sh
@@ -97,7 +96,7 @@ tasks:
   # This is because test cases may behave different while in docker due to user permissions.
   # This is more of a sanity check between a defined docker file and running tests directly on the host.
   docker_unit_tests:
-    name: "Docker Unit Tests"
+    name: Docker Unit Tests
     platform: ubuntu2004
     shell_commands:
     - ./.bazelci/docker_unit_test.sh
@@ -106,16 +105,16 @@ tasks:
   # It starts the distributed storage backend and buildfarm services.
   # It performs a realistic build on generated cc targets and gating projects.
   integration_test_server:
-    name: "Server Integration Test"
+    name: Server Integration Test
     platform: ubuntu2004
     shell_commands:
-      - ./.bazelci/run_server_test.sh
+    - ./.bazelci/run_server_test.sh
 
   # Test that buildfarm can build software using the default configurations.
   # It starts the distributed storage backend and buildfarm services.
   # It performs a realistic build on generated cc targets and gating projects.
   integration_test_many:
-    name: "Integration Test"
+    name: Integration Test
     platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
@@ -126,7 +125,7 @@ tasks:
   # Test the buildfarm deployment with the full config.
   # More issues can be caught when using the fully defined configuration file.
   integration_test_many_full_config:
-    name: "Integration Test (Full Config)"
+    name: Integration Test (Full Config)
     platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
@@ -136,7 +135,7 @@ tasks:
 
   # Test that buildfarm can work with zstd compression
   compression_test_many_compression:
-    name: "Integration Test (Shard/Compression)"
+    name: Integration Test (Shard/Compression)
     platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_generative_cc_many_test.sh
@@ -149,7 +148,7 @@ tasks:
   # We as service owners will want a way to verify that our cache hit rate is correct and
   # that latencies can be captured.
   cache_check_many:
-    name: "Cache Check"
+    name: Cache Check
     platform: ubuntu2004
     shell_commands:
     - export CACHE_TEST=true
@@ -162,7 +161,7 @@ tasks:
     - ./.bazelci/cache_test.sh
 
   integration_test_absei:
-    name: "Abseil Test"
+    name: Abseil Test
     platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
@@ -170,7 +169,7 @@ tasks:
     - export EXECUTION_STAGE_WIDTH=10
     - ./.bazelci/integration_test.sh
   integration_test_abseil_shard_compression:
-    name: "Abseil Test (Shard/Compression)"
+    name: Abseil Test (Shard/Compression)
     platform: ubuntu2004
     shell_commands:
     - export RUN_TEST=./.bazelci/run_abseil_test.sh
