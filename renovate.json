@@ -12,7 +12,7 @@
   "packageRules": [
     {
       "groupName": "Bazel",
-      "matchManagers": [
+      "matchPackageNames": [
         "bazel"
       ],
       "matchUpdateTypes": [
@@ -37,12 +37,44 @@
       "enabled": false
     },
     {
-      "groupName": "Maven deps",
       "description": "Maven dependencies need to be pinned by 'REPIN=1 bazelisk run @maven//:pin && git add maven_install.json && git commit' to pass CI, then they can be auto-merged after approval",
-      "matchManagers": [
-        "maven"
-      ],
+      "matchManagers": ["bazel-module"],
+      "matchDatasources": ["maven"],
       "dependencyDashboardApproval": true,
+      "automerge": true,
+      "prConcurrentLimit": 1,
+      "rebaseWhen": "never"
+    },
+    {
+      "groupName": "Apache commons",
+      "description": "All apache commons grouped into one PR",
+      "matchPackageNames": [
+        "commons-io:commons-io",
+        "org.apache.commons:*"
+      ]
+    },
+    {
+      "groupName": "Java protobuf",
+      "description": "Java protobuf and common protos",
+      "matchPackageNames": [
+        "com.google.api.grpc:proto-google-common-protos",
+        "com.google.protobuf:*"
+      ]
+    },
+    {
+      "groupName": "annotations",
+      "matchPackageNames": [
+        "com.google.errorprone:*",
+        "net.jcip:jcip-annotations",
+        "org.checkerframework:checker-qual"
+      ]
+    },
+    {
+      "groupName": "GitHub Actions",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "extends": ["schedule:monthly"],
       "automerge": true
     }
   ]
