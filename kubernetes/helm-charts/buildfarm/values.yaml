@@ -66,6 +66,7 @@ server:
     #    hosts:
     #      - chart-example.local
 
+  runtimeClassName: ""
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -145,6 +146,7 @@ shardWorker:
     type: ClusterIP
     port: 8982
 
+  #runtimeClassName: ""
   #nodeSelector: {}
   #tolerations: []
   #affinity: {}
