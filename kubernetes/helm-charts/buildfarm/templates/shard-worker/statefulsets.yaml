@@ -80,6 +80,9 @@ spec:
             {{- with .Values.shardWorker.extraVolumeMounts }}
             {{- tpl (toYaml .) $ | nindent 12 -}}
             {{- end }}
+      {{- with .Values.shardWorker.runtimeClassName }}
+      runtimeClassName: {{ tpl . $ }}
+      {{- end }}
 
       {{- with .Values.shardWorker.nodeSelector }}
       nodeSelector:
