@@ -76,6 +76,15 @@
       ],
       "extends": ["schedule:monthly"],
       "automerge": true
+    },
+    {
+      "description": "Bazel Central Registry updates",
+      "matchManagers": [
+        "bazel-module"
+      ],
+      "matchDatasources": ["bazel"],
+      "extends": ["schedule:weekly"],
+      "automerge": true
     }
   ]
 }
