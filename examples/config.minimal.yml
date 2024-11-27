@@ -9,3 +9,5 @@ worker:
   publicName: localhost:8981
   dequeueMatchSettings:
     allowUnmatched: true
+  linkedInputDirectories:
+  - (?!external/)[^/]+
