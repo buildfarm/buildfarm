@@ -17,7 +17,6 @@ import org.apache.commons.pool2.impl.DefaultPooledObject;
  */
 public abstract class CommonsSupervisor<K, V extends Destructable>
     extends BaseKeyedPooledObjectFactory<K, V> implements Supervisor<K, V, PooledObject<V>> {
-
   private static final Logger logger = Logger.getLogger(CommonsSupervisor.class.getName());
 
   public abstract V create(K k) throws Exception;

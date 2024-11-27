@@ -8,7 +8,6 @@ import java.util.Collections;
 import java.util.List;
 
 public class JavaProcessWrapper extends ProcessWrapper {
-
   // Get the path of the JVM from the current process to avoid breaking the Bazel sandbox
   public static final String CURRENT_JVM_COMMAND =
       ProcessHandle.current()

@@ -12,7 +12,6 @@ public abstract class WorkCoordinator<
         O extends CtxAround<WorkResponse>,
         P extends ObjectPool<WorkerKey, PersistentWorker>>
     extends Coordinator<WorkerKey, WorkRequest, WorkResponse, PersistentWorker, I, O, P> {
-
   public WorkCoordinator(P workerPool) {
     super(workerPool);
   }

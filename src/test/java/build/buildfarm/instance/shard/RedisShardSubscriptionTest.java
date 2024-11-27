@@ -46,9 +46,7 @@ import redis.clients.jedis.exceptions.JedisException;
 
 @RunWith(JUnit4.class)
 public class RedisShardSubscriptionTest {
-
   RedisShardSubscriber getDefaultRedisSubscriber() {
-
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());

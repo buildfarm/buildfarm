@@ -1,7 +1,6 @@
 package persistent.common;
 
 public interface CtxAround<T> {
-
   T get();
 
   // i.e. no context

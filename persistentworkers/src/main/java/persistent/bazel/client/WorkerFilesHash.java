@@ -26,7 +26,6 @@ import java.util.SortedMap;
  * reused.
  */
 public final class WorkerFilesHash {
-
   public static HashCode getCombinedHash(Path toolsRoot, SortedMap<Path, HashCode> hashedTools) {
     Hasher hasher = Hashing.sha256().newHasher();
     hashedTools.forEach(

@@ -18,7 +18,6 @@ import lombok.ToString;
  */
 @ToString(onlyExplicitlyIncluded = true)
 public final class WorkerKey {
-
   @Getter @ToString.Include private final ImmutableList<String> cmd;
 
   @Getter @ToString.Include private final ImmutableList<String> args;

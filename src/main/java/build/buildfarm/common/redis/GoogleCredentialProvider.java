@@ -43,7 +43,6 @@ import redis.clients.jedis.RedisCredentialsProvider;
  */
 @Log
 public class GoogleCredentialProvider implements RedisCredentialsProvider, Runnable, Closeable {
-
   private final GoogleCredentials googleCredentials;
   private final ScheduledExecutorService service;
   private final Duration refreshDuration;
