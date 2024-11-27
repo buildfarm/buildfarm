@@ -33,7 +33,7 @@ import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,7 +104,7 @@ class WorkerProfile {
       throw new IllegalArgumentException("Missing Config_PATH");
     }
     try {
-      configs.loadConfigs(Paths.get(residue.get(3)));
+      configs.loadConfigs(Path.of(residue.get(3)));
     } catch (IOException e) {
       System.out.println("Could not parse yml configuration file." + e);
     }

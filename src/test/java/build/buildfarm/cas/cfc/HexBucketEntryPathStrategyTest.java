@@ -18,7 +18,6 @@ import static com.google.common.truth.Truth.assertThat;
 import static java.lang.String.format;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Iterator;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -28,7 +27,7 @@ import org.junit.runners.JUnit4;
 public class HexBucketEntryPathStrategyTest {
   @Test
   public void branchDirectoriesNoLevelsIsEmpty() {
-    Path path = Paths.get("cache");
+    Path path = Path.of("cache");
     EntryPathStrategy entryPathStrategy = new HexBucketEntryPathStrategy(path, 0);
 
     Iterator<Path> paths = entryPathStrategy.branchDirectories().iterator();
@@ -37,7 +36,7 @@ public class HexBucketEntryPathStrategyTest {
 
   @Test
   public void branchDirectoriesSingleLevelsIsRoot() {
-    Path path = Paths.get("cache");
+    Path path = Path.of("cache");
     EntryPathStrategy entryPathStrategy = new HexBucketEntryPathStrategy(path, 1);
 
     Iterator<Path> paths = entryPathStrategy.branchDirectories().iterator();
@@ -49,7 +48,7 @@ public class HexBucketEntryPathStrategyTest {
 
   @Test
   public void branchDirectoriesMultipleLevels() {
-    Path path = Paths.get("cache");
+    Path path = Path.of("cache");
     EntryPathStrategy entryPathStrategy = new HexBucketEntryPathStrategy(path, 2);
 
     Iterator<Path> paths = entryPathStrategy.branchDirectories().iterator();
@@ -66,7 +65,7 @@ public class HexBucketEntryPathStrategyTest {
 
   @Test
   public void getPathMatchesLevels() {
-    Path path = Paths.get("cache");
+    Path path = Path.of("cache");
     EntryPathStrategy entryPathStrategy = new HexBucketEntryPathStrategy(path, 2);
 
     String key = "aa55bb1100bb";

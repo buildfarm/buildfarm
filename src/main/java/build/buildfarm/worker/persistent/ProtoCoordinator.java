@@ -23,7 +23,6 @@ import com.google.protobuf.util.Durations;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -225,7 +224,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     Path opRoot = context.opRoot;
 
     for (String outputDir : context.outputDirectories) {
-      Path outputDirPath = Paths.get(outputDir);
+      Path outputDirPath = Path.of(outputDir);
       Files.createDirectories(outputDirPath);
     }
 

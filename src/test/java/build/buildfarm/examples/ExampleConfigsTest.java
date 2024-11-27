@@ -17,7 +17,6 @@ package build.buildfarm.examples;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -35,14 +34,14 @@ public class ExampleConfigsTest {
   @Test
   public void shardWorkerConfig() throws IOException {
     Path configPath =
-        Paths.get(System.getenv("TEST_SRCDIR"), "_main", "examples", "config.minimal.yml");
+        Path.of(System.getenv("TEST_SRCDIR"), "_main", "examples", "config.minimal.yml");
     BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
     configs.loadConfigs(configPath);
   }
 
   @Test
   public void fullConfig() throws IOException {
-    Path configPath = Paths.get(System.getenv("TEST_SRCDIR"), "_main", "examples", "config.yml");
+    Path configPath = Path.of(System.getenv("TEST_SRCDIR"), "_main", "examples", "config.yml");
     BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
     configs.loadConfigs(configPath);
   }
