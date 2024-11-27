@@ -1940,11 +1940,9 @@ public class ServerInstance extends NodeInstance {
         catchingAsync(
             fetchQueuedOperationFuture,
             Throwable.class,
-            (e) -> {
-              log.warning("got to buildQueuedOperation");
-              return buildQueuedOperation(
-                  operation.getName(), actionDigest, operationTransformService, requestMetadata);
-            },
+            (e) ->
+                buildQueuedOperation(
+                    operation.getName(), actionDigest, operationTransformService, requestMetadata),
             directExecutor());
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     ListenableFuture<QueuedOperation> validatedFuture =
