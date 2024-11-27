@@ -11,7 +11,6 @@ import persistent.testutil.ProcessUtils;
 
 @RunWith(JUnit4.class)
 public class TestDepsTest {
-
   @SuppressWarnings("CheckReturnValue")
   @Test
   public void canRetrieveAdderBinDeployJar() throws Exception {

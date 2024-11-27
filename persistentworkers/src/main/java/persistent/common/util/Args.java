@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Args {
-
   public static final String ARGSFILE_START = "@";
 
   public static final String ARGSFILE_ESCAPE = "@@";

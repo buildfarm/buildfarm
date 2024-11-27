@@ -26,7 +26,6 @@ import persistent.common.processes.ProcessWrapper;
  * <p>Also takes care of the underlying process's environment, i.e. directories and files.
  */
 public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
-
   /** Services supporting being run as persistent workers need to parse this flag */
   public static final String PERSISTENT_WORKER_FLAG = "--persistent_worker";
 

@@ -7,7 +7,6 @@ import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 // ObjectPool which uses Apache Commons
 public abstract class CommonsObjPool<K, V> extends GenericKeyedObjectPool<K, V>
     implements ObjectPool<K, V> {
-
   public CommonsObjPool(
       KeyedPooledObjectFactory<K, V> factory, GenericKeyedObjectPoolConfig<V> config) {
     super(factory, config);

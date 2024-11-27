@@ -12,7 +12,6 @@ import persistent.bazel.client.PersistentWorker;
 import persistent.common.processes.JavaProcessWrapper;
 
 public class ProcessUtils {
-
   /**
    * Creates a new java process with the specified classpath and classname (with the main method),
    * passing along the --persistent_worker flag.
@@ -42,7 +41,6 @@ public class ProcessUtils {
 
   public static Path retrieveFileResource(ClassLoader classLoader, String filename, Path targetPath)
       throws IOException {
-
     InputStream is = classLoader.getResourceAsStream(filename);
 
     Files.write(targetPath, IOUtils.toByteArray(is));

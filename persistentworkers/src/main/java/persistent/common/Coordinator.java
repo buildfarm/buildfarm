@@ -23,7 +23,6 @@ public abstract class Coordinator<
     CI extends CtxAround<I>,
     CO extends CtxAround<O>,
     P extends ObjectPool<K, W>> {
-
   protected final P workerPool;
 
   public Coordinator(P workerPool) {
@@ -56,7 +55,6 @@ public abstract class Coordinator<
    */
   public static class SimpleCoordinator<K, I, O, W extends Worker<I, O>>
       extends Coordinator<K, I, O, W, Id<I>, Id<O>, ObjectPool<K, W>> {
-
     public SimpleCoordinator(ObjectPool<K, W> workerPool) {
       super(workerPool);
     }
