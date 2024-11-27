@@ -89,6 +89,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -807,7 +808,8 @@ public class RedisShardBackplane implements Backplane {
   }
 
   public static <T> List<T> randomN(List<T> list, int n) {
-    return Stream.generate(() -> list.remove((int) (list.size() * Math.random())))
+    return Stream.generate(
+            () -> list.remove((int) (list.size() * ThreadLocalRandom.current().nextDouble())))
         .limit(Math.min(list.size(), n))
         .collect(Collectors.toList());
   }
