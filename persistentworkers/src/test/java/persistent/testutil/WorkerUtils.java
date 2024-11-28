@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import persistent.bazel.client.WorkerKey;
 
 public class WorkerUtils {
-
   public static WorkerKey emptyWorkerKey(Path execDir, ImmutableList<String> initCmd) {
     return new WorkerKey(
         initCmd,

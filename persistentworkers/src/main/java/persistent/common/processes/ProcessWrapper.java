@@ -28,7 +28,6 @@ import lombok.Getter;
  * <p>Constructor immediately starts a process and checks isAlive() right after.
  */
 public class ProcessWrapper implements Closeable {
-
   private static Logger logger = Logger.getLogger(ProcessWrapper.class.getName());
 
   private final Process process;

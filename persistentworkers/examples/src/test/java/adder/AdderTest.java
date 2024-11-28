@@ -14,7 +14,6 @@ import persistent.common.processes.ProcessWrapper;
 
 @RunWith(JUnit4.class)
 public class AdderTest {
-
   private JavaProcessWrapper spawnAdderProcess() throws IOException {
     return spawnPersistentWorkerProcess(System.getProperty("java.class.path"), Adder.class);
   }

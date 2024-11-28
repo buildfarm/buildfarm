@@ -7,6 +7,7 @@ java_library(
         "//src/main/java/build/buildfarm/actioncache",
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/common/resources",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/java/build/buildfarm/instance",

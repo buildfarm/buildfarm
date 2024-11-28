@@ -26,7 +26,6 @@ import persistent.common.processes.ProcessWrapper;
  * per tests).
  */
 public class ProtoWorkerRW {
-
   @Getter private final ProcessWrapper processWrapper;
 
   private final InputStream readStream;

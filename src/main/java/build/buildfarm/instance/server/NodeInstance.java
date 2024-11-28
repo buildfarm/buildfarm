@@ -75,6 +75,7 @@ import build.buildfarm.common.Size;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.net.URL;
 import build.buildfarm.common.resources.BlobInformation;
@@ -149,6 +150,8 @@ import org.apache.http.auth.Credentials;
 
 @Log
 public abstract class NodeInstance extends InstanceBase {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   protected final ContentAddressableStorage contentAddressableStorage;
   protected final ActionCache actionCache;
   protected final OperationsMap outstandingOperations;
@@ -1728,7 +1731,7 @@ public abstract class NodeInstance extends InstanceBase {
 
   protected ExecutionCapabilities getExecutionCapabilities() {
     return ExecutionCapabilities.newBuilder()
-        .setDigestFunction(DigestFunction.Value.BLAKE3)
+        .setDigestFunction(configs.getDigestFunction().getDigestFunction())
         .addAllDigestFunctions(getDigestFunctions())
         .setExecEnabled(true)
         .setExecutionPriorityCapabilities(

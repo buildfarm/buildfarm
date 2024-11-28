@@ -15,7 +15,6 @@ import persistent.testutil.ProcessUtils;
 
 @RunWith(JUnit4.class)
 public class ProtoWorkerRWTest {
-
   // Similar to AdderTest; but spawns the process via a jar
   @SuppressWarnings("CheckReturnValue")
   @Test

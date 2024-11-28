@@ -15,7 +15,6 @@ import java.util.function.BiFunction;
  * them, and returns WorkResponses -- forever
  */
 public class WorkRequestHandler {
-
   private final BiFunction<List<String>, PrintWriter, Integer> requestHandler;
 
   public WorkRequestHandler(BiFunction<List<String>, PrintWriter, Integer> callback) {
@@ -50,7 +49,6 @@ public class WorkRequestHandler {
   public WorkResponse respondTo(WorkRequest request) throws IOException {
     try (StringWriter outputWriter = new StringWriter();
         PrintWriter outputPrinter = new PrintWriter(outputWriter)) {
-
       int exitCode;
       try {
         exitCode = requestHandler.apply(request.getArgumentsList(), outputPrinter);

@@ -1387,7 +1387,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private CacheLoadResults loadCache(
       Consumer<Digest> onStartPut, ExecutorService removeDirectoryService)
       throws IOException, InterruptedException {
-
     // Phase 1: Scan
     // build scan cache results by analyzing each file on the root.
     CacheScanResults scan = scanRoot(onStartPut);

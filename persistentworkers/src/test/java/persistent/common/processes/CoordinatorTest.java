@@ -14,11 +14,9 @@ import persistent.common.Worker;
 
 @RunWith(JUnit4.class)
 public class CoordinatorTest {
-
   @SuppressWarnings("CheckReturnValue")
   @Test
   public void simpleTestWorks() throws Exception {
-
     // Creates an objectpool that uses Strings as a Key for its Workers
     // Workers increment an integer and returns its string value.
     ObjectPool<String, Worker<Integer, String>> spool =
