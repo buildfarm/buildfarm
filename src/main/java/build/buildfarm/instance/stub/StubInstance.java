@@ -366,7 +366,7 @@ public class StubInstance extends InstanceBase {
   @SuppressWarnings({"Guava", "ConstantConditions"})
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
-    if (grpcTimeout.getSeconds() > 0 || grpcTimeout.getNanos() > 0) {
+    if (Durations.isPositive(grpcTimeout)) {
       stub = stub.withDeadline(Time.toDeadline(grpcTimeout));
     }
     return stub;
