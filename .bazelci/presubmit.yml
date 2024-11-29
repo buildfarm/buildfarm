@@ -30,7 +30,13 @@ tasks:
   code_coverage:
     name: Code Coverage
     platform: ubuntu2204
-    shell_commands:
+    coverage_targets:
+    - //src/test/java/...:all
+    coverage_flags:
+    - --combined_report=lcov
+    - --test_tag_filters=-redis,-integration
+    post_shell_commands:
+    - export BUILDFARM_INVOKE_COVERAGE=false
     - export BUILDFARM_SKIP_COVERAGE_HOST=true
     - export BUILDFARM_GATE_LCOV_RESULTS=true
     - ./generate_coverage.sh
