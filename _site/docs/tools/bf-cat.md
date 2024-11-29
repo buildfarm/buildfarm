@@ -11,11 +11,9 @@ Build or run it with `bazel build //src/main/java/build/buildfarm/tools:bf-cat`
 
 Its basic usage is:
 
-`bf-cat <host[:port]> <instance-name> <hash-function> <command> [params...]`
+`bf-cat <host[:port]> <instance-name> <command> [params...]`
 
 **instance-name** is the name of the specific instance to inquire about, typically configured on schedulers. A literal empty string parameter (i.e. bash: `""`) will use the default instance for a server.
-
-**hash-function** is one of MD5, SHA1, SHA256, etc selected to match the supported digest functions of an instance, and used to compute digests for content retrieved.
 
 **command** is typically one of the following, with digest parameters as <hash>/<size>, as typically represented in log entries:
 
