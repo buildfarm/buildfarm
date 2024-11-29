@@ -153,9 +153,9 @@ public final class Group {
         !pids.isEmpty();
         pids = getPids(controllerName)) {
       killAllProcesses(pids);
-      if (deadline.isExpired() || !pids.containsAll(prevPids) || prevPids.containsAll(pids)) {
+      if (deadline.isExpired() || !pids.equals(prevPids)) {
         deadline = Deadline.after(1, SECONDS);
-        log.warning("Killed processes with PIDs: " + pids);
+        log.warning("Sent SIGKILL to pids: " + pids);
       }
       prevPids = pids;
     }
