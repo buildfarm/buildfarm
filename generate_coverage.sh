@@ -20,8 +20,8 @@ set -e
 # Combining coverage files automatically will create a specific coverage report.
 COMBINE_REPORT=true
 
-GATING_LINE_PERCENTAGE="40";
-GATING_FUNC_PERCENTAGE="40";
+GATING_LINE_PERCENTAGE="40"
+GATING_FUNC_PERCENTAGE="40"
 
 # If the user does not pass a given target, this will be used instead.
 DEFAULT_TEST_TARGET="//src/test/java/...:all"
@@ -59,9 +59,9 @@ download_lcov() {
         #download and extract tool
         wget -O $LCOV_TOOL $LCOV_TOOL_URL
         tar -xf $LCOV_TOOL
-        rm $LCOV_TOOL;
-        mv $LCOV_TOOL-$LCOV_VERSION/bin/$LCOV_TOOL .;
-        rm -rf $LCOV_TOOL-$LCOV_VERSION;
+        rm $LCOV_TOOL
+        mv $LCOV_TOOL-$LCOV_VERSION/bin/$LCOV_TOOL .
+        rm -rf $LCOV_TOOL-$LCOV_VERSION
     fi
 }
 
@@ -81,7 +81,7 @@ gate_lcov_results() {
     if [ "$line_percentage" -lt "$GATING_LINE_PERCENTAGE" ]; then
         print_error "line coverage is below gating percentage: "
         print_error "$line_percentage < $GATING_LINE_PERCENTAGE"
-        exit 1;
+        exit 1
     else
         echo "current line coverage: " $line_percentage%
     fi
@@ -89,7 +89,7 @@ gate_lcov_results() {
     if [ "$function_percentage" -lt "$GATING_FUNC_PERCENTAGE" ]; then
         print_error "function coverage is below gating percentage: "
         print_error "$function_percentage < $GATING_FUNC_PERCENTAGE"
-        exit 1;
+        exit 1
     else
         echo "current function coverage: " $function_percentage%
     fi
@@ -119,7 +119,9 @@ bazel=$DEFAULT_BAZEL_WRAPPER
 coverage_dir=$EXPECTED_TEST_LOGS/coverage
 
 # Perform bazel coverage
-generate_coverage_files
+if [ "${BUILDFARM_INVOKE_COVERAGE:-true}" = true ]; then
+    generate_coverage_files
+fi
 
 # Collect all of the trace files.
 # Some trace files may be empty which we will skip over since they fail genhtml
@@ -129,18 +131,18 @@ else
     traces=$(find $EXPECTED_TEST_LOGS/ ! -size 0 -name coverage.dat | sed "s|^|$PWD/|")
 fi
 
-if [ $BUILDFARM_GATE_LCOV_RESULTS  = true ] ; then
+if [ "${BUILDFARM_GATE_LCOV_RESULTS:-false}" = true ]; then
     gate_lcov_results
 fi
 
-# Establish directory for hosting code coverage
-mkdir -p $coverage_dir
-rm -fr $coverage_dir/*
-ln -s $PWD/src $coverage_dir/src
-cd $coverage_dir
-
 # After running coverage, convert the results to HTML and host it locally
 if [ "${BUILDFARM_SKIP_COVERAGE_HOST:-false}" = false ]; then
+    # Establish directory for hosting code coverage
+    mkdir -p $coverage_dir
+    rm -fr $coverage_dir/*
+    ln -s $PWD/src $coverage_dir/src
+    cd $coverage_dir
+
     command -v genhtml >/dev/null 2>&1 || { echo >&2 'genhtml does not exist.  You may need to install lcov.'; exit 1; }
     genhtml -f $traces
 
