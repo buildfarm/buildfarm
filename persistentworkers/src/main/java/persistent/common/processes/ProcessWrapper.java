@@ -65,7 +65,7 @@ public class ProcessWrapper implements Closeable {
             .command(this.args)
             .directory(this.workRoot.toFile())
             .redirectError(ProcessBuilder.Redirect.to(this.errorFile.toFile()));
-
+    pb.environment().clear();
     pb.environment().putAll(env);
 
     try {
