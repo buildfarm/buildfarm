@@ -21,7 +21,7 @@ public class CommonsPool<K, V> extends CommonsObjPool<K, V> {
     try {
       return super.borrowObject(key);
     } catch (Throwable t) {
-      Throwables.propagateIfPossible(t, IOException.class, InterruptedException.class);
+      Throwables.throwIfUnchecked(t);
       throw new RuntimeException("unexpected@<borrowObject>", t);
     }
   }
@@ -31,7 +31,7 @@ public class CommonsPool<K, V> extends CommonsObjPool<K, V> {
     try {
       super.invalidateObject(key, obj);
     } catch (Throwable t) {
-      Throwables.propagateIfPossible(t, IOException.class, InterruptedException.class);
+      Throwables.throwIfUnchecked(t);
       throw new RuntimeException("unexpected@<invalidateObject>", t);
     }
   }
