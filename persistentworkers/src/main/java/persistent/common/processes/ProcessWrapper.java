@@ -96,7 +96,7 @@ public class ProcessWrapper implements Closeable {
 
   public String getErrorString() throws IOException {
     if (Files.exists(this.errorFile)) {
-      return new String(Files.readAllBytes(this.errorFile));
+      return Files.readString(this.errorFile);
     } else {
       return "[No errorFile...]";
     }
