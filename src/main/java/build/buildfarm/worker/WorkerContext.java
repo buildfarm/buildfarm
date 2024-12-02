@@ -107,6 +107,8 @@ public interface WorkerContext {
       Command command)
       throws IOException, InterruptedException, StatusException;
 
+  void unmergeExecution(ActionKey actionKey) throws IOException, InterruptedException;
+
   boolean putOperation(Operation operation) throws IOException, InterruptedException;
 
   void blacklistAction(String actionId) throws IOException, InterruptedException;

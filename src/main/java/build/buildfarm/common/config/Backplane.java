@@ -27,6 +27,7 @@ public class Backplane {
   private int actionBlacklistExpire = 3600; // 1 Hour;
   private String invocationBlacklistPrefix = "InvocationBlacklist";
   private String operationPrefix = "Operation";
+  private String actionsPrefix = "Action";
   private int operationExpire = 604800; // 1 Week
   private String preQueuedOperationsListName = "{Arrival}:PreQueuedOperations";
   private String processingListName = "{Arrival}:ProcessingOperations";

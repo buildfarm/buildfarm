@@ -338,6 +338,21 @@ public abstract class NodeInstance extends InstanceBase {
             directExecutor()));
   }
 
+  private static boolean requestFlag(
+      RequestMetadata requestMetadata, String name, boolean flagDefault) {
+    try {
+      URI uri = new URI(requestMetadata.getCorrelatedInvocationsId());
+      QueryStringDecoder decoder = new QueryStringDecoder(uri);
+      return decoder
+          .parameters()
+          .getOrDefault(name, ImmutableList.of(flagDefault ? "true" : "false"))
+          .getFirst()
+          .equals("true");
+    } catch (URISyntaxException e) {
+      return flagDefault;
+    }
+  }
+
   private static boolean shouldEnsureOutputsPresent(
       boolean ensureOutputsPresent, RequestMetadata requestMetadata) {
     // The 'ensure outputs present' setting means that the AC will only return results to the client
@@ -347,23 +362,15 @@ public abstract class NodeInstance extends InstanceBase {
     // of incoming messages (perhaps due to a proxy). Or other build systems may not be reliable
     // without this extra check.
 
-    // We perform the outputs present check if the system is globally configured to check for it.
-    // Otherwise the behavior is determined dynamically from optional URI parameters.
-    if (ensureOutputsPresent) {
-      return true;
-    }
+    // The behavior is determined dynamically from optional URI parameters.
+    // If unspecified, we perform the outputs present check if the system is globally configured to
+    // check for it.
+    return requestFlag(requestMetadata, "ENSURE_OUTPUTS_PRESENT", ensureOutputsPresent);
+  }
 
-    try {
-      URI uri = new URI(requestMetadata.getCorrelatedInvocationsId());
-      QueryStringDecoder decoder = new QueryStringDecoder(uri);
-      return decoder
-          .parameters()
-          .getOrDefault("ENSURE_OUTPUTS_PRESENT", ImmutableList.of("false"))
-          .getFirst()
-          .equals("true");
-    } catch (URISyntaxException e) {
-      return false;
-    }
+  protected static boolean shouldMergeExecutions(
+      boolean mergeExecutions, RequestMetadata requestMetadata) {
+    return requestFlag(requestMetadata, "MERGE_EXECUTIONS", mergeExecutions);
   }
 
   @Override

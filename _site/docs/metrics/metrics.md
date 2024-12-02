@@ -26,7 +26,11 @@ Counter for key expirations
 
 **execution_success**
 
-Counter for the number of successful executions
+Counter for the number of executions requests received
+
+**merged_executions**
+
+Counter for the number of executions merged by action
 
 **pre_queue_size**
 

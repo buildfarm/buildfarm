@@ -30,6 +30,7 @@ public class Server {
   private boolean runFailsafeOperation = true;
   private boolean runOperationQueuer = true;
   private boolean ensureOutputsPresent = true;
+  private boolean mergeExecutions = true;
   private int maxRequeueAttempts = 5;
   private boolean useDenyList = true;
   private long grpcTimeout = 3600;

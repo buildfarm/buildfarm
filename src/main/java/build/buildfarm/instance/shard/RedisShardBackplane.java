@@ -886,7 +886,7 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public ActionResult getActionResult(ActionKey actionKey) throws IOException {
-    String json = client.call(jedis -> state.actionCache.get(jedis, asDigestStr(actionKey)));
+    String json = client.call(jedis -> state.actionCache.get(jedis, actionKey.toString()));
     if (json == null) {
       return null;
     }
@@ -915,14 +915,11 @@ public class RedisShardBackplane implements Backplane {
     client.run(
         jedis ->
             state.actionCache.insert(
-                jedis,
-                asDigestStr(actionKey),
-                json,
-                configs.getBackplane().getActionCacheExpire()));
+                jedis, actionKey.toString(), json, configs.getBackplane().getActionCacheExpire()));
   }
 
   private void removeActionResult(UnifiedJedis jedis, ActionKey actionKey) {
-    state.actionCache.remove(jedis, asDigestStr(actionKey));
+    state.actionCache.remove(jedis, actionKey.toString());
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -936,7 +933,7 @@ public class RedisShardBackplane implements Backplane {
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
     // convert action keys to strings
     List<String> keyNames = new ArrayList<>();
-    actionKeys.forEach(key -> keyNames.add(asDigestStr(key)));
+    actionKeys.forEach(key -> keyNames.add(key.toString()));
 
     client.run(jedis -> state.actionCache.remove(jedis, keyNames));
   }
@@ -1269,21 +1266,41 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException {
+  public Operation mergeExecution(ActionKey actionKey) throws IOException {
+    return client.call(jedis -> state.executions.merge(jedis, actionKey.toString()));
+  }
+
+  @SuppressWarnings("ConstantConditions")
+  @Override
+  public void unmergeExecution(ActionKey actionKey) throws IOException {
+    client.run(jedis -> state.executions.unmerge(jedis, actionKey.toString()));
+  }
+
+  @SuppressWarnings("ConstantConditions")
+  @Override
+  public boolean prequeue(ExecuteEntry executeEntry, Operation execution, boolean ignoreMerge)
+      throws IOException {
     String toolInvocationId = executeEntry.getRequestMetadata().getToolInvocationId();
-    String executionName = operation.getName();
-    String operationJson = operationPrinter.print(operation);
+    String executionName = execution.getName();
+    String operationJson = operationPrinter.print(execution);
     String executeEntryJson = JsonFormat.printer().print(executeEntry);
-    Operation publishOperation = onPublish.apply(operation);
+    Operation publishExecution = onPublish.apply(execution);
     int priority = executeEntry.getExecutionPolicy().getPriority();
-    client.run(
+    ActionKey actionKey = DigestUtil.asActionKey(executeEntry.getActionDigest());
+    return client.call(
         jedis -> {
-          state.executions.insert(jedis, executionName, operationJson);
-          if (!toolInvocationId.isEmpty()) {
-            state.toolInvocations.add(jedis, toolInvocationId, executionName);
+          if (state.executions.create(jedis, actionKey.toString(), executionName, operationJson)
+              || ignoreMerge) {
+            if (!toolInvocationId.isEmpty()) {
+              state.toolInvocations.add(jedis, toolInvocationId, executionName);
+            }
+            state.prequeue.offer(jedis, executeEntryJson, priority);
+            publishReset(jedis, publishExecution);
+            return true;
           }
-          state.prequeue.offer(jedis, executeEntryJson, priority);
-          publishReset(jedis, publishOperation);
+          // execution should be merged, indicates as much
+          state.executions.remove(jedis, executionName);
+          return false;
         });
   }
 
@@ -1347,10 +1364,6 @@ public class RedisShardBackplane implements Backplane {
 
           publishReset(jedis, o);
         });
-  }
-
-  private String asDigestStr(ActionKey actionKey) {
-    return DigestUtil.toString(actionKey.getDigest());
   }
 
   String executionChannel(String executionName) {

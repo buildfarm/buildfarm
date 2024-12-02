@@ -25,6 +25,7 @@ server:
   dispatchedMonitorIntervalSeconds: 1
   runOperationQueuer: true
   ensureOutputsPresent: true
+  mergeExecutions: true
   runFailsafeOperation: true
   maxCpu: 0
   maxRequeueAttempts: 5
