@@ -701,10 +701,9 @@ class Cat {
     if (entryCount != 0) {
       System.out.println(
           format(
-                  strFloatFormat,
-                  "Percentage of Unreferenced Entry",
-                  100.0f * response.getCasEntryCount() / response.getCasUnreferencedEntryCount())
-              + "%");
+              strFloatFormat,
+              "Percentage of Unreferenced Entry",
+              100.0f * (unreferencedEntryCount / entryCount)));
     }
     System.out.printf(
         (strIntFormat) + "%n",

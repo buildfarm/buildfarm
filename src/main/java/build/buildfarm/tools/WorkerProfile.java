@@ -71,7 +71,7 @@ class WorkerProfile {
       System.out.printf(
           (strFloatFormat) + "%n",
           "Percentage of Unreferenced Entry",
-          1.0 * response.getCasEntryCount() / response.getCasUnreferencedEntryCount());
+          1.0 * (unreferencedEntryCount / entryCount));
     }
     System.out.printf(
         (strIntFormat) + "%n",
