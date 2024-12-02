@@ -153,6 +153,11 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
+  public void unmergeExecution(ActionKey actionKey) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public boolean putOperation(Operation operation) {
     throw new UnsupportedOperationException();
   }

@@ -164,6 +164,7 @@ public class ServerInstanceTest {
             /* maxRequeueAttempts= */ 1,
             /* maxActionTimeout= */ Duration.getDefaultInstance(),
             /* useDenyList= */ true,
+            /* mergeExecutions= */ true,
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
             /* actionCacheFetchService= */ listeningDecorator(newSingleThreadExecutor()),
@@ -304,6 +305,8 @@ public class ServerInstanceTest {
   @Test
   public void executeCallsPrequeueWithAction() throws IOException {
     when(mockBackplane.canPrequeue()).thenReturn(true);
+    when(mockBackplane.prequeue(any(ExecuteEntry.class), any(Operation.class), any(Boolean.class)))
+        .thenReturn(true);
     build.buildfarm.v1test.Digest actionDigest =
         build.buildfarm.v1test.Digest.newBuilder().setHash("action").setSize(10).build();
     Watcher mockWatcher = mock(Watcher.class);
@@ -316,7 +319,8 @@ public class ServerInstanceTest {
         /* watcher= */ mockWatcher);
     verify(mockWatcher, times(1)).observe(any(Operation.class));
     ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
-    verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));
+    verify(mockBackplane, times(1))
+        .prequeue(executeEntryCaptor.capture(), any(Operation.class), any(Boolean.class));
     ExecuteEntry executeEntry = executeEntryCaptor.getValue();
     assertThat(executeEntry.getActionDigest()).isEqualTo(actionDigest);
   }
@@ -716,6 +720,8 @@ public class ServerInstanceTest {
 
     when(mockBackplane.canQueue()).thenReturn(true);
     when(mockBackplane.canPrequeue()).thenReturn(true);
+    when(mockBackplane.prequeue(any(ExecuteEntry.class), any(Operation.class), any(Boolean.class)))
+        .thenReturn(true);
     when(mockBackplane.getActionResult(actionKey)).thenReturn(actionResult);
 
     build.buildfarm.v1test.Digest actionDigest = actionKey.getDigest();
@@ -768,7 +774,8 @@ public class ServerInstanceTest {
         /* watcher= */ mockWatcher);
     verify(mockWatcher, times(1)).observe(any(Operation.class));
     ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
-    verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));
+    verify(mockBackplane, times(1))
+        .prequeue(executeEntryCaptor.capture(), any(Operation.class), any(Boolean.class));
     ExecuteEntry executeEntry = executeEntryCaptor.getValue();
     assertThat(executeEntry.getSkipCacheLookup()).isTrue();
   }

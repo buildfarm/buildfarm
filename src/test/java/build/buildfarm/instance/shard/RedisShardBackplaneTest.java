@@ -26,6 +26,8 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.Queue;
 import build.buildfarm.common.redis.BalancedRedisQueue;
@@ -46,6 +48,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.longrunning.Operation;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
 import java.time.Instant;
@@ -139,14 +142,29 @@ public class RedisShardBackplaneTest {
     state.prequeue = mock(BalancedRedisQueue.class);
     RedisShardBackplane backplane = createBackplane("prequeue-operation-test");
     backplane.start(client, state, "startTime/test:0000");
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
+    ByteString content = ByteString.copyFromUtf8("Action");
+    Digest actionDigest = digestUtil.compute(content);
 
     final String opName = "op";
-    ExecuteEntry executeEntry = ExecuteEntry.newBuilder().setOperationName(opName).build();
+    ExecuteEntry executeEntry =
+        ExecuteEntry.newBuilder().setActionDigest(actionDigest).setOperationName(opName).build();
     Operation op = Operation.newBuilder().setName(opName).build();
-    backplane.prequeue(executeEntry, op);
+    when(state.executions.create(
+            eq(jedis),
+            eq(DigestUtil.asActionKey(actionDigest).toString()),
+            eq(opName),
+            eq(RedisShardBackplane.operationPrinter.print(op))))
+        .thenReturn(true);
+
+    assertThat(backplane.prequeue(executeEntry, op, /* ignoreMerge= */ false)).isTrue();
 
     verify(state.executions, times(1))
-        .insert(eq(jedis), eq(opName), eq(RedisShardBackplane.operationPrinter.print(op)));
+        .create(
+            eq(jedis),
+            eq(DigestUtil.asActionKey(actionDigest).toString()),
+            eq(opName),
+            eq(RedisShardBackplane.operationPrinter.print(op)));
     verifyNoMoreInteractions(state.executions);
     OperationChange opChange = verifyChangePublished(backplane.executionChannel(opName), jedis);
     assertThat(opChange.hasReset()).isTrue();

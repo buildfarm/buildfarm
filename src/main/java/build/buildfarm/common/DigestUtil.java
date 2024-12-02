@@ -157,6 +157,11 @@ public class DigestUtil {
     public int hashCode() {
       return digest.hashCode();
     }
+
+    @Override
+    public String toString() {
+      return DigestUtil.toString(digest);
+    }
   }
 
   private final HashFunction hashFn;

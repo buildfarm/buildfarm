@@ -25,6 +25,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.v1test.Digest;
 import com.google.common.base.Stopwatch;
 import com.google.longrunning.Operation;
@@ -150,9 +151,10 @@ class ResultReporter implements Runnable {
     putOperation(executionContext);
 
     boolean blacklist = false;
+    Digest actionDigest = executionContext.queueEntry.getExecuteEntry().getActionDigest();
     try {
       workerContext.uploadOutputs(
-          executionContext.queueEntry.getExecuteEntry().getActionDigest(),
+          actionDigest,
           executionContext.executeResponse.getResultBuilder(),
           executionContext.execDir,
           executionContext.command);
@@ -191,17 +193,16 @@ class ResultReporter implements Runnable {
     executionContext.metadata.getExecuteOperationMetadataBuilder().clearPartialExecutionMetadata();
     ExecuteResponse executeResponse = executionContext.executeResponse.build();
 
+    ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
     if (blacklist
         || (!executionContext.action.getDoNotCache()
             && executeResponse.getStatus().getCode() == Code.OK.getNumber()
             && executeResponse.getResult().getExitCode() == 0)) {
-      Digest actionDigest = executionContext.queueEntry.getExecuteEntry().getActionDigest();
       try {
         if (blacklist) {
           workerContext.blacklistAction(actionDigest.getHash());
         } else {
-          workerContext.putActionResult(
-              DigestUtil.asActionKey(actionDigest), executeResponse.getResult());
+          workerContext.putActionResult(actionKey, executeResponse.getResult());
         }
       } catch (IOException e) {
         log.log(
@@ -222,6 +223,7 @@ class ResultReporter implements Runnable {
     executionContext.poller.pause();
 
     try {
+      workerContext.unmergeExecution(actionKey);
       if (!workerContext.putOperation(completedOperation)) {
         return 0;
       }

@@ -670,6 +670,16 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  public void unmergeExecution(ActionKey actionKey) throws IOException, InterruptedException {
+    createBackplaneRetrier()
+        .execute(
+            () -> {
+              backplane.unmergeExecution(actionKey);
+              return null;
+            });
+  }
+
+  @Override
   public boolean putOperation(Operation operation) throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
