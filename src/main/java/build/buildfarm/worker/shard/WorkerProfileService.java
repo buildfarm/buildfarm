@@ -16,7 +16,6 @@ package build.buildfarm.worker.shard;
 
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.cfc.CASFileCache;
-import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerListRequest;
@@ -111,8 +110,8 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     // get average time costs on each stage
     OperationStageDurations[] durations = completeStage.getAverageTimeCostPerStage();
     for (OperationStageDurations duration : durations) {
-      OperationTimesBetweenStages.Builder timesBuilder = OperationTimesBetweenStages.newBuilder();
-      timesBuilder
+      replyBuilder
+          .addTimesBuilder()
           .setQueuedToMatch(duration.queuedToMatch)
           .setMatchToInputFetchStart(duration.matchToInputFetchStart)
           .setInputFetchStartToComplete(duration.inputFetchStartToComplete)
@@ -122,7 +121,6 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
           .setOutputUploadStartToComplete(duration.outputUploadStartToComplete)
           .setOperationCount(duration.operationCount)
           .setPeriod(duration.period);
-      replyBuilder.addTimes(timesBuilder.build());
     }
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();
