@@ -22,7 +22,6 @@ import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -36,7 +35,7 @@ import lombok.extern.java.Log;
 @Log
 public final class Group {
   @Getter private static final Group root = new Group(/* name= */ null, /* parent= */ null);
-  private static final Path rootPath = Paths.get("/sys/fs/cgroup");
+  private static final Path rootPath = Path.of("/sys/fs/cgroup");
   private static final POSIX posix = POSIXFactory.getNativePOSIX();
 
   @Getter @Nullable private final String name;

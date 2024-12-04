@@ -34,7 +34,6 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -130,7 +129,7 @@ public class WorkerTestUtils {
     }
 
     public String name() {
-      return Paths.get(this.path).getFileName().toString();
+      return Path.of(this.path).getFileName().toString();
     }
   }
 
@@ -152,7 +151,7 @@ public class WorkerTestUtils {
           props = makeNodeProperties(ImmutableMap.of(BAZEL_TOOL_INPUT_MARKER, ""));
         }
         FileNode fileNode = makeFileNode(file.name(), file.content, props);
-        Path parentDirPath = Paths.get(file.path).getParent();
+        Path parentDirPath = Path.of(file.path).getParent();
         if (parentDirPath != null) {
           String parentDirPathStr = parentDirPath.normalize().toString();
           Directory.Builder parentDirBuilder =

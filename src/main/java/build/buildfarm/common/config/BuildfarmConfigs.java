@@ -12,7 +12,6 @@ import java.io.InputStream;
 import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -132,7 +131,7 @@ public final class BuildfarmConfigs {
   private static Path getConfigurationPath(OptionsParser parser) throws ConfigurationException {
     // source config from env variable
     if (!Strings.isNullOrEmpty(System.getenv("CONFIG_PATH"))) {
-      return Paths.get(System.getenv("CONFIG_PATH"));
+      return Path.of(System.getenv("CONFIG_PATH"));
     }
 
     // source config from cli
@@ -143,7 +142,7 @@ public final class BuildfarmConfigs {
       throw new ConfigurationException("A valid path to a configuration file must be provided.");
     }
 
-    return Paths.get(residue.getFirst());
+    return Path.of(residue.getFirst());
   }
 
   private static void adjustServerConfigs(BuildfarmConfigs configs) {
@@ -310,7 +309,7 @@ public final class BuildfarmConfigs {
         (tools, features) ->
             tools.forEach(
                 (tool) -> {
-                  if (Files.notExists(Paths.get(tool))) {
+                  if (Files.notExists(Path.of(tool))) {
                     String message =
                         String.format(
                             "the execution wrapper %s is missing and therefore the following"
