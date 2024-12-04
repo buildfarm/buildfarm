@@ -49,7 +49,6 @@ import com.google.rpc.Status;
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
@@ -94,9 +93,9 @@ public class InputFetcherTest {
               Action action,
               Command command)
               throws IOException {
-            Path root = Paths.get(operationName);
+            Path root = Path.of(operationName);
             throw new ExecDirException(
-                Paths.get(operationName),
+                Path.of(operationName),
                 ImmutableList.of(
                     new ViolationException(
                         Digest.getDefaultInstance(),

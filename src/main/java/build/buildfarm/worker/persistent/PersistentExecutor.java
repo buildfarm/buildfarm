@@ -30,7 +30,6 @@ import com.google.rpc.Code;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +51,7 @@ public class PersistentExecutor {
       ProtoCoordinator.ofCommonsPool(getMaxWorkersPerKey());
 
   // TODO load from config (i.e. {worker_root}/persistent)
-  public static final Path defaultWorkRootsDir = Paths.get("/tmp/worker/persistent/");
+  public static final Path defaultWorkRootsDir = Path.of("/tmp/worker/persistent/");
 
   public static final String PERSISTENT_WORKER_FLAG = "--persistent_worker";
 
@@ -143,7 +142,7 @@ public class PersistentExecutor {
 
     WorkerInputs workerFiles = WorkerInputs.from(context, requestArgs);
 
-    Path binary = Paths.get(workerExecCmd.getFirst());
+    Path binary = Path.of(workerExecCmd.getFirst());
     if (!workerFiles.containsTool(binary) && !binary.isAbsolute()) {
       throw new IllegalArgumentException(
           "Binary wasn't a tool input nor an absolute path: " + binary);

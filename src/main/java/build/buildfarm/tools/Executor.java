@@ -62,7 +62,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Scanner;
 import java.util.UUID;
@@ -427,7 +426,7 @@ class Executor {
 
     if (blobsDir != null) {
       System.out.println("Loading blobs into cas");
-      loadFilesIntoCAS(instanceName, channel, Paths.get(blobsDir));
+      loadFilesIntoCAS(instanceName, channel, Path.of(blobsDir));
     }
 
     ExecutionStub execStub = ExecutionGrpc.newStub(channel);

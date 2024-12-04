@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import org.apache.commons.io.IOUtils;
 import persistent.bazel.client.PersistentWorker;
 import persistent.common.processes.JavaProcessWrapper;
@@ -20,7 +19,7 @@ public class ProcessUtils {
       throws IOException {
     JavaProcessWrapper jpw =
         new JavaProcessWrapper(
-            Paths.get("."),
+            Path.of("."),
             classpath,
             className,
             new String[] {PersistentWorker.PERSISTENT_WORKER_FLAG});
