@@ -72,8 +72,8 @@ maven.install(
         "com.github.pcj:google-options:1.0.0",
         "com.github.serceman:jnr-fuse:0.5.8",
         "com.google.api.grpc:proto-google-common-protos:2.29.0",
-        "com.google.auth:google-auth-library-credentials:1.23.0",
-        "com.google.auth:google-auth-library-oauth2-http:1.23.0",
+        "com.google.auth:google-auth-library-credentials",  # Version is specified via the BOM below
+        "com.google.auth:google-auth-library-oauth2-http",  # Version is specified via the BOM below
         "com.google.code.findbugs:jsr305:3.0.2",
         "com.google.code.gson:gson:2.11.0",
         "com.google.errorprone:error_prone_annotations:2.36.0",
@@ -142,6 +142,7 @@ maven.install(
         # keep sorted
         "com.amazonaws:aws-java-sdk-bom:1.12.544",
         "com.github.docker-java:docker-java-bom:3.3.3",
+        "com.google.auth:google-auth-library-bom:1.23.0",
         "io.grpc:grpc-bom:1.62.2",
         "io.netty:netty-bom:4.1.108.Final",
     ],
