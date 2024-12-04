@@ -77,7 +77,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -445,7 +444,7 @@ class Cat {
     messages.add(queuedOperation.getAction());
     messages.add(queuedOperation.getCommand());
     messages.addAll(queuedOperation.getTree().getDirectoriesMap().values());
-    Path blobs = Paths.get("blobs");
+    Path blobs = Path.of("blobs");
     for (Message message : messages.build()) {
       Digest digest = digestUtil.compute(message);
       try (OutputStream out =

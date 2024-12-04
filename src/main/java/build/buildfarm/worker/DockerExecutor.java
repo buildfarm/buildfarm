@@ -39,7 +39,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -352,7 +351,7 @@ public class DockerExecutor {
   private static void mountExecRoot(HostConfig config, Path execDir) {
     // decide paths
     List<Path> paths = new ArrayList<>();
-    paths.add(Paths.get("/" + execDir.subpath(0, 1)));
+    paths.add(Path.of("/" + execDir.subpath(0, 1)));
     paths.add(execDir);
     paths.addAll(Utils.getSymbolicLinkReferences(execDir));
     // mount paths needed for the execution root

@@ -4,7 +4,6 @@ import build.buildfarm.v1test.WorkerType;
 import com.google.common.base.Strings;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -71,13 +70,13 @@ public class Worker {
     verifyRootConfiguration();
     addRootIfMissing();
     verifyRootLocation();
-    return Paths.get(root);
+    return Path.of(root);
   }
 
   private void addRootIfMissing() throws ConfigurationException {
     try {
-      if (!Files.isDirectory(Paths.get(root))) {
-        Files.createDirectories(Paths.get(root));
+      if (!Files.isDirectory(Path.of(root))) {
+        Files.createDirectories(Path.of(root));
       }
     } catch (Exception e) {
       throw new ConfigurationException(e.toString());
@@ -93,7 +92,7 @@ public class Worker {
 
   private void verifyRootLocation() throws ConfigurationException {
     // Configuration error if root does not exist.
-    if (!Files.isDirectory(Paths.get(root))) {
+    if (!Files.isDirectory(Path.of(root))) {
       throw new ConfigurationException("root [" + root + "] is not directory");
     }
   }

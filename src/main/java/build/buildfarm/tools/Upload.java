@@ -17,7 +17,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -44,7 +43,7 @@ class Upload {
     String host = args[0];
     String instanceName = args[1];
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
-    Path path = Paths.get(args[3]);
+    Path path = Path.of(args[3]);
     main(host, instanceName, digestUtil, path);
   }
 }

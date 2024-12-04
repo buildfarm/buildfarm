@@ -43,7 +43,7 @@ import com.google.protobuf.Any;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
 import io.grpc.protobuf.StatusProto;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -106,7 +106,7 @@ public class ReportResultStageTest {
             .setAction(Action.newBuilder().setDoNotCache(true).build())
             .setOperation(reportedOperation)
             .setQueueEntry(reportedEntry)
-            .setExecDir(Paths.get("reported-operation-path"))
+            .setExecDir(Path.of("reported-operation-path"))
             .setPoller(mock(Poller.class))
             .build();
     when(context.getReportResultStageWidth()).thenReturn(1);
@@ -149,7 +149,7 @@ public class ReportResultStageTest {
             .setAction(action)
             .setOperation(erroringOperation)
             .setQueueEntry(erroringEntry)
-            .setExecDir(Paths.get("erroring-operation-path"))
+            .setExecDir(Path.of("erroring-operation-path"))
             .setPoller(mock(Poller.class))
             .build();
     when(context.getReportResultStageWidth()).thenReturn(1);
