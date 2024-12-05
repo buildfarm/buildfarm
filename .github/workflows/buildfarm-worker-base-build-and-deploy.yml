@@ -37,7 +37,7 @@ jobs:
 
     - name: Build Jammy Docker image
         # AKA Ubuntu 22
-      uses: docker/build-push-action@5e99dacf67635c4f273e532b9266ddb609b3025a
+      uses: docker/build-push-action@11be14d908760a0756f045980728ec5fb7880f74
       with:
         context: .
         file: ./ci/base-worker-image/jammy/Dockerfile
@@ -46,7 +46,7 @@ jobs:
 
     - name: Build Lunar Docker image
         # AKA Ubuntu 23
-      uses: docker/build-push-action@5e99dacf67635c4f273e532b9266ddb609b3025a
+      uses: docker/build-push-action@11be14d908760a0756f045980728ec5fb7880f74
       with:
         context: .
         file: ./ci/base-worker-image/lunar/Dockerfile
@@ -55,7 +55,7 @@ jobs:
 
     - name: Build Multi-arch Noble Docker image
         # AKA Ubuntu 24
-      uses: docker/build-push-action@5e99dacf67635c4f273e532b9266ddb609b3025a
+      uses: docker/build-push-action@11be14d908760a0756f045980728ec5fb7880f74
       with:
         context: .
         platforms: linux/amd64,linux/arm64/v8
