@@ -4,6 +4,8 @@ load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
 load("//:jvm_flags.bzl", "server_jvm_flags", "worker_jvm_flags")
 load("//container:defs.bzl", "multiarch_oci_image", "oci_image_env")
 
+package(default_visibility = ["//visibility:public"])
+
 # == Docker Image Creation ==
 # When deploying buildfarm, you may want to include additional dependencies within your deployment.
 # These dependencies can enable features related to the observability and runtime of the system.
