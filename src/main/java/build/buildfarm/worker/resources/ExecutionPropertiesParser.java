@@ -18,12 +18,14 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.MapUtils;
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 
 /**
  * @class ExecutionPropertiesParser
@@ -232,11 +234,17 @@ public class ExecutionPropertiesParser {
   @SuppressWarnings("unchecked")
   private static void storeEnvVars(ResourceLimits limits, Property property) {
     try {
-      JSONParser parser = new JSONParser();
-      Map<String, String> map = (Map<String, String>) parser.parse(property.getValue());
+      Gson gson = new Gson();
+      JsonObject jsonObject = gson.fromJson(property.getValue(), JsonObject.class);
+      Map<String, String> map = new HashMap<>();
+      if (jsonObject != null) {
+        for (Map.Entry<String, JsonElement> entry : jsonObject.entrySet()) {
+          map.put(entry.getKey(), entry.getValue().getAsString());
+        }
+      }
       limits.extraEnvironmentVariables = map;
       describeChange(limits.description, "extra env vars added", MapUtils.toString(map), property);
-    } catch (ParseException pe) {
+    } catch (JsonSyntaxException jse) {
       limits.description.add("extra env vars could not be added due to parsing error");
     }
   }
