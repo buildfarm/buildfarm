@@ -487,8 +487,9 @@ class Executor {
     if (!limits.persistentWorkerKey.isEmpty()) {
       // RBE Client suggests to run this Action as persistent...
       log.fine(
-          "usePersistentWorker; got persistentWorkerCommand of : "
-              + limits.persistentWorkerCommand);
+          "usePersistentWorker (mnemonic="
+              + executionContext.metadata.getRequestMetadata().getActionMnemonic()
+              + ")");
 
       Tree execTree = executionContext.tree;
 
