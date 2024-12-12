@@ -60,7 +60,7 @@ public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
   private static final Histogram missingBlobs =
       Histogram.build()
-          .exponentialBuckets(1, 2, 6)
+          .exponentialBuckets(1, 2, 12)
           .name("missing_blobs")
           .help("Find missing blobs.")
           .register();
