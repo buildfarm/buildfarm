@@ -159,7 +159,9 @@ worker:
     amount: 4096
   - name: gpu
     type: POOL
-    amount: 4   # for an A30 MiG in full splay
+    amount: 4 # for an A30 MiG in full splay
+  persistentWorkerActionMnemonicAllowlist:
+  - '*'
 executionWrappers:
   cgroups: /usr/bin/cgexec
   unshare: /usr/bin/unshare
