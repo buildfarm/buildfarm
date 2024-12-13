@@ -570,7 +570,7 @@ class Executor {
         exitCode = process.waitFor();
         processCompleted = true;
       } else {
-        long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
+        long timeoutNanos = Durations.toNanos(timeout);
         long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
         if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
           exitCode = process.exitValue();
@@ -578,7 +578,9 @@ class Executor {
         } else {
           log.log(
               Level.INFO,
-              format("process timed out for %s after %ds", operationName, timeout.getSeconds()));
+              format(
+                  "process timed out for %s after %ds",
+                  operationName, Durations.toSeconds(timeout)));
           statusCode = Code.DEADLINE_EXCEEDED;
         }
       }

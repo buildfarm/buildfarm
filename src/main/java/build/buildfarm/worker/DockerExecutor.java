@@ -34,6 +34,7 @@ import com.github.dockerjava.core.command.ExecStartResultCallback;
 import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -319,7 +320,7 @@ public class DockerExecutor {
     createContainerCmd.withHostConfig(getHostConfig(settings.execDir));
     createContainerCmd.withEnv(MapUtils.envMapToList(settings.envVars));
     createContainerCmd.withNetworkDisabled(!settings.limits.containerSettings.network);
-    createContainerCmd.withStopTimeout((int) settings.timeout.getSeconds());
+    createContainerCmd.withStopTimeout((int) Durations.toSeconds(settings.timeout));
     // run container creation and log any warnings
     CreateContainerResponse response = createContainerCmd.exec();
     if (response.getWarnings().length != 0) {

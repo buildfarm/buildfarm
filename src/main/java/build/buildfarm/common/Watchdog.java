@@ -16,6 +16,7 @@ package build.buildfarm.common;
 
 import build.buildfarm.common.function.InterruptingRunnable;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 
 public class Watchdog implements Runnable {
   private final InterruptingRunnable runnable;
@@ -61,7 +62,7 @@ public class Watchdog implements Runnable {
 
   private synchronized void reset(Duration timeout) {
     start = System.nanoTime();
-    timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
+    timeoutNanos = Durations.toNanos(timeout);
     this.notify();
   }
 
