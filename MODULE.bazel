@@ -181,23 +181,25 @@ oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 # Server base image
 oci.pull(
     name = "amazon_corretto_java_image_base",
-    digest = "sha256:efbf26f3d4105684429a74842d742683a99215c6ec304c6ff0faa9e493bb4329",  # tag:21 as of today.
+    digest = "sha256:efbf26f3d4105684429a74842d742683a99215c6ec304c6ff0faa9e493bb4329",
     image = "public.ecr.aws/amazoncorretto/amazoncorretto",
     platforms = [
         "linux/amd64",
         "linux/arm64/v8",
     ],
+    tag = "21",
 )
 
 # Worker base image
 oci.pull(
     name = "ubuntu_noble",  # aka 24
-    digest = "sha256:f18e19d1329c0df38dd5f6bfd931c7764fa1e3acf6b3280da62015a338805ce8",  # tag: noble
+    digest = "sha256:f18e19d1329c0df38dd5f6bfd931c7764fa1e3acf6b3280da62015a338805ce8",
     image = "index.docker.io/bazelbuild/buildfarm-worker-base",
     platforms = [
         "linux/amd64",
         "linux/arm64",
     ],
+    tag = "noble",
 )
 use_repo(
     oci,
