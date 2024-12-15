@@ -90,6 +90,7 @@ import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import com.google.gson.Gson;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.StatusException;
@@ -141,7 +142,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.Getter;
 import lombok.extern.java.Log;
-import org.json.simple.JSONObject;
 
 @Log
 public abstract class CASFileCache implements ContentAddressableStorage {
@@ -1420,18 +1420,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @SuppressWarnings("unchecked")
   private void logCacheScanResults(CacheScanResults cacheScanResults) {
-    JSONObject obj = new JSONObject();
-    obj.put("dirs", cacheScanResults.computeDirs.size());
-    obj.put("keys", cacheScanResults.fileKeys.size());
-    obj.put("delete", cacheScanResults.deleteFiles.size());
-    log.log(Level.INFO, obj.toString());
+    Map<String, Integer> map =
+        Map.of(
+            "dirs", cacheScanResults.computeDirs.size(),
+            "keys", cacheScanResults.fileKeys.size(),
+            "delete", cacheScanResults.deleteFiles.size());
+    log.log(Level.INFO, new Gson().toJson(map));
   }
 
   @SuppressWarnings("unchecked")
   private void logComputeDirectoriesResults(List<Path> invalidDirectories) {
-    JSONObject obj = new JSONObject();
-    obj.put("invalid dirs", invalidDirectories.size());
-    log.log(Level.INFO, obj.toString());
+    Map<String, Integer> map = Map.of("invalid dirs", invalidDirectories.size());
+    log.log(Level.INFO, new Gson().toJson(map));
   }
 
   private CacheScanResults scanRoot(Consumer<Digest> onStartPut)
