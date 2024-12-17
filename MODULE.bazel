@@ -5,7 +5,7 @@ module(
     repo_name = "build_buildfarm",
 )
 
-bazel_dep(name = "aspect_bazel_lib", version = "2.9.4")
+bazel_dep(name = "aspect_bazel_lib", version = "2.10.0")
 bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "blake3", version = "1.5.4")
 bazel_dep(name = "buildifier_prebuilt", version = "7.3.1")
