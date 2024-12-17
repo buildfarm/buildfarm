@@ -478,9 +478,7 @@ class Executor {
       Collection<String> mnemonicAllowlist =
           BuildfarmConfigs.getInstance().getWorker().getPersistentWorkerActionMnemonicAllowlist();
       String actionMnemonic = executionContext.metadata.getRequestMetadata().getActionMnemonic();
-      boolean allowlisted =
-          mnemonicAllowlist.contains("*") || mnemonicAllowlist.contains(actionMnemonic);
-      return allowlisted;
+      return mnemonicAllowlist.contains("*") || mnemonicAllowlist.contains(actionMnemonic);
     }
     return false;
   }
