@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import javax.naming.ConfigurationException;
 import lombok.Data;
 import lombok.extern.java.Log;
@@ -43,7 +44,7 @@ public class Worker {
   private SandboxSettings sandboxSettings = new SandboxSettings();
   private boolean createSymlinkOutputs = false;
   private int zstdBufferPoolSize = 2048; /* * ZSTD_DStreamInSize (current is 128k) == 256MiB */
-
+  private Set<String> persistentWorkerActionMnemonicAllowlist = Set.of("*");
   // These limited resources are only for the individual worker.
   // An example would be hardware resources such as GPUs.
   // If you want GPU actions to run exclusively, define a single GPU resource.
