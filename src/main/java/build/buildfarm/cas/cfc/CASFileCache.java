@@ -153,7 +153,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Gauge.builder().name("cas_size").help("CAS size.").register();
   private static final Gauge casEntryCountMetric =
       Gauge.builder().name("cas_entry_count").help("Number of entries in the CAS.").register();
-  private static Histogram casTtl =
+  private static Histogram casTtlSeconds =
       Histogram.builder()
           .name("cas_ttl")
           .unit(Unit.SECONDS)
@@ -2791,7 +2791,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     // TODO introduce ttl clock
     long currentTimeMs = new Date().getTime();
     long ttlMs = currentTimeMs - createdTimeMs;
-    casTtl.observe(Time.millisecondsToSeconds(ttlMs));
+    casTtlSeconds.observe(MILLISECONDS.toSeconds(ttlMs);
   }
 
   @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored"})

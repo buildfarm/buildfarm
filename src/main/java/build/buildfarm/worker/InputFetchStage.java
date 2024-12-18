@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import io.prometheus.metrics.core.metrics.Gauge;
 import io.prometheus.metrics.core.metrics.Histogram;
 import io.prometheus.metrics.model.snapshots.Unit;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
@@ -25,13 +26,13 @@ import lombok.extern.java.Log;
 public class InputFetchStage extends SuperscalarPipelineStage {
   private static final Gauge inputFetchSlotUsage =
       Gauge.builder().name("input_fetch_slot_usage").help("Input fetch slot Usage.").register();
-  private static final Histogram inputFetchTime =
+  private static final Histogram inputFetchTimeSeconds =
       Histogram.builder()
           .name("input_fetch_time")
           .unit(Unit.SECONDS)
           .help("Input fetch time")
           .register();
-  private static final Histogram inputFetchStallTime =
+  private static final Histogram inputFetchStallTimeSeconds =
       Histogram.builder()
           .name("input_fetch_stall_time")
           .unit(Unit.SECONDS)
@@ -66,8 +67,8 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   public void releaseInputFetcher(
       String operationName, long usecs, long stallUSecs, boolean success) {
     int size = removeAndRelease(operationName);
-    inputFetchTime.observe(usecs / 1000.0);
-    inputFetchStallTime.observe(stallUSecs / 1000.0);
+    inputFetchTimeSeconds.observe(TimeUnit.MICROSECONDS.toSeconds(usecs));
+    inputFetchStallTimeSeconds.observe(TimeUnit.MICROSECONDS.toSeconds(stallUSecs));
     complete(
         operationName,
         usecs,

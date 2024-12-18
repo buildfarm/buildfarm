@@ -86,4 +86,18 @@ public class Time {
     checkArgument(Timestamps.compare(start, end) <= 0);
     return Durations.toMillis(Timestamps.between(start, end));
   }
+
+  /**
+   * Converts the difference in two timestamps, into seconds
+   *
+   * @param start
+   * @param end
+   * @return The difference, in seconds
+   * @throws IllegalArgumentException if start > end.
+   */
+  public static double toDurationSeconds(Timestamp start, Timestamp end) {
+    // start must be <= end
+    checkArgument(Timestamps.compare(start, end) <= 0);
+    return Durations.toSeconds(Timestamps.between(start, end));
+  }
 }
