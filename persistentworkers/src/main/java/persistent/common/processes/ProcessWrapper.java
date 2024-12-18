@@ -17,8 +17,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import lombok.Getter;
+import lombok.extern.java.Log;
 
 /**
  * Wraps a process, giving it a (possible different) working directory and environment variables.
@@ -27,8 +27,8 @@ import lombok.Getter;
  *
  * <p>Constructor immediately starts a process and checks isAlive() right after.
  */
+@Log
 public class ProcessWrapper implements Closeable {
-  private static Logger logger = Logger.getLogger(ProcessWrapper.class.getName());
 
   private final Process process;
 
@@ -53,12 +53,11 @@ public class ProcessWrapper implements Closeable {
     this.uuid = UUID.randomUUID();
 
     this.errorFile = this.workRoot.resolve(this.uuid + ".stderr");
-
-    logger.log(Level.FINE, "Starting Process:");
-    logger.log(Level.FINE, "\tcmd: " + this.args);
-    logger.log(Level.FINE, "\tdir: " + this.workRoot);
-    logger.log(Level.FINE, "\tenv: " + ImmutableMap.copyOf(env));
-    logger.log(Level.FINE, "\tenv: " + errorFile);
+    log.log(Level.FINE, "Starting Process:");
+    log.log(Level.FINE, "\tcmd: " + this.args);
+    log.log(Level.FINE, "\tdir: " + this.workRoot);
+    log.log(Level.FINE, "\tenv: " + ImmutableMap.copyOf(env));
+    log.log(Level.FINE, "\tenv: " + errorFile);
 
     ProcessBuilder pb =
         new ProcessBuilder()
@@ -72,8 +71,7 @@ public class ProcessWrapper implements Closeable {
       this.process = pb.start();
     } catch (IOException e) {
       String msg = "Failed to start process: " + e;
-      logger.log(Level.SEVERE, msg);
-      e.printStackTrace();
+      log.log(Level.SEVERE, msg, e);
       throw new IOException(msg, e);
     }
 
@@ -98,7 +96,7 @@ public class ProcessWrapper implements Closeable {
 
   public String getErrorString() throws IOException {
     if (Files.exists(this.errorFile)) {
-      return new String(Files.readAllBytes(this.errorFile));
+      return Files.readString(this.errorFile);
     } else {
       return "[No errorFile...]";
     }
