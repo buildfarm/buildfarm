@@ -34,6 +34,7 @@ public class Worker {
   private boolean linkInputDirectories = true;
   private List<String> linkedInputDirectories = Arrays.asList("(?!external/)[^/]+");
   private String execOwner;
+  private List<String> execOwners = new ArrayList<>();
   private int defaultMaxCores = 0;
   private boolean limitGlobalExecution = false;
   private boolean onlyMulticoreTests = false;

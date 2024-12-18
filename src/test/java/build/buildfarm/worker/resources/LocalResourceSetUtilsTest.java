@@ -14,9 +14,12 @@
 
 package build.buildfarm.worker.resources;
 
+import static build.buildfarm.common.Claim.Stage.EXECUTE_ACTION_STAGE;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.Claim;
+import build.buildfarm.worker.resources.LocalResourceSet.SemaphoreResource;
 import java.util.concurrent.Semaphore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -38,7 +41,7 @@ public class LocalResourceSetUtilsTest {
     LocalResourceSet resourceSet = new LocalResourceSet();
     Semaphore foo = new Semaphore(2);
     foo.acquire(); // create room to put two resources back on if malfunctioning
-    resourceSet.resources.put("FOO", foo);
+    resourceSet.resources.put("FOO", new SemaphoreResource(foo, EXECUTE_ACTION_STAGE));
 
     Platform platform =
         Platform.newBuilder()
