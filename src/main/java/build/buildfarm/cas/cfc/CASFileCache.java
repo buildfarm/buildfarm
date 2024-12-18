@@ -59,7 +59,6 @@ import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.EntryLimitException;
-import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
@@ -2791,7 +2790,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     // TODO introduce ttl clock
     long currentTimeMs = new Date().getTime();
     long ttlMs = currentTimeMs - createdTimeMs;
-    casTtlSeconds.observe(MILLISECONDS.toSeconds(ttlMs);
+    casTtlSeconds.observe(MILLISECONDS.toSeconds(ttlMs));
   }
 
   @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored"})

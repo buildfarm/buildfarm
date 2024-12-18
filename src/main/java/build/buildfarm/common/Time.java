@@ -63,17 +63,6 @@ public class Time {
   }
 
   /**
-   * @brief Milliseconds to seconds.
-   * @details Milliseconds to seconds.
-   * @param milliseconds Milliseconds to convert.
-   * @return Seconds converted from milliseconds.
-   * @note Suggested return identifier: seconds.
-   */
-  public static long millisecondsToSeconds(long milliseconds) {
-    return milliseconds / 1000L;
-  }
-
-  /**
    * Converts the difference in two timestamps, into milliseconds
    *
    * @param start
