@@ -29,6 +29,7 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.buildfarm.common.Claim;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -108,6 +109,7 @@ public class ReportResultStageTest {
             .setQueueEntry(reportedEntry)
             .setExecDir(Path.of("reported-operation-path"))
             .setPoller(mock(Poller.class))
+            .setClaim(mock(Claim.class))
             .build();
     when(context.getReportResultStageWidth()).thenReturn(1);
     when(context.putOperation(any(Operation.class))).thenReturn(true);
@@ -151,6 +153,7 @@ public class ReportResultStageTest {
             .setQueueEntry(erroringEntry)
             .setExecDir(Path.of("erroring-operation-path"))
             .setPoller(mock(Poller.class))
+            .setClaim(mock(Claim.class))
             .build();
     when(context.getReportResultStageWidth()).thenReturn(1);
     when(context.putOperation(any(Operation.class))).thenReturn(true);

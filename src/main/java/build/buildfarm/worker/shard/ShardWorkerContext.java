@@ -18,7 +18,6 @@ import static build.buildfarm.cas.ContentAddressableStorage.UNLIMITED_ENTRY_SIZE
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.worker.DequeueMatchEvaluator.acquireClaim;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 
@@ -31,6 +30,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.Claim;
 import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestPath;
 import build.buildfarm.common.DigestUtil;
@@ -54,6 +54,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.worker.DequeueMatchEvaluator;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.MatchListener;
@@ -62,7 +63,6 @@ import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
-import build.buildfarm.worker.resources.Claim;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.ResourceDecider;
 import build.buildfarm.worker.resources.ResourceLimits;
@@ -70,6 +70,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSetMultimap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
@@ -88,9 +89,11 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
@@ -98,6 +101,9 @@ import lombok.extern.java.Log;
 
 @Log
 class ShardWorkerContext implements WorkerContext {
+  static final String EXEC_OWNER_RESOURCE_NAME = "exec-owner";
+  private static final Platform.Property EXEC_OWNER_PROPERTY =
+      Platform.Property.newBuilder().setName(EXEC_OWNER_RESOURCE_NAME).setValue("1").build();
   private static final String PROVISION_CORES_NAME = "cores";
 
   private static final Counter completedOperations =
@@ -133,6 +139,7 @@ class ShardWorkerContext implements WorkerContext {
   private final boolean errorOperationRemainingResources;
   private final LocalResourceSet resourceSet;
   private final boolean errorOperationOutputSizeExceeded;
+  private final boolean provideOwnedClaim;
 
   static SetMultimap<String, String> getMatchProvisions(
       Iterable<ExecutionPolicy> policies, String name, int executeStageWidth) {
@@ -194,6 +201,8 @@ class ShardWorkerContext implements WorkerContext {
     this.errorOperationOutputSizeExceeded = errorOperationOutputSizeExceeded;
     this.resourceSet = resourceSet;
     this.writer = writer;
+
+    provideOwnedClaim = this.resourceSet.poolResources.containsKey(EXEC_OWNER_RESOURCE_NAME);
   }
 
   private static Retrier createBackplaneRetrier() {
@@ -281,12 +290,63 @@ class ShardWorkerContext implements WorkerContext {
     return ProtoUtils.parseQueuedOperation(queuedOperationBlob, queueEntry);
   }
 
+  // FIXME make OwnedClaim with owner
+  // how will this play out with persistent workers, should we have one per user?
+  private Claim acquireClaim(Platform platform) {
+    // expand platform requirements with exec owner
+    if (provideOwnedClaim) {
+      platform = platform.toBuilder().addProperties(EXEC_OWNER_PROPERTY).build();
+    }
+
+    Claim claim = DequeueMatchEvaluator.acquireClaim(matchProvisions, resourceSet, platform);
+
+    // a little awkward wrapping with the early return here to preserve effective final
+    if (provideOwnedClaim) {
+      // enforced by exec owner property value of "1"
+      for (Entry<String, List<Object>> pool : claim.getPools()) {
+        if (!pool.getKey().equals(EXEC_OWNER_RESOURCE_NAME)) {
+          continue;
+        }
+        String name = (String) Iterables.getOnlyElement(pool.getValue());
+
+        return new Claim() {
+          UserPrincipal owner = execFileSystem.getOwner(name);
+
+          @Override
+          public void release(Claim.Stage stage) {
+            claim.release(stage);
+          }
+
+          @Override
+          public void release() {
+            owner = null;
+            claim.release();
+          }
+
+          @Override
+          public UserPrincipal owner() {
+            if (owner != null) {
+              return owner;
+            }
+            return claim.owner();
+          }
+
+          @Override
+          public Iterable<Entry<String, List<Object>>> getPools() {
+            return claim.getPools();
+          }
+        };
+      }
+      // claim was not provided with owner name value
+    }
+    return claim;
+  }
+
   @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     QueueEntry queueEntry = takeEntryOffOperationQueue(listener);
     Claim claim = null;
-    if (queueEntry == null
-        || (claim = acquireClaim(matchProvisions, resourceSet, queueEntry.getPlatform())) != null) {
+    if (queueEntry == null || (claim = acquireClaim(queueEntry.getPlatform())) != null) {
       listener.onEntry(queueEntry, claim);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -695,10 +755,11 @@ class ShardWorkerContext implements WorkerContext {
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       DigestFunction.Value digestFunction,
       Action action,
-      Command command)
+      Command command,
+      @Nullable UserPrincipal owner)
       throws IOException, InterruptedException {
     return execFileSystem.createExecDir(
-        operationName, directoriesIndex, digestFunction, action, command);
+        operationName, directoriesIndex, digestFunction, action, command, owner);
   }
 
   // might want to split for removeDirectory and decrement references to avoid removing for streamed

@@ -17,11 +17,11 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.buildfarm.common.Claim;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
-import build.buildfarm.worker.resources.Claim;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
 

@@ -35,9 +35,11 @@ import io.grpc.Deadline;
 import io.grpc.StatusException;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 
 public interface WorkerContext {
   interface IOResource extends AutoCloseable {
@@ -95,7 +97,8 @@ public interface WorkerContext {
       Map<Digest, Directory> directoriesIndex,
       DigestFunction.Value digestFunction,
       Action action,
-      Command command)
+      Command command,
+      @Nullable UserPrincipal owner)
       throws IOException, InterruptedException;
 
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;

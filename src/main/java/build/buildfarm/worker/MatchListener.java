@@ -14,8 +14,8 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.common.Claim;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.worker.resources.Claim;
 import javax.annotation.Nullable;
 
 public interface MatchListener {

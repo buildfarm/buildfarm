@@ -3,15 +3,23 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <grp.h>
+#include <string.h>
 
 int
 main(int argc, char *argv[])
 {
+  int argi = 1;
+  char *username = "nobody";
+
   if (argc <= 1) {
-    fprintf(stderr, "usage: as-nobody [command]\n");
+    fprintf(stderr, "usage: as-nobody [-u <user>] <command>\n");
     return EXIT_FAILURE;
   }
-  struct passwd *pw = getpwnam("nobody");
+  if (strcmp(argv[1], "-u") == 0) {
+    username = argv[2];
+    argi = 3;
+  }
+  struct passwd *pw = getpwnam(username);
   if (pw == NULL) {
     perror("getpwnam");
     return EXIT_FAILURE;
@@ -28,7 +36,7 @@ main(int argc, char *argv[])
     perror("setreuid");
     return EXIT_FAILURE;
   }
-  execvp(argv[1], argv + 1);
+  execvp(argv[argi], argv + argi);
   perror("execvp");
   return EXIT_FAILURE;
 }

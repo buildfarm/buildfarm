@@ -34,6 +34,7 @@ import build.buildfarm.v1test.Digest;
 import build.buildfarm.worker.ExecDirException.ViolationException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -74,7 +75,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   public CFCLinkExecFileSystem(
       Path root,
       CASFileCache fileCache,
-      @Nullable UserPrincipal owner,
+      ImmutableMap<String, UserPrincipal> owners,
       boolean linkInputDirectories,
       Iterable<String> linkedInputDirectories,
       boolean allowSymlinkTargetAbsolute,
@@ -84,7 +85,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     super(
         root,
         fileCache,
-        owner,
+        owners,
         allowSymlinkTargetAbsolute,
         removeDirectoryService,
         accessRecorder,
@@ -342,7 +343,8 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       DigestFunction.Value digestFunction,
       Action action,
-      Command command)
+      Command command,
+      @Nullable UserPrincipal owner)
       throws IOException, InterruptedException {
     Digest inputRootDigest = DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction);
     OutputDirectory outputDirectory = createOutputDirectory(command);

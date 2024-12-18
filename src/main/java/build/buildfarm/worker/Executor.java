@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import static build.buildfarm.common.Claim.Stage.EXECUTE_ACTION_STAGE;
 import static com.google.common.collect.Maps.transformValues;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.protobuf.util.Durations.add;
@@ -29,6 +30,7 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.common.Claim;
 import build.buildfarm.common.ProcessUtils;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
@@ -40,7 +42,6 @@ import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.persistent.PersistentExecutor;
 import build.buildfarm.worker.persistent.WorkFilesContext;
-import build.buildfarm.worker.resources.LocalResourceSetUtils.LocalResourceSetClaim;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DockerClientBuilder;
@@ -169,10 +170,8 @@ class Executor {
     // since pools mandate injection of resources, each pool claim must require a policy
     // could probably do this with just the properties and the pool resource sets, but this is
     // faster
-    if (executionContext.claim instanceof LocalResourceSetClaim resourceSetClaim) {
-      for (String pool : Iterables.transform(resourceSetClaim.getPools(), Map.Entry::getKey)) {
-        policies = Iterables.concat(policies, workerContext.getExecutionPolicies("pool-" + pool));
-      }
+    for (String pool : Iterables.transform(executionContext.claim.getPools(), Map.Entry::getKey)) {
+      policies = Iterables.concat(policies, workerContext.getExecutionPolicies("pool-" + pool));
     }
 
     try {
@@ -225,11 +224,11 @@ class Executor {
   }
 
   private static Map<String, Interpolator> createInterpolations(
-      LocalResourceSetClaim claim, Iterable<Property> properties) {
+      Claim claim, Iterable<Property> properties) {
     Map<String, Interpolator> interpolations = new HashMap<>();
     if (claim != null) {
-      for (Map.Entry<String, List<Integer>> pool : claim.getPools()) {
-        List<Integer> ids = pool.getValue();
+      for (Map.Entry<String, List<Object>> pool : claim.getPools()) {
+        List<Object> ids = pool.getValue();
         interpolations.put(pool.getKey(), new Interpolator(ids));
         for (int i = 0; i < ids.size(); i++) {
           interpolations.put(pool.getKey() + "-" + i, new Interpolator(String.valueOf(ids.get(i))));
@@ -298,8 +297,7 @@ class Executor {
       // similar to the policy selection here
       Map<String, Interpolator> interpolations =
           createInterpolations(
-              (LocalResourceSetClaim) executionContext.claim,
-              executionContext.command.getPlatform().getPropertiesList());
+              executionContext.claim, executionContext.command.getPlatform().getPropertiesList());
 
       for (ExecutionPolicy policy : policies) {
         if (policy.getExecutionWrapper() != null) {
@@ -446,7 +444,7 @@ class Executor {
       try {
         // Now that the execution has finished we can return any of the claims against local
         // resources.
-        executionContext.claim.release();
+        executionContext.claim.release(EXECUTE_ACTION_STAGE);
         owner.releaseExecutor(
             operationName,
             limits.cpu.claimed,

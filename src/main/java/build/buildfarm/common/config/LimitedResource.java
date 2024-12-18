@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.config;
 
+import build.buildfarm.common.Claim.Stage;
 import lombok.Data;
 
 /**
@@ -50,4 +51,11 @@ public class LimitedResource {
    * @details As a counting semaphore, this amount becomes the limit.
    */
   private int amount = 1;
+
+  /**
+   * @field stage
+   * @brief The stage at which this resource should be released
+   * @details The resource may be released when the specified stage is complete
+   */
+  private Stage releaseStage = Stage.EXECUTE_ACTION_STAGE;
 }
