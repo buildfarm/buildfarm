@@ -236,7 +236,6 @@ server:
 | timeout                        | Integer, _10000_                         |                 |                       | Default timeout                                                                                                                                                                              |
 | maxInvocationIdTimeout         | Integer, _604800_                        |                 |                       | Maximum TTL (Time-to-Live in second) of invocationId keys in RedisBackplane                                                                                                                  |
 | maxAttempts                    | Integer, _20_                            |                 |                       | Maximum number of execution attempts                                                                                                                                                         |
-| cacheCas                       | boolean, _false_                         |                 |                       |                                                                                                                                                                                              |
 
 
 Example:
