@@ -81,7 +81,6 @@ public class Backplane {
   private int timeout = 10000; // Milliseconds
   private String[] redisNodes = {};
   private int maxAttempts = 20;
-  private boolean cacheCas = false;
   private long priorityPollIntervalMillis = 100;
 
   /**

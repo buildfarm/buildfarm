@@ -91,7 +91,6 @@ backplane:
   maxCorrelatedInvocationsTimeout: 604800
   maxToolInvocationTimeout: 604800
   maxAttempts: 20
-  cacheCas: false
   queues:
   - name: cpu
     allowUnmatched: true
