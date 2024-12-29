@@ -20,6 +20,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import io.grpc.Deadline;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
@@ -165,8 +166,13 @@ public final class Group {
     if (parent != null) {
       parent.create(controllerName);
       Path path = getPath(controllerName);
-      if (!Files.exists(path)) {
-        Files.createDirectory(path);
+      try {
+        if (!Files.exists(path)) {
+          Files.createDirectory(path);
+        }
+      } catch (FileAlreadyExistsException e) {
+        // per the avoidance above, we don't care that this already
+        // exists and we lost a race to create it
       }
     }
   }
