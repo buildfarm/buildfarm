@@ -289,22 +289,23 @@ class Executor {
       workingDirectory = workingDirectory.resolve(command.getWorkingDirectory());
     }
 
+    // similar to the policy selection here
+    Map<String, Interpolator> interpolations =
+        createInterpolations(
+            executionContext.claim, executionContext.command.getPlatform().getPropertiesList());
+
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
+
+    for (ExecutionPolicy policy : policies) {
+      if (policy.getExecutionWrapper() != null) {
+        arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
+      }
+    }
+
     Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(
             operationName, arguments, executionContext.command, workingDirectory)) {
-      // similar to the policy selection here
-      Map<String, Interpolator> interpolations =
-          createInterpolations(
-              executionContext.claim, executionContext.command.getPlatform().getPropertiesList());
-
-      for (ExecutionPolicy policy : policies) {
-        if (policy.getExecutionWrapper() != null) {
-          arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
-        }
-      }
-
       if (System.getProperty("os.name").contains("Win")) {
         // Make sure that the executable path is absolute, otherwise processbuilder fails on windows
         Iterator<String> argumentItr = command.getArgumentsList().iterator();
