@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <grp.h>
 #include <string.h>
+#include <errno.h>
 
 int
 main(int argc, char *argv[])
@@ -19,8 +20,14 @@ main(int argc, char *argv[])
     username = argv[2];
     argi = 3;
   }
+  // per getpwnam, this needs to be reset before checking error
+  errno = 0;
   struct passwd *pw = getpwnam(username);
   if (pw == NULL) {
+    if (errno == 0) {
+      // also listed in documentation as a possible error status return
+      errno = ENOENT;
+    }
     perror("getpwnam");
     return EXIT_FAILURE;
   }
