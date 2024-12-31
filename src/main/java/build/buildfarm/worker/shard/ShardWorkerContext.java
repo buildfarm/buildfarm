@@ -885,19 +885,56 @@ class ShardWorkerContext implements WorkerContext {
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory) {
+    ResourceLimits limits = commandExecutionSettings(command);
+    IOResource resource;
     if (shouldLimitCoreUsage()) {
-      ResourceLimits limits = commandExecutionSettings(command);
-      return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
-    }
-    return new IOResource() {
-      @Override
-      public void close() {}
+      resource = limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
+    } else {
+      resource =
+          new IOResource() {
+            @Override
+            public void close() {}
 
-      @Override
-      public boolean isReferenced() {
-        return false;
+            @Override
+            public boolean isReferenced() {
+              return false;
+            }
+          };
+    }
+
+    // Possibly set network restrictions.
+    // This is not the ideal implementation of block-network.
+    // For now, without the linux-sandbox, we will unshare the network namespace.
+    if (limits.network.blockNetwork && !limits.useLinuxSandbox) {
+      arguments.add(configs.getExecutionWrappers().getUnshare(), "-n", "-r");
+    }
+
+    // Decide the CLI for running the sandbox
+    // For reference on how bazel spawns the sandbox:
+    // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
+    if (limits.useLinuxSandbox) {
+      LinuxSandboxOptions options = decideLinuxSandboxOptions(limits, workingDirectory);
+      addLinuxSandboxCli(arguments, options);
+    }
+
+    if (configs.getWorker().getSandboxSettings().isAlwaysUseAsNobody() || limits.fakeUsername) {
+      arguments.add(configs.getExecutionWrappers().getAsNobody());
+    }
+
+    if (limits.time.skipSleep) {
+      arguments.add(configs.getExecutionWrappers().getSkipSleep());
+
+      // we set these values very high because we want sleep calls to return immediately.
+      arguments.add("90000000"); // delay factor
+      arguments.add("90000000"); // time factor
+      arguments.add(configs.getExecutionWrappers().getSkipSleepPreload());
+
+      if (limits.time.timeShift != 0) {
+        arguments.add(configs.getExecutionWrappers().getDelay());
+        arguments.add(String.valueOf(limits.time.timeShift));
       }
-    };
+    }
+    return resource;
   }
 
   IOResource limitSpecifiedExecution(
@@ -933,39 +970,6 @@ class ShardWorkerContext implements WorkerContext {
             configs.getExecutionWrappers().getCgroups(),
             "-g",
             String.join(",", usedGroups) + ":" + group.getHierarchy());
-      }
-    }
-
-    // Possibly set network restrictions.
-    // This is not the ideal implementation of block-network.
-    // For now, without the linux-sandbox, we will unshare the network namespace.
-    if (limits.network.blockNetwork && !limits.useLinuxSandbox) {
-      arguments.add(configs.getExecutionWrappers().getUnshare(), "-n", "-r");
-    }
-
-    // Decide the CLI for running the sandbox
-    // For reference on how bazel spawns the sandbox:
-    // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
-    if (limits.useLinuxSandbox) {
-      LinuxSandboxOptions options = decideLinuxSandboxOptions(limits, workingDirectory);
-      addLinuxSandboxCli(arguments, options);
-    }
-
-    if (configs.getWorker().getSandboxSettings().isAlwaysUseAsNobody() || limits.fakeUsername) {
-      arguments.add(configs.getExecutionWrappers().getAsNobody());
-    }
-
-    if (limits.time.skipSleep) {
-      arguments.add(configs.getExecutionWrappers().getSkipSleep());
-
-      // we set these values very high because we want sleep calls to return immediately.
-      arguments.add("90000000"); // delay factor
-      arguments.add("90000000"); // time factor
-      arguments.add(configs.getExecutionWrappers().getSkipSleepPreload());
-
-      if (limits.time.timeShift != 0) {
-        arguments.add(configs.getExecutionWrappers().getDelay());
-        arguments.add(String.valueOf(limits.time.timeShift));
       }
     }
 
