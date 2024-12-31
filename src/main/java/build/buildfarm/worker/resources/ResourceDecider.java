@@ -176,16 +176,6 @@ public final class ResourceDecider {
     // ignoring the request due to a disabled sandbox.
     decideSandboxUsage(limits, sandbox);
 
-    // Avoid using the existing execution policies when using the linux sandbox.
-    // Using these execution policies under the sandbox do not have the right permissions to work.
-    // For the time being, we want to experiment with dynamically choosing the sandbox-
-    // without affecting current configurations or relying on specific deployments.
-    // This will dynamically skip using the worker configured execution policies.
-    if (limits.useLinuxSandbox) {
-      limits.useExecutionPolicies = false;
-      limits.description.add("configured execution policies skipped because of choosing sandbox");
-    }
-
     // Decide whether the action will run in a container
     if (allowBringYourOwnContainer && !limits.containerSettings.containerImage.isEmpty()) {
       // enable container execution
