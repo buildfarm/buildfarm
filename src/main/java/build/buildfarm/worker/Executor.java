@@ -305,7 +305,11 @@ class Executor {
     Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(
-            operationName, arguments, executionContext.command, workingDirectory)) {
+            operationName,
+            executionContext.claim.owner(),
+            arguments,
+            executionContext.command,
+            workingDirectory)) {
       if (System.getProperty("os.name").contains("Win")) {
         // Make sure that the executable path is absolute, otherwise processbuilder fails on windows
         Iterator<String> argumentItr = command.getArgumentsList().iterator();
