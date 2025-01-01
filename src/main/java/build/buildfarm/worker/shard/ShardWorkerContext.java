@@ -879,16 +879,20 @@ class ShardWorkerContext implements WorkerContext {
         configs.getWorker().getSandboxSettings());
   }
 
+  // This has become an extremely awkward mechanism
+  // an exec dir should be associatable with all of these parameters
+  // and the arguments should be more structured and less susceptible to ordering details
   @Override
   public IOResource limitExecution(
       String operationName,
+      @Nullable UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory) {
     ResourceLimits limits = commandExecutionSettings(command);
     IOResource resource;
     if (shouldLimitCoreUsage()) {
-      resource = limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
+      resource = limitSpecifiedExecution(limits, operationName, owner, arguments, workingDirectory);
     } else {
       resource =
           new IOResource() {
@@ -940,6 +944,7 @@ class ShardWorkerContext implements WorkerContext {
   IOResource limitSpecifiedExecution(
       ResourceLimits limits,
       String operationName,
+      @Nullable UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Path workingDirectory) {
     // The decision to apply resource restrictions has already been decided within the
@@ -954,13 +959,13 @@ class ShardWorkerContext implements WorkerContext {
 
       // Possibly set core restrictions.
       if (limits.cpu.limit) {
-        applyCpuLimits(group, limits, resources);
+        applyCpuLimits(group, owner, limits, resources);
         usedGroups.add(group.getCpu().getName());
       }
 
       // Possibly set memory restrictions.
       if (limits.mem.limit) {
-        applyMemLimits(group, limits, resources);
+        applyMemLimits(group, owner, limits, resources);
         usedGroups.add(group.getMem().getName());
       }
 
@@ -1058,10 +1063,20 @@ class ShardWorkerContext implements WorkerContext {
     arguments.add("--");
   }
 
-  private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+  private void applyCpuLimits(
+      Group group,
+      @Nullable UserPrincipal owner,
+      ResourceLimits limits,
+      ArrayList<IOResource> resources) {
     Cpu cpu = group.getCpu();
     try {
       cpu.close();
+
+      if (owner != null) {
+        // Associate cgroup ownership
+        cpu.setOwner(owner);
+      }
+
       if (limits.cpu.max > 0) {
         /* period of 100ms */
         cpu.setCFSPeriod(100000);
@@ -1086,9 +1101,18 @@ class ShardWorkerContext implements WorkerContext {
     resources.add(cpu);
   }
 
-  private void applyMemLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+  private void applyMemLimits(
+      Group group,
+      @Nullable UserPrincipal owner,
+      ResourceLimits limits,
+      ArrayList<IOResource> resources) {
     try {
       Mem mem = group.getMem();
+      if (owner != null) {
+        // Associate cgroup ownership
+        mem.setOwner(owner);
+      }
+
       mem.setMemoryLimit(limits.mem.claimed);
       resources.add(mem);
     } catch (IOException e) {

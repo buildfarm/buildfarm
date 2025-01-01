@@ -202,6 +202,7 @@ class StubWorkerContext implements WorkerContext {
   @Override
   public IOResource limitExecution(
       String operationName,
+      UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory) {

@@ -131,6 +131,7 @@ public interface WorkerContext {
 
   IOResource limitExecution(
       String operationName,
+      @Nullable UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory);
