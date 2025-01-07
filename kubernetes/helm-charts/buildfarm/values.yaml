@@ -143,6 +143,9 @@ shardWorker:
     # requests:
     #   cpu: 100m
     #   memory: 128Mi
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   storage:
     # the storage class for pv, leave empty will using default
     class: ""
