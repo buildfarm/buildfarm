@@ -18,12 +18,14 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.MapUtils;
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 
 /**
  * @class ExecutionPropertiesParser
@@ -70,9 +72,6 @@ public class ExecutionPropertiesParser {
     parser.put(
         ExecutionProperties.PERSISTENT_WORKER_KEY,
         ExecutionPropertiesParser::storePersistentWorkerKey);
-    parser.put(
-        ExecutionProperties.PERSISTENT_WORKER_COMMAND,
-        ExecutionPropertiesParser::storePersistentWorkerCommand);
 
     ResourceLimits limits = new ResourceLimits();
     command
@@ -232,11 +231,17 @@ public class ExecutionPropertiesParser {
   @SuppressWarnings("unchecked")
   private static void storeEnvVars(ResourceLimits limits, Property property) {
     try {
-      JSONParser parser = new JSONParser();
-      Map<String, String> map = (Map<String, String>) parser.parse(property.getValue());
+      Gson gson = new Gson();
+      JsonObject jsonObject = gson.fromJson(property.getValue(), JsonObject.class);
+      Map<String, String> map = new HashMap<>();
+      if (jsonObject != null) {
+        for (Map.Entry<String, JsonElement> entry : jsonObject.entrySet()) {
+          map.put(entry.getKey(), entry.getValue().getAsString());
+        }
+      }
       limits.extraEnvironmentVariables = map;
       describeChange(limits.description, "extra env vars added", MapUtils.toString(map), property);
-    } catch (ParseException pe) {
+    } catch (JsonSyntaxException jse) {
       limits.description.add("extra env vars could not be added due to parsing error");
     }
   }
@@ -344,19 +349,6 @@ public class ExecutionPropertiesParser {
     ArrayList<String> xs = new ArrayList<>();
     xs.add("Hash of tool inputs for remote persistent workers");
     describeChange(xs, "persistentWorkerKey(hash of tool inputs)", property.getValue(), property);
-  }
-
-  /**
-   * @brief Stores persistentWorkerCommand
-   * @details Parses and stores a String.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storePersistentWorkerCommand(ResourceLimits limits, Property property) {
-    limits.persistentWorkerCommand = property.getValue();
-    ArrayList<String> xs = new ArrayList<>();
-    xs.add("persistentWorkerCommand");
-    describeChange(xs, "persistentWorkerCommand", property.getValue(), property);
   }
 
   /**

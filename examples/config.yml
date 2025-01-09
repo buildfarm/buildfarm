@@ -91,7 +91,6 @@ backplane:
   maxCorrelatedInvocationsTimeout: 604800
   maxToolInvocationTimeout: 604800
   maxAttempts: 20
-  cacheCas: false
   queues:
   - name: cpu
     allowUnmatched: true
@@ -159,7 +158,9 @@ worker:
     amount: 4096
   - name: gpu
     type: POOL
-    amount: 4   # for an A30 MiG in full splay
+    amount: 4 # for an A30 MiG in full splay
+  persistentWorkerActionMnemonicAllowlist:
+  - '*'
 executionWrappers:
   cgroups: /usr/bin/cgexec
   unshare: /usr/bin/unshare

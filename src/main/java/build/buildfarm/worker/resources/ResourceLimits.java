@@ -170,11 +170,4 @@ public class ResourceLimits {
    * @details See https://github.com/bazelbuild/bazel/issues/10091
    */
   public String persistentWorkerKey = "";
-
-  /**
-   * @field persistentWorkerCommand
-   * @brief Command string to start the persistent worker
-   * @details See https://github.com/bazelbuild/bazel/issues/10091
-   */
-  public String persistentWorkerCommand = "";
 }

@@ -232,7 +232,8 @@ public class InputFetcher implements Runnable {
               directoriesIndex,
               executionContext.queueEntry.getExecuteEntry().getActionDigest().getDigestFunction(),
               queuedOperation.getAction(),
-              queuedOperation.getCommand());
+              queuedOperation.getCommand(),
+              executionContext.claim.owner());
     } catch (IOException e) {
       Status.Builder status = Status.newBuilder().setMessage("Error creating exec dir");
       if (e instanceof ExecDirException execDirEx) {

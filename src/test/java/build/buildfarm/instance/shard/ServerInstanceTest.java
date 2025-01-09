@@ -1273,4 +1273,30 @@ public class ServerInstanceTest {
     int start = random.nextInt(end);
     return input.stream().skip(start).limit(end - start).collect(Collectors.toSet());
   }
+
+  @Test
+  public void indexCorrelatedInvocationsTrims() throws Exception {
+    // fragment chosen over query id
+    String uuid = "3142d81d-fc20-4e67-91e3-27072f03c1e9";
+    String correlatedInvocationsId =
+        instance.indexCorrelatedInvocations(
+            new java.net.URI("https://host.example.com/path/to/build/?id=unused&foo=bar#" + uuid));
+    assertThat(correlatedInvocationsId).isEqualTo(uuid);
+
+    // query id chosen over path
+    correlatedInvocationsId =
+        instance.indexCorrelatedInvocations(
+            new java.net.URI("https://host.example.com/path/to/build/?id=" + uuid + "&foo=bar"));
+    assertThat(correlatedInvocationsId).isEqualTo(uuid);
+
+    // path as last selected resort
+    correlatedInvocationsId =
+        instance.indexCorrelatedInvocations(new java.net.URI("https://host.example.com/" + uuid));
+    assertThat(correlatedInvocationsId).isEqualTo("/" + uuid);
+
+    // otherwise we use the uri fully
+    correlatedInvocationsId =
+        instance.indexCorrelatedInvocations(new java.net.URI("https://" + uuid));
+    assertThat(correlatedInvocationsId).isEqualTo("https://" + uuid);
+  }
 }

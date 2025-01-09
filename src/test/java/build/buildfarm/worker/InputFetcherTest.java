@@ -29,6 +29,7 @@ import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.cas.cfc.PutDirectoryException;
+import build.buildfarm.common.Claim;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
@@ -49,6 +50,7 @@ import com.google.rpc.Status;
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
@@ -66,7 +68,11 @@ public class InputFetcherTest {
         ExecuteEntry.newBuilder().setOperationName(operation.getName()).build();
     QueueEntry queueEntry = QueueEntry.newBuilder().setExecuteEntry(executeEntry).build();
     ExecutionContext executionContext =
-        ExecutionContext.newBuilder().setQueueEntry(queueEntry).setOperation(operation).build();
+        ExecutionContext.newBuilder()
+            .setQueueEntry(queueEntry)
+            .setOperation(operation)
+            .setClaim(mock(Claim.class))
+            .build();
     Command command = Command.newBuilder().addArguments("/bin/false").build();
     QueuedOperation queuedOperation = QueuedOperation.newBuilder().setCommand(command).build();
     AtomicReference<Operation> failedOperationRef = new AtomicReference<>();
@@ -91,7 +97,8 @@ public class InputFetcherTest {
               Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
               DigestFunction.Value digestFunction,
               Action action,
-              Command command)
+              Command command,
+              UserPrincipal owner)
               throws IOException {
             Path root = Path.of(operationName);
             throw new ExecDirException(

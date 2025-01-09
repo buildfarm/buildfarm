@@ -15,9 +15,9 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.Claim;
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.worker.resources.Claim;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.collect.Iterables;

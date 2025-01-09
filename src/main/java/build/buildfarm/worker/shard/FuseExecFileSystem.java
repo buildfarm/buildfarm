@@ -27,6 +27,7 @@ import build.buildfarm.worker.FuseCAS;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -40,6 +41,11 @@ class FuseExecFileSystem implements ExecFileSystem {
     this.root = root;
     this.fuseCAS = fuseCAS;
     this.storage = storage;
+  }
+
+  @Override
+  public UserPrincipal getOwner(String name) {
+    return null;
   }
 
   @Override
@@ -74,8 +80,10 @@ class FuseExecFileSystem implements ExecFileSystem {
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       DigestFunction.Value digestFunction,
       Action action,
-      Command command)
+      Command command,
+      UserPrincipal owner)
       throws IOException, InterruptedException {
+    // FIXME insist that the FUSE perform permission checks against the owner
     fuseCAS.createInputRoot(
         operationName, DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction));
     return root.resolve(operationName);

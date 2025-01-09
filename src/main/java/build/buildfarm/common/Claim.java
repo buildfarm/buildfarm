@@ -12,8 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.resources;
+package build.buildfarm.common;
+
+import java.nio.file.attribute.UserPrincipal;
+import java.util.List;
+import java.util.Map.Entry;
+import javax.annotation.Nullable;
 
 public interface Claim {
+  enum Stage {
+    EXECUTE_ACTION_STAGE,
+    REPORT_RESULT_STAGE,
+  }
+
+  void release(Stage stage);
+
   void release();
+
+  @Nullable
+  UserPrincipal owner();
+
+  Iterable<Entry<String, List<Object>>> getPools();
 }
