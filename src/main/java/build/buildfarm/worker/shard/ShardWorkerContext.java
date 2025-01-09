@@ -18,7 +18,6 @@ import static build.buildfarm.cas.ContentAddressableStorage.UNLIMITED_ENTRY_SIZE
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.worker.DequeueMatchEvaluator.acquireClaim;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 
@@ -31,6 +30,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.Claim;
 import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestPath;
 import build.buildfarm.common.DigestUtil;
@@ -54,6 +54,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.worker.DequeueMatchEvaluator;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.MatchListener;
@@ -62,7 +63,6 @@ import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
-import build.buildfarm.worker.resources.Claim;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.ResourceDecider;
 import build.buildfarm.worker.resources.ResourceLimits;
@@ -70,6 +70,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSetMultimap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
@@ -88,9 +89,11 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
@@ -98,6 +101,9 @@ import lombok.extern.java.Log;
 
 @Log
 class ShardWorkerContext implements WorkerContext {
+  static final String EXEC_OWNER_RESOURCE_NAME = "exec-owner";
+  private static final Platform.Property EXEC_OWNER_PROPERTY =
+      Platform.Property.newBuilder().setName(EXEC_OWNER_RESOURCE_NAME).setValue("1").build();
   private static final String PROVISION_CORES_NAME = "cores";
 
   private static final Counter completedOperations =
@@ -133,6 +139,7 @@ class ShardWorkerContext implements WorkerContext {
   private final boolean errorOperationRemainingResources;
   private final LocalResourceSet resourceSet;
   private final boolean errorOperationOutputSizeExceeded;
+  private final boolean provideOwnedClaim;
 
   static SetMultimap<String, String> getMatchProvisions(
       Iterable<ExecutionPolicy> policies, String name, int executeStageWidth) {
@@ -194,6 +201,8 @@ class ShardWorkerContext implements WorkerContext {
     this.errorOperationOutputSizeExceeded = errorOperationOutputSizeExceeded;
     this.resourceSet = resourceSet;
     this.writer = writer;
+
+    provideOwnedClaim = this.resourceSet.poolResources.containsKey(EXEC_OWNER_RESOURCE_NAME);
   }
 
   private static Retrier createBackplaneRetrier() {
@@ -281,12 +290,63 @@ class ShardWorkerContext implements WorkerContext {
     return ProtoUtils.parseQueuedOperation(queuedOperationBlob, queueEntry);
   }
 
+  // FIXME make OwnedClaim with owner
+  // how will this play out with persistent workers, should we have one per user?
+  private Claim acquireClaim(Platform platform) {
+    // expand platform requirements with exec owner
+    if (provideOwnedClaim) {
+      platform = platform.toBuilder().addProperties(EXEC_OWNER_PROPERTY).build();
+    }
+
+    Claim claim = DequeueMatchEvaluator.acquireClaim(matchProvisions, resourceSet, platform);
+
+    // a little awkward wrapping with the early return here to preserve effective final
+    if (provideOwnedClaim) {
+      // enforced by exec owner property value of "1"
+      for (Entry<String, List<Object>> pool : claim.getPools()) {
+        if (!pool.getKey().equals(EXEC_OWNER_RESOURCE_NAME)) {
+          continue;
+        }
+        String name = (String) Iterables.getOnlyElement(pool.getValue());
+
+        return new Claim() {
+          UserPrincipal owner = execFileSystem.getOwner(name);
+
+          @Override
+          public void release(Claim.Stage stage) {
+            claim.release(stage);
+          }
+
+          @Override
+          public void release() {
+            owner = null;
+            claim.release();
+          }
+
+          @Override
+          public UserPrincipal owner() {
+            if (owner != null) {
+              return owner;
+            }
+            return claim.owner();
+          }
+
+          @Override
+          public Iterable<Entry<String, List<Object>>> getPools() {
+            return claim.getPools();
+          }
+        };
+      }
+      // claim was not provided with owner name value
+    }
+    return claim;
+  }
+
   @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     QueueEntry queueEntry = takeEntryOffOperationQueue(listener);
     Claim claim = null;
-    if (queueEntry == null
-        || (claim = acquireClaim(matchProvisions, resourceSet, queueEntry.getPlatform())) != null) {
+    if (queueEntry == null || (claim = acquireClaim(queueEntry.getPlatform())) != null) {
       listener.onEntry(queueEntry, claim);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -695,10 +755,11 @@ class ShardWorkerContext implements WorkerContext {
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       DigestFunction.Value digestFunction,
       Action action,
-      Command command)
+      Command command,
+      @Nullable UserPrincipal owner)
       throws IOException, InterruptedException {
     return execFileSystem.createExecDir(
-        operationName, directoriesIndex, digestFunction, action, command);
+        operationName, directoriesIndex, digestFunction, action, command, owner);
   }
 
   // might want to split for removeDirectory and decrement references to avoid removing for streamed
@@ -818,61 +879,31 @@ class ShardWorkerContext implements WorkerContext {
         configs.getWorker().getSandboxSettings());
   }
 
+  // This has become an extremely awkward mechanism
+  // an exec dir should be associatable with all of these parameters
+  // and the arguments should be more structured and less susceptible to ordering details
   @Override
   public IOResource limitExecution(
       String operationName,
+      @Nullable UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory) {
+    ResourceLimits limits = commandExecutionSettings(command);
+    IOResource resource;
     if (shouldLimitCoreUsage()) {
-      ResourceLimits limits = commandExecutionSettings(command);
-      return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
-    }
-    return new IOResource() {
-      @Override
-      public void close() {}
+      resource = limitSpecifiedExecution(limits, operationName, owner, arguments, workingDirectory);
+    } else {
+      resource =
+          new IOResource() {
+            @Override
+            public void close() {}
 
-      @Override
-      public boolean isReferenced() {
-        return false;
-      }
-    };
-  }
-
-  IOResource limitSpecifiedExecution(
-      ResourceLimits limits,
-      String operationName,
-      ImmutableList.Builder<String> arguments,
-      Path workingDirectory) {
-    // The decision to apply resource restrictions has already been decided within the
-    // ResourceLimits object. We apply the cgroup settings to file resources
-    // and collect group names to use on the CLI.
-    String operationId = getOperationId(operationName);
-    ArrayList<IOResource> resources = new ArrayList<>();
-
-    if (limits.cgroups) {
-      final Group group = operationsGroup.getChild(operationId);
-      ArrayList<String> usedGroups = new ArrayList<>();
-
-      // Possibly set core restrictions.
-      if (limits.cpu.limit) {
-        applyCpuLimits(group, limits, resources);
-        usedGroups.add(group.getCpu().getName());
-      }
-
-      // Possibly set memory restrictions.
-      if (limits.mem.limit) {
-        applyMemLimits(group, limits, resources);
-        usedGroups.add(group.getMem().getName());
-      }
-
-      // Decide the CLI for running under cgroups
-      if (!usedGroups.isEmpty()) {
-        arguments.add(
-            configs.getExecutionWrappers().getCgroups(),
-            "-g",
-            String.join(",", usedGroups) + ":" + group.getHierarchy());
-      }
+            @Override
+            public boolean isReferenced() {
+              return false;
+            }
+          };
     }
 
     // Possibly set network restrictions.
@@ -907,6 +938,45 @@ class ShardWorkerContext implements WorkerContext {
         arguments.add(String.valueOf(limits.time.timeShift));
       }
     }
+    return resource;
+  }
+
+  IOResource limitSpecifiedExecution(
+      ResourceLimits limits,
+      String operationName,
+      @Nullable UserPrincipal owner,
+      ImmutableList.Builder<String> arguments,
+      Path workingDirectory) {
+    // The decision to apply resource restrictions has already been decided within the
+    // ResourceLimits object. We apply the cgroup settings to file resources
+    // and collect group names to use on the CLI.
+    String operationId = getOperationId(operationName);
+    ArrayList<IOResource> resources = new ArrayList<>();
+
+    if (limits.cgroups) {
+      final Group group = operationsGroup.getChild(operationId);
+      ArrayList<String> usedGroups = new ArrayList<>();
+
+      // Possibly set core restrictions.
+      if (limits.cpu.limit) {
+        applyCpuLimits(group, owner, limits, resources);
+        usedGroups.add(group.getCpu().getName());
+      }
+
+      // Possibly set memory restrictions.
+      if (limits.mem.limit) {
+        applyMemLimits(group, owner, limits, resources);
+        usedGroups.add(group.getMem().getName());
+      }
+
+      // Decide the CLI for running under cgroups
+      if (!usedGroups.isEmpty()) {
+        arguments.add(
+            configs.getExecutionWrappers().getCgroups(),
+            "-g",
+            String.join(",", usedGroups) + ":" + group.getHierarchy());
+      }
+    }
 
     // The executor expects a single IOResource.
     // However, we may have multiple IOResources due to using multiple cgroup groups.
@@ -936,7 +1006,7 @@ class ShardWorkerContext implements WorkerContext {
         configs.getWorker().getSandboxSettings().getAdditionalWritePaths());
 
     if (limits.tmpFs) {
-      options.writableFiles.addAll(configs.getWorker().getSandboxSettings().getTmpFsPaths());
+      options.tmpfsDirs.addAll(configs.getWorker().getSandboxSettings().getTmpFsPaths());
     }
 
     if (limits.debugAfterExecution) {
@@ -993,10 +1063,20 @@ class ShardWorkerContext implements WorkerContext {
     arguments.add("--");
   }
 
-  private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+  private void applyCpuLimits(
+      Group group,
+      @Nullable UserPrincipal owner,
+      ResourceLimits limits,
+      ArrayList<IOResource> resources) {
     Cpu cpu = group.getCpu();
     try {
       cpu.close();
+
+      if (owner != null) {
+        // Associate cgroup ownership
+        cpu.setOwner(owner);
+      }
+
       if (limits.cpu.max > 0) {
         /* period of 100ms */
         cpu.setCFSPeriod(100000);
@@ -1021,9 +1101,18 @@ class ShardWorkerContext implements WorkerContext {
     resources.add(cpu);
   }
 
-  private void applyMemLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+  private void applyMemLimits(
+      Group group,
+      @Nullable UserPrincipal owner,
+      ResourceLimits limits,
+      ArrayList<IOResource> resources) {
     try {
       Mem mem = group.getMem();
+      if (owner != null) {
+        // Associate cgroup ownership
+        mem.setOwner(owner);
+      }
+
       mem.setMemoryLimit(limits.mem.claimed);
       resources.add(mem);
     } catch (IOException e) {

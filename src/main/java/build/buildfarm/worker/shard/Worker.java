@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
+import static build.buildfarm.common.Claim.Stage.REPORT_RESULT_STAGE;
 import static build.buildfarm.common.config.Backplane.BACKPLANE_TYPE.SHARD;
 import static build.buildfarm.common.io.Utils.formatIOError;
 import static build.buildfarm.common.io.Utils.getUser;
@@ -67,8 +68,12 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.SuperscalarPipelineStage;
+import build.buildfarm.worker.resources.LocalResourceSet;
+import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import build.buildfarm.worker.resources.LocalResourceSetUtils;
+import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
@@ -89,7 +94,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipal;
+import java.util.AbstractCollection;
+import java.util.ArrayDeque;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -311,14 +320,79 @@ public final class Worker extends LoggingMain {
         storage);
   }
 
-  private @Nullable UserPrincipal getOwner(FileSystem fileSystem) throws ConfigurationException {
+  private @Nullable UserPrincipal getOwner(String name, FileSystem fileSystem)
+      throws ConfigurationException {
     try {
-      return getUser(configs.getWorker().getExecOwner(), fileSystem);
+      return getUser(name, fileSystem);
     } catch (IOException e) {
       ConfigurationException configException =
-          new ConfigurationException("Could not locate exec_owner");
+          new ConfigurationException("Could not locate " + name);
       configException.initCause(e);
       throw configException;
+    }
+  }
+
+  /**
+   * @class Dispenser
+   * @brief A queue which delivers a single element repeatedly without delay or regard for size.
+   * @details For compatibility with POOL resources, this Queue delivers an infinite immediate
+   *     sequence of an identical element.
+   */
+  private static final class Dispenser<T> extends AbstractCollection<T> implements Queue<T> {
+    private final T element;
+
+    Dispenser(T element) {
+      this.element = element;
+    }
+
+    // used methods
+    @Override
+    public T poll() {
+      return element;
+    }
+
+    @Override
+    public boolean add(T o) {
+      checkState(o.equals(element));
+      return true;
+    }
+
+    // unused methods
+    // Queue
+    @Override
+    public T peek() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public T element() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public T remove() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean offer(T o) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void clear() {
+      throw new UnsupportedOperationException();
+    }
+
+    // Collection
+    @Override
+    public int size() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Iterator<T> iterator() {
+      throw new UnsupportedOperationException();
     }
   }
 
@@ -327,14 +401,45 @@ public final class Worker extends LoggingMain {
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
       ExecutorService fetchService,
-      ContentAddressableStorage storage)
+      ContentAddressableStorage storage,
+      LocalResourceSet resourceSet,
+      String ownerName,
+      List<String> ownerNames)
       throws ConfigurationException {
     checkState(storage != null, "no exec fs cas specified");
     if (storage instanceof CASFileCache) {
       CASFileCache cfc = (CASFileCache) storage;
-      UserPrincipal owner = getOwner(cfc.getRoot().getFileSystem());
+      FileSystem fileSystem = cfc.getRoot().getFileSystem();
+      PoolResource execOwnerIndexResource = null;
+      ImmutableMap<String, UserPrincipal> owners = ImmutableMap.of();
+      // there's some sense that ownerNames might be specifiable as 1, but not 2, and 3 being the
+      // minimum passing the config validation
+      if (ownerNames.isEmpty()) {
+        if (!Strings.isNullOrEmpty(ownerName)) {
+          owners = ImmutableMap.of(ownerName, getOwner(ownerName, fileSystem));
+          execOwnerIndexResource =
+              new PoolResource(new Dispenser<>(ownerName), REPORT_RESULT_STAGE);
+        }
+      } else {
+        ImmutableMap.Builder<String, UserPrincipal> builder = ImmutableMap.builder();
+        for (String name : ownerNames) {
+          UserPrincipal owner = getOwner(name, fileSystem);
+          if (owner == null) {
+            throw new ConfigurationException("could not locate user " + name);
+          }
+          builder.put(name, getOwner(name, fileSystem));
+        }
+        owners = builder.build();
+        execOwnerIndexResource =
+            new PoolResource(new ArrayDeque<>(owners.keySet()), REPORT_RESULT_STAGE);
+      }
+      if (execOwnerIndexResource != null) {
+        resourceSet.poolResources.put(
+            ShardWorkerContext.EXEC_OWNER_RESOURCE_NAME, execOwnerIndexResource);
+      }
+
       return createCFCExecFileSystem(
-          removeDirectoryService, accessRecorder, fetchService, cfc, owner);
+          removeDirectoryService, accessRecorder, fetchService, cfc, owners);
     } else {
       // FIXME not the only fuse backing capacity...
       return createFuseExecFileSystem(remoteInputStreamFactory, storage);
@@ -410,12 +515,12 @@ public final class Worker extends LoggingMain {
       ExecutorService accessRecorder,
       ExecutorService fetchService,
       CASFileCache fileCache,
-      @Nullable UserPrincipal owner) {
+      ImmutableMap<String, UserPrincipal> owners) {
     if (configs.getWorker().isLinkExecFileSystem()) {
       return new CFCLinkExecFileSystem(
           root,
           fileCache,
-          owner,
+          owners,
           configs.getWorker().isLinkInputDirectories(),
           configs.getWorker().getLinkedInputDirectories(),
           configs.isAllowSymlinkTargetAbsolute(),
@@ -426,7 +531,7 @@ public final class Worker extends LoggingMain {
       return new CFCExecFileSystem(
           root,
           fileCache,
-          owner,
+          owners,
           configs.isAllowSymlinkTargetAbsolute(),
           removeDirectoryService,
           accessRecorder,
@@ -615,6 +720,17 @@ public final class Worker extends LoggingMain {
             })
         .register();
 
+    int inputFetchStageWidth = configs.getWorker().getInputFetchStageWidth();
+    int executeStageWidth = configs.getWorker().getExecuteStageWidth();
+    int reportResultStageWidth = configs.getWorker().getReportResultStageWidth();
+    LocalResourceSet resourceSet = LocalResourceSetUtils.create(configs.getWorker().getResources());
+    List<String> execOwners = configs.getWorker().getExecOwners();
+    if (!execOwners.isEmpty()
+        && execOwners.size() < inputFetchStageWidth + executeStageWidth + reportResultStageWidth) {
+      throw new ConfigurationException(
+          "execOwners is not large enough to fill requested stage widths");
+    }
+
     InputStreamFactory remoteInputStreamFactory =
         new RemoteInputStreamFactory(
             configs.getWorker().getPublicName(),
@@ -629,13 +745,17 @@ public final class Worker extends LoggingMain {
             accessRecorder,
             zstdBufferPool,
             configs.getWorker().getStorages());
+    // may modify resourceSet to provide additional resources
     execFileSystem =
         createExecFileSystem(
             remoteInputStreamFactory,
             removeDirectoryService,
             accessRecorder,
             fetchService,
-            storage);
+            storage,
+            resourceSet,
+            configs.getWorker().getExecOwner(),
+            execOwners);
 
     instance = new WorkerInstance(configs.getWorker().getPublicName(), backplane, storage);
 
@@ -653,9 +773,9 @@ public final class Worker extends LoggingMain {
             configs.getWorker().getPublicName(),
             Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build(),
             backplane::pollExecution,
-            configs.getWorker().getInputFetchStageWidth(),
-            configs.getWorker().getExecuteStageWidth(),
-            configs.getWorker().getReportResultStageWidth(),
+            inputFetchStageWidth,
+            executeStageWidth,
+            reportResultStageWidth,
             configs.getWorker().getInputFetchDeadline(),
             backplane,
             execFileSystem,
@@ -672,7 +792,7 @@ public final class Worker extends LoggingMain {
             configs.getWorker().isAllowBringYourOwnContainer(),
             configs.getWorker().isErrorOperationRemainingResources(),
             configs.getWorker().isErrorOperationOutputSizeExceeded(),
-            LocalResourceSetUtils.create(configs.getWorker().getResources()),
+            resourceSet,
             writer);
 
     pipeline = new Pipeline();
@@ -692,9 +812,9 @@ public final class Worker extends LoggingMain {
 
     pipeline.start();
     healthCheckMetric.labels("start").inc();
-    executionSlotsTotal.set(configs.getWorker().getExecuteStageWidth());
-    inputFetchSlotsTotal.set(configs.getWorker().getInputFetchStageWidth());
-    reportResultSlotsTotal.set(configs.getWorker().getReportResultStageWidth());
+    inputFetchSlotsTotal.set(inputFetchStageWidth);
+    executionSlotsTotal.set(executeStageWidth);
+    reportResultSlotsTotal.set(reportResultStageWidth);
 
     log.log(INFO, String.format("%s initialized", identifier));
   }

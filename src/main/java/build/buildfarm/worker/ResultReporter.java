@@ -18,6 +18,7 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.buildfarm.common.Actions.asExecutionStatus;
 import static build.buildfarm.common.Actions.isRetriable;
+import static build.buildfarm.common.Claim.Stage.REPORT_RESULT_STAGE;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -93,6 +94,7 @@ class ResultReporter implements Runnable {
       try {
         after(executionContext);
       } finally {
+        executionContext.claim.release(REPORT_RESULT_STAGE);
         owner.releaseResultReporter(
             executionName, stopwatch.elapsed(MICROSECONDS), stallUSecs, success);
         if (wasInterrupted) {

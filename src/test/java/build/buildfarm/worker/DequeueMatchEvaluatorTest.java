@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import static build.buildfarm.common.Claim.Stage.EXECUTE_ACTION_STAGE;
 import static build.buildfarm.common.ExecutionProperties.CORES;
 import static build.buildfarm.common.ExecutionProperties.MAX_CORES;
 import static build.buildfarm.common.ExecutionProperties.MIN_CORES;
@@ -21,9 +22,10 @@ import static build.buildfarm.worker.DequeueMatchEvaluator.acquireClaim;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.Claim;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.worker.resources.Claim;
 import build.buildfarm.worker.resources.LocalResourceSet;
+import build.buildfarm.worker.resources.LocalResourceSet.SemaphoreResource;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 import java.util.concurrent.Semaphore;
@@ -219,7 +221,7 @@ public class DequeueMatchEvaluatorTest {
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     LocalResourceSet resourceSet = new LocalResourceSet();
-    resourceSet.resources.put("FOO", new Semaphore(1));
+    resourceSet.resources.put("FOO", new SemaphoreResource(new Semaphore(1), EXECUTE_ACTION_STAGE));
 
     Platform platform =
         Platform.newBuilder()
@@ -227,7 +229,7 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // PRE-ASSERT
-    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(1);
+    assertThat(resourceSet.resources.get("FOO").semaphore().availablePermits()).isEqualTo(1);
 
     // ACT
     Claim claim = acquireClaim(workerProvisions, resourceSet, platform);
@@ -235,7 +237,7 @@ public class DequeueMatchEvaluatorTest {
     // ASSERT
     // the worker accepts because the resource is available.
     assertThat(claim).isNotNull();
-    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
+    assertThat(resourceSet.resources.get("FOO").semaphore().availablePermits()).isEqualTo(0);
 
     // ACT
     claim = acquireClaim(workerProvisions, resourceSet, platform);
@@ -243,7 +245,7 @@ public class DequeueMatchEvaluatorTest {
     // ASSERT
     // the worker rejects because there are no resources left.
     assertThat(claim).isNull();
-    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
+    assertThat(resourceSet.resources.get("FOO").semaphore().availablePermits()).isEqualTo(0);
   }
 
   // Function under test: acquireClaim
@@ -255,7 +257,7 @@ public class DequeueMatchEvaluatorTest {
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(false);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     LocalResourceSet resourceSet = new LocalResourceSet();
-    resourceSet.resources.put("FOO", new Semaphore(1));
+    resourceSet.resources.put("FOO", new SemaphoreResource(new Semaphore(1), EXECUTE_ACTION_STAGE));
 
     Platform platform =
         Platform.newBuilder()
@@ -264,7 +266,7 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // PRE-ASSERT
-    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(1);
+    assertThat(resourceSet.resources.get("FOO").semaphore().availablePermits()).isEqualTo(1);
 
     // ACT
     Claim claim = acquireClaim(workerProvisions, resourceSet, platform);
@@ -272,7 +274,7 @@ public class DequeueMatchEvaluatorTest {
     // ASSERT
     // the worker rejects because the os is not satisfied
     assertThat(claim).isNull();
-    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(1);
+    assertThat(resourceSet.resources.get("FOO").semaphore().availablePermits()).isEqualTo(1);
   }
 
   // Function under test: acquireClaim
@@ -284,8 +286,8 @@ public class DequeueMatchEvaluatorTest {
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     LocalResourceSet resourceSet = new LocalResourceSet();
-    resourceSet.resources.put("FOO", new Semaphore(2));
-    resourceSet.resources.put("BAR", new Semaphore(4));
+    resourceSet.resources.put("FOO", new SemaphoreResource(new Semaphore(2), EXECUTE_ACTION_STAGE));
+    resourceSet.resources.put("BAR", new SemaphoreResource(new Semaphore(4), EXECUTE_ACTION_STAGE));
 
     Platform platform =
         Platform.newBuilder()
@@ -294,8 +296,8 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // PRE-ASSERT
-    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(2);
-    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(4);
+    assertThat(resourceSet.resources.get("FOO").semaphore().availablePermits()).isEqualTo(2);
+    assertThat(resourceSet.resources.get("BAR").semaphore().availablePermits()).isEqualTo(4);
 
     // ACT
     Claim claim = acquireClaim(workerProvisions, resourceSet, platform);
@@ -303,8 +305,8 @@ public class DequeueMatchEvaluatorTest {
     // ASSERT
     // the worker accepts because the resource is available.
     assertThat(claim).isNotNull();
-    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(1);
-    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(2);
+    assertThat(resourceSet.resources.get("FOO").semaphore().availablePermits()).isEqualTo(1);
+    assertThat(resourceSet.resources.get("BAR").semaphore().availablePermits()).isEqualTo(2);
 
     // ACT
     claim = acquireClaim(workerProvisions, resourceSet, platform);
@@ -312,8 +314,8 @@ public class DequeueMatchEvaluatorTest {
     // ASSERT
     // the worker accepts because the resource is available.
     assertThat(claim).isNotNull();
-    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
-    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(0);
+    assertThat(resourceSet.resources.get("FOO").semaphore().availablePermits()).isEqualTo(0);
+    assertThat(resourceSet.resources.get("BAR").semaphore().availablePermits()).isEqualTo(0);
 
     // ACT
     claim = acquireClaim(workerProvisions, resourceSet, platform);
@@ -321,8 +323,8 @@ public class DequeueMatchEvaluatorTest {
     // ASSERT
     // the worker rejects because there are no resources left.
     assertThat(claim).isNull();
-    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(0);
-    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(0);
+    assertThat(resourceSet.resources.get("FOO").semaphore().availablePermits()).isEqualTo(0);
+    assertThat(resourceSet.resources.get("BAR").semaphore().availablePermits()).isEqualTo(0);
   }
 
   // Function under test: acquireClaim
@@ -335,9 +337,12 @@ public class DequeueMatchEvaluatorTest {
     configs.getWorker().getDequeueMatchSettings().setAllowUnmatched(true);
     SetMultimap<String, String> workerProvisions = HashMultimap.create();
     LocalResourceSet resourceSet = new LocalResourceSet();
-    resourceSet.resources.put("FOO", new Semaphore(50));
-    resourceSet.resources.put("BAR", new Semaphore(100));
-    resourceSet.resources.put("BAZ", new Semaphore(200));
+    resourceSet.resources.put(
+        "FOO", new SemaphoreResource(new Semaphore(50), EXECUTE_ACTION_STAGE));
+    resourceSet.resources.put(
+        "BAR", new SemaphoreResource(new Semaphore(100), EXECUTE_ACTION_STAGE));
+    resourceSet.resources.put(
+        "BAZ", new SemaphoreResource(new Semaphore(200), EXECUTE_ACTION_STAGE));
 
     Platform platform =
         Platform.newBuilder()
@@ -347,9 +352,9 @@ public class DequeueMatchEvaluatorTest {
             .build();
 
     // PRE-ASSERT
-    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(50);
-    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(100);
-    assertThat(resourceSet.resources.get("BAZ").availablePermits()).isEqualTo(200);
+    assertThat(resourceSet.resources.get("FOO").semaphore().availablePermits()).isEqualTo(50);
+    assertThat(resourceSet.resources.get("BAR").semaphore().availablePermits()).isEqualTo(100);
+    assertThat(resourceSet.resources.get("BAZ").semaphore().availablePermits()).isEqualTo(200);
 
     // ACT
     Claim claim = acquireClaim(workerProvisions, resourceSet, platform);
@@ -358,9 +363,9 @@ public class DequeueMatchEvaluatorTest {
     // the worker rejects because there are no resources left.
     // The same amount are returned.
     assertThat(claim).isNull();
-    assertThat(resourceSet.resources.get("FOO").availablePermits()).isEqualTo(50);
-    assertThat(resourceSet.resources.get("BAR").availablePermits()).isEqualTo(100);
-    assertThat(resourceSet.resources.get("BAZ").availablePermits()).isEqualTo(200);
+    assertThat(resourceSet.resources.get("FOO").semaphore().availablePermits()).isEqualTo(50);
+    assertThat(resourceSet.resources.get("BAR").semaphore().availablePermits()).isEqualTo(100);
+    assertThat(resourceSet.resources.get("BAZ").semaphore().availablePermits()).isEqualTo(200);
   }
 
   @Test

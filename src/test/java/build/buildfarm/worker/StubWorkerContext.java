@@ -34,6 +34,7 @@ import com.google.protobuf.Duration;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -133,7 +134,8 @@ class StubWorkerContext implements WorkerContext {
       Map<Digest, Directory> directoriesIndex,
       DigestFunction.Value digestFunction,
       Action action,
-      Command command)
+      Command command,
+      UserPrincipal owner)
       throws IOException, InterruptedException {
     throw new UnsupportedOperationException();
   }
@@ -200,6 +202,7 @@ class StubWorkerContext implements WorkerContext {
   @Override
   public IOResource limitExecution(
       String operationName,
+      UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory) {

@@ -1921,7 +1921,7 @@ public class ServerInstance extends NodeInstance {
   }
 
   private boolean hasMaxActionTimeout() {
-    return maxActionTimeout.getSeconds() > 0 || maxActionTimeout.getNanos() > 0;
+    return Durations.isPositive(maxActionTimeout);
   }
 
   @Override
@@ -1934,9 +1934,8 @@ public class ServerInstance extends NodeInstance {
       PreconditionFailure.Builder preconditionFailure) {
     if (action.hasTimeout() && hasMaxActionTimeout()) {
       Duration timeout = action.getTimeout();
-      if (timeout.getSeconds() > maxActionTimeout.getSeconds()
-          || (timeout.getSeconds() == maxActionTimeout.getSeconds()
-              && timeout.getNanos() > maxActionTimeout.getNanos())) {
+
+      if (Durations.compare(timeout, maxActionTimeout) > 0) {
         preconditionFailure
             .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
@@ -3167,7 +3166,7 @@ public class ServerInstance extends NodeInstance {
     if (Strings.isNullOrEmpty(id)) {
       // If the query contains a single 'id' parameter it is used
       List<String> ids = parameters.get("id");
-      if (ids.size() == 1) {
+      if (ids != null && ids.size() == 1) {
         id = ids.getFirst();
       }
     }
@@ -3182,7 +3181,7 @@ public class ServerInstance extends NodeInstance {
 
     // no unique distinction for this url exists, just use the original uri
     if (Strings.isNullOrEmpty(id)) {
-      id = decoder.uri();
+      id = uri.toString();
     }
 
     // TODO stream() to select sub-map?
@@ -3193,9 +3192,12 @@ public class ServerInstance extends NodeInstance {
 
     // associate uri components and query with this correlated id
     if (indexScopes.contains("username")) {
-      String username = uri.getUserInfo().split(":")[0];
-      if (!username.isEmpty()) {
-        indexScopeValues.put("username", ImmutableList.of(username));
+      String userInfo = uri.getUserInfo();
+      if (!Strings.isNullOrEmpty(userInfo)) {
+        String username = uri.getUserInfo().split(":")[0];
+        if (!username.isEmpty()) {
+          indexScopeValues.put("username", ImmutableList.of(username));
+        }
       }
     }
     if (indexScopes.contains("host")) {
