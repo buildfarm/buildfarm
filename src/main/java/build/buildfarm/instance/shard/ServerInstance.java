@@ -2458,6 +2458,7 @@ public class ServerInstance extends NodeInstance {
                         .build()))
             .setMetadata(Any.pack(completeMetadata))
             .build();
+    backplane.unmergeExecution(actionKey);
     backplane.putOperation(completedOperation, completeMetadata.getStage());
   }
 
