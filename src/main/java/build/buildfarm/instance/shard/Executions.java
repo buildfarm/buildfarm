@@ -77,11 +77,17 @@ public class Executions {
    * @param name The global name of the execution map.
    * @param actionsName The global name of the actions map.
    * @param timeout_s When to expire executions.
+   * @param action_timeout_s When to expire the action -> execution mapping.
    */
-  public Executions(RedisSetMap toolInvocations, String name, String actionsName, int timeout_s) {
+  public Executions(
+      RedisSetMap toolInvocations,
+      String name,
+      String actionsName,
+      int timeout_s,
+      int action_timeout_s) {
     this.toolInvocations = toolInvocations;
     executions = new RedisMap(name, timeout_s);
-    actions = new RedisMap(actionsName, timeout_s);
+    actions = new RedisMap(actionsName, action_timeout_s);
   }
 
   /**
