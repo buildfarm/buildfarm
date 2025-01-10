@@ -787,8 +787,11 @@ public class RedisShardBackplane implements Backplane {
       return recentExecuteWorkers.get();
     } catch (RuntimeException e) {
       // unwrap checked exception mask
+      log.log(Level.WARNING, "getExecuteWorkers failed", e);
       Throwable cause = e.getCause();
-      Throwables.throwIfInstanceOf(cause, IOException.class);
+      if (cause != null) {
+        Throwables.throwIfInstanceOf(cause, IOException.class);
+      }
       throw e;
     }
   }

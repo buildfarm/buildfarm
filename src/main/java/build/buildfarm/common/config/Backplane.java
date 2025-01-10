@@ -29,6 +29,7 @@ public class Backplane {
   private String operationPrefix = "Operation";
   private String actionsPrefix = "Action";
   private int operationExpire = 604800; // 1 Week
+  private int actionExecutionExpire = 21600; // 6 Hours
   private String preQueuedOperationsListName = "{Arrival}:PreQueuedOperations";
   private String processingListName = "{Arrival}:ProcessingOperations";
   private String processingPrefix = "Processing";
