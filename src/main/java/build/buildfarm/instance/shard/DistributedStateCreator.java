@@ -55,7 +55,8 @@ public class DistributedStateCreator {
             state.toolInvocations,
             configs.getBackplane().getOperationPrefix(), // FIXME change to Execution
             configs.getBackplane().getActionsPrefix(),
-            configs.getBackplane().getOperationExpire());
+            configs.getBackplane().getOperationExpire(),
+            configs.getBackplane().getActionExecutionExpire());
     state.processingExecutions = new RedisMap(configs.getBackplane().getProcessingPrefix());
     state.dispatchingExecutions = new RedisMap(configs.getBackplane().getDispatchingPrefix());
     state.dispatchedExecutions =
