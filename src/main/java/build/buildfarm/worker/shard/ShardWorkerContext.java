@@ -1006,7 +1006,7 @@ class ShardWorkerContext implements WorkerContext {
         configs.getWorker().getSandboxSettings().getAdditionalWritePaths());
 
     if (limits.tmpFs) {
-      options.writableFiles.addAll(configs.getWorker().getSandboxSettings().getTmpFsPaths());
+      options.tmpfsDirs.addAll(configs.getWorker().getSandboxSettings().getTmpFsPaths());
     }
 
     if (limits.debugAfterExecution) {
