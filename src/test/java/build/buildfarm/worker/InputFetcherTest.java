@@ -1,4 +1,4 @@
-// Copyright 2018 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
@@ -28,6 +29,7 @@ import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.cas.cfc.PutDirectoryException;
+import build.buildfarm.common.Claim;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
@@ -48,8 +50,9 @@ import com.google.rpc.Status;
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -65,7 +68,11 @@ public class InputFetcherTest {
         ExecuteEntry.newBuilder().setOperationName(operation.getName()).build();
     QueueEntry queueEntry = QueueEntry.newBuilder().setExecuteEntry(executeEntry).build();
     ExecutionContext executionContext =
-        ExecutionContext.newBuilder().setQueueEntry(queueEntry).setOperation(operation).build();
+        ExecutionContext.newBuilder()
+            .setQueueEntry(queueEntry)
+            .setOperation(operation)
+            .setClaim(mock(Claim.class))
+            .build();
     Command command = Command.newBuilder().addArguments("/bin/false").build();
     QueuedOperation queuedOperation = QueuedOperation.newBuilder().setCommand(command).build();
     AtomicReference<Operation> failedOperationRef = new AtomicReference<>();
@@ -90,11 +97,12 @@ public class InputFetcherTest {
               Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
               DigestFunction.Value digestFunction,
               Action action,
-              Command command)
+              Command command,
+              UserPrincipal owner)
               throws IOException {
-            Path root = Paths.get(operationName);
+            Path root = Path.of(operationName);
             throw new ExecDirException(
-                Paths.get(operationName),
+                Path.of(operationName),
                 ImmutableList.of(
                     new ViolationException(
                         Digest.getDefaultInstance(),
@@ -113,7 +121,8 @@ public class InputFetcherTest {
           }
         };
     InputFetchStage owner = new InputFetchStage(workerContext, /* output= */ null, error);
-    InputFetcher inputFetcher = new InputFetcher(workerContext, executionContext, owner);
+    Executor executor = mock(Executor.class);
+    InputFetcher inputFetcher = new InputFetcher(workerContext, executionContext, owner, executor);
     inputFetcher.fetchPolled(/* stopwatch= */ null);
     Operation failedOperation = checkNotNull(failedOperationRef.get());
     verify(error, times(1)).put(any(ExecutionContext.class));
@@ -136,5 +145,6 @@ public class InputFetcherTest {
             .isTrue();
       }
     }
+    verifyNoMoreInteractions(executor);
   }
 }

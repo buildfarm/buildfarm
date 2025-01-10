@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -59,12 +59,13 @@ public class DigestUtil {
 
   public static final Map<DigestFunction.Value, Digest> empty =
       ImmutableMap.of(
-          DigestFunction.Value.MD5, DigestUtil.forHash("MD5").compute(ByteString.empty()),
-          DigestFunction.Value.SHA1, DigestUtil.forHash("SHA1").compute(ByteString.empty()),
-          DigestFunction.Value.SHA256, DigestUtil.forHash("SHA256").compute(ByteString.empty()),
-          DigestFunction.Value.SHA384, DigestUtil.forHash("SHA384").compute(ByteString.empty()),
-          DigestFunction.Value.SHA512, DigestUtil.forHash("SHA512").compute(ByteString.empty()),
-          DigestFunction.Value.BLAKE3, DigestUtil.forHash("BLAKE3").compute(ByteString.empty()));
+          DigestFunction.Value.MD5, DigestUtil.forHash("MD5").computeImpl(ByteString.empty()),
+          DigestFunction.Value.SHA1, DigestUtil.forHash("SHA1").computeImpl(ByteString.empty()),
+          DigestFunction.Value.SHA256, DigestUtil.forHash("SHA256").computeImpl(ByteString.empty()),
+          DigestFunction.Value.SHA384, DigestUtil.forHash("SHA384").computeImpl(ByteString.empty()),
+          DigestFunction.Value.SHA512, DigestUtil.forHash("SHA512").computeImpl(ByteString.empty()),
+          DigestFunction.Value.BLAKE3,
+              DigestUtil.forHash("BLAKE3").computeImpl(ByteString.empty()));
 
   /** Type of hash function to use for digesting blobs. */
   // The underlying HashFunctions are immutable and thread safe.
@@ -156,6 +157,11 @@ public class DigestUtil {
     public int hashCode() {
       return digest.hashCode();
     }
+
+    @Override
+    public String toString() {
+      return DigestUtil.toString(digest);
+    }
   }
 
   private final HashFunction hashFn;
@@ -203,8 +209,12 @@ public class DigestUtil {
 
   public Digest compute(ByteString blob) {
     if (blob.size() == 0) {
-      return Digest.getDefaultInstance();
+      return empty();
     }
+    return computeImpl(blob);
+  }
+
+  private Digest computeImpl(ByteString blob) {
     return buildDigest(computeHash(blob).toString(), blob.size(), getDigestFunction());
   }
 

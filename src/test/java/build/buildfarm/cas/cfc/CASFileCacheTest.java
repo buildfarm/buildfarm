@@ -1,4 +1,4 @@
-// Copyright 2018 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -256,7 +256,7 @@ class CASFileCacheTest {
     Path dirPath =
         getInterruptiblyOrIOException(
                 fileCache.putDirectory(dirDigest, directoriesIndex, putService))
-            .getPath();
+            .path();
     assertThat(Files.isDirectory(dirPath)).isTrue();
     assertThat(Files.exists(dirPath.resolve("file"))).isTrue();
     assertThat(Files.isDirectory(dirPath.resolve("subdir"))).isTrue();
@@ -325,11 +325,11 @@ class CASFileCacheTest {
     StartupCacheResults results = fileCache.start(false);
 
     // check the startuo results to ensure no files were processed
-    assertThat(results.load.loadSkipped).isFalse();
-    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
-    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(0);
-    assertThat(results.load.scan.fileKeys.size()).isEqualTo(0);
-    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
+    assertThat(results.load().loadSkipped()).isFalse();
+    assertThat(results.load().scan().computeDirs().size()).isEqualTo(0);
+    assertThat(results.load().scan().deleteFiles().size()).isEqualTo(0);
+    assertThat(results.load().scan().fileKeys().size()).isEqualTo(0);
+    assertThat(results.load().invalidDirectories().size()).isEqualTo(0);
   }
 
   @Test
@@ -344,11 +344,11 @@ class CASFileCacheTest {
     StartupCacheResults results = fileCache.start(false);
 
     // check the startup results to ensure no files were processed
-    assertThat(results.load.loadSkipped).isFalse();
-    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
-    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(1);
-    assertThat(results.load.scan.fileKeys.size()).isEqualTo(0);
-    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
+    assertThat(results.load().loadSkipped()).isFalse();
+    assertThat(results.load().scan().computeDirs().size()).isEqualTo(0);
+    assertThat(results.load().scan().deleteFiles().size()).isEqualTo(1);
+    assertThat(results.load().scan().fileKeys().size()).isEqualTo(0);
+    assertThat(results.load().invalidDirectories().size()).isEqualTo(0);
   }
 
   @Test
@@ -366,11 +366,11 @@ class CASFileCacheTest {
     StartupCacheResults results = fileCache.start(false);
 
     // check the startup results to ensure our two files were processed
-    assertThat(results.load.loadSkipped).isFalse();
-    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
-    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(0);
-    assertThat(results.load.scan.fileKeys.size()).isEqualTo(2);
-    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
+    assertThat(results.load().loadSkipped()).isFalse();
+    assertThat(results.load().scan().computeDirs().size()).isEqualTo(0);
+    assertThat(results.load().scan().deleteFiles().size()).isEqualTo(0);
+    assertThat(results.load().scan().fileKeys().size()).isEqualTo(2);
+    assertThat(results.load().invalidDirectories().size()).isEqualTo(0);
 
     // explicitly not providing blob via blobs, this would throw if fetched from factory
     //
@@ -394,11 +394,11 @@ class CASFileCacheTest {
     StartupCacheResults results = fileCache.start(/* skipLoad= */ true);
 
     // check the startup results to ensure our two files were processed
-    assertThat(results.load.loadSkipped).isTrue();
-    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
-    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(0);
-    assertThat(results.load.scan.fileKeys.size()).isEqualTo(0);
-    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
+    assertThat(results.load().loadSkipped()).isTrue();
+    assertThat(results.load().scan().computeDirs().size()).isEqualTo(0);
+    assertThat(results.load().scan().deleteFiles().size()).isEqualTo(0);
+    assertThat(results.load().scan().fileKeys().size()).isEqualTo(0);
+    assertThat(results.load().invalidDirectories().size()).isEqualTo(0);
   }
 
   @Test

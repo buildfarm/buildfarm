@@ -1,4 +1,4 @@
-// Copyright 2018 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import static org.mockito.Mockito.when;
 
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -41,7 +41,7 @@ public class ExecuteActionStageTest {
     ExecutionContext errorContext =
         ExecutionContext.newBuilder()
             .setQueueEntry(errorEntry)
-            .setExecDir(Paths.get("error-operation-path"))
+            .setExecDir(Path.of("error-operation-path"))
             .build();
 
     PipelineStage executeActionStage = new ExecuteActionStage(context, /* output= */ null, error);

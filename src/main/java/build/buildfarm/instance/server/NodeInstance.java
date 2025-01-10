@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -75,6 +75,7 @@ import build.buildfarm.common.Size;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.net.URL;
 import build.buildfarm.common.resources.BlobInformation;
@@ -149,6 +150,8 @@ import org.apache.http.auth.Credentials;
 
 @Log
 public abstract class NodeInstance extends InstanceBase {
+  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
+
   protected final ContentAddressableStorage contentAddressableStorage;
   protected final ActionCache actionCache;
   protected final OperationsMap outstandingOperations;
@@ -335,6 +338,21 @@ public abstract class NodeInstance extends InstanceBase {
             directExecutor()));
   }
 
+  private static boolean requestFlag(
+      RequestMetadata requestMetadata, String name, boolean flagDefault) {
+    try {
+      URI uri = new URI(requestMetadata.getCorrelatedInvocationsId());
+      QueryStringDecoder decoder = new QueryStringDecoder(uri);
+      return decoder
+          .parameters()
+          .getOrDefault(name, ImmutableList.of(flagDefault ? "true" : "false"))
+          .getFirst()
+          .equals("true");
+    } catch (URISyntaxException e) {
+      return flagDefault;
+    }
+  }
+
   private static boolean shouldEnsureOutputsPresent(
       boolean ensureOutputsPresent, RequestMetadata requestMetadata) {
     // The 'ensure outputs present' setting means that the AC will only return results to the client
@@ -344,23 +362,15 @@ public abstract class NodeInstance extends InstanceBase {
     // of incoming messages (perhaps due to a proxy). Or other build systems may not be reliable
     // without this extra check.
 
-    // We perform the outputs present check if the system is globally configured to check for it.
-    // Otherwise the behavior is determined dynamically from optional URI parameters.
-    if (ensureOutputsPresent) {
-      return true;
-    }
+    // The behavior is determined dynamically from optional URI parameters.
+    // If unspecified, we perform the outputs present check if the system is globally configured to
+    // check for it.
+    return requestFlag(requestMetadata, "ENSURE_OUTPUTS_PRESENT", ensureOutputsPresent);
+  }
 
-    try {
-      URI uri = new URI(requestMetadata.getCorrelatedInvocationsId());
-      QueryStringDecoder decoder = new QueryStringDecoder(uri);
-      return decoder
-          .parameters()
-          .getOrDefault("ENSURE_OUTPUTS_PRESENT", ImmutableList.of("false"))
-          .getFirst()
-          .equals("true");
-    } catch (URISyntaxException e) {
-      return false;
-    }
+  protected static boolean shouldMergeExecutions(
+      boolean mergeExecutions, RequestMetadata requestMetadata) {
+    return requestFlag(requestMetadata, "MERGE_EXECUTIONS", mergeExecutions);
   }
 
   @Override
@@ -1728,7 +1738,7 @@ public abstract class NodeInstance extends InstanceBase {
 
   protected ExecutionCapabilities getExecutionCapabilities() {
     return ExecutionCapabilities.newBuilder()
-        .setDigestFunction(DigestFunction.Value.BLAKE3)
+        .setDigestFunction(configs.getDigestFunction().getDigestFunction())
         .addAllDigestFunctions(getDigestFunctions())
         .setExecEnabled(true)
         .setExecutionPriorityCapabilities(

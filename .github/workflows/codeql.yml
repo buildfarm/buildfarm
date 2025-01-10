@@ -8,7 +8,7 @@ on:
     branches: [main]
   push:
     branches:
-      - main
+    - main
 
 jobs:
   analyze:
@@ -20,39 +20,39 @@ jobs:
 
     strategy:
       matrix:
-        language: ["java-kotlin"]
+        language: [java-kotlin]
 
     steps:
-      - uses: bazel-contrib/setup-bazel@0.8.1
-        with:
+    - uses: bazel-contrib/setup-bazel@f3f50ea6791b9b0f4c4eeabba4507422426462f5   # 0.9.1
+      with:
           # Avoid downloading Bazel every time.
-          bazelisk-cache: true
+        bazelisk-cache: true
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: manual
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@df409f7d9260372bd5f19e5b04e83cb3c43714ae # v3
+      with:
+        languages: ${{ matrix.language }}
+        build-mode: manual
 
-      - name: Remove file to work around bazel version not working under CodeQL
-        run: |
-          zip -d "$CODEQL_EXTRACTOR_JAVA_ROOT/tools/codeql-java-agent.jar" build-data.properties || echo "CodeQL build-data.properties Hack Not Necessary!!!"
+    - name: Remove file to work around bazel version not working under CodeQL
+      run: |
+        zip -d "$CODEQL_EXTRACTOR_JAVA_ROOT/tools/codeql-java-agent.jar" build-data.properties || echo "CodeQL build-data.properties Hack Not Necessary!!!"
 
-      - name: Build java
+    - name: Build java
         # Note: Bazel requires specific args to do the build with a little caching as possible. Kind of the antithesis of Bazel's philosophy,
         # But codeql wants to observe all the compilation.
         # See also: https://docs.github.com/en/enterprise-cloud@latest/code-security/codeql-cli/getting-started-with-the-codeql-cli/preparing-your-code-for-codeql-analysis#specifying-build-commands
-        run: |
-          bazel version
-          bazel build \
-            --spawn_strategy=local --nouse_action_cache \
-            //src/main/java/build/buildfarm:buildfarm-server \
-            //src/main/java/build/buildfarm:buildfarm-shard-worker
-          bazel shutdown
+      run: |
+        bazel version
+        bazel build \
+          --spawn_strategy=local --nouse_action_cache \
+          //src/main/java/build/buildfarm:buildfarm-server \
+          //src/main/java/build/buildfarm:buildfarm-shard-worker
+        bazel shutdown
 
-      - uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{ matrix.language }}"
+    - uses: github/codeql-action/analyze@df409f7d9260372bd5f19e5b04e83cb3c43714ae # v3
+      with:
+        category: /language:${{ matrix.language }}

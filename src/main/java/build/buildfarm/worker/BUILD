@@ -14,7 +14,7 @@ java_library(
         "//src/main/java/build/buildfarm/worker/persistent",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/java/build/buildfarm/worker/util",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@bazel//src/main/protobuf:execution_statistics_java_proto",
         "@googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_docker_java_docker_java",

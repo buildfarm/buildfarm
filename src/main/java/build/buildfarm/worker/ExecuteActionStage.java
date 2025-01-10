@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,14 +15,9 @@
 package build.buildfarm.worker;
 
 import build.buildfarm.worker.resources.ResourceLimits;
-import com.google.common.collect.Sets;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
 import java.io.IOException;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,18 +35,22 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
           .help("Execution stall time in ms.")
           .register();
 
-  private final Set<Thread> executors = Sets.newHashSet();
   private final AtomicInteger executorClaims = new AtomicInteger(0);
-  private final BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
 
   public ExecuteActionStage(
       WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+    this(workerContext, output, error, workerContext.getExecuteStageWidth());
+  }
+
+  public ExecuteActionStage(
+      WorkerContext workerContext, PipelineStage output, PipelineStage error, int width) {
     super(
         "ExecuteActionStage",
+        "executor",
         workerContext,
         output,
         createDestroyExecDirStage(workerContext, error),
-        workerContext.getExecuteStageWidth());
+        width);
   }
 
   static PipelineStage createDestroyExecDirStage(
@@ -76,26 +75,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
     return log;
   }
 
-  @Override
-  public ExecutionContext take() throws InterruptedException {
-    return takeOrDrain(queue);
-  }
-
-  @Override
-  public void put(ExecutionContext executionContext) throws InterruptedException {
-    while (!isClosed() && !output.isClosed()) {
-      if (queue.offer(executionContext, 10, TimeUnit.MILLISECONDS)) {
-        return;
-      }
-    }
-    throw new InterruptedException("stage closed");
-  }
-
   synchronized int removeAndRelease(String operationName, int claims) {
-    if (!executors.remove(Thread.currentThread())) {
-      throw new IllegalStateException(
-          "tried to remove unknown executor thread for " + operationName);
-    }
     releaseClaim(operationName, claims);
     int slotUsage = executorClaims.addAndGet(-claims);
     executionSlotUsage.set(slotUsage);
@@ -114,15 +94,9 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
         String.format("exit code: %d, %s", exitCode, getUsage(slotUsage)));
   }
 
+  @Override
   public int getSlotUsage() {
     return executorClaims.get();
-  }
-
-  @Override
-  protected synchronized void interruptAll() {
-    for (Thread executor : executors) {
-      executor.interrupt();
-    }
   }
 
   @Override
@@ -134,21 +108,20 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   protected void iterate() throws InterruptedException {
     ExecutionContext executionContext = take();
     ResourceLimits limits = workerContext.commandExecutionSettings(executionContext.command);
-    Executor executor = new Executor(workerContext, executionContext, this);
-    Thread executorThread = new Thread(() -> executor.run(limits), "ExecuteActionStage.executor");
+    Executor actionExecutor = new Executor(workerContext, executionContext, this, pollerExecutor);
 
     synchronized (this) {
-      executors.add(executorThread);
       int slotUsage = executorClaims.addAndGet(limits.cpu.claimed);
       executionSlotUsage.set(slotUsage);
       start(executionContext.operation.getName(), getUsage(slotUsage));
-      executorThread.start();
+      executor.execute(() -> actionExecutor.run(limits));
     }
   }
 
   @Override
   public void close() {
     super.close();
+    // might want to move this to actual teardown of the stage
     workerContext.destroyExecutionLimits();
   }
 

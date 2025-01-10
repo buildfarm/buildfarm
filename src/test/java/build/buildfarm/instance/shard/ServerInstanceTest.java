@@ -1,4 +1,4 @@
-// Copyright 2018 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.config.BuildfarmConfigs;
-import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
@@ -142,9 +142,9 @@ public class ServerInstanceTest {
 
   @Mock private Runnable mockOnStop;
 
-  @Mock private CacheLoader<String, Instance> mockInstanceLoader;
+  @Mock private CacheLoader<String, StubInstance> mockInstanceLoader;
 
-  @Mock Instance mockWorkerInstance;
+  @Mock StubInstance mockWorkerInstance;
 
   @Before
   public void setUp() throws IOException, InterruptedException {
@@ -164,6 +164,7 @@ public class ServerInstanceTest {
             /* maxRequeueAttempts= */ 1,
             /* maxActionTimeout= */ Duration.getDefaultInstance(),
             /* useDenyList= */ true,
+            /* mergeExecutions= */ true,
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
             /* actionCacheFetchService= */ listeningDecorator(newSingleThreadExecutor()),
@@ -304,6 +305,8 @@ public class ServerInstanceTest {
   @Test
   public void executeCallsPrequeueWithAction() throws IOException {
     when(mockBackplane.canPrequeue()).thenReturn(true);
+    when(mockBackplane.prequeue(any(ExecuteEntry.class), any(Operation.class), any(Boolean.class)))
+        .thenReturn(true);
     build.buildfarm.v1test.Digest actionDigest =
         build.buildfarm.v1test.Digest.newBuilder().setHash("action").setSize(10).build();
     Watcher mockWatcher = mock(Watcher.class);
@@ -316,7 +319,8 @@ public class ServerInstanceTest {
         /* watcher= */ mockWatcher);
     verify(mockWatcher, times(1)).observe(any(Operation.class));
     ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
-    verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));
+    verify(mockBackplane, times(1))
+        .prequeue(executeEntryCaptor.capture(), any(Operation.class), any(Boolean.class));
     ExecuteEntry executeEntry = executeEntryCaptor.getValue();
     assertThat(executeEntry.getActionDigest()).isEqualTo(actionDigest);
   }
@@ -716,6 +720,8 @@ public class ServerInstanceTest {
 
     when(mockBackplane.canQueue()).thenReturn(true);
     when(mockBackplane.canPrequeue()).thenReturn(true);
+    when(mockBackplane.prequeue(any(ExecuteEntry.class), any(Operation.class), any(Boolean.class)))
+        .thenReturn(true);
     when(mockBackplane.getActionResult(actionKey)).thenReturn(actionResult);
 
     build.buildfarm.v1test.Digest actionDigest = actionKey.getDigest();
@@ -768,7 +774,8 @@ public class ServerInstanceTest {
         /* watcher= */ mockWatcher);
     verify(mockWatcher, times(1)).observe(any(Operation.class));
     ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
-    verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));
+    verify(mockBackplane, times(1))
+        .prequeue(executeEntryCaptor.capture(), any(Operation.class), any(Boolean.class));
     ExecuteEntry executeEntry = executeEntryCaptor.getValue();
     assertThat(executeEntry.getSkipCacheLookup()).isTrue();
   }
@@ -1265,5 +1272,31 @@ public class ServerInstanceTest {
     int end = random.nextInt(input.size()) + 1;
     int start = random.nextInt(end);
     return input.stream().skip(start).limit(end - start).collect(Collectors.toSet());
+  }
+
+  @Test
+  public void indexCorrelatedInvocationsTrims() throws Exception {
+    // fragment chosen over query id
+    String uuid = "3142d81d-fc20-4e67-91e3-27072f03c1e9";
+    String correlatedInvocationsId =
+        instance.indexCorrelatedInvocations(
+            new java.net.URI("https://host.example.com/path/to/build/?id=unused&foo=bar#" + uuid));
+    assertThat(correlatedInvocationsId).isEqualTo(uuid);
+
+    // query id chosen over path
+    correlatedInvocationsId =
+        instance.indexCorrelatedInvocations(
+            new java.net.URI("https://host.example.com/path/to/build/?id=" + uuid + "&foo=bar"));
+    assertThat(correlatedInvocationsId).isEqualTo(uuid);
+
+    // path as last selected resort
+    correlatedInvocationsId =
+        instance.indexCorrelatedInvocations(new java.net.URI("https://host.example.com/" + uuid));
+    assertThat(correlatedInvocationsId).isEqualTo("/" + uuid);
+
+    // otherwise we use the uri fully
+    correlatedInvocationsId =
+        instance.indexCorrelatedInvocations(new java.net.URI("https://" + uuid));
+    assertThat(correlatedInvocationsId).isEqualTo("https://" + uuid);
   }
 }

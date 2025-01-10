@@ -1,4 +1,4 @@
-// Copyright 2023 The Bazel Authors. All rights reserved.
+// Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ public class InputsIndexerTest {
   @Test
   public void basicEmptyTree() {
     Tree emptyTree = Tree.newBuilder().build();
-    InputsIndexer indexer = new InputsIndexer(emptyTree, Paths.get("."));
+    InputsIndexer indexer = new InputsIndexer(emptyTree, Path.of("."));
     assertThat(indexer.tree).isEqualTo(emptyTree);
   }
 
@@ -55,7 +55,7 @@ public class InputsIndexerTest {
     Digest rootDirDigest = addDirToTree(treeBuilder, "my_root_dir", rootDir);
     treeBuilder.setRootDigest(rootDirDigest);
 
-    Path arbitraryOpRoot = Paths.get(".");
+    Path arbitraryOpRoot = Path.of(".");
 
     InputsIndexer indexer = new InputsIndexer(treeBuilder.build(), arbitraryOpRoot);
     assertThat(indexer.proxyDirs.get(DigestUtil.toDigest(rootDirDigest))).isEqualTo(rootDir);
@@ -72,7 +72,7 @@ public class InputsIndexerTest {
     Digest rootDirDigest = addDirToTree(treeBuilder, "my_root_dir", rootDir);
     treeBuilder.setRootDigest(rootDirDigest);
 
-    Path arbitraryOpRoot = Paths.get("asdf");
+    Path arbitraryOpRoot = Path.of("asdf");
     InputsIndexer indexer = new InputsIndexer(treeBuilder.build(), arbitraryOpRoot);
     assertThat(indexer.proxyDirs.get(DigestUtil.toDigest(rootDirDigest))).isEqualTo(rootDir);
 
@@ -112,7 +112,7 @@ public class InputsIndexerTest {
     Digest rootDirDigest = addDirToTree(treeBuilder, "my_root_dir", rootDir);
     treeBuilder.setRootDigest(rootDirDigest);
 
-    Path arbitraryOpRoot = Paths.get("asdf");
+    Path arbitraryOpRoot = Path.of("asdf");
 
     InputsIndexer indexer = new InputsIndexer(treeBuilder.build(), arbitraryOpRoot);
     assertThat(indexer.proxyDirs.get(DigestUtil.toDigest(rootDirDigest))).isEqualTo(rootDir);

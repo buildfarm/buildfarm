@@ -1,4 +1,4 @@
-// Copyright 2023 The Bazel Authors. All rights reserved.
+// Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,6 +13,8 @@
 // limitations under the License.
 
 package build.buildfarm.common.grpc;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
@@ -33,8 +35,10 @@ public final class Channels {
       target = target.substring(GRPC_URL_PREFIX.length());
       negotiationType = NegotiationType.PLAINTEXT;
     }
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target).negotiationType(negotiationType);
-    return builder.build();
+    return NettyChannelBuilder.forTarget(target)
+        .negotiationType(negotiationType)
+        .keepAliveTime(300, SECONDS)
+        .keepAliveTimeout(10, SECONDS)
+        .build();
   }
 }

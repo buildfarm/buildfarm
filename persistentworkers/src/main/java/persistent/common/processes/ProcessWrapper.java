@@ -1,5 +1,12 @@
 package persistent.common.processes;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.nio.file.StandardOpenOption.WRITE;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -10,34 +17,22 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-
-import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
-import static java.nio.file.StandardOpenOption.WRITE;
-
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import lombok.Getter;
+import lombok.extern.java.Log;
 
 /**
  * Wraps a process, giving it a (possible different) working directory and environment variables.
- * Redirects stderr to a file under its working dir using a random uuid, i.e. "{{randomUUID()}}.stderr"
- * Exposes its stdin as OutputStream and stdout as InputStream.
+ * Redirects stderr to a file under its working dir using a random uuid, i.e.
+ * "{{randomUUID()}}.stderr" Exposes its stdin as OutputStream and stdout as InputStream.
  *
- * Constructor immediately starts a process and checks isAlive() right after.
+ * <p>Constructor immediately starts a process and checks isAlive() right after.
  */
+@Log
 public class ProcessWrapper implements Closeable {
-
-  private static Logger logger = Logger.getLogger(ProcessWrapper.class.getName());
 
   private final Process process;
 
-  @Getter
-  private final Path workRoot;
+  @Getter private final Path workRoot;
 
   private final ImmutableList<String> args;
 
@@ -49,38 +44,34 @@ public class ProcessWrapper implements Closeable {
     this(workDir, args, new HashMap<>());
   }
 
-  public ProcessWrapper(
-      Path workDir, ImmutableList<String> args, Map<String, String> env
-  ) throws IOException {
+  public ProcessWrapper(Path workDir, ImmutableList<String> args, Map<String, String> env)
+      throws IOException {
     this.args = checkNotNull(args);
     this.workRoot = checkNotNull(workDir);
     Preconditions.checkArgument(
-        Files.isDirectory(workDir),
-        "Process workDir must be a directory, got: " + workDir
-    );
+        Files.isDirectory(workDir), "Process workDir must be a directory, got: " + workDir);
     this.uuid = UUID.randomUUID();
 
     this.errorFile = this.workRoot.resolve(this.uuid + ".stderr");
+    log.log(Level.FINE, "Starting Process:");
+    log.log(Level.FINE, "\tcmd: " + this.args);
+    log.log(Level.FINE, "\tdir: " + this.workRoot);
+    log.log(Level.FINE, "\tenv: " + ImmutableMap.copyOf(env));
+    log.log(Level.FINE, "\tenv: " + errorFile);
 
-    logger.log(Level.FINE, "Starting Process:");
-    logger.log(Level.FINE, "\tcmd: " + this.args);
-    logger.log(Level.FINE, "\tdir: " + this.workRoot);
-    logger.log(Level.FINE, "\tenv: " + ImmutableMap.copyOf(env));
-    logger.log(Level.FINE, "\tenv: " + errorFile);
-
-    ProcessBuilder pb = new ProcessBuilder()
-        .command(this.args)
-        .directory(this.workRoot.toFile())
-        .redirectError(ProcessBuilder.Redirect.to(this.errorFile.toFile()));
-
+    ProcessBuilder pb =
+        new ProcessBuilder()
+            .command(this.args)
+            .directory(this.workRoot.toFile())
+            .redirectError(ProcessBuilder.Redirect.to(this.errorFile.toFile()));
+    pb.environment().clear();
     pb.environment().putAll(env);
 
     try {
       this.process = pb.start();
     } catch (IOException e) {
       String msg = "Failed to start process: " + e;
-      logger.log(Level.SEVERE, msg);
-      e.printStackTrace();
+      log.log(Level.SEVERE, msg, e);
       throw new IOException(msg, e);
     }
 
@@ -105,7 +96,7 @@ public class ProcessWrapper implements Closeable {
 
   public String getErrorString() throws IOException {
     if (Files.exists(this.errorFile)) {
-      return new String(Files.readAllBytes(this.errorFile));
+      return Files.readString(this.errorFile);
     } else {
       return "[No errorFile...]";
     }

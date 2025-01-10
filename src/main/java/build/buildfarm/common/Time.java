@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,8 +37,7 @@ public class Time {
    * @note Suggested return identifier: deadline.
    */
   public static Deadline toDeadline(Duration duration) {
-    return Deadline.after(
-        secondsToNanoseconds(duration.getSeconds()) + duration.getNanos(), TimeUnit.NANOSECONDS);
+    return Deadline.after(Durations.toNanos(duration), TimeUnit.NANOSECONDS);
   }
 
   /**
@@ -60,7 +59,7 @@ public class Time {
    * @note Suggested return identifier: nanoseconds.
    */
   public static long secondsToNanoseconds(long seconds) {
-    return seconds * 1000000000L;
+    return seconds * 1_000_000_000L;
   }
 
   /**

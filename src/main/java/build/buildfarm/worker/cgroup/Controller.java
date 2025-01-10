@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 
 abstract class Controller implements IOResource {
   protected final Group group;
@@ -78,6 +79,18 @@ abstract class Controller implements IOResource {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private void setOwner(String propertyName, UserPrincipal owner) throws IOException {
+    Path path = getPath().resolve(propertyName);
+    Files.setOwner(path, owner);
+  }
+
+  public void setOwner(UserPrincipal owner) throws IOException {
+    // an execution owner must be able to join a cgroup through group task/proc ownership
+    open();
+    setOwner("cgroup.procs", owner);
+    setOwner("tasks", owner);
   }
 
   protected void writeInt(String propertyName, int value) throws IOException {

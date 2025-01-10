@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import com.google.auth.Credentials;
 import com.google.devtools.common.options.OptionsParser;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import java.io.IOException;
 import java.net.URI;
@@ -41,6 +43,8 @@ public class HttpProxy extends LoggingMain {
 
   private final Server server;
 
+  private HealthStatusManager healthStatusManager;
+
   public HttpProxy(HttpProxyOptions options, @Nullable Credentials creds)
       throws URISyntaxException, SSLException {
     this(ServerBuilder.forPort(options.port), creds, options);
@@ -50,6 +54,9 @@ public class HttpProxy extends LoggingMain {
       ServerBuilder<?> serverBuilder, @Nullable Credentials creds, HttpProxyOptions options)
       throws URISyntaxException, SSLException {
     super("HttpProxy");
+
+    healthStatusManager = new HealthStatusManager();
+
     SimpleBlobStore simpleBlobStore =
         HttpBlobStore.create(
             URI.create(options.httpCache),
@@ -58,6 +65,7 @@ public class HttpProxy extends LoggingMain {
             creds);
     server =
         serverBuilder
+            .addService(healthStatusManager.getHealthService())
             .addService(new ActionCacheService(simpleBlobStore))
             .addService(
                 new ContentAddressableStorageService(
@@ -68,12 +76,18 @@ public class HttpProxy extends LoggingMain {
   }
 
   public void start() throws IOException {
+    healthStatusManager.setStatus(
+        HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
     server.start();
   }
 
   @Override
   protected void onShutdown() {
     System.err.println("*** shutting down gRPC server since JVM is shutting down");
+    if (healthStatusManager != null) {
+      healthStatusManager.setStatus(
+          HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
+    }
     stop();
     System.err.println("*** server shut down");
   }

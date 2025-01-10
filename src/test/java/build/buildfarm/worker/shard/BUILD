@@ -13,7 +13,7 @@ java_test(
         "//src/main/java/build/buildfarm/worker",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/java/build/buildfarm/worker/shard",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_jimfs_jimfs",

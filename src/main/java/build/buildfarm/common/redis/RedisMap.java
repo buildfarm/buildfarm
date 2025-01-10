@@ -1,4 +1,4 @@
-// Copyright 2021 The Bazel Authors. All rights reserved.
+// Copyright 2021 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.params.ScanParams;
+import redis.clients.jedis.params.SetParams;
 import redis.clients.jedis.resps.ScanResult;
 import redis.clients.jedis.util.JedisClusterCRC16;
 
@@ -116,7 +117,13 @@ public class RedisMap {
   public void insert(UnifiedJedis jedis, String key, String value) {
     // Jedis only provides int precision.  this is fine as the units are seconds.
     // We supply an interface for longs as a convenience to callers.
-    jedis.setex(createKeyName(key), expiration_s, value);
+    SetParams setParams = SetParams.setParams().ex(expiration_s);
+    jedis.set(createKeyName(key), value, setParams);
+  }
+
+  public boolean putIfAbsent(UnifiedJedis jedis, String key, String value) {
+    SetParams setParams = SetParams.setParams().nx().ex(expiration_s);
+    return "OK".equals(jedis.set(createKeyName(key), value, setParams));
   }
 
   /**
@@ -128,6 +135,10 @@ public class RedisMap {
    */
   public void remove(UnifiedJedis jedis, String key) {
     jedis.del(createKeyName(key));
+  }
+
+  public void remove(AbstractPipeline pipeline, String key) {
+    pipeline.del(createKeyName(key));
   }
 
   /**

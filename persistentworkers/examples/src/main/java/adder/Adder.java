@@ -1,16 +1,11 @@
 package adder;
 
-import java.util.List;
-
 import com.google.common.collect.ImmutableList;
-
+import java.util.List;
 import persistent.bazel.processes.WorkRequestHandler;
 
-/**
- * Example of a service which supports being run as a persistent worker
- */
+/** Example of a service which supports being run as a persistent worker */
 public class Adder {
-
   public static void main(String[] args) {
     if (args.length == 1 && args[0].equals("--persistent_worker")) {
       WorkRequestHandler handler = initialize();
@@ -20,11 +15,12 @@ public class Adder {
   }
 
   private static WorkRequestHandler initialize() {
-    return new WorkRequestHandler((actionArgs, pw) -> {
-      String res = work(actionArgs);
-      pw.write(res);
-      return 0;
-    });
+    return new WorkRequestHandler(
+        (actionArgs, pw) -> {
+          String res = work(actionArgs);
+          pw.write(res);
+          return 0;
+        });
   }
 
   private static String work(List<String> args) {

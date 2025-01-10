@@ -1,4 +1,4 @@
-// Copyright 2018 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,8 +34,10 @@ import com.google.protobuf.Duration;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 class StubWorkerContext implements WorkerContext {
   @Override
@@ -44,7 +46,8 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage) {
+  public Poller createPoller(
+      String name, QueueEntry queueEntry, ExecutionStage.Value stage, Executor executor) {
     throw new UnsupportedOperationException();
   }
 
@@ -55,7 +58,8 @@ class StubWorkerContext implements WorkerContext {
       QueueEntry queueEntry,
       ExecutionStage.Value stage,
       Runnable onFailure,
-      Deadline deadline) {
+      Deadline deadline,
+      Executor executor) {
     throw new UnsupportedOperationException();
   }
 
@@ -76,6 +80,11 @@ class StubWorkerContext implements WorkerContext {
 
   @Override
   public int getExecuteStageWidth() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int getReportResultStageWidth() {
     throw new UnsupportedOperationException();
   }
 
@@ -125,7 +134,8 @@ class StubWorkerContext implements WorkerContext {
       Map<Digest, Directory> directoriesIndex,
       DigestFunction.Value digestFunction,
       Action action,
-      Command command)
+      Command command,
+      UserPrincipal owner)
       throws IOException, InterruptedException {
     throw new UnsupportedOperationException();
   }
@@ -141,6 +151,11 @@ class StubWorkerContext implements WorkerContext {
       ActionResult.Builder resultBuilder,
       Path actionRoot,
       Command command) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void unmergeExecution(ActionKey actionKey) {
     throw new UnsupportedOperationException();
   }
 
@@ -187,6 +202,7 @@ class StubWorkerContext implements WorkerContext {
   @Override
   public IOResource limitExecution(
       String operationName,
+      UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory) {

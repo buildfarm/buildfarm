@@ -1,4 +1,4 @@
-// Copyright 2023 The Bazel Authors. All rights reserved.
+// Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.config;
 
+import build.buildfarm.common.Claim.Stage;
 import lombok.Data;
 
 /**
@@ -50,4 +51,11 @@ public class LimitedResource {
    * @details As a counting semaphore, this amount becomes the limit.
    */
   private int amount = 1;
+
+  /**
+   * @field stage
+   * @brief The stage at which this resource should be released
+   * @details The resource may be released when the specified stage is complete
+   */
+  private Stage releaseStage = Stage.EXECUTE_ACTION_STAGE;
 }

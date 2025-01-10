@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import static redis.clients.jedis.args.ListDirection.LEFT;
 import static redis.clients.jedis.args.ListDirection.RIGHT;
 
 import build.buildfarm.common.Queue;
-import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.Visitor;
 import java.time.Duration;
 import java.util.List;
 import java.util.function.Supplier;
@@ -105,6 +105,11 @@ public class RedisQueue implements Queue<String> {
     return jedis.lrem(getDequeueName(), -1, val) != 0;
   }
 
+  @Override
+  public void removeFromDequeue(AbstractPipeline pipeline, String val) {
+    pipeline.lrem(getDequeueName(), -1, val);
+  }
+
   /**
    * @brief Remove all elements that match from queue.
    * @details Removes all matching elements from the queue and specifies whether it was removed.
@@ -174,7 +179,7 @@ public class RedisQueue implements Queue<String> {
    * @param visitor A visitor for each visited element in the queue.
    * @note Overloaded.
    */
-  public void visit(StringVisitor visitor) {
+  public void visit(Visitor<String> visitor) {
     visit(name, visitor);
   }
 
@@ -183,7 +188,7 @@ public class RedisQueue implements Queue<String> {
    * @details Enacts a visitor over each element in the dequeue.
    * @param visitor A visitor for each visited element in the queue.
    */
-  public void visitDequeue(StringVisitor visitor) {
+  public void visitDequeue(Visitor<String> visitor) {
     visit(getDequeueName(), visitor);
   }
 
@@ -194,7 +199,7 @@ public class RedisQueue implements Queue<String> {
    * @param visitor A visitor for each visited element in the queue.
    * @note Overloaded.
    */
-  private void visit(String queueName, StringVisitor visitor) {
+  private void visit(String queueName, Visitor<String> visitor) {
     int index = 0;
     int nextIndex = listPageSize;
     List<String> entries;

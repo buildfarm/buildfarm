@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ import lombok.extern.java.Log;
 @Log
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private final Instance instance;
-  private final long keepaliveAfter;
+  private final long keepaliveAfter; /* Seconds */
   private final ScheduledExecutorService keepaliveScheduler;
   private final MetricsPublisher metricsPublisher;
 

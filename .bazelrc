@@ -22,6 +22,10 @@ test --test_tag_filters=-redis,-integration
 # https://buildkite.com/bazel/bazelisk-plus-incompatible-flags
 common --incompatible_disallow_empty_glob
 
+# Stop recompiling protoc.
+# https://fzakaria.com/2024/10/23/bazel-knowledge-mind-your-path.html
+build --incompatible_strict_action_env
+
 common --enable_bzlmod
 
 # See also https://bazel.build/external/lockfile.
@@ -29,3 +33,7 @@ common --lockfile_mode=off
 # It's off because we have mac/windows/linux developers who may not have access
 # to all three to update the platform-specific bits of the lockfile.
 
+
+build:linux --sandbox_add_mount_pair=/tmp
+build:macos --sandbox_add_mount_pair=/var/tmp
+build:windows --sandbox_add_mount_pair=C:\Temp

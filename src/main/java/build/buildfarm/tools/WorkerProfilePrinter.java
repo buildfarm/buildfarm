@@ -1,4 +1,4 @@
-// Copyright 2021 The Bazel Authors. All rights reserved.
+// Copyright 2021 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ class WorkerProfilePrinter {
     WorkerProfileMessage response = instance.getWorkerProfile();
     System.out.println("\nWorkerProfile:");
     String strIntFormat = "%-50s : %d";
-    String strFloatFormat = "%-50s : %2.1f";
     long entryCount = response.getCasEntryCount();
     long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
     System.out.printf((strIntFormat) + "%n", "Current Total Entry Count", entryCount);
@@ -41,10 +40,8 @@ class WorkerProfilePrinter {
     if (entryCount != 0) {
       System.out.println(
           format(
-                  strFloatFormat,
-                  "Percentage of Unreferenced Entry",
-                  100.0f * response.getCasEntryCount() / response.getCasUnreferencedEntryCount())
-              + "%");
+              "%-50s : %2.1f%%",
+              "Percentage of Unreferenced Entry", (100.0f * unreferencedEntryCount) / entryCount));
     }
     System.out.printf(
         (strIntFormat) + "%n",

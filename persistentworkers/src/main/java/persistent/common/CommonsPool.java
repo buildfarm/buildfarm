@@ -1,21 +1,16 @@
 package persistent.common;
 
-
 import java.io.IOException;
-
-import com.google.common.base.Throwables;
-
 import org.apache.commons.pool2.BaseKeyedPooledObjectFactory;
-import org.apache.commons.pool2.impl.GenericKeyedObjectPool;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 
 /**
  * Pool based on Apache Commons, ripped from Bazel as usual
+ *
  * @param <K>
  * @param <V>
  */
 public class CommonsPool<K, V> extends CommonsObjPool<K, V> {
-
   public CommonsPool(BaseKeyedPooledObjectFactory<K, V> factory, int maxPerKey) {
     super(factory, makeConfig(maxPerKey));
   }
@@ -24,8 +19,9 @@ public class CommonsPool<K, V> extends CommonsObjPool<K, V> {
   public V borrowObject(K key) throws IOException, InterruptedException {
     try {
       return super.borrowObject(key);
+    } catch (IOException | InterruptedException checkedException) {
+      throw checkedException;
     } catch (Throwable t) {
-      Throwables.propagateIfPossible(t, IOException.class, InterruptedException.class);
       throw new RuntimeException("unexpected@<borrowObject>", t);
     }
   }
@@ -34,8 +30,9 @@ public class CommonsPool<K, V> extends CommonsObjPool<K, V> {
   public void invalidateObject(K key, V obj) throws IOException, InterruptedException {
     try {
       super.invalidateObject(key, obj);
+    } catch (IOException | InterruptedException checkedException) {
+      throw checkedException;
     } catch (Throwable t) {
-      Throwables.propagateIfPossible(t, IOException.class, InterruptedException.class);
       throw new RuntimeException("unexpected@<invalidateObject>", t);
     }
   }

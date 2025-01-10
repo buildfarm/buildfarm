@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import static build.buildfarm.common.Claim.Stage.EXECUTE_ACTION_STAGE;
 import static com.google.common.collect.Maps.transformValues;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.protobuf.util.Durations.add;
@@ -29,17 +30,18 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.common.Claim;
 import build.buildfarm.common.ProcessUtils;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
+import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.common.config.ExecutionWrapper;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.persistent.PersistentExecutor;
 import build.buildfarm.worker.persistent.WorkFilesContext;
-import build.buildfarm.worker.resources.LocalResourceSetUtils.LocalResourceSetClaim;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.core.DockerClientBuilder;
@@ -61,6 +63,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -77,14 +80,19 @@ class Executor {
   private final WorkerContext workerContext;
   private final ExecutionContext executionContext;
   private final ExecuteActionStage owner;
+  private final java.util.concurrent.Executor pollerExecutor;
   private int exitCode = INCOMPLETE_EXIT_CODE;
   private boolean wasErrored = false;
 
   Executor(
-      WorkerContext workerContext, ExecutionContext executionContext, ExecuteActionStage owner) {
+      WorkerContext workerContext,
+      ExecutionContext executionContext,
+      ExecuteActionStage owner,
+      java.util.concurrent.Executor pollerExecutor) {
     this.workerContext = workerContext;
     this.executionContext = executionContext;
     this.owner = owner;
+    this.pollerExecutor = pollerExecutor;
   }
 
   // ensure that only one error put attempt occurs
@@ -150,7 +158,8 @@ class Executor {
         executionContext.queueEntry,
         ExecutionStage.Value.EXECUTING,
         Thread.currentThread()::interrupt,
-        pollDeadline);
+        pollDeadline,
+        pollerExecutor);
 
     Iterable<ExecutionPolicy> policies = new ArrayList<>();
     if (limits.useExecutionPolicies) {
@@ -161,10 +170,8 @@ class Executor {
     // since pools mandate injection of resources, each pool claim must require a policy
     // could probably do this with just the properties and the pool resource sets, but this is
     // faster
-    if (executionContext.claim instanceof LocalResourceSetClaim resourceSetClaim) {
-      for (String pool : Iterables.transform(resourceSetClaim.getPools(), Map.Entry::getKey)) {
-        policies = Iterables.concat(policies, workerContext.getExecutionPolicies("pool-" + pool));
-      }
+    for (String pool : Iterables.transform(executionContext.claim.getPools(), Map.Entry::getKey)) {
+      policies = Iterables.concat(policies, workerContext.getExecutionPolicies("pool-" + pool));
     }
 
     try {
@@ -217,11 +224,11 @@ class Executor {
   }
 
   private static Map<String, Interpolator> createInterpolations(
-      LocalResourceSetClaim claim, Iterable<Property> properties) {
+      Claim claim, Iterable<Property> properties) {
     Map<String, Interpolator> interpolations = new HashMap<>();
     if (claim != null) {
-      for (Map.Entry<String, List<Integer>> pool : claim.getPools()) {
-        List<Integer> ids = pool.getValue();
+      for (Map.Entry<String, List<Object>> pool : claim.getPools()) {
+        List<Object> ids = pool.getValue();
         interpolations.put(pool.getKey(), new Interpolator(ids));
         for (int i = 0; i < ids.size(); i++) {
           interpolations.put(pool.getKey() + "-" + i, new Interpolator(String.valueOf(ids.get(i))));
@@ -282,23 +289,27 @@ class Executor {
       workingDirectory = workingDirectory.resolve(command.getWorkingDirectory());
     }
 
+    // similar to the policy selection here
+    Map<String, Interpolator> interpolations =
+        createInterpolations(
+            executionContext.claim, executionContext.command.getPlatform().getPropertiesList());
+
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
+
+    for (ExecutionPolicy policy : policies) {
+      if (policy.getExecutionWrapper() != null) {
+        arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
+      }
+    }
+
     Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(
-            operationName, arguments, executionContext.command, workingDirectory)) {
-      // similar to the policy selection here
-      Map<String, Interpolator> interpolations =
-          createInterpolations(
-              (LocalResourceSetClaim) executionContext.claim,
-              executionContext.command.getPlatform().getPropertiesList());
-
-      for (ExecutionPolicy policy : policies) {
-        if (policy.getExecutionWrapper() != null) {
-          arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
-        }
-      }
-
+            operationName,
+            executionContext.claim.owner(),
+            arguments,
+            executionContext.command,
+            workingDirectory)) {
       if (System.getProperty("os.name").contains("Win")) {
         // Make sure that the executable path is absolute, otherwise processbuilder fails on windows
         Iterator<String> argumentItr = command.getArgumentsList().iterator();
@@ -357,7 +368,8 @@ class Executor {
         executionContext.queueEntry,
         ExecutionStage.Value.EXECUTING,
         Thread.currentThread()::interrupt,
-        Deadline.after(10, DAYS));
+        Deadline.after(10, DAYS),
+        pollerExecutor);
 
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
@@ -365,7 +377,7 @@ class Executor {
         .metadata
         .getExecuteOperationMetadataBuilder()
         .getPartialExecutionMetadataBuilder()
-        .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
+        .setExecutionCompletedTimestamp(Timestamps.now());
     putOperation(/* ignoreFailure= */ true);
 
     log.log(
@@ -437,7 +449,7 @@ class Executor {
       try {
         // Now that the execution has finished we can return any of the claims against local
         // resources.
-        executionContext.claim.release();
+        executionContext.claim.release(EXECUTE_ACTION_STAGE);
         owner.releaseExecutor(
             operationName,
             limits.cpu.claimed,
@@ -450,6 +462,28 @@ class Executor {
         }
       }
     }
+  }
+
+  /**
+   * Decide if this action should run on a Persistent Worker. <br>
+   *
+   * <ul>
+   *   <li>The Persistent worker key must be set. This is set by bazel client with
+   *       "--experimental_remote_mark_tool_inputs"
+   *   <li>the config.yaml has to have a "*" OR have the mnemonic allowlisted.
+   * </ul>
+   *
+   * @return <c>true</c> if the action should be sent to a persistent worker, <c>false</c>
+   *     otherwise.
+   */
+  private boolean shouldRunOnPersistentWorker(ResourceLimits limits) {
+    if (!limits.persistentWorkerKey.isEmpty()) {
+      Collection<String> mnemonicAllowlist =
+          BuildfarmConfigs.getInstance().getWorker().getPersistentWorkerActionMnemonicAllowlist();
+      String actionMnemonic = executionContext.metadata.getRequestMetadata().getActionMnemonic();
+      return mnemonicAllowlist.contains("*") || mnemonicAllowlist.contains(actionMnemonic);
+    }
+    return false;
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -476,14 +510,12 @@ class Executor {
     if (limits.debugBeforeExecution) {
       return ExecutionDebugger.performBeforeExecutionDebug(processBuilder, limits, resultBuilder);
     }
-
-    boolean usePersistentWorker =
-        !limits.persistentWorkerKey.isEmpty() && !limits.persistentWorkerCommand.isEmpty();
-
-    if (usePersistentWorker) {
+    if (shouldRunOnPersistentWorker(limits)) {
+      // RBE Client suggests to run this Action as persistent...
       log.fine(
-          "usePersistentWorker; got persistentWorkerCommand of : "
-              + limits.persistentWorkerCommand);
+          "usePersistentWorker (mnemonic="
+              + executionContext.metadata.getRequestMetadata().getActionMnemonic()
+              + ")");
 
       Tree execTree = executionContext.tree;
 
@@ -491,7 +523,6 @@ class Executor {
           WorkFilesContext.fromContext(execDir, execTree, executionContext.command);
 
       return PersistentExecutor.runOnPersistentWorker(
-          limits.persistentWorkerCommand,
           filesContext,
           operationName,
           ImmutableList.copyOf(arguments),
@@ -518,7 +549,6 @@ class Executor {
 
       return DockerExecutor.runActionWithDocker(dockerClient, settings, resultBuilder);
     }
-
     long startNanoTime = System.nanoTime();
     Process process;
     try {
@@ -566,7 +596,7 @@ class Executor {
         exitCode = process.waitFor();
         processCompleted = true;
       } else {
-        long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
+        long timeoutNanos = Durations.toNanos(timeout);
         long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
         if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
           exitCode = process.exitValue();
@@ -574,7 +604,9 @@ class Executor {
         } else {
           log.log(
               Level.INFO,
-              format("process timed out for %s after %ds", operationName, timeout.getSeconds()));
+              format(
+                  "process timed out for %s after %ds",
+                  operationName, Durations.toSeconds(timeout)));
           statusCode = Code.DEADLINE_EXCEEDED;
         }
       }

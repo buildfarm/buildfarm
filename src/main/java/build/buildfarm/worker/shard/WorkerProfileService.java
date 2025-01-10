@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@ package build.buildfarm.worker.shard;
 
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.cfc.CASFileCache;
-import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerListRequest;
@@ -36,7 +35,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private final PipelineStage matchStage;
   private final SuperscalarPipelineStage inputFetchStage;
   private final SuperscalarPipelineStage executeActionStage;
-  private final PipelineStage reportResultStage;
+  private final SuperscalarPipelineStage reportResultStage;
   private final PutOperationStage completeStage;
   private final Backplane backplane;
 
@@ -45,7 +44,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
       PipelineStage matchStage,
       SuperscalarPipelineStage inputFetchStage,
       SuperscalarPipelineStage executeActionStage,
-      PipelineStage reportResultStage,
+      SuperscalarPipelineStage reportResultStage,
       PutOperationStage completeStage,
       Backplane backplane) {
     super();
@@ -101,10 +100,9 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     // produce: slots that are not consistent with operations, operations
     // in multiple stages even in reverse due to claim progress
     // in short: this is for monitoring, not for guaranteed consistency checks
-    String reportResultOperation = reportResultStage.getOperationName();
     String matchOperation = matchStage.getOperationName();
     replyBuilder
-        .addStages(unaryStageInformation(reportResultStage.getName(), reportResultOperation))
+        .addStages(superscalarStageInformation(reportResultStage))
         .addStages(superscalarStageInformation(executeActionStage))
         .addStages(superscalarStageInformation(inputFetchStage))
         .addStages(unaryStageInformation(matchStage.getName(), matchOperation));
@@ -112,8 +110,8 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     // get average time costs on each stage
     OperationStageDurations[] durations = completeStage.getAverageTimeCostPerStage();
     for (OperationStageDurations duration : durations) {
-      OperationTimesBetweenStages.Builder timesBuilder = OperationTimesBetweenStages.newBuilder();
-      timesBuilder
+      replyBuilder
+          .addTimesBuilder()
           .setQueuedToMatch(duration.queuedToMatch)
           .setMatchToInputFetchStart(duration.matchToInputFetchStart)
           .setInputFetchStartToComplete(duration.inputFetchStartToComplete)
@@ -123,7 +121,6 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
           .setOutputUploadStartToComplete(duration.outputUploadStartToComplete)
           .setOperationCount(duration.operationCount)
           .setPeriod(duration.period);
-      replyBuilder.addTimes(timesBuilder.build());
     }
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();

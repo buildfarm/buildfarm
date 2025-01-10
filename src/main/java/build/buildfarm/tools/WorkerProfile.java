@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,17 +61,16 @@ class WorkerProfile {
     System.out.println("\nWorkerProfile:");
     System.out.println(worker);
     String strIntFormat = "%-50s : %d";
-    String strFloatFormat = "%-50s : %2.1f";
     long entryCount = response.getCasEntryCount();
     long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
     System.out.printf((strIntFormat) + "%n", "Current Total Entry Count", entryCount);
     System.out.printf(
         (strIntFormat) + "%n", "Current Unreferenced Entry Count", unreferencedEntryCount);
     if (entryCount != 0) {
-      System.out.printf(
-          (strFloatFormat) + "%n",
-          "Percentage of Unreferenced Entry",
-          1.0 * response.getCasEntryCount() / response.getCasUnreferencedEntryCount());
+      System.out.println(
+          String.format(
+              "%-50s : %2.1f%%",
+              "Percentage of Unreferenced Entry", (100.0f * unreferencedEntryCount) / entryCount));
     }
     System.out.printf(
         (strIntFormat) + "%n",
@@ -104,7 +103,7 @@ class WorkerProfile {
       throw new IllegalArgumentException("Missing Config_PATH");
     }
     try {
-      configs.loadConfigs(Paths.get(residue.get(3)));
+      configs.loadConfigs(Path.of(residue.get(3)));
     } catch (IOException e) {
       System.out.println("Could not parse yml configuration file." + e);
     }

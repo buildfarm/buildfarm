@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,9 +20,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import io.grpc.Deadline;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -36,7 +36,7 @@ import lombok.extern.java.Log;
 @Log
 public final class Group {
   @Getter private static final Group root = new Group(/* name= */ null, /* parent= */ null);
-  private static final Path rootPath = Paths.get("/sys/fs/cgroup");
+  private static final Path rootPath = Path.of("/sys/fs/cgroup");
   private static final POSIX posix = POSIXFactory.getNativePOSIX();
 
   @Getter @Nullable private final String name;
@@ -153,9 +153,9 @@ public final class Group {
         !pids.isEmpty();
         pids = getPids(controllerName)) {
       killAllProcesses(pids);
-      if (deadline.isExpired() || !pids.containsAll(prevPids) || prevPids.containsAll(pids)) {
+      if (deadline.isExpired() || !pids.equals(prevPids)) {
         deadline = Deadline.after(1, SECONDS);
-        log.warning("Killed processes with PIDs: " + pids);
+        log.warning("Sent SIGKILL to pids: " + pids);
       }
       prevPids = pids;
     }
@@ -166,8 +166,13 @@ public final class Group {
     if (parent != null) {
       parent.create(controllerName);
       Path path = getPath(controllerName);
-      if (!Files.exists(path)) {
-        Files.createDirectory(path);
+      try {
+        if (!Files.exists(path)) {
+          Files.createDirectory(path);
+        }
+      } catch (FileAlreadyExistsException e) {
+        // per the avoidance above, we don't care that this already
+        // exists and we lost a race to create it
       }
     }
   }

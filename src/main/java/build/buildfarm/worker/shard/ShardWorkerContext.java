@@ -1,4 +1,4 @@
-// Copyright 2018 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ import static build.buildfarm.cas.ContentAddressableStorage.UNLIMITED_ENTRY_SIZE
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.worker.DequeueMatchEvaluator.acquireClaim;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 
@@ -28,14 +27,12 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
-import build.bazel.remote.execution.v2.SymlinkNode;
-import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.backplane.Backplane;
+import build.buildfarm.common.Claim;
 import build.buildfarm.common.CommandUtils;
+import build.buildfarm.common.DigestPath;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -50,12 +47,14 @@ import build.buildfarm.common.SystemProcessors;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ExecutionPolicy;
+import build.buildfarm.common.function.IOConsumer;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.worker.DequeueMatchEvaluator;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.MatchListener;
@@ -64,21 +63,21 @@ import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
-import build.buildfarm.worker.resources.Claim;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.ResourceDecider;
 import build.buildfarm.worker.resources.ResourceLimits;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSetMultimap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Deadline;
 import io.grpc.Status;
@@ -87,23 +86,24 @@ import io.prometheus.client.Counter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
+import java.util.Map.Entry;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 @Log
 class ShardWorkerContext implements WorkerContext {
+  static final String EXEC_OWNER_RESOURCE_NAME = "exec-owner";
+  private static final Platform.Property EXEC_OWNER_PROPERTY =
+      Platform.Property.newBuilder().setName(EXEC_OWNER_RESOURCE_NAME).setValue("1").build();
   private static final String PROVISION_CORES_NAME = "cores";
 
   private static final Counter completedOperations =
@@ -120,6 +120,7 @@ class ShardWorkerContext implements WorkerContext {
   private final int inputFetchDeadline;
   private final int inputFetchStageWidth;
   private final int executeStageWidth;
+  private final int reportResultStageWidth;
   private final Backplane backplane;
   private final ExecFileSystem execFileSystem;
   private final InputStreamFactory inputStreamFactory;
@@ -138,6 +139,7 @@ class ShardWorkerContext implements WorkerContext {
   private final boolean errorOperationRemainingResources;
   private final LocalResourceSet resourceSet;
   private final boolean errorOperationOutputSizeExceeded;
+  private final boolean provideOwnedClaim;
 
   static SetMultimap<String, String> getMatchProvisions(
       Iterable<ExecutionPolicy> policies, String name, int executeStageWidth) {
@@ -159,6 +161,7 @@ class ShardWorkerContext implements WorkerContext {
       OperationPoller operationPoller,
       int inputFetchStageWidth,
       int executeStageWidth,
+      int reportResultStageWidth,
       int inputFetchDeadline,
       Backplane backplane,
       ExecFileSystem execFileSystem,
@@ -181,6 +184,7 @@ class ShardWorkerContext implements WorkerContext {
     this.operationPoller = operationPoller;
     this.inputFetchStageWidth = inputFetchStageWidth;
     this.executeStageWidth = executeStageWidth;
+    this.reportResultStageWidth = reportResultStageWidth;
     this.inputFetchDeadline = inputFetchDeadline;
     this.backplane = backplane;
     this.execFileSystem = execFileSystem;
@@ -197,6 +201,8 @@ class ShardWorkerContext implements WorkerContext {
     this.errorOperationOutputSizeExceeded = errorOperationOutputSizeExceeded;
     this.resourceSet = resourceSet;
     this.writer = writer;
+
+    provideOwnedClaim = this.resourceSet.poolResources.containsKey(EXEC_OWNER_RESOURCE_NAME);
   }
 
   private static Retrier createBackplaneRetrier() {
@@ -221,9 +227,10 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage) {
+  public Poller createPoller(
+      String name, QueueEntry queueEntry, ExecutionStage.Value stage, Executor executor) {
     Poller poller = new Poller(operationPollPeriod);
-    resumePoller(poller, name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
+    resumePoller(poller, name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS), executor);
     return poller;
   }
 
@@ -234,7 +241,8 @@ class ShardWorkerContext implements WorkerContext {
       QueueEntry queueEntry,
       ExecutionStage.Value stage,
       Runnable onFailure,
-      Deadline deadline) {
+      Deadline deadline,
+      Executor executor) {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     poller.resume(
         () -> {
@@ -263,7 +271,8 @@ class ShardWorkerContext implements WorkerContext {
               Level.WARNING, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
-        deadline);
+        deadline,
+        executor);
   }
 
   private ByteString getBlob(Digest digest) throws IOException, InterruptedException {
@@ -281,12 +290,63 @@ class ShardWorkerContext implements WorkerContext {
     return ProtoUtils.parseQueuedOperation(queuedOperationBlob, queueEntry);
   }
 
+  // FIXME make OwnedClaim with owner
+  // how will this play out with persistent workers, should we have one per user?
+  private Claim acquireClaim(Platform platform) {
+    // expand platform requirements with exec owner
+    if (provideOwnedClaim) {
+      platform = platform.toBuilder().addProperties(EXEC_OWNER_PROPERTY).build();
+    }
+
+    Claim claim = DequeueMatchEvaluator.acquireClaim(matchProvisions, resourceSet, platform);
+
+    // a little awkward wrapping with the early return here to preserve effective final
+    if (provideOwnedClaim) {
+      // enforced by exec owner property value of "1"
+      for (Entry<String, List<Object>> pool : claim.getPools()) {
+        if (!pool.getKey().equals(EXEC_OWNER_RESOURCE_NAME)) {
+          continue;
+        }
+        String name = (String) Iterables.getOnlyElement(pool.getValue());
+
+        return new Claim() {
+          UserPrincipal owner = execFileSystem.getOwner(name);
+
+          @Override
+          public void release(Claim.Stage stage) {
+            claim.release(stage);
+          }
+
+          @Override
+          public void release() {
+            owner = null;
+            claim.release();
+          }
+
+          @Override
+          public UserPrincipal owner() {
+            if (owner != null) {
+              return owner;
+            }
+            return claim.owner();
+          }
+
+          @Override
+          public Iterable<Entry<String, List<Object>>> getPools() {
+            return claim.getPools();
+          }
+        };
+      }
+      // claim was not provided with owner name value
+    }
+    return claim;
+  }
+
   @SuppressWarnings("ConstantConditions")
   private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     QueueEntry queueEntry = takeEntryOffOperationQueue(listener);
     Claim claim = null;
-    if (queueEntry == null
-        || (claim = acquireClaim(matchProvisions, resourceSet, queueEntry.getPlatform())) != null) {
+    if (queueEntry == null || (claim = acquireClaim(queueEntry.getPlatform())) != null) {
       listener.onEntry(queueEntry, claim);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -295,7 +355,10 @@ class ShardWorkerContext implements WorkerContext {
 
   private @Nullable QueueEntry takeEntryOffOperationQueue(MatchListener listener)
       throws IOException, InterruptedException {
-    listener.onWaitStart();
+    if (!listener.onWaitStart()) {
+      // match listener can signal completion here
+      return null;
+    }
     QueueEntry queueEntry = null;
     try {
       queueEntry =
@@ -331,8 +394,8 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public void onWaitStart() {
-            listener.onWaitStart();
+          public boolean onWaitStart() {
+            return listener.onWaitStart();
           }
 
           @Override
@@ -421,13 +484,18 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  public int getReportResultStageWidth() {
+    return reportResultStageWidth;
+  }
+
+  @Override
   public boolean hasDefaultActionTimeout() {
-    return defaultActionTimeout.getSeconds() > 0 || defaultActionTimeout.getNanos() > 0;
+    return Durations.isPositive(defaultActionTimeout);
   }
 
   @Override
   public boolean hasMaximumActionTimeout() {
-    return maximumActionTimeout.getSeconds() > 0 || maximumActionTimeout.getNanos() > 0;
+    return Durations.isPositive(maximumActionTimeout);
   }
 
   @Override
@@ -565,36 +633,6 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
-  @VisibleForTesting
-  static class OutputDirectoryContext {
-    private final List<FileNode> files = new ArrayList<>();
-    private final List<DirectoryNode> directories = new ArrayList<>();
-    private final List<SymlinkNode> symlinks = new ArrayList<>();
-
-    void addFile(FileNode fileNode) {
-      files.add(fileNode);
-    }
-
-    void addDirectory(DirectoryNode directoryNode) {
-      directories.add(directoryNode);
-    }
-
-    void addSymlink(SymlinkNode symlinkNode) {
-      symlinks.add(symlinkNode);
-    }
-
-    Directory toDirectory() {
-      files.sort(Comparator.comparing(FileNode::getName));
-      directories.sort(Comparator.comparing(DirectoryNode::getName));
-      symlinks.sort(Comparator.comparing(SymlinkNode::getName));
-      return Directory.newBuilder()
-          .addAllFiles(files)
-          .addAllDirectories(directories)
-          .addAllSymlinks(symlinks)
-          .build();
-    }
-  }
-
   private void uploadOutputDirectory(
       ActionResult.Builder resultBuilder,
       DigestUtil digestUtil,
@@ -620,108 +658,27 @@ class ShardWorkerContext implements WorkerContext {
       return;
     }
 
-    Tree.Builder treeBuilder = Tree.newBuilder();
-    OutputDirectoryContext outputRoot = new OutputDirectoryContext();
-    Files.walkFileTree(
-        outputDirPath,
-        new SimpleFileVisitor<>() {
-          OutputDirectoryContext currentDirectory = null;
-          final Stack<OutputDirectoryContext> path = new Stack<>();
-
-          @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-              throws IOException {
-            if (configs.getWorker().isCreateSymlinkOutputs() && attrs.isSymbolicLink()) {
-              visitSymbolicLink(file);
-            } else {
-              visitRegularFile(file);
-            }
-            return FileVisitResult.CONTINUE;
+    IOConsumer<DigestPath> fileObserver =
+        digestPath -> {
+          Digest digest = digestPath.digest();
+          try {
+            insertFile(digest, digestPath.path());
+          } catch (InterruptedException e) {
+            throw new IOException(e);
+          } catch (EntryLimitException e) {
+            preconditionFailure
+                .addViolationsBuilder()
+                .setType(entrySizeViolationType)
+                .setSubject("blobs/" + DigestUtil.toString(digest))
+                .setDescription(
+                    "An output could not be uploaded because it exceeded "
+                        + "the maximum size of an entry");
           }
-
-          private void visitSymbolicLink(Path file) throws IOException {
-            // TODO convert symlinks with absolute targets within execution root to relative ones
-            currentDirectory.addSymlink(
-                SymlinkNode.newBuilder()
-                    .setName(file.getFileName().toString())
-                    .setTarget(Files.readSymbolicLink(file).toString())
-                    .build());
-          }
-
-          private void visitRegularFile(Path file) throws IOException {
-            Digest digest;
-            try {
-              // should we create symlink nodes in output?
-              // is buildstream trying to execute in a specific container??
-              // can get to NSFE for nonexistent symlinks
-              // can fail outright for a symlink to a directory
-              digest = digestUtil.compute(file);
-            } catch (NoSuchFileException e) {
-              log.log(
-                  Level.SEVERE,
-                  format(
-                      "error visiting file %s under output dir %s",
-                      outputDirPath.relativize(file), outputDirPath.toAbsolutePath()),
-                  e);
-              return;
-            }
-
-            // should we cast to PosixFilePermissions and do gymnastics there for executable?
-
-            // TODO symlink per revision proposal
-            currentDirectory.addFile(
-                FileNode.newBuilder()
-                    .setName(file.getFileName().toString())
-                    .setDigest(DigestUtil.toDigest(digest))
-                    .setIsExecutable(Files.isExecutable(file))
-                    .build());
-            try {
-              insertFile(digest, file);
-            } catch (InterruptedException e) {
-              throw new IOException(e);
-            } catch (EntryLimitException e) {
-              preconditionFailure
-                  .addViolationsBuilder()
-                  .setType(entrySizeViolationType)
-                  .setSubject("blobs/" + DigestUtil.toString(digest))
-                  .setDescription(
-                      "An output could not be uploaded because it exceeded the maximum size of an"
-                          + " entry");
-            }
-          }
-
-          @Override
-          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-            path.push(currentDirectory);
-            if (dir.equals(outputDirPath)) {
-              currentDirectory = outputRoot;
-            } else {
-              currentDirectory = new OutputDirectoryContext();
-            }
-            return FileVisitResult.CONTINUE;
-          }
-
-          @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
-            OutputDirectoryContext parentDirectory = path.pop();
-            Directory directory = currentDirectory.toDirectory();
-            if (parentDirectory == null) {
-              treeBuilder.setRoot(directory);
-            } else {
-              parentDirectory.addDirectory(
-                  DirectoryNode.newBuilder()
-                      .setName(dir.getFileName().toString())
-                      // FIXME make one digestUtil for all
-                      .setDigest(DigestUtil.toDigest(digestUtil.compute(directory)))
-                      .build());
-              treeBuilder.addChildren(directory);
-            }
-            currentDirectory = parentDirectory;
-            return FileVisitResult.CONTINUE;
-          }
-        });
-    Tree tree = treeBuilder.build();
-    ByteString treeBlob = tree.toByteString();
+        };
+    TreeWalker treeWalker =
+        new TreeWalker(configs.getWorker().isCreateSymlinkOutputs(), digestUtil, fileObserver);
+    Files.walkFileTree(outputDirPath, treeWalker);
+    ByteString treeBlob = treeWalker.getTree().toByteString();
     Digest treeDigest = digestUtil.compute(treeBlob);
     insertBlob(treeDigest, treeBlob);
     resultBuilder
@@ -773,6 +730,16 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  public void unmergeExecution(ActionKey actionKey) throws IOException, InterruptedException {
+    createBackplaneRetrier()
+        .execute(
+            () -> {
+              backplane.unmergeExecution(actionKey);
+              return null;
+            });
+  }
+
+  @Override
   public boolean putOperation(Operation operation) throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
@@ -788,10 +755,11 @@ class ShardWorkerContext implements WorkerContext {
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       DigestFunction.Value digestFunction,
       Action action,
-      Command command)
+      Command command,
+      @Nullable UserPrincipal owner)
       throws IOException, InterruptedException {
     return execFileSystem.createExecDir(
-        operationName, directoriesIndex, digestFunction, action, command);
+        operationName, directoriesIndex, digestFunction, action, command, owner);
   }
 
   // might want to split for removeDirectory and decrement references to avoid removing for streamed
@@ -911,61 +879,31 @@ class ShardWorkerContext implements WorkerContext {
         configs.getWorker().getSandboxSettings());
   }
 
+  // This has become an extremely awkward mechanism
+  // an exec dir should be associatable with all of these parameters
+  // and the arguments should be more structured and less susceptible to ordering details
   @Override
   public IOResource limitExecution(
       String operationName,
+      @Nullable UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory) {
+    ResourceLimits limits = commandExecutionSettings(command);
+    IOResource resource;
     if (shouldLimitCoreUsage()) {
-      ResourceLimits limits = commandExecutionSettings(command);
-      return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
-    }
-    return new IOResource() {
-      @Override
-      public void close() {}
+      resource = limitSpecifiedExecution(limits, operationName, owner, arguments, workingDirectory);
+    } else {
+      resource =
+          new IOResource() {
+            @Override
+            public void close() {}
 
-      @Override
-      public boolean isReferenced() {
-        return false;
-      }
-    };
-  }
-
-  IOResource limitSpecifiedExecution(
-      ResourceLimits limits,
-      String operationName,
-      ImmutableList.Builder<String> arguments,
-      Path workingDirectory) {
-    // The decision to apply resource restrictions has already been decided within the
-    // ResourceLimits object. We apply the cgroup settings to file resources
-    // and collect group names to use on the CLI.
-    String operationId = getOperationId(operationName);
-    ArrayList<IOResource> resources = new ArrayList<>();
-
-    if (limits.cgroups) {
-      final Group group = operationsGroup.getChild(operationId);
-      ArrayList<String> usedGroups = new ArrayList<>();
-
-      // Possibly set core restrictions.
-      if (limits.cpu.limit) {
-        applyCpuLimits(group, limits, resources);
-        usedGroups.add(group.getCpu().getName());
-      }
-
-      // Possibly set memory restrictions.
-      if (limits.mem.limit) {
-        applyMemLimits(group, limits, resources);
-        usedGroups.add(group.getMem().getName());
-      }
-
-      // Decide the CLI for running under cgroups
-      if (!usedGroups.isEmpty()) {
-        arguments.add(
-            configs.getExecutionWrappers().getCgroups(),
-            "-g",
-            String.join(",", usedGroups) + ":" + group.getHierarchy());
-      }
+            @Override
+            public boolean isReferenced() {
+              return false;
+            }
+          };
     }
 
     // Possibly set network restrictions.
@@ -1000,6 +938,45 @@ class ShardWorkerContext implements WorkerContext {
         arguments.add(String.valueOf(limits.time.timeShift));
       }
     }
+    return resource;
+  }
+
+  IOResource limitSpecifiedExecution(
+      ResourceLimits limits,
+      String operationName,
+      @Nullable UserPrincipal owner,
+      ImmutableList.Builder<String> arguments,
+      Path workingDirectory) {
+    // The decision to apply resource restrictions has already been decided within the
+    // ResourceLimits object. We apply the cgroup settings to file resources
+    // and collect group names to use on the CLI.
+    String operationId = getOperationId(operationName);
+    ArrayList<IOResource> resources = new ArrayList<>();
+
+    if (limits.cgroups) {
+      final Group group = operationsGroup.getChild(operationId);
+      ArrayList<String> usedGroups = new ArrayList<>();
+
+      // Possibly set core restrictions.
+      if (limits.cpu.limit) {
+        applyCpuLimits(group, owner, limits, resources);
+        usedGroups.add(group.getCpu().getName());
+      }
+
+      // Possibly set memory restrictions.
+      if (limits.mem.limit) {
+        applyMemLimits(group, owner, limits, resources);
+        usedGroups.add(group.getMem().getName());
+      }
+
+      // Decide the CLI for running under cgroups
+      if (!usedGroups.isEmpty()) {
+        arguments.add(
+            configs.getExecutionWrappers().getCgroups(),
+            "-g",
+            String.join(",", usedGroups) + ":" + group.getHierarchy());
+      }
+    }
 
     // The executor expects a single IOResource.
     // However, we may have multiple IOResources due to using multiple cgroup groups.
@@ -1029,7 +1006,7 @@ class ShardWorkerContext implements WorkerContext {
         configs.getWorker().getSandboxSettings().getAdditionalWritePaths());
 
     if (limits.tmpFs) {
-      options.writableFiles.addAll(configs.getWorker().getSandboxSettings().getTmpFsPaths());
+      options.tmpfsDirs.addAll(configs.getWorker().getSandboxSettings().getTmpFsPaths());
     }
 
     if (limits.debugAfterExecution) {
@@ -1086,10 +1063,20 @@ class ShardWorkerContext implements WorkerContext {
     arguments.add("--");
   }
 
-  private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+  private void applyCpuLimits(
+      Group group,
+      @Nullable UserPrincipal owner,
+      ResourceLimits limits,
+      ArrayList<IOResource> resources) {
     Cpu cpu = group.getCpu();
     try {
       cpu.close();
+
+      if (owner != null) {
+        // Associate cgroup ownership
+        cpu.setOwner(owner);
+      }
+
       if (limits.cpu.max > 0) {
         /* period of 100ms */
         cpu.setCFSPeriod(100000);
@@ -1114,9 +1101,18 @@ class ShardWorkerContext implements WorkerContext {
     resources.add(cpu);
   }
 
-  private void applyMemLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+  private void applyMemLimits(
+      Group group,
+      @Nullable UserPrincipal owner,
+      ResourceLimits limits,
+      ArrayList<IOResource> resources) {
     try {
       Mem mem = group.getMem();
+      if (owner != null) {
+        // Associate cgroup ownership
+        mem.setOwner(owner);
+      }
+
       mem.setMemoryLimit(limits.mem.claimed);
       resources.add(mem);
     } catch (IOException e) {

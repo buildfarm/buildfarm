@@ -27,6 +27,7 @@ public class Backplane {
   private int actionBlacklistExpire = 3600; // 1 Hour;
   private String invocationBlacklistPrefix = "InvocationBlacklist";
   private String operationPrefix = "Operation";
+  private String actionsPrefix = "Action";
   private int operationExpire = 604800; // 1 Week
   private String preQueuedOperationsListName = "{Arrival}:PreQueuedOperations";
   private String processingListName = "{Arrival}:ProcessingOperations";
@@ -41,7 +42,7 @@ public class Backplane {
   private int casExpire = 604800; // 1 Week
   private String correlatedInvocationsIndexPrefix = "CorrelatedInvocationsIndex";
   private int maxCorrelatedInvocationsIndexTimeout = 3 * 24 * 60 * 60; // 3 Days
-  private String correlatedInvocationsPrefix = "CorrelatedInvocation";
+  private String correlatedInvocationsPrefix = "CorrelatedInvocations";
   private int maxCorrelatedInvocationsTimeout = 7 * 24 * 60 * 60; // 1 Week
   private String toolInvocationsPrefix = "ToolInvocation";
   private int maxToolInvocationTimeout = 604800;
@@ -67,16 +68,65 @@ public class Backplane {
    */
   private String redisCertificateAuthorityFile;
 
-  private int timeout = 10000;
+  /**
+   * Use Google Application Default Credentials to authenticate to Redis.
+   *
+   * <p>Setting GOOGLE_DEFAULT_CREDENTIALS env var can help Google credential provider find your
+   * service account.
+   *
+   * <p>If this is set, the `redisPassword` will be ignored.
+   */
+  private boolean redisAuthWithGoogleCredentials;
+
+  private int timeout = 10000; // Milliseconds
   private String[] redisNodes = {};
   private int maxAttempts = 20;
-  private boolean cacheCas = false;
   private long priorityPollIntervalMillis = 100;
 
   /**
+   * This function is used to print the URI in logs.
+   *
+   * @return The redis URI but the password will be hidden, or <c>null</c> if unset.
+   */
+  public @Nullable String getRedisUriMasked() {
+    String uri = getRedisUri();
+    if (uri == null) {
+      return null;
+    }
+    try {
+      URI redisProperUri = URI.create(uri);
+      String password = JedisURIHelper.getPassword(redisProperUri);
+      if (Strings.isNullOrEmpty(password)) {
+        return uri;
+      }
+      return uri.replace(password, "<HIDDEN>");
+    } catch (ArrayIndexOutOfBoundsException e) {
+      // JedisURIHelper.getPassword did not find the password (e.g. only username in
+      // uri.getUserInfo)
+      return uri;
+    }
+  }
+
+  /**
+   * Look in several prioritized ways to get a Redis username:
+   *
+   * <ol>
+   *   <li>the password in the Redis URI (wherever that came from)
+   *   <li>The `redisUsername` from config YAML
+   * </ol>
+   *
    * @return The redis username, or <c>null</c> if unset.
    */
   public @Nullable String getRedisUsername() {
+    String r = getRedisUri();
+    if (r != null) {
+      URI redisProperUri = URI.create(r);
+      String username = JedisURIHelper.getUser(redisProperUri);
+      if (!Strings.isNullOrEmpty(username)) {
+        return username;
+      }
+    }
+
     return Strings.emptyToNull(redisUsername);
   }
 
@@ -85,8 +135,8 @@ public class Backplane {
    *
    * <ol>
    *   <li>the password in the Redis URI (wherever that came from)
-   *   <li>The `redisPassword` from config YAML
    *   <li>the `redisCredentialFile`.
+   *   <li>The `redisPassword` from config YAML
    * </ol>
    *
    * @return The redis password, or <c>null</c> if unset.
@@ -96,9 +146,14 @@ public class Backplane {
     if (r == null) {
       return null;
     }
-    URI redisProperUri = URI.create(r);
-    if (!Strings.isNullOrEmpty(JedisURIHelper.getPassword(redisProperUri))) {
-      return JedisURIHelper.getPassword(redisProperUri);
+    try {
+      URI redisProperUri = URI.create(r);
+      if (!Strings.isNullOrEmpty(JedisURIHelper.getPassword(redisProperUri))) {
+        return JedisURIHelper.getPassword(redisProperUri);
+      }
+    } catch (ArrayIndexOutOfBoundsException e) {
+      // JedisURIHelper.getPassword did not find the password (e.g. only username in
+      // uri.getUserInfo)
     }
 
     if (!Strings.isNullOrEmpty(redisCredentialFile)) {

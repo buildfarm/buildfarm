@@ -1,4 +1,4 @@
-// Copyright 2021 The Bazel Authors. All rights reserved.
+// Copyright 2021 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,12 +34,12 @@ import com.github.dockerjava.core.command.ExecStartResultCallback;
 import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -320,7 +320,7 @@ public class DockerExecutor {
     createContainerCmd.withHostConfig(getHostConfig(settings.execDir));
     createContainerCmd.withEnv(MapUtils.envMapToList(settings.envVars));
     createContainerCmd.withNetworkDisabled(!settings.limits.containerSettings.network);
-    createContainerCmd.withStopTimeout((int) settings.timeout.getSeconds());
+    createContainerCmd.withStopTimeout((int) Durations.toSeconds(settings.timeout));
     // run container creation and log any warnings
     CreateContainerResponse response = createContainerCmd.exec();
     if (response.getWarnings().length != 0) {
@@ -352,7 +352,7 @@ public class DockerExecutor {
   private static void mountExecRoot(HostConfig config, Path execDir) {
     // decide paths
     List<Path> paths = new ArrayList<>();
-    paths.add(Paths.get("/" + execDir.subpath(0, 1)));
+    paths.add(Path.of("/" + execDir.subpath(0, 1)));
     paths.add(execDir);
     paths.addAll(Utils.getSymbolicLinkReferences(execDir));
     // mount paths needed for the execution root

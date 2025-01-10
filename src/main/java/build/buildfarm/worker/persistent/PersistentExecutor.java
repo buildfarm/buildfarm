@@ -1,4 +1,4 @@
-// Copyright 2023 The Bazel Authors. All rights reserved.
+// Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,11 @@
 
 package build.buildfarm.worker.persistent;
 
+import static java.lang.String.join;
+
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.worker.resources.ResourceLimits;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.build.lib.worker.WorkerProtocol.Input;
@@ -27,7 +30,8 @@ import com.google.rpc.Code;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -47,7 +51,7 @@ public class PersistentExecutor {
       ProtoCoordinator.ofCommonsPool(getMaxWorkersPerKey());
 
   // TODO load from config (i.e. {worker_root}/persistent)
-  public static final Path defaultWorkRootsDir = Paths.get("/tmp/worker/persistent/");
+  public static final Path defaultWorkRootsDir = Path.of("/tmp/worker/persistent/");
 
   public static final String PERSISTENT_WORKER_FLAG = "--persistent_worker";
 
@@ -75,12 +79,27 @@ public class PersistentExecutor {
   }
 
   /**
-   * 1) Parses action inputs into tool inputs and request inputs 2) Makes the WorkerKey 3) Loads the
-   * tool inputs, if needed, into the WorkerKey tool inputs dir 4) Runs the work request on its
-   * Coordinator, passing it the required context 5) Passes output to the resultBuilder
+   * Run some Action on a Persistent Worker.
+   *
+   * <ol>
+   *   <li>Parses action inputs into tool inputs and request inputs
+   *   <li>Makes the WorkerKey
+   *   <li>Loads the tool inputs, if needed, into the WorkerKey tool inputs dir
+   *   <li>Runs the work request on its Coordinator, passing it the required context
+   *   <li>Passes output to the resultBuilder
+   * </ol>
+   *
+   * @param context
+   * @param operationName
+   * @param argsList
+   * @param envVars
+   * @param limits
+   * @param timeout
+   * @param workRootsDir
+   * @param resultBuilder
+   * @return
    */
   public static Code runOnPersistentWorker(
-      String persistentWorkerInitCmd,
       WorkFilesContext context,
       String operationName,
       ImmutableList<String> argsList,
@@ -93,7 +112,7 @@ public class PersistentExecutor {
     // Pull out persistent worker start command from the overall action request
 
     log.log(Level.FINE, "executeCommandOnPersistentWorker[" + operationName + "]");
-
+    String persistentWorkerInitCmd = generatePersistentWorkerCommand(argsList);
     ImmutableList<String> initCmd = parseInitCmd(persistentWorkerInitCmd, argsList);
 
     String executionName = getExecutionName(argsList);
@@ -123,7 +142,7 @@ public class PersistentExecutor {
 
     WorkerInputs workerFiles = WorkerInputs.from(context, requestArgs);
 
-    Path binary = Paths.get(workerExecCmd.getFirst());
+    Path binary = Path.of(workerExecCmd.getFirst());
     if (!workerFiles.containsTool(binary) && !binary.isAbsolute()) {
       throw new IllegalArgumentException(
           "Binary wasn't a tool input nor an absolute path: " + binary);
@@ -254,6 +273,28 @@ public class PersistentExecutor {
       throw new IllegalArgumentException("parseInitCmd?![" + initCmd + "]" + "\n" + argsList);
     }
     return initCmd;
+  }
+
+  /**
+   * Generate a PersistentWorker command + arguments.
+   *
+   * <p>Strip out all the @____, --flagfile or -flagfile
+   *
+   * @param args
+   * @return a String of command + args, culminating in `--persistent_worker`, used to start a
+   *     persistent worker daemon.
+   */
+  @VisibleForTesting
+  static String generatePersistentWorkerCommand(List<String> args) {
+    // Strip out the `@...` argfiles.
+    List<String> filteredArgs = new ArrayList<>();
+    for (String a : args) {
+      if (!a.startsWith("@") && !a.startsWith("--flagfile") && !a.startsWith("-flagfile")) {
+        filteredArgs.add(a);
+      }
+    }
+    filteredArgs.add(PERSISTENT_WORKER_FLAG);
+    return join(" ", filteredArgs);
   }
 
   private static String getExecutionName(ImmutableList<String> argsList) {

@@ -1,4 +1,4 @@
-// Copyright 2019 The Bazel Authors. All rights reserved.
+// Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -49,7 +49,6 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Scanner;
 import java.util.Set;
@@ -73,7 +72,7 @@ class Extract {
 
     ManagedChannel channel = createChannel(host);
 
-    Path root = Paths.get("blobs");
+    Path root = Path.of("blobs");
 
     downloadActionContents(root, instanceName, actionDigests.build(), channel);
 

@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -175,16 +175,6 @@ public final class ResourceDecider {
     // better to choose the sandbox in order to honor the user's request instead of silently
     // ignoring the request due to a disabled sandbox.
     decideSandboxUsage(limits, sandbox);
-
-    // Avoid using the existing execution policies when using the linux sandbox.
-    // Using these execution policies under the sandbox do not have the right permissions to work.
-    // For the time being, we want to experiment with dynamically choosing the sandbox-
-    // without affecting current configurations or relying on specific deployments.
-    // This will dynamically skip using the worker configured execution policies.
-    if (limits.useLinuxSandbox) {
-      limits.useExecutionPolicies = false;
-      limits.description.add("configured execution policies skipped because of choosing sandbox");
-    }
 
     // Decide whether the action will run in a container
     if (allowBringYourOwnContainer && !limits.containerSettings.containerImage.isEmpty()) {

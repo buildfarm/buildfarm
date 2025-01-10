@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import lombok.Data;
 import net.jcip.annotations.ThreadSafe;
 
@@ -271,7 +272,35 @@ public interface Backplane {
   /** Requeue a dispatched execution */
   void requeueDispatchedExecution(QueueEntry queueEntry) throws IOException;
 
-  void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException;
+  /**
+   * @brief Acquire an execution to merge for an action
+   * @details Prevent any further merges of the actionKey with executions.
+   * @param actionKey The source action identifier.
+   * @return An execution if the actionKey has an association, null otherwise.
+   * @note Suggested return identifier: execution.
+   */
+  @Nullable
+  Operation mergeExecution(ActionKey actionKey) throws IOException;
+
+  /**
+   * @brief Remove actionKey execution merge association.
+   * @details Prevent any further merges of the actionKey with executions.
+   * @param actionKey The source action identifier.
+   */
+  void unmergeExecution(ActionKey actionKey) throws IOException;
+
+  /**
+   * @brief Submit an execution into the arrival queue
+   * @details Interacts with executions and actions map to present an execution for processing or
+   *     signal mergability.
+   * @param executeEntry The submission into the arrival queue.
+   * @param execution The execution object created with name key if not mergable.
+   * @param ignoreMerge Whether to consider mergability.
+   * @return false if ignoreMerge is false and the execution could be merged, true otherwise.
+   * @note Suggested return identifier: prequeued.
+   */
+  boolean prequeue(ExecuteEntry executeEntry, Operation execution, boolean ignoreMerge)
+      throws IOException;
 
   void queue(QueueEntry queueEntry, Operation operation) throws IOException;
 

@@ -1,25 +1,20 @@
 package persistent.bazel.processes;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
+import static com.google.common.truth.Truth.assertThat;
+import static persistent.testutil.ProcessUtils.spawnPersistentWorkerProcess;
 
 import com.google.devtools.build.lib.worker.WorkerProtocol;
-
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
 import persistent.common.processes.JavaProcessWrapper;
 import persistent.common.processes.ProcessWrapper;
 import persistent.testutil.ProcessUtils;
 
-import static com.google.common.truth.Truth.assertThat;
-
-import static persistent.testutil.ProcessUtils.spawnPersistentWorkerProcess;
-
 @RunWith(JUnit4.class)
 public class ProtoWorkerRWTest {
-
   // Similar to AdderTest; but spawns the process via a jar
   @SuppressWarnings("CheckReturnValue")
   @Test
@@ -28,11 +23,9 @@ public class ProtoWorkerRWTest {
 
     String filename = "adder-bin_deploy.jar";
 
-    Path jarPath = ProcessUtils.retrieveFileResource(
-        getClass().getClassLoader(),
-        filename,
-        workDir.resolve(filename)
-    );
+    Path jarPath =
+        ProcessUtils.retrieveFileResource(
+            getClass().getClassLoader(), filename, workDir.resolve(filename));
 
     ProcessWrapper process;
     try (JavaProcessWrapper jpw = spawnPersistentWorkerProcess(jarPath, "adder.Adder")) {

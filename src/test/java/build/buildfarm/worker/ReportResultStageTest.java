@@ -1,4 +1,4 @@
-// Copyright 2019 The Bazel Authors. All rights reserved.
+// Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.buildfarm.common.Claim;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -43,7 +44,7 @@ import com.google.protobuf.Any;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
 import io.grpc.protobuf.StatusProto;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -106,15 +107,19 @@ public class ReportResultStageTest {
             .setAction(Action.newBuilder().setDoNotCache(true).build())
             .setOperation(reportedOperation)
             .setQueueEntry(reportedEntry)
-            .setExecDir(Paths.get("reported-operation-path"))
+            .setExecDir(Path.of("reported-operation-path"))
             .setPoller(mock(Poller.class))
+            .setClaim(mock(Claim.class))
             .build();
+    when(context.getReportResultStageWidth()).thenReturn(1);
     when(context.putOperation(any(Operation.class))).thenReturn(true);
 
     PipelineStage reportResultStage = new ReportResultStage(context, output, /* error= */ null);
+    reportResultStage.claim(reportedContext);
     reportResultStage.put(reportedContext);
     reportResultStage.run();
     verify(context, times(1)).destroyExecDir(reportedContext.execDir);
+    verify(context, times(1)).getReportResultStageWidth();
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(context, times(2)).putOperation(operationCaptor.capture());
     Operation completeOperation = Iterables.getLast(operationCaptor.getAllValues());
@@ -146,9 +151,11 @@ public class ReportResultStageTest {
             .setAction(action)
             .setOperation(erroringOperation)
             .setQueueEntry(erroringEntry)
-            .setExecDir(Paths.get("erroring-operation-path"))
+            .setExecDir(Path.of("erroring-operation-path"))
             .setPoller(mock(Poller.class))
+            .setClaim(mock(Claim.class))
             .build();
+    when(context.getReportResultStageWidth()).thenReturn(1);
     when(context.putOperation(any(Operation.class))).thenReturn(true);
     Status erroredStatus =
         Status.newBuilder().setCode(Code.FAILED_PRECONDITION.getNumber()).build();
@@ -161,8 +168,10 @@ public class ReportResultStageTest {
             eq(Command.getDefaultInstance()));
 
     PipelineStage reportResultStage = new ReportResultStage(context, output, /* error= */ null);
+    reportResultStage.claim(erroringContext);
     reportResultStage.put(erroringContext);
     reportResultStage.run();
+    verify(context, times(1)).getReportResultStageWidth();
     verify(context, times(1)).destroyExecDir(erroringContext.execDir);
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(context, times(2)).putOperation(operationCaptor.capture());

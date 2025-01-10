@@ -4,11 +4,11 @@ import build.buildfarm.v1test.WorkerType;
 import com.google.common.base.Strings;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import javax.naming.ConfigurationException;
 import lombok.Data;
 import lombok.extern.java.Log;
@@ -29,10 +29,12 @@ public class Worker {
   private int executeStageWidthOffset = 0;
   private int inputFetchStageWidth = 0;
   private int inputFetchDeadline = 60;
+  private int reportResultStageWidth = 1;
   private boolean linkExecFileSystem = true;
   private boolean linkInputDirectories = true;
-  private List<String> linkedInputDirectories = Arrays.asList("(?!external)[^/]+");
+  private List<String> linkedInputDirectories = Arrays.asList("(?!external/)[^/]+");
   private String execOwner;
+  private List<String> execOwners = new ArrayList<>();
   private int defaultMaxCores = 0;
   private boolean limitGlobalExecution = false;
   private boolean onlyMulticoreTests = false;
@@ -43,7 +45,7 @@ public class Worker {
   private SandboxSettings sandboxSettings = new SandboxSettings();
   private boolean createSymlinkOutputs = false;
   private int zstdBufferPoolSize = 2048; /* * ZSTD_DStreamInSize (current is 128k) == 256MiB */
-
+  private Set<String> persistentWorkerActionMnemonicAllowlist = Set.of("*");
   // These limited resources are only for the individual worker.
   // An example would be hardware resources such as GPUs.
   // If you want GPU actions to run exclusively, define a single GPU resource.
@@ -70,13 +72,13 @@ public class Worker {
     verifyRootConfiguration();
     addRootIfMissing();
     verifyRootLocation();
-    return Paths.get(root);
+    return Path.of(root);
   }
 
   private void addRootIfMissing() throws ConfigurationException {
     try {
-      if (!Files.isDirectory(Paths.get(root))) {
-        Files.createDirectories(Paths.get(root));
+      if (!Files.isDirectory(Path.of(root))) {
+        Files.createDirectories(Path.of(root));
       }
     } catch (Exception e) {
       throw new ConfigurationException(e.toString());
@@ -92,7 +94,7 @@ public class Worker {
 
   private void verifyRootLocation() throws ConfigurationException {
     // Configuration error if root does not exist.
-    if (!Files.isDirectory(Paths.get(root))) {
+    if (!Files.isDirectory(Path.of(root))) {
       throw new ConfigurationException("root [" + root + "] is not directory");
     }
   }

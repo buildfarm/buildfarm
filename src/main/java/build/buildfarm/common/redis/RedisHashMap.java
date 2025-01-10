@@ -1,4 +1,4 @@
-// Copyright 2022 The Bazel Authors. All rights reserved.
+// Copyright 2022 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -74,6 +74,10 @@ public class RedisHashMap {
    */
   public boolean insertIfMissing(UnifiedJedis jedis, String key, String value) {
     return jedis.hsetnx(name, key, value) == 1;
+  }
+
+  public Response<Long> insertIfMissing(AbstractPipeline jedis, String key, String value) {
+    return jedis.hsetnx(name, key, value);
   }
 
   /**

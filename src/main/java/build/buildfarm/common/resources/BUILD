@@ -1,5 +1,5 @@
+load("@protobuf//bazel:java_proto_library.bzl", "java_proto_library")
 load("@protobuf//bazel:proto_library.bzl", "proto_library")
-load("@rules_java//java:defs.bzl", "java_proto_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,7 +7,7 @@ proto_library(
     name = "resource_proto",
     srcs = ["resource.proto"],
     deps = [
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_proto",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_proto",
         "@googleapis//google/api:annotations_proto",
         "@googleapis//google/longrunning:operations_proto",
         "@googleapis//google/rpc:status_proto",
@@ -32,7 +32,7 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@googleapis//google/longrunning:longrunning_java_proto",
         "@googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_jnr_jnr_constants",

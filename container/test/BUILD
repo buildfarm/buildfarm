@@ -11,10 +11,10 @@ container_structure_test(
         "example_config.yaml",
         "telemetry_tools.yaml",
         "worker.yaml",
-        "worker_wrappers.yaml",
+        #"worker_wrappers.yaml", # TODO these depend on your host platform (arm/x86) and isn't consistent yet.
     ],
     driver = DRIVER,
-    image = "//:buildfarm-worker_linux_amd64",
+    image = "//container:_buildfarm-worker.image",
     tags = ["container"],
 )
 
@@ -27,6 +27,6 @@ container_structure_test(
         "telemetry_tools.yaml",
     ],
     driver = DRIVER,
-    image = "//:buildfarm-server_linux_amd64",
+    image = "//container:_buildfarm-server.image",
     tags = ["container"],
 )

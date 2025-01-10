@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +18,9 @@ import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.Visitor;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.redis.BalancedRedisQueue.BalancedQueueEntry;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
@@ -169,7 +170,7 @@ public class BalancedRedisQueueTest {
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, RedisQueue::decorate);
 
     // ACT
-    Boolean success = queue.removeFromDequeue(jedis, "foo");
+    Boolean success = queue.removeFromDequeue(jedis, new BalancedQueueEntry("test", "foo"));
 
     // ASSERT
     assertThat(success).isFalse();
@@ -193,7 +194,7 @@ public class BalancedRedisQueueTest {
     queue.take(jedis, service);
     queue.take(jedis, service);
     service.shutdown();
-    Boolean success = queue.removeFromDequeue(jedis, "baz");
+    Boolean success = queue.removeFromDequeue(jedis, new BalancedQueueEntry("test", "baz"));
 
     // ASSERT
     assertThat(service.awaitTermination(0, SECONDS)).isTrue();
@@ -219,7 +220,7 @@ public class BalancedRedisQueueTest {
     queue.take(jedis, service);
     queue.take(jedis, service);
     service.shutdown();
-    Boolean success = queue.removeFromDequeue(jedis, "bar");
+    Boolean success = queue.removeFromDequeue(jedis, new BalancedQueueEntry("test", "bar"));
 
     // ASSERT
     assertThat(service.awaitTermination(0, SECONDS)).isTrue();
@@ -457,10 +458,10 @@ public class BalancedRedisQueueTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    StringVisitor visitor =
-        new StringVisitor() {
-          public void visit(String entry) {
-            visited.add(entry);
+    Visitor<BalancedQueueEntry> visitor =
+        new Visitor<>() {
+          public void visit(BalancedQueueEntry entry) {
+            visited.add(entry.getValue());
           }
         };
     queue.visit(jedis, visitor);
@@ -497,10 +498,10 @@ public class BalancedRedisQueueTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    StringVisitor visitor =
-        new StringVisitor() {
-          public void visit(String entry) {
-            visited.add(entry);
+    Visitor<BalancedQueueEntry> visitor =
+        new Visitor<>() {
+          public void visit(BalancedQueueEntry entry) {
+            visited.add(entry.getValue());
           }
         };
     queue.visit(jedis, visitor);

@@ -1,4 +1,4 @@
-# This the official list of Bazel Buildfarm authors for copyright purposes.
+# This the official list of Buildfarm authors for copyright purposes.
 # This file is distinct from the CONTRIBUTORS files.
 # See the latter for an explanation.
 
@@ -6,7 +6,7 @@
 # Name or Organization <email address>
 # The email address is not required for organizations.
 
-Uber Technologies Inc.
+George Gensure <werkt0@gmail.com>
 Aurora Innovation, Inc.
 VMware, Inc.
 Salesforce, Inc.

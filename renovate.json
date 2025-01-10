@@ -1,6 +1,90 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    ":approveMajorUpdates",
+    ":label(dependencies)",
+    ":semanticCommitType(chore)",
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "prConcurrentLimit": 2,
+  "packageRules": [
+    {
+      "groupName": "Bazel",
+      "matchPackageNames": [
+        "bazel"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "automerge": true
+    },
+    {
+      "groupName": "tini",
+      "description": "tini x86_64 and arm64v8",
+      "matchPackageNames": [
+        "tini*"
+      ]
+    },
+    {
+      "groupName": "rules_proto",
+      "description": "disable rules_proto as it's transitive and Buildfarm does not use it",
+      "matchPackageNames": [
+        "rules_proto"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Maven dependencies need to be pinned by 'REPIN=1 bazelisk run @maven//:pin && git add maven_install.json && git commit' to pass CI, then they can be auto-merged after approval",
+      "matchManagers": ["bazel-module"],
+      "matchDatasources": ["maven"],
+      "dependencyDashboardApproval": true,
+      "automerge": true,
+      "prConcurrentLimit": 1,
+      "rebaseWhen": "never"
+    },
+    {
+      "groupName": "Apache commons",
+      "description": "All apache commons grouped into one PR",
+      "matchPackageNames": [
+        "commons-io:commons-io",
+        "org.apache.commons:*"
+      ]
+    },
+    {
+      "groupName": "Java protobuf",
+      "description": "Java protobuf and common protos",
+      "matchPackageNames": [
+        "com.google.api.grpc:proto-google-common-protos",
+        "com.google.protobuf:*"
+      ]
+    },
+    {
+      "groupName": "annotations",
+      "matchPackageNames": [
+        "com.google.errorprone:*",
+        "net.jcip:jcip-annotations",
+        "org.checkerframework:checker-qual"
+      ]
+    },
+    {
+      "groupName": "GitHub Actions",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "extends": ["schedule:monthly"],
+      "automerge": true
+    },
+    {
+      "description": "Bazel Central Registry updates",
+      "matchManagers": [
+        "bazel-module"
+      ],
+      "matchDatasources": ["bazel"],
+      "extends": ["schedule:weekly"],
+      "automerge": true
+    }
   ]
 }

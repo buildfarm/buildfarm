@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,13 +14,10 @@
 
 package build.buildfarm.worker;
 
-import com.google.common.collect.Sets;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
+import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
 
 @Log
@@ -35,11 +32,17 @@ public class InputFetchStage extends SuperscalarPipelineStage {
           .help("Input fetch stall time in ms.")
           .register();
 
-  private final Set<Thread> fetchers = Sets.newHashSet();
-  private final BlockingQueue<ExecutionContext> queue = new ArrayBlockingQueue<>(1);
+  @GuardedBy("this")
+  private int slotUsage;
 
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super("InputFetchStage", workerContext, output, error, workerContext.getInputFetchStageWidth());
+    super(
+        "InputFetchStage",
+        "fetcher",
+        workerContext,
+        output,
+        error,
+        workerContext.getInputFetchStageWidth());
   }
 
   @Override
@@ -47,22 +50,9 @@ public class InputFetchStage extends SuperscalarPipelineStage {
     return log;
   }
 
-  @Override
-  public ExecutionContext take() throws InterruptedException {
-    return takeOrDrain(queue);
-  }
-
-  @Override
-  public void put(ExecutionContext executionContext) throws InterruptedException {
-    queue.put(executionContext);
-  }
-
   synchronized int removeAndRelease(String operationName) {
-    if (!fetchers.remove(Thread.currentThread())) {
-      throw new IllegalStateException("tried to remove unknown fetcher thread");
-    }
     releaseClaim(operationName, 1);
-    int slotUsage = fetchers.size();
+    slotUsage--;
     inputFetchSlotUsage.set(slotUsage);
     return slotUsage;
   }
@@ -80,18 +70,6 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   }
 
   @Override
-  public int getSlotUsage() {
-    return fetchers.size();
-  }
-
-  @Override
-  protected synchronized void interruptAll() {
-    for (Thread fetcher : fetchers) {
-      fetcher.interrupt();
-    }
-  }
-
-  @Override
   protected int claimsRequired(ExecutionContext executionContext) {
     return 1;
   }
@@ -99,16 +77,14 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   @Override
   protected void iterate() throws InterruptedException {
     ExecutionContext executionContext = take();
-    Thread fetcher =
-        new Thread(
-            new InputFetcher(workerContext, executionContext, this), "InputFetchStage.fetcher");
+    InputFetcher inputFetcher =
+        new InputFetcher(workerContext, executionContext, this, pollerExecutor);
 
     synchronized (this) {
-      fetchers.add(fetcher);
-      int slotUsage = fetchers.size();
+      slotUsage++;
       inputFetchSlotUsage.set(slotUsage);
       start(executionContext.queueEntry.getExecuteEntry().getOperationName(), getUsage(slotUsage));
-      fetcher.start();
+      executor.execute(inputFetcher);
     }
   }
 }

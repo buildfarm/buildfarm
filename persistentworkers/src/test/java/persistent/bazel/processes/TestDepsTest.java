@@ -1,19 +1,16 @@
 package persistent.bazel.processes;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
-
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
 import persistent.testutil.ProcessUtils;
-
-import static com.google.common.truth.Truth.assertThat;
 
 @RunWith(JUnit4.class)
 public class TestDepsTest {
-
   @SuppressWarnings("CheckReturnValue")
   @Test
   public void canRetrieveAdderBinDeployJar() throws Exception {
@@ -21,11 +18,9 @@ public class TestDepsTest {
 
     String filename = "adder-bin_deploy.jar";
 
-    Path jarPath = ProcessUtils.retrieveFileResource(
-        getClass().getClassLoader(),
-        filename,
-        workDir.resolve(filename)
-    );
+    Path jarPath =
+        ProcessUtils.retrieveFileResource(
+            getClass().getClassLoader(), filename, workDir.resolve(filename));
 
     assertThat(Files.exists(jarPath)).isTrue();
 

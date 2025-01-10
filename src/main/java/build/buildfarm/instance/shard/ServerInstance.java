@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -89,6 +90,7 @@ import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.server.Filter;
 import build.buildfarm.instance.server.NodeInstance;
+import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -122,6 +124,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Parser;
+import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.PreconditionFailure;
@@ -184,9 +187,13 @@ public class ServerInstance extends NodeInstance {
 
   private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
 
+  private static final int TRANSFORM_TOKENS = 256;
+
   // Prometheus metrics
   private static final Counter executionSuccess =
       Counter.build().name("execution_success").help("Execution success.").register();
+  private static final Counter mergedExecutions =
+      Counter.build().name("merged_executions").help("Merged executions.").register();
   private static final Gauge preQueueSize =
       Gauge.build().name("pre_queue_size").help("Pre queue size.").register();
   private static final Counter casHitCounter =
@@ -246,7 +253,7 @@ public class ServerInstance extends NodeInstance {
   private final Backplane backplane;
   private final ActionCache actionCache;
   private final RemoteInputStreamFactory remoteInputStreamFactory;
-  private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
+  private final com.google.common.cache.LoadingCache<String, StubInstance> workerStubs;
   private final Thread dispatchedMonitor;
   private final Duration maxActionTimeout;
   private AsyncCache<build.buildfarm.v1test.Digest, Directory> directoryCache;
@@ -265,8 +272,11 @@ public class ServerInstance extends NodeInstance {
   private final ScheduledExecutorService contextDeadlineScheduler =
       newSingleThreadScheduledExecutor();
   private final ExecutorService operationDeletionService = newSingleThreadExecutor();
-  private final BlockingQueue<Object> transformTokensQueue = new LinkedBlockingQueue<>(256);
+  private final BlockingQueue<Object> transformTokensQueue =
+      new LinkedBlockingQueue<>(TRANSFORM_TOKENS);
+  private final ExecutorService transformPollerExecutor;
   private final boolean useDenyList;
+  private final boolean mergeExecutions;
   private final Scannable<Operation> indexKeys;
   private final Scannable<Operation> operations;
   private final Scannable<DispatchedOperation> dispatchedOperations;
@@ -322,6 +332,7 @@ public class ServerInstance extends NodeInstance {
         configs.getServer().getMaxRequeueAttempts(),
         Duration.newBuilder().setSeconds(configs.getMaximumActionTimeout()).build(),
         configs.getServer().isUseDenyList(),
+        configs.getServer().isMergeExecutions(),
         onStop,
         WorkerStubs.create(
             Duration.newBuilder().setSeconds(configs.getServer().getGrpcTimeout()).build()),
@@ -360,8 +371,9 @@ public class ServerInstance extends NodeInstance {
       int maxRequeueAttempts,
       Duration maxActionTimeout,
       boolean useDenyList,
+      boolean mergeExecutions,
       Runnable onStop,
-      LoadingCache<String, Instance> workerStubs,
+      LoadingCache<String, StubInstance> workerStubs,
       ListeningExecutorService actionCacheFetchService,
       boolean ensureOutputsPresent) {
     super(
@@ -381,6 +393,7 @@ public class ServerInstance extends NodeInstance {
     this.maxRequeueAttempts = maxRequeueAttempts;
     this.maxActionTimeout = maxActionTimeout;
     this.useDenyList = useDenyList;
+    this.mergeExecutions = mergeExecutions;
     this.correlatedInvocations =
         new Scannable<>() {
           @Override
@@ -484,6 +497,8 @@ public class ServerInstance extends NodeInstance {
     }
 
     if (runOperationQueuer) {
+      transformPollerExecutor = newFixedThreadPool(TRANSFORM_TOKENS);
+
       operationQueuer =
           new Thread(
               new Runnable() {
@@ -518,7 +533,8 @@ public class ServerInstance extends NodeInstance {
                         return !stopping && !stopped;
                       },
                       () -> {},
-                      Deadline.after(5, MINUTES));
+                      Deadline.after(5, MINUTES),
+                      transformPollerExecutor);
                   try {
                     log.log(Level.FINER, "queueing " + operationName);
                     ListenableFuture<Void> queueFuture = queue(executeEntry, poller, queueTimeout);
@@ -602,6 +618,7 @@ public class ServerInstance extends NodeInstance {
               });
     } else {
       operationQueuer = null;
+      transformPollerExecutor = null;
     }
 
     prometheusMetricsThread =
@@ -681,6 +698,7 @@ public class ServerInstance extends NodeInstance {
     if (operationQueuer != null) {
       operationQueuer.interrupt();
       operationQueuer.join();
+      transformPollerExecutor.shutdown();
     }
     if (dispatchedMonitor != null) {
       dispatchedMonitor.interrupt();
@@ -710,6 +728,12 @@ public class ServerInstance extends NodeInstance {
     operationTransformService.shutdownNow();
     if (!actionCacheFetchService.awaitTermination(10, SECONDS)) {
       log.log(Level.SEVERE, "Could not shut down action cache fetch service");
+    }
+    if (transformPollerExecutor != null) {
+      transformPollerExecutor.shutdownNow();
+      if (!transformPollerExecutor.awaitTermination(10, SECONDS)) {
+        log.log(Level.SEVERE, "Could not shut down transform poller service");
+      }
     }
     actionCacheFetchService.shutdownNow();
     workerStubs.invalidateAll();
@@ -1391,7 +1415,9 @@ public class ServerInstance extends NodeInstance {
 
   private Instance workerStub(String worker) {
     try {
-      return workerStubs.get(worker);
+      StubInstance stubInstance = workerStubs.get(worker);
+      stubInstance.setOnStopped(() -> workerStubs.invalidate(worker));
+      return stubInstance;
     } catch (ExecutionException e) {
       log.log(Level.SEVERE, "error getting worker stub for " + worker, e);
       throw new IllegalStateException("stub instance creation must not fail");
@@ -1895,7 +1921,7 @@ public class ServerInstance extends NodeInstance {
   }
 
   private boolean hasMaxActionTimeout() {
-    return maxActionTimeout.getSeconds() > 0 || maxActionTimeout.getNanos() > 0;
+    return Durations.isPositive(maxActionTimeout);
   }
 
   @Override
@@ -1908,9 +1934,8 @@ public class ServerInstance extends NodeInstance {
       PreconditionFailure.Builder preconditionFailure) {
     if (action.hasTimeout() && hasMaxActionTimeout()) {
       Duration timeout = action.getTimeout();
-      if (timeout.getSeconds() > maxActionTimeout.getSeconds()
-          || (timeout.getSeconds() == maxActionTimeout.getSeconds()
-              && timeout.getNanos() > maxActionTimeout.getNanos())) {
+
+      if (Durations.compare(timeout, maxActionTimeout) > 0) {
         preconditionFailure
             .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
@@ -1940,11 +1965,9 @@ public class ServerInstance extends NodeInstance {
         catchingAsync(
             fetchQueuedOperationFuture,
             Throwable.class,
-            (e) -> {
-              log.warning("got to buildQueuedOperation");
-              return buildQueuedOperation(
-                  operation.getName(), actionDigest, operationTransformService, requestMetadata);
-            },
+            (e) ->
+                buildQueuedOperation(
+                    operation.getName(), actionDigest, operationTransformService, requestMetadata),
             directExecutor());
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     ListenableFuture<QueuedOperation> validatedFuture =
@@ -2198,78 +2221,160 @@ public class ServerInstance extends NodeInstance {
       RequestMetadata requestMetadata,
       Watcher watcher) {
     try {
-      if (!backplane.canPrequeue()) {
-        return immediateFailedFuture(
-            Status.RESOURCE_EXHAUSTED.withDescription("Too many jobs pending").asException());
-      }
-
-      String executionName = bindExecutions(UUID.randomUUID());
-
-      executionSuccess.inc();
-      log.log(
-          Level.FINER,
-          new StringBuilder()
-              .append("ExecutionSuccess: ")
-              .append(requestMetadata.getToolInvocationId())
-              .append(" -> ")
-              .append(executionName)
-              .append(": ")
-              .append(DigestUtil.toString(actionDigest))
-              .toString());
-
-      actionCache.invalidate(DigestUtil.asActionKey(actionDigest));
-      if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
-        log.log(
-            Level.FINER,
-            format("%s will have skip_cache_lookup = true due to retry", executionName));
-        skipCacheLookup = true;
-      }
-
-      String stdoutStreamName = executionName + "/streams/stdout";
-      String stderrStreamName = executionName + "/streams/stderr";
-      ExecuteEntry executeEntry =
-          ExecuteEntry.newBuilder()
-              .setOperationName(executionName)
-              .setActionDigest(actionDigest)
-              .setExecutionPolicy(executionPolicy)
-              .setResultsCachePolicy(resultsCachePolicy)
-              .setSkipCacheLookup(skipCacheLookup)
-              .setRequestMetadata(requestMetadata)
-              .setStdoutStreamName(stdoutStreamName)
-              .setStderrStreamName(stderrStreamName)
-              .setQueuedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()))
-              .build();
-      ExecuteOperationMetadata metadata =
-          ExecuteOperationMetadata.newBuilder()
-              .setActionDigest(DigestUtil.toDigest(actionDigest))
-              .setStdoutStreamName(stdoutStreamName)
-              .setStderrStreamName(stderrStreamName)
-              .setDigestFunction(actionDigest.getDigestFunction())
-              .build();
-      Operation operation =
-          Operation.newBuilder().setName(executionName).setMetadata(Any.pack(metadata)).build();
-      try {
-        watcher.observe(operation);
-      } catch (Exception e) {
-        return immediateFailedFuture(e);
-      }
-
-      if (inDenyList(requestMetadata)) {
-        watcher.observe(
-            operation.toBuilder()
-                .setDone(true)
-                .setResponse(Any.pack(denyActionResponse(actionDigest, BLOCK_LIST_ERROR)))
-                .build());
-        return immediateFuture(null);
-      }
-      backplane.prequeue(executeEntry, operation);
-      return watchOperation(
-          operation,
-          newActionResultWatcher(DigestUtil.asActionKey(actionDigest), watcher),
-          /* initial= */ false);
+      return mergeOrSchedule(
+          actionDigest,
+          skipCacheLookup,
+          executionPolicy,
+          resultsCachePolicy,
+          requestMetadata,
+          watcher,
+          !shouldMergeExecutions(mergeExecutions, requestMetadata));
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }
+  }
+
+  private Operation validateMergedExecution(Operation execution, ActionKey actionKey)
+      throws IOException {
+    if (execution == null) {
+      return null;
+    }
+
+    if (!execution.getDone()) {
+      return execution;
+    } else if (execution.getResponse().is(ExecuteResponse.class)) {
+      // if operation is done, it must have succeeded within the last 60s
+      ExecuteResponse executeResponse = execution.getResponse().unpack(ExecuteResponse.class);
+      Timestamp workerCompleted =
+          executeResponse.getResult().getExecutionMetadata().getWorkerCompletedTimestamp();
+      Timestamp deadline = Timestamps.add(workerCompleted, Durations.fromMinutes(1));
+      if (executeResponse.getStatus().getCode() == Code.OK.value()
+          && Timestamps.compare(deadline, Timestamps.now()) > 0) {
+        return execution;
+      }
+    }
+    // the merge must not qualify, clean up after it
+    backplane.unmergeExecution(actionKey);
+    return null;
+  }
+
+  private ListenableFuture<Void> mergeOrSchedule(
+      build.buildfarm.v1test.Digest actionDigest,
+      boolean skipCacheLookup,
+      ExecutionPolicy executionPolicy,
+      ResultsCachePolicy resultsCachePolicy,
+      RequestMetadata requestMetadata,
+      Watcher watcher,
+      boolean ignoreMerge)
+      throws IOException {
+    int lookupAttempts = 5;
+    Operation execution = null;
+    ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
+
+    /**
+     * we must avoid a merge if we recently served this invocation a cache result this will not
+     * affect the merging invocations, as they will come in with different requestMetadata from the
+     * invocation which received the update and was assigned to it
+     */
+    if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
+      ignoreMerge = true;
+    }
+
+    while (execution == null && lookupAttempts-- != 0) {
+      if (!ignoreMerge) {
+        execution = validateMergedExecution(backplane.mergeExecution(actionKey), actionKey);
+        if (execution != null) {
+          mergedExecutions.inc();
+        }
+      }
+      if (execution == null) {
+        if (!backplane.canPrequeue()) {
+          return immediateFailedFuture(
+              Status.RESOURCE_EXHAUSTED.withDescription("Too many jobs pending").asException());
+        }
+        ignoreMerge = ignoreMerge || lookupAttempts != 0;
+        execution =
+            schedule(
+                actionDigest,
+                skipCacheLookup,
+                executionPolicy,
+                resultsCachePolicy,
+                requestMetadata,
+                ignoreMerge);
+      }
+    }
+    if (execution == null) {
+      return immediateFailedFuture(
+          Status.RESOURCE_EXHAUSTED
+              .withDescription("Could not merge or schedule execution")
+              .asException());
+    }
+    return watchOperation(
+        execution, newActionResultWatcher(DigestUtil.asActionKey(actionDigest), watcher));
+  }
+
+  private Operation schedule(
+      build.buildfarm.v1test.Digest actionDigest,
+      boolean skipCacheLookup,
+      ExecutionPolicy executionPolicy,
+      ResultsCachePolicy resultsCachePolicy,
+      RequestMetadata requestMetadata,
+      boolean ignoreMerge)
+      throws IOException {
+    executionSuccess.inc();
+    String executionName = bindExecutions(UUID.randomUUID());
+    log.log(
+        Level.FINER,
+        new StringBuilder()
+            .append("ExecutionSuccess: ")
+            .append(requestMetadata.getToolInvocationId())
+            .append(" -> ")
+            .append(executionName)
+            .append(": ")
+            .append(DigestUtil.toString(actionDigest))
+            .toString());
+
+    actionCache.invalidate(DigestUtil.asActionKey(actionDigest));
+    if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
+      log.log(
+          Level.FINER, format("%s will have skip_cache_lookup = true due to retry", executionName));
+      skipCacheLookup = true;
+    }
+
+    String stdoutStreamName = executionName + "/streams/stdout";
+    String stderrStreamName = executionName + "/streams/stderr";
+    ExecuteEntry executeEntry =
+        ExecuteEntry.newBuilder()
+            .setOperationName(executionName)
+            .setActionDigest(actionDigest)
+            .setExecutionPolicy(executionPolicy)
+            .setResultsCachePolicy(resultsCachePolicy)
+            .setSkipCacheLookup(skipCacheLookup)
+            .setRequestMetadata(requestMetadata)
+            .setStdoutStreamName(stdoutStreamName)
+            .setStderrStreamName(stderrStreamName)
+            .setQueuedTimestamp(Timestamps.now())
+            .build();
+    ExecuteOperationMetadata metadata =
+        ExecuteOperationMetadata.newBuilder()
+            .setActionDigest(DigestUtil.toDigest(actionDigest))
+            .setStdoutStreamName(stdoutStreamName)
+            .setStderrStreamName(stderrStreamName)
+            .setDigestFunction(actionDigest.getDigestFunction())
+            .build();
+    Operation operation =
+        Operation.newBuilder().setName(executionName).setMetadata(Any.pack(metadata)).build();
+    if (inDenyList(requestMetadata)) {
+      operation =
+          operation.toBuilder()
+              .setDone(true)
+              .setResponse(Any.pack(denyActionResponse(actionDigest, BLOCK_LIST_ERROR)))
+              .build();
+    }
+    if (!operation.getDone() && !backplane.prequeue(executeEntry, operation, ignoreMerge)) {
+      return null;
+    }
+    return operation;
   }
 
   private static ExecuteResponse denyActionResponse(
@@ -2715,15 +2820,13 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
-  ListenableFuture<Void> watchOperation(Operation operation, Watcher watcher, boolean initial) {
-    if (initial) {
-      try {
-        watcher.observe(stripOperation(operation));
-      } catch (Exception e) {
-        return immediateFailedFuture(e);
-      }
+  ListenableFuture<Void> watchOperation(Operation operation, Watcher watcher) {
+    try {
+      watcher.observe(stripOperation(operation));
+    } catch (Exception e) {
+      return immediateFailedFuture(e);
     }
-    if (operation == null || operation.getDone()) {
+    if (operation.getDone()) {
       return immediateFuture(null);
     }
 
@@ -2740,7 +2843,7 @@ public class ServerInstance extends NodeInstance {
               .withDescription(String.format("Execution not found: %s", operationName))
               .asException());
     }
-    return watchOperation(operation, watcher, /* initial= */ true);
+    return watchOperation(operation, watcher);
   }
 
   private static Operation stripOperation(Operation operation) {
@@ -3063,7 +3166,7 @@ public class ServerInstance extends NodeInstance {
     if (Strings.isNullOrEmpty(id)) {
       // If the query contains a single 'id' parameter it is used
       List<String> ids = parameters.get("id");
-      if (ids.size() == 1) {
+      if (ids != null && ids.size() == 1) {
         id = ids.getFirst();
       }
     }
@@ -3078,7 +3181,7 @@ public class ServerInstance extends NodeInstance {
 
     // no unique distinction for this url exists, just use the original uri
     if (Strings.isNullOrEmpty(id)) {
-      id = decoder.uri();
+      id = uri.toString();
     }
 
     // TODO stream() to select sub-map?
@@ -3089,9 +3192,12 @@ public class ServerInstance extends NodeInstance {
 
     // associate uri components and query with this correlated id
     if (indexScopes.contains("username")) {
-      String username = uri.getUserInfo().split(":")[0];
-      if (!username.isEmpty()) {
-        indexScopeValues.put("username", ImmutableList.of(username));
+      String userInfo = uri.getUserInfo();
+      if (!Strings.isNullOrEmpty(userInfo)) {
+        String username = uri.getUserInfo().split(":")[0];
+        if (!username.isEmpty()) {
+          indexScopeValues.put("username", ImmutableList.of(username));
+        }
       }
     }
     if (indexScopes.contains("host")) {

@@ -1,4 +1,4 @@
-// Copyright 2023 The Bazel Authors. All rights reserved.
+// Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Command;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -39,11 +38,11 @@ public class CommandUtilsTest {
     Command command = Command.newBuilder().addOutputPaths("foo0").addOutputPaths("foo1").build();
 
     // ACT
-    List<Path> paths = CommandUtils.getResolvedOutputPaths(command, Paths.get("root"));
+    List<Path> paths = CommandUtils.getResolvedOutputPaths(command, Path.of("root"));
 
     // ASSERT
-    assertThat(paths.get(0).toString()).isEqualTo(Paths.get("root/foo0").toString());
-    assertThat(paths.get(1).toString()).isEqualTo(Paths.get("root/foo1").toString());
+    assertThat(paths.get(0).toString()).isEqualTo(Path.of("root/foo0").toString());
+    assertThat(paths.get(1).toString()).isEqualTo(Path.of("root/foo1").toString());
   }
 
   // Function under test: getResolvedOutputPaths
@@ -55,10 +54,10 @@ public class CommandUtilsTest {
     Command command = Command.newBuilder().addOutputFiles("foo0").addOutputFiles("foo1").build();
 
     // ACT
-    List<Path> paths = CommandUtils.getResolvedOutputPaths(command, Paths.get("root"));
+    List<Path> paths = CommandUtils.getResolvedOutputPaths(command, Path.of("root"));
 
     // ASSERT
-    assertThat(paths.get(0).toString()).isEqualTo(Paths.get("root/foo0").toString());
-    assertThat(paths.get(1).toString()).isEqualTo(Paths.get("root/foo1").toString());
+    assertThat(paths.get(0).toString()).isEqualTo(Path.of("root/foo0").toString());
+    assertThat(paths.get(1).toString()).isEqualTo(Path.of("root/foo1").toString());
   }
 }

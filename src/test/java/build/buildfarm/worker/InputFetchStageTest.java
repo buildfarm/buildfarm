@@ -1,4 +1,4 @@
-// Copyright 2018 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import com.google.common.collect.Lists;
 import com.google.longrunning.Operation;
 import io.grpc.Deadline;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import lombok.Getter;
@@ -120,7 +121,8 @@ public class InputFetchStageTest {
             eq(badEntry),
             eq(QUEUED),
             any(Runnable.class),
-            any(Deadline.class));
+            any(Deadline.class),
+            any(Executor.class));
     verifyNoMoreInteractions(workerContext);
     ExecutionContext executionContext = error.getExecutionContexts().getFirst();
     assertThat(executionContext).isEqualTo(badContext);

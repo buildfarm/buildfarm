@@ -9,7 +9,7 @@ server:
   name: shard
   actionCacheReadOnly: false
   port: 8980
-  bindAddress: ""
+  bindAddress: ''
   grpcMetrics:
     enabled: true
     provideLatencyHistograms: true
@@ -25,6 +25,7 @@ server:
   dispatchedMonitorIntervalSeconds: 1
   runOperationQueuer: true
   ensureOutputsPresent: true
+  mergeExecutions: true
   runFailsafeOperation: true
   maxCpu: 0
   maxRequeueAttempts: 5
@@ -42,7 +43,7 @@ server:
     recentServedExecutionsCacheMaxEntries: 10000
   admin:
     deploymentEnvironment: AWS
-    clusterEndpoint: "grpc://localhost"
+    clusterEndpoint: grpc://localhost
   metrics:
     publisher: LOG
     logLevel: FINEST
@@ -54,30 +55,30 @@ server:
     ? username
 backplane:
   type: SHARD
-  redisUri: "redis://localhost:6379"
+  redisUri: redis://localhost:6379
   redisUsername:
   redisPassword:
   redisNodes:
   jedisPoolMaxTotal: 4000
-  workersHashName: "Workers"
-  workerChannel: "WorkerChannel"
-  actionCachePrefix: "ActionCache"
+  workersHashName: Workers
+  workerChannel: WorkerChannel
+  actionCachePrefix: ActionCache
   actionCacheExpire: 2419200 # 4 weeks
-  actionBlacklistPrefix: "ActionBlacklist"
+  actionBlacklistPrefix: ActionBlacklist
   actionBlacklistExpire: 3600 # 1 hour
-  invocationBlacklistPrefix: "InvocationBlacklist"
-  operationPrefix: "Operation"
+  invocationBlacklistPrefix: InvocationBlacklist
+  operationPrefix: Operation
   operationExpire: 604800 # 1 week
-  preQueuedOperationsListName: "{Arrival}:PreQueuedOperations"
-  processingListName: "{Arrival}:ProcessingOperations"
-  processingPrefix: "Processing"
+  preQueuedOperationsListName: '{Arrival}:PreQueuedOperations'
+  processingListName: '{Arrival}:ProcessingOperations'
+  processingPrefix: Processing
   processingTimeoutMillis: 20000
-  queuedOperationsListName: "{Execution}:QueuedOperations"
-  dispatchingPrefix: "Dispatching"
+  queuedOperationsListName: '{Execution}:QueuedOperations'
+  dispatchingPrefix: Dispatching
   dispatchingTimeoutMillis: 10000
-  dispatchedOperationsHashName: "DispatchedOperations"
-  operationChannelPrefix: "OperationChannel"
-  casPrefix: "ContentAddressableStorage"
+  dispatchedOperationsHashName: DispatchedOperations
+  operationChannelPrefix: OperationChannel
+  casPrefix: ContentAddressableStorage
   casExpire: 604800 # 1 week
   maxQueueDepth: 100000
   maxPreQueueDepth: 1000000
@@ -90,18 +91,17 @@ backplane:
   maxCorrelatedInvocationsTimeout: 604800
   maxToolInvocationTimeout: 604800
   maxAttempts: 20
-  cacheCas: false
   queues:
-    - name: "cpu"
-      allowUnmatched: true
-      properties:
-        - name: "min-cores"
-          value: "*"
-        - name: "max-cores"
-          value: "*"
+  - name: cpu
+    allowUnmatched: true
+    properties:
+    - name: min-cores
+      value: '*'
+    - name: max-cores
+      value: '*'
 worker:
   port: 8981
-  publicName: "localhost:8981"
+  publicName: localhost:8981
   grpcMetrics:
     enabled: false
     provideLatencyHistograms: false
@@ -109,28 +109,29 @@ worker:
   capabilities:
     cas: true
     execution: true
-  root: "/tmp/worker"
+  root: /tmp/worker
   inlineContentLimit: 1048567 # 1024 * 1024
   operationPollPeriod: 1
   dequeueMatchSettings:
     allowUnmatched: false
   storages:
-    - type: FILESYSTEM
-      path: "cache"
-      maxSizeBytes: 2147483648 # 2 * 1024 * 1024 * 1024
-      fileDirectoriesIndexInMemory: false
-      skipLoad: false
-      hexBucketLevels: 0
-      execRootCopyFallback: false
+  - type: FILESYSTEM
+    path: cache
+    maxSizeBytes: 2147483648   # 2 * 1024 * 1024 * 1024
+    fileDirectoriesIndexInMemory: false
+    skipLoad: false
+    hexBucketLevels: 0
+    execRootCopyFallback: false
     #- type: GRPC
     #  target: "grpc://host:port"
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
+  reportResultStageWidth: 1
   linkExecFileSystem: true
   linkInputDirectories: true
   linkedInputDirectories:
-    - "(?!external)[^/]+"
+  - (?!external/)[^/]+
   execOwner:
   defaultMaxCores: 0
   limitGlobalExecution: false
@@ -148,16 +149,18 @@ worker:
   createSymlinkOutputs: false
   zstdBufferPoolSize: 2048
   executionPolicies:
-    - name: test
-      executionWrapper:
-        path: "/"
-        arguments:
+  - name: test
+    executionWrapper:
+      path: /
+      arguments:
   resources:
-    - name: sockets
-      amount: 4096
-    - name: gpu
-      type: POOL
-      amount: 4 # for an A30 MiG in full splay
+  - name: sockets
+    amount: 4096
+  - name: gpu
+    type: POOL
+    amount: 4 # for an A30 MiG in full splay
+  persistentWorkerActionMnemonicAllowlist:
+  - '*'
 executionWrappers:
   cgroups: /usr/bin/cgexec
   unshare: /usr/bin/unshare

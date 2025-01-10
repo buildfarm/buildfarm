@@ -1,29 +1,21 @@
 package adder;
 
-import java.io.IOException;
+import static com.google.common.truth.Truth.assertThat;
+import static persistent.testutil.ProcessUtils.spawnPersistentWorkerProcess;
 
 import com.google.devtools.build.lib.worker.WorkerProtocol;
-
+import java.io.IOException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
+import persistent.bazel.processes.ProtoWorkerRW;
 import persistent.common.processes.JavaProcessWrapper;
 import persistent.common.processes.ProcessWrapper;
-import persistent.bazel.processes.ProtoWorkerRW;
-
-import static com.google.common.truth.Truth.assertThat;
-
-import static persistent.testutil.ProcessUtils.spawnPersistentWorkerProcess;
 
 @RunWith(JUnit4.class)
 public class AdderTest {
-
   private JavaProcessWrapper spawnAdderProcess() throws IOException {
-    return spawnPersistentWorkerProcess(
-        System.getProperty("java.class.path"),
-        Adder.class
-    );
+    return spawnPersistentWorkerProcess(System.getProperty("java.class.path"), Adder.class);
   }
 
   @SuppressWarnings("CheckReturnValue")

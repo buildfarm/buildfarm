@@ -1,4 +1,4 @@
-// Copyright 2023 The Bazel Authors. All rights reserved.
+// Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,11 +34,37 @@ public class BackplaneTest {
   }
 
   @Test
+  public void testRedisUsernameFromUri() {
+    Backplane b = new Backplane();
+    b.setRedisUri("redis://user1:pass1@redisHost.redisDomain");
+    assertThat(b.getRedisUsername()).isEqualTo("user1");
+  }
+
+  @Test
+  public void testRedisUsernamePriorities() {
+    Backplane b = new Backplane();
+    b.setRedisUri("redis://user1:pass1@redisHost.redisDomain");
+    b.setRedisUsername("user2");
+    assertThat(b.getRedisUsername()).isEqualTo("user1");
+
+    b.setRedisUri("redis://redisHost.redisDomain");
+    b.setRedisUsername("user2");
+    assertThat(b.getRedisUsername()).isEqualTo("user2");
+
+    b.setRedisUri("redis://:pass1@redisHost.redisDomain");
+    b.setRedisUsername("user2");
+    assertThat(b.getRedisUsername()).isEqualTo("user2");
+  }
+
+  @Test
   public void testRedisPasswordFromUri() {
     Backplane b = new Backplane();
     String testRedisUri = "redis://user:pass1@redisHost.redisDomain";
     b.setRedisUri(testRedisUri);
     assertThat(b.getRedisPassword()).isEqualTo("pass1");
+
+    b.setRedisUri("redis://user@redisHost.redisDomain");
+    assertThat(b.getRedisPassword()).isEqualTo(null);
   }
 
   /**
@@ -50,5 +76,22 @@ public class BackplaneTest {
     b.setRedisUri("redis://user:pass1@redisHost.redisDomain");
     b.setRedisPassword("pass2");
     assertThat(b.getRedisPassword()).isEqualTo("pass1");
+  }
+
+  /** Test that the `getRedisUriMasked` function returns the URI with the password hidden */
+  @Test
+  public void testGetRedisUriMasked() {
+    Backplane b = new Backplane();
+    b.setRedisUri("redis://user:pass1@redisHost.redisDomain");
+    assertThat(b.getRedisUriMasked()).isEqualTo("redis://user:<HIDDEN>@redisHost.redisDomain");
+
+    b.setRedisUri("redis://:pass1@redisHost.redisDomain");
+    assertThat(b.getRedisUriMasked()).isEqualTo("redis://:<HIDDEN>@redisHost.redisDomain");
+
+    b.setRedisUri("redis://user@redisHost.redisDomain");
+    assertThat(b.getRedisUriMasked()).isEqualTo("redis://user@redisHost.redisDomain");
+
+    b.setRedisUri("redis://redisHost.redisDomain");
+    assertThat(b.getRedisUriMasked()).isEqualTo("redis://redisHost.redisDomain");
   }
 }

@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,8 +35,11 @@ import io.grpc.Deadline;
 import io.grpc.StatusException;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 
 public interface WorkerContext {
   interface IOResource extends AutoCloseable {
@@ -50,7 +53,8 @@ public interface WorkerContext {
 
   boolean shouldErrorOperationOnRemainingResources();
 
-  Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage);
+  Poller createPoller(
+      String name, QueueEntry queueEntry, ExecutionStage.Value stage, Executor executor);
 
   void resumePoller(
       Poller poller,
@@ -58,7 +62,8 @@ public interface WorkerContext {
       QueueEntry queueEntry,
       ExecutionStage.Value stage,
       Runnable onFailure,
-      Deadline deadline);
+      Deadline deadline,
+      Executor executor);
 
   void match(MatchListener listener) throws InterruptedException;
 
@@ -69,6 +74,8 @@ public interface WorkerContext {
   int getInputFetchStageWidth();
 
   int getInputFetchDeadline();
+
+  int getReportResultStageWidth();
 
   boolean hasDefaultActionTimeout();
 
@@ -90,7 +97,8 @@ public interface WorkerContext {
       Map<Digest, Directory> directoriesIndex,
       DigestFunction.Value digestFunction,
       Action action,
-      Command command)
+      Command command,
+      @Nullable UserPrincipal owner)
       throws IOException, InterruptedException;
 
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;
@@ -101,6 +109,8 @@ public interface WorkerContext {
       Path actionRoot,
       Command command)
       throws IOException, InterruptedException, StatusException;
+
+  void unmergeExecution(ActionKey actionKey) throws IOException, InterruptedException;
 
   boolean putOperation(Operation operation) throws IOException, InterruptedException;
 
@@ -121,6 +131,7 @@ public interface WorkerContext {
 
   IOResource limitExecution(
       String operationName,
+      @Nullable UserPrincipal owner,
       ImmutableList.Builder<String> arguments,
       Command command,
       Path workingDirectory);

@@ -1,4 +1,4 @@
-// Copyright 2018 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,15 +43,21 @@ public class PutOperationStage extends PipelineStage.NullStage {
   @Override
   public void put(ExecutionContext executionContext) throws InterruptedException {
     onPut.acceptInterruptibly(executionContext.operation);
-    synchronized (this) {
-      if (executionContext.operation.getDone()) {
+    if (executionContext.operation.getDone()) {
+      synchronized (this) {
         for (AverageTimeCostOfLastPeriod average : averagesWithinDifferentPeriods) {
-          average.addOperation(
-              executionContext
-                  .metadata
-                  .build()
-                  .getExecuteOperationMetadata()
-                  .getPartialExecutionMetadata());
+          ExecutedActionMetadata metadata;
+          if (executionContext.executeResponse.hasResult()) {
+            metadata = executionContext.executeResponse.getResult().getExecutionMetadata();
+          } else {
+            metadata =
+                executionContext
+                    .metadata
+                    .build()
+                    .getExecuteOperationMetadata()
+                    .getPartialExecutionMetadata();
+          }
+          average.addOperation(metadata);
         }
       }
     }
@@ -68,7 +74,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
     private final OperationStageDurations[] buckets;
     private int lastUsedSlot = -1;
     private final Duration period;
-    private final OperationStageDurations nextOperation;
     private OperationStageDurations averageTimeCosts;
     private Timestamp lastOperationCompleteTime;
 
@@ -78,7 +83,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
       for (int i = 0; i < buckets.length; i++) {
         buckets[i] = new OperationStageDurations();
       }
-      nextOperation = new OperationStageDurations();
       averageTimeCosts = new OperationStageDurations();
     }
 
@@ -135,6 +139,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
       // add new ExecutedOperation metadata
       int currentSlot = getCurrentSlot(completeTime);
+      OperationStageDurations nextOperation = new OperationStageDurations();
       nextOperation.set(metadata);
       buckets[currentSlot].addOperations(nextOperation);
 
@@ -144,7 +149,8 @@ public class PutOperationStage extends PipelineStage.NullStage {
   }
 
   private static Duration betweenIfAfter(Timestamp a, Timestamp b) {
-    if (Timestamps.compare(a, b) > 0) {
+    // ensure a < b
+    if (Timestamps.compare(a, b) < 0) {
       return Timestamps.between(a, b);
     }
     return Duration.getDefaultInstance();

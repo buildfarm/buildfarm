@@ -1,4 +1,4 @@
-// Copyright 2019 The Bazel Authors. All rights reserved.
+// Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -340,6 +340,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
     try {
       if (offset == 0) {
         write.reset();
+        out = null;
       }
       committedSize = getCommittedSizeForWrite(offset);
     } catch (IOException e) {
@@ -384,8 +385,12 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
         if (bytesToWrite == 0 || committedSize - offset >= bytesToWrite) {
           requestNextIfReady();
         } else {
-          // constrained to be within bytesToWrite
-          bytesToWrite -= (int) (committedSize - offset);
+          // committed size is nonsense for compressed streams. Uncompressed + Compressed in
+          // sequence
+          if (compressor == Compressor.Value.IDENTITY) {
+            // constrained to be within bytesToWrite
+            bytesToWrite -= (int) (committedSize - offset);
+          }
           int skipBytes = data.size() - bytesToWrite;
           if (skipBytes != 0) {
             data = data.substring(skipBytes);

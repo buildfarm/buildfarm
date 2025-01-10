@@ -1,4 +1,4 @@
-// Copyright 2016 The Bazel Authors. All rights reserved.
+// Copyright 2016 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,27 +14,25 @@
 
 package persistent.bazel.client;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.util.Map;
-import java.util.SortedMap;
-
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.SortedMap;
 
 /**
  * Calculates the hash based on the files, which should be unchanged on disk for a worker to get
  * reused.
  */
 public final class WorkerFilesHash {
-
   public static HashCode getCombinedHash(Path toolsRoot, SortedMap<Path, HashCode> hashedTools) {
     Hasher hasher = Hashing.sha256().newHasher();
-    hashedTools.forEach((relPath, toolHash) -> {
-      hasher.putString(toolsRoot.resolve(relPath).toString(), StandardCharsets.UTF_8);
-      hasher.putBytes(toolHash.asBytes());
-    });
+    hashedTools.forEach(
+        (relPath, toolHash) -> {
+          hasher.putString(toolsRoot.resolve(relPath).toString(), StandardCharsets.UTF_8);
+          hasher.putBytes(toolHash.asBytes());
+        });
     return hasher.hash();
   }
 }

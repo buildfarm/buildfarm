@@ -1,10 +1,9 @@
----
 name: Lint Helm Chart
 
 on:
   push:
     paths:
-      - kubernetes/helm-charts/buildfarm/**
+    - kubernetes/helm-charts/buildfarm/**
 
 env:
   CHART_ROOT: kubernetes/helm-charts/buildfarm
@@ -17,11 +16,11 @@ jobs:
     name: Lint Helm Chart
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - id: helm-lint
-        name: Lint Helm Chart
-        run: |-
-          set -ex
-          helm dep up "${CHART_ROOT}"
-          helm lint "${CHART_ROOT}"
+    - name: Checkout
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4
+    - id: helm-lint
+      name: Lint Helm Chart
+      run: |-
+        set -ex
+        helm dep up "${CHART_ROOT}"
+        helm lint "${CHART_ROOT}"

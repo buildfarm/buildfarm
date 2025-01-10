@@ -1,4 +1,4 @@
-// Copyright 2021 The Bazel Authors. All rights reserved.
+// Copyright 2021 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,13 +14,14 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.common.Claim;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.worker.resources.Claim;
 import javax.annotation.Nullable;
 
 public interface MatchListener {
   // start/end pair called for each wait period
-  void onWaitStart();
+  // if this returns false, the wait does not begin, and onEntry will be called with 'null'
+  boolean onWaitStart();
 
   void onWaitEnd();
 

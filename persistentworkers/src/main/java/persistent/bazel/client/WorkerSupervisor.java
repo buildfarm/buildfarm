@@ -1,21 +1,16 @@
 package persistent.bazel.client;
 
-
+import com.google.common.hash.HashCode;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import com.google.common.hash.HashCode;
-
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
-
 import persistent.common.CommonsSupervisor;
 
 public abstract class WorkerSupervisor extends CommonsSupervisor<WorkerKey, PersistentWorker> {
-
   public static WorkerSupervisor simple() {
     return new WorkerSupervisor() {
       @Override
@@ -46,12 +41,10 @@ public abstract class WorkerSupervisor extends CommonsSupervisor<WorkerKey, Pers
       } catch (Exception e) {
         errorStr = "Couldn't read Stderr: " + e;
       }
-      String msg = String.format(
-          "Worker unexpectedly died with exit code %d. Key:\n%s\n%s",
-          exitValue.get(),
-          key,
-          errorStr
-      );
+      String msg =
+          String.format(
+              "Worker unexpectedly died with exit code %d. Key:\n%s\n%s",
+              exitValue.get(), key, errorStr);
       logger.log(Level.SEVERE, msg);
       return false;
     }

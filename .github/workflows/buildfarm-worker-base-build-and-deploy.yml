@@ -3,10 +3,11 @@ name: Build and Push Base Buildfarm Worker Images
 on:
   push:
     branches:
-      - main
+    - main
     paths:
-      - ci/base-worker-image/jammy/Dockerfile
-      - ci/base-worker-image/lunar/Dockerfile
+    - ci/base-worker-image/jammy/Dockerfile
+    - ci/base-worker-image/lunar/Dockerfile
+    - ci/base-worker-image/noble/Dockerfile
 permissions:
   contents: read
 
@@ -16,27 +17,48 @@ jobs:
     name: Build Base Buildfarm Worker Image
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4
 
-      - name: Login to Bazelbuild Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
-          password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf   # v3
+        # QEMU needed for the ARM variant.
 
-      - name: Build Jammy Docker image
-        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
-        with:
-          context: .
-          file: ./ci/base-worker-image/jammy/Dockerfile
-          push: true
-          tags: bazelbuild/buildfarm-worker-base:jammy
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349   # v3
+        # Docker Buildx needed for the ARM variant.
 
-      - name: Build Mantic Docker image
-        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
-        with:
-          context: .
-          file: ./ci/base-worker-image/lunar/Dockerfile
-          push: true
-          tags: bazelbuild/buildfarm-worker-base:lunar
+    - name: Login to Bazelbuild Docker Hub
+      uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567   # v3
+      with:
+        username: ${{ secrets.BAZELBUILD_DOCKERHUB_USERNAME }}
+        password: ${{ secrets.BAZELBUILD_DOCKERHUB_TOKEN }}
+
+
+    - name: Build Jammy Docker image
+        # AKA Ubuntu 22
+      uses: docker/build-push-action@11be14d908760a0756f045980728ec5fb7880f74
+      with:
+        context: .
+        file: ./ci/base-worker-image/jammy/Dockerfile
+        push: true
+        tags: bazelbuild/buildfarm-worker-base:jammy
+
+    - name: Build Lunar Docker image
+        # AKA Ubuntu 23
+      uses: docker/build-push-action@11be14d908760a0756f045980728ec5fb7880f74
+      with:
+        context: .
+        file: ./ci/base-worker-image/lunar/Dockerfile
+        push: true
+        tags: bazelbuild/buildfarm-worker-base:lunar
+
+    - name: Build Multi-arch Noble Docker image
+        # AKA Ubuntu 24
+      uses: docker/build-push-action@11be14d908760a0756f045980728ec5fb7880f74
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64/v8
+        file: ./ci/base-worker-image/noble/Dockerfile
+        push: true
+        tags: bazelbuild/buildfarm-worker-base:noble

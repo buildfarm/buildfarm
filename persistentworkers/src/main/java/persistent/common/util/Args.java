@@ -2,12 +2,11 @@ package persistent.common.util;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Args {
-
   public static final String ARGSFILE_START = "@";
 
   public static final String ARGSFILE_ESCAPE = "@@";
@@ -30,10 +29,8 @@ public class Args {
   }
 
   public static List<String> readAllLines(String fileArg) throws IOException {
-    String file = isArgsFile(fileArg)
-        ? fileArg.substring(1)
-        : fileArg;
+    String file = isArgsFile(fileArg) ? fileArg.substring(1) : fileArg;
 
-    return Files.readAllLines(Paths.get(file));
+    return Files.readAllLines(Path.of(file));
   }
 }

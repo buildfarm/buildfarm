@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,6 +41,7 @@ import build.buildfarm.v1test.Digest;
 import build.buildfarm.worker.ExecDirException.ViolationException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
@@ -67,7 +68,7 @@ import lombok.extern.java.Log;
 public class CFCExecFileSystem implements ExecFileSystem {
   private final Path root;
   protected final CASFileCache fileCache;
-  protected final @Nullable UserPrincipal owner;
+  private final ImmutableMap<String, UserPrincipal> owners;
 
   // permit symlinks to point to absolute paths in inputs
   private final boolean allowSymlinkTargetAbsolute;
@@ -80,18 +81,23 @@ public class CFCExecFileSystem implements ExecFileSystem {
   public CFCExecFileSystem(
       Path root,
       CASFileCache fileCache,
-      @Nullable UserPrincipal owner,
+      ImmutableMap<String, UserPrincipal> owners,
       boolean allowSymlinkTargetAbsolute,
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
       ExecutorService fetchService) {
     this.root = root;
     this.fileCache = fileCache;
-    this.owner = owner;
+    this.owners = owners;
     this.allowSymlinkTargetAbsolute = allowSymlinkTargetAbsolute;
     this.removeDirectoryService = removeDirectoryService;
     this.accessRecorder = accessRecorder;
     this.fetchService = fetchService;
+  }
+
+  @Override
+  public UserPrincipal getOwner(String name) {
+    return owners.get(name);
   }
 
   @SuppressWarnings("ConstantConditions")
@@ -303,7 +309,8 @@ public class CFCExecFileSystem implements ExecFileSystem {
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       DigestFunction.Value digestFunction,
       Action action,
-      Command command)
+      Command command,
+      @Nullable UserPrincipal owner)
       throws IOException, InterruptedException {
     OutputDirectory outputDirectory = createOutputDirectory(command);
 

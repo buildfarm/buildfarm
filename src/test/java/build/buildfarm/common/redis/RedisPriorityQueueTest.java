@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.Visitor;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.shard.JedisClusterFactory;
 import com.google.common.base.Stopwatch;
@@ -327,8 +327,8 @@ public class RedisPriorityQueueTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    StringVisitor visitor =
-        new StringVisitor() {
+    Visitor<String> visitor =
+        new Visitor<>() {
           public void visit(String entry) {
             visited.add(entry);
           }
@@ -360,8 +360,8 @@ public class RedisPriorityQueueTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    StringVisitor visitor =
-        new StringVisitor() {
+    Visitor<String> visitor =
+        new Visitor<>() {
           public void visit(String entry) {
             visited.add(entry);
           }

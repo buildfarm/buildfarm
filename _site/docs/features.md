@@ -17,5 +17,7 @@ Most notably, buildfarm has universal support for:
 
 Bazel Client Feature Usage:
 
-## [Fetch API](https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_remote_downloader) - [Planned](https://github.com/buildfarm/buildfarm/pull/605)
+## [Fetch API](https://docs.bazel.build/versions/master/command-line-reference.html#flag--experimental_remote_downloader)
+## [Wire Compression](https://bazel.build/reference/command-line-reference#flag--remote_cache_compression)
+## [Independent Digest Functions](https://github.com/buildfarm/buildfarm/blob/c4cd910bd4359f124695b4e4fbab5fc7cd2390da/src/main/java/build/buildfarm/common/DigestUtil.java#L73)
 ## [Builds Without The Bytes](https://github.com/bazelbuild/bazel/issues/6862) - [Read This](https://buildfarm.github.io/buildfarm/docs/execution/builds-without-the-bytes/)

@@ -1,4 +1,4 @@
-// Copyright 2023 The Bazel Authors. All rights reserved.
+// Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import com.google.protobuf.util.Durations;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -37,9 +36,13 @@ import persistent.bazel.client.WorkerKey;
 import persistent.bazel.client.WorkerSupervisor;
 
 /**
- * Responsible for: 1) Initializing a new Worker's file environment correctly 2) pre-request
- * requirements, e.g. ensuring tool input files 3) post-response requirements, i.e. putting output
- * files in the right place
+ * Responsible for:
+ *
+ * <ol>
+ *   <li>Initializing a new Worker's file environment correctly
+ *   <li>pre-request requirements, e.g. ensuring tool input files
+ *   <li>post-response requirements, i.e. putting output files in the right place
+ * </ol>
  */
 @Log
 public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, CommonsWorkerPool> {
@@ -64,7 +67,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     super(workerPool);
   }
 
-  public ProtoCoordinator(WorkerSupervisor supervisor, int maxWorkersPerKey) {
+  private ProtoCoordinator(WorkerSupervisor supervisor, int maxWorkersPerKey) {
     super(new CommonsWorkerPool(supervisor, maxWorkersPerKey));
   }
 
@@ -221,7 +224,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     Path opRoot = context.opRoot;
 
     for (String outputDir : context.outputDirectories) {
-      Path outputDirPath = Paths.get(outputDir);
+      Path outputDirPath = Path.of(outputDir);
       Files.createDirectories(outputDirPath);
     }
 

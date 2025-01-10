@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,9 +14,14 @@
 
 package build.buildfarm.instance.shard;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
+import build.buildfarm.common.config.Backplane;
 import build.buildfarm.common.config.BuildfarmConfigs;
+import build.buildfarm.common.redis.Cluster;
+import build.buildfarm.common.redis.GoogleCredentialProvider;
+import build.buildfarm.common.redis.Pooled;
 import build.buildfarm.common.redis.RedisSSL;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
@@ -28,14 +33,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import javax.annotation.Nonnull;
 import javax.naming.ConfigurationException;
+import lombok.extern.java.Log;
 import redis.clients.jedis.ConnectionPool;
 import redis.clients.jedis.ConnectionPoolConfig;
 import redis.clients.jedis.DefaultJedisClientConfig;
 import redis.clients.jedis.HostAndPort;
-import redis.clients.jedis.JedisClientConfig;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.exceptions.JedisClusterOperationException;
 import redis.clients.jedis.params.ScanParams;
@@ -47,6 +53,7 @@ import redis.clients.jedis.util.JedisURIHelper;
  * @brief Create a jedis cluster instance from proto configs.
  * @details A factory for creating a jedis cluster instance.
  */
+@Log
 public class JedisClusterFactory {
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
@@ -64,23 +71,13 @@ public class JedisClusterFactory {
     String[] redisNodes = configs.getBackplane().getRedisNodes();
     if (redisNodes != null && redisNodes.length > 0) {
       return createJedisClusterFactory(
-          identifier,
-          list2Set(redisNodes),
-          configs.getBackplane().getTimeout(),
-          configs.getBackplane().getMaxAttempts(),
-          Strings.emptyToNull(configs.getBackplane().getRedisUsername()),
-          Strings.emptyToNull(configs.getBackplane().getRedisPassword()),
-          createConnectionPoolConfig());
+          list2Set(redisNodes), createJedisConfig(identifier), createConnectionPoolConfig());
     }
 
     // support "" as redis password.
     return createJedisClusterFactory(
-        identifier,
         parseUri(configs.getBackplane().getRedisUri()),
-        configs.getBackplane().getTimeout(),
-        configs.getBackplane().getMaxAttempts(),
-        Strings.emptyToNull(configs.getBackplane().getRedisUsername()),
-        Strings.emptyToNull(configs.getBackplane().getRedisPassword()),
+        createJedisConfig(identifier),
         createConnectionPoolConfig());
   }
 
@@ -157,38 +154,14 @@ public class JedisClusterFactory {
 
   private static UnifiedJedis createJedis(
       Set<HostAndPort> hostAndPorts,
-      int connectionTimeout,
-      int soTimeout,
-      int maxAttempts,
-      String username,
-      String password,
-      String identifier,
-      ConnectionPoolConfig poolConfig,
-      boolean ssl) {
-    DefaultJedisClientConfig.Builder builder =
-        DefaultJedisClientConfig.builder()
-            .connectionTimeoutMillis(connectionTimeout)
-            .socketTimeoutMillis(soTimeout)
-            .user(username)
-            .password(password)
-            .clientName(identifier)
-            .ssl(ssl);
-    if (!Strings.isNullOrEmpty(configs.getBackplane().getRedisCertificateAuthorityFile())) {
-      checkState(
-          ssl,
-          "Can't specify a Certificate Authority file if you aren't using redis with SSL. Did you"
-              + " set 'rediss://' scheme on your Redis URI?");
-      builder.sslSocketFactory(
-          RedisSSL.createSslSocketFactory(
-              new File(configs.getBackplane().getRedisCertificateAuthorityFile())));
-    }
-    JedisClientConfig jedisClientConfig = builder.build();
-
+      DefaultJedisClientConfig jedisClientConfig,
+      ConnectionPoolConfig poolConfig) {
+    int maxAttempts = Integer.max(5, configs.getBackplane().getMaxAttempts());
     try {
-      return new JedisCluster(hostAndPorts, jedisClientConfig, maxAttempts, poolConfig);
+      return new Cluster(hostAndPorts, jedisClientConfig, maxAttempts, poolConfig);
     } catch (JedisClusterOperationException e) {
       // probably not a cluster
-      return new JedisPooled(poolConfig, Iterables.getOnlyElement(hostAndPorts), jedisClientConfig);
+      return new Pooled(poolConfig, Iterables.getOnlyElement(hostAndPorts), jedisClientConfig);
     }
   }
 
@@ -197,31 +170,17 @@ public class JedisClusterFactory {
    * @details Use the URI, pool and connection information to connect to a redis cluster server and
    *     provide a jedis client.
    * @param redisUri A valid uri to a redis instance.
-   * @param timeout Connection timeout
-   * @param maxAttempts Number of connection attempts
    * @param poolConfig Configuration related to redis pools.
    * @return An established jedis client used to operate on the redis cluster.
    * @note Suggested return identifier: jedis.
    */
   private static Supplier<UnifiedJedis> createJedisClusterFactory(
-      String identifier,
-      URI redisUri,
-      int timeout,
-      int maxAttempts,
-      String username,
-      String password,
-      ConnectionPoolConfig poolConfig) {
+      URI redisUri, DefaultJedisClientConfig jedisClientConfig, ConnectionPoolConfig poolConfig) {
     return () ->
         createJedis(
             ImmutableSet.of(new HostAndPort(redisUri.getHost(), redisUri.getPort())),
-            /* connectionTimeout= */ Integer.max(2000, timeout),
-            /* soTimeout= */ Integer.max(2000, timeout),
-            Integer.max(5, maxAttempts),
-            username,
-            password,
-            identifier,
-            poolConfig,
-            /* ssl= */ JedisURIHelper.isRedisSSLScheme(redisUri));
+            jedisClientConfig,
+            poolConfig);
   }
 
   /**
@@ -229,31 +188,15 @@ public class JedisClusterFactory {
    * @details Use the nodes addresses, pool and connection information to connect to a redis cluster
    *     server and provide a jedis client.
    * @param redisUrisNodes A valid uri set to a redis nodes instances.
-   * @param timeout Connection timeout
-   * @param maxAttempts Number of connection attempts
    * @param poolConfig Configuration related to redis pools.
    * @return An established jedis client used to operate on the redis cluster.
    * @note Suggested return identifier: jedis.
    */
   private static Supplier<UnifiedJedis> createJedisClusterFactory(
-      String identifier,
       Set<HostAndPort> redisUrisNodes,
-      int timeout,
-      int maxAttempts,
-      String username,
-      String password,
+      DefaultJedisClientConfig jedisClientConfig,
       ConnectionPoolConfig poolConfig) {
-    return () ->
-        createJedis(
-            redisUrisNodes,
-            /* connectionTimeout= */ Integer.max(2000, timeout),
-            /* soTimeout= */ Integer.max(2000, timeout),
-            Integer.max(5, maxAttempts),
-            username,
-            password,
-            identifier,
-            poolConfig,
-            /* ssl= */ false);
+    return () -> createJedis(redisUrisNodes, jedisClientConfig, poolConfig);
   }
 
   /**
@@ -266,6 +209,61 @@ public class JedisClusterFactory {
     ConnectionPoolConfig connectionPoolConfig = new ConnectionPoolConfig();
     connectionPoolConfig.setMaxTotal(configs.getBackplane().getJedisPoolMaxTotal());
     return connectionPoolConfig;
+  }
+
+  /**
+   * Create a Jedis configuration that can be used both for Redis and Redis Cluster
+   *
+   * @param identifier Redis Client identifier
+   * @return
+   */
+  private static DefaultJedisClientConfig createJedisConfig(@Nonnull String identifier) {
+    checkNotNull(identifier, "Identifier cannot be null");
+
+    Backplane backplane = configs.getBackplane();
+    DefaultJedisClientConfig.Builder builder = DefaultJedisClientConfig.builder();
+
+    builder.connectionTimeoutMillis(Integer.max(2000, backplane.getTimeout()));
+    builder.socketTimeoutMillis(Integer.max(2000, backplane.getTimeout()));
+    builder.clientName(identifier);
+
+    if (!Strings.isNullOrEmpty(backplane.getRedisUri())) {
+      try {
+        URI redisUri = parseUri(backplane.getRedisUri());
+        boolean ssl = JedisURIHelper.isRedisSSLScheme(redisUri);
+
+        builder.ssl(ssl);
+
+        if (!Strings.isNullOrEmpty(configs.getBackplane().getRedisCertificateAuthorityFile())) {
+          checkState(
+              ssl,
+              "Can't specify a Certificate Authority file if you aren't using redis with SSL. Did"
+                  + " you set 'rediss://' scheme on your Redis URI?");
+          builder.sslSocketFactory(
+              RedisSSL.createSslSocketFactory(
+                  new File(backplane.getRedisCertificateAuthorityFile())));
+        }
+
+      } catch (ConfigurationException ce) {
+        // redis URI was malformed. Assume NOT tls-redis.
+        log.log(Level.WARNING, "Redis URI malformed. Assuming NOT TLS", ce);
+        builder.ssl(false);
+      }
+    }
+
+    builder.user(Strings.emptyToNull(backplane.getRedisUsername()));
+    if (backplane.isRedisAuthWithGoogleCredentials()) {
+      log.log(Level.FINE, "Configuring Redis with Google Credentials");
+      try {
+        builder.credentialsProvider(new GoogleCredentialProvider());
+      } catch (Exception e) {
+        log.log(Level.SEVERE, "Could not construct Redis credential provider", e);
+        throw new RuntimeException(e);
+      }
+    } else {
+      builder.password(Strings.emptyToNull(backplane.getRedisPassword()));
+    }
+    return builder.build();
   }
 
   /**
@@ -285,7 +283,7 @@ public class JedisClusterFactory {
   }
 
   /**
-   * @brief Convert protobuff list to set
+   * @brief Convert protobuf list to set
    * @details Convert the string list representation of the nodes URIs into a set of HostAndPort
    *     objects. If the URI object is invalid a configuration exception will be thrown.
    * @param nodes The redis nodes.

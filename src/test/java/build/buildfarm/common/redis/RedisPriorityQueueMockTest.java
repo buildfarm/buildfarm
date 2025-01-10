@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.Visitor;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -295,8 +295,8 @@ public class RedisPriorityQueueMockTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    StringVisitor visitor =
-        new StringVisitor() {
+    Visitor<String> visitor =
+        new Visitor<>() {
           public void visit(String entry) {
             visited.add(entry);
           }
@@ -338,8 +338,8 @@ public class RedisPriorityQueueMockTest {
 
     // ACT
     List<String> visited = new ArrayList<>();
-    StringVisitor visitor =
-        new StringVisitor() {
+    Visitor<String> visitor =
+        new Visitor<>() {
           public void visit(String entry) {
             visited.add(entry);
           }

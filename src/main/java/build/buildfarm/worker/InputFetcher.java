@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -50,6 +50,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
@@ -59,13 +60,18 @@ public class InputFetcher implements Runnable {
   private final WorkerContext workerContext;
   private final ExecutionContext executionContext;
   private final InputFetchStage owner;
+  private final Executor pollerExecutor;
   private boolean success = false;
 
   InputFetcher(
-      WorkerContext workerContext, ExecutionContext executionContext, InputFetchStage owner) {
+      WorkerContext workerContext,
+      ExecutionContext executionContext,
+      InputFetchStage owner,
+      Executor pollerExecutor) {
     this.workerContext = workerContext;
     this.executionContext = executionContext;
     this.owner = owner;
+    this.pollerExecutor = pollerExecutor;
   }
 
   private List<String> validateQueuedOperation(QueuedOperation queuedOperation) {
@@ -104,7 +110,8 @@ public class InputFetcher implements Runnable {
         executionContext.queueEntry,
         QUEUED,
         Thread.currentThread()::interrupt,
-        Deadline.after(workerContext.getInputFetchDeadline(), SECONDS));
+        Deadline.after(workerContext.getInputFetchDeadline(), SECONDS),
+        pollerExecutor);
     try {
       return fetchPolled(stopwatch);
     } finally {
@@ -225,7 +232,8 @@ public class InputFetcher implements Runnable {
               directoriesIndex,
               executionContext.queueEntry.getExecuteEntry().getActionDigest().getDigestFunction(),
               queuedOperation.getAction(),
-              queuedOperation.getCommand());
+              queuedOperation.getCommand(),
+              executionContext.claim.owner());
     } catch (IOException e) {
       Status.Builder status = Status.newBuilder().setMessage("Error creating exec dir");
       if (e instanceof ExecDirException execDirEx) {
@@ -235,8 +243,7 @@ public class InputFetcher implements Runnable {
         log.log(Level.SEVERE, format("error creating exec dir for %s", executionName), e);
       }
       // populate the inputFetch complete to know how long it took before error
-      executedAction.setInputFetchCompletedTimestamp(
-          Timestamps.fromMillis(System.currentTimeMillis()));
+      executedAction.setInputFetchCompletedTimestamp(Timestamps.now());
       failOperation(executedAction.build(), status.build());
       return 0;
     }
@@ -253,8 +260,7 @@ public class InputFetcher implements Runnable {
             .addAllArguments(Iterables.skip(queuedOperation.getCommand().getArgumentsList(), 1))
             .build();
 
-    executedAction.setInputFetchCompletedTimestamp(
-        Timestamps.fromMillis(System.currentTimeMillis()));
+    executedAction.setInputFetchCompletedTimestamp(Timestamps.now());
     putOperation();
 
     // we are now responsible for destroying the exec dir if anything goes wrong
@@ -287,7 +293,8 @@ public class InputFetcher implements Runnable {
         executionContext.queueEntry,
         QUEUED,
         Thread.currentThread()::interrupt,
-        Deadline.after(10, DAYS));
+        Deadline.after(10, DAYS),
+        pollerExecutor);
 
     ExecutionContext fetchedExecutionContext =
         executionContext.toBuilder()
@@ -309,7 +316,7 @@ public class InputFetcher implements Runnable {
       String executionName = executionContext.queueEntry.getExecuteEntry().getOperationName();
       log.log(Level.FINER, "InputFetcher: Execution " + executionName + " Failed to claim output");
 
-      owner.error().put(executionContext);
+      owner.error().put(fetchedExecutionContext);
     }
   }
 

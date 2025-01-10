@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,23 +21,25 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
 import io.grpc.Deadline;
+import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
 
 public class Poller {
-  private final long periodMicros;
-  private Deadline periodDeadline;
+  private final Duration period;
   private ActivePoller activePoller = null;
 
   private class ActivePoller implements Runnable {
     private final BooleanSupplier poll;
     private final Runnable onExpiration;
     private final Deadline expirationDeadline;
+    private Deadline periodDeadline;
     private volatile boolean running = true;
 
     ActivePoller(BooleanSupplier poll, Runnable onExpiration, Deadline expirationDeadline) {
       this.poll = poll;
       this.onExpiration = onExpiration;
       this.expirationDeadline = expirationDeadline;
+      periodDeadline = Deadline.after(Durations.toMicros(period), MICROSECONDS);
     }
 
     private Duration getWaitTime() {
@@ -53,10 +55,8 @@ public class Poller {
     private void waitForNextDeadline() {
       try {
         Duration waitTime = getWaitTime();
-        if (waitTime.getSeconds() != 0 || waitTime.getNanos() != 0) {
-          wait(
-              waitTime.getSeconds() * 1000 + waitTime.getNanos() / 1000000,
-              waitTime.getNanos() % 1000000);
+        if (Durations.isPositive(waitTime)) {
+          wait(Durations.toMillis(waitTime), waitTime.getNanos() % 1000000);
         }
       } catch (InterruptedException e) {
         running = false;
@@ -65,6 +65,7 @@ public class Poller {
 
     @Override
     public synchronized void run() {
+      // should we switch to a scheduled execution?
       while (running) {
         if (expirationDeadline.isExpired()) {
           onExpiration.run();
@@ -73,7 +74,7 @@ public class Poller {
           // FP interface with distinct returns, do not memoize!
           running = poll.getAsBoolean();
           while (periodDeadline.isExpired()) {
-            periodDeadline = periodDeadline.offset(periodMicros, MICROSECONDS);
+            periodDeadline = periodDeadline.offset(Durations.toMicros(period), MICROSECONDS);
           }
         } else {
           waitForNextDeadline();
@@ -88,15 +89,15 @@ public class Poller {
   }
 
   public Poller(Duration period) {
-    checkState(period.getSeconds() > 0 || period.getNanos() >= 1000);
-    periodMicros = period.getSeconds() * 1000000 + period.getNanos() / 1000;
-    periodDeadline = Deadline.after(periodMicros, MICROSECONDS);
+    checkState(Durations.toMicros(period) >= 1);
+    this.period = period;
   }
 
-  public void resume(BooleanSupplier poll, Runnable onExpiry, Deadline expiryDeadline) {
+  public void resume(
+      BooleanSupplier poll, Runnable onExpiry, Deadline expiryDeadline, Executor executor) {
     checkState(activePoller == null);
     activePoller = new ActivePoller(poll, onExpiry, expiryDeadline);
-    new Thread(activePoller).start();
+    executor.execute(activePoller);
   }
 
   public void pause() {

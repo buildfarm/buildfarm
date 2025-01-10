@@ -1,4 +1,4 @@
-// Copyright 2018 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ServerInstance.WorkersCallback;
+import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.Digest;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
@@ -64,13 +65,13 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
   private final @Nullable String publicName;
   private final Backplane backplane;
   private final Random rand;
-  private final LoadingCache<String, Instance> workerStubs;
+  private final LoadingCache<String, StubInstance> workerStubs;
   private final UnavailableConsumer onUnavailable;
 
   RemoteInputStreamFactory(
       Backplane backplane,
       Random rand,
-      LoadingCache<String, Instance> workerStubs,
+      LoadingCache<String, StubInstance> workerStubs,
       UnavailableConsumer onUnavailable) {
     this(/* publicName= */ null, backplane, rand, workerStubs, onUnavailable);
   }
@@ -80,7 +81,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
       String publicName,
       Backplane backplane,
       Random rand,
-      LoadingCache<String, Instance> workerStubs,
+      LoadingCache<String, StubInstance> workerStubs,
       UnavailableConsumer onUnavailable) {
     this.publicName = publicName;
     this.backplane = backplane;
@@ -91,7 +92,9 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
 
   private Instance workerStub(String worker) {
     try {
-      return workerStubs.get(worker);
+      StubInstance stubInstance = workerStubs.get(worker);
+      stubInstance.setOnStopped(() -> workerStubs.invalidate(worker));
+      return stubInstance;
     } catch (ExecutionException e) {
       log.log(Level.SEVERE, String.format("error getting worker stub for %s", worker), e);
       throw new IllegalStateException("stub instance creation must not fail");

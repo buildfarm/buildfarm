@@ -1,4 +1,4 @@
-// Copyright 2019 The Bazel Authors. All rights reserved.
+// Copyright 2019 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,6 @@ import io.grpc.ManagedChannel;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -43,7 +42,7 @@ class Mount {
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, channel);
 
-    Path cwd = Paths.get(".");
+    Path cwd = Path.of(".");
 
     FuseCAS fuse =
         new FuseCAS(

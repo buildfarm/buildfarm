@@ -1,4 +1,4 @@
-// Copyright 2024 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.resources;
+package build.buildfarm.common;
 
-public interface Claim {
-  void release();
+/**
+ * @class Visitor
+ * @brief A type visitor.
+ * @details Used to visit types in a generic context.
+ */
+public interface Visitor<T> {
+  /**
+   * @brief The visit interface to be implemented.
+   * @param value The visited value.
+   */
+  void visit(T t);
 }

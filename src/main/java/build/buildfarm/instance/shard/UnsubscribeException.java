@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2024 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,18 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.instance.shard;
 
-/**
- * @class StringVisitor
- * @brief A string visitor.
- * @details Used to visit strings in a generic context.
- */
-public abstract class StringVisitor {
-  /**
-   * @brief The visit interface to be implemented.
-   * @details Inherited classes but implement visit.
-   * @param str The visited string.
-   */
-  public abstract void visit(String str);
+public class UnsubscribeException extends RuntimeException {
+  public UnsubscribeException(String message) {
+    super(message);
+  }
 }

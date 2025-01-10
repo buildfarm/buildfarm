@@ -1,4 +1,4 @@
-// Copyright 2023 The Bazel Authors. All rights reserved.
+// Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import java.util.logging.Level;
+import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.resps.ScanResult;
@@ -64,14 +65,23 @@ public class Executions {
   public RedisMap executions;
 
   /**
+   * @field actions
+   * @brief A mapping from actionKey -> operationName
+   * @details ActionKeys which may produce execution merges.
+   */
+  public RedisMap actions;
+
+  /**
    * @brief Constructor.
    * @details Construct container for executions.
    * @param name The global name of the execution map.
+   * @param actionsName The global name of the actions map.
    * @param timeout_s When to expire executions.
    */
-  public Executions(RedisSetMap toolInvocations, String name, int timeout_s) {
+  public Executions(RedisSetMap toolInvocations, String name, String actionsName, int timeout_s) {
     this.toolInvocations = toolInvocations;
     executions = new RedisMap(name, timeout_s);
+    actions = new RedisMap(actionsName, timeout_s);
   }
 
   /**
@@ -130,6 +140,10 @@ public class Executions {
     return parseScanResult(jedis, toolInvocations.scan(jedis, toolInvocationId, setCursor, count));
   }
 
+  public void insert(UnifiedJedis jedis, String name, String operationJson) {
+    executions.insert(jedis, name, operationJson);
+  }
+
   /**
    * @brief Insert an execution.
    * @details If the execution already exists, then it will be replaced.
@@ -137,8 +151,12 @@ public class Executions {
    * @param name name of operation.
    * @param operationJson Json of the operation.
    */
-  public void insert(UnifiedJedis jedis, String name, String operationJson) {
+  public boolean create(UnifiedJedis jedis, String actionKey, String name, String operationJson) {
     executions.insert(jedis, name, operationJson);
+    if (!actions.putIfAbsent(jedis, actionKey, name)) {
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -149,5 +167,17 @@ public class Executions {
    */
   public void remove(UnifiedJedis jedis, String name) {
     executions.remove(jedis, name);
+  }
+
+  public @Nullable Operation merge(UnifiedJedis jedis, String actionKey) {
+    String name = actions.get(jedis, actionKey);
+    if (name == null) {
+      return null;
+    }
+    return get(jedis, name);
+  }
+
+  public void unmerge(UnifiedJedis jedis, String actionKey) {
+    actions.remove(jedis, actionKey);
   }
 }

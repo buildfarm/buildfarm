@@ -1,38 +1,32 @@
 package persistent.bazel.processes;
 
+import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
+import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
+import com.google.protobuf.GeneratedMessage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Supplier;
-
-import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
-import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
-import com.google.protobuf.GeneratedMessage;
-
-import org.apache.commons.io.IOUtils;
-
 import lombok.Getter;
+import org.apache.commons.io.IOUtils;
 import persistent.common.processes.ProcessWrapper;
 
 /**
- * Based off Google's ProtoWorkerProtocol
- * Slightly generified to encapsulate read/writes
- * Should be used by both the PersistentWorker (client-side)
- *  and the WorkRequestHandler (in the persistent worker process)
+ * Based off Google's ProtoWorkerProtocol Slightly generified to encapsulate read/writes Should be
+ * used by both the PersistentWorker (client-side) and the WorkRequestHandler (in the persistent
+ * worker process)
  *
- * Writes WorkRequest protos to the persistent worker
- * Reads WorkResponse protos from the persistent worker
+ * <p>Writes WorkRequest protos to the persistent worker Reads WorkResponse protos from the
+ * persistent worker
  *
- * Static methods also expose some useful(?) utilities
+ * <p>Static methods also expose some useful(?) utilities
  *
- * TODO: What happens to input/output streams when the process dies?
- *  Presumably, it is closed (as per tests).
+ * <p>TODO: What happens to input/output streams when the process dies? Presumably, it is closed (as
+ * per tests).
  */
 public class ProtoWorkerRW {
-
-  @Getter
-  private final ProcessWrapper processWrapper;
+  @Getter private final ProcessWrapper processWrapper;
 
   private final InputStream readStream;
 
@@ -63,12 +57,14 @@ public class ProtoWorkerRW {
       } catch (IOException e2) {
         stdOut = "Exception trying to read stdout: " + e2;
       }
-      throw new IOException("IOException on waitForInput; stdErr: " + stdErrMsg + "\nStdout: " + stdOut, e);
+      throw new IOException(
+          "IOException on waitForInput; stdErr: " + stdErrMsg + "\nStdout: " + stdOut, e);
     }
     return readResponse(readStream);
   }
 
-  public static <R extends GeneratedMessage> void writeTo(R req, OutputStream outputStream) throws IOException {
+  public static <R extends GeneratedMessage> void writeTo(R req, OutputStream outputStream)
+      throws IOException {
     try {
       req.writeDelimitedTo(outputStream);
     } finally {
@@ -84,7 +80,8 @@ public class ProtoWorkerRW {
     return WorkRequest.parseDelimitedFrom(inputStream);
   }
 
-  public static void waitForInput(Supplier<Boolean> liveCheck, InputStream inputStream) throws IOException, InterruptedException {
+  public static void waitForInput(Supplier<Boolean> liveCheck, InputStream inputStream)
+      throws IOException, InterruptedException {
     String workerDeathMsg = "Worker process for died while waiting for response";
     // TODO can we do better than spinning? i.e. condition variable?
     while (inputAvailable(inputStream, workerDeathMsg) == 0) {

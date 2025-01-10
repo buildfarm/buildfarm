@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2017 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import build.buildfarm.v1test.Digest;
 import build.buildfarm.worker.ExecDirException.ViolationException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -74,7 +75,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
   public CFCLinkExecFileSystem(
       Path root,
       CASFileCache fileCache,
-      @Nullable UserPrincipal owner,
+      ImmutableMap<String, UserPrincipal> owners,
       boolean linkInputDirectories,
       Iterable<String> linkedInputDirectories,
       boolean allowSymlinkTargetAbsolute,
@@ -84,7 +85,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     super(
         root,
         fileCache,
-        owner,
+        owners,
         allowSymlinkTargetAbsolute,
         removeDirectoryService,
         accessRecorder,
@@ -139,7 +140,7 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
     return transformAsync(
         fileCache.putDirectory(digest, directoriesIndex, fetchService),
         pathResult -> {
-          Path path = pathResult.getPath();
+          Path path = pathResult.path();
           if (pathResult.isMissed()) {
             log.finer(
                 String.format(
@@ -342,7 +343,8 @@ public class CFCLinkExecFileSystem extends CFCExecFileSystem {
       Map<build.bazel.remote.execution.v2.Digest, Directory> directoriesIndex,
       DigestFunction.Value digestFunction,
       Action action,
-      Command command)
+      Command command,
+      @Nullable UserPrincipal owner)
       throws IOException, InterruptedException {
     Digest inputRootDigest = DigestUtil.fromDigest(action.getInputRootDigest(), digestFunction);
     OutputDirectory outputDirectory = createOutputDirectory(command);

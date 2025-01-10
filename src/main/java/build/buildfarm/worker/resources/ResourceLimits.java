@@ -1,4 +1,4 @@
-// Copyright 2021 The Bazel Authors. All rights reserved.
+// Copyright 2021 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -170,11 +170,4 @@ public class ResourceLimits {
    * @details See https://github.com/bazelbuild/bazel/issues/10091
    */
   public String persistentWorkerKey = "";
-
-  /**
-   * @field persistentWorkerCommand
-   * @brief Command string to start the persistent worker
-   * @details See https://github.com/bazelbuild/bazel/issues/10091
-   */
-  public String persistentWorkerCommand = "";
 }
