@@ -1,3 +1,6 @@
+load("@rules_java//java:java_library.bzl", "java_library")
+load("@rules_java//java:java_test.bzl", "java_test")
+
 java_library(
     name = "worker_test_utils",
     testonly = True,
