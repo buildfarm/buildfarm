@@ -1,3 +1,4 @@
+load("@rules_java//java:java_test.bzl", "java_test")
 load("//:jvm_flags.bzl", "ensure_accurate_metadata")
 
 java_test(

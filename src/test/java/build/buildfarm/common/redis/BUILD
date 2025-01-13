@@ -1,3 +1,5 @@
+load("@rules_java//java:java_test.bzl", "java_test")
+
 COMMON_DEPS = [
     "//src/main/java/build/buildfarm/instance/shard",
     "//src/main/java/build/buildfarm/common",
