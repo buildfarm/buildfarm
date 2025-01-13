@@ -35,6 +35,7 @@ import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.Dispenser;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
@@ -94,11 +95,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipal;
-import java.util.AbstractCollection;
 import java.util.ArrayDeque;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -329,70 +327,6 @@ public final class Worker extends LoggingMain {
           new ConfigurationException("Could not locate " + name);
       configException.initCause(e);
       throw configException;
-    }
-  }
-
-  /**
-   * @class Dispenser
-   * @brief A queue which delivers a single element repeatedly without delay or regard for size.
-   * @details For compatibility with POOL resources, this Queue delivers an infinite immediate
-   *     sequence of an identical element.
-   */
-  private static final class Dispenser<T> extends AbstractCollection<T> implements Queue<T> {
-    private final T element;
-
-    Dispenser(T element) {
-      this.element = element;
-    }
-
-    // used methods
-    @Override
-    public T poll() {
-      return element;
-    }
-
-    @Override
-    public boolean add(T o) {
-      checkState(o.equals(element));
-      return true;
-    }
-
-    // unused methods
-    // Queue
-    @Override
-    public T peek() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public T element() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public T remove() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean offer(T o) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void clear() {
-      throw new UnsupportedOperationException();
-    }
-
-    // Collection
-    @Override
-    public int size() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Iterator<T> iterator() {
-      throw new UnsupportedOperationException();
     }
   }
 

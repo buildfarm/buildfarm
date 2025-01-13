@@ -292,7 +292,7 @@ class ShardWorkerContext implements WorkerContext {
 
   // FIXME make OwnedClaim with owner
   // how will this play out with persistent workers, should we have one per user?
-  private Claim acquireClaim(Platform platform) {
+  private @Nullable Claim acquireClaim(Platform platform) {
     // expand platform requirements with exec owner
     if (provideOwnedClaim) {
       platform = platform.toBuilder().addProperties(EXEC_OWNER_PROPERTY).build();
@@ -301,7 +301,7 @@ class ShardWorkerContext implements WorkerContext {
     Claim claim = DequeueMatchEvaluator.acquireClaim(matchProvisions, resourceSet, platform);
 
     // a little awkward wrapping with the early return here to preserve effective final
-    if (provideOwnedClaim) {
+    if (claim != null && provideOwnedClaim) {
       // enforced by exec owner property value of "1"
       for (Entry<String, List<Object>> pool : claim.getPools()) {
         if (!pool.getKey().equals(EXEC_OWNER_RESOURCE_NAME)) {

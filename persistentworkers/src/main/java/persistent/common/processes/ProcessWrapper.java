@@ -29,7 +29,6 @@ import lombok.extern.java.Log;
  */
 @Log
 public class ProcessWrapper implements Closeable {
-
   private final Process process;
 
   @Getter private final Path workRoot;
