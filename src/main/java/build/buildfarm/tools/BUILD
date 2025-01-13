@@ -1,3 +1,7 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
+load("@rules_java//java:java_library.bzl", "java_library")
+load("@rules_java//java:java_plugin.bzl", "java_plugin")
+
 java_binary(
     name = "bf-mount",
     srcs = ["Mount.java"],

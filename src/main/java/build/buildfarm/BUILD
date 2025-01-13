@@ -1,3 +1,4 @@
+load("@rules_java//java:java_binary.bzl", "java_binary")
 load("//:jvm_flags.bzl", "add_opens_sun_nio_fs", "ensure_accurate_metadata")
 
 package(

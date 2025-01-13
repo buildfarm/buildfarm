@@ -1,3 +1,5 @@
+load("@rules_java//java:java_test.bzl", "java_test")
+
 java_test(
     name = "tests",
     size = "small",

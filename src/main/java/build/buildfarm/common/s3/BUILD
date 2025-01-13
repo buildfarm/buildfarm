@@ -1,3 +1,5 @@
+load("@rules_java//java:java_library.bzl", "java_library")
+
 java_library(
     name = "S3Bucket",
     srcs = ["S3Bucket.java"],

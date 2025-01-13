@@ -1,3 +1,5 @@
+load("@rules_java//java:java_library.bzl", "java_library")
+
 java_library(
     name = "blake3",
     srcs = glob(["*.java"]),
