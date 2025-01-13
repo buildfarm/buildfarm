@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.common.Claim.Stage.REPORT_RESULT_STAGE;
 import static build.buildfarm.common.config.Server.INSTANCE_TYPE.SHARD;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
@@ -22,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
@@ -33,6 +35,7 @@ import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.Claim;
+import build.buildfarm.common.Dispenser;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ExecutionPolicy;
@@ -44,6 +47,7 @@ import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.resources.LocalResourceSet;
+import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Jimfs;
@@ -93,6 +97,11 @@ public class ShardWorkerContextTest {
   }
 
   WorkerContext createTestContext(Iterable<ExecutionPolicy> policies) {
+    return createTestContext(policies, /* resourceSet= */ new LocalResourceSet());
+  }
+
+  WorkerContext createTestContext(
+      Iterable<ExecutionPolicy> policies, LocalResourceSet resourceSet) {
     return new ShardWorkerContext(
         "test",
         /* operationPollPeriod= */ Duration.getDefaultInstance(),
@@ -117,7 +126,7 @@ public class ShardWorkerContextTest {
         /* allowBringYourOwnContainer= */ false,
         /* errorOperationRemainingResources= */ false,
         /* errorOperationOutputSizeExceeded= */ false,
-        /* resourceSet= */ new LocalResourceSet(),
+        resourceSet,
         writer);
   }
 
@@ -198,5 +207,32 @@ public class ShardWorkerContextTest {
     ActionResult result = resultBuilder.build();
     OutputFile outputFile = Iterables.getOnlyElement(result.getOutputFilesList());
     assertThat(outputFile.getPath()).isEqualTo("baz/quux");
+  }
+
+  @Test
+  public void resourceExhaustedIgnoresEntryWithExecOwner() throws Exception {
+    LocalResourceSet resourceSet = new LocalResourceSet();
+    resourceSet.poolResources.put(
+        ShardWorkerContext.EXEC_OWNER_RESOURCE_NAME,
+        new PoolResource(new Dispenser<>("exec-user-name"), REPORT_RESULT_STAGE));
+    WorkerContext context = createTestContext(/* policies= */ ImmutableList.of(), resourceSet);
+
+    Platform platform =
+        Platform.newBuilder()
+            .addProperties(Property.newBuilder().setName("unavailable-resource").setValue("1"))
+            .build();
+    QueueEntry queueEntry = QueueEntry.newBuilder().setPlatform(platform).build();
+    when(backplane.dispatchOperation(any(List.class)))
+        .thenReturn(queueEntry)
+        .thenReturn(null); // provide a match completion in failure case
+    MatchListener listener = mock(MatchListener.class);
+
+    when(listener.onWaitStart()).thenReturn(true);
+    context.match(listener);
+    verify(listener, times(1)).onEntry(null, null);
+    // twice because there were 2 dequeues to complete queueEntry
+    verify(listener, times(2)).onWaitStart();
+    verify(listener, times(2)).onWaitEnd();
+    verifyNoMoreInteractions(listener);
   }
 }
