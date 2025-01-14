@@ -29,12 +29,6 @@ public class Cpu extends Controller {
     return "cpu";
   }
 
-  @Deprecated(forRemoval = true)
-  public int getShares() throws IOException {
-    open();
-    return readLong("cpu.shares");
-  }
-
   /**
    * Represents how much CPU shares are allocated. Note - this method does nothing for CGroups v2.
    * All processes get equal weight.

@@ -143,22 +143,6 @@ public final class Group {
     return parent.getHierarchy() + "/" + getName();
   }
 
-  /**
-   * Get hierarchy of this cgroup and all parents. Includes the controller name.
-   *
-   * <p>This is for CGroups v1 only.
-   *
-   * @param controllerName
-   * @return
-   */
-  String getHierarchy(String controllerName) {
-    if (parent != null) {
-      return parent.getHierarchy(controllerName) + "/" + getName();
-    }
-    return "";
-  }
-
-  /* use for cgroups v2 */
   Path getPath() {
     return rootPath.resolve(getHierarchy());
   }
