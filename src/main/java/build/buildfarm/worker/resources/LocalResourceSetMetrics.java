@@ -31,7 +31,7 @@ public class LocalResourceSetMetrics {
 
   public static final Gauge resourceTotalMetric =
       Gauge.builder()
-          .name("local_resource_total")
+          .name("local_resource")
           .labelNames("resource_name")
           .help("The total number of claims exist for a particular resource")
           .register();
