@@ -1016,6 +1016,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               reset();
             }
             if (isComplete()) {
+              if (!future.isDone()) {
+                log.log(Level.WARNING, format("%s isComplete but has not completed future", key));
+                future.set(key.getDigest().getSize());
+              }
               throw new WriteCompleteException();
             }
             checkState(
