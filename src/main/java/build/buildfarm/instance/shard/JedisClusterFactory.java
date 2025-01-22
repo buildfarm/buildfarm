@@ -223,8 +223,8 @@ public class JedisClusterFactory {
     Backplane backplane = configs.getBackplane();
     DefaultJedisClientConfig.Builder builder = DefaultJedisClientConfig.builder();
 
-    builder.connectionTimeoutMillis(Integer.max(2000, backplane.getTimeout()));
-    builder.socketTimeoutMillis(Integer.max(2000, backplane.getTimeout()));
+    builder.connectionTimeoutMillis(Integer.max(2000, backplane.getTimeoutMillis()));
+    builder.socketTimeoutMillis(Integer.max(2000, backplane.getTimeoutMillis()));
     builder.clientName(identifier);
 
     if (!Strings.isNullOrEmpty(backplane.getRedisUri())) {
