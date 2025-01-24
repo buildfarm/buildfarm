@@ -100,6 +100,7 @@ server:
     targetLabels: []
 
   loggingProperties:
+    build.buildfarm.level: INFO
     handlers: java.util.logging.ConsoleHandler
     java.util.logging.ConsoleHandler.level: INFO
     java.util.logging.ConsoleHandler.formatter: java.util.logging.SimpleFormatter
@@ -182,6 +183,7 @@ shardWorker:
     targetLabels: []
 
   loggingProperties:
+    build.buildfarm.level: INFO
     handlers: java.util.logging.ConsoleHandler
     java.util.logging.ConsoleHandler.level: INFO
     java.util.logging.ConsoleHandler.formatter: java.util.logging.SimpleFormatter
