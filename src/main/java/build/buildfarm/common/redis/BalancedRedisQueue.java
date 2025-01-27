@@ -243,24 +243,17 @@ public class BalancedRedisQueue {
     }
   }
 
-  public BalancedQueueEntry takeAny(UnifiedJedis unified, Duration timeout, ExecutorService service)
-      throws InterruptedException {
-    // consider duration / queues.size() timeouts
-    Duration queueTimeout = timeout.dividedBy(queues.size());
-    int startIndex = currentPopQueue;
-    int currentIndex = roundRobinPopIndex();
-    do {
-      String queueName = queues.get(currentIndex);
-      try (Jedis jedis = getJedisFromKey(unified, queueName)) {
-        Queue<String> queue = queueDecorator.decorate(jedis, queueName);
-        String item = take(jedis, queue, queueTimeout, service);
-        if (item != null) {
-          return new BalancedQueueEntry(queueName, item);
-        }
+  public @Nullable BalancedQueueEntry take(
+      UnifiedJedis unified, Duration timeout, ExecutorService service) throws InterruptedException {
+    String queueName = queues.get(roundRobinPopIndex());
+    try (Jedis jedis = getJedisFromKey(unified, queueName)) {
+      Queue<String> queue = queueDecorator.decorate(jedis, queueName);
+      String value = take(jedis, queue, timeout, service);
+      if (value == null) {
+        return null;
       }
-      currentIndex = roundRobinPopIndex();
-    } while (currentIndex != startIndex);
-    return null;
+      return new BalancedQueueEntry(queueName, value);
+    }
   }
 
   /**
@@ -343,22 +336,21 @@ public class BalancedRedisQueue {
     return new Jedis(connection);
   }
 
-  // BalancedQueue -> BalancedRedisQueue
-  // make into decorated pattern
-  public @Nullable BalancedQueueEntry pollAny(UnifiedJedis unified) throws InterruptedException {
-    int startIndex = currentPopQueue;
-    int currentIndex = roundRobinPopIndex();
-    do {
-      String queueName = queues.get(currentIndex);
-      try (Jedis jedis = getJedisFromKey(unified, queueName)) {
-        String item = queueDecorator.decorate(jedis, queueName).poll();
-        if (item != null) {
-          return new BalancedQueueEntry(queueName, item);
-        }
+  /**
+   * @brief Pop element into internal dequeue and return value.
+   * @details Null is returned if the queue is empty.
+   * @return The value of the transfered element. null if queue is empty or thread was interrupted.
+   * @note Suggested return identifier: val.
+   */
+  public @Nullable BalancedQueueEntry poll(UnifiedJedis unified) {
+    String queue = queues.get(roundRobinPopIndex());
+    try (Jedis jedis = getJedisFromKey(unified, queue)) {
+      String value = queueDecorator.decorate(jedis, queue).poll();
+      if (value == null) {
+        return null;
       }
-      currentIndex = roundRobinPopIndex();
-    } while (currentIndex != startIndex);
-    return null;
+      return new BalancedQueueEntry(queue, value);
+    }
   }
 
   /**
