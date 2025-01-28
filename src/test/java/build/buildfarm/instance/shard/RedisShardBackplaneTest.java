@@ -44,6 +44,7 @@ import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -251,7 +252,8 @@ public class RedisShardBackplaneTest {
     BalancedRedisQueue subQueue = mock(BalancedRedisQueue.class);
     ExecutionQueueEntry executionQueueEntry =
         new ExecutionQueueEntry(subQueue, /* balancedQueueEntry= */ null, queueEntry);
-    when(state.executionQueue.dequeue(eq(jedis), any(List.class), any(ExecutorService.class)))
+    when(state.executionQueue.dequeue(
+            eq(jedis), any(List.class), any(LocalResourceSet.class), any(ExecutorService.class)))
         .thenReturn(executionQueueEntry);
     when(subQueue.removeFromDequeue(jedis, null)).thenReturn(true);
     // PRE-ASSERT
@@ -273,7 +275,8 @@ public class RedisShardBackplaneTest {
 
     // ACT
     // dispatch the operation and test properties of the QueueEntry and internal jedis calls.
-    QueueEntry readyForRequeue = backplane.dispatchOperation(ImmutableList.of());
+    QueueEntry readyForRequeue =
+        backplane.dispatchOperation(ImmutableList.of(), new LocalResourceSet());
 
     // ASSERT
     verify(jedis, times(1)).pipelined(any(Executor.class));
@@ -285,7 +288,8 @@ public class RedisShardBackplaneTest {
     assertThat(readyForRequeue.getRequeueAttempts())
         .isEqualTo(REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE);
     verify(state.executionQueue, times(1))
-        .dequeue(eq(jedis), any(List.class), any(ExecutorService.class));
+        .dequeue(
+            eq(jedis), any(List.class), any(LocalResourceSet.class), any(ExecutorService.class));
     verifyNoMoreInteractions(state.executionQueue);
     verify(subQueue, times(1)).removeFromDequeue(pipeline, null);
     verifyNoMoreInteractions(subQueue);
@@ -331,7 +335,8 @@ public class RedisShardBackplaneTest {
     BalancedRedisQueue subQueue = mock(BalancedRedisQueue.class);
     ExecutionQueueEntry executionQueueEntry =
         new ExecutionQueueEntry(subQueue, /* balancedQueueEntry= */ null, queueEntry);
-    when(state.executionQueue.dequeue(eq(jedis), any(List.class), any(ExecutorService.class)))
+    when(state.executionQueue.dequeue(
+            eq(jedis), any(List.class), any(LocalResourceSet.class), any(ExecutorService.class)))
         .thenReturn(executionQueueEntry);
     when(state.executionQueue.removeFromDequeue(jedis, executionQueueEntry)).thenReturn(true);
     // PRE-ASSERT
@@ -353,7 +358,8 @@ public class RedisShardBackplaneTest {
 
     // ACT
     // dispatch the operation and test properties of the QueueEntry and internal jedis calls.
-    QueueEntry readyForRequeue = backplane.dispatchOperation(ImmutableList.of());
+    QueueEntry readyForRequeue =
+        backplane.dispatchOperation(ImmutableList.of(), new LocalResourceSet());
 
     // ASSERT
     verify(jedis, times(1)).pipelined(any(Executor.class));
@@ -365,7 +371,8 @@ public class RedisShardBackplaneTest {
     assertThat(readyForRequeue.getRequeueAttempts())
         .isEqualTo(REQUEUE_AMOUNT_WHEN_READY_TO_REQUEUE);
     verify(state.executionQueue, times(1))
-        .dequeue(eq(jedis), any(List.class), any(ExecutorService.class));
+        .dequeue(
+            eq(jedis), any(List.class), any(LocalResourceSet.class), any(ExecutorService.class));
     verifyNoMoreInteractions(state.executionQueue);
     verify(subQueue, times(1)).removeFromDequeue(pipeline, null);
     verifyNoMoreInteractions(subQueue);

@@ -45,6 +45,11 @@ public final class Dispenser<T> extends AbstractCollection<T> implements Queue<T
     return true;
   }
 
+  @Override
+  public boolean isEmpty() {
+    return false;
+  }
+
   // unused methods
   // Queue
   @Override

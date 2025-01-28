@@ -31,6 +31,7 @@ import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import java.io.IOException;
@@ -232,7 +233,7 @@ public interface Backplane {
    *
    * <p>Moves an operation from the list of queued operations to the list of dispatched operations.
    */
-  QueueEntry dispatchOperation(List<Platform.Property> provisions)
+  QueueEntry dispatchOperation(List<Platform.Property> provisions, LocalResourceSet resourceSet)
       throws IOException, InterruptedException;
 
   /**
