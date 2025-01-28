@@ -79,7 +79,7 @@ public class Backplane {
    */
   private boolean redisAuthWithGoogleCredentials;
 
-  private int timeout = 10000; // Milliseconds
+  private int timeoutMillis = 10000; // Milliseconds
   private String[] redisNodes = {};
   private int maxAttempts = 20;
   private long priorityPollIntervalMillis = 100;
