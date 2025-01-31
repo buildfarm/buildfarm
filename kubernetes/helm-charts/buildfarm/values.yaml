@@ -35,12 +35,12 @@ server:
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
   replicaCount: 1
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
   resources:
     {}
-    # We usually recommend not to specify default resources and to leave this as a conscious
-    # choice for the user. This also increases chances charts run on environments with little
-    # resources, such as Minikube. If you do want to specify resources, uncomment the following
-    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
     # limits:
     #   cpu: 100m
     #   memory: 128Mi
@@ -72,6 +72,15 @@ server:
   tolerations: []
   affinity: {}
   topologySpreadConstraints: []
+
+  ## Pod Disruption Budget configuration
+  ## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+  ##
+  pdb:
+    create: false
+    minAvailable: ""
+    maxUnavailable: ""
+
   extraVolumes:
     []
     # - name: additionalSecret
@@ -143,7 +152,7 @@ shardWorker:
     # requests:
     #   cpu: 100m
     #   memory: 128Mi
-  persistentVolumeClaim:
+  storage:
     enabled: true
     # the storage class for pv, leave empty will using default
     class: ""
@@ -153,19 +162,26 @@ shardWorker:
     type: ClusterIP
     port: 8982
 
-  #runtimeClassName: ""
-  #nodeSelector: {}
-  #tolerations: []
-  #affinity: {}
-  #topologySpreadConstraints: []
+  runtimeClassName: ""
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
 
-  #extraVolumes:
+  ## Pod Disruption Budget configuration
+  ## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
+  ##
+  pdb:
+    create: false
+    minAvailable: ""
+    maxUnavailable: ""
+
+  extraVolumes: []
   # - name: additionalSecret
   #   secret:
   #   secretName: my-secret
   #   defaultMode: 0600
 
-  #extraVolumeMounts:
+  extraVolumeMounts: []
   # - name: customConfig
   #   mountPath: /mnt/config
   #   readOnly: true

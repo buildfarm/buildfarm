@@ -72,7 +72,7 @@ spec:
             - mountPath: /config
               name: config
               readOnly: true
-            {{ if .Values.shardWorker.persistentVolumeClaim.enabled }}
+            {{ if .Values.shardWorker.storage.enabled }}
             - mountPath: /tmp/worker
               name: {{ include "buildfarm.fullname" . }}-shard-worker-data
             {{ end }}
@@ -117,7 +117,7 @@ spec:
         {{- with .Values.shardWorker.extraVolumes }}
         {{- tpl (toYaml .) $ | nindent 8 }}
         {{- end }}
-  {{- if .Values.shardWorker.persistentVolumeClaim.enabled }}
+  {{- if .Values.shardWorker.storage.enabled }}
   volumeClaimTemplates:
     - apiVersion: v1
       kind: PersistentVolumeClaim
