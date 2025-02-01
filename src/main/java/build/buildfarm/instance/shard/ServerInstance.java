@@ -2899,6 +2899,13 @@ public class ServerInstance extends NodeInstance {
   public boolean putOperation(Operation operation) {
     if (isErrored(operation)) {
       try {
+        ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+        if (metadata != null) {
+          ActionKey actionKey =
+              DigestUtil.asActionKey(
+                  DigestUtil.fromDigest(metadata.getActionDigest(), metadata.getDigestFunction()));
+          backplane.unmergeExecution(actionKey);
+        }
         return backplane.putOperation(operation, ExecutionStage.Value.COMPLETED);
       } catch (IOException e) {
         throw Status.fromThrowable(e).asRuntimeException();
