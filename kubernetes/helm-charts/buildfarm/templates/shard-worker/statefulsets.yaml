@@ -94,6 +94,11 @@ spec:
         {{- tpl (toYaml .) $ | nindent 8 -}}
       {{- end }}
 
+      {{- with .Values.shardWorker.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
       {{- with .Values.shardWorker.tolerations }}
       tolerations:
         {{- tpl (toYaml .) $ | nindent 8 -}}
