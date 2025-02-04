@@ -208,6 +208,8 @@ public class JedisClusterFactory {
   private static ConnectionPoolConfig createConnectionPoolConfig() {
     ConnectionPoolConfig connectionPoolConfig = new ConnectionPoolConfig();
     connectionPoolConfig.setMaxTotal(configs.getBackplane().getJedisPoolMaxTotal());
+    connectionPoolConfig.setMaxIdle(configs.getBackplane().getJedisPoolMaxIdle());
+    connectionPoolConfig.setMinIdle(configs.getBackplane().getJedisPoolMinIdle());
     return connectionPoolConfig;
   }
 
