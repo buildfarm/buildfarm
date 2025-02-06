@@ -460,14 +460,12 @@ public class RedisShardBackplane implements Backplane {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    subscriberService = BuildfarmExecutors.getSubscriberPool();
     subscriber =
         new RedisShardSubscriber(
             watchers,
             storageWorkers,
             WorkerType.STORAGE.getNumber(),
-            configs.getBackplane().getWorkerChannel(),
-            subscriberService);
+            configs.getBackplane().getWorkerChannel());
 
     operationSubscription =
         new RedisShardSubscription(
