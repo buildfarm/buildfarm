@@ -33,8 +33,11 @@ import com.google.protobuf.util.Timestamps;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -68,20 +71,19 @@ class RedisShardSubscriber extends JedisPubSub {
   private final Map<String, ShardWorker> workers;
   private final int workerChangeTypeMask;
   private final String workerChannel;
-  private final Executor executor;
+  private final Map<String, Executor> executors;
   private SettableFuture<Void> subscribeFuture = null;
 
   RedisShardSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers,
       Map<String, ShardWorker> workers,
       int workerChangeTypeMask,
-      String workerChannel,
-      Executor executor) {
+      String workerChannel) {
     this.watchers = watchers;
     this.workers = workers;
     this.workerChangeTypeMask = workerChangeTypeMask;
     this.workerChannel = workerChannel;
-    this.executor = executor;
+    this.executors = new ConcurrentHashMap<>();
   }
 
   public List<String> watchedOperationChannels() {
@@ -192,6 +194,8 @@ class RedisShardSubscriber extends JedisPubSub {
           observers.add(watchFuture::observe);
         }
       }
+      Executor executor =
+          executors.computeIfAbsent(channel, k -> Executors.newSingleThreadExecutor());
       for (Consumer<Operation> observer : observers.build()) {
         executor.execute(
             () -> {
@@ -314,6 +318,11 @@ class RedisShardSubscriber extends JedisPubSub {
     }
     for (TimedWatchFuture watchFuture : operationWatchers) {
       watchFuture.complete();
+    }
+
+    Executor executor = executors.remove(channel);
+    if (executor instanceof ExecutorService) {
+      ((ExecutorService) executor).shutdown();
     }
   }
 
