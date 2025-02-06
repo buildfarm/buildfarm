@@ -17,7 +17,6 @@ package build.buildfarm.instance.shard;
 import static build.buildfarm.instance.shard.RedisShardBackplane.printOperationChange;
 import static build.buildfarm.instance.shard.RedisShardBackplane.toTimestamp;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -51,7 +50,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
@@ -183,14 +181,9 @@ public class RedisShardSubscriberTest {
     }
   }
 
-  RedisShardSubscriber createSubscriber(
-      ListMultimap<String, TimedWatchFuture> watchers, Executor executor) {
-    return new RedisShardSubscriber(
-        watchers, /* workers= */ null, WorkerType.NONE.getNumber(), "worker-channel", executor);
-  }
-
   RedisShardSubscriber createSubscriber(ListMultimap<String, TimedWatchFuture> watchers) {
-    return createSubscriber(watchers, /* executor= */ null);
+    return new RedisShardSubscriber(
+        watchers, /* workers= */ null, WorkerType.NONE.getNumber(), "worker-channel");
   }
 
   private static final Correspondence<Rawable, Rawable> rawableCorrespondence =
@@ -208,7 +201,7 @@ public class RedisShardSubscriberTest {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
 
     TestConnection testConnection = new TestConnection();
     Thread proceedThread = new Thread(() -> operationSubscriber.start(testConnection));
@@ -286,7 +279,7 @@ public class RedisShardSubscriberTest {
   public void existingChannelWatcherSuppressesSubscription() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
     String existingChannel = "existing-channel";
     TimedWatcher existingWatcher = new UnobservableWatcher();
     watchers.put(existingChannel, new LidlessTimedWatchFuture(existingWatcher));
@@ -301,7 +294,7 @@ public class RedisShardSubscriberTest {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
 
     TestConnection testConnection = new TestConnection();
     Thread proceedThread = new Thread(() -> operationSubscriber.start(testConnection));
@@ -361,7 +354,7 @@ public class RedisShardSubscriberTest {
     TimedWatcher expiredWatcher = mock(TimedWatcher.class);
     when(expiredWatcher.isExpiredAt(any(Instant.class))).thenReturn(true);
 
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
 
     String expireChannel = "expire-channel";
     TimedWatchFuture watchFuture =
@@ -388,7 +381,7 @@ public class RedisShardSubscriberTest {
   public void unsetTypeOperationChangeIsIgnored() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
 
     operationSubscriber.onOperationChange(
         "unset-type-operation", OperationChange.getDefaultInstance());
@@ -398,7 +391,7 @@ public class RedisShardSubscriberTest {
   public void invalidOperationChangeIsIgnored() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
 
     operationSubscriber.onMessage("invalid-operation-change", "not-json!#?");
   }
@@ -409,8 +402,7 @@ public class RedisShardSubscriberTest {
     int storageWorkerType = WorkerType.STORAGE.getNumber();
     String workerChannel = "worker-channel";
     RedisShardSubscriber operationSubscriber =
-        new RedisShardSubscriber(
-            /* watchers */ null, workers, storageWorkerType, workerChannel, directExecutor());
+        new RedisShardSubscriber(/* watchers */ null, workers, storageWorkerType, workerChannel);
     String workerChangeJson =
         JsonFormat.printer()
             .print(
@@ -428,8 +420,7 @@ public class RedisShardSubscriberTest {
     int workerType = WorkerType.STORAGE.getNumber();
     String workerChannel = "worker-channel";
     RedisShardSubscriber operationSubscriber =
-        new RedisShardSubscriber(
-            /* watchers */ null, workers, workerType, workerChannel, directExecutor());
+        new RedisShardSubscriber(/* watchers */ null, workers, workerType, workerChannel);
     String workerChangeJson =
         JsonFormat.printer()
             .print(
