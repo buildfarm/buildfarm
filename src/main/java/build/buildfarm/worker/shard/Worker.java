@@ -209,9 +209,9 @@ public final class Worker extends LoggingMain {
     return instance.stripOperation(operation);
   }
 
-  private static class ReleaseClaimAndRequeueStage extends PutOperationStage {
-    public ReleaseClaimAndRequeueStage(InterruptingConsumer<Operation> requeue) {
-      super(requeue);
+  private static class ReleaseClaimStage extends PutOperationStage {
+    public ReleaseClaimStage(InterruptingConsumer<Operation> onPut) {
+      super(onPut);
     }
 
     @Override
@@ -238,14 +238,16 @@ public final class Worker extends LoggingMain {
     // It will use various execution phases for it's profile service.
     // On the other hand, a worker that is only capable of CAS storage does not need a pipeline.
     if (configs.getWorker().getCapabilities().isExecution()) {
+      // all claims should be released upon pipeline completion, but it is safe to ensure that
+      // they are whether empty or not, so do so.
       PutOperationStage completeStage =
-          new PutOperationStage(operation -> context.deactivate(operation.getName()));
+          new ReleaseClaimStage(operation -> context.deactivate(operation.getName()));
       PipelineStage errorStage = completeStage; /* new ErrorStage(); */
       SuperscalarPipelineStage reportResultStage =
           new ReportResultStage(context, completeStage, errorStage);
       SuperscalarPipelineStage executeActionStage =
           new ExecuteActionStage(context, reportResultStage, errorStage);
-      PipelineStage releaseClaimAndRequeueStage = new ReleaseClaimAndRequeueStage(context::requeue);
+      PipelineStage releaseClaimAndRequeueStage = new ReleaseClaimStage(context::requeue);
       SuperscalarPipelineStage inputFetchStage =
           new InputFetchStage(context, executeActionStage, releaseClaimAndRequeueStage);
       PipelineStage matchStage =
