@@ -5,6 +5,7 @@ metadata:
   labels:
     name: {{ include "buildfarm.fullname" . }}-shard-worker
     {{- include "buildfarm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: shard-worker
 spec:
   serviceName: {{ include "buildfarm.fullname" . }}-shard-worker
   {{- if .Values.shardWorker.autoscaling.enabled }}
@@ -26,6 +27,7 @@ spec:
       labels:
         name: {{ include "buildfarm.fullname" . }}-shard-worker
         {{- include "buildfarm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: shard-worker
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
