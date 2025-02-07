@@ -84,7 +84,7 @@ backplane:
   maxPreQueueDepth: 1000000
   priorityQueue: false
   priorityPollIntervalMillis: 100
-  timeout: 10000
+  timeoutMillis: 10000
   correlatedInvocationsIndexPrefix: CorrelatedInvocationsIndex
   maxCorrelatedInvocationsIndexTimeout: 259200
   correlatedInvocationsPrefix: CorrelatedInvocation
