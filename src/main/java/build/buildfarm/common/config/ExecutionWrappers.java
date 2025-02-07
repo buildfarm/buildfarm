@@ -30,7 +30,7 @@ public class ExecutionWrappers {
    * @brief The program to use when running actions under cgroups.
    * @details This program is expected to be packaged with the worker image.
    */
-  private String cgroups = "/usr/bin/cgexec";
+  private String cgroups = "/app/build_buildfarm/cgexec-wrapper";
 
   /**
    * @field unshare
