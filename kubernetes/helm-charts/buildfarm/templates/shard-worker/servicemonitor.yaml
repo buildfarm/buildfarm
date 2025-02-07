@@ -6,6 +6,9 @@ metadata:
   name: {{ include "buildfarm.fullname" . }}-shard-worker
   labels:
     {{- include "buildfarm.labels" . | nindent 4 }}
+    {{- with .Values.shardWorker.serviceMonitor.additionalLabels -}}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   endpoints:
     - port: "metrics"
