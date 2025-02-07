@@ -465,8 +465,8 @@ public class RedisShardBackplane implements Backplane {
             watchers,
             storageWorkers,
             WorkerType.STORAGE.getNumber(),
-            configs.getBackplane().getWorkerChannel());
-
+            configs.getBackplane().getWorkerChannel(),
+            new ConcurrentHashMap<>());
     operationSubscription =
         new RedisShardSubscription(
             subscriber,

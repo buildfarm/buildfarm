@@ -34,6 +34,7 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
 import com.google.common.util.concurrent.SettableFuture;
+import java.util.HashMap;
 import java.util.List;
 import java.util.function.Consumer;
 import org.junit.Assert;
@@ -50,7 +51,7 @@ public class RedisShardSubscriptionTest {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    return new RedisShardSubscriber(watchers, null, 1, "worker-channel");
+    return new RedisShardSubscriber(watchers, null, 1, "worker-channel", new HashMap<>());
   }
 
   @Test

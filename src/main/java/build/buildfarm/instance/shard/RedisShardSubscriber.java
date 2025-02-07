@@ -33,7 +33,6 @@ import com.google.protobuf.util.Timestamps;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -78,12 +77,13 @@ class RedisShardSubscriber extends JedisPubSub {
       ListMultimap<String, TimedWatchFuture> watchers,
       Map<String, ShardWorker> workers,
       int workerChangeTypeMask,
-      String workerChannel) {
+      String workerChannel,
+      Map<String, Executor> executors) {
     this.watchers = watchers;
     this.workers = workers;
     this.workerChangeTypeMask = workerChangeTypeMask;
     this.workerChannel = workerChannel;
-    this.executors = new ConcurrentHashMap<>();
+    this.executors = executors;
   }
 
   public List<String> watchedOperationChannels() {
