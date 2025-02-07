@@ -121,6 +121,9 @@ spec:
       metadata:
         name: {{ include "buildfarm.fullname" . }}-shard-worker-data
       spec:
+        {{- with .Values.shardWorker.csi }}
+        {{- tpo (toYaml .) $ | nindent 8 }}
+        {{- end }}
         accessModes: ["ReadWriteOnce"]
         {{- with .Values.shardWorker.storage.class }}
         storageClassName: "{{ . }}"
