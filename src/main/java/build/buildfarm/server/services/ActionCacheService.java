@@ -96,19 +96,23 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
           @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
-            log.log(
-                Level.WARNING,
-                format(
-                    "getActionResult(%s): %s",
-                    request.getInstanceName(), DigestUtil.toString(actionDigest)),
-                t);
             Status status = Status.fromThrowable(t);
-            if (!call.isCancelled()) {
-              try {
-                responseObserver.onError(status.asException());
-              } catch (StatusRuntimeException e) {
-                // ignore
-              }
+            if (call.isCancelled()) {
+              // no further logging/response required
+              return;
+            }
+            if (status.getCode() != Status.Code.CANCELLED) {
+              log.log(
+                  Level.WARNING,
+                  format(
+                      "getActionResult(%s): %s",
+                      request.getInstanceName(), DigestUtil.toString(actionDigest)),
+                  t);
+            }
+            try {
+              responseObserver.onError(status.asException());
+            } catch (StatusRuntimeException e) {
+              // ignore
             }
           }
         },
