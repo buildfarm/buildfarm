@@ -41,8 +41,19 @@ import lombok.extern.java.Log;
 
 @Log
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
-  private static final Counter actionResultsMetric =
-      Counter.build().name("action_results").help("Action results.").register();
+  private static final Counter requests =
+      Counter.build().name("action_results").help("Action result requests.").register();
+  private static final Counter kinds =
+      Counter.build()
+          .name("action_result_kind")
+          .labelNames("kind")
+          .help("Action result response kind: hit, miss, or code.")
+          .register();
+  private static final Counter cancellations =
+      Counter.build()
+          .name("action_results_cancelled")
+          .help("Action result requests cancelled.")
+          .register();
 
   private final Instance instance;
   private final boolean isWritable;
@@ -84,9 +95,11 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
             try {
               if (actionResult == null) {
                 responseObserver.onError(Status.NOT_FOUND.asException());
+                kinds.labels("miss").inc();
               } else {
                 responseObserver.onNext(actionResult);
                 responseObserver.onCompleted();
+                kinds.labels("hit").inc();
               }
             } catch (StatusRuntimeException e) {
               onFailure(e);
@@ -98,6 +111,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (call.isCancelled()) {
+              cancellations.inc();
               // no further logging/response required
               return;
             }
@@ -111,13 +125,14 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
             }
             try {
               responseObserver.onError(status.asException());
+              kinds.labels(status.getCode().toString().toLowerCase()).inc();
             } catch (StatusRuntimeException e) {
               // ignore
             }
           }
         },
         directExecutor());
-    actionResultsMetric.inc();
+    requests.inc();
   }
 
   @Override
