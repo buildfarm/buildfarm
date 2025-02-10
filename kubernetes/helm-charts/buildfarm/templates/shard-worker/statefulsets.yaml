@@ -5,6 +5,7 @@ metadata:
   labels:
     name: {{ include "buildfarm.fullname" . }}-shard-worker
     {{- include "buildfarm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: shard-worker
 spec:
   serviceName: {{ include "buildfarm.fullname" . }}-shard-worker
   {{- if .Values.shardWorker.autoscaling.enabled }}
@@ -26,6 +27,7 @@ spec:
       labels:
         name: {{ include "buildfarm.fullname" . }}-shard-worker
         {{- include "buildfarm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: shard-worker
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -72,8 +74,10 @@ spec:
             - mountPath: /config
               name: config
               readOnly: true
+            {{ if .Values.shardWorker.storage.enabled }}
             - mountPath: /tmp/worker
               name: {{ include "buildfarm.fullname" . }}-shard-worker-data
+            {{ end }}
             - mountPath: /shard-worker-log-props
               name: shard-worker-log-props
               readOnly: true
@@ -118,6 +122,7 @@ spec:
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: {{ .Values.shardWorker.persistentVolumeClaimRetentionPolicy.whenDeleted }}
     whenScaled: {{ .Values.shardWorker.persistentVolumeClaimRetentionPolicy.whenScaled }}
+  {{- if .Values.shardWorker.storage.enabled }}
   volumeClaimTemplates:
     - apiVersion: v1
       kind: PersistentVolumeClaim
@@ -131,3 +136,4 @@ spec:
         resources:
           requests:
             storage: "{{ .Values.shardWorker.storage.size }}"
+  {{- end }}

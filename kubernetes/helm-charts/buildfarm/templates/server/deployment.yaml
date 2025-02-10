@@ -5,6 +5,7 @@ metadata:
   labels:
     name: {{ include "buildfarm.fullname" . }}-server
     {{- include "buildfarm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
 spec:
   replicas: {{ .Values.server.replicaCount }}
   selector:
@@ -21,6 +22,7 @@ spec:
       labels:
         name: {{ include "buildfarm.fullname" . }}-server
         {{- include "buildfarm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: server
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
