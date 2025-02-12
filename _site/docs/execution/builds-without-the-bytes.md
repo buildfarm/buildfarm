@@ -21,7 +21,7 @@ The stored ActionResult also has no source - if you switch bazel `--remote_cache
 
 If ActionResult contents expire on Buildfarm, when bazel requests them, it will fail, hopefully with the special REMOTE_CACHE_EVICTED (39) exit code. The [flag](https://bazel.build/reference/command-line-reference#flag--experimental_remote_cache_eviction_retries) `--experimental_remote_cache_eviction_retries` will cause bazel to restart a build _with no intervention required_, for the specified limit # of times.
 
-Buildfarm server configs now default to `ensureOutputsPresent: true`. When bazel requests an ActionResult, it will be NOT_FOUND (cache miss) unless all of its contents exist in the CAS. This also extends the lifetime of those contents (without shard loss) to the minimum ttl before expiration.
+Buildfarm (since [2.11](https://github.com/buildfarm/buildfarm/releases/tag/2.11.0)) defaults to `ensureOutputsPresent: true` in server configs. When bazel requests an ActionResult, it will be NOT_FOUND (cache miss) unless all of its contents exist in the CAS. This also extends the lifetime of those contents (without shard loss) to the minimum ttl before expiration.
 
 With `ensureOutputsPresent: false`, there is also a mechanism to control this check on a per-request level.
 
