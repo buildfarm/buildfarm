@@ -73,6 +73,11 @@ server:
   affinity: {}
   topologySpreadConstraints: []
 
+  ## Security Context
+  ## https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+  ##
+  securityContext: {}
+
   ## Pod Disruption Budget configuration
   ## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
   ##
@@ -169,6 +174,11 @@ shardWorker:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+
+  ## Security Context
+  ## https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+  ##
+  securityContext: {}
 
   ## Pod Disruption Budget configuration
   ## ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/

@@ -35,7 +35,7 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "buildfarm.serviceAccountName" . }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- toYaml .Values.shardWorker.securityContext | nindent 8 }}
       containers:
         - name: buildfarm-worker
           image: "{{ .Values.shardWorker.image.repository }}:{{ .Values.shardWorker.image.tag | default .Chart.AppVersion }}"
