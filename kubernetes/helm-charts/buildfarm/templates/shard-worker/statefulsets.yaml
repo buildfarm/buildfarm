@@ -120,6 +120,9 @@ spec:
         {{- tpl (toYaml .) $ | nindent 8 }}
         {{- end }}
   {{- if .Values.shardWorker.storage.enabled }}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: {{ .Values.shardWorker.persistentVolumeClaimRetentionPolicy.whenDeleted }}
+    whenScaled: {{ .Values.shardWorker.persistentVolumeClaimRetentionPolicy.whenScaled }}
   volumeClaimTemplates:
     - apiVersion: v1
       kind: PersistentVolumeClaim
