@@ -542,6 +542,11 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
+  public boolean isReadOnly() {
+    return false;
+  }
+
+  @Override
   public Write getOperationStreamWrite(String name) {
     return getWrite(
         name,
