@@ -416,6 +416,11 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
+  public boolean isReadOnly() {
+    return contentAddressableStorage.isReadOnly();
+  }
+
+  @Override
   public Write getBlobWrite(
       Compressor.Value compressor,
       build.buildfarm.v1test.Digest digest,

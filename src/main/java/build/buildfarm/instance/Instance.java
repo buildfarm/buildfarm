@@ -99,6 +99,8 @@ public interface Instance {
   String getTree(
       build.buildfarm.v1test.Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree);
 
+  boolean isReadOnly();
+
   Write getBlobWrite(
       Compressor.Value compressor,
       build.buildfarm.v1test.Digest digest,
