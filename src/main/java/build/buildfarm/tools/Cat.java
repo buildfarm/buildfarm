@@ -585,7 +585,7 @@ class Cat {
       ExecuteResponse response, DigestFunction.Value digestFunction)
       throws InvalidProtocolBufferException {
     printStatus(response.getStatus());
-    if (Code.forNumber(response.getStatus().getCode()) == Code.OK) {
+    if (response.hasResult()) {
       printActionResult(response.getResult(), digestFunction, 2);
       System.out.println("  CachedResult: " + (response.getCachedResult() ? "true" : "false"));
     }
