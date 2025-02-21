@@ -24,7 +24,6 @@ import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Digest;
@@ -41,17 +40,26 @@ import lombok.extern.java.Log;
 
 @Log
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
-  private static final Counter actionResultsMetric =
-      Counter.build().name("action_results").help("Action results.").register();
+  private static final Counter requests =
+      Counter.build().name("action_results").help("Action result requests.").register();
+  private static final Counter kinds =
+      Counter.build()
+          .name("action_result_kind")
+          .labelNames("kind")
+          .help("Action result response kind: hit, miss, or code.")
+          .register();
+  private static final Counter cancellations =
+      Counter.build()
+          .name("action_results_cancelled")
+          .help("Action result requests cancelled.")
+          .register();
 
   private final Instance instance;
   private final boolean isWritable;
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
-  public ActionCacheService(Instance instance) {
+  public ActionCacheService(Instance instance, boolean isWritable) {
     this.instance = instance;
-    this.isWritable = !configs.getServer().isActionCacheReadOnly();
+    this.isWritable = isWritable;
   }
 
   @Override
@@ -84,9 +92,11 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
             try {
               if (actionResult == null) {
                 responseObserver.onError(Status.NOT_FOUND.asException());
+                kinds.labels("miss").inc();
               } else {
                 responseObserver.onNext(actionResult);
                 responseObserver.onCompleted();
+                kinds.labels("hit").inc();
               }
             } catch (StatusRuntimeException e) {
               onFailure(e);
@@ -96,34 +106,35 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
           @SuppressWarnings("NullableProblems")
           @Override
           public void onFailure(Throwable t) {
-            log.log(
-                Level.WARNING,
-                format(
-                    "getActionResult(%s): %s",
-                    request.getInstanceName(), DigestUtil.toString(actionDigest)),
-                t);
             Status status = Status.fromThrowable(t);
-            if (!call.isCancelled()) {
-              try {
-                responseObserver.onError(status.asException());
-              } catch (StatusRuntimeException e) {
-                // ignore
-              }
+            if (call.isCancelled()) {
+              cancellations.inc();
+              // no further logging/response required
+              return;
+            }
+            if (status.getCode() != Status.Code.CANCELLED) {
+              log.log(
+                  Level.WARNING,
+                  format(
+                      "getActionResult(%s): %s",
+                      request.getInstanceName(), DigestUtil.toString(actionDigest)),
+                  t);
+            }
+            try {
+              responseObserver.onError(status.asException());
+              kinds.labels(status.getCode().toString().toLowerCase()).inc();
+            } catch (StatusRuntimeException e) {
+              // ignore
             }
           }
         },
         directExecutor());
-    actionResultsMetric.inc();
+    requests.inc();
   }
 
   @Override
   public void updateActionResult(
       UpdateActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
-    // A user with write access to the cache can write anything, including malicious code and
-    // binaries, which can then be returned to other users on cache lookups.  This is a security
-    // concern.  To counteract this, we allow enforcing a policy where clients cannot upload to the
-    // action cache.  In this paradigm, it is only the remote execution engine itself that populates
-    // the action cache.
     if (!isWritable) {
       responseObserver.onError(Status.PERMISSION_DENIED.asException());
       return;
