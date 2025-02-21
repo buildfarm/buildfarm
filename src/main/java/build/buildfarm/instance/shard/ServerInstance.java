@@ -2455,11 +2455,15 @@ public class ServerInstance extends NodeInstance {
       throws Exception {
     recentCacheServedExecutions.put(requestMetadata, true);
 
-    ExecuteOperationMetadata completeMetadata =
-        ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(DigestUtil.toDigest(actionKey.getDigest()))
-            .setStage(ExecutionStage.Value.COMPLETED)
-            .setDigestFunction(actionKey.getDigest().getDigestFunction())
+    QueuedOperationMetadata completeMetadata =
+        QueuedOperationMetadata.newBuilder()
+            .setExecuteOperationMetadata(
+                ExecuteOperationMetadata.newBuilder()
+                    .setActionDigest(DigestUtil.toDigest(actionKey.getDigest()))
+                    .setStage(ExecutionStage.Value.COMPLETED)
+                    .setDigestFunction(actionKey.getDigest().getDigestFunction())
+                    .build())
+            .setRequestMetadata(requestMetadata)
             .build();
 
     Operation completedOperation =
@@ -2476,7 +2480,8 @@ public class ServerInstance extends NodeInstance {
             .setMetadata(Any.pack(completeMetadata))
             .build();
     backplane.unmergeExecution(actionKey);
-    backplane.putOperation(completedOperation, completeMetadata.getStage());
+    backplane.putOperation(
+        completedOperation, completeMetadata.getExecuteOperationMetadata().getStage());
   }
 
   private ListenableFuture<Boolean> checkCacheFuture(
