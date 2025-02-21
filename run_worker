@@ -14,5 +14,11 @@ else
   config=$1
 fi
 
+declare -a prometheus_port_arg
+if lsof -ti :9090 &>/dev/null
+then
+    prometheus_port_arg=(--prometheus_port=9091)
+fi
+
 # Run Worker
-bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file="$PWD/examples/logging.properties" "$config"
+bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file="$PWD/examples/logging.properties" "${prometheus_port_arg[@]}" "$config"
