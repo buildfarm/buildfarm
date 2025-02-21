@@ -1001,7 +1001,7 @@ public class ServerInstanceTest {
   }
 
   @Test
-  public void wtchExecutionCallsBackplaneForIncompleteOperation() throws IOException {
+  public void watchExecutionCallsBackplaneForIncompleteOperation() throws IOException {
     Watcher watcher = mock(Watcher.class);
     UUID incompleteExecution = UUID.randomUUID();
     Operation incompleteOperation =
