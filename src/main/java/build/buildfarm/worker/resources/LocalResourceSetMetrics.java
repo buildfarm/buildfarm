@@ -41,7 +41,7 @@ public class LocalResourceSetMetrics {
           .name("local_resource_requesters")
           .labelNames("resource_name")
           .help(
-              "Tracks how many actions have requested local resources.  This can help determine if"
+              "Tracks how many actions have requested local resources. This can help determine if"
                   + " resources are being hogged by some actions.")
           .register();
 }
