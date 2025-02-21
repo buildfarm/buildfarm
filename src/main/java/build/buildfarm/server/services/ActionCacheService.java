@@ -24,7 +24,6 @@ import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Digest;
@@ -47,11 +46,9 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   private final Instance instance;
   private final boolean isWritable;
 
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
-  public ActionCacheService(Instance instance) {
+  public ActionCacheService(Instance instance, boolean isWritable) {
     this.instance = instance;
-    this.isWritable = !configs.getServer().isActionCacheReadOnly();
+    this.isWritable = isWritable;
   }
 
   @Override
@@ -119,11 +116,6 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   @Override
   public void updateActionResult(
       UpdateActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
-    // A user with write access to the cache can write anything, including malicious code and
-    // binaries, which can then be returned to other users on cache lookups.  This is a security
-    // concern.  To counteract this, we allow enforcing a policy where clients cannot upload to the
-    // action cache.  In this paradigm, it is only the remote execution engine itself that populates
-    // the action cache.
     if (!isWritable) {
       responseObserver.onError(Status.PERMISSION_DENIED.asException());
       return;

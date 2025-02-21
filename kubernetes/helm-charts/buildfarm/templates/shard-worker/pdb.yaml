@@ -1,0 +1,19 @@
+{{- if .Values.shardWorker.pdb.create }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-shard-worker
+  labels:
+  {{- include "buildfarm.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.shardWorker.pdb.minAvailable }}
+  minAvailable: {{ .Values.shardWorker.pdb.minAvailable }}
+  {{- end }}
+  {{- if or .Values.shardWorker.pdb.maxUnavailable (not .Values.shardWorker.pdb.minAvailable)}}
+  maxUnavailable: {{ .Values.shardWorker.pdb.maxUnavailable | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      name: {{ include "buildfarm.fullname" . }}-shard-worker
+      {{- include "buildfarm.selectorLabels" . | nindent 6 }}
+{{- end }}
