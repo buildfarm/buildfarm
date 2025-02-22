@@ -30,6 +30,7 @@ class HexBucketEntryPathStrategy implements EntryPathStrategy {
   public Path getPath(String key) {
     checkState(levels == 0 || pattern.matcher(key).matches());
     Path keyPath = path;
+    // THIS NEEDS TO BE FIXED FOR DIGEST FUNCTIONS
     for (int i = 0; i < levels; i++) {
       keyPath = keyPath.resolve(key.substring(i * 2, i * 2 + 2));
     }
