@@ -133,7 +133,7 @@ maven.install(
         "org.slf4j:slf4j-simple:2.0.16",
         "org.threeten:threetenbp:1.7.0",
         "org.xerial:sqlite-jdbc:3.47.0.0",
-        "org.yaml:snakeyaml:2.3",
+        "org.yaml:snakeyaml:2.4",
         "redis.clients:jedis:5.2.0",
     ],
     boms = [
