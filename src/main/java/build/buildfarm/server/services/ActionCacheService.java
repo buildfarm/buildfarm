@@ -40,8 +40,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
-  private static final Counter actionResultsMetric =
-      Counter.builder().name("action_results").help("Action results.").register();
   private static final Counter requests =
       Counter.builder().name("action_results").help("Action result requests.").register();
   private static final Counter kinds =
