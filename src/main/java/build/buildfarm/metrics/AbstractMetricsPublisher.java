@@ -26,44 +26,49 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
-import io.prometheus.client.Counter;
-import io.prometheus.client.Histogram;
+import io.prometheus.metrics.core.metrics.Counter;
+import io.prometheus.metrics.core.metrics.Histogram;
+import io.prometheus.metrics.model.snapshots.Unit;
 import java.util.logging.Level;
 import lombok.extern.java.Log;
 
 @Log
 public abstract class AbstractMetricsPublisher implements MetricsPublisher {
   private static final Counter actionsCounter =
-      Counter.build().name("actions").help("Number of actions.").register();
+      Counter.builder().name("actions").help("Number of actions.").register();
   private static final Counter operationsInStage =
-      Counter.build()
+      Counter.builder()
           .name("operations_stage_load")
           .labelNames("stage_name")
           .help("Operations in stage.")
           .register();
   private static final Counter operationStatus =
-      Counter.build()
+      Counter.builder()
           .name("operation_status")
           .labelNames("code")
           .help("Operation execution status.")
           .register();
   private static final Counter operationsPerWorker =
-      Counter.build()
+      Counter.builder()
           .name("operation_worker")
           .labelNames("worker_name")
           .help("Operations per worker.")
           .register();
 
   private static final Counter operationExitCode =
-      Counter.build()
+      Counter.builder()
           .name("operation_exit_code")
           .labelNames("exit_code")
           .help("Operation execution exit code.")
           .register();
-  private static final Histogram queuedTime =
-      Histogram.build().name("queued_time_ms").help("Queued time in ms.").register();
-  private static final Histogram outputUploadTime =
-      Histogram.build().name("output_upload_time_ms").help("Output upload time in ms.").register();
+  private static final Histogram queuedTimeSeconds =
+      Histogram.builder().name("queued_time").unit(Unit.SECONDS).help("Queued time.").register();
+  private static final Histogram outputUploadTimeSeconds =
+      Histogram.builder()
+          .name("output_upload_time")
+          .unit(Unit.SECONDS)
+          .help("Output upload time")
+          .register();
 
   private final String clusterId;
 
@@ -101,12 +106,12 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
                 .setExecuteResponse(operation.getResponse().unpack(ExecuteResponse.class))
                 .build();
         operationStatus
-            .labels(
+            .labelValues(
                 Code.forNumber(operationRequestMetadata.getExecuteResponse().getStatus().getCode())
                     .name())
             .inc();
         operationExitCode
-            .labels(
+            .labelValues(
                 Integer.toString(
                     operationRequestMetadata.getExecuteResponse().getResult().getExitCode()))
             .inc();
@@ -114,13 +119,13 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
             && operationRequestMetadata.getExecuteResponse().getResult().hasExecutionMetadata()) {
           ExecutedActionMetadata executionMetadata =
               operationRequestMetadata.getExecuteResponse().getResult().getExecutionMetadata();
-          operationsPerWorker.labels(executionMetadata.getWorker()).inc();
-          queuedTime.observe(
-              Time.toDurationMs(
+          operationsPerWorker.labelValues(executionMetadata.getWorker()).inc();
+          queuedTimeSeconds.observe(
+              Time.toDurationSeconds(
                   executionMetadata.getQueuedTimestamp(),
                   executionMetadata.getExecutionStartTimestamp()));
-          outputUploadTime.observe(
-              Time.toDurationMs(
+          outputUploadTimeSeconds.observe(
+              Time.toDurationSeconds(
                   executionMetadata.getOutputUploadStartTimestamp(),
                   executionMetadata.getOutputUploadCompletedTimestamp()));
         }
@@ -132,7 +137,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
                     operation.getMetadata().unpack(ExecuteOperationMetadata.class))
                 .build();
         operationsInStage
-            .labels(operationRequestMetadata.getExecuteOperationMetadata().getStage().name())
+            .labelValues(operationRequestMetadata.getExecuteOperationMetadata().getStage().name())
             .inc();
       }
       return operationRequestMetadata;

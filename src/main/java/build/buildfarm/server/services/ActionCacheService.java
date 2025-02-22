@@ -33,7 +33,7 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
-import io.prometheus.client.Counter;
+import io.prometheus.metrics.core.metrics.Counter;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
@@ -41,15 +41,15 @@ import lombok.extern.java.Log;
 @Log
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   private static final Counter requests =
-      Counter.build().name("action_results").help("Action result requests.").register();
+      Counter.builder().name("action_results").help("Action result requests.").register();
   private static final Counter kinds =
-      Counter.build()
+      Counter.builder()
           .name("action_result_kind")
           .labelNames("kind")
           .help("Action result response kind: hit, miss, or code.")
           .register();
   private static final Counter cancellations =
-      Counter.build()
+      Counter.builder()
           .name("action_results_cancelled")
           .help("Action result requests cancelled.")
           .register();
@@ -92,11 +92,11 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
             try {
               if (actionResult == null) {
                 responseObserver.onError(Status.NOT_FOUND.asException());
-                kinds.labels("miss").inc();
+                kinds.labelValues("miss").inc();
               } else {
                 responseObserver.onNext(actionResult);
                 responseObserver.onCompleted();
-                kinds.labels("hit").inc();
+                kinds.labelValues("hit").inc();
               }
             } catch (StatusRuntimeException e) {
               onFailure(e);
@@ -122,7 +122,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
             }
             try {
               responseObserver.onError(status.asException());
-              kinds.labels(status.getCode().toString().toLowerCase()).inc();
+              kinds.labelValues(status.getCode().toString().toLowerCase()).inc();
             } catch (StatusRuntimeException e) {
               // ignore
             }

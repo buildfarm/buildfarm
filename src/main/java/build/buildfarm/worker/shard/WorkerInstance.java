@@ -52,7 +52,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.stub.ServerCallStreamObserver;
-import io.prometheus.client.Counter;
+import io.prometheus.metrics.core.metrics.Counter;
+import io.prometheus.metrics.model.snapshots.Unit;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -66,7 +67,7 @@ import lombok.extern.java.Log;
 @Log
 public class WorkerInstance extends NodeInstance {
   private static final Counter IO_METRIC =
-      Counter.build().name("io_bytes_read").help("Read I/O (bytes)").register();
+      Counter.builder().name("io_bytes_read").unit(Unit.BYTES).help("Read I/O (bytes)").register();
 
   private final Backplane backplane;
 

@@ -110,9 +110,10 @@ maven.install(
         "io.netty:netty-transport-native-epoll",
         "io.netty:netty-transport-native-kqueue",
         "io.netty:netty-transport-native-unix-common",
-        "io.prometheus:simpleclient:0.16.0",
-        "io.prometheus:simpleclient_hotspot:0.16.0",
-        "io.prometheus:simpleclient_httpserver:0.16.0",
+        "io.prometheus:prometheus-metrics-core",  # Version is specified via the BOM below
+        "io.prometheus:prometheus-metrics-exporter-httpserver",
+        "io.prometheus:prometheus-metrics-instrumentation-jvm",
+        "io.prometheus:prometheus-metrics-model",
         "javax.annotation:javax.annotation-api:1.3.2",
         "me.dinowernli:java-grpc-prometheus:0.6.0",
         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
@@ -143,6 +144,7 @@ maven.install(
         "com.google.auth:google-auth-library-bom:1.23.0",
         "io.grpc:grpc-bom:1.62.2",
         "io.netty:netty-bom:4.1.108.Final",
+        "io.prometheus:prometheus-metrics-bom:1.3.0",
     ],
     fail_if_repin_required = True,  # TO RE-PIN: REPIN=1 bazel run @unpinned_maven//:pin
     generate_compat_repositories = True,

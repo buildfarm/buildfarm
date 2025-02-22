@@ -48,7 +48,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.stub.StreamObserver;
-import io.prometheus.client.Histogram;
+import io.prometheus.metrics.core.metrics.Histogram;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -59,11 +59,7 @@ import lombok.extern.java.Log;
 public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
   private static final Histogram missingBlobs =
-      Histogram.build()
-          .exponentialBuckets(1, 2, 12)
-          .name("missing_blobs")
-          .help("Find missing blobs.")
-          .register();
+      Histogram.builder().name("missing_blobs").help("Find missing blobs.").register();
 
   private final Instance instance;
   private final long writeDeadlineAfter;

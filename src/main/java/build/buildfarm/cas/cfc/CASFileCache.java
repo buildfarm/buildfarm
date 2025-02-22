@@ -59,7 +59,6 @@ import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.EntryLimitException;
-import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.ZstdCompressingInputStream;
@@ -97,9 +96,10 @@ import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.prometheus.client.Counter;
-import io.prometheus.client.Gauge;
-import io.prometheus.client.Histogram;
+import io.prometheus.metrics.core.metrics.Counter;
+import io.prometheus.metrics.core.metrics.Gauge;
+import io.prometheus.metrics.core.metrics.Histogram;
+import io.prometheus.metrics.model.snapshots.Unit;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -147,32 +147,25 @@ import lombok.extern.java.Log;
 public abstract class CASFileCache implements ContentAddressableStorage {
   // Prometheus metrics
   private static final Counter expiredKeyCounter =
-      Counter.build().name("expired_key").help("Number of key expirations.").register();
+      Counter.builder().name("expired_key").help("Number of key expirations.").register();
   private static final Gauge casSizeMetric =
-      Gauge.build().name("cas_size").help("CAS size.").register();
+      Gauge.builder().name("cas_size").help("CAS size.").register();
   private static final Gauge casEntryCountMetric =
-      Gauge.build().name("cas_entry_count").help("Number of entries in the CAS.").register();
-  private static Histogram casTtl =
-      Histogram.build()
-          .name("cas_ttl_s")
-          .buckets(
-              3600, // 1 hour
-              21600, // 6 hours
-              86400, // 1 day
-              345600, // 4 days
-              604800, // 1 week
-              1210000 // 2 weeks
-              )
+      Gauge.builder().name("cas_entry_count").help("Number of entries in the CAS.").register();
+  private static Histogram casTtlSeconds =
+      Histogram.builder()
+          .name("cas_ttl")
+          .unit(Unit.SECONDS)
           .help("The amount of time CAS entries live on L1 storage before expiration (seconds)")
           .register();
 
   private static final Counter casCopyFallbackMetric =
-      Counter.build()
+      Counter.builder()
           .name("cas_copy_fallback")
           .help("Number of times the CAS performed a file copy because hardlinking failed")
           .register();
   private static final Counter readIOErrors =
-      Counter.build().name("read_io_errors").help("Number of IO errors on read.").register();
+      Counter.builder().name("read_io_errors").help("Number of IO errors on read.").register();
 
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
@@ -2797,7 +2790,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     // TODO introduce ttl clock
     long currentTimeMs = new Date().getTime();
     long ttlMs = currentTimeMs - createdTimeMs;
-    casTtl.observe(Time.millisecondsToSeconds(ttlMs));
+    casTtlSeconds.observe(MILLISECONDS.toSeconds(ttlMs));
   }
 
   @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored"})

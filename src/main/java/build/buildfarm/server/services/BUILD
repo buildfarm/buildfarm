@@ -31,7 +31,7 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_stub",
-        "@maven//:io_prometheus_simpleclient",
+        "@maven//:io_prometheus_prometheus_metrics_core",
         "@maven//:org_projectlombok_lombok",
         "@remoteapis//build/bazel/remote/asset/v1:remote_asset_java_proto",
         "@remoteapis//build/bazel/semver:semver_java_proto",

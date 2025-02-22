@@ -63,17 +63,6 @@ public class Time {
   }
 
   /**
-   * @brief Milliseconds to seconds.
-   * @details Milliseconds to seconds.
-   * @param milliseconds Milliseconds to convert.
-   * @return Seconds converted from milliseconds.
-   * @note Suggested return identifier: seconds.
-   */
-  public static long millisecondsToSeconds(long milliseconds) {
-    return milliseconds / 1000L;
-  }
-
-  /**
    * Converts the difference in two timestamps, into milliseconds
    *
    * @param start
@@ -85,5 +74,19 @@ public class Time {
     // start must be <= end
     checkArgument(Timestamps.compare(start, end) <= 0);
     return Durations.toMillis(Timestamps.between(start, end));
+  }
+
+  /**
+   * Converts the difference in two timestamps, into seconds
+   *
+   * @param start
+   * @param end
+   * @return The difference, in seconds
+   * @throws IllegalArgumentException if start > end.
+   */
+  public static double toDurationSeconds(Timestamp start, Timestamp end) {
+    // start must be <= end
+    checkArgument(Timestamps.compare(start, end) <= 0);
+    return Durations.toSeconds(Timestamps.between(start, end));
   }
 }

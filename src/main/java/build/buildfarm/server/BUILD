@@ -26,7 +26,7 @@ java_library(
         "@maven//:io_grpc_grpc_netty",
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_util",
-        "@maven//:io_prometheus_simpleclient",
+        "@maven//:io_prometheus_prometheus_metrics_core",
         "@maven//:javax_annotation_javax_annotation_api",
         "@maven//:org_bouncycastle_bcprov_jdk15on",
         "@maven//:org_projectlombok_lombok",

@@ -8,9 +8,9 @@ java_library(
     plugins = ["//src/main/java/build/buildfarm/common:lombok"],
     visibility = ["//visibility:public"],
     deps = [
-        "@maven//:io_prometheus_simpleclient",
-        "@maven//:io_prometheus_simpleclient_hotspot",
-        "@maven//:io_prometheus_simpleclient_httpserver",
+        "@maven//:io_prometheus_prometheus_metrics_core",
+        "@maven//:io_prometheus_prometheus_metrics_exporter_httpserver",
+        "@maven//:io_prometheus_prometheus_metrics_instrumentation_jvm",
         "@maven//:org_projectlombok_lombok",
     ],
 )

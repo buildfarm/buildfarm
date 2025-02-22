@@ -32,7 +32,6 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.Time;
 import build.buildfarm.common.Visitor;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.WorkerIndexer;
@@ -229,7 +228,7 @@ public class RedisShardBackplane implements Backplane {
               // persist the flag for at least an hour, and at most 10 times longer than the timeout
               // the key identifies so that we don't loop with the flag expired, resetting the
               // unaccounted for operation
-              long expire_s = Math.max(3600, Time.millisecondsToSeconds(processingTimeout_ms) * 10);
+              long expire_s = Math.max(3600, MILLISECONDS.toSeconds(processingTimeout_ms) * 10);
               state.processingExecutions.insert(jedis, executionName, keyValue, expire_s);
             }
 
@@ -266,8 +265,7 @@ public class RedisShardBackplane implements Backplane {
               // persist the flag for at least an hour, and at most 10 times longer than the timeout
               // the key identifies so that we don't loop with the flag expired, resetting the
               // unaccounted for operation
-              long expire_s =
-                  Math.max(3600, Time.millisecondsToSeconds(dispatchingTimeout_ms) * 10);
+              long expire_s = Math.max(3600, MILLISECONDS.toSeconds(dispatchingTimeout_ms) * 10);
               state.dispatchingExecutions.insert(jedis, executionName, keyValue, expire_s);
             }
 

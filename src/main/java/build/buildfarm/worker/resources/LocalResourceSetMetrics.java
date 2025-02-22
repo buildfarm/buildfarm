@@ -14,7 +14,7 @@
 
 package build.buildfarm.worker.resources;
 
-import io.prometheus.client.Gauge;
+import io.prometheus.metrics.core.metrics.Gauge;
 
 /**
  * @class LocalResourceSetMetrics
@@ -23,21 +23,21 @@ import io.prometheus.client.Gauge;
  */
 public class LocalResourceSetMetrics {
   public static final Gauge resourceUsageMetric =
-      Gauge.build()
+      Gauge.builder()
           .name("local_resource_usage")
           .labelNames("resource_name")
           .help("The number of claims for each resource currently being used for execution")
           .register();
 
   public static final Gauge resourceTotalMetric =
-      Gauge.build()
-          .name("local_resource_total")
+      Gauge.builder()
+          .name("local_resource")
           .labelNames("resource_name")
           .help("The total number of claims exist for a particular resource")
           .register();
 
   public static final Gauge requestersMetric =
-      Gauge.build()
+      Gauge.builder()
           .name("local_resource_requesters")
           .labelNames("resource_name")
           .help(

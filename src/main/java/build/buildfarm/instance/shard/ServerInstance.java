@@ -137,9 +137,10 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.prometheus.client.Counter;
-import io.prometheus.client.Gauge;
-import io.prometheus.client.Histogram;
+import io.prometheus.metrics.core.metrics.Counter;
+import io.prometheus.metrics.core.metrics.Gauge;
+import io.prometheus.metrics.core.metrics.Histogram;
+import io.prometheus.metrics.model.snapshots.Unit;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -191,55 +192,58 @@ public class ServerInstance extends NodeInstance {
 
   // Prometheus metrics
   private static final Counter executionSuccess =
-      Counter.build().name("execution_success").help("Execution success.").register();
+      Counter.builder().name("execution_success").help("Execution success.").register();
   private static final Counter mergedExecutions =
-      Counter.build().name("merged_executions").help("Merged executions.").register();
+      Counter.builder().name("merged_executions").help("Merged executions.").register();
   private static final Gauge preQueueSize =
-      Gauge.build().name("pre_queue_size").help("Pre queue size.").register();
+      Gauge.builder().name("pre_queue_size").help("Pre queue size.").register();
   private static final Counter casHitCounter =
-      Counter.build()
+      Counter.builder()
           .name("cas_hit")
           .help("Number of successful CAS hits from worker-worker.")
           .register();
   private static final Counter casMissCounter =
-      Counter.build().name("cas_miss").help("Number of CAS misses from worker-worker.").register();
+      Counter.builder()
+          .name("cas_miss")
+          .help("Number of CAS misses from worker-worker.")
+          .register();
   private static final Counter requeueFailureCounter =
-      Counter.build()
+      Counter.builder()
           .name("requeue_failure")
           .help("Number of operations that failed to requeue.")
           .register();
   private static final Counter queueFailureCounter =
-      Counter.build()
+      Counter.builder()
           .name("queue_failure")
           .help("Number of operations that failed to queue.")
           .register();
   // Metrics about the dispatched operations
   private static final Gauge dispatchedOperationsSize =
-      Gauge.build()
+      Gauge.builder()
           .name("dispatched_operations_size")
           .help("Dispatched operations size.")
           .register();
 
   // Other metrics from the backplane
   private static final Gauge workerPoolSize =
-      Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
+      Gauge.builder().name("worker_pool_size").help("Active worker pool size.").register();
   private static final Gauge storageWorkerPoolSize =
-      Gauge.build()
+      Gauge.builder()
           .name("storage_worker_pool_size")
           .help("Active storage worker pool size.")
           .register();
   private static final Gauge executeWorkerPoolSize =
-      Gauge.build()
+      Gauge.builder()
           .name("execute_worker_pool_size")
           .help("Active execute worker pool size.")
           .register();
   private static final Gauge queueSize =
-      Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
+      Gauge.builder().name("queue_size").labelNames("queue_name").help("Queue size.").register();
 
   private static final Histogram ioMetric =
-      Histogram.build()
+      Histogram.builder()
           .name("io_bytes_read")
-          .buckets(new double[] {10, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000})
+          .unit(Unit.BYTES)
           .help("Read I/O (bytes)")
           .register();
   private static final Scannable<String> bindings =
@@ -649,7 +653,7 @@ public class ServerInstance extends NodeInstance {
     if (queueSize != null) {
       for (QueueStatus queueStatus : queues) {
         queueSize
-            .labels(RedisHashtags.unhashedName(queueStatus.getName()))
+            .labelValues(RedisHashtags.unhashedName(queueStatus.getName()))
             .set(queueStatus.getSize());
       }
     }

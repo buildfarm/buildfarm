@@ -44,7 +44,7 @@ import io.grpc.netty.NettyServerBuilder;
 import io.grpc.protobuf.services.HealthStatusManager;
 import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
-import io.prometheus.client.Counter;
+import io.prometheus.metrics.core.metrics.Counter;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -62,7 +62,7 @@ public class BuildFarmServer extends LoggingMain {
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
   private static final Counter healthCheckMetric =
-      Counter.build()
+      Counter.builder()
           .name("health_check")
           .labelNames("lifecycle")
           .help("Service health check.")
@@ -181,7 +181,7 @@ public class BuildFarmServer extends LoggingMain {
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
     PrometheusPublisher.startHttpServer(configs.getPrometheusPort());
-    healthCheckMetric.labels("start").inc();
+    healthCheckMetric.labelValues("start").inc();
   }
 
   private synchronized void awaitRelease() throws InterruptedException {
@@ -207,7 +207,7 @@ public class BuildFarmServer extends LoggingMain {
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     }
     PrometheusPublisher.stopHttpServer();
-    healthCheckMetric.labels("stop").inc();
+    healthCheckMetric.labelValues("stop").inc();
     try {
       initiateShutdown();
       instance.stop();
