@@ -92,6 +92,7 @@ class Extract {
     return ByteStreamHelper.newInput(
         blobName(instanceName, digest),
         0,
+        "endpoint",
         () -> bsStub.withDeadlineAfter(10, TimeUnit.SECONDS),
         Retrier.Backoff.exponential(Duration.ofSeconds(0), Duration.ofSeconds(0), 2, 0, 5),
         Retrier.DEFAULT_IS_RETRIABLE,

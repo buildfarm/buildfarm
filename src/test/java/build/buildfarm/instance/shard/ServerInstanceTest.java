@@ -1012,7 +1012,9 @@ public class ServerInstanceTest {
     when(mockBackplane.getExecution(incompleteOperation.getName())).thenReturn(incompleteOperation);
     instance.watchExecution(incompleteExecution, watcher);
     verify(mockBackplane, times(1)).getExecution(incompleteOperation.getName());
-    verify(mockBackplane, times(1)).watchExecution(incompleteOperation.getName(), watcher);
+    verify(mockBackplane, times(1))
+        .watchExecution(eq(incompleteOperation.getName()), any(Watcher.class));
+    verify(watcher, times(1)).observe(incompleteOperation);
   }
 
   @Test
@@ -1035,10 +1037,16 @@ public class ServerInstanceTest {
     Watcher actionResultWatcher = instance.newActionResultWatcher(actionKey, mockWatcher);
 
     Action uncacheableAction = Action.newBuilder().setDoNotCache(true).build();
-    Operation operation = Operation.newBuilder().setMetadata(Any.pack(uncacheableAction)).build();
+    QueuedOperationMetadata metadata =
+        QueuedOperationMetadata.newBuilder().setAction(uncacheableAction).build();
+    Operation operation = Operation.newBuilder().setMetadata(Any.pack(metadata)).build();
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder().setCachedResult(true).build();
     Operation completedOperation =
-        Operation.newBuilder().setDone(true).setResponse(Any.pack(executeResponse)).build();
+        Operation.newBuilder()
+            .setDone(true)
+            .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
+            .setResponse(Any.pack(executeResponse))
+            .build();
 
     actionResultWatcher.observe(operation);
     actionResultWatcher.observe(completedOperation);
@@ -1064,7 +1072,11 @@ public class ServerInstanceTest {
             .build();
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder().setResult(actionResult).build();
     Operation completedOperation =
-        Operation.newBuilder().setDone(true).setResponse(Any.pack(executeResponse)).build();
+        Operation.newBuilder()
+            .setDone(true)
+            .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
+            .setResponse(Any.pack(executeResponse))
+            .build();
 
     actionResultWatcher.observe(completedOperation);
 

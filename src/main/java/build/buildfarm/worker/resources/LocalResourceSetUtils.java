@@ -212,14 +212,13 @@ public class LocalResourceSetUtils {
     boolean wasAcquired = resource.tryAcquire(amount);
     if (wasAcquired) {
       metrics.resourceUsageMetric.labels(resourceName).inc(amount);
+      metrics.requestersMetric.labels(resourceName).inc();
     }
-    metrics.requestersMetric.labels(resourceName).inc();
     return wasAcquired;
   }
 
   private static boolean poolAcquire(
       Queue<Object> resource, String resourceName, int amount, Consumer<Object> onClaimed) {
-    metrics.requestersMetric.labels(resourceName).inc();
     for (int i = 0; i < amount; i++) {
       Object id = resource.poll();
       if (id == null) {
@@ -230,6 +229,7 @@ public class LocalResourceSetUtils {
     }
     // only records when fully acquired
     metrics.resourceUsageMetric.labels(resourceName).inc(amount);
+    metrics.requestersMetric.labels(resourceName).inc();
     return true;
   }
 

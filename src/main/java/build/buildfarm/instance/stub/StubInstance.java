@@ -562,6 +562,7 @@ public class StubInstance extends InstanceBase {
     return ByteStreamHelper.newInput(
         resourceName,
         offset,
+        identifier,
         () -> deadlined(bsStub).withInterceptors(attachMetadataInterceptor(requestMetadata)),
         retrier::newBackoff,
         retrier::isRetriable,

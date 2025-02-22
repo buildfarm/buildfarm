@@ -298,7 +298,7 @@ public class ServerInstance extends NodeInstance {
           identifier,
           /* subscribeToBackplane= */ true,
           configs.getServer().isRunFailsafeOperation(),
-          ServerInstance::stripOperation);
+          ServerInstance::stripExecution);
     } else {
       throw new IllegalArgumentException("Shard Backplane not set in config");
     }
@@ -667,7 +667,7 @@ public class ServerInstance extends NodeInstance {
   public void start(String publicName) throws IOException {
     stopped = false;
     try {
-      backplane.start(publicName);
+      backplane.start(publicName, workerStubs::invalidate);
     } catch (RuntimeException e) {
       try {
         stop();
@@ -1709,10 +1709,12 @@ public class ServerInstance extends NodeInstance {
   }
 
   private QueuedOperationMetadata buildQueuedOperationMetadata(
+      Action action,
       ExecuteOperationMetadata executeOperationMetadata,
       RequestMetadata requestMetadata,
       build.buildfarm.v1test.Digest queuedOperationDigest) {
     return QueuedOperationMetadata.newBuilder()
+        .setAction(action)
         .setExecuteOperationMetadata(
             executeOperationMetadata.toBuilder().setStage(ExecutionStage.Value.QUEUED))
         .setRequestMetadata(requestMetadata)
@@ -2182,34 +2184,49 @@ public class ServerInstance extends NodeInstance {
     return future;
   }
 
-  Watcher newActionResultWatcher(ActionKey actionKey, Watcher watcher) {
-    return new Watcher() {
-      boolean writeThrough = true; // default case for action, default here
+  private class ActionResultWatcher implements Watcher {
+    private final ActionKey actionKey;
+    private final Watcher watcher;
+    private boolean writeThrough = true; // default case for action, default here
 
-      @Override
-      public void observe(Operation operation) {
-        if (operation != null && writeThrough) {
-          ActionResult actionResult = getCacheableActionResult(operation);
+    ActionResultWatcher(ActionKey actionKey, Watcher watcher) {
+      this.actionKey = actionKey;
+      this.watcher = watcher;
+    }
+
+    @Override
+    public void observe(Operation execution) {
+      if (execution != null) {
+        if (execution.getMetadata().is(QueuedOperationMetadata.class)) {
+          try {
+            QueuedOperationMetadata metadata =
+                execution.getMetadata().unpack(QueuedOperationMetadata.class);
+            if (metadata.hasAction()) {
+              writeThrough = !metadata.getAction().getDoNotCache();
+            }
+          } catch (InvalidProtocolBufferException e) {
+            // unlikely
+          }
+        }
+        if (writeThrough) {
+          ActionResult actionResult = getCacheableActionResult(execution);
           if (actionResult != null) {
             actionCache.readThrough(actionKey, actionResult);
-          } else if (wasCompletelyExecuted(operation)) {
+          } else if (wasCompletelyExecuted(execution)) {
             // we want to avoid presenting any results for an action which
             // was not completely executed
             actionCache.invalidate(actionKey);
           }
         }
-        if (operation != null && operation.getMetadata().is(Action.class)) {
-          // post-action validation sequence, do not propagate to watcher
-          try {
-            writeThrough = !operation.getMetadata().unpack(Action.class).getDoNotCache();
-          } catch (InvalidProtocolBufferException e) {
-            // unlikely
-          }
-        } else {
-          watcher.observe(operation);
-        }
+        execution = stripExecution(execution);
       }
-    };
+      watcher.observe(execution);
+    }
+  }
+
+  @VisibleForTesting
+  ActionResultWatcher newActionResultWatcher(ActionKey actionKey, Watcher watcher) {
+    return new ActionResultWatcher(actionKey, watcher);
   }
 
   @Override
@@ -2309,7 +2326,7 @@ public class ServerInstance extends NodeInstance {
               .withDescription("Could not merge or schedule execution")
               .asException());
     }
-    return watchOperation(
+    return watchExecution(
         execution, newActionResultWatcher(DigestUtil.asActionKey(actionDigest), watcher));
   }
 
@@ -2438,11 +2455,15 @@ public class ServerInstance extends NodeInstance {
       throws Exception {
     recentCacheServedExecutions.put(requestMetadata, true);
 
-    ExecuteOperationMetadata completeMetadata =
-        ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(DigestUtil.toDigest(actionKey.getDigest()))
-            .setStage(ExecutionStage.Value.COMPLETED)
-            .setDigestFunction(actionKey.getDigest().getDigestFunction())
+    QueuedOperationMetadata completeMetadata =
+        QueuedOperationMetadata.newBuilder()
+            .setExecuteOperationMetadata(
+                ExecuteOperationMetadata.newBuilder()
+                    .setActionDigest(DigestUtil.toDigest(actionKey.getDigest()))
+                    .setStage(ExecutionStage.Value.COMPLETED)
+                    .setDigestFunction(actionKey.getDigest().getDigestFunction())
+                    .build())
+            .setRequestMetadata(requestMetadata)
             .build();
 
     Operation completedOperation =
@@ -2459,7 +2480,8 @@ public class ServerInstance extends NodeInstance {
             .setMetadata(Any.pack(completeMetadata))
             .build();
     backplane.unmergeExecution(actionKey);
-    backplane.putOperation(completedOperation, completeMetadata.getStage());
+    backplane.putOperation(
+        completedOperation, completeMetadata.getExecuteOperationMetadata().getStage());
   }
 
   private ListenableFuture<Boolean> checkCacheFuture(
@@ -2597,8 +2619,14 @@ public class ServerInstance extends NodeInstance {
                   } else if (action.getDoNotCache()) {
                     // invalidate our action cache result as well as watcher owner
                     actionCache.invalidate(DigestUtil.asActionKey(actionDigest));
+                    QueuedOperationMetadata actionMetadata =
+                        QueuedOperationMetadata.newBuilder()
+                            .setExecuteOperationMetadata(metadata)
+                            .setAction(action)
+                            .setRequestMetadata(requestMetadata)
+                            .build();
                     backplane.putOperation(
-                        operation.toBuilder().setMetadata(Any.pack(action)).build(),
+                        operation.toBuilder().setMetadata(Any.pack(actionMetadata)).build(),
                         metadata.getStage());
                   }
                   return immediateFuture(action);
@@ -2647,7 +2675,10 @@ public class ServerInstance extends NodeInstance {
                           .setQueuedOperation(queuedOperation)
                           .setQueuedOperationMetadata(
                               buildQueuedOperationMetadata(
-                                  metadata, requestMetadata, digestUtil.compute(queuedOperation)))
+                                  action,
+                                  metadata,
+                                  requestMetadata,
+                                  digestUtil.compute(queuedOperation)))
                           .setTransformedIn(
                               Durations.fromMicros(transformStopwatch.elapsed(MICROSECONDS))),
                   operationTransformService);
@@ -2821,33 +2852,37 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
-  ListenableFuture<Void> watchOperation(Operation operation, Watcher watcher) {
+  ListenableFuture<Void> watchExecution(Operation execution, ActionResultWatcher watcher) {
     try {
-      watcher.observe(stripOperation(operation));
+      watcher.observe(execution);
     } catch (Exception e) {
       return immediateFailedFuture(e);
     }
-    if (operation.getDone()) {
+    if (execution.getDone()) {
       return immediateFuture(null);
     }
 
-    return backplane.watchExecution(operation.getName(), watcher);
+    return backplane.watchExecution(execution.getName(), watcher);
   }
 
   @Override
   public ListenableFuture<Void> watchExecution(UUID executionId, Watcher watcher) {
     String operationName = bindExecutions(executionId);
-    Operation operation = getOperation(operationName);
-    if (operation == null) {
+    Operation execution = getOperation(operationName);
+    if (execution == null) {
       return immediateFailedFuture(
           Status.NOT_FOUND
               .withDescription(String.format("Execution not found: %s", operationName))
               .asException());
     }
-    return watchOperation(operation, watcher);
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(execution);
+    build.buildfarm.v1test.Digest actionDigest =
+        DigestUtil.fromDigest(metadata.getActionDigest(), metadata.getDigestFunction());
+    return watchExecution(
+        execution, newActionResultWatcher(DigestUtil.asActionKey(actionDigest), watcher));
   }
 
-  private static Operation stripOperation(Operation operation) {
+  private static Operation stripExecution(Operation operation) {
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     if (metadata == null) {
       metadata = ExecuteOperationMetadata.getDefaultInstance();
