@@ -58,6 +58,7 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
 import build.buildfarm.v1test.WorkerType;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
@@ -1179,9 +1180,10 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private @Nullable QueueEntry dispatchOperation(
-      UnifiedJedis jedis, List<Platform.Property> provisions) throws InterruptedException {
+      UnifiedJedis jedis, List<Platform.Property> provisions, LocalResourceSet resourceSet)
+      throws InterruptedException {
     ExecutionQueueEntry executionQueueEntry =
-        state.executionQueue.dequeue(jedis, provisions, dequeueService);
+        state.executionQueue.dequeue(jedis, provisions, resourceSet, dequeueService);
     if (executionQueueEntry == null) {
       return null;
     }
@@ -1220,9 +1222,10 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public QueueEntry dispatchOperation(List<Platform.Property> provisions)
+  public QueueEntry dispatchOperation(
+      List<Platform.Property> provisions, LocalResourceSet resourceSet)
       throws IOException, InterruptedException {
-    return client.blockingCall(jedis -> dispatchOperation(jedis, provisions));
+    return client.blockingCall(jedis -> dispatchOperation(jedis, provisions, resourceSet));
   }
 
   String printPollOperation(QueueEntry queueEntry, long requeueAt)

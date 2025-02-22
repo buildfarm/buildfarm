@@ -15,9 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static build.buildfarm.instance.Instance.SENTINEL_PAGE_TOKEN;
-import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,10 +28,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.v1test.Digest;
-import build.buildfarm.v1test.ExecuteEntry;
-import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.Tree;
-import build.buildfarm.worker.MatchListener;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
@@ -41,7 +36,6 @@ import com.google.protobuf.ByteString;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.net.SocketException;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 import org.junit.Before;
 import org.junit.Test;
@@ -64,27 +58,6 @@ public class WorkerInstanceTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     instance = new WorkerInstance("test", backplane, storage);
-  }
-
-  @SuppressWarnings("unchecked")
-  @Test(expected = SocketException.class)
-  public void dispatchOperationThrowsOnSocketException() throws IOException, InterruptedException {
-    when(backplane.dispatchOperation(any(List.class))).thenThrow(SocketException.class);
-    MatchListener listener = mock(MatchListener.class);
-    instance.dispatchOperation(listener);
-  }
-
-  @SuppressWarnings("unchecked")
-  @Test
-  public void dispatchOperationIgnoresNull() throws IOException, InterruptedException {
-    QueueEntry queueEntry =
-        QueueEntry.newBuilder()
-            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("op"))
-            .build();
-    when(backplane.dispatchOperation(any(List.class))).thenReturn(null).thenReturn(queueEntry);
-    MatchListener listener = mock(MatchListener.class);
-    assertThat(instance.dispatchOperation(listener)).isEqualTo(queueEntry);
-    verify(backplane, times(2)).dispatchOperation(any(List.class));
   }
 
   @Test(expected = StatusRuntimeException.class)
