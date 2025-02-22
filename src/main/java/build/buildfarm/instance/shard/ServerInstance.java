@@ -667,7 +667,7 @@ public class ServerInstance extends NodeInstance {
   public void start(String publicName) throws IOException {
     stopped = false;
     try {
-      backplane.start(publicName);
+      backplane.start(publicName, workerStubs::invalidate);
     } catch (RuntimeException e) {
       try {
         stop();

@@ -2576,8 +2576,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
       if (cause instanceof StatusException statusException) {
         return statusException;
-      } else if (cause instanceof StatusRuntimeException) {
-        return (StatusRuntimeException) cause;
+      } else if (cause instanceof StatusRuntimeException statusRuntimeException) {
+        return statusRuntimeException;
       }
     }
     return e;
