@@ -123,7 +123,7 @@ maven.install(
         "org.apache.httpcomponents:httpclient:4.5.14",
         "org.apache.tomcat:annotations-api:6.0.53",
         "org.bouncycastle:bcprov-jdk15on:1.70",
-        "org.checkerframework:checker-qual:3.48.2",
+        "org.checkerframework:checker-qual:3.49.0",
         "org.jetbrains:annotations:26.0.1",
         "org.mockito:mockito-core:5.15.2",
         "org.openjdk.jmh:jmh-core:1.37",
