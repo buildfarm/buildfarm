@@ -122,17 +122,17 @@ public final class Worker extends LoggingMain {
       Counter.builder().name("worker_paused").help("Worker paused.").register();
   private static final Gauge executionSlotsTotal =
       Gauge.builder()
-          .name("execution_slots_total")
+          .name("execution_slots")
           .help("Total execution slots configured on worker.")
           .register();
   private static final Gauge inputFetchSlotsTotal =
       Gauge.builder()
-          .name("input_fetch_slots_total")
+          .name("input_fetch_slots")
           .help("Total input fetch slots configured on worker.")
           .register();
   private static final Gauge reportResultSlotsTotal =
       Gauge.builder()
-          .name("report_result_slots_total")
+          .name("report_result_slots")
           .help("Total report result slots configured on worker.")
           .register();
 
