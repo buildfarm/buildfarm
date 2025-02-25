@@ -7,7 +7,7 @@ metadata:
     {{- include "buildfarm.labels" . | nindent 4 }}
     app.kubernetes.io/component: server
   annotations:
-    {{- toYaml .Values.shardWorker.annotations | nindent 4 }}
+    {{- toYaml .Values.server.annotations | nindent 4 }}
 spec:
   replicas: {{ .Values.server.replicaCount }}
   selector:
