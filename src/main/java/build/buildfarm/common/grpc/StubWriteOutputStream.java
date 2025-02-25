@@ -279,7 +279,15 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     }
     if (expectedSize != COMPRESSED_EXPECTED_SIZE
         && offset + writtenBytes + bufferOffset + len > expectedSize) {
-      throw new IndexOutOfBoundsException("write would exceed expected size");
+      throw new IndexOutOfBoundsException(
+          format(
+              "write of %d would exceed expected size %d at offset %d (%d+%d+%d)",
+              len,
+              expectedSize,
+              offset + writtenBytes + bufferOffset,
+              offset,
+              writtenBytes,
+              bufferOffset));
     }
     boolean lastFlushed = false;
     while (len > 0 && !checkComplete()) {

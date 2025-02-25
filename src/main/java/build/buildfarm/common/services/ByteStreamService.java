@@ -241,10 +241,8 @@ public class ByteStreamService extends ByteStreamImplBase {
     ServerCallStreamObserver<ReadResponse> target =
         onErrorLogReadObserver(
             format(
-                "%s/%s(%s)",
-                downloadBlobRequest.getBlob().getDigest().getDigestFunction(),
-                DigestUtil.toString(downloadBlobRequest.getBlob().getDigest()),
-                instance.getName()),
+                "%s(%s)",
+                DigestUtil.toString(downloadBlobRequest.getBlob().getDigest()), instance.getName()),
             downloadBlobRequest.getBlob().getCompressor(),
             offset,
             (ServerCallStreamObserver<ReadResponse>) responseObserver);

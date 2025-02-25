@@ -17,6 +17,7 @@ java_library(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/server",
         "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@googleapis//google/rpc:rpc_java_proto",
         "@maven//:com_github_ben_manes_caffeine_caffeine",
