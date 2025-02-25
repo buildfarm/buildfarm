@@ -363,7 +363,8 @@ class ShardWorkerContext implements WorkerContext {
     try {
       queueEntry =
           backplane.dispatchOperation(
-              configs.getWorker().getDequeueMatchSettings().getPlatform().getPropertiesList());
+              configs.getWorker().getDequeueMatchSettings().getPlatform().getPropertiesList(),
+              resourceSet);
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {

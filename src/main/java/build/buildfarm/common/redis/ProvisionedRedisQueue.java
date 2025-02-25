@@ -16,6 +16,7 @@ package build.buildfarm.common.redis;
 
 import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.MapUtils;
+import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.SetMultimap;
@@ -149,6 +150,22 @@ public class ProvisionedRedisQueue {
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
     provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard);
     this.allowUserUnmatched = allowUserUnmatched;
+  }
+
+  public boolean isExhausted(Set<String> exhausted) {
+    if (isFullyWildcard) {
+      return false;
+    }
+
+    // if there is any intersection with the exhausted list for requirements
+    // we will consider this queue exhausted
+    for (Map.Entry<String, String> requirement : provisions.required) {
+      String resourceName = LocalResourceSetUtils.getResourceName(requirement.getKey());
+      if (exhausted.contains(resourceName)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

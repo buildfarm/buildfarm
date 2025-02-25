@@ -93,9 +93,7 @@ public class FetchService extends FetchImplBase {
     }
 
     FetchQualifiers qualifiers =
-        parseQualifiers(
-            request.getQualifiersList(),
-            DigestFunction.Value.UNKNOWN /* request.getDigestFunction() */);
+        parseQualifiers(request.getQualifiersList(), request.getDigestFunction());
 
     Digest expectedDigest = qualifiers.getDigest();
 

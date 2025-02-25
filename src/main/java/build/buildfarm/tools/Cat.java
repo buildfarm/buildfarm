@@ -613,7 +613,7 @@ class Cat {
       printExecutedActionMetadata(metadata.getPartialExecutionMetadata(), 1);
       System.out.println("Metadata:");
       System.out.println("  Stage: " + metadata.getStage());
-      // digestFunction = metadata.getDigestFunction();
+      digestFunction = metadata.getDigestFunction();
       System.out.println(
           "  Action: "
               + DigestUtil.toString(

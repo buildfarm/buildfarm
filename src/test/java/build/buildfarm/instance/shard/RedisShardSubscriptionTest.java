@@ -51,7 +51,8 @@ public class RedisShardSubscriptionTest {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    return new RedisShardSubscriber(watchers, null, 1, "worker-channel", new HashMap<>());
+    return new RedisShardSubscriber(
+        watchers, null, 1, "worker-channel", workerName -> {}, new HashMap<>());
   }
 
   @Test

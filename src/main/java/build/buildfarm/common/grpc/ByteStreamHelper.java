@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.grpc;
 
+import build.buildfarm.common.BlobNotFoundException;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.common.io.ByteStringQueueInputStream;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
@@ -47,6 +48,7 @@ public final class ByteStreamHelper {
   public static InputStream newInput(
       String resourceName,
       long offset,
+      String endpoint,
       Supplier<ByteStreamStub> bsStubSupplier,
       Supplier<Backoff> backoffSupplier,
       Predicate<Status> isRetriable,
@@ -115,7 +117,11 @@ public final class ByteStreamHelper {
                     },
                     MoreExecutors.directExecutor());
               } catch (RejectedExecutionException e) {
-                inputStream.setException(e);
+                e.addSuppressed(
+                    new Exception(String.format("could not retry read on %s", endpoint), t));
+                BlobNotFoundException bnfe = new BlobNotFoundException(resourceName, e);
+                streamReadyFuture.setException(bnfe);
+                inputStream.setException(bnfe);
               }
             }
           }

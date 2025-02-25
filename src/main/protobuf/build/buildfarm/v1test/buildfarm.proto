@@ -477,6 +477,8 @@ message QueuedOperationMetadata {
   Digest queued_operation_digest = 2;
 
   build.bazel.remote.execution.v2.RequestMetadata request_metadata = 3;
+
+  build.bazel.remote.execution.v2.Action action = 4;
 }
 
 // A `Tree` contains all the

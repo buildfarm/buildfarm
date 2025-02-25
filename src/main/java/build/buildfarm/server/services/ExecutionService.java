@@ -70,7 +70,9 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
         future,
         new FutureCallback<Void>() {
           boolean isCancelled() {
-            return serverCallStreamObserver.isCancelled() || Context.current().isCancelled();
+            return serverCallStreamObserver.isCancelled()
+                || Context.current().isCancelled()
+                || future.isCancelled();
           }
 
           @Override

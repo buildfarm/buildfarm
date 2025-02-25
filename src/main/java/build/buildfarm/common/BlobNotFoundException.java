@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.shard;
+package build.buildfarm.common;
 
-public class UnsubscribeTimeoutException extends RuntimeException {
-  public UnsubscribeTimeoutException(String message) {
-    super(message);
+import java.io.IOException;
+
+public class BlobNotFoundException extends IOException {
+  public BlobNotFoundException(String name, Throwable cause) {
+    super(name, cause);
   }
 }

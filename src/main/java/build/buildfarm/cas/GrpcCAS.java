@@ -120,6 +120,7 @@ public class GrpcCAS implements ContentAddressableStorage {
     return ByteStreamHelper.newInput(
         resourceName,
         offset,
+        channel.toString(),
         bsStub,
         NO_RETRIES::newBackoff,
         NO_RETRIES::isRetriable,

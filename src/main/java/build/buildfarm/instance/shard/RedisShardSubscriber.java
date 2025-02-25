@@ -70,6 +70,7 @@ class RedisShardSubscriber extends JedisPubSub {
   private final Map<String, ShardWorker> workers;
   private final int workerChangeTypeMask;
   private final String workerChannel;
+  private final Consumer<String> onWorkerRemoved;
   private final Map<String, Executor> executors;
   private SettableFuture<Void> subscribeFuture = null;
 
@@ -78,11 +79,13 @@ class RedisShardSubscriber extends JedisPubSub {
       Map<String, ShardWorker> workers,
       int workerChangeTypeMask,
       String workerChannel,
+      Consumer<String> onWorkerRemoved,
       Map<String, Executor> executors) {
     this.watchers = watchers;
     this.workers = workers;
     this.workerChangeTypeMask = workerChangeTypeMask;
     this.workerChannel = workerChannel;
+    this.onWorkerRemoved = onWorkerRemoved;
     this.executors = executors;
   }
 
@@ -259,7 +262,9 @@ class RedisShardSubscriber extends JedisPubSub {
 
   boolean removeWorker(WorkerChange workerChange) {
     synchronized (workers) {
-      return workers.remove(workerChange.getName()) != null;
+      boolean result = workers.remove(workerChange.getName()) != null;
+      onWorkerRemoved.accept(workerChange.getName());
+      return result;
     }
   }
 

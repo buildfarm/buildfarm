@@ -88,6 +88,7 @@ public class ByteStreamHelperTest {
         ByteStreamHelper.newInput(
             resourceName,
             /* offset= */ 0,
+            "test-endpoint",
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             NO_RETRIES::newBackoff,
             NO_RETRIES::isRetriable,
