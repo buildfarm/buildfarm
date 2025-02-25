@@ -60,9 +60,9 @@ backplane:
   redisPassword:
   redisNodes:
   jedisPoolMaxTotal: 4000
-  jedisPoolMaxIdle: 4000
-  jedisPoolMinIdle: 500
-  jedisTimeBetweenEvictionRunsMillis: -1
+  jedisPoolMaxIdle: 8
+  jedisPoolMinIdle: 0
+  jedisTimeBetweenEvictionRunsMillis: 30000
   workersHashName: Workers
   workerChannel: WorkerChannel
   actionCachePrefix: ActionCache
