@@ -54,6 +54,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -65,6 +66,8 @@ import redis.clients.jedis.commands.ProtocolCommand;
 
 @RunWith(JUnit4.class)
 public class RedisShardSubscriberTest {
+  private static final String WORKER_CHANNEL = "worker-channel";
+
   /* he cannot unsee */
   private static class LidlessTimedWatchFuture extends TimedWatchFuture {
     LidlessTimedWatchFuture(TimedWatcher timedWatcher) {
@@ -184,9 +187,17 @@ public class RedisShardSubscriberTest {
   }
 
   RedisShardSubscriber createSubscriber(
-      ListMultimap<String, TimedWatchFuture> watchers, Executor executor) {
+      ListMultimap<String, TimedWatchFuture> watchers,
+      Map<String, ShardWorker> workers,
+      Executor executor,
+      Consumer<String> onWorkerRemoved) {
     return new RedisShardSubscriber(
-        watchers, /* workers= */ null, WorkerType.NONE.getNumber(), "worker-channel", executor);
+        watchers, workers, WorkerType.NONE.getNumber(), WORKER_CHANNEL, onWorkerRemoved, executor);
+  }
+
+  RedisShardSubscriber createSubscriber(
+      ListMultimap<String, TimedWatchFuture> watchers, Executor executor) {
+    return createSubscriber(watchers, /* workers= */ null, executor, name -> {});
   }
 
   RedisShardSubscriber createSubscriber(ListMultimap<String, TimedWatchFuture> watchers) {
@@ -407,10 +418,14 @@ public class RedisShardSubscriberTest {
   public void addSupportedWorkerTypeOnWorkerChange() throws IOException {
     Map<String, ShardWorker> workers = new HashMap<>();
     int storageWorkerType = WorkerType.STORAGE.getNumber();
-    String workerChannel = "worker-channel";
     RedisShardSubscriber operationSubscriber =
         new RedisShardSubscriber(
-            /* watchers */ null, workers, storageWorkerType, workerChannel, directExecutor());
+            /* watchers */ null,
+            workers,
+            storageWorkerType,
+            WORKER_CHANNEL,
+            name -> {},
+            directExecutor());
     String workerChangeJson =
         JsonFormat.printer()
             .print(
@@ -418,7 +433,7 @@ public class RedisShardSubscriberTest {
                     .setName("execute-worker")
                     .setAdd(WorkerChange.Add.newBuilder().setWorkerType(storageWorkerType).build())
                     .build());
-    operationSubscriber.onMessage(workerChannel, workerChangeJson);
+    operationSubscriber.onMessage(WORKER_CHANNEL, workerChangeJson);
     assertThat(workers.size()).isEqualTo(1);
   }
 
@@ -426,10 +441,9 @@ public class RedisShardSubscriberTest {
   public void ignoreUnsupportedWorkerTypeOnWorkerChange() throws IOException {
     Map<String, ShardWorker> workers = new HashMap<>();
     int workerType = WorkerType.STORAGE.getNumber();
-    String workerChannel = "worker-channel";
     RedisShardSubscriber operationSubscriber =
         new RedisShardSubscriber(
-            /* watchers */ null, workers, workerType, workerChannel, directExecutor());
+            /* watchers */ null, workers, workerType, WORKER_CHANNEL, name -> {}, directExecutor());
     String workerChangeJson =
         JsonFormat.printer()
             .print(
@@ -440,7 +454,32 @@ public class RedisShardSubscriberTest {
                             .setWorkerType(WorkerType.EXECUTE.getNumber())
                             .build())
                     .build());
-    operationSubscriber.onMessage(workerChannel, workerChangeJson);
+    operationSubscriber.onMessage(WORKER_CHANNEL, workerChangeJson);
     assertThat(workers.isEmpty()).isTrue();
+  }
+
+  @Test
+  public void workerRemovedCallsOnWorkerRemoved() throws Exception {
+    Map<String, ShardWorker> workers = new HashMap<>();
+    workers.put("removeWorkerName", ShardWorker.getDefaultInstance());
+    Consumer<String> onWorkerRemoved = mock(Consumer.class);
+    RedisShardSubscriber operationSubscriber =
+        createSubscriber(null, workers, directExecutor(), onWorkerRemoved);
+
+    String removeWorkerName = "removed-worker";
+
+    WorkerChange workerRemove =
+        WorkerChange.newBuilder()
+            .setName(removeWorkerName)
+            .setRemove(WorkerChange.Remove.getDefaultInstance())
+            .build();
+
+    operationSubscriber.onMessage(WORKER_CHANNEL, JsonFormat.printer().print(workerRemove));
+    verify(onWorkerRemoved, times(1)).accept(removeWorkerName);
+    assertThat(workers.isEmpty());
+
+    // validate callback regardless of map status, now missing the worker
+    operationSubscriber.onMessage(WORKER_CHANNEL, JsonFormat.printer().print(workerRemove));
+    verify(onWorkerRemoved, times(2)).accept(removeWorkerName);
   }
 }

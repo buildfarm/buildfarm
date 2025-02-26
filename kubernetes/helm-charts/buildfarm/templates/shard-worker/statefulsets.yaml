@@ -5,6 +5,9 @@ metadata:
   labels:
     name: {{ include "buildfarm.fullname" . }}-shard-worker
     {{- include "buildfarm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: shard-worker
+  annotations:
+    {{- toYaml .Values.shardWorker.annotations | nindent 4 }}
 spec:
   serviceName: {{ include "buildfarm.fullname" . }}-shard-worker
   {{- if .Values.shardWorker.autoscaling.enabled }}
@@ -26,6 +29,7 @@ spec:
       labels:
         name: {{ include "buildfarm.fullname" . }}-shard-worker
         {{- include "buildfarm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: shard-worker
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -33,7 +37,7 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "buildfarm.serviceAccountName" . }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- toYaml .Values.shardWorker.securityContext | nindent 8 }}
       containers:
         - name: buildfarm-worker
           image: "{{ .Values.shardWorker.image.repository }}:{{ .Values.shardWorker.image.tag | default .Chart.AppVersion }}"
@@ -72,8 +76,10 @@ spec:
             - mountPath: /config
               name: config
               readOnly: true
+            {{ if .Values.shardWorker.storage.enabled }}
             - mountPath: /tmp/worker
               name: {{ include "buildfarm.fullname" . }}-shard-worker-data
+            {{ end }}
             - mountPath: /shard-worker-log-props
               name: shard-worker-log-props
               readOnly: true
@@ -115,6 +121,10 @@ spec:
         {{- with .Values.shardWorker.extraVolumes }}
         {{- tpl (toYaml .) $ | nindent 8 }}
         {{- end }}
+  {{- if .Values.shardWorker.storage.enabled }}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: {{ .Values.shardWorker.persistentVolumeClaimRetentionPolicy.whenDeleted }}
+    whenScaled: {{ .Values.shardWorker.persistentVolumeClaimRetentionPolicy.whenScaled }}
   volumeClaimTemplates:
     - apiVersion: v1
       kind: PersistentVolumeClaim
@@ -128,3 +138,4 @@ spec:
         resources:
           requests:
             storage: "{{ .Values.shardWorker.storage.size }}"
+  {{- end }}

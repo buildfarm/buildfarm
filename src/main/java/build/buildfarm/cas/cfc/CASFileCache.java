@@ -208,20 +208,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                   return new ReentrantLock();
                 }
               });
-  private final LoadingCache<BlobWriteKey, Write> writes =
-      CacheBuilder.newBuilder()
-          .expireAfterAccess(1, HOURS)
-          .removalListener(
-              (RemovalListener<BlobWriteKey, Write>)
-                  notification -> notification.getValue().reset())
-          .build(
-              new CacheLoader<>() {
-                @SuppressWarnings("NullableProblems")
-                @Override
-                public Write load(BlobWriteKey key) {
-                  return newWrite(key, CASFileCache.this.getFuture(key.getDigest()));
-                }
-              });
+  private final LoadingCache<BlobWriteKey, Write> writes;
 
   private final LoadingCache<Digest, SettableFuture<Long>> writesInProgress =
       CacheBuilder.newBuilder()
@@ -335,6 +322,21 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.delegateSkipLoad = delegateSkipLoad;
     this.directoriesIndexDbName = directoriesIndexDbName;
     this.zstdBufferPool = zstdBufferPool;
+
+    writes =
+        CacheBuilder.newBuilder()
+            .expireAfterAccess(1, HOURS)
+            .removalListener(
+                (RemovalListener<BlobWriteKey, Write>)
+                    notification -> expireService.execute(notification.getValue()::reset))
+            .build(
+                new CacheLoader<>() {
+                  @SuppressWarnings("NullableProblems")
+                  @Override
+                  public Write load(BlobWriteKey key) {
+                    return newWrite(key, CASFileCache.this.getFuture(key.getDigest()));
+                  }
+                });
 
     entryPathStrategy = new HexBucketEntryPathStrategy(root, hexBucketLevels);
 
@@ -1083,7 +1085,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             return future;
           }
         };
-    write.getFuture().addListener(write::reset, directExecutor());
+    write.getFuture().addListener(write::reset, expireService);
     return write;
   }
 
@@ -2574,8 +2576,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     for (Throwable cause = e.getCause(); cause != null; cause = cause.getCause()) {
       if (cause instanceof StatusException statusException) {
         return statusException;
-      } else if (cause instanceof StatusRuntimeException) {
-        return (StatusRuntimeException) cause;
+      } else if (cause instanceof StatusRuntimeException statusRuntimeException) {
+        return statusRuntimeException;
       }
     }
     return e;

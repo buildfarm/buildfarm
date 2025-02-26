@@ -25,10 +25,12 @@ import java.nio.file.attribute.UserPrincipal;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
@@ -141,6 +143,21 @@ public class LocalResourceSetUtils {
     return resourceSet;
   }
 
+  public static Set<String> exhausted(LocalResourceSet resourceSet) {
+    Set<String> exhausted = new HashSet<>();
+    for (Entry<String, SemaphoreResource> resource : resourceSet.resources.entrySet()) {
+      if (resource.getValue().semaphore().availablePermits() == 0) {
+        exhausted.add(resource.getKey());
+      }
+    }
+    for (Entry<String, PoolResource> resource : resourceSet.poolResources.entrySet()) {
+      if (resource.getValue().pool().isEmpty()) {
+        exhausted.add(resource.getKey());
+      }
+    }
+    return exhausted;
+  }
+
   public static @Nullable Claim claimResources(Platform platform, LocalResourceSet resourceSet) {
     List<SemaphoreLease> semaphoreClaimed = new ArrayList<>();
     List<PoolLease> poolClaimed = new ArrayList<>();
@@ -195,14 +212,13 @@ public class LocalResourceSetUtils {
     boolean wasAcquired = resource.tryAcquire(amount);
     if (wasAcquired) {
       metrics.resourceUsageMetric.labels(resourceName).inc(amount);
+      metrics.requestersMetric.labels(resourceName).inc();
     }
-    metrics.requestersMetric.labels(resourceName).inc();
     return wasAcquired;
   }
 
   private static boolean poolAcquire(
       Queue<Object> resource, String resourceName, int amount, Consumer<Object> onClaimed) {
-    metrics.requestersMetric.labels(resourceName).inc();
     for (int i = 0; i < amount; i++) {
       Object id = resource.poll();
       if (id == null) {
@@ -213,6 +229,7 @@ public class LocalResourceSetUtils {
     }
     // only records when fully acquired
     metrics.resourceUsageMetric.labels(resourceName).inc(amount);
+    metrics.requestersMetric.labels(resourceName).inc();
     return true;
   }
 
@@ -239,7 +256,7 @@ public class LocalResourceSetUtils {
     }
   }
 
-  private static String getResourceName(String propertyName) {
+  public static String getResourceName(String propertyName) {
     // We match to keys whether they are prefixed "resource:" or not.
     // "resource:gpu:1" requests the gpu resource in the same way that "gpu:1" does.
     // The prefix originates from bazel's syntax for the --extra_resources flag.

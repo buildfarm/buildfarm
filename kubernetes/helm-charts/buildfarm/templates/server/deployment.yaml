@@ -5,6 +5,9 @@ metadata:
   labels:
     name: {{ include "buildfarm.fullname" . }}-server
     {{- include "buildfarm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  annotations:
+    {{- toYaml .Values.server.annotations | nindent 4 }}
 spec:
   replicas: {{ .Values.server.replicaCount }}
   selector:
@@ -21,12 +24,15 @@ spec:
       labels:
         name: {{ include "buildfarm.fullname" . }}-server
         {{- include "buildfarm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: server
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "buildfarm.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.server.securityContext | nindent 8 }}
       containers:
         - name: buildfarm-server
           image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag | default .Chart.AppVersion }}"

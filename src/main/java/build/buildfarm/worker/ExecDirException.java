@@ -20,6 +20,7 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.cas.cfc.PutDirectoryException;
+import build.buildfarm.common.BlobNotFoundException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.v1test.Digest;
 import com.google.protobuf.Any;
@@ -59,7 +60,7 @@ public class ExecDirException extends IOException {
 
     static void toViolation(
         Violation.Builder violation, Throwable cause, Path path, boolean isExecutable) {
-      if (cause instanceof NoSuchFileException) {
+      if (cause instanceof NoSuchFileException || cause instanceof BlobNotFoundException) {
         violation
             .setType(VIOLATION_TYPE_MISSING)
             .setDescription(getDescription(path, isExecutable));
