@@ -193,8 +193,10 @@ public class RedisShardSubscriberTest {
       Map<String, ShardWorker> workers,
       Consumer<String> onWorkerRemoved) {
     Map<String, Executor> executors = new ConcurrentHashMap<>();
-    for (String channel : channels) {
-      executors.put(channel, directExecutor());
+    if (channels != null) {
+      for (String channel : channels) {
+        executors.put(channel, directExecutor());
+      }
     }
     return new RedisShardSubscriber(
         watchers, workers, WorkerType.NONE.getNumber(), WORKER_CHANNEL, onWorkerRemoved, executors);
