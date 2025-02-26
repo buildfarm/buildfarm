@@ -187,8 +187,10 @@ public class RedisShardSubscriberTest {
   RedisShardSubscriber createSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers, Iterable<String> channels) {
     Map<String, Executor> executors = new ConcurrentHashMap<>();
-    for (String channel : channels) {
-      executors.put(channel, directExecutor());
+    if (channels != null) {
+      for (String channel : channels) {
+        executors.put(channel, directExecutor());
+      }
     }
     return new RedisShardSubscriber(
         watchers, /* workers= */ null, WorkerType.NONE.getNumber(), "worker-channel", executors);
