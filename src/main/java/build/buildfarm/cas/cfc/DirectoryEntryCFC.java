@@ -31,6 +31,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.v1test.Digest;
@@ -64,7 +65,7 @@ import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 @Log
-public abstract class DirectoryEntryCFC extends CASFileCache {
+public class DirectoryEntryCFC extends CASFileCache {
   private final Cache<Digest, ListenableFuture<Void>> fetchers = CacheBuilder.newBuilder().build();
 
   public DirectoryEntryCFC(
@@ -79,7 +80,8 @@ public abstract class DirectoryEntryCFC extends CASFileCache {
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire,
       @Nullable ContentAddressableStorage delegate,
-      boolean delegateSkipLoad) {
+      boolean delegateSkipLoad,
+      InputStreamFactory externalInputStreamFactory) {
     super(
         root,
         maxSizeInBytes,
@@ -92,7 +94,8 @@ public abstract class DirectoryEntryCFC extends CASFileCache {
         onPut,
         onExpire,
         delegate,
-        delegateSkipLoad);
+        delegateSkipLoad,
+        externalInputStreamFactory);
   }
 
   // needs to delete directories which have multiple references (link count > 1)

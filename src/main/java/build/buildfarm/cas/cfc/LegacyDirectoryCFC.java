@@ -34,6 +34,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
 import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.NamedFileKey;
@@ -65,7 +66,7 @@ import javax.annotation.concurrent.GuardedBy;
 import lombok.extern.java.Log;
 
 @Log
-public abstract class LegacyDirectoryCFC extends CASFileCache {
+public class LegacyDirectoryCFC extends CASFileCache {
   // Prometheus metrics
   private static final Counter casCopyFallbackMetric =
       Counter.build()
@@ -73,7 +74,7 @@ public abstract class LegacyDirectoryCFC extends CASFileCache {
           .help("Number of times the CAS performed a file copy because hardlinking failed")
           .register();
 
-  protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
+  public static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private final boolean execRootFallback;
@@ -102,7 +103,8 @@ public abstract class LegacyDirectoryCFC extends CASFileCache {
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire,
       @Nullable ContentAddressableStorage delegate,
-      boolean delegateSkipLoad) {
+      boolean delegateSkipLoad,
+      InputStreamFactory externalInputStreamFactory) {
     super(
         root,
         maxSizeInBytes,
@@ -115,7 +117,8 @@ public abstract class LegacyDirectoryCFC extends CASFileCache {
         onPut,
         onExpire,
         delegate,
-        delegateSkipLoad);
+        delegateSkipLoad,
+        externalInputStreamFactory);
     this.execRootFallback = execRootFallback;
     this.directoriesIndexDbName = directoriesIndexDbName;
 

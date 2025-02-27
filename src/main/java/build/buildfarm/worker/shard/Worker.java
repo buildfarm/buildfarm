@@ -32,10 +32,14 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
 import build.buildfarm.cas.cfc.CASFileCache;
+import build.buildfarm.cas.cfc.DirectoryEntryCFC;
+import build.buildfarm.cas.cfc.LegacyDirectoryCFC;
 import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Dispenser;
+import build.buildfarm.common.EmptyInputStreamFactory;
+import build.buildfarm.common.FailoverInputStreamFactory;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.ZstdDecompressingOutputStream.FixedBufferPool;
@@ -76,6 +80,7 @@ import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
@@ -99,9 +104,11 @@ import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
@@ -343,8 +350,7 @@ public final class Worker extends LoggingMain {
       List<String> ownerNames)
       throws ConfigurationException {
     checkState(storage != null, "no exec fs cas specified");
-    if (storage instanceof CASFileCache) {
-      CASFileCache cfc = (CASFileCache) storage;
+    if (storage instanceof CASFileCache cfc) {
       FileSystem fileSystem = cfc.getRoot().getFileSystem();
       PoolResource execOwnerIndexResource = null;
       ImmutableMap<String, UserPrincipal> owners = ImmutableMap.of();
@@ -427,21 +433,68 @@ public final class Worker extends LoggingMain {
         checkState(delegate == null, "grpc cas cannot delegate");
         return createGrpcCAS(cas);
       case FILESYSTEM:
-        return new ShardCASFileCache(
-            remoteInputStreamFactory,
+        return createCASFileCache(
             root.resolve(cas.getValidPath(root)),
-            cas.getMaxSizeBytes(),
+            cas,
             configs.getMaxEntrySizeBytes(), // TODO make this a configurable value for each cas
-            // delegate level
-            cas.getHexBucketLevels(),
             removeDirectoryService,
             accessRecorder,
+            /* storage= */ Maps.newConcurrentMap(),
             zstdBufferPool,
             this::onStoragePut,
             delegate == null ? this::onStorageExpire : (digests) -> {},
             delegate,
-            delegateSkipLoad);
+            delegateSkipLoad,
+            remoteInputStreamFactory);
     }
+  }
+
+  private CASFileCache createCASFileCache(
+      Path root,
+      Cas cas,
+      long maxEntrySizeInBytes,
+      ExecutorService expireService,
+      Executor accessRecorder,
+      ConcurrentMap<String, CASFileCache.Entry> storage,
+      FixedBufferPool zstdBufferPool,
+      Consumer<Digest> onPut,
+      Consumer<Iterable<Digest>> onExpire,
+      @Nullable ContentAddressableStorage delegate,
+      boolean delegateSkipLoad,
+      InputStreamFactory externalInputStreamFactory) {
+    if (configs.getWorker().isLegacyDirectoryFileCache()) {
+      return new LegacyDirectoryCFC(
+          root,
+          cas.getMaxSizeBytes(),
+          maxEntrySizeInBytes, // TODO make this a configurable value for each cas
+          cas.getHexBucketLevels(),
+          cas.isFileDirectoriesIndexInMemory(),
+          cas.isExecRootCopyFallback(),
+          expireService,
+          accessRecorder,
+          storage,
+          LegacyDirectoryCFC.DEFAULT_DIRECTORIES_INDEX_NAME,
+          zstdBufferPool,
+          onPut,
+          onExpire,
+          delegate,
+          delegateSkipLoad,
+          externalInputStreamFactory);
+    }
+    return new DirectoryEntryCFC(
+        root,
+        cas.getMaxSizeBytes(),
+        maxEntrySizeInBytes,
+        cas.getHexBucketLevels(),
+        expireService,
+        accessRecorder,
+        storage,
+        zstdBufferPool,
+        onPut,
+        onExpire,
+        delegate,
+        delegateSkipLoad,
+        externalInputStreamFactory);
   }
 
   private ExecFileSystem createCFCExecFileSystem(
