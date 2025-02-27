@@ -54,7 +54,10 @@ import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.EmptyInputStreamFactory;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.FailoverInputStreamFactory;
+import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
@@ -174,6 +177,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final FixedBufferPool zstdBufferPool;
   @Nullable private final ContentAddressableStorage delegate;
   private final boolean delegateSkipLoad;
+  private final InputStreamFactory inputStreamFactory;
   private final LoadingCache<String, Lock> keyLocks =
       CacheBuilder.newBuilder()
           .expireAfterAccess(
@@ -284,7 +288,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire,
       @Nullable ContentAddressableStorage delegate,
-      boolean delegateSkipLoad) {
+      boolean delegateSkipLoad,
+      InputStreamFactory externalInputStreamFactory) {
     this.root = root;
     this.maxSizeInBytes = maxSizeInBytes;
     this.maxEntrySizeInBytes = maxEntrySizeInBytes;
@@ -295,6 +300,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.onExpire = onExpire;
     this.delegate = delegate;
     this.delegateSkipLoad = delegateSkipLoad;
+    this.inputStreamFactory =
+        new EmptyInputStreamFactory(
+            new FailoverInputStreamFactory(this::newTransparentInput, externalInputStreamFactory));
     this.zstdBufferPool = zstdBufferPool;
 
     writes =
@@ -2620,8 +2628,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  protected abstract InputStream newExternalInput(
-      Compressor.Value compressor, Digest digest, long offset) throws IOException;
+  private InputStream newExternalInput(Compressor.Value compressor, Digest digest, long offset)
+      throws IOException {
+    return inputStreamFactory.newInput(compressor, digest, offset);
+  }
 
   // CAS fallback methods
 
