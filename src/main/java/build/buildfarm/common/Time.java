@@ -96,8 +96,8 @@ public class Time {
    * @throws IllegalArgumentException if {@code start > end}.
    */
   public static double toDurationSeconds(Timestamp start, Timestamp end) {
-      // start must be <= end
-      checkArgument(Timestamps.compare(start, end) <= 0);
-      return Durations.toSeconds(Timestamps.between(start, end));
+    // start must be <= end
+    checkArgument(Timestamps.compare(start, end) <= 0);
+    return Durations.toSeconds(Timestamps.between(start, end));
   }
 }
