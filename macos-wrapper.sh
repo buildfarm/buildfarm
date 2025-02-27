@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # An Apple specific Apple execution wrapper - mainly to set SDKROOT and
 # DEVELOPER_DIR.
 # There is no enforcement of where Xcode.app is installed locally or remote so
