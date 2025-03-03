@@ -181,6 +181,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final EntryPathStrategy entryPathStrategy;
   private final long maxSizeInBytes;
   private final long maxEntrySizeInBytes;
+  private final long maxHardLinkCount;
   private final boolean execRootFallback;
   private final ConcurrentMap<String, Entry> storage;
   private final Consumer<Digest> onPut;
@@ -298,6 +299,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       long maxSizeInBytes,
       long maxEntrySizeInBytes,
       int hexBucketLevels,
+      int maxHardLinkCount,
       boolean storeFileDirsIndexInMemory,
       boolean execRootFallback,
       ExecutorService expireService,
@@ -312,6 +314,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.root = root;
     this.maxSizeInBytes = maxSizeInBytes;
     this.maxEntrySizeInBytes = maxEntrySizeInBytes;
+    this.maxHardLinkCount = maxHardLinkCount;
     this.execRootFallback = execRootFallback;
     this.expireService = expireService;
     this.accessRecorder = accessRecorder;
@@ -2146,6 +2149,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     // per inode. If you are using a filesystem with low hardlink limits, this call will likely fail
     // with 'Too many links...`.
 
+    // Now we can limit the max number of hardlinks by setting the 'maxHardLinkCount' parameter, so
+    // that the ext4 filesystem is supported.
+
     try {
       Files.createLink(filePath, cacheFilePath);
     } catch (IOException e) {
@@ -2889,8 +2895,30 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throw new EntryLimitException(blobSizeInBytes, maxEntrySizeInBytes);
     }
 
+    final boolean deleteExistingFile;
+
     if (!charge(key, blobSizeInBytes, requiresDischarge)) {
-      return DUPLICATE_OUTPUT_STREAM;
+      if (maxHardLinkCount == 0) {
+        return DUPLICATE_OUTPUT_STREAM;
+      }
+
+      // if hard link count is reached, discharge
+      Path filepath = getPath(key);
+      Integer linkCount = 0;
+      try {
+        linkCount = (Integer) Files.getAttribute(filepath, "unix:nlink");
+      } catch (IOException exception) {
+        log.log(Level.FINER, "Cannot get file attribute.", exception);
+      }
+
+      if (linkCount < maxHardLinkCount) {
+        return DUPLICATE_OUTPUT_STREAM;
+      } else {
+        log.log(Level.FINER, format("File %s has link count %d, discharge", filepath, linkCount));
+        deleteExistingFile = true;
+      }
+    } else {
+      deleteExistingFile = false;
     }
 
     DigestUtil digestUtil = new DigestUtil(HashFunction.get(digestFunction));
@@ -3023,8 +3051,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Entry existingEntry = null;
         boolean inserted = false;
         try {
-          // acquire the key lock
-          Files.createLink(CASFileCache.this.getPath(key), writePath);
+          Path path = CASFileCache.this.getPath(key);
+          if (deleteExistingFile && Files.exists(path)) {
+            log.log(
+                Level.FINER, format("delete existing file %s, and link it to %s", path, writePath));
+            Files.delete(path);
+          }
+          Files.createLink(path, writePath);
           existingEntry = safeStorageInsertion(key, entry);
           inserted = existingEntry == null;
         } catch (FileAlreadyExistsException e) {

@@ -25,6 +25,7 @@ public class Cas {
   private boolean fileDirectoriesIndexInMemory = false;
   private boolean skipLoad = false;
 
+  private int maxHardLinkCount = 0;
   // if creating a hardlink fails, copy the file instead
   private boolean execRootCopyFallback = false;
 
