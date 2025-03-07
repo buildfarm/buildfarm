@@ -15,4 +15,4 @@ else
 fi
 
 # Run Worker
-bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/logging.properties $config
+bazelisk run //src/main/java/build/buildfarm:buildfarm-shard-worker -- --jvm_flag=-Djava.util.logging.config.file="$PWD/examples/logging.properties" --prometheus_port=9091 "$config"
