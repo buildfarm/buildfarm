@@ -90,7 +90,6 @@ abstract class Controller implements IOResource {
     // an execution owner must be able to join a cgroup through group task/proc ownership
     open();
     setOwner("cgroup.procs", owner);
-    setOwner("tasks", owner);
   }
 
   protected void writeInt(String propertyName, int value) throws IOException {
