@@ -52,6 +52,7 @@ public class Worker {
   private List<LimitedResource> resources = new ArrayList<>();
 
   private boolean errorOperationOutputSizeExceeded = false;
+  private boolean legacyDirectoryFileCache = false;
 
   public List<ExecutionPolicy> getExecutionPolicies() {
     return executionPolicies;

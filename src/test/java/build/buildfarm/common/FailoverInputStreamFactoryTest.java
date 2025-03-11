@@ -12,51 +12,61 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.shard;
+package build.buildfarm.common;
 
 import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.v1test.Digest;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.NoSuchFileException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class EmptyInputStreamFactoryTest {
+public class FailoverInputStreamFactoryTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(DigestUtil.HashFunction.SHA256);
 
   @Test
-  public void emptyDigestIsNotDelegated() throws IOException, InterruptedException {
-    EmptyInputStreamFactory emptyFactory =
-        new EmptyInputStreamFactory(
-            (compressor, digest, offset) -> {
+  public void DigestInPrimaryIsNotDelegated() throws IOException, InterruptedException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest contentDigest = DIGEST_UTIL.compute(content);
+    FailoverInputStreamFactory failoverFactory =
+        new FailoverInputStreamFactory(
+            /* primary= */ (compressor, digest, offset) -> {
+              if (digest.equals(contentDigest)) {
+                return content.newInput();
+              }
+              throw new NoSuchFileException(DigestUtil.toString(digest));
+            },
+            /* failover= */ (compressor, digest, offset) -> {
               throw new IOException("invalid");
             });
     InputStream in =
-        emptyFactory.newInput(
-            Compressor.Value.IDENTITY, Digest.getDefaultInstance(), /* offset= */ 0);
-    assertThat(in.read()).isEqualTo(-1);
+        failoverFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset= */ 0);
+    assertThat(ByteString.readFrom(in)).isEqualTo(content);
   }
 
   @Test
-  public void nonEmptyDigestIsDelegated() throws IOException, InterruptedException {
+  public void missingDigestIsDelegated() throws IOException, InterruptedException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Digest contentDigest = DIGEST_UTIL.compute(content);
-    EmptyInputStreamFactory emptyFactory =
-        new EmptyInputStreamFactory(
-            (compressor, digest, offset) -> {
+    FailoverInputStreamFactory failoverFactory =
+        new FailoverInputStreamFactory(
+            /* primary= */ (compressor, digest, offset) -> {
+              throw new NoSuchFileException(DigestUtil.toString(digest));
+            },
+            /* failover= */ (compressor, digest, offset) -> {
               if (digest.equals(contentDigest)) {
                 return content.newInput();
               }
               throw new IOException("invalid");
             });
     InputStream in =
-        emptyFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset= */ 0);
+        failoverFactory.newInput(Compressor.Value.IDENTITY, contentDigest, /* offset= */ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);
   }
 }
