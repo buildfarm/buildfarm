@@ -61,9 +61,12 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
           .help("Operation execution exit code.")
           .register();
   private static final Histogram queuedTime =
-      Histogram.build().name("queued_time_ms").help("Queued time in ms.").register();
+      Histogram.build().name("queued_time_s").help("Queued time in seconds.").register();
   private static final Histogram outputUploadTime =
-      Histogram.build().name("output_upload_time_ms").help("Output upload time in ms.").register();
+      Histogram.build()
+          .name("output_upload_time_s")
+          .help("Output upload time in seconds.")
+          .register();
 
   private final String clusterId;
 
@@ -116,11 +119,11 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
               operationRequestMetadata.getExecuteResponse().getResult().getExecutionMetadata();
           operationsPerWorker.labels(executionMetadata.getWorker()).inc();
           queuedTime.observe(
-              Time.toDurationMs(
+              Time.toDurationSeconds(
                   executionMetadata.getQueuedTimestamp(),
                   executionMetadata.getExecutionStartTimestamp()));
           outputUploadTime.observe(
-              Time.toDurationMs(
+              Time.toDurationSeconds(
                   executionMetadata.getOutputUploadStartTimestamp(),
                   executionMetadata.getOutputUploadCompletedTimestamp()));
         }

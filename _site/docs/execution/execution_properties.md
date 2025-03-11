@@ -78,7 +78,7 @@ Despite being given 1 core, they see all of the cpus and decide to spawn that ma
 This test will succeed when env var TESTVAR is foobar, and fail otherwise.
 
 ```shell
-#!/bin/bash
+#!/usr/bin/env bash
 [ "$TESTVAR" = "foobar" ]
 ```
 
@@ -99,7 +99,7 @@ PASS
 **Template Example:**
 If you give a range of cores, buildfarm has the authority to decide how many your operation actually claims.  You can let buildfarm resolve this value for you (via [mustache](https://mustache.github.io/)).
 ```bash
-#!/bin/bash
+#!/usr/bin/env bash
 [ "$MKL_NUM_THREADS" = "1" ]
 ```
 

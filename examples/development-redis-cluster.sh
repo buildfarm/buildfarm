@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # First, start six Redis instances using this script:
 #   ./development-redis-cluster.sh 0
