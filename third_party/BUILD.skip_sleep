@@ -3,8 +3,8 @@ package(default_visibility = ["//visibility:public"])
 cc_binary(
     name = "skip_sleep",
     srcs = select({
-        "@//config:windows": ["tardis-windows.c"],
-        "@//conditions:default": ["tardis.c"],
+        "@build_buildfarm//config:windows": ["tardis-windows.c"],
+        "//conditions:default": ["tardis.c"],
     }),
     target_compatible_with = [
         "@platforms//cpu:x86_64", # Avoid ARM/aarch64
@@ -17,8 +17,8 @@ cc_binary(
 cc_binary(
     name = "skip_sleep_preload",
     srcs = select({
-        "@//config:windows": ["novdso-windows.c"],
-        "@//conditions:default": ["novdso.c"],
+        "@build_buildfarm//config:windows": ["novdso-windows.c"],
+        "//conditions:default": ["novdso.c"],
     }),
     target_compatible_with = [
         "@platforms//cpu:x86_64", # Avoid ARM/aarch64
