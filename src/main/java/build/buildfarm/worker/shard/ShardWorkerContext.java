@@ -419,7 +419,7 @@ class ShardWorkerContext implements WorkerContext {
             String operationName = queueEntry.getExecuteEntry().getOperationName();
             if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
               claim.release();
-              log.log(Level.WARNING, "matched duplicate operation " + operationName);
+              log.log(Level.FINE, "matched duplicate operation " + operationName);
               return false;
             }
             return onUniqueEntry(queueEntry, claim);
