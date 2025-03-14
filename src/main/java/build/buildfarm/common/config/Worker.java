@@ -14,6 +14,8 @@
 
 package build.buildfarm.common.config;
 
+import static build.buildfarm.common.base.System.isWindows;
+
 import build.buildfarm.v1test.WorkerType;
 import com.google.common.base.Strings;
 import java.nio.file.Files;
@@ -67,6 +69,7 @@ public class Worker {
 
   private boolean errorOperationOutputSizeExceeded = false;
   private boolean legacyDirectoryFileCache = false;
+  private boolean absolutizeCommandProgram = isWindows();
 
   public List<ExecutionPolicy> getExecutionPolicies() {
     return executionPolicies;

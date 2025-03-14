@@ -61,6 +61,7 @@ import com.google.rpc.Code;
 import io.grpc.Deadline;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -310,17 +311,19 @@ class Executor {
             arguments,
             executionContext.command,
             workingDirectory)) {
-      if (System.getProperty("os.name").contains("Win")) {
-        // Make sure that the executable path is absolute, otherwise processbuilder fails on windows
-        Iterator<String> argumentItr = command.getArgumentsList().iterator();
-        if (argumentItr.hasNext()) {
-          String exe = argumentItr.next(); // Get first element, this is the executable
-          arguments.add(workingDirectory.resolve(exe).toAbsolutePath().normalize().toString());
-          argumentItr.forEachRemaining(arguments::add);
-        }
-      } else {
-        arguments.addAll(command.getArgumentsList());
+      // Windows requires that relative command programs are absolutized
+      Iterator<String> argumentItr = command.getArgumentsList().iterator();
+      boolean absolutizeExe =
+          BuildfarmConfigs.getInstance().getWorker().isAbsolutizeCommandProgram()
+              && argumentItr.hasNext()
+              && Files.exists(workingDirectory.resolve(command.getArguments(0)));
+      if (absolutizeExe) {
+        Path exe =
+            workingDirectory.resolve(
+                argumentItr.next()); // Get first element, this is the executable
+        arguments.add(exe.toAbsolutePath().normalize().toString());
       }
+      argumentItr.forEachRemaining(arguments::add);
 
       statusCode =
           executeCommand(
