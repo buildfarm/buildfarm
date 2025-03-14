@@ -26,6 +26,7 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.PutOperationStage.OperationStageDurations;
 import build.buildfarm.worker.SuperscalarPipelineStage;
+import com.google.common.base.Strings;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import javax.annotation.Nullable;
@@ -60,7 +61,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private StageInformation unaryStageInformation(String name, @Nullable String operationName) {
     StageInformation.Builder builder =
         StageInformation.newBuilder().setName(name).setSlotsConfigured(1);
-    if (operationName != null) {
+    if (!Strings.isNullOrEmpty(operationName)) {
       builder.setSlotsUsed(1).addOperationNames(operationName);
     }
     return builder.build();
