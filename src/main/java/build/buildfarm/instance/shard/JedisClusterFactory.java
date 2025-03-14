@@ -29,6 +29,7 @@ import com.google.common.collect.Iterables;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -161,7 +162,8 @@ public class JedisClusterFactory {
       return new Cluster(hostAndPorts, jedisClientConfig, maxAttempts, poolConfig);
     } catch (JedisClusterOperationException e) {
       // probably not a cluster
-      return new Pooled(poolConfig, Iterables.getOnlyElement(hostAndPorts), jedisClientConfig);
+      return new Pooled(poolConfig, Iterables.getOnlyElement(hostAndPorts), jedisClientConfig, maxAttempts,
+          configs.getBackplane().getRetryDurationMillis());
     }
   }
 

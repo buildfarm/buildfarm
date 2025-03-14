@@ -19,6 +19,7 @@ public class Backplane {
   private BACKPLANE_TYPE type = BACKPLANE_TYPE.SHARD;
   private String redisUri;
   private int jedisPoolMaxTotal = 4000;
+  private int jedisRetryDurationMillis = 0;
   private String workersHashName = "Workers";
   private String workerChannel = "WorkerChannel";
   private String actionCachePrefix = "ActionCache";

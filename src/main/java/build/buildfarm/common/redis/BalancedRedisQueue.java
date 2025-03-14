@@ -332,10 +332,10 @@ public class BalancedRedisQueue {
 
   private static Jedis getJedisFromKey(UnifiedJedis jedis, String name) {
     Connection connection = null;
-    if (jedis instanceof JedisCluster cluster) {
+    if (jedis instanceof Cluster cluster) {
       connection = cluster.getConnectionFromSlot(JedisClusterCRC16.getSlot(name));
-    } else if (jedis instanceof JedisPooled pooled) {
-      connection = pooled.getPool().getResource();
+    } else if (jedis instanceof Pooled pooled) {
+      connection = pooled.getConnection();
     }
     if (connection == null) {
       throw new IllegalArgumentException(jedis.toString());
