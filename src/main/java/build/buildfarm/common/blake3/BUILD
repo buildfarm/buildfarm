@@ -17,6 +17,7 @@ java_library(
     }),
     visibility = ["//src/main/java/build/buildfarm/common:__pkg__"],
     deps = [
+        "//src/main/java/build/buildfarm/common/base",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_errorprone_error_prone_annotations",
         "@maven//:com_google_guava_guava",
