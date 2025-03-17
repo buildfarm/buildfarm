@@ -1,5 +1,6 @@
 package build.buildfarm.common.redis;
 
+import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
@@ -15,8 +16,14 @@ public class Cluster extends JedisCluster implements Unified {
       Set<HostAndPort> clusterNodes,
       JedisClientConfig clientConfig,
       int maxAttempts,
+      int maxTotalRetriesDurationMillis,
       GenericObjectPoolConfig<Connection> poolConfig) {
-    super(clusterNodes, clientConfig, maxAttempts, poolConfig);
+    super(
+        clusterNodes,
+        clientConfig,
+        maxAttempts,
+        Duration.ofMillis(maxTotalRetriesDurationMillis),
+        poolConfig);
   }
 
   @Override

@@ -2,6 +2,7 @@ package build.buildfarm.common.config;
 
 import com.google.common.base.Strings;
 import java.net.URI;
+import java.util.OptionalInt;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -19,6 +20,7 @@ public class Backplane {
   private BACKPLANE_TYPE type = BACKPLANE_TYPE.SHARD;
   private String redisUri;
   private int jedisPoolMaxTotal = 4000;
+  private OptionalInt jedisRetryDurationMillis = OptionalInt.empty();
   private String workersHashName = "Workers";
   private String workerChannel = "WorkerChannel";
   private String actionCachePrefix = "ActionCache";

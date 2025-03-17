@@ -158,10 +158,23 @@ public class JedisClusterFactory {
       ConnectionPoolConfig poolConfig) {
     int maxAttempts = Integer.max(5, configs.getBackplane().getMaxAttempts());
     try {
-      return new Cluster(hostAndPorts, jedisClientConfig, maxAttempts, poolConfig);
+      return new Cluster(
+          hostAndPorts,
+          jedisClientConfig,
+          maxAttempts,
+          configs
+              .getBackplane()
+              .getJedisRetryDurationMillis()
+              .orElse(maxAttempts * jedisClientConfig.getSocketTimeoutMillis()),
+          poolConfig);
     } catch (JedisClusterOperationException e) {
       // probably not a cluster
-      return new Pooled(poolConfig, Iterables.getOnlyElement(hostAndPorts), jedisClientConfig);
+      return new Pooled(
+          poolConfig,
+          Iterables.getOnlyElement(hostAndPorts),
+          jedisClientConfig,
+          maxAttempts,
+          configs.getBackplane().getJedisRetryDurationMillis().orElse(0));
     }
   }
 
