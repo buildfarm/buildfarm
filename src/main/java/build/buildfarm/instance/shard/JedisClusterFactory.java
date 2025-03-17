@@ -29,7 +29,6 @@ import com.google.common.collect.Iterables;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -159,11 +158,14 @@ public class JedisClusterFactory {
       ConnectionPoolConfig poolConfig) {
     int maxAttempts = Integer.max(5, configs.getBackplane().getMaxAttempts());
     try {
-      return new Cluster(hostAndPorts, jedisClientConfig, maxAttempts, poolConfig);
+      return new Cluster(hostAndPorts, jedisClientConfig, maxAttempts,
+          configs.getBackplane().getJedisRetryDurationMillis().orElse(
+              maxAttempts * jedisClientConfig.getSocketTimeoutMillis()),
+          poolConfig);
     } catch (JedisClusterOperationException e) {
       // probably not a cluster
       return new Pooled(poolConfig, Iterables.getOnlyElement(hostAndPorts), jedisClientConfig, maxAttempts,
-          configs.getBackplane().getRetryDurationMillis());
+          configs.getBackplane().getJedisRetryDurationMillis().orElse(0));
     }
   }
 

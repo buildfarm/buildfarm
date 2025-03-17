@@ -1,7 +1,10 @@
 package build.buildfarm.common.config;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import java.net.URI;
+import java.util.OptionalInt;
+
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -19,7 +22,7 @@ public class Backplane {
   private BACKPLANE_TYPE type = BACKPLANE_TYPE.SHARD;
   private String redisUri;
   private int jedisPoolMaxTotal = 4000;
-  private int jedisRetryDurationMillis = 0;
+  private OptionalInt jedisRetryDurationMillis = OptionalInt.empty();
   private String workersHashName = "Workers";
   private String workerChannel = "WorkerChannel";
   private String actionCachePrefix = "ActionCache";
@@ -65,7 +68,8 @@ public class Backplane {
   private String redisPassword;
 
   /**
-   * Path to a CA.pem for the redis TLS. If specified, ONLY this root CA will be used (it will not
+   * Path to a CA.pem for the redis TLS. If specified, ONLY this root CA will be
+   * used (it will not
    * be added to the defaults)
    */
   private String redisCertificateAuthorityFile;
@@ -73,10 +77,13 @@ public class Backplane {
   /**
    * Use Google Application Default Credentials to authenticate to Redis.
    *
-   * <p>Setting GOOGLE_DEFAULT_CREDENTIALS env var can help Google credential provider find your
+   * <p>
+   * Setting GOOGLE_DEFAULT_CREDENTIALS env var can help Google credential
+   * provider find your
    * service account.
    *
-   * <p>If this is set, the `redisPassword` will be ignored.
+   * <p>
+   * If this is set, the `redisPassword` will be ignored.
    */
   private boolean redisAuthWithGoogleCredentials;
 
@@ -88,7 +95,8 @@ public class Backplane {
   /**
    * This function is used to print the URI in logs.
    *
-   * @return The redis URI but the password will be hidden, or <c>null</c> if unset.
+   * @return The redis URI but the password will be hidden, or <c>null</c> if
+   *         unset.
    */
   public @Nullable String getRedisUriMasked() {
     String uri = getRedisUri();
@@ -113,8 +121,8 @@ public class Backplane {
    * Look in several prioritized ways to get a Redis username:
    *
    * <ol>
-   *   <li>the password in the Redis URI (wherever that came from)
-   *   <li>The `redisUsername` from config YAML
+   * <li>the password in the Redis URI (wherever that came from)
+   * <li>The `redisUsername` from config YAML
    * </ol>
    *
    * @return The redis username, or <c>null</c> if unset.
@@ -136,9 +144,9 @@ public class Backplane {
    * Look in several prioritized ways to get a Redis password:
    *
    * <ol>
-   *   <li>the password in the Redis URI (wherever that came from)
-   *   <li>the `redisCredentialFile`.
-   *   <li>The `redisPassword` from config YAML
+   * <li>the password in the Redis URI (wherever that came from)
+   * <li>the `redisCredentialFile`.
+   * <li>The `redisPassword` from config YAML
    * </ol>
    *
    * @return The redis password, or <c>null</c> if unset.
