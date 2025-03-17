@@ -31,12 +31,14 @@ import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import lombok.Data;
 import net.jcip.annotations.ThreadSafe;
@@ -66,7 +68,7 @@ public interface Backplane {
   void setOnUnsubscribe(InterruptingRunnable onUnsubscribe);
 
   /** Start the backplane's operation */
-  void start(String publicClientName) throws IOException;
+  void start(String publicClientName, Consumer<String> onWorkerRemoved) throws IOException;
 
   /** Stop the backplane's operation */
   void stop() throws InterruptedException;
@@ -232,7 +234,7 @@ public interface Backplane {
    *
    * <p>Moves an operation from the list of queued operations to the list of dispatched operations.
    */
-  QueueEntry dispatchOperation(List<Platform.Property> provisions)
+  QueueEntry dispatchOperation(List<Platform.Property> provisions, LocalResourceSet resourceSet)
       throws IOException, InterruptedException;
 
   /**

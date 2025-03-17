@@ -8,10 +8,10 @@ import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.worker.ExecFileSystem.ExecDirectoryAttributes;
 import java.io.Closeable;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.DirectoryIteratorException;
 import java.nio.file.DirectoryStream;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayDeque;
@@ -109,7 +109,7 @@ class ExecTreeWalker implements Closeable {
           EventType.ENTRY,
           entry.getPath(),
           entry.getAttributes(),
-          new FileNotFoundException(
+          new NoSuchFileException(
               DigestUtil.toString(DigestUtil.fromDigest(digest, digestFunction))));
     }
     DirectoryStream<Entry> stream = new ExecDirectoryStream(directory, entry.getPath());

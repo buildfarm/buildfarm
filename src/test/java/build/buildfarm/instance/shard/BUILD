@@ -54,6 +54,7 @@ java_test(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/server",
         "//src/main/java/build/buildfarm/instance/shard",
+        "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "@googleapis//google/longrunning:longrunning_java_proto",
