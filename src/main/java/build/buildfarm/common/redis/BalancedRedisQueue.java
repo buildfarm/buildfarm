@@ -37,8 +37,6 @@ import lombok.Getter;
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Connection;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPooled;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.util.JedisClusterCRC16;
 

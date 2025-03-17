@@ -18,7 +18,12 @@ public class Cluster extends JedisCluster implements Unified {
       int maxAttempts,
       int maxTotalRetriesDurationMillis,
       GenericObjectPoolConfig<Connection> poolConfig) {
-    super(clusterNodes, clientConfig, maxAttempts, Duration.ofMillis(maxTotalRetriesDurationMillis), poolConfig);
+    super(
+        clusterNodes,
+        clientConfig,
+        maxAttempts,
+        Duration.ofMillis(maxTotalRetriesDurationMillis),
+        poolConfig);
   }
 
   @Override

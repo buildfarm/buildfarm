@@ -3,7 +3,6 @@ package build.buildfarm.common.redis;
 import java.time.Duration;
 import java.util.concurrent.Executor;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
-
 import redis.clients.jedis.Connection;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.JedisClientConfig;
@@ -17,19 +16,11 @@ public class Pooled extends UnifiedJedis implements Unified {
       HostAndPort hostAndPort,
       JedisClientConfig clientConfig,
       int maxAttempts,
-      int retryDurationMillis
-  ) {
+      int retryDurationMillis) {
     super(
-      new PooledConnectionProvider(
-        hostAndPort,
-        clientConfig,
-        poolConfig
-      ),
-      maxAttempts, 
-      Duration.ofMillis(
-        retryDurationMillis
-      )
-    );
+        new PooledConnectionProvider(hostAndPort, clientConfig, poolConfig),
+        maxAttempts,
+        Duration.ofMillis(retryDurationMillis));
   }
 
   @Override
@@ -39,5 +30,5 @@ public class Pooled extends UnifiedJedis implements Unified {
 
   public Connection getConnection() {
     return super.provider.getConnection();
-  } 
+  }
 }
