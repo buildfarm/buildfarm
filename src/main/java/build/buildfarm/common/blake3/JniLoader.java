@@ -14,6 +14,8 @@
 
 package build.buildfarm.common.blake3;
 
+import static build.buildfarm.common.base.System.isDarwin;
+import static build.buildfarm.common.base.System.isWindows;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.google.common.io.ByteStreams;
@@ -31,14 +33,6 @@ import lombok.extern.java.Log;
 @Log
 public final class JniLoader {
   @Nullable private static final Throwable JNI_LOAD_ERROR;
-
-  private static boolean isDarwin() {
-    return System.getProperty("os.name").equals("Mac OS X");
-  }
-
-  private static boolean isWindows() {
-    return System.getProperty("os.name").startsWith("Windows");
-  }
 
   static {
     Throwable jniLoadError;

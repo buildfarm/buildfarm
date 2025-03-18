@@ -14,6 +14,8 @@
 
 package build.buildfarm.examples;
 
+import static build.buildfarm.common.base.System.isWindows;
+
 import build.buildfarm.common.config.BuildfarmConfigs;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -28,7 +30,7 @@ import org.junit.runners.JUnit4;
 public class ExampleConfigsTest {
   @Before
   public void skipWindows() {
-    org.junit.Assume.assumeFalse(System.getProperty("os.name").contains("Win"));
+    org.junit.Assume.assumeFalse(isWindows());
   }
 
   @Test
