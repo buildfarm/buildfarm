@@ -14,6 +14,8 @@
 
 package build.buildfarm.common.io;
 
+import static build.buildfarm.common.base.System.isDarwin;
+
 import com.google.common.base.Strings;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
@@ -56,15 +58,6 @@ public final class Utils {
   @SuppressWarnings("Guava")
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
-
-  // pretty poor check here, but avoiding apache commons for now
-  @SuppressWarnings("Guava")
-  private static final Supplier<Boolean> isMacOS =
-      Suppliers.memoize(
-          () -> {
-            String osName = System.getProperty("os.name").toLowerCase();
-            return osName.startsWith("mac");
-          });
 
   private static jnr.ffi.Runtime runtime() {
     return jnr.ffi.Runtime.getRuntime(libc.get());
@@ -220,7 +213,7 @@ public final class Utils {
       throws IOException {
     final List<NamedFileKey> dirents;
     // OSX presents an incompatible ffi dirent structure that has not been properly enumerated
-    if (fileStore.supportsFileAttributeView("posix") && !isMacOS.get()) {
+    if (fileStore.supportsFileAttributeView("posix") && !isDarwin()) {
       dirents = ffiReaddir(libc.get(), runtime(), path, fileStore);
     } else {
       dirents = listNIOdirentSorted(path, fileStore);
