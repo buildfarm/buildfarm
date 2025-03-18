@@ -1,0 +1,19 @@
+{{- if .Values.server.pdb.create }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-server
+  labels:
+  {{- include "buildfarm.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.server.pdb.minAvailable }}
+  minAvailable: {{ .Values.server.pdb.minAvailable }}
+  {{- end }}
+  {{- if or .Values.server.pdb.maxUnavailable (not .Values.server.pdb.minAvailable)}}
+  maxUnavailable: {{ .Values.server.pdb.maxUnavailable | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      name: {{ include "buildfarm.fullname" . }}-server
+      {{- include "buildfarm.selectorLabels" . | nindent 6 }}
+{{- end }}

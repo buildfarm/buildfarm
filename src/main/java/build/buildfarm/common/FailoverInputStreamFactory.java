@@ -12,20 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.shard;
+package build.buildfarm.common;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.v1test.Digest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
 
-class FailoverInputStreamFactory implements InputStreamFactory {
+public class FailoverInputStreamFactory implements InputStreamFactory {
   private final InputStreamFactory primary;
   private final InputStreamFactory delegate;
 
-  FailoverInputStreamFactory(InputStreamFactory primary, InputStreamFactory delegate) {
+  public FailoverInputStreamFactory(InputStreamFactory primary, InputStreamFactory delegate) {
     this.primary = primary;
     this.delegate = delegate;
   }

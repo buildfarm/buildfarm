@@ -32,6 +32,10 @@ public interface Write {
 
   boolean isComplete();
 
+  /**
+   * Implementations may throw WriteCompleteException, but as a precondition, the future must be
+   * complete.
+   */
   FeedbackOutputStream getOutput(
       long offset, long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
       throws IOException;

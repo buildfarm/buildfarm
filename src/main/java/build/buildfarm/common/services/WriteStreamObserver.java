@@ -343,6 +343,9 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
         out = null;
       }
       committedSize = getCommittedSizeForWrite(offset);
+    } catch (WriteCompleteException e) {
+      // write future must be set, ignore this request
+      return;
     } catch (IOException e) {
       if (errorResponse(e)) {
         logWriteActivity("querying", e);
@@ -419,6 +422,8 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
     } catch (DigestMismatchException e) {
       errorResponse(
           Status.INVALID_ARGUMENT.withDescription(e.getMessage()).withCause(e).asException());
+    } catch (WriteCompleteException e) {
+      // ignore, write will be closed with future callback
     } catch (IOException e) {
       if (errorResponse(Status.fromThrowable(e).asException())) {
         log.log(Level.SEVERE, format("error closing stream for %s", name), e);
@@ -462,6 +467,8 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private void requestNextIfReady() {
     try {
       requestNextIfReady(getOutput(earliestOffset));
+    } catch (WriteCompleteException e) {
+      // ignore, write will be closed with future callback
     } catch (IOException e) {
       if (errorResponse(Status.fromThrowable(e).asException())) {
         log.log(Level.SEVERE, format("error getting output stream for %s", name), e);

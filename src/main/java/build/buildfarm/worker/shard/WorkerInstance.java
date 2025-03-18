@@ -21,7 +21,6 @@ import build.bazel.remote.execution.v2.Compressor;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.backplane.Backplane;
@@ -39,10 +38,7 @@ import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
-import build.buildfarm.worker.MatchListener;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
@@ -55,8 +51,6 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.prometheus.client.Counter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -171,28 +165,6 @@ public class WorkerInstance extends NodeInstance {
       RequestMetadata requestMetadata,
       Watcher watcher) {
     throw new UnsupportedOperationException();
-  }
-
-  @VisibleForTesting
-  public QueueEntry dispatchOperation(MatchListener listener)
-      throws IOException, InterruptedException {
-    while (!backplane.isStopped()) {
-      listener.onWaitStart();
-      try {
-        List<Platform.Property> provisions = new ArrayList<>();
-        QueueEntry queueEntry = backplane.dispatchOperation(provisions);
-        if (queueEntry != null) {
-          return queueEntry;
-        }
-      } catch (IOException e) {
-        Status status = Status.fromThrowable(e);
-        if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
-          throw e;
-        }
-      }
-      listener.onWaitEnd();
-    }
-    throw new IOException(Status.UNAVAILABLE.withDescription("backplane is stopped").asException());
   }
 
   @Override

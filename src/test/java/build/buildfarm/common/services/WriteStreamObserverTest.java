@@ -3,6 +3,7 @@ package build.buildfarm.common.services;
 import static build.buildfarm.common.resources.ResourceParser.uploadResourceName;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Compressor;
@@ -17,6 +19,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.WriteCompleteException;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.resources.BlobInformation;
 import build.buildfarm.common.resources.UploadBlobRequest;
@@ -196,5 +199,59 @@ public class WriteStreamObserverTest {
     verify(responseObserver, times(1)).onNext(any(WriteResponse.class));
     verify(responseObserver, times(1)).onCompleted();
     verify(responseObserver, never()).onError(any(Throwable.class));
+  }
+
+  @Test
+  public void waitForFutureOnComplete() throws Exception {
+    ByteString completed = ByteString.copyFromUtf8("Write already completed");
+    Digest completedDigest = DIGEST_UTIL.compute(completed);
+    SettableFuture<Long> future = SettableFuture.create();
+
+    Write write = mock(Write.class);
+    when(write.getFuture()).thenReturn(future);
+    when(write.isComplete()).thenAnswer((Answer<Boolean>) invocation -> future.isDone());
+    doAnswer(
+            invocation -> {
+              future.set(completedDigest.getSize());
+              throw new WriteCompleteException();
+            })
+        .when(write)
+        .getOutput(any(Long.class), any(Long.class), any(TimeUnit.class), any(Runnable.class));
+    UUID uuid = UUID.randomUUID();
+    Instance instance = mock(Instance.class);
+    when(instance.getBlobWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(completedDigest),
+            eq(uuid),
+            any(RequestMetadata.class)))
+        .thenReturn(write);
+
+    UploadBlobRequest uploadBlobRequest =
+        UploadBlobRequest.newBuilder()
+            .setBlob(BlobInformation.newBuilder().setDigest(completedDigest))
+            .setUuid(uuid.toString())
+            .build();
+    StreamObserver<WriteResponse> responseObserver = mock(StreamObserver.class);
+    WriteStreamObserver observer =
+        new WriteStreamObserver(instance, 1, SECONDS, () -> {}, responseObserver);
+    observer.onNext(
+        WriteRequest.newBuilder()
+            .setResourceName(uploadResourceName(uploadBlobRequest))
+            .setData(completed)
+            .setFinishWrite(true)
+            .build());
+
+    verify(instance, times(1))
+        .getBlobWrite(
+            eq(Compressor.Value.IDENTITY),
+            eq(completedDigest),
+            eq(uuid),
+            any(RequestMetadata.class));
+    verify(write, atLeastOnce()).getFuture();
+    verify(write, times(1))
+        .getOutput(any(Long.class), any(Long.class), any(TimeUnit.class), any(Runnable.class));
+    verify(responseObserver, times(1)).onNext(any(WriteResponse.class));
+    verify(responseObserver, times(1)).onCompleted();
+    verifyNoMoreInteractions(responseObserver);
   }
 }

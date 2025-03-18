@@ -24,6 +24,8 @@ import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueueStatus;
+import build.buildfarm.worker.resources.LocalResourceSet;
+import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -245,7 +247,10 @@ public class ExecutionQueue {
   }
 
   public ExecutionQueueEntry take(
-      UnifiedJedis jedis, List<BalancedRedisQueue> queues, ExecutorService service)
+      UnifiedJedis jedis,
+      List<ProvisionedRedisQueue> queues,
+      LocalResourceSet resourceSet,
+      ExecutorService service)
       throws InterruptedException {
     // The conditions of this algorithm are as followed:
     // - from a client's perspective we want to block indefinitely.
@@ -270,14 +275,19 @@ public class ExecutionQueue {
     // try each of the internal queues with exponential backoff
     Duration currentTimeout = START_TIMEOUT;
     while (true) {
-      final BalancedQueueEntry balancedQueueEntry;
+      BalancedQueueEntry balancedQueueEntry = null;
       int index = roundRobinPopIndex(queues);
-      BalancedRedisQueue queue = queues.get(index);
-      if (blocking) {
-        balancedQueueEntry = queue.takeAny(jedis, currentTimeout, service);
-      } else {
-        balancedQueueEntry = queue.pollAny(jedis);
+      ProvisionedRedisQueue provisionedQueue = queues.get(index);
+      BalancedRedisQueue queue = provisionedQueue.queue();
+      if (!provisionedQueue.isExhausted(LocalResourceSetUtils.exhausted(resourceSet))) {
+        if (blocking) {
+          balancedQueueEntry = queue.takeAny(jedis, currentTimeout, service);
+        } else {
+          balancedQueueEntry = queue.pollAny(jedis);
+        }
       }
+      // TODO need logic to determine if _all_ queues are currently exhausted
+
       // return if found
       if (balancedQueueEntry != null) {
         try {
@@ -322,14 +332,17 @@ public class ExecutionQueue {
    * @note Suggested return identifier: val.
    */
   public ExecutionQueueEntry dequeue(
-      UnifiedJedis jedis, List<Platform.Property> provisions, ExecutorService service)
+      UnifiedJedis jedis,
+      List<Platform.Property> provisions,
+      LocalResourceSet resourceSet,
+      ExecutorService service)
       throws InterruptedException {
     // Select all matched queues, and attempt dequeuing via round-robin.
-    List<BalancedRedisQueue> queues = chooseEligibleQueues(provisions);
+    List<ProvisionedRedisQueue> queues = chooseEligibleQueues(provisions);
     checkState(!queues.isEmpty());
     // Keep iterating over matched queues until we find one that is non-empty and provides a
     // dequeued value.
-    return take(jedis, queues, service);
+    return take(jedis, queues, resourceSet, service);
   }
 
   /**
@@ -413,11 +426,10 @@ public class ExecutionQueue {
    * @return The chosen queues.
    * @note Suggested return identifier: queues.
    */
-  private List<BalancedRedisQueue> chooseEligibleQueues(List<Platform.Property> provisions) {
-    List<BalancedRedisQueue> eligibleQueues =
+  private List<ProvisionedRedisQueue> chooseEligibleQueues(List<Platform.Property> provisions) {
+    List<ProvisionedRedisQueue> eligibleQueues =
         queues.stream()
             .filter(provisionedQueue -> provisionedQueue.isEligible(toMultimap(provisions)))
-            .map(ProvisionedRedisQueue::queue)
             .collect(Collectors.toList());
 
     if (eligibleQueues.isEmpty()) {
@@ -459,7 +471,7 @@ public class ExecutionQueue {
    * @return The current round-robin index.
    * @note Suggested return identifier: queueIndex.
    */
-  private int roundRobinPopIndex(List<BalancedRedisQueue> matchedQueues) {
+  private int roundRobinPopIndex(List<?> matchedQueues) {
     int currentIndex = currentDequeueIndex;
     currentDequeueIndex = nextQueueInRoundRobin(currentDequeueIndex, matchedQueues);
     return currentIndex;
@@ -473,7 +485,7 @@ public class ExecutionQueue {
    * @return And adjusted val based on the current queue index.
    * @note Suggested return identifier: adjustedCurrentQueue.
    */
-  private int nextQueueInRoundRobin(int index, List<BalancedRedisQueue> matchedQueues) {
+  private int nextQueueInRoundRobin(int index, List<?> matchedQueues) {
     if (index >= matchedQueues.size() - 1) {
       return 0;
     }

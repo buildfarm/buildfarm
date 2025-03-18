@@ -1,4 +1,4 @@
-// Copyright 2024 The Buildfarm Authors. All rights reserved.
+// Copyright 2025 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.shard;
+package build.buildfarm.common.base;
 
-public class UnsubscribeTimeoutException extends RuntimeException {
-  public UnsubscribeTimeoutException(String message) {
-    super(message);
+public final class System {
+  public static boolean isDarwin() {
+    return java.lang.System.getProperty("os.name").equals("Mac OS X");
   }
+
+  public static boolean isWindows() {
+    return java.lang.System.getProperty("os.name").startsWith("Windows");
+  }
+
+  private System() {}
 }
