@@ -30,16 +30,21 @@ public class Cpu extends Controller {
   }
 
   /**
-   * Represents how much CPU shares are allocated. Note - this method does nothing for CGroups v2.
-   * All processes get equal weight.
+   * Represents how much CPU shares are allocated.
    *
+   * @see <a
+   *     href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#weights">Cgroups
+   *     v2: Weights</a>
    * @param shares
    * @throws IOException
    */
-  @Deprecated
   public void setShares(int shares) throws IOException {
-    open();
-    // TODO what to do for cgroups v2?
+    if (shares > 0) {
+      open();
+      // cpu.weight in the range [1,1000]
+      // the default is 100, so we want to set something every time.
+      writeInt("cpu.weight", shares);
+    }
   }
 
   /**

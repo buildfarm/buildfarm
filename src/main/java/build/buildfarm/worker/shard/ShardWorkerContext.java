@@ -1081,7 +1081,7 @@ class ShardWorkerContext implements WorkerContext {
         cpu.setMaxCpu(limits.cpu.max);
       }
       if (limits.cpu.min > 0) {
-        cpu.setShares(limits.cpu.min * 1024);
+        cpu.setShares(limits.cpu.min);
       }
     } catch (IOException e) {
       // clear interrupt flag if set due to ClosedByInterruptException
