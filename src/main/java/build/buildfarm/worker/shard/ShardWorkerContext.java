@@ -827,8 +827,8 @@ class ShardWorkerContext implements WorkerContext {
         /* only divide up our cfs quota if we need to limit below the available processors for executions */
         executionsGroup.getCpu().setMaxCpu(executeStageWidth);
       }
-      // create 1024 * execution width shares to choose from
-      operationsGroup.getCpu().setShares(executeStageWidth * 1024);
+      // create `execution width` shares to choose from. This is the ceiling for the operations
+      operationsGroup.getCpu().setShares(executeStageWidth);
     } catch (IOException e) {
       log.log(Level.WARNING, "Unable to set up CGroup", e);
       try {
@@ -1086,7 +1086,7 @@ class ShardWorkerContext implements WorkerContext {
         cpu.setMaxCpu(limits.cpu.max);
       }
       if (limits.cpu.min > 0) {
-        cpu.setShares(limits.cpu.min * 1024);
+        cpu.setShares(limits.cpu.min);
       }
     } catch (IOException e) {
       // clear interrupt flag if set due to ClosedByInterruptException

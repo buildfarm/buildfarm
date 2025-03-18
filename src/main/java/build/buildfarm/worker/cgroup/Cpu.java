@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker.cgroup;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 import java.io.IOException;
 
 public class Cpu extends Controller {
@@ -36,17 +38,28 @@ public class Cpu extends Controller {
   }
 
   /**
-   * Represents how much CPU shares are allocated. Note - this method does nothing for CGroups v2.
-   * All processes get equal weight.
+   * Represents how much CPU shares are allocated.
    *
-   * @param shares
+   * @see <a
+   *     href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html#weights">Cgroups
+   *     v2: Weights</a>
+   * @param shares how many vCPUs to give. a value of one means one CPU core.
    * @throws IOException
    */
-  @Deprecated
   public void setShares(int shares) throws IOException {
-    open();
-    if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
-      writeInt("cpu.shares", shares);
+    if (shares > 0) {
+      open();
+      // If you really have a 1000-core machine, please patch this =)
+      checkArgument(
+          shares < 1000,
+          "for cgroups v1 and v2 compatibility, the argument is now the cpu cores to allocate.");
+      if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
+        // cpu.weight in the range [1,10_000]
+        // the default is 100, so we want to set something every time.
+        writeInt("cpu.weight", shares);
+      } else if (Group.VERSION == CGroupVersion.CGROUPS_V1) {
+        writeInt("cpu.shares", shares * 1024);
+      }
     }
   }
 
