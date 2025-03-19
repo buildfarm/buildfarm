@@ -122,6 +122,7 @@ public class FetchService extends FetchImplBase {
             responseObserver.onNext(
                 FetchBlobResponse.newBuilder()
                     .setBlobDigest(DigestUtil.toDigest(actualDigest))
+                    .setDigestFunction(actualDigest.getDigestFunction())
                     .build());
             responseObserver.onCompleted();
           }
