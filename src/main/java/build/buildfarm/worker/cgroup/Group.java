@@ -73,12 +73,10 @@ public final class Group {
         // split[1]: mountpoint
         // split[2]: fs type
         checkState(split.length >= 3, "could not parse /proc/mounts");
-        if (split[2].contains("cgroup")) {
-          if (split[2].equals("cgroup2")) {
-            return CGroupVersion.CGROUPS_V2;
-          }
+        if (split[2].equals("cgroup2")) {
+          return CGroupVersion.CGROUPS_V2;
         }
-        // by this point, we haven't found any `cgroup` or `cgroup2` fs types.
+        // by this point, we haven't found any `cgroup2` fs types.
       }
     } catch (IOException e) {
       log.log(

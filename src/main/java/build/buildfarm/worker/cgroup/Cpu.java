@@ -18,7 +18,7 @@ import java.io.IOException;
 
 public class Cpu extends Controller {
 
-  private final int CPU_GRANULARITY = 100_000; // microseconds (μS)
+  private static final int CPU_GRANULARITY = 100_000; // microseconds (μS)
 
   Cpu(Group group) {
     super(group);
