@@ -330,14 +330,18 @@ worker:
 ```
 
 ### Sandbox Settings
+Using the sandbox can be configurable by the client via `exec_properties`. However, sometimes it is preferred to enable it via buildfarm config to prevent users from running actions outside the sandbox.
 
-| Configuration | Accepted and _Default_ Values | Description                                          |
-|---------------|-------------------------------|------------------------------------------------------|
-| alwaysUseSandbox      | boolean, _false_      | Enforce that the sandbox be used on every acion.     |
-| alwaysUseCgroups      | boolean, _true_       | Enforce that actions run under cgroups.              |
-| alwaysUseTmpFs        | boolean, _false_      | Enforce that the sandbox uses tmpfs on every acion.  |
-| selectForBlockNetwork | boolean, _false_      | `block-network` enables sandbox action execution.    |
-| selectForTmpFs        | boolean, _false_      | `tmpfs` enables sandbox action execution.            |
+| Configuration         | Accepted and _Default_ Values | Description                                                                                                                                                                                                     |
+|-----------------------|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| alwaysUseSandbox      | boolean, _false_              | Whether or not to always use the sandbox when running actions. It may be preferred to enforce sandbox usage than rely on client selection.                                                                      |
+| alwaysUseAsNobody     | boolean, _false_              | Whether or not to always use the as-nobody wrapper when running actions. It may be preferred to enforce this wrapper instead of relying on client selection.                                                    |
+| alwaysUseCgroups      | boolean, _true_               | Whether or not to use cgroups when sandboxing actions.  It may be preferred to enforce cgroup usage.                                                                                                            |
+| alwaysUseTmpFs        | boolean, _false_              | Whether or not to always use tmpfs when using the sandbox. It may be preferred to enforce sandbox usage than rely on client selection.                                                                          |
+| additionalWritePaths  | List of Strings, _[]_         | Additional paths the sandbox is allowed to write to. Suggestions may include: /tmp, /dev/shm                                                                                                                    |
+| tmpFsPaths            | List of Strings, _[]_         | Additional paths the sandbox uses for tmpfs. Suggestions may include: /tmp                                                                                                                                      |
+| selectForBlockNetwork | boolean, _false_              | If the action requires "block network" use the sandbox to fulfill this request. Otherwise, there may be no alternative solution and the "block network" request will be ignored / implemented differently.      |
+| selectForTmpFs        | boolean, _false_              | If the action requires "tmpfs" use the sandbox to fulfill this request.execution. Otherwise, there may be no alternative solution and the "tmpfs" request will be ignored / implemented differently.            |
 
 Example:
 
@@ -345,8 +349,11 @@ Example:
 worker:
   sandboxSettings:
     alwaysUseSandbox: true
+    alwaysUseAsNobody: false
     alwaysUseCgroups: true
     alwaysUseTmpFs: true
+    additionalWritePaths: []
+    tmpFsPaths: []
     selectForBlockNetwork: false
     selectForTmpFs: false
 ```
