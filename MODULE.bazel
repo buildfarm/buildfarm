@@ -213,7 +213,7 @@ use_repo(
 
 # https://github.com/bazelbuild/rules_python/pull/713#issuecomment-1885628496
 # Satisfy running tests in Docker as root.
-bazel_dep(name = "rules_python", version = "1.1.0")
+bazel_dep(name = "rules_python", version = "1.2.0")
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
