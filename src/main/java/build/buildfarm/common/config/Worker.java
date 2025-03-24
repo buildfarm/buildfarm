@@ -32,42 +32,42 @@ import lombok.extern.java.Log;
 @Data
 @Log
 public class Worker {
-  private int port = 8981;
+  private int port;
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
   private String publicName;
   private Capabilities capabilities = new Capabilities();
-  private String root = "/tmp/worker";
-  private int inlineContentLimit = 1048567; // 1024 * 1024
-  private long operationPollPeriod = 1;
+  private String root;
+  private int inlineContentLimit;
+  private long operationPollPeriod;
   private DequeueMatchSettings dequeueMatchSettings = new DequeueMatchSettings();
   private List<Cas> storages = Arrays.asList(new Cas());
-  private int executeStageWidth = 0;
-  private int executeStageWidthOffset = 0;
-  private int inputFetchStageWidth = 0;
-  private int inputFetchDeadline = 60;
-  private int reportResultStageWidth = 1;
-  private boolean linkExecFileSystem = true;
-  private boolean linkInputDirectories = true;
-  private List<String> linkedInputDirectories = Arrays.asList("(?!external/)[^/]+");
+  private int executeStageWidth;
+  private int executeStageWidthOffset;
+  private int inputFetchStageWidth;
+  private int inputFetchDeadline;
+  private int reportResultStageWidth;
+  private boolean linkExecFileSystem;
+  private boolean linkInputDirectories;
+  private List<String> linkedInputDirectories;
   private String execOwner;
   private List<String> execOwners = new ArrayList<>();
-  private int defaultMaxCores = 0;
-  private boolean limitGlobalExecution = false;
-  private boolean onlyMulticoreTests = false;
-  private boolean allowBringYourOwnContainer = false;
-  private boolean errorOperationRemainingResources = false;
-  private int gracefulShutdownSeconds = 0;
+  private int defaultMaxCores;
+  private boolean limitGlobalExecution;
+  private boolean onlyMulticoreTests;
+  private boolean allowBringYourOwnContainer;
+  private boolean errorOperationRemainingResources;
+  private int gracefulShutdownSeconds;
   private List<ExecutionPolicy> executionPolicies = Collections.emptyList();
   private SandboxSettings sandboxSettings = new SandboxSettings();
-  private boolean createSymlinkOutputs = false;
-  private int zstdBufferPoolSize = 2048; /* * ZSTD_DStreamInSize (current is 128k) == 256MiB */
-  private Set<String> persistentWorkerActionMnemonicAllowlist = Set.of("*");
+  private boolean createSymlinkOutputs;
+  private int zstdBufferPoolSize;
+  private Set<String> persistentWorkerActionMnemonicAllowlist;
   // These limited resources are only for the individual worker.
   // An example would be hardware resources such as GPUs.
   // If you want GPU actions to run exclusively, define a single GPU resource.
   private List<LimitedResource> resources = new ArrayList<>();
 
-  private boolean errorOperationOutputSizeExceeded = false;
+  private boolean errorOperationOutputSizeExceeded;
   private boolean legacyDirectoryFileCache = false;
   private boolean absolutizeCommandProgram = isWindows();
 

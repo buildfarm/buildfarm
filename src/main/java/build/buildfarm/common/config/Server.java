@@ -1,6 +1,5 @@
 package build.buildfarm.common.config;
 
-import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
@@ -15,39 +14,39 @@ public class Server {
 
   private static UUID sessionGuid = UUID.randomUUID();
 
-  private INSTANCE_TYPE instanceType = INSTANCE_TYPE.SHARD;
-  private String name = "shard";
-  private boolean actionCacheReadOnly = false;
-  private String bindAddress = "";
-  private int port = 8980;
+  private INSTANCE_TYPE instanceType;
+  private String name;
+  private boolean actionCacheReadOnly;
+  private String bindAddress;
+  private int port;
   private GrpcMetrics grpcMetrics = new GrpcMetrics();
-  private int casWriteTimeout = 3600;
-  private int bytestreamTimeout = 3600;
-  private String sslCertificatePath = null;
-  private String sslPrivateKeyPath = null;
-  private boolean runDispatchedMonitor = true;
-  private int dispatchedMonitorIntervalSeconds = 1;
-  private boolean runFailsafeOperation = true;
-  private boolean runOperationQueuer = true;
-  private boolean ensureOutputsPresent = true;
-  private boolean mergeExecutions = true;
-  private int maxRequeueAttempts = 5;
-  private boolean useDenyList = true;
-  private long grpcTimeout = 3600;
-  private long executeKeepaliveAfterSeconds = 60;
-  private boolean recordBesEvents = false;
+  private int casWriteTimeout;
+  private int bytestreamTimeout;
+  private String sslCertificatePath;
+  private String sslPrivateKeyPath;
+  private boolean runDispatchedMonitor;
+  private int dispatchedMonitorIntervalSeconds;
+  private boolean runFailsafeOperation;
+  private boolean runOperationQueuer;
+  private boolean ensureOutputsPresent;
+  private boolean mergeExecutions;
+  private int maxRequeueAttempts;
+  private boolean useDenyList;
+  private long grpcTimeout;
+  private long executeKeepaliveAfterSeconds;
+  private boolean recordBesEvents;
   private Admin admin = new Admin();
   private Metrics metrics = new Metrics();
   private int maxCpu;
-  private String clusterId = "";
+  private String clusterId;
   private String cloudRegion;
   private String publicName;
-  private int maxInboundMessageSizeBytes = 0;
-  private int maxInboundMetadataSize = 0;
+  private int maxInboundMessageSizeBytes;
+  private int maxInboundMetadataSize;
   private ServerCacheConfigs caches = new ServerCacheConfigs();
-  private boolean findMissingBlobsViaBackplane = false;
-  private int gracefulShutdownSeconds = 0;
-  private Set<String> correlatedInvocationsIndexScopes = ImmutableSet.of("host", "username");
+  private boolean findMissingBlobsViaBackplane;
+  private int gracefulShutdownSeconds;
+  private Set<String> correlatedInvocationsIndexScopes;
 
   public String getSession() {
     return String.format("buildfarm-server-%s-%s", getPublicName(), sessionGuid);

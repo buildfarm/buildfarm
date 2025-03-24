@@ -32,28 +32,28 @@ public class SandboxSettings {
    * @brief Whether or not to always use the sandbox when running actions.
    * @details It may be preferred to enforce sandbox usage than rely on client selection.
    */
-  private boolean alwaysUseSandbox = false;
+  private boolean alwaysUseSandbox;
 
   /**
    * @field alwaysUseAsNobody
    * @brief Whether or not to always use the as-nobody wrapper when running actions.
    * @details It may be preferred to enforce this wrapper instead of relying on client selection.
    */
-  private boolean alwaysUseAsNobody = false;
+  private boolean alwaysUseAsNobody;
 
   /**
    * @field alwaysUseCgroups
    * @brief Whether or not to use cgroups when sandboxing actions.
    * @details It may be preferred to enforce cgroup usage.
    */
-  private boolean alwaysUseCgroups = true;
+  private boolean alwaysUseCgroups;
 
   /**
    * @field alwaysUseTmpFs
    * @brief Whether or not to always use tmpfs when using the sandbox.
    * @details It may be preferred to enforce sandbox usage than rely on client selection.
    */
-  private boolean alwaysUseTmpFs = false;
+  private boolean alwaysUseTmpFs;
 
   /**
    * @field additionalWritePaths
@@ -75,7 +75,7 @@ public class SandboxSettings {
    * @details Otherwise, there may be no alternative solution and the "block network" request will
    *     be ignored / implemented differently.
    */
-  private boolean selectForBlockNetwork = false;
+  private boolean selectForBlockNetwork;
 
   /**
    * @field selectForTmpFs
@@ -83,5 +83,5 @@ public class SandboxSettings {
    * @details Otherwise, there may be no alternative solution and the "tmpfs" request will be
    *     ignored / implemented differently.
    */
-  private boolean selectForTmpFs = false;
+  private boolean selectForTmpFs;
 }

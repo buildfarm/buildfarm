@@ -5,20 +5,57 @@ nav_order: 4
 has_children: true
 ---
 
+Configuration is derived from included base configuration file located in `examples/config.yml`. This file includes sensible defaults but is not meant for production use. You can specify your own configuration file(s) by passing a comma separated list as an argument to the Buildfarm service. Please note that multiple files are allowed and will be processed in the order they are passed. Each duplicate configuration option will overwrite previous value.
+
+```
+./bazel run //src/main/java/build/buildfarm:buildfarm-server -- custom-config-server-base.yml,custom-config-server-production.yml
+```
+
+config.yml (`examples/config.yml`)
+```yaml
+server:
+  redisUri: redis://localhost:6379
+```
+
+custom-config-server-base.yml
+```yaml
+server:
+  redisUri: redis://dev:6379
+```
+
+custom-config-server-production.yml
+```yaml
+server:
+  redisUri: redis://production:6379
+```
+
+config.yml (final result)
+```yaml
+server:
+  redisUri: redis://production:6379
+```
+
 Minimal required:
 
 ```yaml
 backplane:
-  redisUri: "redis://localhost:6379"
+  redisUri: redis://localhost:6379
   queues:
-    - name: "cpu"
-      properties:
-        - name: "min-cores"
-          value: "*"
-        - name: "max-cores"
-          value: "*"
+  - name: cpu
+    allowUnmatched: true
+    properties:
+    - name: min-cores
+      value: '*'
+    - name: max-cores
+      value: '*'
 worker:
-  publicName: "localhost:8981"
+  publicName: localhost:8981
+  storages:
+  - type: FILESYSTEM
+    path: cache
+    maxSizeBytes: 2147483648   # 2 * 1024 * 1024 * 1024
+  linkedInputDirectories:
+  - (?!external/)[^/]+
 ```
 
 The configuration can be provided to the server and worker as a CLI argument or through the environment variable `CONFIG_PATH`

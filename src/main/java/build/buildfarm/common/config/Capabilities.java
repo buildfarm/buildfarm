@@ -4,6 +4,6 @@ import lombok.Data;
 
 @Data
 public class Capabilities {
-  private boolean cas = true;
-  private boolean execution = true;
+  private boolean cas;
+  private boolean execution;
 }
