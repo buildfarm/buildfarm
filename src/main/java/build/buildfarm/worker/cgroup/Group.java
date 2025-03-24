@@ -93,6 +93,7 @@ public final class Group {
           e);
     }
     // Give up.
+    log.log(Level.WARNING, "No cgroups support");
     return CGroupVersion.NONE;
   }
 
