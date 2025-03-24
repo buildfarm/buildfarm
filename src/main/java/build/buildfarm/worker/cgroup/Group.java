@@ -65,7 +65,7 @@ public final class Group {
   @SuppressWarnings(
       "PMD.MutableStaticState") // Unit tests set this. When CGroups v1 support is gone, this will
   // go away, too.
-  protected static CGroupVersion VERSION = discoverCgroupVersion();
+  public static CGroupVersion VERSION = discoverCgroupVersion();
 
   private static CGroupVersion discoverCgroupVersion() {
     /* Try to figure out which version of CGroups is available. */

@@ -60,6 +60,7 @@ import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.worker.cgroup.CGroupVersion;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
@@ -939,6 +940,13 @@ class ShardWorkerContext implements WorkerContext {
     return resource;
   }
 
+  private String getCgroups() {
+    if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
+      return configs.getExecutionWrappers().getCgroups2();
+    }
+    return configs.getExecutionWrappers().getCgroups1();
+  }
+
   IOResource limitSpecifiedExecution(
       ResourceLimits limits,
       String operationName,
@@ -971,9 +979,7 @@ class ShardWorkerContext implements WorkerContext {
       // Decide the CLI for running under cgroups
       if (!usedGroups.isEmpty()) {
         arguments.add(
-            configs.getExecutionWrappers().getCgroups(),
-            "-g",
-            String.join(",", usedGroups) + ":" + group.getHierarchy());
+            getCgroups(), "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
       }
     }
 
