@@ -29,12 +29,14 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -68,25 +70,27 @@ public final class Group {
   private static CGroupVersion discoverCgroupVersion() {
     /* Try to figure out which version of CGroups is available. */
     try {
-      List<String> allMounts = Files.readAllLines(Paths.get("/proc/mounts"));
-      for (String mount : allMounts) {
-        String[] split = mount.split("\\s+");
-        // split[0]: the block
-        // split[1]: mountpoint
-        // split[2]: fs type
-        checkState(split.length >= 3, "could not parse /proc/mounts");
-        if (split[2].contains("cgroup")) {
-          if (split[2].equals("cgroup2")) {
-            return CGroupVersion.CGROUPS_V2;
-          } else if (split[2].equals("cgroup")) {
-            return CGroupVersion.CGROUPS_V1;
-          }
+      Path path = Path.of("/sys/fs/cgroup");
+      if (path.toFile().exists() && path.toFile().isDirectory()) {
+        FileStore fileStore = Files.getFileStore(path);
+        String fsType = fileStore.type();
+        if (fsType.equals("cgroup2")) {
+          return CGroupVersion.CGROUPS_V2;
+        } else {
+          /* fsType=cgroup or fsType=tmpfs */
+          log.log(
+              Level.WARNING,
+              "CGroups v1 detected at /sys/fs/cgroup ! This is the last Buildfarm version to"
+                  + " support v1 - Please upgrade your host to Cgroups v2! See also"
+                  + " https://github.com/buildfarm/buildfarm/issues/2205");
+          return CGroupVersion.CGROUPS_V1;
         }
-        // by this point, we haven't found any `cgroup` or `cgroup2` fs types.
       }
     } catch (IOException e) {
-      // TODO logging
-      return CGroupVersion.NONE;
+      log.log(
+          Level.WARNING,
+          "Could not auto-detect CGroups version in /sys/fs/cgroup, assuming no CGroups support",
+          e);
     }
     // Give up.
     return CGroupVersion.NONE;
@@ -94,20 +98,18 @@ public final class Group {
 
   static Path getSelfCgroup() {
     try {
-      String myCgroup = Files.readString(Paths.get("/proc/self/cgroup"));
-      // This always starts with "0::" for CGroups v2.
-      if (myCgroup.startsWith("0::")) {
-        VERSION = CGroupVersion.CGROUPS_V2;
+      // For Cgroups v2, there's only one line and it always starts with `0::`
+      // For v1, there's other lines for cgroup subsystem managers.
+      List<String> myCgroups = Files.readAllLines(Paths.get("/proc/self/cgroup"));
 
-        return Path.of("/sys/fs/cgroup", myCgroup.substring(3).trim());
-      } else {
-        // TODO CGroups v1.
-        return null;
+      Optional<String> selfCgroup = myCgroups.stream().filter(s -> s.startsWith("0::")).findFirst();
+      if (selfCgroup.isPresent()) {
+        return Path.of("/sys/fs/cgroup", selfCgroup.get().substring(3).trim());
       }
     } catch (IOException ioe) {
       log.log(Level.SEVERE, "Cannot read my own cgroup!", ioe);
-      return Paths.get("/sys/fs/cgroup");
     }
+    return Paths.get("/sys/fs/cgroup");
   }
 
   private Group(@Nullable String name, @Nullable Group parent) {
