@@ -145,8 +145,11 @@ worker:
   gracefulShutdownSeconds: 0
   sandboxSettings:
     alwaysUseSandbox: false
+    alwaysUseAsNobody: false
     alwaysUseCgroups: false
     alwaysUseTmpFs: false
+    additionalWritePaths: []
+    tmpFsPaths: []
     selectForBlockNetwork: false
     selectForTmpFs: false
   createSymlinkOutputs: false
