@@ -15,7 +15,6 @@
 package build.buildfarm.worker.resources;
 
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.config.SandboxSettings;
 import org.apache.commons.lang3.StringUtils;
