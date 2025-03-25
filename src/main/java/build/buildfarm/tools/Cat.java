@@ -45,6 +45,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.resources.UploadBlobRequest;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.QueuedOperation;
@@ -713,16 +714,29 @@ class Cat {
     System.out.println(DigestUtil.toString(digest.get()));
   }
 
-  private static void getWorkerProfile(Instance instance) {
-    WorkerProfileMessage response = instance.getWorkerProfile();
+  private static void batchWorkerProfiles(Instance instance, Iterable<String> names)
+      throws Exception {
+    BatchWorkerProfilesResponse responses = instance.batchWorkerProfiles(names).get();
+    for (BatchWorkerProfilesResponse.Response response : responses.getResponsesList()) {
+      System.out.println("Worker: " + response.getWorkerName());
+      int code = response.getStatus().getCode();
+      if (code == Code.OK.getNumber()) {
+        printWorkerProfile(response.getProfile());
+      } else {
+        System.out.println("Error: " + Code.forNumber(code));
+      }
+    }
+  }
+
+  private static void printWorkerProfile(WorkerProfileMessage workerProfile) {
     System.out.println("\nWorkerProfile:");
     String strIntFormat = "%-50s : %d";
-    long entryCount = response.getCasEntryCount();
-    long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
+    long entryCount = workerProfile.getCasEntryCount();
+    long unreferencedEntryCount = workerProfile.getCasUnreferencedEntryCount();
     System.out.printf((strIntFormat) + "%n", "Current Total Entry Count", entryCount);
-    System.out.printf((strIntFormat) + "%n", "Current Total Size", response.getCasSize());
-    System.out.printf((strIntFormat) + "%n", "Max Size", response.getCasMaxSize());
-    System.out.printf((strIntFormat) + "%n", "Max Entry Size", response.getCasMaxEntrySize());
+    System.out.printf((strIntFormat) + "%n", "Current Total Size", workerProfile.getCasSize());
+    System.out.printf((strIntFormat) + "%n", "Max Size", workerProfile.getCasMaxSize());
+    System.out.printf((strIntFormat) + "%n", "Max Entry Size", workerProfile.getCasMaxEntrySize());
     System.out.printf(
         (strIntFormat) + "%n", "Current Unreferenced Entry Count", unreferencedEntryCount);
     if (entryCount != 0) {
@@ -734,20 +748,22 @@ class Cat {
     System.out.printf(
         (strIntFormat) + "%n",
         "Current DirectoryEntry Count",
-        response.getCasDirectoryEntryCount());
+        workerProfile.getCasDirectoryEntryCount());
     System.out.printf(
-        (strIntFormat) + "%n", "Number of Evicted Entries", response.getCasEvictedEntryCount());
+        (strIntFormat) + "%n",
+        "Number of Evicted Entries",
+        workerProfile.getCasEvictedEntryCount());
     System.out.printf(
         (strIntFormat) + "%n",
         "Total Evicted Entries size in Bytes",
-        response.getCasEvictedEntrySize());
+        workerProfile.getCasEvictedEntrySize());
 
-    List<StageInformation> stages = response.getStagesList();
+    List<StageInformation> stages = workerProfile.getStagesList();
     for (StageInformation stage : stages) {
       printStageInformation(stage);
     }
 
-    List<OperationTimesBetweenStages> times = response.getTimesList();
+    List<OperationTimesBetweenStages> times = workerProfile.getTimesList();
     for (OperationTimesBetweenStages time : times) {
       printOperationTime(time);
     }
@@ -914,8 +930,8 @@ class Cat {
     }
 
     @Override
-    public void run(Instance instance, Iterable<String> args) {
-      getWorkerProfile(instance);
+    public void run(Instance instance, Iterable<String> args) throws Exception {
+      batchWorkerProfiles(instance, args);
     }
   }
 
