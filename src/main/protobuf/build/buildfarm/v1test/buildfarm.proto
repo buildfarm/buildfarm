@@ -668,3 +668,9 @@ message Digest {
 
   build.bazel.remote.execution.v2.DigestFunction.Value digest_function = 3;
 }
+
+message WorkerExecutedMetadata {
+  int64 fetched_bytes = 1;
+
+  repeated string linked_input_directories = 2;
+}

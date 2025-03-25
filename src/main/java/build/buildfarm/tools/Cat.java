@@ -51,6 +51,7 @@ import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
@@ -217,6 +218,16 @@ class Cat {
     }
   }
 
+  private static void printWorkerMetadata(WorkerExecutedMetadata metadata, int indentLevel) {
+    indentOut(indentLevel, format("Fetched Bytes: %d", metadata.getFetchedBytes()));
+    if (metadata.getLinkedInputDirectoriesCount() > 0) {
+      indentOut(indentLevel, "Linked Input Directories:");
+    }
+    for (String linkedInputDirectory : metadata.getLinkedInputDirectoriesList()) {
+      indentOut(indentLevel + 1, linkedInputDirectory);
+    }
+  }
+
   private static void printExecutedActionMetadata(
       ExecutedActionMetadata metadata, int indentLevel) {
     if (!metadata.getWorker().isEmpty()) {
@@ -266,6 +277,21 @@ class Cat {
       indentOut(
           indentLevel,
           "Worker Completed: " + Timestamps.toString(metadata.getWorkerCompletedTimestamp()));
+    }
+    if (metadata.getAuxiliaryMetadataCount() > 0) {
+      indentOut(indentLevel, "Auxiliary Metadata:");
+    }
+    for (Any auxiliary : metadata.getAuxiliaryMetadataList()) {
+      if (auxiliary.is(WorkerExecutedMetadata.class)) {
+        try {
+          printWorkerMetadata(auxiliary.unpack(WorkerExecutedMetadata.class), indentLevel + 1);
+        } catch (InvalidProtocolBufferException e) {
+          // unlikely
+          e.printStackTrace();
+        }
+      } else {
+        indentOut(indentLevel + 1, "Unrecognized Metadata: " + auxiliary);
+      }
     }
   }
 

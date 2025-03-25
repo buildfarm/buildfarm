@@ -57,6 +57,7 @@ import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.v1test.WorkerType;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import com.google.common.annotations.VisibleForTesting;
@@ -116,6 +117,13 @@ public class RedisShardBackplane implements Backplane {
                   .add(ExecuteOperationMetadata.getDescriptor())
                   .add(QueuedOperationMetadata.getDescriptor())
                   .add(PreconditionFailure.getDescriptor())
+                  .build());
+
+  static final JsonFormat.Printer actionResultPrinter =
+      JsonFormat.printer()
+          .usingTypeRegistry(
+              JsonFormat.TypeRegistry.newBuilder()
+                  .add(WorkerExecutedMetadata.getDescriptor())
                   .build());
 
   private final String source; // used in operation change publication
@@ -923,7 +931,7 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
-    String json = JsonFormat.printer().print(actionResult);
+    String json = actionResultPrinter.print(actionResult);
     client.run(
         jedis ->
             state.actionCache.insert(
