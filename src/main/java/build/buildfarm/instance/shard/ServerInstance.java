@@ -34,6 +34,7 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
+import static com.google.common.util.concurrent.Futures.whenAllComplete;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 import static java.util.concurrent.Executors.newFixedThreadPool;
@@ -92,6 +93,7 @@ import build.buildfarm.instance.server.Filter;
 import build.buildfarm.instance.server.NodeInstance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
@@ -102,6 +104,7 @@ import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerProfileMessage;
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -3201,6 +3204,37 @@ public class ServerInstance extends NodeInstance {
     return super.getCacheCapabilities().toBuilder()
         .setSymlinkAbsolutePathStrategy(symlinkAbsolutePathStrategy)
         .build();
+  }
+
+  @Override
+  public ListenableFuture<WorkerProfileMessage> getWorkerProfile(String name) {
+    return workerStub(name).getWorkerProfile(name);
+  }
+
+  @Override
+  public ListenableFuture<BatchWorkerProfilesResponse> batchWorkerProfiles(Iterable<String> names) {
+    Iterable<ListenableFuture<WorkerProfileMessage>> profiles =
+        Iterables.transform(names, this::getWorkerProfile);
+    return whenAllComplete(profiles)
+        .call(
+            () -> {
+              Iterator<String> iter = names.iterator();
+              Iterator<ListenableFuture<WorkerProfileMessage>> profileIter = profiles.iterator();
+              BatchWorkerProfilesResponse.Builder response =
+                  BatchWorkerProfilesResponse.newBuilder();
+              while (iter.hasNext() && profileIter.hasNext()) {
+                ListenableFuture<WorkerProfileMessage> profileFuture = profileIter.next();
+                BatchWorkerProfilesResponse.Response.Builder builder =
+                    response.addResponsesBuilder().setWorkerName(iter.next());
+                try {
+                  builder.setProfile(profileFuture.get());
+                } catch (Exception e) {
+                  builder.setStatus(StatusProto.fromThrowable(e));
+                }
+              }
+              return response.build();
+            },
+            directExecutor());
   }
 
   public String indexCorrelatedInvocations(URI uri) throws IOException {

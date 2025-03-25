@@ -593,6 +593,18 @@ message StageInformation {
   repeated string operation_names = 4;
 }
 
+message BatchWorkerProfilesResponse {
+  message Response {
+    string worker_name = 1;
+
+    WorkerProfileMessage profile = 2;
+
+    google.rpc.Status status = 3;
+  }
+
+  repeated Response responses = 1;
+}
+
 message WorkerProfileMessage {
   // number of Entry in CAS
   int64 cas_entry_count = 1;
@@ -626,18 +638,22 @@ message WorkerProfileMessage {
   repeated OperationTimesBetweenStages times = 10;
 }
 
-message WorkerProfileRequest {}
+message WorkerProfileRequest {
+  string instance_name = 1;
 
-message WorkerListRequest {}
+  string worker_name = 2;
+}
 
-message WorkerListMessage {
-  repeated string workers = 1;
+message BatchWorkerProfilesRequest {
+  string instance_name = 1;
+
+  repeated string worker_names = 2;
 }
 
 service WorkerProfile {
   rpc GetWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}
 
-  rpc GetWorkerList(WorkerListRequest) returns (WorkerListMessage) {}
+  rpc BatchWorkerProfiles(BatchWorkerProfilesRequest) returns (BatchWorkerProfilesResponse) {}
 }
 
 message PrepareWorkerForGracefulShutDownRequest {

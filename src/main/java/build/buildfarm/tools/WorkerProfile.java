@@ -31,7 +31,6 @@ import com.google.devtools.common.options.OptionsParser;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.JsonFormat;
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -173,10 +172,10 @@ class WorkerProfile {
                     Durations.fromMinutes(1)));
           }
           try {
-            currentWorkerMessage = workersToChannels.get(worker).getWorkerProfile();
+            currentWorkerMessage = workersToChannels.get(worker).getWorkerProfile(worker).get();
             System.out.println(worker);
             analyzeMessage(worker, currentWorkerMessage);
-          } catch (StatusRuntimeException e) {
+          } catch (Exception e) {
             e.printStackTrace();
             System.out.println("==============TIMEOUT");
           }
