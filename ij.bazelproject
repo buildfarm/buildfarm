@@ -12,6 +12,7 @@ directories:
   -_site
   -admin
   -checkstyle
+  -container
 
 
 targets:
