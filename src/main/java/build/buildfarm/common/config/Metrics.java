@@ -22,9 +22,9 @@ public class Metrics {
   }
 
   @Getter(AccessLevel.NONE)
-  private PUBLISHER publisher = PUBLISHER.LOG; // deprecated
+  private PUBLISHER publisher;
 
-  private LOG_LEVEL logLevel = LOG_LEVEL.FINEST;
+  private LOG_LEVEL logLevel;
   private String topic;
   private int topicMaxConnections;
   private String secretName;

@@ -38,13 +38,13 @@ public class ExampleConfigsTest {
     Path configPath =
         Path.of(System.getenv("TEST_SRCDIR"), "_main", "examples", "config.minimal.yml");
     BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-    configs.loadConfigs(configPath);
+    configs.loadConfigs(configPath.toString());
   }
 
   @Test
   public void fullConfig() throws IOException {
     Path configPath = Path.of(System.getenv("TEST_SRCDIR"), "_main", "examples", "config.yml");
     BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-    configs.loadConfigs(configPath);
+    configs.loadConfigs(configPath.toString());
   }
 }

@@ -3,9 +3,7 @@ package build.buildfarm.common.config;
 import com.google.common.base.Strings;
 import java.net.URI;
 import javax.annotation.Nullable;
-import lombok.AccessLevel;
 import lombok.Data;
-import lombok.Getter;
 import lombok.ToString;
 import oshi.util.FileUtil;
 import redis.clients.jedis.util.JedisURIHelper;
@@ -16,50 +14,43 @@ public class Backplane {
     SHARD
   }
 
-  private BACKPLANE_TYPE type = BACKPLANE_TYPE.SHARD;
+  private BACKPLANE_TYPE type;
   private String redisUri;
-  private int jedisPoolMaxTotal = 4000;
-  private int jedisPoolMaxIdle = 8;
-  private int jedisPoolMinIdle = 0;
-  private long jedisTimeBetweenEvictionRunsMillis = 30000L;
-  private String workersHashName = "Workers";
-  private String workerChannel = "WorkerChannel";
-  private String actionCachePrefix = "ActionCache";
-  private int actionCacheExpire = 2419200; // 4 Weeks
-  private String actionBlacklistPrefix = "ActionBlacklist";
-  private int actionBlacklistExpire = 3600; // 1 Hour;
-  private String invocationBlacklistPrefix = "InvocationBlacklist";
-  private String operationPrefix = "Operation";
-  private String actionsPrefix = "Action";
-  private int operationExpire = 604800; // 1 Week
-  private int actionExecutionExpire = 21600; // 6 Hours
-  private String preQueuedOperationsListName = "{Arrival}:PreQueuedOperations";
-  private String processingListName = "{Arrival}:ProcessingOperations";
-  private String processingPrefix = "Processing";
-  private int processingTimeoutMillis = 20000;
-  private String queuedOperationsListName = "{Execution}:QueuedOperations";
-  private String dispatchingPrefix = "Dispatching";
-  private int dispatchingTimeoutMillis = 10000;
-  private String dispatchedOperationsHashName = "DispatchedOperations";
-  private String operationChannelPrefix = "OperationChannel";
-  private String casPrefix = "ContentAddressableStorage";
-  private int casExpire = 604800; // 1 Week
-  private String correlatedInvocationsIndexPrefix = "CorrelatedInvocationsIndex";
-  private int maxCorrelatedInvocationsIndexTimeout = 3 * 24 * 60 * 60; // 3 Days
-  private String correlatedInvocationsPrefix = "CorrelatedInvocations";
-  private int maxCorrelatedInvocationsTimeout = 7 * 24 * 60 * 60; // 1 Week
-  private String toolInvocationsPrefix = "ToolInvocation";
-  private int maxToolInvocationTimeout = 604800;
-
-  @Getter(AccessLevel.NONE)
-  private boolean subscribeToBackplane = true; // deprecated
-
-  @Getter(AccessLevel.NONE)
-  private boolean runFailsafeOperation = true; // deprecated
-
-  private int maxQueueDepth = 100000;
-  private int maxPreQueueDepth = 1000000;
-  private boolean priorityQueue = false;
+  private int jedisPoolMaxTotal;
+  private int jedisPoolMaxIdle;
+  private int jedisPoolMinIdle;
+  private long jedisTimeBetweenEvictionRunsMillis;
+  private String workersHashName;
+  private String workerChannel;
+  private String actionCachePrefix;
+  private int actionCacheExpire;
+  private String actionBlacklistPrefix;
+  private int actionBlacklistExpire;
+  private String invocationBlacklistPrefix;
+  private String operationPrefix;
+  private String actionsPrefix;
+  private int operationExpire;
+  private int actionExecutionExpire;
+  private String preQueuedOperationsListName;
+  private String processingListName;
+  private String processingPrefix;
+  private int processingTimeoutMillis;
+  private String queuedOperationsListName;
+  private String dispatchingPrefix;
+  private int dispatchingTimeoutMillis;
+  private String dispatchedOperationsHashName;
+  private String operationChannelPrefix;
+  private String casPrefix;
+  private int casExpire;
+  private String correlatedInvocationsIndexPrefix;
+  private int maxCorrelatedInvocationsIndexTimeout;
+  private String correlatedInvocationsPrefix;
+  private int maxCorrelatedInvocationsTimeout;
+  private String toolInvocationsPrefix;
+  private int maxToolInvocationTimeout;
+  private int maxQueueDepth;
+  private int maxPreQueueDepth;
+  private boolean priorityQueue;
   private Queue[] queues = {};
   private String redisCredentialFile;
   private String redisUsername;
@@ -82,10 +73,10 @@ public class Backplane {
    */
   private boolean redisAuthWithGoogleCredentials;
 
-  private int timeout = 10000; // Milliseconds
+  private int timeout;
   private String[] redisNodes = {};
-  private int maxAttempts = 20;
-  private long priorityPollIntervalMillis = 100;
+  private int maxAttempts;
+  private long priorityPollIntervalMillis;
 
   /**
    * This function is used to print the URI in logs.

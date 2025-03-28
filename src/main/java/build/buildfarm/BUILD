@@ -13,8 +13,9 @@ filegroup(
 
 java_binary(
     name = "buildfarm-server",
-    classpath_resources = [
+    data = [
         ":configs",
+        "//examples:base_config",
     ],
     jvm_flags = ensure_accurate_metadata() + add_opens_sun_nio_fs(),
     main_class = "build.buildfarm.server.BuildFarmServer",
@@ -27,8 +28,9 @@ java_binary(
 
 java_binary(
     name = "buildfarm-shard-worker",
-    classpath_resources = [
+    data = [
         ":configs",
+        "//examples:base_config",
     ],
     jvm_flags = ensure_accurate_metadata() + add_opens_sun_nio_fs(),
     main_class = "build.buildfarm.worker.shard.Worker",
