@@ -34,7 +34,6 @@ import java.util.Set;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import persistent.bazel.client.PersistentWorker;
 import persistent.bazel.client.WorkerKey;
 
 @RunWith(JUnit4.class)
@@ -102,10 +101,11 @@ public class ProtoCoordinatorTest {
     WorkerKey key = makeWorkerKey(ctx, workerFiles, fsRoot.resolve("workRootsDir"));
 
     Path workRoot = key.getExecRoot();
-    Path toolsRoot = workRoot.resolve(PersistentWorker.TOOL_INPUT_SUBDIR);
+    Path toolsRoot = key.getToolRoot();
 
-    // Assert: all Tools are copied into "/workRootsDir/*/tool_inputs"
+    // Assert: all Tools are copied into "/workRootsDir/*/<tool_inputs_hash>"
     assertThat(toolsRoot.toString()).startsWith(workRoot.toString());
+    assertThat(toolsRoot.toString()).endsWith(key.getWorkerFilesCombinedHash().toString());
     pc.copyToolInputsIntoWorkerToolRoot(key, workerFiles);
 
     assertThat(Files.exists(workRoot)).isTrue();

@@ -31,8 +31,6 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
 
   private static final Logger logger = Logger.getLogger(PersistentWorker.class.getName());
 
-  public static final String TOOL_INPUT_SUBDIR = "tool_inputs";
-
   @Getter private final WorkerKey key;
   @Getter private final ImmutableList<String> initCmd;
   @Getter private final Path execRoot;
@@ -46,17 +44,20 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
 
     Files.createDirectories(execRoot);
 
-    Set<Path> workerFiles = ImmutableSet.copyOf(key.getWorkerFilesWithHashes().keySet());
-    logger.log(
-        Level.FINE,
-        "Starting Worker["
-            + key.getMnemonic()
-            + "]<"
-            + execRoot
-            + ">("
-            + initCmd
-            + ") with files: \n"
-            + workerFiles);
+    final var logLevel = Level.FINE;
+    if (logger.isLoggable(logLevel)) {
+      Set<Path> workerFiles = ImmutableSet.copyOf(key.getWorkerFilesWithHashes().keySet());
+      StringBuilder msg = new StringBuilder();
+      msg.append("Starting Worker[");
+      msg.append(key.getMnemonic());
+      msg.append("]<");
+      msg.append(execRoot);
+      msg.append(">(");
+      msg.append(initCmd);
+      msg.append(") with files: \n");
+      msg.append(workerFiles);
+      logger.log(logLevel, msg.toString());
+    }
 
     ProcessWrapper processWrapper = new ProcessWrapper(execRoot, initCmd, key.getEnv());
     this.workerRW = new ProtoWorkerRW(processWrapper);
