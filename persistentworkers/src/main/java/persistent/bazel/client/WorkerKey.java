@@ -30,11 +30,12 @@ public final class WorkerKey {
   @Getter @ToString.Include private final String mnemonic;
 
   /**
-   * These are used during validation whether a worker is still usable. They are not used to
-   * uniquely identify a kind of worker, thus it is not to be used by the .equals() / .hashCode()
-   * methods.
+   * In a remote persistent worker we don't want to eagerly throw away an existing worker if two
+   * different clients have two different workers, so we include the tool inputs hash in the
+   * WorkerKey so that different clients with different implementations can each have their
+   * own remote persistent workers.
    */
-  @Getter private final HashCode workerFilesCombinedHash;
+  @Getter @ToString.Include private final HashCode workerFilesCombinedHash;
 
   /**
    * Worker files with the corresponding hash code.
@@ -43,6 +44,8 @@ public final class WorkerKey {
    * like /tmp/my_tools/...)
    */
   @Getter private final SortedMap<Path, HashCode> workerFilesWithHashes;
+
+  @Getter private final Path toolRoot;
 
   /** If true, the workers run inside a sandbox. Returns true if workers are sandboxed. */
   @Getter private final boolean sandboxed;
@@ -74,9 +77,10 @@ public final class WorkerKey {
     this.mnemonic = Preconditions.checkNotNull(mnemonic);
     this.sandboxed = sandboxed;
     this.cancellable = cancellable;
-    // Not part of hash
     this.workerFilesCombinedHash = Preconditions.checkNotNull(workerFilesCombinedHash);
+    // Not part of hash
     this.workerFilesWithHashes = Preconditions.checkNotNull(workerFilesWithHashes);
+    this.toolRoot = execRoot.resolve(workerFilesCombinedHash.toString());
 
     this.hash = calculateHashCode();
   }
@@ -112,6 +116,9 @@ public final class WorkerKey {
     if (!execRoot.equals(workerKey.execRoot)) {
       return false;
     }
+    if (!workerFilesCombinedHash.equals(workerKey.workerFilesCombinedHash)) {
+      return false;
+    }
     return mnemonic.equals(workerKey.mnemonic);
   }
 
@@ -124,6 +131,6 @@ public final class WorkerKey {
   private int calculateHashCode() {
     // Use the string representation of the protocolFormat because the hash of the same enum value
     // can vary across instances.
-    return Objects.hash(cmd, args, env, execRoot, mnemonic, cancellable, sandboxed);
+    return Objects.hash(cmd, args, env, execRoot, mnemonic, cancellable, sandboxed, workerFilesCombinedHash);
   }
 }
