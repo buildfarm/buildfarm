@@ -46,10 +46,19 @@ public class GroupV2Test {
   @Test
   public void testGetPath() {
     Group g = Group.getRoot().getChild("c1");
-    assertThat(g.getPath()).isEqualTo(Path.of("/sys/fs/cgroup/c1"));
+    Path gPath = g.getPath();
+    assertThat(gPath.toString()).startsWith("/sys/fs/cgroup/");
+    assertThat(gPath.toString()).endsWith("/c1");
+
+    // If we're not in cgroups, it looks like this
+    // But we don't assert this, as running this test on remote-exec with cgroups gets a path
+    // more like this: //sys/fs/cgroup/KUBERENTES-SLICE/POD-ETC/c1
+    // assertThat(g.getPath()).isEqualTo(Path.of("/sys/fs/cgroup/c1"));
 
     Group g2 = g.getChild("c2");
-    assertThat(g2.getPath()).isEqualTo(Path.of("/sys/fs/cgroup/c1/c2"));
+    Path g2Path = g2.getPath();
+    assertThat(g2Path.toString()).startsWith("/sys/fs/cgroup/");
+    assertThat(g2Path.toString()).endsWith("/c1/c2");
   }
 
   @Test
