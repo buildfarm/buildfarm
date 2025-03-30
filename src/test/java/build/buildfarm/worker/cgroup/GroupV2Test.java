@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker.cgroup;
 
+import static build.buildfarm.common.base.System.isWindows;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -21,6 +22,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Set;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -33,6 +35,7 @@ public class GroupV2Test {
   @Before
   public void setup() {
     Group.VERSION = CGroupVersion.CGROUPS_V2;
+    Assume.assumeFalse(isWindows());
   }
 
   @Test
