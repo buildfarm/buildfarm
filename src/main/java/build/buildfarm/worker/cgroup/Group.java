@@ -347,7 +347,7 @@ public final class Group {
             "There are no controllers at all in CGroup at path " + cgroupPath);
       }
       if (!availableControllers.containsAll(controllerNames)) {
-        Set<String> desiredAndNotAvailable = new HashSet<>(controllerNames);
+        Set<String> desiredAndNotAvailable = new HashSet<>(availableControllers);
         desiredAndNotAvailable.removeAll(controllerNames);
         throw new IllegalStateException(
             "Some controllers not enabled in CGroup at path "
