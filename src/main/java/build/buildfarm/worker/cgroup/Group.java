@@ -57,6 +57,14 @@ public final class Group {
   private static final String CGROUP_CONTROLLERS = "cgroup.controllers";
   private static final String CGROUP_SUBTREE_CONTROL = "cgroup.subtree_control";
 
+  /**
+   * These are the controllers we need enabled for our execution cgroup so that Buildfarm can set
+   * cpu, memory limits for individual executions.
+   *
+   * <p>We also will un-do these in #onShutdown()
+   */
+  private static final Set<String> REQUIRED_CGROUP_CONTROLLER_NAMES = Set.of("memory", "cpu");
+
   @Getter @Nullable private final String name;
   @Nullable private final Group parent;
   @Getter private final Cpu cpu;
@@ -365,7 +373,11 @@ public final class Group {
       Set<String> alreadyEnabledControllers =
           Arrays.stream(Files.readString(cgroupSubtreeControlPath).split("\\s+"))
               .collect(Collectors.toSet());
-      log.log(Level.FINE, "Existing sub_tree control: {0}", alreadyEnabledControllers);
+      log.log(
+          Level.FINEST,
+          String.format(
+              "Existing sub_tree controllers under %s: %s",
+              cgroupSubtreeControlPath, alreadyEnabledControllers));
       if (!alreadyEnabledControllers.containsAll(controllerNames)) {
         log.log(
             Level.FINE,
@@ -393,7 +405,7 @@ public final class Group {
       Files.createDirectory(evacuation.getPath());
       evacuation.adoptPids(root.getPids());
       verify(root.isEmpty(), "tried to evacuate root cgroup but there were processes remaining");
-      ensureControllerIsEnabled(root.getPath(), Set.of("cpu", "memory"), true);
+      ensureControllerIsEnabled(root.getPath(), REQUIRED_CGROUP_CONTROLLER_NAMES, true);
     }
     if (parent != null) {
       parent.create(controllerName);
@@ -415,6 +427,41 @@ public final class Group {
         checkState(cgroupPath.startsWith("/sys/fs/cgroup/"));
         checkState(!cgroupPath.endsWith("/"));
         ensureControllerIsEnabled(cgroupPath, Set.of(controllerName));
+      }
+    }
+  }
+
+  /** Shutdown hook. If there were cgroups things done earlier, un-do them now. */
+  public static void onShutdown() {
+    if (VERSION == CGroupVersion.CGROUPS_V2) {
+      try {
+        Group evacuation = root.getChild("evacuation");
+        if (evacuation.isEmpty()) {
+          // nothing to move back.
+          return;
+        }
+        log.log(
+            Level.FINE,
+            String.format(
+                "homecoming - returning processes from %s cgroup to root cgroup %s",
+                evacuation.getPath(), root.getPath()));
+        // Turn off memory,cpu from subtree_control
+        // If we don't do this first, we can't move processes back.
+        Path subtreeControl = root.getPath().resolve(CGROUP_SUBTREE_CONTROL);
+        try (Writer out =
+            new OutputStreamWriter(
+                Files.newOutputStream(subtreeControl))) {
+          for (String eachControllerName : REQUIRED_CGROUP_CONTROLLER_NAMES) {
+            out.write(String.format("-%s ", eachControllerName));
+          }
+        }
+        // The great return home - move evacuated processes back to root cgroup, where they started.
+        root.adoptPids(evacuation.getPids());
+        // Try to delete the "evacuation" cgroup, which should be empty.
+        // We could check it by reading `cgroup.stat`
+        Files.delete(evacuation.getPath());
+      } catch (IOException ioe) {
+        throw new RuntimeException("Could not clean-up cgroups v2", ioe);
       }
     }
   }
