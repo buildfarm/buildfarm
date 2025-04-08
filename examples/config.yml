@@ -11,8 +11,8 @@ server:
   port: 8980
   bindAddress: ''
   grpcMetrics:
-    enabled: true
-    provideLatencyHistograms: true
+    enabled: false
+    provideLatencyHistograms: false
     latencyBuckets: [0.001, 0.01, 0.1, 1, 5, 10, 20, 40, 60, +Infinity]
     labelsToReport: []
   maxInboundMessageSizeBytes: 0
@@ -28,12 +28,12 @@ server:
   mergeExecutions: true
   runFailsafeOperation: true
   maxCpu: 0
-  maxRequeueAttempts: 5
+  maxRequeueAttempts: 3
   useDenyList: true
   grpcTimeout: 3600
   executeKeepaliveAfterSeconds: 60
   recordBesEvents: false
-  clusterId: local
+  clusterId: ''
   cloudRegion: us-east-1
   gracefulShutdownSeconds: 0
   caches:
@@ -59,12 +59,13 @@ backplane:
   redisUsername:
   redisPassword:
   redisNodes:
-  jedisPoolMaxTotal: 4000
+  jedisPoolMaxTotal: 100
   jedisPoolMaxIdle: 8
   jedisPoolMinIdle: 0
   jedisTimeBetweenEvictionRunsMillis: 30000
   workersHashName: Workers
   workerChannel: WorkerChannel
+  actionExecutionExpire: 21600 # 6 Hours
   actionCachePrefix: ActionCache
   actionCacheExpire: 2419200 # 4 weeks
   actionBlacklistPrefix: ActionBlacklist
@@ -92,16 +93,10 @@ backplane:
   maxCorrelatedInvocationsIndexTimeout: 259200
   correlatedInvocationsPrefix: CorrelatedInvocation
   maxCorrelatedInvocationsTimeout: 604800
+  toolInvocationsPrefix: ToolInvocation
   maxToolInvocationTimeout: 604800
   maxAttempts: 20
   queues:
-  - name: cpu
-    allowUnmatched: true
-    properties:
-    - name: min-cores
-      value: '*'
-    - name: max-cores
-      value: '*'
 worker:
   port: 8981
   publicName: localhost:8981
@@ -118,15 +113,6 @@ worker:
   dequeueMatchSettings:
     allowUnmatched: false
   storages:
-  - type: FILESYSTEM
-    path: cache
-    maxSizeBytes: 2147483648   # 2 * 1024 * 1024 * 1024
-    fileDirectoriesIndexInMemory: false
-    skipLoad: false
-    hexBucketLevels: 0
-    execRootCopyFallback: false
-    #- type: GRPC
-    #  target: "grpc://host:port"
   executeStageWidth: 1
   inputFetchStageWidth: 1
   inputFetchDeadline: 60
@@ -134,7 +120,6 @@ worker:
   linkExecFileSystem: true
   linkInputDirectories: true
   linkedInputDirectories:
-  - (?!external/)[^/]+
   execOwner:
   defaultMaxCores: 0
   limitGlobalExecution: false
@@ -155,18 +140,7 @@ worker:
   createSymlinkOutputs: false
   zstdBufferPoolSize: 2048
   executionPolicies:
-  - name: test
-    executionWrapper:
-      path: /
-      arguments:
-  resources:
-  - name: sockets
-    amount: 4096
-  - name: gpu
-    type: POOL
-    amount: 4 # for an A30 MiG in full splay
   persistentWorkerActionMnemonicAllowlist:
-  - '*'
 executionWrappers:
   cgroups: /usr/bin/cgexec
   unshare: /usr/bin/unshare

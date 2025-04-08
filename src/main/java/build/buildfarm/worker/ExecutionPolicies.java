@@ -56,13 +56,15 @@ public final class ExecutionPolicies {
 
   public static Platform getMatchPlatform(Platform platform, Iterable<ExecutionPolicy> policies) {
     Platform.Builder builder = platform.toBuilder();
-    for (ExecutionPolicy policy : policies) {
-      String name = policy.getName();
-      if (!name.equals(DEFAULT_EXECUTION_POLICY_NAME)) {
-        builder
-            .addPropertiesBuilder()
-            .setName(EXECUTION_POLICY_PROPERTY_NAME)
-            .setValue(policy.getName());
+    if (policies != null) {
+      for (ExecutionPolicy policy : policies) {
+        String name = policy.getName();
+        if (!name.equals(DEFAULT_EXECUTION_POLICY_NAME)) {
+          builder
+              .addPropertiesBuilder()
+              .setName(EXECUTION_POLICY_PROPERTY_NAME)
+              .setValue(policy.getName());
+        }
       }
     }
     return builder.build();

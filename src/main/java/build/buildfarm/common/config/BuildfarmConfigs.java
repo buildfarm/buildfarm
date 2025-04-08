@@ -7,6 +7,7 @@ import build.buildfarm.common.SystemProcessors;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -15,7 +16,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import javax.naming.ConfigurationException;
 import lombok.Data;
 import lombok.extern.java.Log;
@@ -30,12 +33,12 @@ public final class BuildfarmConfigs {
 
   private static final long DEFAULT_CAS_SIZE = 2147483648L; // 2 * 1024 * 1024 * 1024
 
-  private DigestUtil.HashFunction digestFunction = DigestUtil.HashFunction.SHA256;
-  private long defaultActionTimeout = 600;
-  private long maximumActionTimeout = 3600;
-  private long maxEntrySizeBytes = 2147483648L; // 2 * 1024 * 1024 * 1024
-  private int prometheusPort = 9090;
-  private boolean allowSymlinkTargetAbsolute = false;
+  private DigestUtil.HashFunction digestFunction;
+  private long defaultActionTimeout;
+  private long maximumActionTimeout;
+  private long maxEntrySizeBytes;
+  private int prometheusPort;
+  private boolean allowSymlinkTargetAbsolute;
   private Server server = new Server();
   private Backplane backplane = new Backplane();
   private Worker worker = new Worker();
@@ -50,14 +53,45 @@ public final class BuildfarmConfigs {
     return buildfarmConfigs;
   }
 
-  public static BuildfarmConfigs loadConfigs(Path configLocation) throws IOException {
-    try (InputStream inputStream = Files.newInputStream(configLocation)) {
-      Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass(), new LoaderOptions()));
-      buildfarmConfigs = yaml.load(inputStream);
-      if (buildfarmConfigs == null) {
-        throw new RuntimeException("Could not load configs from path: " + configLocation);
+  private static void mergeBaseAndCustomConfigs(
+      Map<String, Object> baseConfigs, Map<String, Object> newConfigs) {
+    newConfigs.forEach(
+        (key, value) -> {
+          if (value instanceof LinkedHashMap) {
+            LinkedHashMap<String, Object> newConfigsValue = (LinkedHashMap<String, Object>) value;
+            LinkedHashMap<String, Object> baseConfigsValue =
+                (LinkedHashMap<String, Object>)
+                    baseConfigs.getOrDefault(key, new LinkedHashMap<>());
+            mergeBaseAndCustomConfigs(baseConfigsValue, newConfigsValue);
+          } else {
+            baseConfigs.put(key, value);
+          }
+        });
+  }
+
+  public static BuildfarmConfigs loadConfigs(String configLocations) throws IOException {
+    try (InputStream baseInputStream = new FileInputStream("./examples/config.yml")) {
+      Yaml yaml = new Yaml();
+      // Load base config.yaml to initialize with default values
+      Map<String, Object> baseConfigs = yaml.load(baseInputStream);
+      // Load custom configs provided by the user to overwrite defaults
+      List<String> customConfigFiles = Arrays.asList(configLocations.split(","));
+      for (String customConfigFile : customConfigFiles) {
+        try (InputStream customInputStream = new FileInputStream(customConfigFile)) {
+          Map<String, Object> customConfigs = yaml.load(customInputStream);
+          // Merge the base and custom configs
+          mergeBaseAndCustomConfigs(baseConfigs, customConfigs);
+          log.info("Merged base config with custom config file " + customConfigFile);
+        } catch (IOException ioe) {
+          log.severe("Could not parse yml configuration file." + ioe);
+          throw new RuntimeException(ioe);
+        }
       }
+      // Load the merged configs into the buildfarmConfigs object
+      yaml = new Yaml(new Constructor(buildfarmConfigs.getClass(), new LoaderOptions()));
+      buildfarmConfigs = yaml.load(yaml.dump(baseConfigs));
       log.info(buildfarmConfigs.toString());
+      log.info(yaml.dump(buildfarmConfigs));
       return buildfarmConfigs;
     }
   }
@@ -128,10 +162,10 @@ public final class BuildfarmConfigs {
     return parser;
   }
 
-  private static Path getConfigurationPath(OptionsParser parser) throws ConfigurationException {
+  private static String getConfigurationPath(OptionsParser parser) throws ConfigurationException {
     // source config from env variable
     if (!Strings.isNullOrEmpty(System.getenv("CONFIG_PATH"))) {
-      return Path.of(System.getenv("CONFIG_PATH"));
+      return System.getenv("CONFIG_PATH");
     }
 
     // source config from cli
@@ -139,10 +173,11 @@ public final class BuildfarmConfigs {
     if (residue.isEmpty()) {
       log.info("Usage: CONFIG_PATH");
       log.info(parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
-      throw new ConfigurationException("A valid path to a configuration file must be provided.");
+      throw new ConfigurationException(
+          "A valid comma separated path(s) to configuration file(s) must be provided.");
     }
 
-    return Path.of(residue.getFirst());
+    return residue.getFirst();
   }
 
   private static void adjustServerConfigs(BuildfarmConfigs configs) {
