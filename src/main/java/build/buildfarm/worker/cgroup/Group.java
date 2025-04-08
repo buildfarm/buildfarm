@@ -51,7 +51,7 @@ import lombok.extern.java.Log;
 @Log
 public final class Group {
   @Getter private static final Group root = new Group(/* name= */ null, /* parent= */ null);
-  private static final Path rootPath = getSelfCgroup();
+  private static final Path rootPath;
   private static final POSIX posix = POSIXFactory.getNativePOSIX();
 
   private static final String CGROUP_CONTROLLERS = "cgroup.controllers";
@@ -73,7 +73,13 @@ public final class Group {
   @SuppressWarnings(
       "PMD.MutableStaticState") // Unit tests set this. When CGroups v1 support is gone, this will
   // go away, too.
-  public static CGroupVersion VERSION = discoverCgroupVersion();
+  public static CGroupVersion VERSION;
+
+  static {
+    // Must be done in order
+    VERSION = discoverCgroupVersion();
+    rootPath = getSelfCgroup();
+  }
 
   private static CGroupVersion discoverCgroupVersion() {
     /* Try to figure out which version of CGroups is available. */
@@ -105,18 +111,28 @@ public final class Group {
     return CGroupVersion.NONE;
   }
 
+  /**
+   * Find our own cgroup.
+   * <p>
+   * For cgroups v1, preserve old behavior of always assuming `/sys/fs/cgroup/ is the root,
+   * And look for controller-specific files at <code>/sys/fs/cgroups/&lt;controller&gt;/cgroup.*</code>
+   * @return
+   */
   static Path getSelfCgroup() {
-    try {
-      // For Cgroups v2, there's only one line and it always starts with `0::`
-      // For v1, there's other lines for cgroup subsystem managers.
-      List<String> myCgroups = Files.readAllLines(Paths.get("/proc/self/cgroup"));
+    log.log(Level.INFO, "discovering self cgroup for " + VERSION.name());
+    if (VERSION == CGroupVersion.CGROUPS_V2) {
+      try {
+        // For cgroups v2, there's only one line, and it always starts with `0::`
+        // For v1, there's other lines for cgroup subsystem managers.
+        List<String> myCgroups = Files.readAllLines(Paths.get("/proc/self/cgroup"));
 
-      Optional<String> selfCgroup = myCgroups.stream().filter(s -> s.startsWith("0::")).findFirst();
-      if (selfCgroup.isPresent()) {
-        return Path.of("/sys/fs/cgroup", selfCgroup.get().substring(3).trim());
+        Optional<String> selfCgroup = myCgroups.stream().filter(s -> s.startsWith("0::")).findFirst();
+        if (selfCgroup.isPresent()) {
+          return Path.of("/sys/fs/cgroup", selfCgroup.get().substring(3).trim());
+        }
+      } catch (IOException ioe) {
+        log.log(Level.SEVERE, "Cannot read my own cgroup!", ioe);
       }
-    } catch (IOException ioe) {
-      log.log(Level.SEVERE, "Cannot read my own cgroup!", ioe);
     }
     return Paths.get("/sys/fs/cgroup");
   }
@@ -141,12 +157,9 @@ public final class Group {
   /**
    * Get hierarchy of this cgroup and all parents.
    *
-   * <p>This is for CGroups v2 only.
-   *
    * @return
    */
   public String getHierarchy() {
-    checkState(VERSION == CGroupVersion.CGROUPS_V2);
     /* is root */
     if (parent == null) {
       return "";
@@ -178,8 +191,20 @@ public final class Group {
     }
   }
 
+  /**
+   * Get the path for a given Controller Name
+   * <p>
+   *     This is for cgroups v1 only
+   * </p>
+   * @param controllerName
+   * @return
+   */
+  @Deprecated(forRemoval = true)
   Path getPath(String controllerName) {
-    return rootPath.resolve(getHierarchy(controllerName));
+    if (VERSION == CGroupVersion.CGROUPS_V1) {
+      return rootPath.resolve(getHierarchy(controllerName));
+    }
+    return getPath();
   }
 
   /* use for cgroups v2 */
@@ -196,8 +221,12 @@ public final class Group {
    */
   @Deprecated
   boolean isEmpty(String controllerName) throws IOException {
-    checkState(VERSION == CGroupVersion.CGROUPS_V1);
-    return getPids(controllerName).isEmpty();
+    if (VERSION == CGroupVersion.CGROUPS_V1) {
+      return getPids(controllerName).isEmpty();
+    } else if (VERSION == CGroupVersion.CGROUPS_V2) {
+      return isEmpty();
+    }
+    throw new IllegalStateException("Not cgroups 1 or 2!");
   }
 
   boolean isEmpty() throws IOException {
@@ -244,7 +273,7 @@ public final class Group {
           .collect(ImmutableSet.toImmutableSet());
     } catch (IOException e) {
       if (Files.exists(path)) {
-        log.log(Level.WARNING, "Unable to get PIDs for Cgroup at {0}", procs);
+        log.log(Level.WARNING, "Unable to get PIDs for Cgroup at " + procs, e);
       }
       // nonexistent controller path means no processes
       return ImmutableSet.of();
@@ -260,8 +289,9 @@ public final class Group {
    *     Processes and Threads</a>
    */
   void adoptPids(Iterable<Integer> pids) {
+    checkState(VERSION == CGroupVersion.CGROUPS_V2, "No PID adoption for v1");
     Path path = getPath().resolve("cgroup.procs");
-    verify(Files.exists(path), "cgroup procs doesn't exist");
+    verify(Files.exists(path), "cgroup.procs doesn't exist");
     // Only one process can be migrated on a single write(2) call.
     for (Integer pid : pids) {
       try {
@@ -339,7 +369,7 @@ public final class Group {
     // By now, all recursive parents of `cgroupPath` already have subcontrollers set.
     // Finally, we make our new cgroup, if it doesn't exist.
     if (!Files.exists(cgroupPath)) {
-      Files.createDirectory(cgroupPath);
+      Files.createDirectories(cgroupPath);
     }
     if (setSubtreeControl) {
       Path cgroupControllerPath = cgroupPath.resolve(CGROUP_CONTROLLERS);
@@ -355,15 +385,14 @@ public final class Group {
             "There are no controllers at all in CGroup at path " + cgroupPath);
       }
       if (!availableControllers.containsAll(controllerNames)) {
-        Set<String> desiredAndNotAvailable = new HashSet<>(availableControllers);
-        desiredAndNotAvailable.removeAll(controllerNames);
+
         throw new IllegalStateException(
             "Some controllers not enabled in CGroup at path "
                 + cgroupPath
                 + ". Only found "
                 + availableControllers
-                + ", missing "
-                + desiredAndNotAvailable);
+                + ", but wanted at least "
+                + controllerNames);
       }
       Path cgroupSubtreeControlPath = cgroupPath.resolve(CGROUP_SUBTREE_CONTROL);
       while (!Files.exists(cgroupSubtreeControlPath)) {
@@ -396,16 +425,17 @@ public final class Group {
 
   void create(@Nonnull String controllerName) throws IOException {
     /* root already has all controllers created */
-    if (!root.isEmpty()) {
+    if (VERSION == CGroupVersion.CGROUPS_V2 && !root.isEmpty(controllerName)) {
       Group evacuation = root.getChild("evacuation");
-      if (Files.exists(evacuation.getPath())) {
+      log.log(Level.FINE, "beginning evacuation of root cgroup for cgroups v2 from " + rootPath + " to " + evacuation.getPath());
+      if (Files.exists(evacuation.getPath(controllerName))) {
         // Clean it up.
-        Files.delete(evacuation.getPath());
+        Files.delete(evacuation.getPath(controllerName));
       }
-      Files.createDirectory(evacuation.getPath());
+      Files.createDirectories(evacuation.getPath(controllerName));
       evacuation.adoptPids(root.getPids());
       verify(root.isEmpty(), "tried to evacuate root cgroup but there were processes remaining");
-      ensureControllerIsEnabled(root.getPath(), REQUIRED_CGROUP_CONTROLLER_NAMES, true);
+      ensureControllerIsEnabled(root.getPath(controllerName), REQUIRED_CGROUP_CONTROLLER_NAMES, true);
     }
     if (parent != null) {
       parent.create(controllerName);
@@ -413,7 +443,7 @@ public final class Group {
         Path path = getPath(controllerName);
         try {
           if (!Files.exists(path)) {
-            Files.createDirectory(path);
+            Files.createDirectories(path);
           }
         } catch (FileAlreadyExistsException e) {
           // per the avoidance above, we don't care that this already
