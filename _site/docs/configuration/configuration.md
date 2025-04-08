@@ -21,6 +21,14 @@ worker:
   publicName: "localhost:8981"
 ```
 
+Configuration files also support includes via !include tag:
+
+```yaml
+backplane: !include "backplane.yml"
+server: !include "server.yml"
+worker: !include "worker.yml"
+```
+
 The configuration can be provided to the server and worker as a CLI argument or through the environment variable `CONFIG_PATH`
 For an example configuration containing all of the configuration values, see `examples/config.yml`.
 
