@@ -21,6 +21,7 @@ import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.UserPrincipal;
 
@@ -87,14 +88,21 @@ abstract class Controller implements IOResource {
 
   private void setOwner(String propertyName, UserPrincipal owner) throws IOException {
     Path path = getPath().resolve(propertyName);
-    Files.setOwner(path, owner);
+    if (Files.exists(path)) { // cgroups v1 protector
+      Files.setOwner(path, owner);
+    }
   }
 
   public void setOwner(UserPrincipal owner) throws IOException {
     // an execution owner must be able to join a cgroup through group task/proc ownership
     open();
     setOwner("cgroup.procs", owner);
-    setOwner("tasks", owner);
+    // TODO: this is a cgroups v1 thing
+    try {
+      setOwner("tasks", owner);
+    } catch (NoSuchFileException nsfe) {
+      /* swallowed */
+    }
   }
 
   protected void writeInt(String propertyName, int value) throws IOException {
