@@ -829,7 +829,7 @@ class ShardWorkerContext implements WorkerContext {
       }
       // create `execution width` shares to choose from. This is the ceiling for the operations
       operationsGroup.getCpu().setShares(executeStageWidth);
-    } catch (IOException e) {
+    } catch (IOException | IllegalStateException e) {
       log.log(Level.WARNING, "Unable to set up CGroup", e);
       try {
         operationsGroup.getCpu().close();
