@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -77,56 +76,27 @@ public final class Group {
 
   static {
     // Must be done in order
-    VERSION = discoverCgroupVersion();
-    rootPath = getSelfCgroup();
-  }
-
-  private static CGroupVersion discoverCgroupVersion() {
-    /* Try to figure out which version of CGroups is available. */
-    try {
-      Path path = Path.of("/sys/fs/cgroup");
-      if (path.toFile().exists() && path.toFile().isDirectory()) {
-        FileStore fileStore = Files.getFileStore(path);
-        String fsType = fileStore.type();
-        if (fsType.equals("cgroup2")) {
-          return CGroupVersion.CGROUPS_V2;
-        } else {
-          /* fsType=cgroup or fsType=tmpfs */
-          log.log(
-              Level.WARNING,
-              "CGroups v1 detected at /sys/fs/cgroup ! This is the last Buildfarm version to"
-                  + " support v1 - Please upgrade your host to Cgroups v2! See also"
-                  + " https://github.com/buildfarm/buildfarm/issues/2205");
-          return CGroupVersion.CGROUPS_V1;
-        }
-      }
-    } catch (IOException e) {
-      log.log(
-          Level.WARNING,
-          "Could not auto-detect CGroups version in /sys/fs/cgroup, assuming no CGroups support",
-          e);
-    }
-    // Give up.
-    log.log(Level.WARNING, "No cgroups support");
-    return CGroupVersion.NONE;
+    VERSION = new CGroupVersionProvider().get();
+    rootPath = getSelfCgroup(VERSION);
   }
 
   /**
    * Find our own cgroup.
-   * <p>
-   * For cgroups v1, preserve old behavior of always assuming `/sys/fs/cgroup/ is the root,
-   * And look for controller-specific files at <code>/sys/fs/cgroups/&lt;controller&gt;/cgroup.*</code>
+   *
+   * <p>For cgroups v1, preserve old behavior of always assuming `/sys/fs/cgroup/ is the root, And
+   * look for controller-specific files at <code>/sys/fs/cgroups/&lt;controller&gt;/cgroup.*</code>
+   *
    * @return
    */
-  static Path getSelfCgroup() {
-    log.log(Level.INFO, "discovering self cgroup for " + VERSION.name());
-    if (VERSION == CGroupVersion.CGROUPS_V2) {
+  static Path getSelfCgroup(CGroupVersion version) {
+    if (version == CGroupVersion.CGROUPS_V2) {
       try {
         // For cgroups v2, there's only one line, and it always starts with `0::`
         // For v1, there's other lines for cgroup subsystem managers.
         List<String> myCgroups = Files.readAllLines(Paths.get("/proc/self/cgroup"));
 
-        Optional<String> selfCgroup = myCgroups.stream().filter(s -> s.startsWith("0::")).findFirst();
+        Optional<String> selfCgroup =
+            myCgroups.stream().filter(s -> s.startsWith("0::")).findFirst();
         if (selfCgroup.isPresent()) {
           return Path.of("/sys/fs/cgroup", selfCgroup.get().substring(3).trim());
         }
@@ -134,6 +104,7 @@ public final class Group {
         log.log(Level.SEVERE, "Cannot read my own cgroup!", ioe);
       }
     }
+    // cgroup v1 or NONE always assume /sys/fs/cgroup
     return Paths.get("/sys/fs/cgroup");
   }
 
@@ -193,9 +164,9 @@ public final class Group {
 
   /**
    * Get the path for a given Controller Name
-   * <p>
-   *     This is for cgroups v1 only
-   * </p>
+   *
+   * <p>This is for cgroups v1 only
+   *
    * @param controllerName
    * @return
    */
@@ -427,7 +398,12 @@ public final class Group {
     /* root already has all controllers created */
     if (VERSION == CGroupVersion.CGROUPS_V2 && !root.isEmpty(controllerName)) {
       Group evacuation = root.getChild("evacuation");
-      log.log(Level.FINE, "beginning evacuation of root cgroup for cgroups v2 from " + rootPath + " to " + evacuation.getPath());
+      log.log(
+          Level.FINE,
+          "beginning evacuation of root cgroup for cgroups v2 from "
+              + rootPath
+              + " to "
+              + evacuation.getPath());
       if (Files.exists(evacuation.getPath(controllerName))) {
         // Clean it up.
         Files.delete(evacuation.getPath(controllerName));
@@ -435,7 +411,8 @@ public final class Group {
       Files.createDirectories(evacuation.getPath(controllerName));
       evacuation.adoptPids(root.getPids());
       verify(root.isEmpty(), "tried to evacuate root cgroup but there were processes remaining");
-      ensureControllerIsEnabled(root.getPath(controllerName), REQUIRED_CGROUP_CONTROLLER_NAMES, true);
+      ensureControllerIsEnabled(
+          root.getPath(controllerName), REQUIRED_CGROUP_CONTROLLER_NAMES, true);
     }
     if (parent != null) {
       parent.create(controllerName);
@@ -478,9 +455,7 @@ public final class Group {
         // Turn off memory,cpu from subtree_control
         // If we don't do this first, we can't move processes back.
         Path subtreeControl = root.getPath().resolve(CGROUP_SUBTREE_CONTROL);
-        try (Writer out =
-            new OutputStreamWriter(
-                Files.newOutputStream(subtreeControl))) {
+        try (Writer out = new OutputStreamWriter(Files.newOutputStream(subtreeControl))) {
           for (String eachControllerName : REQUIRED_CGROUP_CONTROLLER_NAMES) {
             out.write(String.format("-%s ", eachControllerName));
           }
