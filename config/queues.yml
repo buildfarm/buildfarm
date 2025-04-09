@@ -1,0 +1,5 @@
+- name: cpu
+  allowUnmatched: true
+  properties:
+  - name: '*'
+    value: '*'
