@@ -55,6 +55,7 @@ public final class Group {
 
   private static final String CGROUP_CONTROLLERS = "cgroup.controllers";
   private static final String CGROUP_SUBTREE_CONTROL = "cgroup.subtree_control";
+  private static final String EVACUATION_CGROUP_NAME = "evacuation";
 
   /**
    * These are the controllers we need enabled for our execution cgroup so that Buildfarm can set
@@ -397,7 +398,7 @@ public final class Group {
   void create(@Nonnull String controllerName) throws IOException {
     /* root already has all controllers created */
     if (VERSION == CGroupVersion.CGROUPS_V2 && !root.isEmpty(controllerName)) {
-      Group evacuation = root.getChild("evacuation");
+      Group evacuation = root.getChild(EVACUATION_CGROUP_NAME);
       log.log(
           Level.FINE,
           "beginning evacuation of root cgroup for cgroups v2 from "
@@ -442,7 +443,7 @@ public final class Group {
   public static void onShutdown() {
     if (VERSION == CGroupVersion.CGROUPS_V2) {
       try {
-        Group evacuation = root.getChild("evacuation");
+        Group evacuation = root.getChild(EVACUATION_CGROUP_NAME);
         if (evacuation.isEmpty()) {
           // nothing to move back.
           return;
@@ -462,7 +463,7 @@ public final class Group {
         }
         // The great return home - move evacuated processes back to root cgroup, where they started.
         root.adoptPids(evacuation.getPids());
-        // Try to delete the "evacuation" cgroup, which should be empty.
+        // Try to delete the EVACUATION_CGROUP_NAME cgroup, which should be empty.
         // We could check it by reading `cgroup.stat`
         Files.delete(evacuation.getPath());
       } catch (IOException ioe) {
