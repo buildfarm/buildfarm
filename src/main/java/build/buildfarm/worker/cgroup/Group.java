@@ -47,6 +47,26 @@ import jnr.posix.POSIXFactory;
 import lombok.Getter;
 import lombok.extern.java.Log;
 
+/**
+ * Represents a cgroup abstraction.
+ *
+ * <p>For cgroups v2, we do an evacuation dance. For cgroups v2, it's not possible to have child
+ * groups (with processes) when parent groups also have processes when subtree controllers are
+ * enabled. Only "leaf cgroups" can have processes in them. So we move all the processes in the
+ * current cgroup into a child cgroup named "evacuation". When running with cgroups enabled, you
+ * will have two child cgroups of the starting cgroup:
+ *
+ * <ul>
+ *   <li><b>evacuation</b> - where buildfarm, tini, and whatever else was in the cgroup when
+ *       buildfarm was started
+ *   <li><b>executions</b> - where the exec actions will spawn
+ * </ul>
+ *
+ * At shutdown, we make every effort to undo this re-arrangement in the {@link #onShutdown()}
+ * method.
+ *
+ * <p>All cgroupv1 support is temporary; please migrate to v2 as quickly as possible.
+ */
 @Log
 public final class Group {
   @Getter private static final Group root = new Group(/* name= */ null, /* parent= */ null);
@@ -61,7 +81,7 @@ public final class Group {
    * These are the controllers we need enabled for our execution cgroup so that Buildfarm can set
    * cpu, memory limits for individual executions.
    *
-   * <p>We also will un-do these in #onShutdown()
+   * <p>We also will un-do these in {@link #onShutdown()}
    */
   private static final Set<String> REQUIRED_CGROUP_CONTROLLER_NAMES = Set.of("memory", "cpu");
 
