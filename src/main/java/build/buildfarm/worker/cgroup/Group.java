@@ -99,7 +99,18 @@ public final class Group {
         Optional<String> selfCgroup =
             myCgroups.stream().filter(s -> s.startsWith("0::")).findFirst();
         if (selfCgroup.isPresent()) {
-          return Path.of("/sys/fs/cgroup", selfCgroup.get().substring(3).trim());
+          Path self = Path.of("/sys/fs/cgroup", selfCgroup.get().substring(3).trim());
+          if (self.endsWith(EVACUATION_CGROUP_NAME)) {
+            // but wait, there's more... we seem to have landed in an already-evacuated tree.
+            log.log(
+                Level.WARNING,
+                String.format(
+                    "Found pre-existing evacuation cgroup at %s. This indicates buildfarm did not"
+                        + " shutdown cleanly",
+                    self));
+            // Use the parent as the root.
+            return self.getParent();
+          }
         }
       } catch (IOException ioe) {
         log.log(Level.SEVERE, "Cannot read my own cgroup!", ioe);
