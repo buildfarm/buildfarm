@@ -22,7 +22,7 @@ java_library(
         "@maven//:com_github_docker_java_docker_java",
         "@maven//:com_github_docker_java_docker_java_api",
         "@maven//:com_github_docker_java_docker_java_core",
-        "@maven//:com_github_jnr_jffi_native",
+        "@maven//:com_github_jnr_jffi",
         "@maven//:com_github_jnr_jnr_constants",
         "@maven//:com_github_jnr_jnr_ffi",
         "@maven//:com_github_jnr_jnr_posix",
