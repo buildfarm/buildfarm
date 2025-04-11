@@ -1,0 +1,30 @@
+{{- if and (.Values.execWorker.autoscaling.enabled) (.Values.execWorker.enabled) -}}
+apiVersion: {{ include "buildfarm.autoscalingVersion" . }}
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-exec-worker
+  labels:
+    name: {{ include "buildfarm.fullname" . }}-exec-worker
+    {{- include "buildfarm.labels" . | nindent 4 }}
+  {{- with .Values.execWorker.service.annotations }}
+  annotations:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  maxReplicas: {{ .Values.execWorker.autoscaling.maxReplicas }}
+  minReplicas: {{ .Values.execWorker.autoscaling.minReplicas }}
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name:  {{ include "buildfarm.fullname" . }}-exec-worker
+  {{- if contains "autoscaling/v2" (include "buildfarm.autoscalingVersion" . ) }}
+    {{- if .Values.execWorker.autoscaling.behavior }}
+  behavior:
+      {{- toYaml .Values.execWorker.autoscaling.behavior | nindent 4 }}
+    {{- end }}
+  metrics:
+    {{- toYaml .Values.execWorker.autoscaling.metrics | nindent 4 }}
+  {{- else }}
+  targetCPUUtilizationPercentage: {{ .Values.execWorker.autoscaling.targetCPUUtilizationPercentage }}
+  {{- end }}
+{{- end }}
