@@ -129,8 +129,9 @@ public final class Group {
                         + " shutdown cleanly",
                     self));
             // Use the parent as the root.
-            return self.getParent();
+            return gatherAllCgroupChildProcesses(self.getParent());
           }
+          return self;
         }
       } catch (IOException ioe) {
         log.log(Level.SEVERE, "Cannot read my own cgroup!", ioe);
@@ -268,7 +269,7 @@ public final class Group {
     return getPids(getPath());
   }
 
-  private Set<Integer> getPids(Path path) {
+  private static Set<Integer> getPids(Path path) {
     Path procs = path.resolve("cgroup.procs");
     try {
       return Files.readAllLines(procs).stream()
@@ -293,7 +294,11 @@ public final class Group {
    */
   void adoptPids(Iterable<Integer> pids) {
     checkState(VERSION == CGroupVersion.CGROUPS_V2, "No PID adoption for v1");
-    Path path = getPath().resolve("cgroup.procs");
+    adoptPids(getPath(), pids);
+  }
+
+  static void adoptPids(Path cgroupPath, Iterable<Integer> pids) {
+    Path path = cgroupPath.resolve("cgroup.procs");
     verify(Files.exists(path), "cgroup.procs doesn't exist");
     // Only one process can be migrated on a single write(2) call.
     for (Integer pid : pids) {
@@ -304,7 +309,7 @@ public final class Group {
       } catch (IOException e) {
         log.log(
             Level.WARNING,
-            "process ID " + pid + " could not be moved to CGroup " + getPath() + "; continuing",
+            "process ID " + pid + " could not be moved to CGroup " + cgroupPath + "; continuing",
             e);
       }
     }
@@ -479,27 +484,66 @@ public final class Group {
           // nothing to move back.
           return;
         }
-        log.log(
-            Level.FINE,
-            String.format(
-                "homecoming - returning processes from %s cgroup to root cgroup %s",
-                evacuation.getPath(), root.getPath()));
-        // Turn off memory,cpu from subtree_control
-        // If we don't do this first, we can't move processes back.
-        Path subtreeControl = root.getPath().resolve(CGROUP_SUBTREE_CONTROL);
-        try (Writer out = new OutputStreamWriter(Files.newOutputStream(subtreeControl))) {
-          for (String eachControllerName : REQUIRED_CGROUP_CONTROLLER_NAMES) {
-            out.write(String.format("-%s ", eachControllerName));
-          }
-        }
-        // The great return home - move evacuated processes back to root cgroup, where they started.
-        root.adoptPids(evacuation.getPids());
-        // Try to delete the EVACUATION_CGROUP_NAME cgroup, which should be empty.
-        // We could check it by reading `cgroup.stat`
-        Files.delete(evacuation.getPath());
+        gatherAllCgroupChildProcesses(rootPath);
       } catch (IOException ioe) {
         throw new RuntimeException("Could not clean-up cgroups v2", ioe);
       }
     }
+  }
+
+  private static void disableSubtreeControl(Path cgroupPath) throws IOException {
+    Path subtreeControl = cgroupPath.resolve(CGROUP_SUBTREE_CONTROL);
+    log.log(Level.FINE, String.format("Disable subtree control at %s", subtreeControl));
+    try (Writer out = new OutputStreamWriter(Files.newOutputStream(subtreeControl))) {
+      for (String eachControllerName : REQUIRED_CGROUP_CONTROLLER_NAMES) {
+        out.write(String.format("-%s ", eachControllerName));
+      }
+    }
+  }
+
+  /**
+   * Bring all processes in all recursive cgroups into the cgroup at the given path
+   *
+   * <p>This also disabled cpu,memory subtree control for the given path.
+   *
+   * @param cgroupPath Cgroup to contain all children
+   * @return <code>cgroupPath</code>
+   * @throws IOException on any cgroups i/o problems
+   */
+  private static Path gatherAllCgroupChildProcesses(Path cgroupPath) throws IOException {
+    log.log(
+        Level.FINE,
+        String.format("homecoming - returning child processes to cgroup %s", cgroupPath));
+
+    // Depth-first walk through all child cgroups first
+    try (var childDirectories = Files.list(cgroupPath)) {
+      childDirectories
+          .filter(Files::isDirectory)
+          .forEach(
+              childPath -> {
+                try {
+                  // Recurse deeper. Depth-first gathering
+                  gatherAllCgroupChildProcesses(childPath);
+
+                  disableSubtreeControl(cgroupPath);
+                  adoptPids(cgroupPath, getPids(childPath));
+                  verify(
+                      getPids(childPath).isEmpty(),
+                      "evacuated but processes remain in cgroup %s",
+                      childPath);
+
+                  Files.delete(childPath);
+
+                } catch (IOException e) {
+                  log.log(
+                      Level.WARNING, "Failed to move processes from child cgroup: " + childPath, e);
+                }
+              });
+    }
+    // This may have been done above, when looping through the child directories. If this is a leaf
+    // directory, we need to disable subtree control here, too.
+    disableSubtreeControl(cgroupPath);
+
+    return cgroupPath;
   }
 }
