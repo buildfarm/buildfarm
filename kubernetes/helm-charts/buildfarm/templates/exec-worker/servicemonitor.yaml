@@ -1,0 +1,40 @@
+{{- if and (.Values.execWorker.serviceMonitor.enabled) (.Values.execWorker.enabled) }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-exec-worker
+  labels:
+    {{- include "buildfarm.labels" . | nindent 4 }}
+    {{- with .Values.execWorker.serviceMonitor.additionalLabels -}}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  endpoints:
+    - port: "metrics"
+      {{- with .Values.execWorker.serviceMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.execWorker.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      honorLabels: true
+      path: {{ .Values.execWorker.serviceMonitor.path }}
+      scheme: {{ .Values.execWorker.serviceMonitor.scheme }}
+      {{- with .Values.execWorker.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  jobLabel: "{{ .Release.Name }}"
+  selector:
+    matchLabels:
+      name: {{ include "buildfarm.fullname" . }}-exec-worker
+      {{- include "buildfarm.labels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  {{- with .Values.execWorker.serviceMonitor.targetLabels }}
+  targetLabels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
