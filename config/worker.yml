@@ -1,0 +1,9 @@
+publicName: localhost:8981
+storages:
+- type: FILESYSTEM
+  path: cache
+  maxSizeBytes: 2147483648   # 2 * 1024 * 1024 * 1024
+dequeueMatchSettings:
+  allowUnmatched: true
+linkedInputDirectories:
+- (?!external/)[^/]+

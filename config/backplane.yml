@@ -1,0 +1,2 @@
+redisUri: redis://localhost:6379
+queues: !include "queues.yml"
