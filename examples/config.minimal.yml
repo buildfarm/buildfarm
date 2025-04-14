@@ -2,10 +2,17 @@ backplane:
   redisUri: redis://localhost:6379
   queues:
   - name: cpu
+    allowUnmatched: true
     properties:
-    - name: '*'
+    - name: min-cores
+      value: '*'
+    - name: max-cores
       value: '*'
 worker:
   publicName: localhost:8981
-  dequeueMatchSettings:
-    allowUnmatched: true
+  storages:
+  - type: FILESYSTEM
+    path: cache
+    maxSizeBytes: 2147483648   # 2 * 1024 * 1024 * 1024
+  linkedInputDirectories:
+  - (?!external/)[^/]+
