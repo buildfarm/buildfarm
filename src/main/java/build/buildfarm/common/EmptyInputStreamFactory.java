@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.shard;
+package build.buildfarm.common;
 
 import build.bazel.remote.execution.v2.Compressor;
-import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.v1test.Digest;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 
-class EmptyInputStreamFactory implements InputStreamFactory {
+public class EmptyInputStreamFactory implements InputStreamFactory {
   private final InputStreamFactory delegate;
 
-  EmptyInputStreamFactory(InputStreamFactory delegate) {
+  public EmptyInputStreamFactory(InputStreamFactory delegate) {
     this.delegate = delegate;
   }
 

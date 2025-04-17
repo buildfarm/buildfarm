@@ -1,7 +1,8 @@
 name: Lint Helm Chart
 
 on:
-  push:
+  pull_request:
+    branches: [main]
     paths:
     - kubernetes/helm-charts/buildfarm/**
 

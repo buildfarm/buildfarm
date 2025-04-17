@@ -60,6 +60,9 @@ backplane:
   redisPassword:
   redisNodes:
   jedisPoolMaxTotal: 4000
+  jedisPoolMaxIdle: 8
+  jedisPoolMinIdle: 0
+  jedisTimeBetweenEvictionRunsMillis: 30000
   workersHashName: Workers
   workerChannel: WorkerChannel
   actionCachePrefix: ActionCache
@@ -142,8 +145,11 @@ worker:
   gracefulShutdownSeconds: 0
   sandboxSettings:
     alwaysUseSandbox: false
+    alwaysUseAsNobody: false
     alwaysUseCgroups: false
     alwaysUseTmpFs: false
+    additionalWritePaths: []
+    tmpFsPaths: []
     selectForBlockNetwork: false
     selectForTmpFs: false
   createSymlinkOutputs: false

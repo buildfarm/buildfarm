@@ -6,6 +6,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         "//src/main/java/build/buildfarm/common",
+        "//src/main/java/build/buildfarm/common/base",
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/test/java/build/buildfarm:test_runner",
         "@googleapis//google/bytestream:bytestream_java_grpc",

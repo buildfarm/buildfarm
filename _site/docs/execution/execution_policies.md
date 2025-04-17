@@ -52,7 +52,7 @@ This addresses two problems in regards to an action's dependence on time.  The 1
 ### Issue 1 (slow test)
 
 ```bash
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 echo -n "testing... "
@@ -81,7 +81,7 @@ Now the test is 10x faster.  If skipping sleep makes an action perform significa
 ### Issue 2 (future failing test)
 
 ```bash
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 CURRENT_YEAR=$(date +"%Y")
