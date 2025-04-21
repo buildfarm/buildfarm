@@ -1600,6 +1600,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       DigestFunction.Value digestFunction)
       throws IOException, InterruptedException;
 
+  @GuardedBy("this")
   @SuppressWarnings("NonAtomicOperationOnVolatileField")
   protected int decrementInputReferences(Iterable<String> inputFiles) {
     int entriesDereferenced = 0;
@@ -1669,6 +1670,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       int max = 0;
       String minkey = null;
       String maxkey = null;
+      int unreferencedEntries = 0;
       log.log(
           Level.INFO,
           format(
@@ -1677,7 +1679,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               header.hashCode(),
               header.after.hashCode(),
               header.before.hashCode()));
-      // this should be incorporated in the listenable future construction...
       for (Map.Entry<String, Entry> pe : storage.entrySet()) {
         String key = pe.getKey();
         Entry e = pe.getValue();
@@ -1690,17 +1691,22 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           minkey = key;
         }
         if (e.referenceCount == 0) {
-          log.log(
-              Level.INFO,
-              format(
-                  "CASFileCache::expireEntry(%d) unreferenced entry(%s): { after: %s, before: %s }",
-                  blobSizeInBytes,
-                  e.hashCode(),
-                  e.after == null ? null : e.after.hashCode(),
-                  e.before == null ? null : e.before.hashCode()));
+          e.addBefore(header);
+          unreferencedEntries++;
         }
         references += e.referenceCount;
         keys++;
+      }
+      if (unreferencedEntries != 0) {
+        log.log(
+            Level.SEVERE,
+            format(
+                "CASFileCache::expireEntry(%d) %d (%d metrics) unreferenced entries with %s == %s",
+                blobSizeInBytes,
+                unreferencedEntries,
+                unreferencedEntryCount,
+                header.after.hashCode(),
+                header.hashCode()));
       }
       if (keys == 0) {
         throw new IllegalStateException(
