@@ -4,8 +4,8 @@ java_test(
     name = "tests",
     size = "small",
     srcs = glob(["*.java"]),
-    data = [
-        "//config:base_properties",
+    classpath_resources = [
+        "//src/test/java/build/buildfarm:configs",
     ],
     test_class = "build.buildfarm.AllTests",
     deps = [
