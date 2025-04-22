@@ -163,7 +163,7 @@ pkg_tar(
 
 pkg_tar(
     name = "layer_logging_config",
-    srcs = ["@build_buildfarm//src/main/java/build/buildfarm:configs"],
+    srcs = ["@build_buildfarm//config:base_properties"],
     package_dir = DEFAULT_PACKAGE_DIR + "/src/main/java/build/buildfarm",
     tags = ["container"],
 )
