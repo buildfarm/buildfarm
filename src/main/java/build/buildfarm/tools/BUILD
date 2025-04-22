@@ -104,8 +104,8 @@ java_binary(
 java_binary(
     name = "bf-cat",
     srcs = ["Cat.java"],
-    classpath_resources = [
-        "//src/main/java/build/buildfarm:configs",
+    data = [
+        "//config:base_properties",
     ],
     main_class = "build.buildfarm.tools.Cat",
     visibility = ["//visibility:public"],
@@ -132,8 +132,8 @@ java_binary(
 java_binary(
     name = "bf-workerprofile",
     srcs = ["WorkerProfile.java"],
-    classpath_resources = [
-        "//src/main/java/build/buildfarm:configs",
+    data = [
+        "//config:base_properties",
     ],
     main_class = "build.buildfarm.tools.WorkerProfile",
     visibility = ["//visibility:public"],
@@ -164,8 +164,8 @@ java_binary(
 java_binary(
     name = "bf-ac",
     srcs = ["Ac.java"],
-    classpath_resources = [
-        "//src/main/java/build/buildfarm:configs",
+    data = [
+        "//config:base_properties",
     ],
     main_class = "build.buildfarm.tools.Ac",
     visibility = ["//visibility:public"],
