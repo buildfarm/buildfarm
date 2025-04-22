@@ -92,7 +92,10 @@ public class OutputDirectory {
     ImmutableList.Builder<OutputDirectoryEntry> entries = ImmutableList.builder();
     for (EnvironmentVariable envVar : envVars) {
       if (OUTPUT_DIRECTORY_ENV_VARS.contains(envVar.getName())) {
-        entries.add(new OutputDirectoryEntry("/" + envVar.getValue() + "/", false));
+        String value = envVar.getValue();
+        if (!value.startsWith("/")) {
+          entries.add(new OutputDirectoryEntry("/" + value + "/", false));
+        }
       } else if (OUTPUT_FILE_ENV_VARS.contains(envVar.getName())) {
         String file = envVar.getValue();
         entries.add(
