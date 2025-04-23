@@ -101,7 +101,6 @@ public final class BuildfarmConfigs {
         throw new RuntimeException("Could not load configs from path: " + configLocation);
       }
       log.info(buildfarmConfigs.toString());
-      log.info(yaml.dump(buildfarmConfigs));
       return buildfarmConfigs;
     }
   }
