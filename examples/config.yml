@@ -28,7 +28,7 @@ server:
   mergeExecutions: true
   runFailsafeOperation: true
   maxCpu: 0
-  maxRequeueAttempts: 5
+  maxRequeueAttempts: 3
   useDenyList: true
   grpcTimeout: 3600
   executeKeepaliveAfterSeconds: 60
