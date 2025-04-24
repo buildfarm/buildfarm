@@ -126,8 +126,10 @@ public class DirectoryEntryCFC extends CASFileCache {
         }
       } else {
         storage.put(key, e);
-        if (e.decrementReference(header)) {
-          unreferencedEntryCount++;
+        synchronized (this) {
+          if (e.decrementReference(header)) {
+            unreferencedEntryCount++;
+          }
         }
         sizeInBytes += e.size;
       }
