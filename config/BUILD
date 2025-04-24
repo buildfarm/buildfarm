@@ -14,3 +14,9 @@ filegroup(
     srcs = glob(["*.properties"]),
     visibility = ["//visibility:public"],
 )
+
+filegroup(
+    name = "base_configs",
+    srcs = glob(["*.yml"]),
+    visibility = ["//visibility:public"],
+)
