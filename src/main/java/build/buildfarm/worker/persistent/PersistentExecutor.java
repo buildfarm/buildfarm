@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 import lombok.extern.java.Log;
 import persistent.bazel.client.WorkerKey;
 
