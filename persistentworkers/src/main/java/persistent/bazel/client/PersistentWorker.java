@@ -123,7 +123,7 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
       sb.append("\n\tProcess stderr: ");
       String stderr = workerRW.getProcessWrapper().getErrorString();
       sb.append(stderr);
-      logger.log(Level.SEVERE, sb.toString());
+      logger.log(Level.FINE, sb.toString());
     }
   }
 
