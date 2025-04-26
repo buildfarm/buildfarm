@@ -28,7 +28,7 @@ server:
   mergeExecutions: true
   runFailsafeOperation: true
   maxCpu: 0
-  maxRequeueAttempts: 5
+  maxRequeueAttempts: 3
   useDenyList: true
   grpcTimeout: 3600
   executeKeepaliveAfterSeconds: 60
@@ -59,7 +59,7 @@ backplane:
   redisUsername:
   redisPassword:
   redisNodes:
-  jedisPoolMaxTotal: 4000
+  jedisPoolMaxTotal: 200
   jedisPoolMaxIdle: 8
   jedisPoolMinIdle: 0
   jedisTimeBetweenEvictionRunsMillis: 30000

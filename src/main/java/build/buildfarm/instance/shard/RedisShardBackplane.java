@@ -1287,7 +1287,7 @@ public class RedisShardBackplane implements Backplane {
 
   @SuppressWarnings("ConstantConditions")
   @Override
-  public Operation mergeExecution(ActionKey actionKey) throws IOException {
+  public @Nullable Operation mergeExecution(ActionKey actionKey) throws IOException {
     return client.call(jedis -> state.executions.merge(jedis, actionKey.toString()));
   }
 
