@@ -88,6 +88,18 @@ public final class BuildfarmConfigs {
   }
 
   public static BuildfarmConfigs loadConfigs(Path configLocation) throws IOException {
+    Path parent = configLocation.getParent();
+    if (parent == null || !Files.isDirectory(parent)) {
+      log.info("Loading configs from single file: " + configLocation);
+      Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass(), new LoaderOptions()));
+      buildfarmConfigs = yaml.load(Files.newInputStream(configLocation));
+      if (buildfarmConfigs == null) {
+        throw new RuntimeException("Could not load configs from path: " + configLocation);
+      }
+      log.info(buildfarmConfigs.toString());
+      return buildfarmConfigs;
+    }
+
     try (InputStream inputStream = Files.newInputStream(configLocation)) {
       constructor =
           new BuildfarmConfigsConstructor(
