@@ -77,6 +77,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -684,8 +685,8 @@ class Cat {
     System.out.println(DigestUtil.toString(digest.get()));
   }
 
-  private static void getWorkerProfile(Instance instance) {
-    WorkerProfileMessage response = instance.getWorkerProfile();
+  private static void getWorkerProfile(Instance instance, String workerName) {
+    WorkerProfileMessage response = instance.getWorkerProfile(workerName);
     System.out.println("\nWorkerProfile:");
     String strIntFormat = "%-50s : %d";
     long entryCount = response.getCasEntryCount();
@@ -863,7 +864,9 @@ class Cat {
 
     @Override
     public void run(Instance instance, Iterable<String> args) {
-      getWorkerProfile(instance);
+      Iterator<String> argsIterator = args.iterator();
+      String workerName = argsIterator.hasNext() ? argsIterator.next() : null;
+      getWorkerProfile(instance, workerName);
     }
   }
 

@@ -25,9 +25,9 @@ import com.google.protobuf.util.Durations;
 import java.util.List;
 
 class WorkerProfilePrinter {
-  public static void getWorkerProfile(Instance instance) {
-    WorkerProfileMessage response = instance.getWorkerProfile();
-    System.out.println("\nWorkerProfile:");
+  public static void getWorkerProfile(Instance instance, String workerName) {
+    WorkerProfileMessage response = instance.getWorkerProfile(workerName);
+    System.out.println("\nWorkerProfile: " + workerName);
     String strIntFormat = "%-50s : %d";
     long entryCount = response.getCasEntryCount();
     long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
