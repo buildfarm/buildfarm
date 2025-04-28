@@ -39,6 +39,7 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
         "@maven//:javax_annotation_javax_annotation_api",
+        "@maven//:org_apache_commons_commons_lang3",
         "@maven//:org_projectlombok_lombok",
     ],
 )

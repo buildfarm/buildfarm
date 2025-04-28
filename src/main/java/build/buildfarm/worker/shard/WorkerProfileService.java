@@ -28,8 +28,8 @@ import build.buildfarm.worker.PutOperationStage.OperationStageDurations;
 import build.buildfarm.worker.SuperscalarPipelineStage;
 import com.google.common.base.Strings;
 import io.grpc.stub.StreamObserver;
-import java.io.IOException;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.NotImplementedException;
 
 public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
   private final @Nullable CASFileCache storage;
@@ -126,17 +126,10 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();
   }
-
   @Override
   public void getWorkerList(
-      WorkerListRequest request, StreamObserver<WorkerListMessage> responseObserver) {
-    WorkerListMessage.Builder replyBuilder = WorkerListMessage.newBuilder();
-    try {
-      replyBuilder.addAllWorkers(backplane.getStorageWorkers());
-    } catch (IOException e) {
-      responseObserver.onError(e);
-    }
-    responseObserver.onNext(replyBuilder.build());
-    responseObserver.onCompleted();
+          WorkerListRequest request, StreamObserver<WorkerListMessage> responseObserver) {
+    throw new NotImplementedException();
   }
+
 }
