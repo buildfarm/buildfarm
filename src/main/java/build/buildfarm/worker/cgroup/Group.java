@@ -39,6 +39,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import jnr.constants.platform.Signal;
@@ -516,7 +517,7 @@ public final class Group {
         String.format("homecoming - returning child processes to cgroup %s", cgroupPath));
 
     // Depth-first walk through all child cgroups first
-    try (var childDirectories = Files.list(cgroupPath)) {
+    try (Stream<Path> childDirectories = Files.list(cgroupPath)) {
       childDirectories
           .filter(Files::isDirectory)
           .forEach(
