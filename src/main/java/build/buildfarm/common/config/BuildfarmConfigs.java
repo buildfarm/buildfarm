@@ -88,6 +88,18 @@ public final class BuildfarmConfigs {
   }
 
   public static BuildfarmConfigs loadConfigs(Path configLocation) throws IOException {
+    Path parent = configLocation.getParent();
+    if (parent == null || !Files.isDirectory(parent)) {
+      log.info("Loading configs from single file: " + configLocation);
+      Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass(), new LoaderOptions()));
+      buildfarmConfigs = yaml.load(Files.newInputStream(configLocation));
+      if (buildfarmConfigs == null) {
+        throw new RuntimeException("Could not load configs from path: " + configLocation);
+      }
+      log.info(buildfarmConfigs.toString());
+      return buildfarmConfigs;
+    }
+
     try (InputStream inputStream = Files.newInputStream(configLocation)) {
       constructor =
           new BuildfarmConfigsConstructor(
@@ -306,7 +318,17 @@ public final class BuildfarmConfigs {
     // Create a mapping from the execution wrappers to the features they enable.
     ExecutionWrapperProperties wrapperProperties = new ExecutionWrapperProperties();
     wrapperProperties.mapping.put(
-        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getCgroups())),
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getCgroups1())),
+        new ArrayList<String>(
+            Arrays.asList(
+                "limit_execution",
+                ExecutionProperties.CORES,
+                ExecutionProperties.MIN_CORES,
+                ExecutionProperties.MAX_CORES,
+                ExecutionProperties.MIN_MEM,
+                ExecutionProperties.MAX_MEM)));
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getCgroups2())),
         new ArrayList<String>(
             Arrays.asList(
                 "limit_execution",

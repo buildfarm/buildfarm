@@ -2219,6 +2219,17 @@ public class ServerInstance extends NodeInstance {
           }
         }
         execution = stripExecution(execution);
+      } else {
+        try {
+          backplane.unmergeExecution(actionKey);
+        } catch (IOException e) {
+          log.log(
+              Level.SEVERE,
+              format(
+                  "error unmerging null execution of %s",
+                  DigestUtil.toString(actionKey.getDigest())),
+              e);
+        }
       }
       watcher.observe(execution);
     }
@@ -2251,7 +2262,7 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
-  private Operation validateMergedExecution(Operation execution, ActionKey actionKey)
+  private Operation validateMergedExecution(@Nullable Operation execution, ActionKey actionKey)
       throws IOException {
     if (execution == null) {
       return null;
