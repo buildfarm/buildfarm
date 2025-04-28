@@ -104,6 +104,7 @@ pkg_files(
     }) + [
         # keep sorted
         "//:as-nobody",
+        "//:cgexec-wrapper",
         "//:macos-wrapper.sh",
         "@bazel//src/main/tools:linux-sandbox",
         "@bazel//src/main/tools:process-wrapper",
