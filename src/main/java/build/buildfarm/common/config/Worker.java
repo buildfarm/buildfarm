@@ -75,6 +75,11 @@ public class Worker {
     return executionPolicies;
   }
 
+  /**
+   * The type of worker
+   *
+   * @return A bitmask of {@class build.buildfarm.v1test.WorkerType} enum
+   */
   public int getWorkerType() {
     int workerType = 0;
     if (getCapabilities().isCas()) {
