@@ -102,6 +102,8 @@ import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerListMessage;
+import build.buildfarm.v1test.WorkerProfileMessage;
 import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -3280,5 +3282,23 @@ public class ServerInstance extends NodeInstance {
       throws IOException {
     // TODO maybe track per server instance as well
     backplane.incrementRequestCounters(actionId, toolInvocationId, actionMnemonic, targetId);
+  }
+
+  @Override
+  public WorkerListMessage getWorkerList() {
+    try {
+      Set allWorkers = backplane.getStorageWorkers();
+      // TODO add exec workers too.
+      WorkerListMessage.Builder b = WorkerListMessage.newBuilder();
+      b.addAllWorkers(allWorkers);
+      return b.build();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public WorkerProfileMessage getWorkerProfile(String workerName) {
+    return workerStub(workerName).getWorkerProfile(workerName);
   }
 }
