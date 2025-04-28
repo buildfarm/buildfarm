@@ -33,20 +33,20 @@ import org.apache.commons.lang3.NotImplementedException;
 
 public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
   private final @Nullable CASFileCache storage;
-  private final PipelineStage matchStage;
-  private final SuperscalarPipelineStage inputFetchStage;
-  private final SuperscalarPipelineStage executeActionStage;
-  private final SuperscalarPipelineStage reportResultStage;
-  private final PutOperationStage completeStage;
+  private final @Nullable PipelineStage matchStage;
+  private final @Nullable SuperscalarPipelineStage inputFetchStage;
+  private final @Nullable SuperscalarPipelineStage executeActionStage;
+  private final @Nullable SuperscalarPipelineStage reportResultStage;
+  private final @Nullable PutOperationStage completeStage;
   private final Backplane backplane;
 
   public WorkerProfileService(
       @Nullable CASFileCache storage,
-      PipelineStage matchStage,
-      SuperscalarPipelineStage inputFetchStage,
-      SuperscalarPipelineStage executeActionStage,
-      SuperscalarPipelineStage reportResultStage,
-      PutOperationStage completeStage,
+      @Nullable PipelineStage matchStage,
+      @Nullable SuperscalarPipelineStage inputFetchStage,
+      @Nullable SuperscalarPipelineStage executeActionStage,
+      @Nullable SuperscalarPipelineStage reportResultStage,
+      @Nullable PutOperationStage completeStage,
       Backplane backplane) {
     super();
     this.storage = storage;
@@ -101,35 +101,43 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     // produce: slots that are not consistent with operations, operations
     // in multiple stages even in reverse due to claim progress
     // in short: this is for monitoring, not for guaranteed consistency checks
-    String matchOperation = matchStage.getOperationName();
-    replyBuilder
-        .addStages(superscalarStageInformation(reportResultStage))
-        .addStages(superscalarStageInformation(executeActionStage))
-        .addStages(superscalarStageInformation(inputFetchStage))
-        .addStages(unaryStageInformation(matchStage.getName(), matchOperation));
-
+    if (reportResultStage != null) {
+      replyBuilder.addStages(superscalarStageInformation(reportResultStage));
+    }
+    if (executeActionStage != null) {
+      replyBuilder.addStages(superscalarStageInformation(executeActionStage));
+    }
+    if (inputFetchStage != null) {
+      replyBuilder.addStages(superscalarStageInformation(inputFetchStage));
+    }
+    if (matchStage != null) {
+      String matchOperation = matchStage.getOperationName();
+      replyBuilder.addStages(unaryStageInformation(matchStage.getName(), matchOperation));
+    }
     // get average time costs on each stage
-    OperationStageDurations[] durations = completeStage.getAverageTimeCostPerStage();
-    for (OperationStageDurations duration : durations) {
-      replyBuilder
-          .addTimesBuilder()
-          .setQueuedToMatch(duration.queuedToMatch)
-          .setMatchToInputFetchStart(duration.matchToInputFetchStart)
-          .setInputFetchStartToComplete(duration.inputFetchStartToComplete)
-          .setInputFetchCompleteToExecutionStart(duration.inputFetchCompleteToExecutionStart)
-          .setExecutionStartToComplete(duration.executionStartToComplete)
-          .setExecutionCompleteToOutputUploadStart(duration.executionCompleteToOutputUploadStart)
-          .setOutputUploadStartToComplete(duration.outputUploadStartToComplete)
-          .setOperationCount(duration.operationCount)
-          .setPeriod(duration.period);
+    if (completeStage != null) {
+      OperationStageDurations[] durations = completeStage.getAverageTimeCostPerStage();
+      for (OperationStageDurations duration : durations) {
+        replyBuilder
+            .addTimesBuilder()
+            .setQueuedToMatch(duration.queuedToMatch)
+            .setMatchToInputFetchStart(duration.matchToInputFetchStart)
+            .setInputFetchStartToComplete(duration.inputFetchStartToComplete)
+            .setInputFetchCompleteToExecutionStart(duration.inputFetchCompleteToExecutionStart)
+            .setExecutionStartToComplete(duration.executionStartToComplete)
+            .setExecutionCompleteToOutputUploadStart(duration.executionCompleteToOutputUploadStart)
+            .setOutputUploadStartToComplete(duration.outputUploadStartToComplete)
+            .setOperationCount(duration.operationCount)
+            .setPeriod(duration.period);
+      }
     }
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();
   }
+
   @Override
   public void getWorkerList(
-          WorkerListRequest request, StreamObserver<WorkerListMessage> responseObserver) {
+      WorkerListRequest request, StreamObserver<WorkerListMessage> responseObserver) {
     throw new NotImplementedException();
   }
-
 }
