@@ -205,7 +205,7 @@ public class NodeInstanceTest {
     }
 
     @Override
-    public WorkerProfileMessage getWorkerProfile() {
+    public WorkerProfileMessage getWorkerProfile(String workerName) {
       throw new UnsupportedOperationException();
     }
 

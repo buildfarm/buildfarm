@@ -209,7 +209,7 @@ class DummyInstanceBase extends InstanceBase {
   }
 
   @Override
-  public WorkerProfileMessage getWorkerProfile() {
+  public WorkerProfileMessage getWorkerProfile(String workerName) {
     throw new UnsupportedOperationException();
   }
 

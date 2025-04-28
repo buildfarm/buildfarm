@@ -938,9 +938,9 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
-  public WorkerProfileMessage getWorkerProfile() {
+  public WorkerProfileMessage getWorkerProfile(String workerName) {
     return deadlined(workerProfileBlockingStub)
-        .getWorkerProfile(WorkerProfileRequest.newBuilder().build());
+        .getWorkerProfile(WorkerProfileRequest.newBuilder().setWorker(workerName).build());
   }
 
   @Override

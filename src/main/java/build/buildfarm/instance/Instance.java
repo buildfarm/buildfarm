@@ -159,7 +159,7 @@ public interface Instance {
 
   ServerCapabilities getCapabilities();
 
-  WorkerProfileMessage getWorkerProfile();
+  WorkerProfileMessage getWorkerProfile(String workerName);
 
   WorkerListMessage getWorkerList();
 

@@ -1769,7 +1769,7 @@ public abstract class NodeInstance extends InstanceBase {
   }
 
   @Override
-  public WorkerProfileMessage getWorkerProfile() {
+  public WorkerProfileMessage getWorkerProfile(String workerName) {
     throw new UnsupportedOperationException(
         "NodeInstance doesn't support getWorkerProfile() method.");
   }

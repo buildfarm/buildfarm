@@ -626,7 +626,9 @@ message WorkerProfileMessage {
   repeated OperationTimesBetweenStages times = 10;
 }
 
-message WorkerProfileRequest {}
+message WorkerProfileRequest {
+  string worker = 1; // The worker identifier from GetWorkerList()
+}
 
 message WorkerListRequest {}
 
