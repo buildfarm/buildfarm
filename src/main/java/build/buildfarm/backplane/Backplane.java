@@ -122,6 +122,9 @@ public interface Backplane {
   /** Returns a set of the names of all active storage workers. */
   Set<String> getStorageWorkers() throws IOException;
 
+  /** Returns a set of the names of all active execute workers. */
+  Set<String> getExecuteWorkers() throws IOException;
+
   // TODO this is just a namespace, but kind of jank for just digest function as a string...
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the digest of the action

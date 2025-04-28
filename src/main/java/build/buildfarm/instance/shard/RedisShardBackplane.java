@@ -789,7 +789,8 @@ public class RedisShardBackplane implements Backplane {
     return client.call(jedis -> createCasWorkerMap(jedis).insertTime(blobDigest));
   }
 
-  private synchronized Set<String> getExecuteWorkers() throws IOException {
+  @Override
+  public synchronized Set<String> getExecuteWorkers() throws IOException {
     try {
       return recentExecuteWorkers.get();
     } catch (RuntimeException e) {
