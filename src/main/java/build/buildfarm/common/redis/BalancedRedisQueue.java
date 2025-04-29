@@ -26,26 +26,26 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.logging.Level;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Data;
-import lombok.extern.java.Log;
 import lombok.Getter;
+import lombok.extern.java.Log;
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Connection;
-import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPooled;
-import redis.clients.jedis.providers.ConnectionProvider;
-import redis.clients.jedis.providers.ClusterConnectionProvider;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.exceptions.JedisConnectionException;
+import redis.clients.jedis.providers.ClusterConnectionProvider;
+import redis.clients.jedis.providers.ConnectionProvider;
 import redis.clients.jedis.util.JedisClusterCRC16;
 
 /**
@@ -339,14 +339,14 @@ public class BalancedRedisQueue {
 
   private static Jedis getJedisFromKey(UnifiedJedis jedis, String name) {
     Connection connection = null;
-    boolean clusterTopologyChanged = false; 
+    boolean clusterTopologyChanged = false;
     if (jedis instanceof JedisCluster cluster) {
       // 1) Cluster case: keep trying until we can connect to the right slot
 
       // If the Redis cluster topology changes, we need to wait until the topology is refreshed
       // with exponential back off.
-      long delayMs    = 100;    // initial wait 100 ms
-      long maxDelayMs = 1_000;  // wait time cap at 1s
+      long delayMs = 100; // initial wait 100 ms
+      long maxDelayMs = 1_000; // wait time cap at 1s
       int slot = JedisClusterCRC16.getSlot(name);
       while (true) {
         try {
@@ -354,18 +354,23 @@ public class BalancedRedisQueue {
           break;
         } catch (JedisConnectionException e) {
           // This should be rare
-          // When a master node is offline, the cluster topology changes and Jedis will 
+          // When a master node is offline, the cluster topology changes and Jedis will
           // complain "JedisConnectionException: Failed to connect to XXX"
-          // We need to wait for the topology to be refreshed and also refresh the slot cache in Jedis
+          // We need to wait for the topology to be refreshed and also refresh the slot cache in
+          // Jedis
           clusterTopologyChanged = true;
-          log.log(Level.WARNING, "failed to get slot: " + slot + ", waiting for the cluster toplogy to be refreshed...");
+          log.log(
+              Level.WARNING,
+              "failed to get slot: "
+                  + slot
+                  + ", waiting for the cluster toplogy to be refreshed...");
           refreshClusterTopology(jedis);
 
           try {
             Thread.sleep(delayMs);
           } catch (InterruptedException ie) {
-              Thread.currentThread().interrupt();
-              throw new RuntimeException("Interrupted while retrying Redis connection", ie);
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrupted while retrying Redis connection", ie);
           }
           delayMs = Math.min(maxDelayMs, delayMs * 2);
         }
@@ -375,7 +380,7 @@ public class BalancedRedisQueue {
     } else {
       throw new IllegalArgumentException("Unsupported Jedis type: " + jedis.getClass());
     }
-  
+
     if (connection == null) {
       throw new IllegalStateException("Could not obtain a Redis connection for key=" + name);
     }
@@ -383,13 +388,15 @@ public class BalancedRedisQueue {
     if (clusterTopologyChanged) {
       log.log(Level.INFO, "cluster topology finished, connection can be used");
     }
-  
+
     return new Jedis(connection);
   }
 
   // When a Redis cluster master node fails, the cluster topology changes and the slot cache
-  // needs to be refreshed. However, Jedis does not provide a public API to do this and as a workaround,
-  // we use reflection to access the private method 'ClusterConnectionProvider.getConnectionFromSlot()'
+  // needs to be refreshed. However, Jedis does not provide a public API to do this and as a
+  // workaround,
+  // we use reflection to access the private method
+  // 'ClusterConnectionProvider.getConnectionFromSlot()'
   // TODO: Remove the reflection once this Jedis issue is resolved:
   //  https://github.com/redis/jedis/issues/4154
   private static void refreshClusterTopology(UnifiedJedis jedis) {
