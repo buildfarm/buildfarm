@@ -231,8 +231,11 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     for (String relOutput : context.outputFiles) {
       Path execOutputPath = workerExecRoot.resolve(relOutput);
       Path opOutputPath = opRoot.resolve(relOutput);
-
-      FileAccessUtils.moveFile(execOutputPath, opOutputPath);
+      // Don't fail here if the action failed to produce a file.
+      // The missing file will be handled just like it is for non-worker actions.
+      if (Files.exists(execOutputPath)) {
+        FileAccessUtils.moveFile(execOutputPath, opOutputPath);
+      }
     }
   }
 
