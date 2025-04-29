@@ -113,7 +113,7 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
 
   private void logIfBadResponse(WorkResponse response) throws IOException {
     int returnCode = response.getExitCode();
-    if (returnCode != 0) {
+    if (returnCode != 0 && logger.isLoggable(Level.FINE)) {
       StringBuilder sb = new StringBuilder();
       sb.append("logBadResponse(err)");
       sb.append("\nResponse non-zero exit_code: ");
@@ -123,7 +123,7 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
       sb.append("\n\tProcess stderr: ");
       String stderr = workerRW.getProcessWrapper().getErrorString();
       sb.append(stderr);
-      logger.log(Level.SEVERE, sb.toString());
+      logger.log(Level.FINE, sb.toString());
     }
   }
 
