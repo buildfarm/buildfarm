@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker.shard;
 
-import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.WorkerListMessage;
@@ -38,7 +37,6 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private final @Nullable SuperscalarPipelineStage executeActionStage;
   private final @Nullable SuperscalarPipelineStage reportResultStage;
   private final @Nullable PutOperationStage completeStage;
-  private final Backplane backplane;
 
   public WorkerProfileService(
       @Nullable CASFileCache storage,
@@ -46,8 +44,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
       @Nullable SuperscalarPipelineStage inputFetchStage,
       @Nullable SuperscalarPipelineStage executeActionStage,
       @Nullable SuperscalarPipelineStage reportResultStage,
-      @Nullable PutOperationStage completeStage,
-      Backplane backplane) {
+      @Nullable PutOperationStage completeStage) {
     super();
     this.storage = storage;
     this.matchStage = matchStage;
@@ -55,7 +52,6 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     this.executeActionStage = executeActionStage;
     this.reportResultStage = reportResultStage;
     this.completeStage = (PutOperationStage) completeStage;
-    this.backplane = backplane;
   }
 
   private StageInformation unaryStageInformation(String name, @Nullable String operationName) {
