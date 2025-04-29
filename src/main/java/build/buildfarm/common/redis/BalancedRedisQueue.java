@@ -21,10 +21,12 @@ import build.buildfarm.common.Visitor;
 import build.buildfarm.v1test.QueueStatus;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -33,12 +35,16 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Data;
+import lombok.extern.java.Log;
 import lombok.Getter;
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.Connection;
+import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPooled;
+import redis.clients.jedis.providers.ConnectionProvider;
+import redis.clients.jedis.providers.ClusterConnectionProvider;
 import redis.clients.jedis.UnifiedJedis;
 import redis.clients.jedis.util.JedisClusterCRC16;
 
@@ -51,6 +57,7 @@ import redis.clients.jedis.util.JedisClusterCRC16;
  *     (since it exists in redis). Therefore, two redis queues with the same name, would in fact be
  *     the same underlying redis queues.
  */
+@Log
 public class BalancedRedisQueue {
   private static final Duration START_TIMEOUT = Duration.ofSeconds(1);
 
@@ -332,15 +339,78 @@ public class BalancedRedisQueue {
 
   private static Jedis getJedisFromKey(UnifiedJedis jedis, String name) {
     Connection connection = null;
+    boolean clusterTopologyChanged = false; 
     if (jedis instanceof JedisCluster cluster) {
-      connection = cluster.getConnectionFromSlot(JedisClusterCRC16.getSlot(name));
+      // 1) Cluster case: keep trying until we can connect to the right slot
+
+      // If the Redis cluster topology changes, we need to wait until the topology is refreshed
+      // with exponential back off.
+      long delayMs    = 100;    // initial wait 100 ms
+      long maxDelayMs = 1_000;  // wait time cap at 1s
+      int slot = JedisClusterCRC16.getSlot(name);
+      while (true) {
+        try {
+          connection = cluster.getConnectionFromSlot(slot);
+          break;
+        } catch (JedisConnectionException e) {
+          // This should be rare
+          // When a master node is offline, the cluster topology changes and Jedis will 
+          // complain "JedisConnectionException: Failed to connect to XXX"
+          // We need to wait for the topology to be refreshed and also refresh the slot cache in Jedis
+          clusterTopologyChanged = true;
+          log.log(Level.WARNING, "failed to get slot: " + slot + ", waiting for the cluster toplogy to be refreshed...");
+          refreshClusterTopology(jedis);
+
+          try {
+            Thread.sleep(delayMs);
+          } catch (InterruptedException ie) {
+              Thread.currentThread().interrupt();
+              throw new RuntimeException("Interrupted while retrying Redis connection", ie);
+          }
+          delayMs = Math.min(maxDelayMs, delayMs * 2);
+        }
+      }
     } else if (jedis instanceof JedisPooled pooled) {
       connection = pooled.getPool().getResource();
+    } else {
+      throw new IllegalArgumentException("Unsupported Jedis type: " + jedis.getClass());
     }
+  
     if (connection == null) {
-      throw new IllegalArgumentException(jedis.toString());
+      throw new IllegalStateException("Could not obtain a Redis connection for key=" + name);
     }
+
+    if (clusterTopologyChanged) {
+      log.log(Level.INFO, "cluster topology finished, connection can be used");
+    }
+  
     return new Jedis(connection);
+  }
+
+  // When a Redis cluster master node fails, the cluster topology changes and the slot cache
+  // needs to be refreshed. However, Jedis does not provide a public API to do this and as a workaround,
+  // we use reflection to access the private method 'ClusterConnectionProvider.getConnectionFromSlot()'
+  // TODO: Remove the reflection once this Jedis issue is resolved:
+  //  https://github.com/redis/jedis/issues/4154
+  private static void refreshClusterTopology(UnifiedJedis jedis) {
+    try {
+      // 1) grab the protected 'provider' field from UnifiedJedis
+      Field providerField = UnifiedJedis.class.getDeclaredField("provider");
+      providerField.setAccessible(true);
+
+      // 2) extract the ConnectionProvider instance
+      ConnectionProvider provider = (ConnectionProvider) providerField.get(jedis);
+
+      // 3) only ClusterConnectionProvider actually has renewSlotCache()
+      if (provider instanceof ClusterConnectionProvider clusterProvider) {
+        clusterProvider.renewSlotCache();
+      } else {
+        throw new IllegalStateException(
+            "Jedis provider is not cluster‐aware: " + provider.getClass());
+      }
+    } catch (NoSuchFieldException | IllegalAccessException e) {
+      throw new RuntimeException("Failed to refresh cluster topology via reflection", e);
+    }
   }
 
   // BalancedQueue -> BalancedRedisQueue
