@@ -129,15 +129,27 @@ public final class ZstdDecompressingOutputStream extends FeedbackOutputStream {
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
-    inner = new ByteArrayInputStream(b, off, len);
-    byte[] data = ByteString.readFrom(zis).toByteArray();
-    out.write(data, 0, data.length);
+    try {
+      inner = new ByteArrayInputStream(b, off, len);
+      byte[] data = ByteString.readFrom(zis).toByteArray();
+      out.write(data, 0, data.length);
+    } catch (Exception e) {
+      try {
+        zis.close();
+      } catch (IOException ignored) {
+        // Ignore close errors during cleanup
+      }
+      throw e;
+    }
   }
 
   @Override
   public void close() throws IOException {
-    zis.close();
-    out.close();
+    try {
+      zis.close();
+    } finally {
+      out.close();
+    }
   }
 
   @Override
