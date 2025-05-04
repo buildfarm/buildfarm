@@ -1,13 +1,16 @@
 #!/bin/bash
+
+set -eo pipefail
+
 # Run from the root of repository.
 # This script will remove any unused java dependencies
 # Use the flag --check if you want the script to fail when the dependencies not correct.
 
 DEPS_TOOL_URL=https://github.com/bazelbuild/buildtools/releases/download/4.0.1/unused_deps-linux-amd64
-LOCAL_DEPS_TOOL="unused_deps"
+LOCAL_DEPS_TOOL="./unused_deps"
 
 BUILDOZER_URL=https://github.com/bazelbuild/buildtools/releases/download/4.0.1/buildozer-linux-amd64
-LOCAL_BUILDOZER_TOOL="buildozer"
+LOCAL_BUILDOZER_TOOL="./buildozer"
 
 # The "unused deps" tool is not perfect.  It might try to remove a
 # dependency that is needed at runtime.  If that is the case, the dependency
