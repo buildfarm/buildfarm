@@ -134,7 +134,7 @@ worker:
   linkExecFileSystem: true
   linkInputDirectories: true
   linkedInputDirectories:
-  - (?!external/)[^/]+
+  - ^(?!external$).*$
   execOwner:
   defaultMaxCores: 0
   limitGlobalExecution: false
