@@ -52,13 +52,6 @@ public class BuildfarmExecutors {
         nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
   }
 
-  public static ExecutorService getSubscriberPool() {
-    int nThreads = 32;
-    String threadNameFormat = "subscriber-service-pool-%d";
-    return Executors.newFixedThreadPool(
-        nThreads, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
-  }
-
   public static ExecutorService getDequeuePool() {
     String threadNameFormat = "dequeue-pool-%d";
     return Executors.newCachedThreadPool(
