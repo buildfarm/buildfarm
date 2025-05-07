@@ -22,11 +22,52 @@ data:
     server:
       {{- toYaml . | nindent 6 }}
     {{- end }}
-    {{- with .Values.config.worker }}
+    {{- with .Values.shardWorker.config }}
     worker:
       {{- toYaml . | nindent 6 }}
     {{- end }}
 ---
+{{- if .Values.execWorker.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-exec-config
+data:
+  config.yml: |-
+    {{- range $key, $value := .Values.config }}
+    {{- if kindIs "map" $value }}
+    {{- else }}
+    {{ $key }}: {{ $value }}{{- end }}
+    {{- end }}
+    backplane:
+      {{- if .Values.redis.enabled }}
+      redisUri: '{{ printf "redis://%s-redis-master.%s:6379" .Release.Name .Release.Namespace }}'
+      {{- else }}
+      redisUri: "{{ .Values.externalRedis.uri }}"
+      {{- end }}
+      {{- with .Values.config.backplane }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- with .Values.config.server }}
+    server:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.execWorker.config }}
+    worker:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-exec-worker-log-props
+data:
+  logging.properties: |-
+    {{- range $key, $value := .Values.execWorker.loggingProperties }}
+    {{ $key }}={{ $value }}
+    {{- end }}
+---
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
