@@ -42,6 +42,16 @@ tasks:
     - ./generate_coverage.sh
 
   # Typical unit tests that run across a variety of operating systems.
+  ubuntu2404:
+    name: Unit Tests
+    build_targets:
+    - '...'
+    build_flags:
+    - --build_tag_filters=-container
+    test_flags:
+    - --test_tag_filters=-integration,-redis
+    test_targets:
+    - '...'
   ubuntu2204:
     name: Unit Tests
     build_targets:
