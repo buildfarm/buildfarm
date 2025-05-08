@@ -22,6 +22,7 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
 
@@ -36,6 +37,7 @@ public final class ExecutionContext {
   final Tree tree;
   final QueueEntry queueEntry;
   public final Claim claim;
+  final WorkerExecutedMetadata.Builder workerExecutedMetadata;
 
   private ExecutionContext(
       ExecuteResponse.Builder executeResponse,
@@ -47,7 +49,8 @@ public final class ExecutionContext {
       Command command,
       Tree tree,
       QueueEntry queueEntry,
-      Claim claim) {
+      Claim claim,
+      WorkerExecutedMetadata.Builder workerExecutedMetadata) {
     this.executeResponse = executeResponse;
     this.operation = operation;
     this.metadata = metadata;
@@ -58,6 +61,7 @@ public final class ExecutionContext {
     this.tree = tree;
     this.queueEntry = queueEntry;
     this.claim = claim;
+    this.workerExecutedMetadata = workerExecutedMetadata;
   }
 
   public static final class Builder {
@@ -71,6 +75,7 @@ public final class ExecutionContext {
     private Tree tree;
     private QueueEntry queueEntry;
     private Claim claim;
+    private WorkerExecutedMetadata.Builder workerExecutedMetadata;
 
     private Builder(
         ExecuteResponse.Builder executeResponse,
@@ -82,7 +87,8 @@ public final class ExecutionContext {
         Command command,
         Tree tree,
         QueueEntry queueEntry,
-        Claim claim) {
+        Claim claim,
+        WorkerExecutedMetadata.Builder workerExecutedMetadata) {
       this.executeResponse = executeResponse;
       this.operation = operation;
       this.metadata = metadata;
@@ -93,6 +99,7 @@ public final class ExecutionContext {
       this.tree = tree;
       this.queueEntry = queueEntry;
       this.claim = claim;
+      this.workerExecutedMetadata = workerExecutedMetadata;
     }
 
     public Builder setOperation(Operation operation) {
@@ -151,7 +158,8 @@ public final class ExecutionContext {
           command,
           tree,
           queueEntry,
-          claim);
+          claim,
+          workerExecutedMetadata);
     }
   }
 
@@ -166,7 +174,8 @@ public final class ExecutionContext {
         /* command= */ null,
         /* tree= */ null,
         /* queueEntry= */ null,
-        /* claim= */ null);
+        /* claim= */ null,
+        /* workerExecutedMetadata= */ WorkerExecutedMetadata.newBuilder());
   }
 
   public Builder toBuilder() {
@@ -180,6 +189,7 @@ public final class ExecutionContext {
         command,
         tree,
         queueEntry,
-        claim);
+        claim,
+        workerExecutedMetadata);
   }
 }
