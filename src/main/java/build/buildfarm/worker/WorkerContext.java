@@ -27,6 +27,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.config.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
@@ -98,7 +99,8 @@ public interface WorkerContext {
       DigestFunction.Value digestFunction,
       Action action,
       Command command,
-      @Nullable UserPrincipal owner)
+      @Nullable UserPrincipal owner,
+      WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException;
 
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;

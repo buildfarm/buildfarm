@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 import lombok.extern.java.Log;
 import persistent.bazel.client.WorkerKey;
 
@@ -225,22 +224,7 @@ public class PersistentExecutor {
         .setExitCode(exitCode)
         .setStdoutRaw(response.getOutputBytes())
         .setStderrRaw(ByteString.copyFrom(stdErr, StandardCharsets.UTF_8));
-
-    if (exitCode == 0) {
-      return Code.OK;
-    }
-
-    log.severe(
-        "PersistentExecutor.runOnPersistentWorker Failed with code: "
-            + exitCode
-            + "\n"
-            + responseOut
-            + "\n"
-            + executionName
-            + " inputs:\n"
-            + ImmutableList.copyOf(
-                reqInputs.stream().map(Input::getPath).collect(Collectors.toList())));
-    return Code.FAILED_PRECONDITION;
+    return Code.OK;
   }
 
   private static ImmutableList<String> parseInitCmd(String cmdStr, ImmutableList<String> argsList) {

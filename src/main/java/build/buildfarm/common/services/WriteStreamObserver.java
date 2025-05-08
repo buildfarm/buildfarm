@@ -84,6 +84,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private long earliestOffset = -1;
   private long requestCount = 0;
   private long requestBytes = 0;
+  private long initialWriteOffset = 0;
   private Compressor.Value compressor;
 
   public WriteStreamObserver(
@@ -207,6 +208,7 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
       errorResponse(INVALID_ARGUMENT.withDescription("resource_name is empty").asException());
     } else {
       compressor = parseUploadBlobCompressor(resourceName);
+      initialWriteOffset = request.getWriteOffset();
       name = resourceName;
       try {
         write = getWrite(resourceName);
@@ -330,6 +332,24 @@ public class WriteStreamObserver implements StreamObserver<WriteRequest> {
   @GuardedBy("this")
   private long getCommittedSizeForWrite(long offset) throws IOException {
     getOutput(offset); // establish ownership for this output
+    // From REAPI:
+    //
+    //   Note that when writing compressed blobs, the `WriteRequest.write_offset` in
+    //   the initial request in a stream refers to the offset in the uncompressed form
+    //   of the blob. In subsequent requests, `WriteRequest.write_offset` MUST be the
+    //   sum of the first request's 'WriteRequest.write_offset' and the total size of
+    //   all the compressed data bundles in the previous requests.
+    //   Note that this mixes an uncompressed offset with a compressed byte length,
+    //   which is nonsensical, but it is done to fit the semantics of the existing
+    //   ByteStream protocol.
+    //
+    // Here, we assert that for non-initial compressed conditions, we have a stream
+    // offset that must be matched based on the initially supplied write offset. In
+    // the initial case, we should compare to the reported write committed size, which
+    // is always uncompressed, per both the document above and client upload resumption
+    if (requestBytes != 0 && compressor != Compressor.Value.IDENTITY) {
+      return initialWriteOffset + requestBytes;
+    }
     return write.getCommittedSize();
   }
 

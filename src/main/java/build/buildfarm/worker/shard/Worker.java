@@ -73,6 +73,7 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.SuperscalarPipelineStage;
+import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import build.buildfarm.worker.resources.LocalResourceSetUtils;
@@ -272,8 +273,7 @@ public final class Worker extends LoggingMain {
               inputFetchStage,
               executeActionStage,
               reportResultStage,
-              completeStage,
-              backplane));
+              completeStage));
     }
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getWorker().getGrpcMetrics());
     serverBuilder.intercept(new ServerHeadersInterceptor(meta -> {}));
@@ -844,6 +844,8 @@ public final class Worker extends LoggingMain {
   private void shutdown() throws InterruptedException {
     log.info("*** shutting down gRPC server since JVM is shutting down");
     prepareWorkerForGracefulShutdown();
+    // Clean-up any cgroups that were possibly created/mutated.
+    Group.onShutdown();
     PrometheusPublisher.stopHttpServer();
     boolean interrupted = Thread.interrupted();
     if (pipeline != null) {
