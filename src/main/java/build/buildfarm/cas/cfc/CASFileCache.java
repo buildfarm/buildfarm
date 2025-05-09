@@ -1825,7 +1825,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 put(digest, isExecutable, service),
                 cacheFilePath -> {
                   try {
-                    onFileContent.call(filePath, cacheFilePath, digest.getSize(), isExecutable);
+                    onFileContent.call(
+                        filePath, cacheFilePath.path(), digest.getSize(), isExecutable);
                   } catch (Exception e) {
                     return immediateFailedFuture(e);
                   }
@@ -1935,7 +1936,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ExecutorService service);
 
   @VisibleForTesting
-  public Path put(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
+  public PathResult put(Digest digest, boolean isExecutable)
+      throws IOException, InterruptedException {
     checkState(digest.getSize() > 0, "file entries may not be empty");
 
     return putAndCopy(digest, isExecutable);
@@ -1943,7 +1945,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   // This can result in deadlock if called with a direct executor. I'm unsure how to guard
   // against it, until we can get to using a current-download future
-  public ListenableFuture<Path> put(Digest digest, boolean isExecutable, Executor executor) {
+  public ListenableFuture<PathResult> put(Digest digest, boolean isExecutable, Executor executor) {
     checkState(digest.getSize() > 0, "file entries may not be empty");
 
     return transformAsync(
@@ -1953,8 +1955,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @SuppressWarnings("ThrowFromFinallyBlock")
-  Path putAndCopy(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
+  PathResult putAndCopy(Digest digest, boolean isExecutable)
+      throws IOException, InterruptedException {
     String key = getKey(digest, isExecutable);
+    boolean downloadComplete = false;
     CancellableOutputStream out =
         putImpl(
             key,
@@ -1966,14 +1970,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             () -> invalidateWrite(digest),
             /* isReset= */ true);
     if (out != null) {
-      boolean complete = false;
       try {
         copyExternalInput(digest, out);
-        complete = true;
+        downloadComplete = true;
       } finally {
         try {
           log.log(Level.FINER, format("closing output stream for %s", DigestUtil.toString(digest)));
-          if (complete) {
+          if (downloadComplete) {
             out.close();
           } else {
             out.cancel();
@@ -1998,7 +2001,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
       }
     }
-    return getPath(key);
+    return new PathResult(getPath(key), downloadComplete);
   }
 
   private void copyExternalInputProgressive(Digest digest, CancellableOutputStream out)
@@ -2380,7 +2383,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       @Override
       public void cancel() throws IOException {
         try {
-          written = 0;
           out.close();
           Files.delete(writePath);
         } finally {
@@ -2390,12 +2392,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public void write(int b) throws IOException {
-        if (written >= blobSizeInBytes) {
+        if (getWritten() >= blobSizeInBytes) {
           throw new IOException(
-              format("attempted overwrite at %d by 1 byte for %s", written, writeKey));
+              format("attempted overwrite at %d by 1 byte for %s", getWritten(), writeKey));
         }
         out.write(b);
-        written++;
       }
 
       @Override
@@ -2405,12 +2406,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public void write(byte[] b, int off, int len) throws IOException {
+        long written = getWritten();
         if (written + len > blobSizeInBytes) {
           throw new IOException(
               format("attempted overwrite at %d by %d bytes for %s", written, len, writeKey));
         }
         out.write(b, off, len);
-        written += len;
+        if (getWritten() > blobSizeInBytes) {
+          throw new IOException(
+              format("overwrite at %d by %d bytes for %s", written, len, writeKey));
+        }
       }
 
       @Override

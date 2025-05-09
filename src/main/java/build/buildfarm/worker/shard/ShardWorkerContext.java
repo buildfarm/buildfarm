@@ -54,6 +54,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.DequeueMatchEvaluator;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.ExecutionPolicies;
@@ -758,10 +759,17 @@ class ShardWorkerContext implements WorkerContext {
       DigestFunction.Value digestFunction,
       Action action,
       Command command,
-      @Nullable UserPrincipal owner)
+      @Nullable UserPrincipal owner,
+      WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException {
     return execFileSystem.createExecDir(
-        operationName, directoriesIndex, digestFunction, action, command, owner);
+        operationName,
+        directoriesIndex,
+        digestFunction,
+        action,
+        command,
+        owner,
+        workerExecutedMetadata);
   }
 
   // might want to split for removeDirectory and decrement references to avoid removing for streamed

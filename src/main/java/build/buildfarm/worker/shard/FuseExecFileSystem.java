@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.v1test.Digest;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.FuseCAS;
 import java.io.IOException;
@@ -81,7 +82,8 @@ class FuseExecFileSystem implements ExecFileSystem {
       DigestFunction.Value digestFunction,
       Action action,
       Command command,
-      UserPrincipal owner)
+      UserPrincipal owner,
+      WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException {
     // FIXME insist that the FUSE perform permission checks against the owner
     fuseCAS.createInputRoot(
