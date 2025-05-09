@@ -43,7 +43,7 @@ import io.grpc.ServerInterceptor;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.netty.NettyServerBuilder;
 import io.grpc.protobuf.services.HealthStatusManager;
-import io.grpc.protobuf.services.ProtoReflectionService;
+import io.grpc.protobuf.services.ProtoReflectionServiceV1;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import io.prometheus.client.Counter;
 import java.io.File;
@@ -160,7 +160,7 @@ public class BuildFarmServer extends LoggingMain {
         .addService(new OperationQueueService(instance))
         .addService(new OperationsService(instance))
         .addService(new FetchService(instance))
-        .addService(ProtoReflectionService.newInstance())
+        .addService(ProtoReflectionServiceV1.newInstance())
         .addService(new PublishBuildEventService())
         .addService(new WorkerProfileService(instance))
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
