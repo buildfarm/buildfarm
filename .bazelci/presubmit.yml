@@ -96,7 +96,7 @@ tasks:
     - '...'
   rpm_builds:
     name: Rpm Builds
-    platform: rockylinux8_java11_devtoolset10
+    platform: rockylinux8
     shell_commands:
     - bazel build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
 
