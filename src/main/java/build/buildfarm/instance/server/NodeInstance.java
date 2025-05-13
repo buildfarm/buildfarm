@@ -1729,6 +1729,7 @@ public abstract class NodeInstance extends InstanceBase {
             ActionCacheUpdateCapabilities.newBuilder().setUpdateEnabled(true))
         .setMaxBatchTotalSizeBytes(Size.mbToBytes(4))
         .setSymlinkAbsolutePathStrategy(SymlinkAbsolutePathStrategy.Value.DISALLOWED)
+        .setMaxCasBlobSizeBytes(configs.getMaxEntrySizeBytes())
 
         // Compression support
         .addSupportedCompressors(Compressor.Value.IDENTITY)
