@@ -4,27 +4,27 @@ tasks:
   # Linting jobs
   format_check:
     name: Code Format
-    platform: ubuntu2204
+    platform: ubuntu2404
     shell_commands:
     - ./.bazelci/format.sh --check
   package_layout:
     name: Package Layout
-    platform: ubuntu2204
+    platform: ubuntu2404
     shell_commands:
     - ./.bazelci/package_name_check.sh
   java_unused_deps_check:
     name: Java Unused Dependencies
-    platform: ubuntu2204
+    platform: ubuntu2404
     shell_commands:
     - ./.bazelci/unused_deps.sh --check
   static_analysis_check:
     name: Static Analysis
-    platform: ubuntu2204
+    platform: ubuntu2404
     shell_commands:
     - ./.bazelci/static_analyze.sh
   checkstyle:
     name: Check Style
-    platform: ubuntu2204
+    platform: ubuntu2404
     shell_commands:
     - ./.bazelci/run_checkstyle.sh
   code_coverage:
