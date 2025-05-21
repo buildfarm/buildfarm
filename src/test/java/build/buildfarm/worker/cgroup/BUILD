@@ -6,6 +6,7 @@ java_test(
     srcs = glob(["*.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
+        "//src/main/java/build/buildfarm/common/base",
         "//src/main/java/build/buildfarm/worker/cgroup",
         "//src/test/java/build/buildfarm:test_runner",
         "@maven//:com_google_guava_guava",

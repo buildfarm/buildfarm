@@ -7,6 +7,9 @@ import build.buildfarm.common.SystemProcessors;
 import com.google.common.base.Strings;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.common.options.OptionsParsingException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -16,19 +19,53 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.naming.ConfigurationException;
 import lombok.Data;
 import lombok.extern.java.Log;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.AbstractConstruct;
 import org.yaml.snakeyaml.constructor.Constructor;
+import org.yaml.snakeyaml.nodes.Node;
+import org.yaml.snakeyaml.nodes.ScalarNode;
+import org.yaml.snakeyaml.nodes.Tag;
 
 @Data
 @Log
 public final class BuildfarmConfigs {
   private static BuildfarmConfigs buildfarmConfigs;
+  private static Constructor constructor;
 
   private static final long DEFAULT_CAS_SIZE = 2147483648L; // 2 * 1024 * 1024 * 1024
+
+  private static final class ImportConstruct extends AbstractConstruct {
+    String configsBasePath;
+
+    public ImportConstruct(String configsBasePath) {
+      this.configsBasePath = configsBasePath;
+    }
+
+    @Override
+    public Object construct(Node node) {
+      final ScalarNode scalarNode = (ScalarNode) node;
+      final String value = scalarNode.getValue();
+      try {
+        final InputStream input = new FileInputStream(new File(configsBasePath + "/" + value));
+        final Yaml yaml = new Yaml(constructor);
+        return yaml.load(input);
+      } catch (FileNotFoundException ex) {
+        throw new RuntimeException("Could not find config file: " + value);
+      }
+    }
+  }
+
+  private static class BuildfarmConfigsConstructor extends Constructor {
+    public BuildfarmConfigsConstructor(String configsBasePath, LoaderOptions loaderOptions) {
+      super(loaderOptions);
+      yamlConstructors.put(new Tag("!include"), new ImportConstruct(configsBasePath));
+    }
+  }
 
   private DigestUtil.HashFunction digestFunction = DigestUtil.HashFunction.SHA256;
   private long defaultActionTimeout = 600;
@@ -51,9 +88,27 @@ public final class BuildfarmConfigs {
   }
 
   public static BuildfarmConfigs loadConfigs(Path configLocation) throws IOException {
-    try (InputStream inputStream = Files.newInputStream(configLocation)) {
+    Path parent = configLocation.getParent();
+    if (parent == null || !Files.isDirectory(parent)) {
+      log.info("Loading configs from single file: " + configLocation);
       Yaml yaml = new Yaml(new Constructor(buildfarmConfigs.getClass(), new LoaderOptions()));
-      buildfarmConfigs = yaml.load(inputStream);
+      buildfarmConfigs = yaml.load(Files.newInputStream(configLocation));
+      if (buildfarmConfigs == null) {
+        throw new RuntimeException("Could not load configs from path: " + configLocation);
+      }
+      log.info(buildfarmConfigs.toString());
+      return buildfarmConfigs;
+    }
+
+    try (InputStream inputStream = Files.newInputStream(configLocation)) {
+      constructor =
+          new BuildfarmConfigsConstructor(
+              configLocation.getParent().toString(), new LoaderOptions());
+      Yaml yaml = new Yaml(constructor);
+      Map<String, Object> customConfigs = yaml.load(inputStream);
+      log.info(yaml.dump(customConfigs));
+      yaml = new Yaml(new Constructor(buildfarmConfigs.getClass(), new LoaderOptions()));
+      buildfarmConfigs = yaml.load(yaml.dump(customConfigs));
       if (buildfarmConfigs == null) {
         throw new RuntimeException("Could not load configs from path: " + configLocation);
       }
@@ -263,7 +318,17 @@ public final class BuildfarmConfigs {
     // Create a mapping from the execution wrappers to the features they enable.
     ExecutionWrapperProperties wrapperProperties = new ExecutionWrapperProperties();
     wrapperProperties.mapping.put(
-        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getCgroups())),
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getCgroups1())),
+        new ArrayList<String>(
+            Arrays.asList(
+                "limit_execution",
+                ExecutionProperties.CORES,
+                ExecutionProperties.MIN_CORES,
+                ExecutionProperties.MAX_CORES,
+                ExecutionProperties.MIN_MEM,
+                ExecutionProperties.MAX_MEM)));
+    wrapperProperties.mapping.put(
+        new ArrayList<String>(Arrays.asList(configs.getExecutionWrappers().getCgroups2())),
         new ArrayList<String>(
             Arrays.asList(
                 "limit_execution",

@@ -14,57 +14,12 @@
 
 package build.buildfarm.tools;
 
-import static java.lang.String.format;
-
-import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.StageInformation;
-import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
-import java.util.List;
 
 class WorkerProfilePrinter {
-  public static void getWorkerProfile(Instance instance) {
-    WorkerProfileMessage response = instance.getWorkerProfile();
-    System.out.println("\nWorkerProfile:");
-    String strIntFormat = "%-50s : %d";
-    long entryCount = response.getCasEntryCount();
-    long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
-    System.out.printf((strIntFormat) + "%n", "Current Total Entry Count", entryCount);
-    System.out.printf((strIntFormat) + "%n", "Current Total Size", response.getCasSize());
-    System.out.printf((strIntFormat) + "%n", "Max Size", response.getCasMaxSize());
-    System.out.printf((strIntFormat) + "%n", "Max Entry Size", response.getCasMaxEntrySize());
-    System.out.printf(
-        (strIntFormat) + "%n", "Current Unreferenced Entry Count", unreferencedEntryCount);
-    if (entryCount != 0) {
-      System.out.println(
-          format(
-              "%-50s : %2.1f%%",
-              "Percentage of Unreferenced Entry", (100.0f * unreferencedEntryCount) / entryCount));
-    }
-    System.out.printf(
-        (strIntFormat) + "%n",
-        "Current DirectoryEntry Count",
-        response.getCasDirectoryEntryCount());
-    System.out.printf(
-        (strIntFormat) + "%n", "Number of Evicted Entries", response.getCasEvictedEntryCount());
-    System.out.printf(
-        (strIntFormat) + "%n",
-        "Total Evicted Entries size in Bytes",
-        response.getCasEvictedEntrySize());
-
-    List<StageInformation> stages = response.getStagesList();
-    for (StageInformation stage : stages) {
-      printStageInformation(stage);
-    }
-
-    List<OperationTimesBetweenStages> times = response.getTimesList();
-    for (OperationTimesBetweenStages time : times) {
-      printOperationTime(time);
-    }
-  }
-
   public static void printStageInformation(StageInformation stage) {
     System.out.printf("%s slots configured: %d%n", stage.getName(), stage.getSlotsConfigured());
     System.out.printf("%s slots used %d%n", stage.getName(), stage.getSlotsUsed());
