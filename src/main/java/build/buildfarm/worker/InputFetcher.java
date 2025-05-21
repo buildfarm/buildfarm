@@ -62,6 +62,7 @@ public class InputFetcher implements Runnable {
   private final InputFetchStage owner;
   private final Executor pollerExecutor;
   private boolean success = false;
+  private boolean polling = false;
 
   InputFetcher(
       WorkerContext workerContext,
@@ -112,10 +113,13 @@ public class InputFetcher implements Runnable {
         Thread.currentThread()::interrupt,
         Deadline.after(workerContext.getInputFetchDeadline(), SECONDS),
         pollerExecutor);
+    polling = true;
     try {
       return fetchPolled(stopwatch);
     } finally {
-      executionContext.poller.pause();
+      if (polling) {
+        executionContext.poller.pause();
+      }
     }
   }
 
@@ -319,6 +323,7 @@ public class InputFetcher implements Runnable {
 
       owner.error().put(fetchedExecutionContext);
     }
+    polling = false;
   }
 
   @Override
