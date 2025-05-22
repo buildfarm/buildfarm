@@ -1,0 +1,19 @@
+{{- if and (.Values.execWorker.pdb.create) (.Values.execWorker.enabled) -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "buildfarm.fullname" . }}-exec-worker
+  labels:
+  {{- include "buildfarm.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.execWorker.pdb.minAvailable }}
+  minAvailable: {{ .Values.execWorker.pdb.minAvailable }}
+  {{- end }}
+  {{- if or .Values.execWorker.pdb.maxUnavailable (not .Values.execWorker.pdb.minAvailable)}}
+  maxUnavailable: {{ .Values.execWorker.pdb.maxUnavailable | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      name: {{ include "buildfarm.fullname" . }}-exec-worker
+      {{- include "buildfarm.selectorLabels" . | nindent 6 }}
+{{- end }}

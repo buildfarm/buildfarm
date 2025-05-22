@@ -113,6 +113,8 @@ java_binary(
         ":worker-profiler-printer",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/grpc",
+        "//src/main/java/build/buildfarm/common/resources",
+        "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/server/services",
