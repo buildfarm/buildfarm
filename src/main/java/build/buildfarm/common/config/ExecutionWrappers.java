@@ -26,11 +26,19 @@ import lombok.Data;
 @Data
 public class ExecutionWrappers {
   /**
-   * @field cgroups
-   * @brief The program to use when running actions under cgroups.
+   * @field cgroups2
+   * @brief The program to use when running actions under cgroups v2.
    * @details This program is expected to be packaged with the worker image.
    */
-  private String cgroups = "/usr/bin/cgexec";
+  private String cgroups2 = "/app/build_buildfarm/cgexec-wrapper";
+
+  /**
+   * @field cgroups1
+   * @brief The program to use when running actions under cgroups v1.
+   * @details This program is expected to be packaged with the worker image.
+   */
+  @Deprecated(forRemoval = true)
+  private String cgroups1 = "/usr/bin/cgexec";
 
   /**
    * @field unshare

@@ -15,6 +15,7 @@
 package build.buildfarm.worker.resources;
 
 import java.util.ArrayList;
+import lombok.ToString;
 
 /**
  * @class MemLimits
@@ -29,6 +30,7 @@ import java.util.ArrayList;
  *     ultimately encourage action writers to implement their actions more efficiently or opt for
  *     local execution as an alternative.
  */
+@ToString
 public class MemLimits {
   /**
    * @field limit

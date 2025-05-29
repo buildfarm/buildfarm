@@ -21,6 +21,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.v1test.Digest;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -50,7 +51,8 @@ public interface ExecFileSystem extends InputStreamFactory {
       DigestFunction.Value digestFunction,
       Action action,
       Command command,
-      @Nullable UserPrincipal owner)
+      @Nullable UserPrincipal owner,
+      WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException;
 
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;

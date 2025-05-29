@@ -62,6 +62,7 @@ public class InputFetcher implements Runnable {
   private final InputFetchStage owner;
   private final Executor pollerExecutor;
   private boolean success = false;
+  private boolean polling = false;
 
   InputFetcher(
       WorkerContext workerContext,
@@ -112,10 +113,13 @@ public class InputFetcher implements Runnable {
         Thread.currentThread()::interrupt,
         Deadline.after(workerContext.getInputFetchDeadline(), SECONDS),
         pollerExecutor);
+    polling = true;
     try {
       return fetchPolled(stopwatch);
     } finally {
-      executionContext.poller.pause();
+      if (polling) {
+        executionContext.poller.pause();
+      }
     }
   }
 
@@ -233,7 +237,8 @@ public class InputFetcher implements Runnable {
               executionContext.queueEntry.getExecuteEntry().getActionDigest().getDigestFunction(),
               queuedOperation.getAction(),
               queuedOperation.getCommand(),
-              executionContext.claim.owner());
+              executionContext.claim.owner(),
+              executionContext.workerExecutedMetadata);
     } catch (IOException e) {
       Status.Builder status = Status.newBuilder().setMessage("Error creating exec dir");
       if (e instanceof ExecDirException execDirEx) {
@@ -318,6 +323,7 @@ public class InputFetcher implements Runnable {
 
       owner.error().put(fetchedExecutionContext);
     }
+    polling = false;
   }
 
   @Override
