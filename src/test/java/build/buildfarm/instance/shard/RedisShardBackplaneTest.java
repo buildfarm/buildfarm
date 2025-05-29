@@ -154,7 +154,7 @@ public class RedisShardBackplaneTest {
             eq(jedis),
             eq(DigestUtil.asActionKey(actionDigest).toString()),
             eq(opName),
-            eq(RedisShardBackplane.operationPrinter.print(op))))
+            eq(RedisShardBackplane.executionPrinter.print(op))))
         .thenReturn(true);
 
     assertThat(backplane.prequeue(executeEntry, op, /* ignoreMerge= */ false)).isTrue();
@@ -164,7 +164,7 @@ public class RedisShardBackplaneTest {
             eq(jedis),
             eq(DigestUtil.asActionKey(actionDigest).toString()),
             eq(opName),
-            eq(RedisShardBackplane.operationPrinter.print(op)));
+            eq(RedisShardBackplane.executionPrinter.print(op)));
     verifyNoMoreInteractions(state.executions);
     OperationChange opChange = verifyChangePublished(backplane.executionChannel(opName), jedis);
     assertThat(opChange.hasReset()).isTrue();

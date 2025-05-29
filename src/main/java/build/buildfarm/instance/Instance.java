@@ -32,11 +32,11 @@ import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.Tree;
-import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -159,9 +159,9 @@ public interface Instance {
 
   ServerCapabilities getCapabilities();
 
-  WorkerProfileMessage getWorkerProfile();
+  ListenableFuture<WorkerProfileMessage> getWorkerProfile(String name);
 
-  WorkerListMessage getWorkerList();
+  ListenableFuture<BatchWorkerProfilesResponse> batchWorkerProfiles(Iterable<String> names);
 
   PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully();
 

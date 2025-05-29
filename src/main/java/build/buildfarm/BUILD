@@ -5,16 +5,11 @@ package(
     default_visibility = ["//src:__subpackages__"],
 )
 
-filegroup(
-    name = "configs",
-    srcs = ["logging.properties"],
-    visibility = ["//visibility:public"],
-)
-
 java_binary(
     name = "buildfarm-server",
-    classpath_resources = [
-        ":configs",
+    data = [
+        "//config:base_configs",
+        "//config:base_properties",
     ],
     jvm_flags = ensure_accurate_metadata() + add_opens_sun_nio_fs(),
     main_class = "build.buildfarm.server.BuildFarmServer",
@@ -27,8 +22,9 @@ java_binary(
 
 java_binary(
     name = "buildfarm-shard-worker",
-    classpath_resources = [
-        ":configs",
+    data = [
+        "//config:base_configs",
+        "//config:base_properties",
     ],
     jvm_flags = ensure_accurate_metadata() + add_opens_sun_nio_fs(),
     main_class = "build.buildfarm.worker.shard.Worker",

@@ -84,6 +84,7 @@ class Executor {
   private final java.util.concurrent.Executor pollerExecutor;
   private int exitCode = INCOMPLETE_EXIT_CODE;
   private boolean wasErrored = false;
+  private boolean polling = false;
 
   Executor(
       WorkerContext workerContext,
@@ -175,10 +176,13 @@ class Executor {
       policies = Iterables.concat(policies, workerContext.getExecutionPolicies("pool-" + pool));
     }
 
+    polling = true;
     try {
       return executePolled(limits, policies, timeout, stopwatch);
     } finally {
-      executionContext.poller.pause();
+      if (polling) {
+        executionContext.poller.pause();
+      }
     }
   }
 
@@ -410,6 +414,7 @@ class Executor {
         }
       }
     }
+    polling = false;
     return stopwatch.elapsed(MICROSECONDS) - executeUSecs;
   }
 
