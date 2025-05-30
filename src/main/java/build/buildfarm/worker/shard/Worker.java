@@ -274,6 +274,8 @@ public final class Worker extends LoggingMain {
               executeActionStage,
               reportResultStage,
               completeStage));
+    } else {
+      serverBuilder.addService(new WorkerProfileService(storage));
     }
     GrpcMetrics.handleGrpcMetricIntercepts(serverBuilder, configs.getWorker().getGrpcMetrics());
     serverBuilder.intercept(new ServerHeadersInterceptor(meta -> {}));
