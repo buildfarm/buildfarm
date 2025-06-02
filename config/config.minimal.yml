@@ -1,3 +1,0 @@
-backplane: !include "backplane.yml"
-server: !include "server.yml"
-worker: !include "worker.yml"
