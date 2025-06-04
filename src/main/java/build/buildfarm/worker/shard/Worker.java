@@ -564,7 +564,9 @@ public final class Worker extends LoggingMain {
   private void addBlobsLocation(List<Digest> digests, String name) {
     while (!backplane.isStopped()) {
       try {
-        backplane.addBlobsLocation(digests, name);
+        if (configs.getWorker().getCapabilities().isCas()) {
+          backplane.addBlobsLocation(digests, name);
+        }
         return;
       } catch (IOException e) {
         Status status = Status.fromThrowable(e);
