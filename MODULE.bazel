@@ -17,7 +17,6 @@ bazel_dep(name = "hermetic_cc_toolchain", version = "3.2.0")
 bazel_dep(name = "platforms", version = "0.0.11")
 bazel_dep(name = "protobuf", version = "29.4")
 bazel_dep(name = "rules_cc", version = "0.1.1")
-bazel_dep(name = "rules_go", version = "0.54.0")
 bazel_dep(name = "rules_java", version = "8.11.0")
 bazel_dep(name = "rules_jvm_external", version = "6.6")
 bazel_dep(name = "rules_license", version = "1.0.0")
@@ -31,14 +30,13 @@ bazel_dep(
     dev_dependency = True,
 )
 
-# TODO: remove this after https://github.com/bazelbuild/remote-apis/pull/293 is merged
-bazel_dep(name = "bazel_remote_apis", version = "6777112ef7defa6705b1ebd2831d6c7efeb12ba2", repo_name = "remoteapis")
+bazel_dep(name = "bazel_remote_apis", version = "536ec595e1df0064bb37aecc95332a661b8c79b2", repo_name = "remoteapis")
 archive_override(
     module_name = "bazel_remote_apis",
-    integrity = "sha256-PTtx9Vz9LjLvvUhv/n4QnksoD19BfqoFssrb3QvxcSE=",
-    strip_prefix = "remote-apis-6777112ef7defa6705b1ebd2831d6c7efeb12ba2",
+    integrity = "sha256-vkbz/qTr+h+lV4+7sIzPL1snDxTYs99Lt2rsV5/l7TQ=",
+    strip_prefix = "remote-apis-536ec595e1df0064bb37aecc95332a661b8c79b2",
     urls = [
-        "https://github.com/bazelbuild/remote-apis/archive/6777112ef7defa6705b1ebd2831d6c7efeb12ba2.zip",
+        "https://github.com/bazelbuild/remote-apis/archive/536ec595e1df0064bb37aecc95332a661b8c79b2.zip",
     ],
 )
 
