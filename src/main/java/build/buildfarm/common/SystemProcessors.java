@@ -43,13 +43,24 @@ public class SystemProcessors {
   }
 
   /**
+   * @field cachedProcessorCount
+   * @brief Cached processor count.
+   * @details We cache the processor count since it won't change during runtime.
+   */
+  private static Integer cachedProcessorCount = null;
+
+  /**
    * @brief Get the number of logical processors on the system.
    * @details Buildfarm will choose the best implementation.
    * @return Number of logical processors on the system.
    */
   public static int get() {
-    // Have buildfarm choose the best value.
-    return Math.max(get(PROCESSOR_DERIVE.JAVA_RUNTIME), get(PROCESSOR_DERIVE.OSHI));
+    // Cache the processor count since it won't change during runtime
+    if (cachedProcessorCount == null) {
+      cachedProcessorCount =
+          Math.max(get(PROCESSOR_DERIVE.JAVA_RUNTIME), get(PROCESSOR_DERIVE.OSHI));
+    }
+    return cachedProcessorCount;
   }
 
   /**
