@@ -84,6 +84,8 @@ import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.BackplaneStatusRequest;
+import build.buildfarm.v1test.BatchWorkerProfilesRequest;
+import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
@@ -97,10 +99,8 @@ import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import build.buildfarm.v1test.ShutDownWorkerGrpc.ShutDownWorkerBlockingStub;
 import build.buildfarm.v1test.Tree;
-import build.buildfarm.v1test.WorkerListMessage;
-import build.buildfarm.v1test.WorkerListRequest;
 import build.buildfarm.v1test.WorkerProfileGrpc;
-import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileBlockingStub;
+import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileFutureStub;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.WorkerProfileRequest;
 import com.google.bytestream.ByteStreamGrpc;
@@ -344,12 +344,12 @@ public class StubInstance extends InstanceBase {
           });
 
   @SuppressWarnings("Guava")
-  private final Supplier<WorkerProfileBlockingStub> workerProfileBlockingStub =
+  private final Supplier<WorkerProfileFutureStub> workerProfileFutureStub =
       Suppliers.memoize(
           new Supplier<>() {
             @Override
-            public WorkerProfileBlockingStub get() {
-              return WorkerProfileGrpc.newBlockingStub(channel);
+            public WorkerProfileFutureStub get() {
+              return WorkerProfileGrpc.newFutureStub(channel);
             }
           });
 
@@ -562,6 +562,7 @@ public class StubInstance extends InstanceBase {
     return ByteStreamHelper.newInput(
         resourceName,
         offset,
+        identifier,
         () -> deadlined(bsStub).withInterceptors(attachMetadataInterceptor(requestMetadata)),
         retrier::newBackoff,
         retrier::isRetriable,
@@ -937,14 +938,19 @@ public class StubInstance extends InstanceBase {
   }
 
   @Override
-  public WorkerProfileMessage getWorkerProfile() {
-    return deadlined(workerProfileBlockingStub)
-        .getWorkerProfile(WorkerProfileRequest.newBuilder().build());
+  public ListenableFuture<WorkerProfileMessage> getWorkerProfile(String name) {
+    return deadlined(workerProfileFutureStub)
+        .getWorkerProfile(WorkerProfileRequest.newBuilder().setWorkerName(name).build());
   }
 
   @Override
-  public WorkerListMessage getWorkerList() {
-    return workerProfileBlockingStub.get().getWorkerList(WorkerListRequest.newBuilder().build());
+  public ListenableFuture<BatchWorkerProfilesResponse> batchWorkerProfiles(Iterable<String> names) {
+    return deadlined(workerProfileFutureStub)
+        .batchWorkerProfiles(
+            BatchWorkerProfilesRequest.newBuilder()
+                .setInstanceName(getName())
+                .addAllWorkerNames(names)
+                .build());
   }
 
   @Override

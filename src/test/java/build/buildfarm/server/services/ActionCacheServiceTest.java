@@ -22,7 +22,6 @@ import static org.mockito.Mockito.verify;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
-import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.instance.Instance;
 import io.grpc.stub.StreamObserver;
 import org.junit.Test;
@@ -31,8 +30,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class ActionCacheServiceTest {
-  private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
-
   @Test
   public void writeFailsWhenActionCacheIsReadOnly() throws Exception {
     // If the ActionCache is configured to be read-only,
@@ -40,8 +37,7 @@ public class ActionCacheServiceTest {
 
     // ARRANGE
     Instance instance = mock(Instance.class);
-    configs.getServer().setActionCacheReadOnly(true);
-    ActionCacheService service = new ActionCacheService(instance);
+    ActionCacheService service = new ActionCacheService(instance, /* isWritable= */ false);
 
     // ACT
     StreamObserver<ActionResult> response = mock(StreamObserver.class);
@@ -59,8 +55,7 @@ public class ActionCacheServiceTest {
 
     // ARRANGE
     Instance instance = mock(Instance.class);
-    configs.getServer().setActionCacheReadOnly(false);
-    ActionCacheService service = new ActionCacheService(instance);
+    ActionCacheService service = new ActionCacheService(instance, /* isWritable= */ true);
 
     // ACT
     StreamObserver<ActionResult> response = mock(StreamObserver.class);

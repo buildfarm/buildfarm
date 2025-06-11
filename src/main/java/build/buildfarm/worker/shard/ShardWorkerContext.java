@@ -54,12 +54,14 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.worker.DequeueMatchEvaluator;
 import build.buildfarm.worker.ExecFileSystem;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.worker.cgroup.CGroupVersion;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
@@ -363,7 +365,8 @@ class ShardWorkerContext implements WorkerContext {
     try {
       queueEntry =
           backplane.dispatchOperation(
-              configs.getWorker().getDequeueMatchSettings().getPlatform().getPropertiesList());
+              configs.getWorker().getDequeueMatchSettings().getPlatform().getPropertiesList(),
+              resourceSet);
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       switch (status.getCode()) {
@@ -756,10 +759,17 @@ class ShardWorkerContext implements WorkerContext {
       DigestFunction.Value digestFunction,
       Action action,
       Command command,
-      @Nullable UserPrincipal owner)
+      @Nullable UserPrincipal owner,
+      WorkerExecutedMetadata.Builder workerExecutedMetadata)
       throws IOException, InterruptedException {
     return execFileSystem.createExecDir(
-        operationName, directoriesIndex, digestFunction, action, command, owner);
+        operationName,
+        directoriesIndex,
+        digestFunction,
+        action,
+        command,
+        owner,
+        workerExecutedMetadata);
   }
 
   // might want to split for removeDirectory and decrement references to avoid removing for streamed
@@ -820,18 +830,15 @@ class ShardWorkerContext implements WorkerContext {
     try {
       int availableProcessors = SystemProcessors.get();
       Preconditions.checkState(availableProcessors >= executeStageWidth);
-      int executionsShares =
-          Group.getRoot().getCpu().getShares() * executeStageWidth / availableProcessors;
-      executionsGroup.getCpu().setShares(executionsShares);
+      executionsGroup.getCpu().setMaxCpu(executeStageWidth);
       if (executeStageWidth < availableProcessors) {
         /* only divide up our cfs quota if we need to limit below the available processors for executions */
-        executionsGroup
-            .getCpu()
-            .setCFSQuota(executeStageWidth * Group.getRoot().getCpu().getCFSPeriod());
+        executionsGroup.getCpu().setMaxCpu(executeStageWidth);
       }
-      // create 1024 * execution width shares to choose from
-      operationsGroup.getCpu().setShares(executeStageWidth * 1024);
-    } catch (IOException e) {
+      // create `execution width` shares to choose from. This is the ceiling for the operations
+      operationsGroup.getCpu().setShares(executeStageWidth);
+    } catch (IOException | IllegalStateException e) {
+      log.log(Level.WARNING, "Unable to set up CGroup", e);
       try {
         operationsGroup.getCpu().close();
       } catch (IOException closeEx) {
@@ -941,6 +948,13 @@ class ShardWorkerContext implements WorkerContext {
     return resource;
   }
 
+  private String getCgroups() {
+    if (Group.VERSION == CGroupVersion.CGROUPS_V2) {
+      return configs.getExecutionWrappers().getCgroups2();
+    }
+    return configs.getExecutionWrappers().getCgroups1();
+  }
+
   IOResource limitSpecifiedExecution(
       ResourceLimits limits,
       String operationName,
@@ -952,29 +966,28 @@ class ShardWorkerContext implements WorkerContext {
     // and collect group names to use on the CLI.
     String operationId = getOperationId(operationName);
     ArrayList<IOResource> resources = new ArrayList<>();
-
     if (limits.cgroups) {
       final Group group = operationsGroup.getChild(operationId);
       ArrayList<String> usedGroups = new ArrayList<>();
 
       // Possibly set core restrictions.
       if (limits.cpu.limit) {
+        log.log(Level.FINEST, "Applying CPU limit {0}", limits.cpu);
         applyCpuLimits(group, owner, limits, resources);
-        usedGroups.add(group.getCpu().getName());
+        usedGroups.add(group.getCpu().getControllerName());
       }
 
       // Possibly set memory restrictions.
       if (limits.mem.limit) {
+        log.log(Level.FINEST, "Applying Mem limit {0}", limits.mem);
         applyMemLimits(group, owner, limits, resources);
-        usedGroups.add(group.getMem().getName());
+        usedGroups.add(group.getMem().getControllerName());
       }
 
       // Decide the CLI for running under cgroups
       if (!usedGroups.isEmpty()) {
         arguments.add(
-            configs.getExecutionWrappers().getCgroups(),
-            "-g",
-            String.join(",", usedGroups) + ":" + group.getHierarchy());
+            getCgroups(), "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
       }
     }
 
@@ -1078,12 +1091,10 @@ class ShardWorkerContext implements WorkerContext {
       }
 
       if (limits.cpu.max > 0) {
-        /* period of 100ms */
-        cpu.setCFSPeriod(100000);
-        cpu.setCFSQuota(limits.cpu.max * 100000);
+        cpu.setMaxCpu(limits.cpu.max);
       }
       if (limits.cpu.min > 0) {
-        cpu.setShares(limits.cpu.min * 1024);
+        cpu.setShares(limits.cpu.min);
       }
     } catch (IOException e) {
       // clear interrupt flag if set due to ClosedByInterruptException

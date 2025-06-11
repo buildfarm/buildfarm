@@ -140,7 +140,7 @@ public class ShardWorkerContextTest {
                 Property.newBuilder().setName("execution-policy").setValue("foo").build())
             .build();
     QueueEntry queueEntry = QueueEntry.newBuilder().setPlatform(matchPlatform).build();
-    when(backplane.dispatchOperation(any(List.class)))
+    when(backplane.dispatchOperation(any(List.class), any(LocalResourceSet.class)))
         .thenReturn(queueEntry)
         .thenReturn(null); // provide a match completion in failure case
     MatchListener listener = mock(MatchListener.class);
@@ -160,7 +160,7 @@ public class ShardWorkerContextTest {
             .addProperties(Property.newBuilder().setName("os").setValue("randos").build())
             .build();
     QueueEntry queueEntry = QueueEntry.newBuilder().setPlatform(matchPlatform).build();
-    when(backplane.dispatchOperation(any(List.class)))
+    when(backplane.dispatchOperation(any(List.class), any(LocalResourceSet.class)))
         .thenReturn(queueEntry)
         .thenReturn(null); // provide a match completion in failure case
     MatchListener listener = mock(MatchListener.class);
@@ -179,7 +179,7 @@ public class ShardWorkerContextTest {
     configs.getWorker().getDequeueMatchSettings().setPlatform(testOSPlatform);
     WorkerContext context = createTestContext();
     QueueEntry queueEntry = QueueEntry.newBuilder().setPlatform(testOSPlatform).build();
-    when(backplane.dispatchOperation(any(List.class)))
+    when(backplane.dispatchOperation(any(List.class), any(LocalResourceSet.class)))
         .thenReturn(queueEntry)
         .thenReturn(null); // provide a match completion in failure case
     MatchListener listener = mock(MatchListener.class);
@@ -222,7 +222,7 @@ public class ShardWorkerContextTest {
             .addProperties(Property.newBuilder().setName("unavailable-resource").setValue("1"))
             .build();
     QueueEntry queueEntry = QueueEntry.newBuilder().setPlatform(platform).build();
-    when(backplane.dispatchOperation(any(List.class)))
+    when(backplane.dispatchOperation(any(List.class), any(LocalResourceSet.class)))
         .thenReturn(queueEntry)
         .thenReturn(null); // provide a match completion in failure case
     MatchListener listener = mock(MatchListener.class);

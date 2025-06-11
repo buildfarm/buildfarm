@@ -23,7 +23,7 @@ jobs:
         language: [java-kotlin]
 
     steps:
-    - uses: bazel-contrib/setup-bazel@f3f50ea6791b9b0f4c4eeabba4507422426462f5   # 0.9.1
+    - uses: bazel-contrib/setup-bazel@e8776f58fb6a6e9055cbaf1b38c52ccc5247e9c4   # 0.14.0
       with:
           # Avoid downloading Bazel every time.
         bazelisk-cache: true
@@ -32,7 +32,7 @@ jobs:
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@df409f7d9260372bd5f19e5b04e83cb3c43714ae # v3
+      uses: github/codeql-action/init@1b549b9259bda1cb5ddde3b41741a82a2d15a841 # v3
       with:
         languages: ${{ matrix.language }}
         build-mode: manual
@@ -53,6 +53,6 @@ jobs:
           //src/main/java/build/buildfarm:buildfarm-shard-worker
         bazel shutdown
 
-    - uses: github/codeql-action/analyze@df409f7d9260372bd5f19e5b04e83cb3c43714ae # v3
+    - uses: github/codeql-action/analyze@1b549b9259bda1cb5ddde3b41741a82a2d15a841 # v3
       with:
         category: /language:${{ matrix.language }}

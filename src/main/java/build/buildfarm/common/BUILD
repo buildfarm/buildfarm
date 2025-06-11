@@ -15,6 +15,7 @@ java_library(
     plugins = [":lombok"],
     visibility = ["//visibility:public"],
     deps = [
+        "//src/main/java/build/buildfarm/common/base",
         "//src/main/java/build/buildfarm/common/blake3",
         "//src/main/java/build/buildfarm/common/resources:resource_java_proto",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",

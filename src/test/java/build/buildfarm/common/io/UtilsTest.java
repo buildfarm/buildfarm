@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.io;
 
+import static build.buildfarm.common.base.System.isWindows;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.protobuf.ByteString;
@@ -42,7 +43,7 @@ public class UtilsTest {
   public void setUp() throws IOException {
     root = Files.createTempDirectory("native-cas-test");
     fileStore = Files.getFileStore(root);
-    org.junit.Assume.assumeFalse(System.getProperty("os.name").contains("Win"));
+    org.junit.Assume.assumeFalse(isWindows());
   }
 
   @After

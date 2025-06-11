@@ -15,6 +15,7 @@
 package build.buildfarm.tools;
 
 import static build.buildfarm.common.grpc.Channels.createChannel;
+import static build.buildfarm.common.resources.ResourceParser.parseUploadBlobRequest;
 import static build.buildfarm.instance.Utils.getBlob;
 import static build.buildfarm.server.services.OperationsService.LIST_OPERATIONS_MAXIMUM_PAGE_SIZE;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
@@ -40,14 +41,18 @@ import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.ProxyDirectoriesIndex;
+import build.buildfarm.common.Write;
+import build.buildfarm.common.resources.UploadBlobRequest;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.v1test.BatchWorkerProfilesResponse;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerExecutedMetadata;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
@@ -214,6 +219,16 @@ class Cat {
     }
   }
 
+  private static void printWorkerMetadata(WorkerExecutedMetadata metadata, int indentLevel) {
+    indentOut(indentLevel, format("Fetched Bytes: %d", metadata.getFetchedBytes()));
+    if (metadata.getLinkedInputDirectoriesCount() > 0) {
+      indentOut(indentLevel, "Linked Input Directories:");
+    }
+    for (String linkedInputDirectory : metadata.getLinkedInputDirectoriesList()) {
+      indentOut(indentLevel + 1, linkedInputDirectory);
+    }
+  }
+
   private static void printExecutedActionMetadata(
       ExecutedActionMetadata metadata, int indentLevel) {
     if (!metadata.getWorker().isEmpty()) {
@@ -263,6 +278,21 @@ class Cat {
       indentOut(
           indentLevel,
           "Worker Completed: " + Timestamps.toString(metadata.getWorkerCompletedTimestamp()));
+    }
+    if (metadata.getAuxiliaryMetadataCount() > 0) {
+      indentOut(indentLevel, "Auxiliary Metadata:");
+    }
+    for (Any auxiliary : metadata.getAuxiliaryMetadataList()) {
+      if (auxiliary.is(WorkerExecutedMetadata.class)) {
+        try {
+          printWorkerMetadata(auxiliary.unpack(WorkerExecutedMetadata.class), indentLevel + 1);
+        } catch (InvalidProtocolBufferException e) {
+          // unlikely
+          e.printStackTrace();
+        }
+      } else {
+        indentOut(indentLevel + 1, "Unrecognized Metadata: " + auxiliary);
+      }
     }
   }
 
@@ -585,7 +615,7 @@ class Cat {
       ExecuteResponse response, DigestFunction.Value digestFunction)
       throws InvalidProtocolBufferException {
     printStatus(response.getStatus());
-    if (Code.forNumber(response.getStatus().getCode()) == Code.OK) {
+    if (response.hasResult()) {
       printActionResult(response.getResult(), digestFunction, 2);
       System.out.println("  CachedResult: " + (response.getCachedResult() ? "true" : "false"));
     }
@@ -613,7 +643,7 @@ class Cat {
       printExecutedActionMetadata(metadata.getPartialExecutionMetadata(), 1);
       System.out.println("Metadata:");
       System.out.println("  Stage: " + metadata.getStage());
-      // digestFunction = metadata.getDigestFunction();
+      digestFunction = metadata.getDigestFunction();
       System.out.println(
           "  Action: "
               + DigestUtil.toString(
@@ -684,16 +714,29 @@ class Cat {
     System.out.println(DigestUtil.toString(digest.get()));
   }
 
-  private static void getWorkerProfile(Instance instance) {
-    WorkerProfileMessage response = instance.getWorkerProfile();
+  private static void batchWorkerProfiles(Instance instance, Iterable<String> names)
+      throws Exception {
+    BatchWorkerProfilesResponse responses = instance.batchWorkerProfiles(names).get();
+    for (BatchWorkerProfilesResponse.Response response : responses.getResponsesList()) {
+      System.out.println("Worker: " + response.getWorkerName());
+      int code = response.getStatus().getCode();
+      if (code == Code.OK.getNumber()) {
+        printWorkerProfile(response.getProfile());
+      } else {
+        System.out.println("Error: " + Code.forNumber(code));
+      }
+    }
+  }
+
+  private static void printWorkerProfile(WorkerProfileMessage workerProfile) {
     System.out.println("\nWorkerProfile:");
     String strIntFormat = "%-50s : %d";
-    long entryCount = response.getCasEntryCount();
-    long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
+    long entryCount = workerProfile.getCasEntryCount();
+    long unreferencedEntryCount = workerProfile.getCasUnreferencedEntryCount();
     System.out.printf((strIntFormat) + "%n", "Current Total Entry Count", entryCount);
-    System.out.printf((strIntFormat) + "%n", "Current Total Size", response.getCasSize());
-    System.out.printf((strIntFormat) + "%n", "Max Size", response.getCasMaxSize());
-    System.out.printf((strIntFormat) + "%n", "Max Entry Size", response.getCasMaxEntrySize());
+    System.out.printf((strIntFormat) + "%n", "Current Total Size", workerProfile.getCasSize());
+    System.out.printf((strIntFormat) + "%n", "Max Size", workerProfile.getCasMaxSize());
+    System.out.printf((strIntFormat) + "%n", "Max Entry Size", workerProfile.getCasMaxEntrySize());
     System.out.printf(
         (strIntFormat) + "%n", "Current Unreferenced Entry Count", unreferencedEntryCount);
     if (entryCount != 0) {
@@ -705,20 +748,22 @@ class Cat {
     System.out.printf(
         (strIntFormat) + "%n",
         "Current DirectoryEntry Count",
-        response.getCasDirectoryEntryCount());
+        workerProfile.getCasDirectoryEntryCount());
     System.out.printf(
-        (strIntFormat) + "%n", "Number of Evicted Entries", response.getCasEvictedEntryCount());
+        (strIntFormat) + "%n",
+        "Number of Evicted Entries",
+        workerProfile.getCasEvictedEntryCount());
     System.out.printf(
         (strIntFormat) + "%n",
         "Total Evicted Entries size in Bytes",
-        response.getCasEvictedEntrySize());
+        workerProfile.getCasEvictedEntrySize());
 
-    List<StageInformation> stages = response.getStagesList();
+    List<StageInformation> stages = workerProfile.getStagesList();
     for (StageInformation stage : stages) {
       printStageInformation(stage);
     }
 
-    List<OperationTimesBetweenStages> times = response.getTimesList();
+    List<OperationTimesBetweenStages> times = workerProfile.getTimesList();
     for (OperationTimesBetweenStages time : times) {
       printOperationTime(time);
     }
@@ -855,6 +900,29 @@ class Cat {
     }
   }
 
+  static class WriteStatus extends CatCommand {
+    @Override
+    public String description() {
+      return "Retrieve write status";
+    }
+
+    @Override
+    public void run(Instance instance, Iterable<String> args) throws Exception {
+      for (String resourceName : args) {
+        UploadBlobRequest request = parseUploadBlobRequest(resourceName);
+        Write write =
+            instance.getBlobWrite(
+                request.getBlob().getCompressor(),
+                request.getBlob().getDigest(),
+                UUID.fromString(request.getUuid()),
+                RequestMetadata.getDefaultInstance());
+        System.out.println("resourceName: " + resourceName);
+        System.out.println("committedSize: " + write.getCommittedSize());
+        System.out.println("complete: " + write.isComplete());
+      }
+    }
+  }
+
   static class WorkerProfile extends CatCommand {
     @Override
     public String description() {
@@ -862,8 +930,8 @@ class Cat {
     }
 
     @Override
-    public void run(Instance instance, Iterable<String> args) {
-      getWorkerProfile(instance);
+    public void run(Instance instance, Iterable<String> args) throws Exception {
+      batchWorkerProfiles(instance, args);
     }
   }
 
@@ -1199,6 +1267,7 @@ class Cat {
     new CatRECommand(),
     new CatDirectory(),
     new Fetch(),
+    new WriteStatus(),
   };
 
   static void usage() {

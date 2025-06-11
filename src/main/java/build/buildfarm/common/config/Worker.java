@@ -1,4 +1,20 @@
+// Copyright 2025 The Buildfarm Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.common.config;
+
+import static build.buildfarm.common.base.System.isWindows;
 
 import build.buildfarm.v1test.WorkerType;
 import com.google.common.base.Strings;
@@ -32,7 +48,7 @@ public class Worker {
   private int reportResultStageWidth = 1;
   private boolean linkExecFileSystem = true;
   private boolean linkInputDirectories = true;
-  private List<String> linkedInputDirectories = Arrays.asList("(?!external/)[^/]+");
+  private List<String> linkedInputDirectories = Arrays.asList("^(?!external$).*$");
   private String execOwner;
   private List<String> execOwners = new ArrayList<>();
   private int defaultMaxCores = 0;
@@ -52,6 +68,8 @@ public class Worker {
   private List<LimitedResource> resources = new ArrayList<>();
 
   private boolean errorOperationOutputSizeExceeded = false;
+  private boolean legacyDirectoryFileCache = false;
+  private boolean absolutizeCommandProgram = isWindows();
 
   public List<ExecutionPolicy> getExecutionPolicies() {
     return executionPolicies;

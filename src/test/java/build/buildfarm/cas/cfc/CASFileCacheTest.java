@@ -149,7 +149,7 @@ class CASFileCacheTest {
     storage = Maps.newConcurrentMap();
     expireService = newSingleThreadExecutor();
     fileCache =
-        new CASFileCache(
+        new LegacyDirectoryCFC(
             root,
             /* maxSizeInBytes= */ 1024,
             /* maxEntrySizeInBytes= */ 1024,
@@ -164,18 +164,15 @@ class CASFileCacheTest {
             onPut,
             onExpire,
             delegate,
-            /* delegateSkipLoad= */ false) {
-          @Override
-          protected InputStream newExternalInput(
-              Compressor.Value compressor, Digest digest, long offset) throws IOException {
-            ByteString content = blobs.get(digest);
-            if (content == null) {
-              return fileCache.newTransparentInput(compressor, digest, offset);
-            }
-            checkArgument(compressor == Compressor.Value.IDENTITY);
-            return content.substring((int) offset).newInput();
-          }
-        };
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              ByteString content = blobs.get(digest);
+              if (content == null) {
+                return fileCache.newTransparentInput(compressor, digest, offset);
+              }
+              checkArgument(compressor == Compressor.Value.IDENTITY);
+              return content.substring((int) offset).newInput();
+            });
     // do this so that we can remove the cache root dir
     fileCache.initializeRootDirectory();
   }
@@ -186,13 +183,13 @@ class CASFileCacheTest {
     // bazel appears to have a problem with us creating directories under
     // windows that are marked as no-delete. clean up after ourselves with
     // our utils
-    Directories.remove(root, fileStore);
     if (!shutdownAndAwaitTermination(putService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down put service");
     }
     if (!shutdownAndAwaitTermination(expireService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down expire service");
     }
+    Directories.remove(root, fileStore);
   }
 
   @Test
@@ -200,7 +197,7 @@ class CASFileCacheTest {
     ByteString blob = ByteString.copyFromUtf8("Hello, World");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     blobs.put(blobDigest, blob);
-    Path path = fileCache.put(blobDigest, false);
+    Path path = fileCache.put(blobDigest, false).path();
     assertThat(Files.exists(path)).isTrue();
   }
 
@@ -224,7 +221,7 @@ class CASFileCacheTest {
     ByteString blob = ByteString.copyFromUtf8("executable");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     blobs.put(blobDigest, blob);
-    Path path = fileCache.put(blobDigest, true);
+    Path path = fileCache.put(blobDigest, true).path();
     assertThat(Files.isExecutable(path)).isTrue();
   }
 
@@ -304,7 +301,7 @@ class CASFileCacheTest {
     ByteString bigBlob = ByteString.copyFrom(bigData);
     Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
     blobs.put(bigDigest, bigBlob);
-    Path bigPath = fileCache.put(bigDigest, false);
+    Path bigPath = fileCache.put(bigDigest, false).path();
 
     decrementReference(bigPath);
 
@@ -312,7 +309,7 @@ class CASFileCacheTest {
     ByteString strawBlob = ByteString.copyFrom(strawData);
     Digest strawDigest = DIGEST_UTIL.compute(strawBlob);
     blobs.put(strawDigest, strawBlob);
-    Path strawPath = fileCache.put(strawDigest, false);
+    Path strawPath = fileCache.put(strawDigest, false).path();
 
     assertThat(Files.exists(bigPath)).isFalse();
     assertThat(Files.exists(strawPath)).isTrue();
@@ -375,8 +372,8 @@ class CASFileCacheTest {
     // explicitly not providing blob via blobs, this would throw if fetched from factory
     //
     // FIXME https://github.com/google/truth/issues/285 assertThat(Path) is ambiguous
-    assertThat(fileCache.put(blobDigest, false).equals(path)).isTrue();
-    assertThat(fileCache.put(blobDigest, true).equals(execPath)).isTrue();
+    assertThat(fileCache.put(blobDigest, false).path().equals(path)).isTrue();
+    assertThat(fileCache.put(blobDigest, true).path().equals(execPath)).isTrue();
   }
 
   @Test
@@ -452,7 +449,7 @@ class CASFileCacheTest {
     ByteString bigContent = ByteString.copyFrom(bigData);
     Digest bigDigest = DIGEST_UTIL.compute(bigContent);
     blobs.put(bigDigest, bigContent);
-    Path bigPath = fileCache.put(bigDigest, /* isExecutable= */ false);
+    Path bigPath = fileCache.put(bigDigest, /* isExecutable= */ false).path();
 
     AtomicBoolean started = new AtomicBoolean(false);
     ExecutorService service = newSingleThreadExecutor();
@@ -493,10 +490,12 @@ class CASFileCacheTest {
     Digest digestThree = DIGEST_UTIL.compute(contentThree);
     blobs.put(digestThree, contentThree);
 
-    String pathOne = fileCache.put(digestOne, /* isExecutable= */ false).getFileName().toString();
-    String pathTwo = fileCache.put(digestTwo, /* isExecutable= */ false).getFileName().toString();
+    String pathOne =
+        fileCache.put(digestOne, /* isExecutable= */ false).path().getFileName().toString();
+    String pathTwo =
+        fileCache.put(digestTwo, /* isExecutable= */ false).path().getFileName().toString();
     String pathThree =
-        fileCache.put(digestThree, /* isExecutable= */ false).getFileName().toString();
+        fileCache.put(digestThree, /* isExecutable= */ false).path().getFileName().toString();
     fileCache.decrementReferences(
         ImmutableList.of(pathOne, pathTwo, pathThree),
         ImmutableList.of(),
@@ -580,6 +579,9 @@ class CASFileCacheTest {
       content.writeTo(out);
     }
     assertThat(notified.get()).isTrue();
+    if (!shutdownAndAwaitTermination(expireService, 1, SECONDS)) {
+      throw new RuntimeException("could not shut down expire service");
+    }
     assertThat(fileCache.size()).isEqualTo(digest.getSize());
     assertThat(incompleteWrite.getCommittedSize()).isEqualTo(digest.getSize());
     assertThat(incompleteWrite.isComplete()).isTrue();
@@ -900,12 +902,14 @@ class CASFileCacheTest {
     }
     blobs.put(expiringBlob.getDigest(), expiringBlob.getData());
     decrementReference(
-        fileCache.put(expiringBlob.getDigest(), /* isExecutable= */ false)); // expected eviction
+        fileCache
+            .put(expiringBlob.getDigest(), /* isExecutable= */ false)
+            .path()); // expected eviction
     blobs.clear();
     decrementReference(
-        fileCache.put(
-            expiringBlob.getDigest(),
-            /* isExecutable= */ true)); // should be fed from storage directly, not through delegate
+        fileCache
+            .put(expiringBlob.getDigest(), /* isExecutable= */ true)
+            .path()); // should be fed from storage directly, not through delegate
 
     fileCache.put(new Blob(ByteString.copyFromUtf8("Hello, World"), DIGEST_UTIL));
 
@@ -1148,7 +1152,7 @@ class CASFileCacheTest {
   @Test
   public void copyExternalInputRetries() throws Exception {
     CASFileCache flakyExternalCAS =
-        new CASFileCache(
+        new LegacyDirectoryCFC(
             root,
             /* maxSizeInBytes= */ 1024,
             /* maxEntrySizeInBytes= */ 1024,
@@ -1163,55 +1167,56 @@ class CASFileCacheTest {
             /* onPut= */ digest -> {},
             /* onExpire= */ digests -> {},
             /* delegate= */ null,
-            /* delegateSkipLoad= */ false) {
-          boolean throwUnavailable = true;
+            /* delegateSkipLoad= */ false,
+            new InputStreamFactory() {
+              boolean throwUnavailable = true;
 
-          @Override
-          protected InputStream newExternalInput(
-              Compressor.Value compressor, Digest digest, long offset) throws IOException {
-            ByteString content = blobs.get(digest);
-            if (throwUnavailable) {
-              throwUnavailable = false;
-              return new InputStream() {
-                int count = 0;
+              @Override
+              public InputStream newInput(Compressor.Value compressor, Digest digest, long offset)
+                  throws IOException {
+                ByteString content = blobs.get(digest);
+                if (throwUnavailable) {
+                  throwUnavailable = false;
+                  return new InputStream() {
+                    int count = 0;
 
-                @Override
-                public int read(byte[] buf) throws IOException {
-                  return read(buf, 0, buf.length);
+                    @Override
+                    public int read(byte[] buf) throws IOException {
+                      return read(buf, 0, buf.length);
+                    }
+
+                    @Override
+                    public int read() {
+                      throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public int read(byte[] buf, int offset, int len) throws IOException {
+                      if (count >= digest.getSize() / 2) {
+                        throw new IOException(Status.UNAVAILABLE.asRuntimeException());
+                      }
+                      len = Math.min((int) digest.getSize() / 2 - count, len);
+                      content.substring(count, count + len).copyTo(buf, offset);
+                      count += len;
+                      return len;
+                    }
+                  };
                 }
-
-                @Override
-                public int read() {
-                  throw new UnsupportedOperationException();
-                }
-
-                @Override
-                public int read(byte[] buf, int offset, int len) throws IOException {
-                  if (count >= digest.getSize() / 2) {
-                    throw new IOException(Status.UNAVAILABLE.asRuntimeException());
-                  }
-                  len = Math.min((int) digest.getSize() / 2 - count, len);
-                  content.substring(count, count + len).copyTo(buf, offset);
-                  count += len;
-                  return len;
-                }
-              };
-            }
-            return content.substring((int) offset).newInput();
-          }
-        };
+                return content.substring((int) offset).newInput();
+              }
+            });
     flakyExternalCAS.initializeRootDirectory();
     ByteString blob = ByteString.copyFromUtf8("Flaky Entry");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     blobs.put(blobDigest, blob);
-    Path path = flakyExternalCAS.put(blobDigest, false);
+    Path path = flakyExternalCAS.put(blobDigest, false).path();
     assertThat(Files.exists(path)).isTrue(); // would not have been created if not valid
   }
 
   @Test
   public void newInputThrowsNoSuchFileExceptionWithoutDelegate() throws Exception {
     ContentAddressableStorage undelegatedCAS =
-        new CASFileCache(
+        new LegacyDirectoryCFC(
             root,
             /* maxSizeInBytes= */ 1024,
             /* maxEntrySizeInBytes= */ 1024,
@@ -1226,18 +1231,15 @@ class CASFileCacheTest {
             /* onPut= */ digest -> {},
             /* onExpire= */ digests -> {},
             /* delegate= */ null,
-            /* delegateSkipLoad= */ false) {
-          @Override
-          protected InputStream newExternalInput(
-              Compressor.Value compressor, Digest digest, long offset) throws IOException {
-            ByteString content = blobs.get(digest);
-            if (content == null) {
-              return fileCache.newTransparentInput(compressor, digest, offset);
-            }
-            checkArgument(compressor == Compressor.Value.IDENTITY);
-            return content.substring((int) offset).newInput();
-          }
-        };
+            /* delegateSkipLoad= */ false,
+            (compressor, digest, offset) -> {
+              ByteString content = blobs.get(digest);
+              if (content == null) {
+                return fileCache.newTransparentInput(compressor, digest, offset);
+              }
+              checkArgument(compressor == Compressor.Value.IDENTITY);
+              return content.substring((int) offset).newInput();
+            });
     ByteString blob = ByteString.copyFromUtf8("Missing Entry");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     assertThrows(

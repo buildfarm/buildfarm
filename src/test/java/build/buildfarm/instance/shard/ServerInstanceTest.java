@@ -88,6 +88,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -781,6 +782,35 @@ public class ServerInstanceTest {
   }
 
   @Test
+  public void notFoundExecutionIsUnmerged() throws Exception {
+    when(mockBackplane.canPrequeue()).thenReturn(true);
+    when(mockBackplane.prequeue(any(ExecuteEntry.class), any(Operation.class), any(Boolean.class)))
+        .thenReturn(true);
+    build.buildfarm.v1test.Digest actionDigest =
+        build.buildfarm.v1test.Digest.newBuilder().setHash("merging-action").setSize(10).build();
+    ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
+    Operation execution = Operation.newBuilder().setName("orphaned-execution").build();
+    when(mockBackplane.mergeExecution(actionKey)).thenReturn(execution);
+    SettableFuture<Void> future = SettableFuture.create();
+    when(mockBackplane.watchExecution(eq(execution.getName()), any(Watcher.class)))
+        .thenReturn(future);
+    Watcher mockWatcher = mock(Watcher.class);
+    instance.execute(
+        actionDigest,
+        /* skipCacheLookup= */ false,
+        ExecutionPolicy.getDefaultInstance(),
+        ResultsCachePolicy.getDefaultInstance(),
+        RequestMetadata.getDefaultInstance(),
+        /* watcher= */ mockWatcher);
+    ArgumentCaptor<Watcher> captor = ArgumentCaptor.forClass(Watcher.class);
+    verify(mockBackplane, times(1)).watchExecution(eq(execution.getName()), captor.capture());
+    Watcher watcher = captor.getValue();
+    watcher.observe(null);
+    future.set(null);
+    verify(mockBackplane, times(1)).unmergeExecution(actionKey);
+  }
+
+  @Test
   public void requeueFailsOnMissingDirectory() throws Exception {
     String operationName = "missing-directory-operation";
 
@@ -1012,7 +1042,9 @@ public class ServerInstanceTest {
     when(mockBackplane.getExecution(incompleteOperation.getName())).thenReturn(incompleteOperation);
     instance.watchExecution(incompleteExecution, watcher);
     verify(mockBackplane, times(1)).getExecution(incompleteOperation.getName());
-    verify(mockBackplane, times(1)).watchExecution(incompleteOperation.getName(), watcher);
+    verify(mockBackplane, times(1))
+        .watchExecution(eq(incompleteOperation.getName()), any(Watcher.class));
+    verify(watcher, times(1)).observe(incompleteOperation);
   }
 
   @Test
@@ -1035,10 +1067,16 @@ public class ServerInstanceTest {
     Watcher actionResultWatcher = instance.newActionResultWatcher(actionKey, mockWatcher);
 
     Action uncacheableAction = Action.newBuilder().setDoNotCache(true).build();
-    Operation operation = Operation.newBuilder().setMetadata(Any.pack(uncacheableAction)).build();
+    QueuedOperationMetadata metadata =
+        QueuedOperationMetadata.newBuilder().setAction(uncacheableAction).build();
+    Operation operation = Operation.newBuilder().setMetadata(Any.pack(metadata)).build();
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder().setCachedResult(true).build();
     Operation completedOperation =
-        Operation.newBuilder().setDone(true).setResponse(Any.pack(executeResponse)).build();
+        Operation.newBuilder()
+            .setDone(true)
+            .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
+            .setResponse(Any.pack(executeResponse))
+            .build();
 
     actionResultWatcher.observe(operation);
     actionResultWatcher.observe(completedOperation);
@@ -1064,7 +1102,11 @@ public class ServerInstanceTest {
             .build();
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder().setResult(actionResult).build();
     Operation completedOperation =
-        Operation.newBuilder().setDone(true).setResponse(Any.pack(executeResponse)).build();
+        Operation.newBuilder()
+            .setDone(true)
+            .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
+            .setResponse(Any.pack(executeResponse))
+            .build();
 
     actionResultWatcher.observe(completedOperation);
 

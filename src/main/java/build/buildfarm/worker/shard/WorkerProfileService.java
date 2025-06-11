@@ -14,11 +14,8 @@
 
 package build.buildfarm.worker.shard;
 
-import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.v1test.StageInformation;
-import build.buildfarm.v1test.WorkerListMessage;
-import build.buildfarm.v1test.WorkerListRequest;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.WorkerProfileRequest;
@@ -26,8 +23,8 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.PutOperationStage.OperationStageDurations;
 import build.buildfarm.worker.SuperscalarPipelineStage;
+import com.google.common.base.Strings;
 import io.grpc.stub.StreamObserver;
-import java.io.IOException;
 import javax.annotation.Nullable;
 
 public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
@@ -37,7 +34,6 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private final SuperscalarPipelineStage executeActionStage;
   private final SuperscalarPipelineStage reportResultStage;
   private final PutOperationStage completeStage;
-  private final Backplane backplane;
 
   public WorkerProfileService(
       @Nullable CASFileCache storage,
@@ -45,22 +41,19 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
       SuperscalarPipelineStage inputFetchStage,
       SuperscalarPipelineStage executeActionStage,
       SuperscalarPipelineStage reportResultStage,
-      PutOperationStage completeStage,
-      Backplane backplane) {
-    super();
+      PutOperationStage completeStage) {
     this.storage = storage;
     this.matchStage = matchStage;
     this.inputFetchStage = inputFetchStage;
     this.executeActionStage = executeActionStage;
     this.reportResultStage = reportResultStage;
     this.completeStage = (PutOperationStage) completeStage;
-    this.backplane = backplane;
   }
 
   private StageInformation unaryStageInformation(String name, @Nullable String operationName) {
     StageInformation.Builder builder =
         StageInformation.newBuilder().setName(name).setSlotsConfigured(1);
-    if (operationName != null) {
+    if (!Strings.isNullOrEmpty(operationName)) {
       builder.setSlotsUsed(1).addOperationNames(operationName);
     }
     return builder.build();
@@ -121,19 +114,6 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
           .setOutputUploadStartToComplete(duration.outputUploadStartToComplete)
           .setOperationCount(duration.operationCount)
           .setPeriod(duration.period);
-    }
-    responseObserver.onNext(replyBuilder.build());
-    responseObserver.onCompleted();
-  }
-
-  @Override
-  public void getWorkerList(
-      WorkerListRequest request, StreamObserver<WorkerListMessage> responseObserver) {
-    WorkerListMessage.Builder replyBuilder = WorkerListMessage.newBuilder();
-    try {
-      replyBuilder.addAllWorkers(backplane.getStorageWorkers());
-    } catch (IOException e) {
-      responseObserver.onError(e);
     }
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();

@@ -4,27 +4,27 @@ tasks:
   # Linting jobs
   format_check:
     name: Code Format
-    platform: ubuntu2204
+    platform: ubuntu2404
     shell_commands:
     - ./.bazelci/format.sh --check
   package_layout:
     name: Package Layout
-    platform: ubuntu2204
+    platform: ubuntu2404
     shell_commands:
     - ./.bazelci/package_name_check.sh
   java_unused_deps_check:
     name: Java Unused Dependencies
-    platform: ubuntu2204
+    platform: ubuntu2404
     shell_commands:
     - ./.bazelci/unused_deps.sh --check
   static_analysis_check:
     name: Static Analysis
-    platform: ubuntu2204
+    platform: ubuntu2404
     shell_commands:
     - ./.bazelci/static_analyze.sh
   checkstyle:
     name: Check Style
-    platform: ubuntu2204
+    platform: ubuntu2404
     shell_commands:
     - ./.bazelci/run_checkstyle.sh
   code_coverage:
@@ -42,6 +42,16 @@ tasks:
     - ./generate_coverage.sh
 
   # Typical unit tests that run across a variety of operating systems.
+  ubuntu2404:
+    name: Unit Tests
+    build_targets:
+    - '...'
+    build_flags:
+    - --build_tag_filters=-container
+    test_flags:
+    - --test_tag_filters=-integration,-redis
+    test_targets:
+    - '...'
   ubuntu2204:
     name: Unit Tests
     build_targets:
@@ -86,7 +96,7 @@ tasks:
     - '...'
   rpm_builds:
     name: Rpm Builds
-    platform: centos7_java11_devtoolset10
+    platform: rockylinux8
     shell_commands:
     - bazel build //src/main/java/build/buildfarm/rpms/server:buildfarm-server-rpm //src/main/java/build/buildfarm/rpms/worker:buildfarm-worker-rpm
 
@@ -160,9 +170,9 @@ tasks:
     - export CACHE_TEST=true
     - export RUN_TEST=./.bazelci/run_generative_cc_many_double_test.sh
     - export BUILDFARM_CONFIG="/buildfarm/examples/config.minimal.yml"
-    - export TEST_ARG1=--experimental_remote_grpc_log='./grpc.log'
-    - export TEST_ARG2=--experimental_remote_grpc_log='./grpc2.log'
-    - export SHA1_TOOLS_REMOTE=eeddeff416118c86856fd76c95733307256dc855
+    - export TEST_ARG1=--remote_grpc_log='./grpc.log'
+    - export TEST_ARG2=--remote_grpc_log='./grpc2.log'
+    - export SHA1_TOOLS_REMOTE=8abbff48ada653a42dfef977e6ba91d31e900fd5
     - export EXECUTION_STAGE_WIDTH=5
     - ./.bazelci/cache_test.sh
 

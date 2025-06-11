@@ -199,8 +199,10 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   private boolean checkComplete() throws IOException {
     try {
-      return writeFuture.isDone()
-          && (expectedSize == UNLIMITED_EXPECTED_SIZE || writeFuture.get() == expectedSize);
+      if (writeFuture.isDone()) {
+        writeFuture.get();
+        return true;
+      }
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       Throwables.throwIfUnchecked(cause);
@@ -211,6 +213,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     }
+    return false;
   }
 
   private synchronized void initiateWrite() {
@@ -279,7 +282,15 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     }
     if (expectedSize != COMPRESSED_EXPECTED_SIZE
         && offset + writtenBytes + bufferOffset + len > expectedSize) {
-      throw new IndexOutOfBoundsException("write would exceed expected size");
+      throw new IndexOutOfBoundsException(
+          format(
+              "write of %d would exceed expected size %d at offset %d (%d+%d+%d)",
+              len,
+              expectedSize,
+              offset + writtenBytes + bufferOffset,
+              offset,
+              writtenBytes,
+              bufferOffset));
     }
     boolean lastFlushed = false;
     while (len > 0 && !checkComplete()) {
@@ -346,7 +357,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   @Override
   public boolean isComplete() {
     try {
-      return checkComplete() || getCommittedSize() == expectedSize;
+      return checkComplete();
     } catch (IOException e) {
       // errored write is not complete
       return false;

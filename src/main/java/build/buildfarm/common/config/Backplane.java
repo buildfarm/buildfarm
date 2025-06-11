@@ -18,7 +18,10 @@ public class Backplane {
 
   private BACKPLANE_TYPE type = BACKPLANE_TYPE.SHARD;
   private String redisUri;
-  private int jedisPoolMaxTotal = 4000;
+  private int jedisPoolMaxTotal = 200;
+  private int jedisPoolMaxIdle = 8;
+  private int jedisPoolMinIdle = 0;
+  private long jedisTimeBetweenEvictionRunsMillis = 30000L;
   private String workersHashName = "Workers";
   private String workerChannel = "WorkerChannel";
   private String actionCachePrefix = "ActionCache";
