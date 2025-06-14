@@ -14,6 +14,8 @@
 
 package build.buildfarm.common;
 
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import oshi.SystemInfo;
 import oshi.hardware.CentralProcessor;
 import oshi.hardware.HardwareAbstractionLayer;
@@ -43,13 +45,21 @@ public class SystemProcessors {
   }
 
   /**
+   * @brief Memoized supplier for processor count.
+   * @details Uses Guava's memoize to cache the processor count since it won't change during
+   *     runtime.
+   */
+  private static final Supplier<Integer> processorCount =
+      Suppliers.memoize(
+          () -> Math.max(get(PROCESSOR_DERIVE.JAVA_RUNTIME), get(PROCESSOR_DERIVE.OSHI)));
+
+  /**
    * @brief Get the number of logical processors on the system.
    * @details Buildfarm will choose the best implementation.
    * @return Number of logical processors on the system.
    */
   public static int get() {
-    // Have buildfarm choose the best value.
-    return Math.max(get(PROCESSOR_DERIVE.JAVA_RUNTIME), get(PROCESSOR_DERIVE.OSHI));
+    return processorCount.get();
   }
 
   /**
