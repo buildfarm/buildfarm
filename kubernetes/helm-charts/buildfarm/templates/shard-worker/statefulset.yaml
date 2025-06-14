@@ -9,6 +9,7 @@ metadata:
   annotations:
     {{- toYaml .Values.shardWorker.annotations | nindent 4 }}
 spec:
+  podManagementPolicy: {{ .Values.shardWorker.podManagementPolicy }}
   serviceName: {{ include "buildfarm.fullname" . }}-shard-worker
   {{- if .Values.shardWorker.autoscaling.enabled }}
   replicas: {{ .Values.shardWorker.autoscaling.minReplicas }}
