@@ -29,10 +29,10 @@ jobs:
         bazelisk-cache: true
 
     - name: Checkout repository
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@1b549b9259bda1cb5ddde3b41741a82a2d15a841 # v3
+      uses: github/codeql-action/init@ce28f5bb42b7a9f2c824e633a3f6ee835bab6858   # v3.29.0
       with:
         languages: ${{ matrix.language }}
         build-mode: manual
@@ -53,6 +53,6 @@ jobs:
           //src/main/java/build/buildfarm:buildfarm-shard-worker
         bazel shutdown
 
-    - uses: github/codeql-action/analyze@1b549b9259bda1cb5ddde3b41741a82a2d15a841 # v3
+    - uses: github/codeql-action/analyze@ce28f5bb42b7a9f2c824e633a3f6ee835bab6858   # v3.29.0
       with:
         category: /language:${{ matrix.language }}
