@@ -131,6 +131,7 @@ shardWorker:
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
+  podManagementPolicy: Parallel # Or "OrderedReady"
   replicaCount: 2
   autoscaling:
     enabled: true
