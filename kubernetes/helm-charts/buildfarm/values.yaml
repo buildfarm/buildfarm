@@ -24,9 +24,6 @@ config:
             value: "*"
           - name: "max-cores"
             value: "*"
-  server:
-    name: "shard"
-    recordBesEvents: true
 
 server:
   image:
@@ -116,6 +113,10 @@ server:
     scrapeTimeout: 30s
     relabelings: []
     targetLabels: []
+
+  config:
+    name: "shard"
+    recordBesEvents: true
 
   loggingProperties:
     build.buildfarm.level: INFO
