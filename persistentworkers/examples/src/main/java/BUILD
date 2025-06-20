@@ -8,7 +8,7 @@ java_library(
     deps = [
         "//persistentworkers/src/main/java/persistent/bazel:bazel-persistent-workers",
         "//persistentworkers/src/main/java/persistent/common:persistent-common",
-        "@maven//:com_google_guava_guava",
+        "@buildfarm_maven//:com_google_guava_guava",
     ],
 )
 

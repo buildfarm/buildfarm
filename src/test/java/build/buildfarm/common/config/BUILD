@@ -7,10 +7,10 @@ java_test(
     deps = [
         "//src/main/java/build/buildfarm/common/config",
         "//src/test/java/build/buildfarm:test_runner",
-        "@maven//:com_google_truth_truth",
-        "@maven//:io_grpc_grpc_api",
-        "@maven//:io_grpc_grpc_testing",
-        "@maven//:me_dinowernli_java_grpc_prometheus",
-        "@maven//:org_mockito_mockito_core",
+        "@buildfarm_maven//:com_google_truth_truth",
+        "@buildfarm_maven//:io_grpc_grpc_api",
+        "@buildfarm_maven//:io_grpc_grpc_testing",
+        "@buildfarm_maven//:me_dinowernli_java_grpc_prometheus",
+        "@buildfarm_maven//:org_mockito_mockito_core",
     ],
 )

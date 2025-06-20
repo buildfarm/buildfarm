@@ -9,9 +9,9 @@ java_test(
         "//src/main/java/build/buildfarm/common/base",
         "//src/main/java/build/buildfarm/worker/cgroup",
         "//src/test/java/build/buildfarm:test_runner",
-        "@maven//:com_google_guava_guava",
-        "@maven//:com_google_truth_truth",
-        "@maven//:org_mockito_mockito_core",
-        "@maven//:org_projectlombok_lombok",
+        "@buildfarm_maven//:com_google_guava_guava",
+        "@buildfarm_maven//:com_google_truth_truth",
+        "@buildfarm_maven//:org_mockito_mockito_core",
+        "@buildfarm_maven//:org_projectlombok_lombok",
     ],
 )
