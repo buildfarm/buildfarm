@@ -24,9 +24,6 @@ config:
             value: "*"
           - name: "max-cores"
             value: "*"
-  server:
-    name: "shard"
-    recordBesEvents: true
 
 server:
   image:
@@ -117,6 +114,10 @@ server:
     relabelings: []
     targetLabels: []
 
+  config:
+    name: "shard"
+    recordBesEvents: true
+
   loggingProperties:
     build.buildfarm.level: INFO
     handlers: java.util.logging.ConsoleHandler
@@ -131,6 +132,7 @@ shardWorker:
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
+  podManagementPolicy: Parallel # Or "OrderedReady"
   replicaCount: 2
   autoscaling:
     enabled: true

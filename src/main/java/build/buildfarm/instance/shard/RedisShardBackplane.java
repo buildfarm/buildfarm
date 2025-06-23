@@ -126,6 +126,13 @@ public class RedisShardBackplane implements Backplane {
                   .add(WorkerExecutedMetadata.getDescriptor())
                   .build());
 
+  static final JsonFormat.Parser actionResultParser =
+      JsonFormat.parser()
+          .usingTypeRegistry(
+              JsonFormat.TypeRegistry.newBuilder()
+                  .add(WorkerExecutedMetadata.getDescriptor())
+                  .build());
+
   private final String source; // used in operation change publication
   private final boolean subscribeToBackplane;
   private final boolean runFailsafeOperation;
@@ -893,10 +900,10 @@ public class RedisShardBackplane implements Backplane {
     return returnWorkers;
   }
 
-  private static ActionResult parseActionResult(String json) {
+  public static ActionResult parseActionResult(String json) {
     try {
       ActionResult.Builder builder = ActionResult.newBuilder();
-      JsonFormat.parser().merge(json, builder);
+      actionResultParser.merge(json, builder);
       return builder.build();
     } catch (InvalidProtocolBufferException e) {
       return null;
