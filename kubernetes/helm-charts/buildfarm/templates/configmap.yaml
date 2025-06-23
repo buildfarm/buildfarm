@@ -48,7 +48,7 @@ data:
       {{- with .Values.config.backplane }}
       {{- toYaml . | nindent 6 }}
       {{- end }}
-    {{- with .Values.config.server }}
+    {{- with .Values.server.config }}
     server:
       {{- toYaml . | nindent 6 }}
     {{- end }}
