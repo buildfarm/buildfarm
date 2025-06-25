@@ -68,14 +68,6 @@ public interface WorkerContext {
 
   boolean inGracefulShutdown();
 
-  boolean isMatching();
-
-  boolean isInputFetching();
-
-  boolean isExecuting();
-
-  boolean isReportingResults();
-
   void prepareForGracefulShutdown();
 
   void match(MatchListener listener) throws InterruptedException;

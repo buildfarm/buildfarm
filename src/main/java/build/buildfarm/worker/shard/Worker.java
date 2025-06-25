@@ -60,6 +60,7 @@ import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.Digest;
+import build.buildfarm.v1test.PipelineChange;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.worker.CFCExecFileSystem;
 import build.buildfarm.worker.CFCLinkExecFileSystem;
@@ -81,6 +82,7 @@ import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.FutureCallback;
@@ -243,7 +245,7 @@ public final class Worker extends LoggingMain {
     serverBuilder.addService(healthStatusManager.getHealthService());
     serverBuilder.addService(new ContentAddressableStorageService(instance));
     serverBuilder.addService(new ByteStreamService(instance));
-    serverBuilder.addService(new ShutDownWorkerGracefully(this));
+    serverBuilder.addService(new WorkerControl(this));
     serverBuilder.addService(ProtoReflectionServiceV1.newInstance());
     serverBuilder.addService(workerProfileService);
 
@@ -857,6 +859,28 @@ public final class Worker extends LoggingMain {
         server.awaitTermination();
       }
     }
+  }
+
+  public Iterable<PipelineChange> pipelineChange(Iterable<PipelineChange> changes) {
+    for (PipelineChange change : changes) {
+      for (PipelineStage stage : pipeline) {
+        if (change.getStage().equals(stage.getName())) {
+          stage.setPaused(change.getPaused());
+          if (change.getWidth() > 0) {
+            stage.setWidth(change.getWidth());
+          }
+        }
+      }
+    }
+
+    return Iterables.transform(
+        pipeline,
+        stage ->
+            PipelineChange.newBuilder()
+                .setStage(stage.getName())
+                .setPaused(stage.isPaused())
+                .setWidth(stage.getWidth())
+                .build());
   }
 
   public void initiateShutdown() {
