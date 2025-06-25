@@ -76,6 +76,9 @@ public class ReportResultStage extends SuperscalarPipelineStage {
 
   @Override
   protected void iterate() throws InterruptedException {
+    if (!workerContext.inGracefulShutdown() && isPaused()) {
+      return;
+    }
     ExecutionContext executionContext = take();
     ResultReporter reporter =
         new ResultReporter(workerContext, executionContext, this, pollerExecutor);

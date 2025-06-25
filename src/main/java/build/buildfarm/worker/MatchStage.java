@@ -161,7 +161,7 @@ public class MatchStage extends PipelineStage {
   protected void iterate() throws InterruptedException {
     start(); // clear any previous operation
     // stop matching and picking up any works if the worker is in graceful shutdown.
-    if (!workerContext.isMatching() || output.isStalled()) {
+    if (workerContext.inGracefulShutdown() || isPaused() || output.isStalled()) {
       return;
     }
     Stopwatch stopwatch = Stopwatch.createStarted();
