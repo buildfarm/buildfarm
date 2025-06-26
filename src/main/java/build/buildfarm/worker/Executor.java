@@ -41,6 +41,7 @@ import build.buildfarm.common.config.ExecutionWrapper;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import build.buildfarm.worker.persistent.PersistentExecutor;
+import build.buildfarm.worker.persistent.ProtoCoordinator;
 import build.buildfarm.worker.persistent.WorkFilesContext;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
@@ -82,6 +83,7 @@ class Executor {
   private final ExecutionContext executionContext;
   private final ExecuteActionStage owner;
   private final java.util.concurrent.Executor pollerExecutor;
+  private final PersistentExecutor persistentExecutor;
   private int exitCode = INCOMPLETE_EXIT_CODE;
   private boolean wasErrored = false;
   private boolean polling = false;
@@ -90,11 +92,13 @@ class Executor {
       WorkerContext workerContext,
       ExecutionContext executionContext,
       ExecuteActionStage owner,
-      java.util.concurrent.Executor pollerExecutor) {
+      java.util.concurrent.Executor pollerExecutor,
+      ProtoCoordinator coordinator) {
     this.workerContext = workerContext;
     this.executionContext = executionContext;
     this.owner = owner;
     this.pollerExecutor = pollerExecutor;
+    this.persistentExecutor = new PersistentExecutor(coordinator);
   }
 
   // ensure that only one error put attempt occurs
@@ -530,7 +534,7 @@ class Executor {
       WorkFilesContext filesContext =
           WorkFilesContext.fromContext(execDir, execTree, executionContext.command);
 
-      return PersistentExecutor.runOnPersistentWorker(
+      return persistentExecutor.runOnPersistentWorker(
           filesContext,
           operationName,
           ImmutableList.copyOf(arguments),

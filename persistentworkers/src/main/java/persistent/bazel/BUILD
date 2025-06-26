@@ -8,7 +8,9 @@ java_library(
     deps = [
         "//persistentworkers/src/main/java/persistent/common:persistent-common",
         "//persistentworkers/src/main/protobuf:worker_protocol_java_proto",
+        "//src/main/java/build/buildfarm/common",
         "@maven//:com_github_pcj_google_options",
+        "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_protobuf_protobuf_java_util",

@@ -1,5 +1,7 @@
 package persistent.bazel.client;
 
+import build.buildfarm.common.Claim;
+import build.buildfarm.common.io.Directories;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
@@ -7,10 +9,12 @@ import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Optional;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import persistent.bazel.processes.ProtoWorkerRW;
 import persistent.common.Worker;
@@ -36,15 +40,27 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
   @Getter private final WorkerKey key;
   @Getter private final ImmutableList<String> initCmd;
   @Getter private final Path execRoot;
+  private final Claim claim;
   private final ProtoWorkerRW workerRW;
 
-  public PersistentWorker(WorkerKey key, String workerDir) throws IOException {
+  public PersistentWorker(WorkerKey key, String workerDir, @Nullable Claim claim)
+      throws IOException {
     this.key = key;
     this.execRoot = key.getExecRoot().resolve(workerDir);
     this.initCmd =
         ImmutableList.<String>builder().addAll(key.getCmd()).addAll(key.getArgs()).build();
 
+    this.claim = claim;
+
     Files.createDirectories(execRoot);
+
+    if (claim != null) {
+      UserPrincipal owner = claim.owner();
+
+      if (owner != null) {
+        Directories.setAllOwner(execRoot, owner);
+      }
+    }
 
     Set<Path> workerFiles = ImmutableSet.copyOf(key.getWorkerFilesWithHashes().keySet());
     logger.log(
@@ -130,5 +146,13 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
   @Override
   public void destroy() {
     this.workerRW.getProcessWrapper().destroy();
+
+    if (this.claim != null) {
+      this.claim.release();
+    }
+  }
+
+  public @Nullable UserPrincipal getOwner() {
+    return this.claim != null ? this.claim.owner() : null;
   }
 }

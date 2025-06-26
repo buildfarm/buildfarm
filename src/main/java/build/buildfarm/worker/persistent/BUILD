@@ -15,6 +15,7 @@ java_library(
         "//src/main/java/build/buildfarm/worker/util",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",
         "@maven//:com_google_api_grpc_proto_google_common_protos",
+        "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_protobuf_protobuf_java_util",

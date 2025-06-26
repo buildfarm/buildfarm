@@ -17,6 +17,7 @@ package build.buildfarm.worker.persistent;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Command;
+import build.buildfarm.common.StubClaimAcquirer;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.util.WorkerTestUtils;
 import build.buildfarm.worker.util.WorkerTestUtils.TreeFile;
@@ -69,7 +70,7 @@ public class ProtoCoordinatorTest {
 
   @Test
   public void testProtoCoordinator() throws Exception {
-    ProtoCoordinator pc = ProtoCoordinator.ofCommonsPool(4);
+    ProtoCoordinator pc = ProtoCoordinator.ofCommonsPool(4, new StubClaimAcquirer());
 
     Path fsRoot = jimFsRoot();
     Path opRoot = fsRoot.resolve("opRoot");

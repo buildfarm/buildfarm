@@ -21,6 +21,8 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.Claim;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
@@ -223,6 +225,11 @@ class StubWorkerContext implements WorkerContext {
 
   @Override
   public boolean shouldErrorOperationOnRemainingResources() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Claim acquireClaim(Platform platform) {
     throw new UnsupportedOperationException();
   }
 }

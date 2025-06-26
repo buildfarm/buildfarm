@@ -39,5 +39,5 @@ java_test(
     resources = [
         "//persistentworkers/examples/src/main/java:adder-bin_deploy.jar",
     ],
-    deps = COMMON_DEPS,
+    deps = COMMON_DEPS + ["//src/main/java/build/buildfarm/common"],
 )
