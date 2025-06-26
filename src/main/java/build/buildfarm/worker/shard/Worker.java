@@ -798,7 +798,7 @@ public final class Worker extends LoggingMain {
     removeWorker(configs.getWorker().getPublicName());
 
     boolean skipLoad = configs.getWorker().getStorages().getFirst().isSkipLoad();
-    ListenableFuture<Void> writable =
+    ListenableFuture<Void> fileSystemStarted =
         execFileSystem.start(
             (digests) -> addBlobsLocation(digests, configs.getWorker().getPublicName()),
             skipLoad,
@@ -806,7 +806,7 @@ public final class Worker extends LoggingMain {
 
     server.start();
     Futures.addCallback(
-        writable,
+        fileSystemStarted,
         new FutureCallback<>() {
           @Override
           public void onSuccess(Void result) {
@@ -816,7 +816,9 @@ public final class Worker extends LoggingMain {
           }
 
           @Override
-          public void onFailure(Throwable t) {}
+          public void onFailure(Throwable t) {
+            log.log(SEVERE, "execFileSystem start failure", t);
+          }
         },
         directExecutor());
     startFailsafeRegistration();
