@@ -143,7 +143,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
             fileCacheWritable,
             result -> {
               onDigests.accept(blobDigests.build());
-              return null;
+              return immediateFuture(null);
             },
             directExecutor());
     removeDirectoryFutures.add(fileCacheWritable);
