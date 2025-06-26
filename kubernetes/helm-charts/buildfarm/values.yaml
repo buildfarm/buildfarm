@@ -147,6 +147,15 @@ shardWorker:
             type: Utilization
             averageUtilization: 50
     targetCPUUtilizationPercentage: 50 # effective only in `v1`
+  
+  livenessProbe:
+    grpc:
+      port: 8982
+    initialDelaySeconds: 10
+  readinessProbe:
+    grpc:
+      port: 8982
+    initialDelaySeconds: 10
 
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little

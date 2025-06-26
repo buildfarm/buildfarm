@@ -64,13 +64,9 @@ spec:
             - containerPort: 9090
               name: "metrics"
           livenessProbe:
-            grpc:
-              port: 8982
-            initialDelaySeconds: 10
+            {{- toYaml .Values.shardWorker.livenessProbe | nindent 12 }}
           readinessProbe:
-            grpc:
-              port: 8982
-            initialDelaySeconds: 10
+            {{- toYaml .Values.shardWorker.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.shardWorker.resources | nindent 12 }}
           volumeMounts:
