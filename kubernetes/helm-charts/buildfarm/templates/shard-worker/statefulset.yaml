@@ -63,10 +63,14 @@ spec:
               name: "worker-comm"
             - containerPort: 9090
               name: "metrics"
+          {{- with .Values.shardWorker.livenessProbe }}
           livenessProbe:
-            {{- toYaml .Values.shardWorker.livenessProbe | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.shardWorker.readinessProbe }}
           readinessProbe:
-            {{- toYaml .Values.shardWorker.readinessProbe | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.shardWorker.resources | nindent 12 }}
           volumeMounts:
