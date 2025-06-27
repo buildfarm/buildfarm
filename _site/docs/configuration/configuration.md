@@ -496,7 +496,7 @@ worker:
 
 `<exec-owner>` is an automatically provided pool resource when `execOwner` or `execOwners` is specified, and will contain the value of the execution's owner selected for exec tree creation.
 
-This would produce a command line like:
+An execution with `as-nobody`, `unshare`, and `linux-sandbox` execution policies enabled would produce a command line like:
 ```sh
 /app/build_buildfarm/as-nobody -u <exec-owner> /usr/bin/unshare -n -r /app/build_buildfarm/linux-sandbox -- /YOUR/WRAPPER arg1 arg2 <platform-property-name> ACTION
 ```
