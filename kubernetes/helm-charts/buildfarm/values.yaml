@@ -41,6 +41,7 @@ server:
     grpc:
       port: 8980
     initialDelaySeconds: 10
+  startupProbe: {}
 
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
@@ -166,6 +167,7 @@ shardWorker:
     grpc:
       port: 8982
     initialDelaySeconds: 10
+  startupProbe: {}
 
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
@@ -286,6 +288,7 @@ execWorker:
     grpc:
       port: 8982
     initialDelaySeconds: 10
+  startupProbe: {}
 
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
