@@ -465,9 +465,27 @@ Example:
 ```yaml
 worker:
   executionPolicies:
+    - name: as-nobody
+      executionWrapper:
+        path: /app/build_buildfarm/as-nobody
+        arguments:
+          - "-u"
+          - "<exec-owner>"
+    - name: unshare
+      executionWrapper:
+        path: /usr/bin/unshare
+        arguments:
+          - "-n"
+          - "-r"
+    - name: linux-sandbox
+      executionWrapper:
+        path: /app/build_buildfarm/linux-sandbox
+        arguments:
+          # use "--" to signal the end of linux-sandbox args. "--" should always be last!
+          - "--"
     - name: test
       executionWrapper:
-        path: /
+        path: /YOUR/WRAPPER
         arguments:
           - arg1
           - arg2
@@ -477,3 +495,9 @@ worker:
 `arg1` and `arg2` are interpreted literally. `<platform-property-value>` will be substituted with the value of a property named `"platform-property-name"` from a Command's Platform _or_ the requested pool resources for the execution. If a matching property or pool resource is not found for a specified name, the entire wrapper will be discarded and have no effect on the execution.
 
 `<exec-owner>` is an automatically provided pool resource when `execOwner` or `execOwners` is specified, and will contain the value of the execution's owner selected for exec tree creation.
+
+This would produce a command line like:
+```sh
+/app/build_buildfarm/as-nobody -u <exec-owner> /usr/bin/unshare -n -r /app/build_buildfarm/linux-sandbox -- /YOUR/WRAPPER arg1 arg2 <platform-property-name> ACTION
+```
+where ACTION is the Command from remote execution action.
