@@ -21,6 +21,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.buildfarm.common.ClaimAcquirer;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
@@ -42,7 +43,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 
-public interface WorkerContext {
+public interface WorkerContext extends ClaimAcquirer {
   interface IOResource extends AutoCloseable {
     @Override
     void close() throws IOException;

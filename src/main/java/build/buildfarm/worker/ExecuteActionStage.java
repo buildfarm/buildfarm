@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.worker.persistent.ProtoCoordinator;
 import build.buildfarm.worker.resources.ResourceLimits;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
@@ -35,7 +36,12 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
           .help("Execution stall time in ms.")
           .register();
 
+  // How many workers can exist at once for a given WorkerKey
+  // There may be multiple WorkerKeys per mnemonic,
+  //  e.g. if builds are run with different tool fingerprints
+  private static final int defaultMaxWorkersPerKey = 6;
   private final AtomicInteger executorClaims = new AtomicInteger(0);
+  private final ProtoCoordinator coordinator;
 
   public ExecuteActionStage(
       WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -51,6 +57,19 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
         output,
         createDestroyExecDirStage(workerContext, error),
         width);
+
+    this.coordinator = ProtoCoordinator.ofCommonsPool(getMaxWorkersPerKey(), workerContext);
+  }
+
+  private static int getMaxWorkersPerKey() {
+    try {
+      return Integer.parseInt(System.getenv("BUILDFARM_MAX_WORKERS_PER_KEY"));
+    } catch (Exception ignored) {
+      log.info(
+          "Could not get env var BUILDFARM_MAX_WORKERS_PER_KEY; defaulting to "
+              + defaultMaxWorkersPerKey);
+    }
+    return defaultMaxWorkersPerKey;
   }
 
   static PipelineStage createDestroyExecDirStage(
@@ -108,7 +127,8 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   protected void iterate() throws InterruptedException {
     ExecutionContext executionContext = take();
     ResourceLimits limits = workerContext.commandExecutionSettings(executionContext.command);
-    Executor actionExecutor = new Executor(workerContext, executionContext, this, pollerExecutor);
+    Executor actionExecutor =
+        new Executor(workerContext, executionContext, this, pollerExecutor, coordinator);
 
     synchronized (this) {
       int slotUsage = executorClaims.addAndGet(limits.cpu.claimed);

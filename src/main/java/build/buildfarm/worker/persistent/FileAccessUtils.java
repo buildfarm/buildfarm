@@ -22,9 +22,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 /**
@@ -65,7 +67,8 @@ public final class FileAccessUtils {
    * @param to
    * @throws IOException
    */
-  public static void copyFile(Path from, Path to) throws IOException {
+  public static void copyFile(Path from, Path to, @Nullable UserPrincipal owner)
+      throws IOException {
     Path absTo = to.toAbsolutePath();
     log.finer("copyFile: " + from + " to " + absTo);
     if (!Files.exists(from)) {
@@ -74,9 +77,14 @@ public final class FileAccessUtils {
     IOException ioException =
         writeFileSafe(
             to,
+            owner,
             () -> {
               try {
                 Files.copy(from, absTo, REPLACE_EXISTING, COPY_ATTRIBUTES);
+
+                if (owner != null) {
+                  Files.setOwner(absTo, owner);
+                }
                 addPosixOwnerWrite(absTo);
                 return null;
               } catch (IOException e) {
@@ -106,6 +114,7 @@ public final class FileAccessUtils {
     IOException ioException =
         writeFileSafe(
             absTo,
+            null,
             () -> {
               try {
                 Files.move(from, absTo, REPLACE_EXISTING);
@@ -138,6 +147,16 @@ public final class FileAccessUtils {
     }
   }
 
+  private static void createDirectoriesWithOwner(Path directory, UserPrincipal owner)
+      throws IOException {
+    if (!Files.exists(directory)) {
+      createDirectoriesWithOwner(directory.getParent(), owner);
+
+      Files.createDirectory(directory);
+      Files.setOwner(directory, owner);
+    }
+  }
+
   /**
    * Thread-safe (not multi-process-safe) wrapper for locking paths before a write operation.
    *
@@ -146,12 +165,17 @@ public final class FileAccessUtils {
    * <p>It is up to the write operation to specify whether or not to overwrite existing files.
    */
   @SuppressWarnings("PMD.UnnecessaryLocalBeforeReturn")
-  private static IOException writeFileSafe(Path absTo, Supplier<IOException> writeOp) {
+  private static IOException writeFileSafe(
+      Path absTo, @Nullable UserPrincipal owner, Supplier<IOException> writeOp) {
     PathLock toLock = fileLock(absTo);
     synchronized (toLock) {
       try {
         // If 'absTo' is a symlink, checks if its target file exists
-        Files.createDirectories(absTo.getParent());
+        if (owner == null) {
+          Files.createDirectories(absTo.getParent());
+        } else {
+          createDirectoriesWithOwner(absTo.getParent(), owner);
+        }
         return writeOp.get();
       } catch (IOException e) {
         // PMD will complain about UnnecessaryLocalBeforeReturn

@@ -11,15 +11,6 @@ import org.apache.commons.pool2.impl.DefaultPooledObject;
 import persistent.common.CommonsSupervisor;
 
 public abstract class WorkerSupervisor extends CommonsSupervisor<WorkerKey, PersistentWorker> {
-  public static WorkerSupervisor simple() {
-    return new WorkerSupervisor() {
-      @Override
-      public PersistentWorker create(WorkerKey workerKey) throws Exception {
-        return new PersistentWorker(workerKey, "");
-      }
-    };
-  }
-
   private final Logger logger = Logger.getLogger(this.getClass().getName());
 
   public abstract PersistentWorker create(WorkerKey workerKey) throws Exception;

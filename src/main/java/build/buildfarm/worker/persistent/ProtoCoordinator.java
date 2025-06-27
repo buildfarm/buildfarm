@@ -17,12 +17,16 @@ package build.buildfarm.worker.persistent;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static persistent.bazel.client.PersistentWorker.TOOL_INPUT_SUBDIR;
 
+import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.Claim;
+import build.buildfarm.common.ClaimAcquirer;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
 import com.google.protobuf.util.Durations;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -63,19 +67,26 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     return toolInputSyncs.computeIfAbsent(key, k -> k);
   }
 
-  public ProtoCoordinator(CommonsWorkerPool workerPool) {
+  private final ClaimAcquirer claimAcquirer;
+
+  public ProtoCoordinator(CommonsWorkerPool workerPool, ClaimAcquirer claimAcquirer) {
     super(workerPool);
+
+    this.claimAcquirer = claimAcquirer;
   }
 
-  private ProtoCoordinator(WorkerSupervisor supervisor, int maxWorkersPerKey) {
+  private ProtoCoordinator(
+      WorkerSupervisor supervisor, int maxWorkersPerKey, ClaimAcquirer claimAcquirer) {
     super(new CommonsWorkerPool(supervisor, maxWorkersPerKey));
+
+    this.claimAcquirer = claimAcquirer;
   }
 
   // We copy tool inputs from the shared WorkerKey tools directory into our worker exec root,
   //    since there are multiple workers per key,
   //    and presumably there might be writes to tool inputs?
   // Tool inputs which are absolute-paths (e.g. /usr/bin/...) are not affected
-  public static ProtoCoordinator ofCommonsPool(int maxWorkersPerKey) {
+  public static ProtoCoordinator ofCommonsPool(int maxWorkersPerKey, ClaimAcquirer claimAcquirer) {
     WorkerSupervisor loadToolsOnCreate =
         new WorkerSupervisor() {
           @Override
@@ -97,10 +108,14 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
 
               Files.write(initArgsLogFile, initArgs.toString().getBytes());
             }
-            return new PersistentWorker(workerKey, workerExecDir);
+
+            // We only want to acquire an exec owner, so we can use a platform with no properties
+            Claim claim = claimAcquirer.acquireClaim(Platform.newBuilder().build());
+
+            return new PersistentWorker(workerKey, workerExecDir, claim);
           }
         };
-    return new ProtoCoordinator(loadToolsOnCreate, maxWorkersPerKey);
+    return new ProtoCoordinator(loadToolsOnCreate, maxWorkersPerKey, claimAcquirer);
   }
 
   public void copyToolInputsIntoWorkerToolRoot(WorkerKey key, WorkerInputs workerFiles)
@@ -113,7 +128,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
         for (Path opToolPath : workerFiles.opToolInputs) {
           Path workToolPath = workerFiles.relativizeInput(workToolRoot, opToolPath);
           if (!Files.exists(workToolPath)) {
-            workerFiles.copyInputFile(opToolPath, workToolPath);
+            workerFiles.copyInputFile(opToolPath, workToolPath, null);
           }
         }
       } finally {
@@ -140,7 +155,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
       Path toolInputPath = toolInputRoot.resolve(relPath);
       Path execRootPath = workerExecRoot.resolve(relPath);
 
-      FileAccessUtils.copyFile(toolInputPath, execRootPath);
+      FileAccessUtils.copyFile(toolInputPath, execRootPath, null);
     }
   }
 
@@ -161,7 +176,7 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     startTimeoutTimer(request);
 
     // Symlinking should hypothetically be faster+leaner than copying inputs, but it's buggy.
-    copyNontoolInputs(request.workerInputs, worker.getExecRoot());
+    copyNontoolInputs(request.workerInputs, worker.getExecRoot(), worker.getOwner());
 
     return request.request;
   }
@@ -207,12 +222,12 @@ public class ProtoCoordinator extends WorkCoordinator<RequestCtx, ResponseCtx, C
     return new IOException("Response was OK but failed on postWorkCleanup", e);
   }
 
-  private void copyNontoolInputs(WorkerInputs workerInputs, Path workerExecRoot)
-      throws IOException {
+  private void copyNontoolInputs(
+      WorkerInputs workerInputs, Path workerExecRoot, UserPrincipal owner) throws IOException {
     for (Path opPath : workerInputs.allInputs.keySet()) {
       if (!workerInputs.allToolInputs.contains(opPath)) {
         Path execPath = workerInputs.relativizeInput(workerExecRoot, opPath);
-        workerInputs.copyInputFile(opPath, execPath);
+        workerInputs.copyInputFile(opPath, execPath, owner);
       }
     }
   }

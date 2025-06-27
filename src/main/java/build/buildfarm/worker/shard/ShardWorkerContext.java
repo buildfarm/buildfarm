@@ -293,8 +293,8 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   // FIXME make OwnedClaim with owner
-  // how will this play out with persistent workers, should we have one per user?
-  private @Nullable Claim acquireClaim(Platform platform) {
+  @Override
+  public @Nullable Claim acquireClaim(Platform platform) {
     // expand platform requirements with exec owner
     if (provideOwnedClaim) {
       platform = platform.toBuilder().addProperties(EXEC_OWNER_PROPERTY).build();

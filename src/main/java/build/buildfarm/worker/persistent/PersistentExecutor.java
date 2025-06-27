@@ -46,9 +46,6 @@ import persistent.bazel.client.WorkerKey;
  */
 @Log
 public class PersistentExecutor {
-  private static final ProtoCoordinator coordinator =
-      ProtoCoordinator.ofCommonsPool(getMaxWorkersPerKey());
-
   // TODO load from config (i.e. {worker_root}/persistent)
   public static final Path defaultWorkRootsDir = Path.of("/tmp/worker/persistent/");
 
@@ -60,21 +57,10 @@ public class PersistentExecutor {
 
   private static final String SCALAC_EXEC_NAME = "Scalac";
   private static final String JAVAC_EXEC_NAME = "JavaBuilder";
+  private final ProtoCoordinator coordinator;
 
-  // How many workers can exist at once for a given WorkerKey
-  // There may be multiple WorkerKeys per mnemonic,
-  //  e.g. if builds are run with different tool fingerprints
-  private static final int defaultMaxWorkersPerKey = 6;
-
-  private static int getMaxWorkersPerKey() {
-    try {
-      return Integer.parseInt(System.getenv("BUILDFARM_MAX_WORKERS_PER_KEY"));
-    } catch (Exception ignored) {
-      log.info(
-          "Could not get env var BUILDFARM_MAX_WORKERS_PER_KEY; defaulting to "
-              + defaultMaxWorkersPerKey);
-    }
-    return defaultMaxWorkersPerKey;
+  public PersistentExecutor(ProtoCoordinator coordinator) {
+    this.coordinator = coordinator;
   }
 
   /**
@@ -98,7 +84,7 @@ public class PersistentExecutor {
    * @param resultBuilder
    * @return
    */
-  public static Code runOnPersistentWorker(
+  public Code runOnPersistentWorker(
       WorkFilesContext context,
       String operationName,
       ImmutableList<String> argsList,
