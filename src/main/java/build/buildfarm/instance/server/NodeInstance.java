@@ -128,6 +128,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.NoSuchFileException;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -141,9 +142,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 import org.apache.http.auth.Credentials;
@@ -743,19 +746,57 @@ public abstract class NodeInstance extends InstanceBase {
     return fetchBlobUrls(urls.build(), headers, expectedDigest, requestMetadata);
   }
 
+  /**
+   * Some headers in `allHeaders` are intended ONLY for specific URLs indexes, for example, AUTH
+   * headers that we wouldn't want exposed to all URL (mirrors).
+   *
+   * <p>If a header is prefixed with "<int>:", it is intended for the URL at index <int>. If a
+   * header is not prefixed, it is intended for all URLs. If a header is indexed, it is higher
+   * priority and will override existing headers with the same key.
+   *
+   * @param allHeaders
+   * @param urlIndex
+   * @return
+   */
+  @VisibleForTesting
+  static @Nonnull Map<String, String> getHeadersForUrlIndex(
+      @Nonnull Map<String, String> allHeaders, int urlIndex) {
+    Preconditions.checkArgument(urlIndex >= 0, "urlIndex must be >= 0");
+    Map<String, String> mapBuilder = new HashMap<>();
+    // Copy over all the "global" headers that apply to all URLs
+    Pattern urlIndexPattern = Pattern.compile("^\\d+:.*$");
+    allHeaders.forEach(
+        (key, value) -> {
+          if (!urlIndexPattern.matcher(key).matches()) {
+            // it's a global header
+            mapBuilder.put(key, value);
+          }
+        });
+    String urlIndexPrefix = urlIndex + ":";
+    allHeaders.forEach(
+        (key, value) -> {
+          if (key.startsWith(urlIndexPrefix)) {
+            // it's an indexed header
+            mapBuilder.put(key.substring(urlIndexPrefix.length()), value);
+          }
+        });
+    return mapBuilder;
+  }
+
   @VisibleForTesting
   ListenableFuture<Digest> fetchBlobUrls(
       Iterable<URL> urls,
       Map<String, String> headers,
       Digest expectedDigest,
       RequestMetadata requestMetadata) {
+    int urlIndex = 0;
     for (URL url : urls) {
       try {
         // some minor abuse here, we want the download to set our built digest size as side effect
         return downloadUrl(
             url,
             expectedDigest.getHash(),
-            headers,
+            getHeadersForUrlIndex(headers, urlIndex),
             new DigestUtil(HashFunction.get(expectedDigest.getDigestFunction())),
             actualDigest -> {
               if (!expectedDigest.getHash().isEmpty()
@@ -771,6 +812,7 @@ public abstract class NodeInstance extends InstanceBase {
         log.log(Level.WARNING, "download attempt failed", e);
         // ignore?
       }
+      urlIndex++;
     }
     return immediateFailedFuture(new NoSuchFileException(expectedDigest.getHash()));
   }

@@ -83,6 +83,8 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -695,6 +697,94 @@ public class NodeInstanceTest {
   }
 
   @SuppressWarnings("unchecked")
+  @Test
+  public void getHeadersForUrlIndex_returnsAllHeadersWhenNoIndexedHeaders() {
+    // Arrange
+    Map<String, String> headers = new HashMap<>();
+    headers.put("Authorization", "Bearer token123");
+    headers.put("X-Custom-Header", "value1");
+    headers.put("Accept", "application/json");
+
+    // Act
+    Map<String, String> result = NodeInstance.getHeadersForUrlIndex(headers, 0);
+
+    // Assert
+    assertThat(result)
+        .containsExactly(
+            "Authorization", "Bearer token123",
+            "X-Custom-Header", "value1",
+            "Accept", "application/json");
+  }
+
+  @Test
+  public void getHeadersForUrlIndex_filtersAndRenamesIndexedHeaders() {
+    // Arrange
+    Map<String, String> headers = new HashMap<>();
+    headers.put("0:Authorization", "Bearer token123");
+    headers.put("1:Authorization", "Bearer token456");
+    headers.put("X-Custom-Header", "value1");
+    headers.put("1:X-Custom-Header", "value2");
+
+    // Act - Test with index 0
+    Map<String, String> result0 = NodeInstance.getHeadersForUrlIndex(headers, 0);
+
+    // Assert
+    assertThat(result0)
+        .containsExactly(
+            "Authorization", "Bearer token123",
+            "X-Custom-Header", "value1");
+
+    // Act - Test with index 1
+    Map<String, String> result1 = NodeInstance.getHeadersForUrlIndex(headers, 1);
+
+    // Assert
+    assertThat(result1)
+        .containsExactly(
+            "Authorization", "Bearer token456",
+            "X-Custom-Header", "value2");
+  }
+
+  @Test
+  public void getHeadersForUrlIndex_handlesMixedIndexedAndNonIndexedHeaders() {
+    // Arrange
+    Map<String, String> headers = new HashMap<>();
+    headers.put("0:Authorization", "Bearer token123");
+    headers.put("X-Custom-Header", "shared-value");
+    headers.put("1:X-Custom-Header", "specific-value");
+    headers.put("Accept", "application/json");
+
+    // Act - Test with index 0 (should use shared headers and index 0 specific ones)
+    Map<String, String> result0 = NodeInstance.getHeadersForUrlIndex(headers, 0);
+
+    // Assert
+    assertThat(result0)
+        .containsExactly(
+            "Authorization", "Bearer token123",
+            "X-Custom-Header", "shared-value",
+            "Accept", "application/json");
+
+    // Act - Test with index 1 (should use shared headers and index 1 specific ones)
+    Map<String, String> result1 = NodeInstance.getHeadersForUrlIndex(headers, 1);
+
+    // Assert
+    assertThat(result1)
+        .containsExactly(
+            "X-Custom-Header", "specific-value",
+            "Accept", "application/json");
+  }
+
+  @Test
+  public void getHeadersForUrlIndex_handlesEmptyHeadersMap() {
+    // Arrange
+    Map<String, String> headers = Map.of();
+
+    // Act
+    Map<String, String> result = NodeInstance.getHeadersForUrlIndex(headers, 0);
+
+    // Assert
+    assertThat(result).isEmpty();
+  }
+
   @Test
   public void outputDirectoriesFilesAreEnsuredPresent() throws Exception {
     // our test subjects - these should appear in the findMissingBlobs request
