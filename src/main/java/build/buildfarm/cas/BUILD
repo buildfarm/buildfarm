@@ -21,6 +21,7 @@ java_library(
         "@googleapis//google/bytestream:bytestream_java_grpc",
         "@googleapis//google/bytestream:bytestream_java_proto",
         "@googleapis//google/rpc:rpc_java_proto",
+        "@maven//:com_github_ben_manes_caffeine_caffeine",
         "@maven//:com_github_jnr_jnr_ffi",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_code_gson_gson",
