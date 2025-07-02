@@ -49,14 +49,11 @@ public class DequeueMatchEvaluator {
    * @details Compares the platform properties of the worker to the operation's platform properties.
    * @param workerProvisions The provisions of the worker.
    * @param resourceSet The limited resources that the worker has available.
-   * @param queueEntry An entry recently removed from the queue.
    * @return An acquired claim on resources, or null if the platform could not be satisfied or
    *     resourced.
    * @note Overloaded.
    * @note Suggested return identifier: claim.
    */
-  @SuppressWarnings("NullableProblems")
-  @NotNull
   public static @Nullable Claim acquireClaim(
       SetMultimap<String, String> workerProvisions,
       LocalResourceSet resourceSet,
