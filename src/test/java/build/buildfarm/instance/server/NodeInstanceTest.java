@@ -696,93 +696,96 @@ public class NodeInstanceTest {
             eq(requestMetadata));
   }
 
-  @SuppressWarnings("unchecked")
   @Test
-  public void getHeadersForUrlIndex_returnsAllHeadersWhenNoIndexedHeaders() {
+  public void createHeadersMapView_returnsEmptyMapForEmptyInput() {
     // Arrange
     Map<String, String> headers = new HashMap<>();
-    headers.put("Authorization", "Bearer token123");
-    headers.put("X-Custom-Header", "value1");
-    headers.put("Accept", "application/json");
-
     // Act
-    Map<String, String> result = NodeInstance.getHeadersForUrlIndex(headers, 0);
-
-    // Assert
-    assertThat(result)
-        .containsExactly(
-            "Authorization", "Bearer token123",
-            "X-Custom-Header", "value1",
-            "Accept", "application/json");
-  }
-
-  @Test
-  public void getHeadersForUrlIndex_filtersAndRenamesIndexedHeaders() {
-    // Arrange
-    Map<String, String> headers = new HashMap<>();
-    headers.put("0:Authorization", "Bearer token123");
-    headers.put("1:Authorization", "Bearer token456");
-    headers.put("X-Custom-Header", "value1");
-    headers.put("1:X-Custom-Header", "value2");
-
-    // Act - Test with index 0
-    Map<String, String> result0 = NodeInstance.getHeadersForUrlIndex(headers, 0);
-
-    // Assert
-    assertThat(result0)
-        .containsExactly(
-            "Authorization", "Bearer token123",
-            "X-Custom-Header", "value1");
-
-    // Act - Test with index 1
-    Map<String, String> result1 = NodeInstance.getHeadersForUrlIndex(headers, 1);
-
-    // Assert
-    assertThat(result1)
-        .containsExactly(
-            "Authorization", "Bearer token456",
-            "X-Custom-Header", "value2");
-  }
-
-  @Test
-  public void getHeadersForUrlIndex_handlesMixedIndexedAndNonIndexedHeaders() {
-    // Arrange
-    Map<String, String> headers = new HashMap<>();
-    headers.put("0:Authorization", "Bearer token123");
-    headers.put("X-Custom-Header", "shared-value");
-    headers.put("1:X-Custom-Header", "specific-value");
-    headers.put("Accept", "application/json");
-
-    // Act - Test with index 0 (should use shared headers and index 0 specific ones)
-    Map<String, String> result0 = NodeInstance.getHeadersForUrlIndex(headers, 0);
-
-    // Assert
-    assertThat(result0)
-        .containsExactly(
-            "Authorization", "Bearer token123",
-            "X-Custom-Header", "shared-value",
-            "Accept", "application/json");
-
-    // Act - Test with index 1 (should use shared headers and index 1 specific ones)
-    Map<String, String> result1 = NodeInstance.getHeadersForUrlIndex(headers, 1);
-
-    // Assert
-    assertThat(result1)
-        .containsExactly(
-            "X-Custom-Header", "specific-value",
-            "Accept", "application/json");
-  }
-
-  @Test
-  public void getHeadersForUrlIndex_handlesEmptyHeadersMap() {
-    // Arrange
-    Map<String, String> headers = Map.of();
-
-    // Act
-    Map<String, String> result = NodeInstance.getHeadersForUrlIndex(headers, 0);
-
+    Map<String, String> globalHeaders = NodeInstance.calculateGlobalHeaders(headers);
+    Map<Integer, Map<String, String>> result =
+        NodeInstance.createHeadersMapView(headers, globalHeaders);
     // Assert
     assertThat(result).isEmpty();
+  }
+
+  @Test
+  public void createHeadersMapView_returnsGlobalHeadersForAllIndices() {
+    // Arrange
+    Map<String, String> headers =
+        Map.of(
+            "Authorization", "Bearer token",
+            "X-Custom-Header", "value");
+
+    // Act
+    Map<String, String> globalHeaders = NodeInstance.calculateGlobalHeaders(headers);
+    Map<Integer, Map<String, String>> result =
+        NodeInstance.createHeadersMapView(headers, globalHeaders);
+
+    // Assert
+    // Should contain an entry for any index with global headers
+    Map<String, String> anyIndexHeaders = result.getOrDefault(0, globalHeaders);
+    assertThat(anyIndexHeaders).isNotNull();
+    assertThat(anyIndexHeaders).containsEntry("Authorization", "Bearer token");
+    assertThat(anyIndexHeaders).containsEntry("X-Custom-Header", "value");
+    assertThat(anyIndexHeaders).hasSize(2);
+  }
+
+  @Test
+  public void createHeadersMapView_handlesIndexedHeaders() {
+    // Arrange
+    Map<String, String> headers =
+        Map.of(
+            "0:Authorization", "Bearer token0",
+            "1:Authorization", "Bearer token1",
+            "X-Global-Header", "global");
+
+    // Act
+    Map<String, String> globalHeaders = NodeInstance.calculateGlobalHeaders(headers);
+    Map<Integer, Map<String, String>> result =
+        NodeInstance.createHeadersMapView(headers, globalHeaders);
+
+    // Assert
+    // Check index 0 headers
+    Map<String, String> index0Headers = result.getOrDefault(0, globalHeaders);
+    assertThat(index0Headers).isNotNull();
+    assertThat(index0Headers).containsEntry("Authorization", "Bearer token0");
+    assertThat(index0Headers).containsEntry("X-Global-Header", "global");
+
+    // Check index 1 headers
+    Map<String, String> index1Headers = result.getOrDefault(1, globalHeaders);
+    assertThat(index1Headers).isNotNull();
+    assertThat(index1Headers).containsEntry("Authorization", "Bearer token1");
+    assertThat(index1Headers).containsEntry("X-Global-Header", "global");
+
+    // Verify no other indices were created
+    assertThat(result).hasSize(2);
+  }
+
+  @Test
+  public void createHeadersMapView_mergesGlobalAndIndexedHeaders() {
+    // Arrange
+    Map<String, String> headers =
+        Map.of(
+            "Authorization", "GlobalToken",
+            "0:Authorization", "Index0Token",
+            "X-Common-Header", "CommonValue");
+
+    // Act
+    Map<String, String> globalHeaders = NodeInstance.calculateGlobalHeaders(headers);
+    Map<Integer, Map<String, String>> result =
+        NodeInstance.createHeadersMapView(headers, globalHeaders);
+
+    // Assert
+    Map<String, String> index0Headers = result.getOrDefault(0, globalHeaders);
+    assertThat(index0Headers).isNotNull();
+    assertThat(index0Headers).containsEntry("Authorization", "Index0Token");
+    assertThat(index0Headers).containsEntry("X-Common-Header", "CommonValue");
+
+    // Check that another index would get the global Authorization
+    Map<String, String> index1Headers = result.getOrDefault(1, globalHeaders);
+    assertThat(index1Headers).isNotNull();
+    assertThat(index1Headers).containsEntry("Authorization", "GlobalToken");
+    assertThat(index1Headers).containsEntry("X-Common-Header", "CommonValue");
   }
 
   @Test

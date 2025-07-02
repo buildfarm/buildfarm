@@ -142,11 +142,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 import org.apache.http.auth.Credentials;
@@ -746,6 +744,8 @@ public abstract class NodeInstance extends InstanceBase {
     return fetchBlobUrls(urls.build(), headers, expectedDigest, requestMetadata);
   }
 
+  private static final String INDEXED_HEADER_REGEX = "^\\d+:.*$";
+
   /**
    * Some headers in `allHeaders` are intended ONLY for specific URLs indexes, for example, AUTH
    * headers that we wouldn't want exposed to all URL (mirrors).
@@ -754,33 +754,44 @@ public abstract class NodeInstance extends InstanceBase {
    * header is not prefixed, it is intended for all URLs. If a header is indexed, it is higher
    * priority and will override existing headers with the same key.
    *
-   * @param allHeaders
-   * @param urlIndex
+   * @param allHeaders headers from the request. Some may begin with index, but not necessarily.
    * @return
    */
   @VisibleForTesting
-  static @Nonnull Map<String, String> getHeadersForUrlIndex(
-      @Nonnull Map<String, String> allHeaders, int urlIndex) {
-    Preconditions.checkArgument(urlIndex >= 0, "urlIndex must be >= 0");
-    Map<String, String> mapBuilder = new HashMap<>();
-    // Copy over all the "global" headers that apply to all URLs
-    Pattern urlIndexPattern = Pattern.compile("^\\d+:.*$");
+  static Map<Integer, Map<String, String>> createHeadersMapView(
+      Map<String, String> allHeaders, Map<String, String> globalHeaders) {
+    Map<Integer, Map<String, String>> headersMapView = new HashMap<>();
+
+    // Second pass: process index headers and merge with globals
     allHeaders.forEach(
         (key, value) -> {
-          if (!urlIndexPattern.matcher(key).matches()) {
-            // it's a global header
-            mapBuilder.put(key, value);
+          if (key.matches(INDEXED_HEADER_REGEX)) {
+            // It's an indexed header
+            int colonIndex = key.indexOf(':');
+            int urlIndex = Integer.parseInt(key.substring(0, colonIndex));
+            String headerKey = key.substring(colonIndex + 1);
+
+            // Get or create the map for this index and initialize with global headers
+            Map<String, String> indexMap =
+                headersMapView.computeIfAbsent(urlIndex, k -> new HashMap<>(globalHeaders));
+
+            // Add/overwrite with the index-specific header
+            indexMap.put(headerKey, value);
           }
         });
-    String urlIndexPrefix = urlIndex + ":";
-    allHeaders.forEach(
-        (key, value) -> {
-          if (key.startsWith(urlIndexPrefix)) {
-            // it's an indexed header
-            mapBuilder.put(key.substring(urlIndexPrefix.length()), value);
-          }
-        });
-    return mapBuilder;
+    return headersMapView;
+  }
+
+  /**
+   * All non-indexed headers are intended for all URLs.
+   *
+   * @param headers headers from the request. Some may begin with index, but not necessarily.
+   * @return Filtered headers where index headers are removed
+   */
+  static Map<String, String> calculateGlobalHeaders(Map<String, String> headers) {
+    return headers.entrySet().stream()
+        .filter((entry) -> !entry.getKey().matches(INDEXED_HEADER_REGEX))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @VisibleForTesting
@@ -789,6 +800,11 @@ public abstract class NodeInstance extends InstanceBase {
       Map<String, String> headers,
       Digest expectedDigest,
       RequestMetadata requestMetadata) {
+    // First pass: collect global headers
+    // These apply to all URLs.
+    Map<String, String> globalHeaders = calculateGlobalHeaders(headers);
+    // generate a map of headers for each URL, indexed by URL index
+    Map<Integer, Map<String, String>> headersMapView = createHeadersMapView(headers, globalHeaders);
     int urlIndex = 0;
     for (URL url : urls) {
       try {
@@ -796,7 +812,7 @@ public abstract class NodeInstance extends InstanceBase {
         return downloadUrl(
             url,
             expectedDigest.getHash(),
-            getHeadersForUrlIndex(headers, urlIndex),
+            headersMapView.getOrDefault(urlIndex, globalHeaders),
             new DigestUtil(HashFunction.get(expectedDigest.getDigestFunction())),
             actualDigest -> {
               if (!expectedDigest.getHash().isEmpty()
