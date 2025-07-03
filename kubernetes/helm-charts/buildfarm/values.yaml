@@ -32,6 +32,17 @@ server:
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
   replicaCount: 1
+
+  livenessProbe:
+    grpc:
+      port: 8980
+    initialDelaySeconds: 10
+  readinessProbe:
+    grpc:
+      port: 8980
+    initialDelaySeconds: 10
+  startupProbe: {}
+
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
   # resources, such as Minikube. If you do want to specify resources, uncomment the following
@@ -148,6 +159,16 @@ shardWorker:
             averageUtilization: 50
     targetCPUUtilizationPercentage: 50 # effective only in `v1`
 
+  livenessProbe:
+    grpc:
+      port: 8982
+    initialDelaySeconds: 10
+  readinessProbe:
+    grpc:
+      port: 8982
+    initialDelaySeconds: 10
+  startupProbe: {}
+
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
   # resources, such as Minikube. If you do want to specify resources, uncomment the following
@@ -258,6 +279,16 @@ execWorker:
             type: Utilization
             averageUtilization: 50
     targetCPUUtilizationPercentage: 50 # effective only in `v1`
+
+  livenessProbe:
+    grpc:
+      port: 8982
+    initialDelaySeconds: 10
+  readinessProbe:
+    grpc:
+      port: 8982
+    initialDelaySeconds: 10
+  startupProbe: {}
 
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
