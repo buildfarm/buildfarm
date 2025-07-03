@@ -14,9 +14,13 @@
 
 package build.buildfarm.worker.resources;
 
+import build.buildfarm.common.Claim.Lease;
 import build.buildfarm.common.Claim.Stage;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.Semaphore;
 
@@ -30,16 +34,86 @@ import java.util.concurrent.Semaphore;
  *     resources are specific to the individual worker.
  */
 public class LocalResourceSet {
-  public record SemaphoreResource(Semaphore semaphore, Stage stage) {}
+  public record SemaphoreLease(Semaphore semaphore, Stage stage, int amount) implements Lease {
+    @Override
+    public int getAmount() {
+      return amount;
+    }
 
-  public record PoolResource(Queue<Object> pool, Stage stage) {}
+    @Override
+    public Stage getStage() {
+      return stage;
+    }
+
+    @Override
+    public void release() {
+      semaphore.release(amount);
+    }
+  }
+
+  public record SemaphoreResource(Semaphore semaphore, Stage stage) implements LocalResource {
+    @Override
+    public int available() {
+      return semaphore.availablePermits();
+    }
+
+    @Override
+    public Optional<Lease> tryAcquire(int amount) {
+      if (semaphore.tryAcquire(amount)) {
+        return Optional.of(new SemaphoreLease(semaphore, stage, amount));
+      }
+
+      return Optional.empty();
+    }
+  }
+
+  public record PoolLease(Queue<Object> pool, Stage stage, List<Object> claims) implements Lease {
+    @Override
+    public int getAmount() {
+      return claims.size();
+    }
+
+    @Override
+    public Stage getStage() {
+      return stage;
+    }
+
+    @Override
+    public void release() {
+      pool.addAll(claims);
+    }
+  }
+
+  public record PoolResource(Queue<Object> pool, Stage stage) implements LocalResource {
+    @Override
+    public int available() {
+      return pool.size();
+    }
+
+    @Override
+    public Optional<Lease> tryAcquire(int amount) {
+      List<Object> claimedIds = new ArrayList<>(amount);
+
+      for (int i = 0; i < amount; i++) {
+        Object id = pool.poll();
+
+        claimedIds.add(id);
+
+        if (id == null) {
+          pool.addAll(claimedIds);
+
+          return Optional.empty();
+        }
+      }
+
+      return Optional.of(new PoolLease(pool, stage, claimedIds));
+    }
+  }
 
   /**
    * @field resources
-   * @brief A set containing resource semaphores organized by name.
+   * @brief A set containing resources organized by name.
    * @details Key is name, and value contains current usage amount.
    */
-  public Map<String, SemaphoreResource> resources = new HashMap<>();
-
-  public Map<String, PoolResource> poolResources = new HashMap<>();
+  public Map<String, LocalResource> resources = new HashMap<>();
 }

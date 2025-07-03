@@ -209,7 +209,7 @@ class ShardWorkerContext implements WorkerContext {
     this.resourceSet = resourceSet;
     this.writer = writer;
 
-    provideOwnedClaim = this.resourceSet.poolResources.containsKey(EXEC_OWNER_RESOURCE_NAME);
+    provideOwnedClaim = this.resourceSet.resources.containsKey(EXEC_OWNER_RESOURCE_NAME);
   }
 
   private static Retrier createBackplaneRetrier() {

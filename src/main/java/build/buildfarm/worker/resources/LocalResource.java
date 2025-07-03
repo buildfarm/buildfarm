@@ -1,4 +1,4 @@
-// Copyright 2024 The Buildfarm Authors. All rights reserved.
+// Copyright 2023 The Buildfarm Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,33 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.worker.resources;
 
-import java.nio.file.attribute.UserPrincipal;
-import java.util.List;
-import java.util.Map.Entry;
-import javax.annotation.Nullable;
+import build.buildfarm.common.Claim.Lease;
+import java.util.Optional;
 
-public interface Claim {
-  interface Lease {
-    int getAmount();
+public interface LocalResource {
+  int available();
 
-    Stage getStage();
-
-    void release();
-  }
-
-  enum Stage {
-    EXECUTE_ACTION_STAGE,
-    REPORT_RESULT_STAGE,
-  }
-
-  void release(Stage stage);
-
-  void release();
-
-  @Nullable
-  UserPrincipal owner();
-
-  Iterable<Entry<String, List<Object>>> getPools();
+  Optional<Lease> tryAcquire(int amount);
 }

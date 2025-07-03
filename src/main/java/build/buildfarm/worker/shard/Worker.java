@@ -377,7 +377,7 @@ public final class Worker extends LoggingMain {
             new PoolResource(new ArrayDeque<>(owners.keySet()), REPORT_RESULT_STAGE);
       }
       if (execOwnerIndexResource != null) {
-        resourceSet.poolResources.put(
+        resourceSet.resources.put(
             ShardWorkerContext.EXEC_OWNER_RESOURCE_NAME, execOwnerIndexResource);
       }
 
