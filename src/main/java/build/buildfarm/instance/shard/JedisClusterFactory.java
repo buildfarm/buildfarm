@@ -213,6 +213,7 @@ public class JedisClusterFactory {
     connectionPoolConfig.setMinIdle(configs.getBackplane().getJedisPoolMinIdle());
     connectionPoolConfig.setTimeBetweenEvictionRuns(
         Duration.ofMillis(configs.getBackplane().getJedisTimeBetweenEvictionRunsMillis()));
+    connectionPoolConfig.setTestOnBorrow(configs.getBackplane().isConnectionValidatedOnBorrow());
     return connectionPoolConfig;
   }
 

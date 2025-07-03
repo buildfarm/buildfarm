@@ -22,6 +22,7 @@ public class Backplane {
   private int jedisPoolMaxIdle = 8;
   private int jedisPoolMinIdle = 0;
   private long jedisTimeBetweenEvictionRunsMillis = 30000L;
+  private boolean connectionValidatedOnBorrow = false;
   private String workersHashName = "Workers";
   private String workerChannel = "WorkerChannel";
   private String actionCachePrefix = "ActionCache";
