@@ -31,7 +31,6 @@ import org.junit.runners.JUnit4;
 /** These test CGroups v1 behavior. When CGroups v1 is no longer supported, delete these tests. */
 @RunWith(JUnit4.class)
 public class GroupV1Test {
-
   @Before
   public void setup() {
     Group.VERSION = CGroupVersion.CGROUPS_V1;

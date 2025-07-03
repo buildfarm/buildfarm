@@ -22,8 +22,11 @@ import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Objects;
 import java.util.SortedMap;
+import javax.annotation.Nullable;
+import persistent.bazel.client.BasicWorkerKey;
 import persistent.bazel.client.PersistentWorker;
 import persistent.bazel.client.WorkerKey;
 
@@ -37,7 +40,8 @@ public class Keymaker {
       ImmutableList<String> workerInitArgs,
       ImmutableMap<String, String> workerEnv,
       String executionName,
-      WorkerInputs workerFiles) {
+      WorkerInputs workerFiles,
+      @Nullable UserPrincipal owner) {
     // Cancellation not yet supported; can change in the future,
     //  Presumably, following how Bazel's own persistent workers work
     boolean sandboxed = true;
@@ -58,15 +62,17 @@ public class Keymaker {
     HashCode combinedToolsHash = workerFilesCombinedHash(toolsRoot, hashedTools);
 
     return new WorkerKey(
-        workerInitCmd,
-        workerInitArgs,
-        workerEnv,
-        workRoot,
-        executionName,
-        combinedToolsHash,
-        hashedTools,
-        sandboxed,
-        cancellable);
+        new BasicWorkerKey(
+            workerInitCmd,
+            workerInitArgs,
+            workerEnv,
+            workRoot,
+            executionName,
+            combinedToolsHash,
+            hashedTools,
+            sandboxed,
+            cancellable),
+        owner);
   }
 
   // Hash of a subset of the WorkerKey

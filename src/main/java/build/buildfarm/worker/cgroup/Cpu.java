@@ -19,7 +19,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import java.io.IOException;
 
 public class Cpu extends Controller {
-
   private static final int CPU_GRANULARITY = 100_000; // microseconds (μS)
 
   Cpu(Group group) {

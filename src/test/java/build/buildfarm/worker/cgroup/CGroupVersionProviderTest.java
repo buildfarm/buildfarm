@@ -36,7 +36,6 @@ import org.mockito.Mockito;
 
 @RunWith(JUnit4.class)
 public class CGroupVersionProviderTest {
-
   @Before
   public void setup() throws IOException {
     Assume.assumeFalse(isWindows());
@@ -49,7 +48,6 @@ public class CGroupVersionProviderTest {
 
     try (MockedStatic<Files> mockedFiles = Mockito.mockStatic(Files.class);
         MockedStatic<Path> mockedPath = Mockito.mockStatic(Path.class)) {
-
       // Mock Path.of to return a path we can control
       Path mockPath = mock(Path.class);
       mockedPath.when(() -> Path.of("/sys/fs/cgroup")).thenReturn(mockPath);
@@ -103,7 +101,6 @@ public class CGroupVersionProviderTest {
   public void testNoCGroupsWhenDirectoryDoesntExist() {
     try (MockedStatic<Files> mockedFiles = Mockito.mockStatic(Files.class);
         MockedStatic<Path> mockedPath = Mockito.mockStatic(Path.class)) {
-
       // Mock Path.of to return a path we can control
       Path mockPath = mock(Path.class);
       mockedPath.when(() -> Path.of("/sys/fs/cgroup")).thenReturn(mockPath);
@@ -140,7 +137,6 @@ public class CGroupVersionProviderTest {
   public void testIOExceptionHandling() {
     try (MockedStatic<Files> mockedFiles = Mockito.mockStatic(Files.class);
         MockedStatic<Path> mockedPath = Mockito.mockStatic(Path.class)) {
-
       // Mock Path.of to return a path we can control
       Path mockPath = mock(Path.class);
       mockedPath.when(() -> Path.of("/sys/fs/cgroup")).thenReturn(mockPath);
