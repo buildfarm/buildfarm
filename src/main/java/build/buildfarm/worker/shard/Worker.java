@@ -267,7 +267,7 @@ public final class Worker extends LoggingMain {
       pipeline.add(reportResultStage, 1);
 
       serverBuilder.addService(
-          new WorkerProfileService(
+          new WorkerExecProfileService(
               storage,
               matchStage,
               inputFetchStage,
