@@ -30,10 +30,12 @@ import com.google.rpc.Code;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
+import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 import persistent.bazel.client.WorkerKey;
 
@@ -96,6 +98,7 @@ public class PersistentExecutor {
    * @param timeout
    * @param workRootsDir
    * @param resultBuilder
+   * @param owner
    * @return
    */
   public static Code runOnPersistentWorker(
@@ -106,7 +109,8 @@ public class PersistentExecutor {
       ResourceLimits limits,
       Duration timeout,
       Path workRootsDir,
-      ActionResult.Builder resultBuilder)
+      ActionResult.Builder resultBuilder,
+      @Nullable UserPrincipal owner)
       throws IOException {
     // Pull out persistent worker start command from the overall action request
 
@@ -155,7 +159,8 @@ public class PersistentExecutor {
             workerInitArgs,
             env,
             executionName,
-            workerFiles);
+            workerFiles,
+            owner);
 
     coordinator.copyToolInputsIntoWorkerToolRoot(key, workerFiles);
 

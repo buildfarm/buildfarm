@@ -63,6 +63,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -72,6 +73,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
+import javax.annotation.Nullable;
 import lombok.extern.java.Log;
 
 @Log
@@ -341,7 +343,8 @@ class Executor {
               timeout,
               // executingMetadata.getStdoutStreamName(),
               // executingMetadata.getStderrStreamName(),
-              executionContext.executeResponse.getResultBuilder());
+              executionContext.executeResponse.getResultBuilder(),
+              executionContext.claim.owner());
 
       // From Bazel Test Encyclopedia:
       // If the main process of a test exits, but some of its children are still running,
@@ -504,7 +507,8 @@ class Executor {
       List<EnvironmentVariable> environmentVariables,
       ResourceLimits limits,
       Duration timeout,
-      ActionResult.Builder resultBuilder)
+      ActionResult.Builder resultBuilder,
+      @Nullable UserPrincipal owner)
       throws IOException, InterruptedException {
     ProcessBuilder processBuilder =
         new ProcessBuilder(arguments).directory(execDir.toAbsolutePath().toFile());
@@ -540,7 +544,8 @@ class Executor {
           limits,
           timeout,
           PersistentExecutor.defaultWorkRootsDir,
-          resultBuilder);
+          resultBuilder,
+          owner);
     }
 
     // run the action under docker
