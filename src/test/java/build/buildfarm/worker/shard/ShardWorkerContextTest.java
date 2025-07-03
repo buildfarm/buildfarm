@@ -212,7 +212,7 @@ public class ShardWorkerContextTest {
   @Test
   public void resourceExhaustedIgnoresEntryWithExecOwner() throws Exception {
     LocalResourceSet resourceSet = new LocalResourceSet();
-    resourceSet.poolResources.put(
+    resourceSet.resources.put(
         ShardWorkerContext.EXEC_OWNER_RESOURCE_NAME,
         new PoolResource(new Dispenser<>("exec-user-name"), REPORT_RESULT_STAGE));
     WorkerContext context = createTestContext(/* policies= */ ImmutableList.of(), resourceSet);
