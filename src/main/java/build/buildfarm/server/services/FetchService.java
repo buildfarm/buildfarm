@@ -39,6 +39,10 @@ public class FetchService extends FetchImplBase {
   // header name itself.
   public static final String QUALIFIER_HTTP_HEADER_PREFIX = "http_header:";
 
+  // The `:` character is not permitted in an HTTP header name.
+  // These are use specifically to indicate that headers should only be applied to specific URLs
+  public static final String QUALIFIER_HTTP_HEADER_URL_PREFIX = "http_header_url:";
+
   public FetchService(Instance instance) {
     this.instance = instance;
   }
@@ -64,6 +68,8 @@ public class FetchService extends FetchImplBase {
           fetchQualifiers.setDigest(parseChecksumSRI(value, digestFunction));
       case String s when s.startsWith(QUALIFIER_HTTP_HEADER_PREFIX) ->
           fetchQualifiers.putHeaders(s.substring(QUALIFIER_HTTP_HEADER_PREFIX.length()), value);
+      case String s when s.startsWith(QUALIFIER_HTTP_HEADER_URL_PREFIX) ->
+          fetchQualifiers.putHeaders(s.substring(QUALIFIER_HTTP_HEADER_URL_PREFIX.length()), value);
       default -> {
         // ignore unknown qualifiers
       }
