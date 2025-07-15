@@ -1,6 +1,6 @@
 
 # Helm chart
-kubernetes/helm-charts/buildfarm    @jasonschroeder-sfdc
+/kubernetes/helm-charts/buildfarm/    @jasonschroeder-sfdc
 
 # Default owner
 *   @werkt
