@@ -3,6 +3,7 @@ package build.buildfarm.common;
 import java.time.Duration;
 import java.util.function.Supplier;
 import redis.clients.jedis.AbstractPipeline;
+import redis.clients.jedis.resps.ScanResult;
 
 public interface Queue<E> {
   // java.util.BlockingQueue-ish
@@ -29,4 +30,6 @@ public interface Queue<E> {
   boolean removeFromDequeue(E e);
 
   void removeFromDequeue(AbstractPipeline pipeline, E e);
+
+  ScanResult<String> scan(String cursor, int count, String match);
 }

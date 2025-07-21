@@ -82,6 +82,7 @@ import com.google.rpc.Status;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -203,7 +204,7 @@ public class RedisShardBackplane implements Backplane {
     protected abstract void visit(ExecuteEntry executeEntry, BalancedQueueEntry balancedQueueEntry);
 
     public void visit(BalancedQueueEntry balancedQueueEntry) {
-      String entry = balancedQueueEntry.getValue();
+      String entry = balancedQueueEntry.value();
       ExecuteEntry.Builder executeEntry = ExecuteEntry.newBuilder();
       try {
         JsonFormat.parser().merge(entry, executeEntry);
@@ -267,7 +268,7 @@ public class RedisShardBackplane implements Backplane {
         new Visitor<>() {
           @Override
           public void visit(ExecutionQueueEntry executionQueueEntry) {
-            QueueEntry queueEntry = executionQueueEntry.getQueueEntry();
+            QueueEntry queueEntry = executionQueueEntry.queueEntry();
             String executionName = queueEntry.getExecuteEntry().getOperationName();
             String value = state.dispatchingExecutions.get(jedis, executionName);
             long dispatchingTimeout_ms = configs.getBackplane().getDispatchingTimeoutMillis();
@@ -316,7 +317,7 @@ public class RedisShardBackplane implements Backplane {
         new Visitor<>() {
           @Override
           public void visit(ExecutionQueueEntry executionQueueEntry) {
-            QueueEntry queueEntry = executionQueueEntry.getQueueEntry();
+            QueueEntry queueEntry = executionQueueEntry.queueEntry();
             onOperationName.accept(queueEntry.getExecuteEntry().getOperationName());
           }
         });
@@ -1154,6 +1155,37 @@ public class RedisShardBackplane implements Backplane {
     return new ScanResult(tokenFromRedisCursor(scanResult.getCursor()), builder.build());
   }
 
+  @Override
+  public ScanResult<Map.Entry<String, QueueEntry>> scanQueuedOperations(String cursor, int count)
+      throws IOException {
+    ImmutableList.Builder<Map.Entry<String, QueueEntry>> builder = ImmutableList.builder();
+    redis.clients.jedis.resps.ScanResult<ExecutionQueueEntry> scanResult =
+        client.call(jedis -> state.executionQueue.scan(jedis, cursor, count, /* match= */ "*"));
+    for (ExecutionQueueEntry entry : scanResult.getResult()) {
+      builder.add(new AbstractMap.SimpleEntry<>(entry.queue().getName(), entry.queueEntry()));
+    }
+    return new ScanResult(tokenFromRedisCursor(scanResult.getCursor()), builder.build());
+  }
+
+  @Override
+  public ScanResult<ExecuteEntry> scanPrequeuedOperations(String cursor, int count)
+      throws IOException {
+    ImmutableList.Builder<ExecuteEntry> builder = ImmutableList.builder();
+    redis.clients.jedis.resps.ScanResult<BalancedQueueEntry> scanResult =
+        client.call(jedis -> state.prequeue.scan(jedis, cursor, count, /* match= */ "*"));
+    for (BalancedQueueEntry entry : scanResult.getResult()) {
+      ExecuteEntry.Builder executeEntryBuilder = ExecuteEntry.newBuilder();
+      try {
+        JsonFormat.parser().merge(entry.value(), executeEntryBuilder);
+        ExecuteEntry executeEntry = executeEntryBuilder.build();
+        builder.add(executeEntry);
+      } catch (InvalidProtocolBufferException e) {
+        log.log(Level.SEVERE, "error parsing execute entry", e);
+      }
+    }
+    return new ScanResult(tokenFromRedisCursor(scanResult.getCursor()), builder.build());
+  }
+
   private synchronized ExecutorService getDequeueService() {
     if (dequeueService == null) {
       dequeueService = BuildfarmExecutors.getDequeuePool();
@@ -1169,7 +1201,7 @@ public class RedisShardBackplane implements Backplane {
 
     ExecuteEntry.Builder executeEntryBuilder = ExecuteEntry.newBuilder();
     try {
-      JsonFormat.parser().merge(balancedQueueEntry.getValue(), executeEntryBuilder);
+      JsonFormat.parser().merge(balancedQueueEntry.value(), executeEntryBuilder);
       ExecuteEntry executeEntry = executeEntryBuilder.build();
       String executionName = executeEntry.getOperationName();
 
@@ -1207,7 +1239,7 @@ public class RedisShardBackplane implements Backplane {
       return null;
     }
 
-    QueueEntry queueEntry = executionQueueEntry.getQueueEntry();
+    QueueEntry queueEntry = executionQueueEntry.queueEntry();
     String executionName = queueEntry.getExecuteEntry().getOperationName();
     Operation operation = keepaliveExecution(executionName);
     Unified unified = (Unified) jedis;

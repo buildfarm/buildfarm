@@ -283,6 +283,8 @@ public class ServerInstance extends NodeInstance {
   private final boolean mergeExecutions;
   private final Scannable<Operation> indexKeys;
   private final Scannable<Operation> operations;
+  private final Scannable<ExecuteEntry> prequeuedOperations;
+  private final Scannable<Map.Entry<String, QueueEntry>> queuedOperations;
   private final Scannable<DispatchedOperation> dispatchedOperations;
   private final Scannable<String> correlatedInvocations;
   private final Scannable<String> toolInvocations;
@@ -445,6 +447,7 @@ public class ServerInstance extends NodeInstance {
             return result.getToken();
           }
         };
+    // we can probably just construct the scanner for this once
     this.dispatchedOperations =
         new Scannable<>() {
           @Override
@@ -459,6 +462,39 @@ public class ServerInstance extends NodeInstance {
             Backplane.ScanResult<DispatchedOperation> scanResult =
                 backplane.scanDispatchedOperations(pageToken, limit);
             scanResult.getResult().forEach(onDispatchedOperation);
+            return scanResult.getToken();
+          }
+        };
+    this.queuedOperations =
+        new Scannable<>() {
+          @Override
+          public String getName() {
+            return "queued";
+          }
+
+          @Override
+          public String scan(
+              int limit, String pageToken, Consumer<Map.Entry<String, QueueEntry>> onQueueEntry)
+              throws IOException {
+            Backplane.ScanResult<Map.Entry<String, QueueEntry>> scanResult =
+                backplane.scanQueuedOperations(pageToken, limit);
+            scanResult.getResult().forEach(onQueueEntry);
+            return scanResult.getToken();
+          }
+        };
+    this.prequeuedOperations =
+        new Scannable<>() {
+          @Override
+          public String getName() {
+            return "prequeued";
+          }
+
+          @Override
+          public String scan(int limit, String pageToken, Consumer<ExecuteEntry> onExecuteEntry)
+              throws IOException {
+            Backplane.ScanResult<ExecuteEntry> scanResult =
+                backplane.scanPrequeuedOperations(pageToken, limit);
+            scanResult.getResult().forEach(onExecuteEntry);
             return scanResult.getToken();
           }
         };
@@ -3078,34 +3114,100 @@ public class ServerInstance extends NodeInstance {
     }
   }
 
+  private Scannable<Operation> dispatchedOperationsScannable() {
+    return new Scannable<>() {
+      @Override
+      public String getName() {
+        return dispatchedOperations.getName();
+      }
+
+      @Override
+      public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
+          throws IOException {
+        return dispatchedOperations.scan(
+            limit,
+            pageToken,
+            dispatchedOperation -> {
+              ExecuteEntry executeEntry = dispatchedOperation.getQueueEntry().getExecuteEntry();
+              onOperation.accept(
+                  Operation.newBuilder()
+                      .setName(executeEntry.getOperationName())
+                      .setMetadata(Any.pack(dispatchedOperation))
+                      .build());
+            });
+      }
+    };
+  }
+
+  private Scannable<Operation> prequeuedOperationsScannable() {
+    return new Scannable<>() {
+      @Override
+      public String getName() {
+        return prequeuedOperations.getName();
+      }
+
+      @Override
+      public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
+          throws IOException {
+        // fancier things later with queue
+        return prequeuedOperations.scan(
+            limit,
+            pageToken,
+            executeEntry -> {
+              onOperation.accept(
+                  Operation.newBuilder()
+                      .setName(executeEntry.getOperationName())
+                      .setMetadata(Any.pack(executeEntry))
+                      .build());
+            });
+      }
+    };
+  }
+
+  private Scannable<Operation> queuedOperationsScannable() {
+    return new Scannable<>() {
+      @Override
+      public String getName() {
+        return queuedOperations.getName();
+      }
+
+      @Override
+      public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
+          throws IOException {
+        // fancier things later with queue
+        return queuedOperations.scan(
+            limit,
+            pageToken,
+            entry -> {
+              ExecuteEntry executeEntry = entry.getValue().getExecuteEntry();
+              onOperation.accept(
+                  Operation.newBuilder()
+                      .setName(executeEntry.getOperationName())
+                      .setMetadata(Any.pack(entry.getValue()))
+                      .build());
+            });
+      }
+    };
+  }
+
   Filter<Operation> parseOperationsFilter(String filter) {
     if (filter.startsWith("toolInvocationId=")) {
       return new Filter<>(
           ImmutableList.of(new ToolInvocationExecutionsBounds(filter.split("=")[1])));
     }
-    if (filter.equals("status=dispatched")) {
-      return new Filter<>(
-          ImmutableList.of(
-              new Scannable<>() {
-                @Override
-                public String getName() {
-                  return dispatchedOperations.getName();
-                }
-
-                @Override
-                public String scan(int limit, String pageToken, Consumer<Operation> onOperation)
-                    throws IOException {
-                  return dispatchedOperations.scan(
-                      limit,
-                      pageToken,
-                      dispatchedOperation -> {
-                        ExecuteEntry executeEntry =
-                            dispatchedOperation.getQueueEntry().getExecuteEntry();
-                        onOperation.accept(
-                            OperationNameScannable.toOperation(executeEntry.getOperationName()));
-                      });
-                }
-              }));
+    if (filter.startsWith("status=")) {
+      Scannable scannable = null;
+      if (filter.equals("status=dispatched")) {
+        // could create this once per object
+        scannable = dispatchedOperationsScannable();
+      } else if (filter.equals("status=queued")) {
+        scannable = queuedOperationsScannable();
+      } else if (filter.equals("status=prequeued")) {
+        scannable = prequeuedOperationsScannable();
+      }
+      if (scannable != null) {
+        return new Filter<>(ImmutableList.of(scannable));
+      }
     }
     // more?
     return new Filter<>(ImmutableList.of(operations));
@@ -3188,7 +3290,10 @@ public class ServerInstance extends NodeInstance {
         CountingConsumer<T> onCounting = new CountingConsumer<>(onResult);
         token = location.scan(pageSize, token, onCounting);
         checkState(
-            token.equals(Scannable.SENTINEL_PAGE_TOKEN) || onCounting.getCount() == pageSize);
+            token.equals(Scannable.SENTINEL_PAGE_TOKEN) || onCounting.getCount() == pageSize,
+            format(
+                "%s was not %s or %d != %d",
+                token, Scannable.SENTINEL_PAGE_TOKEN, onCounting.getCount(), pageSize));
         pageSize -= onCounting.getCount();
         if (pageSize > 0) {
           locationName = null;

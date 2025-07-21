@@ -113,6 +113,11 @@ public interface Backplane {
   ScanResult<String> scanCorrelatedInvocationIndexEntries(String cursor, int count, String keyMatch)
       throws IOException;
 
+  ScanResult<Map.Entry<String, QueueEntry>> scanQueuedOperations(String cursor, int count)
+      throws IOException;
+
+  ScanResult<ExecuteEntry> scanPrequeuedOperations(String cursor, int count) throws IOException;
+
   /** Returns a map of the worker name and its start time for given workers. */
   Map<String, Long> getWorkersStartTimeInEpochSecs(Set<String> workerNames) throws IOException;
 

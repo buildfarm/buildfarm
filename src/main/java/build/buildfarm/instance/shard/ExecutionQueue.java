@@ -15,6 +15,9 @@
 package build.buildfarm.instance.shard;
 
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.Iterables.transform;
+import static com.google.common.collect.Lists.newArrayList;
+import static redis.clients.jedis.params.ScanParams.SCAN_POINTER_START;
 
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.Visitor;
@@ -31,15 +34,17 @@ import com.google.common.collect.SetMultimap;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
-import lombok.Data;
 import lombok.extern.java.Log;
 import redis.clients.jedis.AbstractPipeline;
 import redis.clients.jedis.UnifiedJedis;
+import redis.clients.jedis.resps.ScanResult;
 
 /**
  * @class ExecutionQueue
@@ -53,19 +58,8 @@ public class ExecutionQueue {
 
   private static final Duration MAX_TIMEOUT = Duration.ofSeconds(8);
 
-  @Data
-  public static final class ExecutionQueueEntry {
-    private final BalancedRedisQueue queue;
-    private final BalancedQueueEntry balancedQueueEntry;
-    private final QueueEntry queueEntry;
-
-    ExecutionQueueEntry(
-        BalancedRedisQueue queue, BalancedQueueEntry balancedQueueEntry, QueueEntry queueEntry) {
-      this.queue = queue;
-      this.balancedQueueEntry = balancedQueueEntry;
-      this.queueEntry = queueEntry;
-    }
-  }
+  public record ExecutionQueueEntry(
+      BalancedRedisQueue queue, BalancedQueueEntry balancedQueueEntry, QueueEntry queueEntry) {}
 
   /**
    * @field maxQueueSize
@@ -116,7 +110,7 @@ public class ExecutionQueue {
     return new Visitor<>() {
       @Override
       public void visit(BalancedQueueEntry balancedQueueEntry) {
-        String entry = balancedQueueEntry.getValue();
+        String entry = balancedQueueEntry.value();
         QueueEntry.Builder queueEntry = QueueEntry.newBuilder();
         try {
           JsonFormat.parser().merge(entry, queueEntry);
@@ -151,11 +145,11 @@ public class ExecutionQueue {
    * @note Suggested return identifier: wasRemoved.
    */
   public static boolean removeFromDequeue(UnifiedJedis jedis, ExecutionQueueEntry entry) {
-    return entry.getQueue().removeFromDequeue(jedis, entry.getBalancedQueueEntry());
+    return entry.queue().removeFromDequeue(jedis, entry.balancedQueueEntry());
   }
 
   public static void removeFromDequeue(AbstractPipeline pipeline, ExecutionQueueEntry entry) {
-    entry.getQueue().removeFromDequeue(pipeline, entry.getBalancedQueueEntry());
+    entry.queue().removeFromDequeue(pipeline, entry.balancedQueueEntry());
   }
 
   /**
@@ -292,7 +286,7 @@ public class ExecutionQueue {
       if (balancedQueueEntry != null) {
         try {
           QueueEntry.Builder queueEntryBuilder = QueueEntry.newBuilder();
-          JsonFormat.parser().merge(balancedQueueEntry.getValue(), queueEntryBuilder);
+          JsonFormat.parser().merge(balancedQueueEntry.value(), queueEntryBuilder);
           QueueEntry queueEntry = queueEntryBuilder.build();
 
           return new ExecutionQueueEntry(queue, balancedQueueEntry, queueEntry);
@@ -505,5 +499,73 @@ public class ExecutionQueue {
       set.put(property.getName(), property.getValue());
     }
     return set;
+  }
+
+  private static QueueEntry parse(String json) {
+    QueueEntry.Builder queueEntry = QueueEntry.newBuilder();
+    try {
+      JsonFormat.parser().merge(json, queueEntry);
+    } catch (InvalidProtocolBufferException e) {
+      log.log(Level.SEVERE, "invalid QueueEntry json: " + json, e);
+    }
+    return queueEntry.build();
+  }
+
+  public ScanResult<ExecutionQueueEntry> scan(
+      UnifiedJedis jedis, String queueCursor, int count, String match) {
+    int queueIndex = queueCursor.indexOf('{') + 1;
+    String currentQueue = null;
+    if (queueIndex > 0) {
+      int queueEnd = queueCursor.indexOf('}');
+      currentQueue = queueCursor.substring(queueIndex, queueEnd);
+      queueCursor = queueCursor.substring(queueEnd + 1);
+    }
+    Iterator<ProvisionedRedisQueue> queueIter = queues.iterator();
+
+    BalancedRedisQueue queue = null;
+    while (currentQueue != null && queueIter.hasNext()) {
+      queue = queueIter.next().queue();
+      if (queue.getName().equals(currentQueue)) {
+        break;
+      }
+    }
+
+    if (currentQueue != null && !currentQueue.equals(queue.getName())) {
+      return new ScanResult<>(SCAN_POINTER_START, new ArrayList<>());
+    }
+
+    List<ExecutionQueueEntry> result = new ArrayList<>(count);
+    while (result.size() < count) {
+      if (currentQueue == null || queueCursor.equals(SCAN_POINTER_START)) {
+        if (!queueIter.hasNext()) {
+          break;
+        }
+        queue = queueIter.next().queue();
+        currentQueue = queue.getName();
+      }
+      final BalancedRedisQueue entryQueue = queue;
+      ScanResult<BalancedQueueEntry> scanResult =
+          queue.scan(jedis, queueCursor, count - result.size(), match);
+      queueCursor = scanResult.getCursor();
+      result.addAll(
+          newArrayList(
+              transform(
+                  scanResult.getResult(),
+                  balancedQueueEntry ->
+                      new ExecutionQueueEntry(
+                          entryQueue, balancedQueueEntry, parse(balancedQueueEntry.value())))));
+    }
+
+    if (queueCursor.equals(SCAN_POINTER_START)) {
+      currentQueue = null;
+      if (queueIter.hasNext()) {
+        currentQueue = queueIter.next().queue().getName();
+      }
+    }
+    String nextCursor = SCAN_POINTER_START;
+    if (currentQueue != null) {
+      nextCursor = "{" + currentQueue + "}" + queueCursor;
+    }
+    return new ScanResult<>(nextCursor, result);
   }
 }
