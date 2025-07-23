@@ -260,6 +260,7 @@ shardWorker:
 
 execWorker:
   enabled: false
+  annotations: {}
   image:
     repository: bazelbuild/buildfarm-worker
     pullPolicy: IfNotPresent
@@ -312,6 +313,7 @@ execWorker:
     size: 50Gi
 
   service:
+    annotations: {}
     type: ClusterIP
     port: 8982
 
