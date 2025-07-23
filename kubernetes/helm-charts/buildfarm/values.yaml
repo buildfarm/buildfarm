@@ -26,6 +26,7 @@ config:
             value: "*"
 
 server:
+  annotations: {}
   image:
     repository: bazelbuild/buildfarm-server
     pullPolicy: IfNotPresent
@@ -56,6 +57,7 @@ server:
     #   cpu: 100m
     #   memory: 128Mi
   service:
+    annotations: {}
     type: ClusterIP
     port: 8980
 
