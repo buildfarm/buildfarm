@@ -304,6 +304,9 @@ public class InputFetcher implements Runnable {
     return stalled;
   }
 
+  @SuppressWarnings(
+      "PMD.UnusedLocalVariable") // PMD thinks that the try-with-resources is not used. See
+  // https://github.com/pmd/pmd/issues/5747
   private void proceedToOutput(Action action, Command command, Path execDir, Tree tree)
       throws InterruptedException {
     // switch poller to disable deadline
@@ -325,6 +328,7 @@ public class InputFetcher implements Runnable {
             .build();
     stalled = true;
     boolean claimed;
+    // PMD exemption false positive: unused variable
     try (StallState state = new StallState()) {
       claimed = owner.output().claim(fetchedExecutionContext);
     }
