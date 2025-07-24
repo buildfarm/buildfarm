@@ -309,7 +309,7 @@ class Executor {
             arguments,
             executionContext.command,
             workingDirectory)) {
-      
+
       // Apply custom execution policies AFTER built-in wrappers
       for (ExecutionPolicy policy : policies) {
         if (policy.getExecutionWrapper() != null) {
