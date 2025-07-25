@@ -134,7 +134,7 @@ PASS
 
 ## Execution Flow:
 
-This is a special set of action mnemonics (*not* Platform properties) that can be used to test the flow of actions through the execution segments (prequeue/queue)
+This is a special set of action mnemonics (*not* Platform properties) that can be used to test the flow of actions through the execution segments (prequeue/queue).
 In all of these cases, the buildfarm agent which observes the operation at the halt state will deliver a `done` operation with no further processing.
 
 ### `buildfarm:halt-on-execute`
