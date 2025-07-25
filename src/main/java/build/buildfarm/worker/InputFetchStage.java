@@ -88,6 +88,9 @@ public class InputFetchStage extends SuperscalarPipelineStage {
 
   @Override
   protected void iterate() throws InterruptedException {
+    if (!workerContext.isInputFetching()) {
+      return;
+    }
     ExecutionContext executionContext = take();
     InputFetcher inputFetcher =
         new InputFetcher(workerContext, executionContext, this, pollerExecutor);
