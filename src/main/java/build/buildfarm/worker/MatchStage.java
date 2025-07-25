@@ -20,7 +20,10 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Claim;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Poller;
@@ -92,10 +95,23 @@ public class MatchStage extends PipelineStage {
         return false;
       }
 
+      ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+      RequestMetadata requestMetadata = executeEntry.getRequestMetadata();
+      if (requestMetadata.getActionMnemonic().equals("buildfarm:halt-on-dequeue")) {
+        putOperation(
+            Operation.newBuilder()
+                .setName(executeEntry.getOperationName())
+                .setDone(true)
+                .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
+                .setResponse(Any.pack(ExecuteResponse.getDefaultInstance()))
+                .build());
+        return false;
+      }
+
       executionContext
           .metadata
           .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
-          .setRequestMetadata(queueEntry.getExecuteEntry().getRequestMetadata())
+          .setRequestMetadata(requestMetadata)
           .getExecuteOperationMetadataBuilder()
           .setDigestFunction(queueEntry.getExecuteEntry().getActionDigest().getDigestFunction());
 
