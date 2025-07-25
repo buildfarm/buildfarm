@@ -96,7 +96,7 @@ public class MatchStage extends PipelineStage {
       }
 
       ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
-      RequestMetadata requestMetadata = queueEntry.getExecuteEntry().getRequestMetadata();
+      RequestMetadata requestMetadata = executeEntry.getRequestMetadata();
       if (requestMetadata.getActionMnemonic().equals("buildfarm:halt-on-dequeue")) {
         putOperation(
             Operation.newBuilder()
