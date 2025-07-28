@@ -1,11 +1,11 @@
-package build.buildfarm.worker;
+package build.buildfarm.worker.filesystem;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.worker.ExecTreeWalker.Event;
+import build.buildfarm.worker.filesystem.ExecTreeWalker.Event;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;

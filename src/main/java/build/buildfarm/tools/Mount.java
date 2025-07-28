@@ -25,7 +25,7 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.Digest;
-import build.buildfarm.worker.FuseCAS;
+import build.buildfarm.worker.filesystem.FuseCAS;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import java.io.IOException;

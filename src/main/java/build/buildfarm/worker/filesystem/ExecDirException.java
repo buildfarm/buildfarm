@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.filesystem;
 
 import static build.buildfarm.common.Errors.MISSING_INPUT;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
@@ -99,7 +99,7 @@ public class ExecDirException extends IOException {
     return exceptions;
   }
 
-  Status.Builder toStatus(Status.Builder status) {
+  public Status.Builder toStatus(Status.Builder status) {
     status.setCode(Code.FAILED_PRECONDITION.getNumber());
 
     // aggregate into a single preconditionFailure

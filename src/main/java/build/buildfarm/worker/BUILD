@@ -8,11 +8,11 @@ java_library(
     deps = [
         "//persistentworkers/src/main/java/persistent/bazel:bazel-persistent-workers",
         "//persistentworkers/src/main/java/persistent/common:persistent-common",
-        "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/java/build/buildfarm/worker/filesystem",
         "//src/main/java/build/buildfarm/worker/persistent",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/java/build/buildfarm/worker/util",

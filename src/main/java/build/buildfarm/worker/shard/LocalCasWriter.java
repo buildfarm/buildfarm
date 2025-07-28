@@ -21,7 +21,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.v1test.Digest;
-import build.buildfarm.worker.ExecFileSystem;
+import build.buildfarm.worker.filesystem.ExecFileSystem;
 import com.google.common.io.ByteStreams;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
