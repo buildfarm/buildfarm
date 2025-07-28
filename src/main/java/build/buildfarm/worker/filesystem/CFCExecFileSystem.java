@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.filesystem;
 
 import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
 import static build.buildfarm.common.io.Utils.readdir;
@@ -41,7 +41,7 @@ import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.Dirent;
 import build.buildfarm.v1test.Digest;
 import build.buildfarm.v1test.WorkerExecutedMetadata;
-import build.buildfarm.worker.ExecDirException.ViolationException;
+import build.buildfarm.worker.filesystem.ExecDirException.ViolationException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
