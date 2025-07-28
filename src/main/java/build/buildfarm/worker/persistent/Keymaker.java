@@ -22,26 +22,22 @@ import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.attribute.UserPrincipal;
 import java.util.Objects;
 import java.util.SortedMap;
-import javax.annotation.Nullable;
 import persistent.bazel.client.BasicWorkerKey;
 import persistent.bazel.client.PersistentWorker;
-import persistent.bazel.client.WorkerKey;
 
 /** Much of the logic (hashing) is from Bazel itself (private library/methods, i.e. WorkerKey). */
 public class Keymaker {
   // Constructs a key with its worker tool input files being relative paths
-  public static WorkerKey make(
+  public static BasicWorkerKey make(
       Path opRoot,
       Path workRootsDir,
       ImmutableList<String> workerInitCmd,
       ImmutableList<String> workerInitArgs,
       ImmutableMap<String, String> workerEnv,
       String executionName,
-      WorkerInputs workerFiles,
-      @Nullable UserPrincipal owner) {
+      WorkerInputs workerFiles) {
     // Cancellation not yet supported; can change in the future,
     //  Presumably, following how Bazel's own persistent workers work
     boolean sandboxed = true;
@@ -61,18 +57,16 @@ public class Keymaker {
     SortedMap<Path, HashCode> hashedTools = workerFilesWithHashes(workerFiles);
     HashCode combinedToolsHash = workerFilesCombinedHash(toolsRoot, hashedTools);
 
-    return new WorkerKey(
-        new BasicWorkerKey(
-            workerInitCmd,
-            workerInitArgs,
-            workerEnv,
-            workRoot,
-            executionName,
-            combinedToolsHash,
-            hashedTools,
-            sandboxed,
-            cancellable),
-        owner);
+    return new BasicWorkerKey(
+        workerInitCmd,
+        workerInitArgs,
+        workerEnv,
+        workRoot,
+        executionName,
+        combinedToolsHash,
+        hashedTools,
+        sandboxed,
+        cancellable);
   }
 
   // Hash of a subset of the WorkerKey

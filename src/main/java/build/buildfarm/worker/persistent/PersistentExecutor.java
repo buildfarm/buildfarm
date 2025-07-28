@@ -17,10 +17,17 @@ package build.buildfarm.worker.persistent;
 import static java.lang.String.join;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.Claim;
+import build.buildfarm.common.config.ExecutionPolicy;
+import build.buildfarm.worker.executionwrappers.ExecutionWrapperUtils;
+import build.buildfarm.worker.filesystem.ExecFileSystem;
+import build.buildfarm.worker.resources.LocalResourceSet;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.devtools.build.lib.worker.WorkerProtocol.Input;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkRequest;
 import com.google.devtools.build.lib.worker.WorkerProtocol.WorkResponse;
@@ -34,9 +41,12 @@ import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
+import persistent.bazel.client.BasicWorkerKey;
+import persistent.bazel.client.WorkerIndex;
 import persistent.bazel.client.WorkerKey;
 
 /**
@@ -48,8 +58,10 @@ import persistent.bazel.client.WorkerKey;
  */
 @Log
 public class PersistentExecutor {
+  public static final WorkerIndex workerIndex = new WorkerIndex();
+
   private static final ProtoCoordinator coordinator =
-      ProtoCoordinator.ofCommonsPool(getMaxWorkersPerKey());
+      ProtoCoordinator.ofCommonsPool(workerIndex, getMaxWorkersPerKey());
 
   // TODO load from config (i.e. {worker_root}/persistent)
   public static final Path defaultWorkRootsDir = Path.of("/tmp/worker/persistent/");
@@ -98,7 +110,7 @@ public class PersistentExecutor {
    * @param timeout
    * @param workRootsDir
    * @param resultBuilder
-   * @param owner
+   * @param claim
    * @return
    */
   public static Code runOnPersistentWorker(
@@ -110,7 +122,11 @@ public class PersistentExecutor {
       Duration timeout,
       Path workRootsDir,
       ActionResult.Builder resultBuilder,
-      @Nullable UserPrincipal owner)
+      ExecFileSystem execFileSystem,
+      @Nullable PersistentWorkerAwareExecOwnerPool execOwnerPool,
+      Claim claim,
+      Iterable<ExecutionPolicy> executionPolicies,
+      Iterable<Platform.Property> platformProperties)
       throws IOException {
     // Pull out persistent worker start command from the overall action request
 
@@ -151,7 +167,7 @@ public class PersistentExecutor {
           "Binary wasn't a tool input nor an absolute path: " + binary);
     }
 
-    WorkerKey key =
+    BasicWorkerKey basicKey =
         Keymaker.make(
             context.opRoot,
             workRootsDir,
@@ -159,10 +175,32 @@ public class PersistentExecutor {
             workerInitArgs,
             env,
             executionName,
-            workerFiles,
-            owner);
+            workerFiles);
 
-    coordinator.copyToolInputsIntoWorkerToolRoot(key, workerFiles);
+    if (execOwnerPool != null) {
+      Optional<PersistentWorkerAwareExecOwnerPool.Lease> newExecOwnerLease =
+          execOwnerPool.tryAcquireForPersistentWorker(basicKey);
+
+      if (newExecOwnerLease.isPresent()) {
+        PersistentWorkerAwareExecOwnerPool.Lease lease = newExecOwnerLease.get();
+
+        claim.replace(LocalResourceSet.EXEC_OWNER_RESOURCE_NAME, lease);
+
+        String newExecOwnerName = Iterables.getOnlyElement(lease.ownerNames);
+        UserPrincipal newExecOwner = execFileSystem.getOwner(newExecOwnerName);
+
+        claim.setOwner(newExecOwner);
+      }
+    }
+
+    // Evaluate execution wrappers after exec owner swapping to ensure correct context
+    ImmutableList<String> wrapperArguments =
+        ExecutionWrapperUtils.evaluateExecutionWrappers(
+            executionPolicies, claim, platformProperties);
+
+    WorkerKey key = new WorkerKey(basicKey, claim.getOwner(), wrapperArguments);
+
+    coordinator.copyToolInputsIntoWorkerToolRoot(key, workerFiles, key.getOwner());
 
     // Make request
 

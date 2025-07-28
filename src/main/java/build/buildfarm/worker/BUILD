@@ -12,6 +12,7 @@ java_library(
         "//src/main/java/build/buildfarm/common/config",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
+        "//src/main/java/build/buildfarm/worker/executionwrappers",
         "//src/main/java/build/buildfarm/worker/filesystem",
         "//src/main/java/build/buildfarm/worker/persistent",
         "//src/main/java/build/buildfarm/worker/resources",

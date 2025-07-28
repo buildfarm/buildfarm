@@ -103,9 +103,6 @@ import lombok.extern.java.Log;
 
 @Log
 class ShardWorkerContext implements WorkerContext {
-  static final String EXEC_OWNER_RESOURCE_NAME = "exec-owner";
-  private static final Platform.Property EXEC_OWNER_PROPERTY =
-      Platform.Property.newBuilder().setName(EXEC_OWNER_RESOURCE_NAME).setValue("1").build();
   private static final String PROVISION_CORES_NAME = "cores";
 
   private static final Counter completedOperations =
@@ -209,7 +206,8 @@ class ShardWorkerContext implements WorkerContext {
     this.resourceSet = resourceSet;
     this.writer = writer;
 
-    provideOwnedClaim = this.resourceSet.resources.containsKey(EXEC_OWNER_RESOURCE_NAME);
+    provideOwnedClaim =
+        this.resourceSet.resources.containsKey(LocalResourceSet.EXEC_OWNER_RESOURCE_NAME);
   }
 
   private static Retrier createBackplaneRetrier() {
@@ -329,11 +327,10 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   // FIXME make OwnedClaim with owner
-  // how will this play out with persistent workers, should we have one per user?
   private @Nullable Claim acquireClaim(Platform platform) {
     // expand platform requirements with exec owner
     if (provideOwnedClaim) {
-      platform = platform.toBuilder().addProperties(EXEC_OWNER_PROPERTY).build();
+      platform = platform.toBuilder().addProperties(LocalResourceSet.EXEC_OWNER_PROPERTY).build();
     }
 
     Claim claim = DequeueMatchEvaluator.acquireClaim(matchProvisions, resourceSet, platform);
@@ -341,39 +338,13 @@ class ShardWorkerContext implements WorkerContext {
     // a little awkward wrapping with the early return here to preserve effective final
     if (claim != null && provideOwnedClaim) {
       // enforced by exec owner property value of "1"
-      for (Entry<String, List<Object>> pool : claim.getPools()) {
-        if (!pool.getKey().equals(EXEC_OWNER_RESOURCE_NAME)) {
+      for (Entry<String, List<?>> pool : claim.getPools()) {
+        if (!pool.getKey().equals(LocalResourceSet.EXEC_OWNER_RESOURCE_NAME)) {
           continue;
         }
         String name = (String) Iterables.getOnlyElement(pool.getValue());
 
-        return new Claim() {
-          UserPrincipal owner = execFileSystem.getOwner(name);
-
-          @Override
-          public void release(Claim.Stage stage) {
-            claim.release(stage);
-          }
-
-          @Override
-          public void release() {
-            owner = null;
-            claim.release();
-          }
-
-          @Override
-          public UserPrincipal owner() {
-            if (owner != null) {
-              return owner;
-            }
-            return claim.owner();
-          }
-
-          @Override
-          public Iterable<Entry<String, List<Object>>> getPools() {
-            return claim.getPools();
-          }
-        };
+        claim.setOwner(execFileSystem.getOwner(name));
       }
       // claim was not provided with owner name value
     }

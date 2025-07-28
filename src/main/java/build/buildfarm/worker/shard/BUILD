@@ -21,6 +21,7 @@ java_library(
         "//src/main/java/build/buildfarm/worker",
         "//src/main/java/build/buildfarm/worker/cgroup",
         "//src/main/java/build/buildfarm/worker/filesystem",
+        "//src/main/java/build/buildfarm/worker/persistent",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_grpc",
         "//src/main/protobuf/build/buildfarm/v1test:buildfarm_java_proto",

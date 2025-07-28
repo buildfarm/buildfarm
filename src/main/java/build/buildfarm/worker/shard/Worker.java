@@ -37,7 +37,6 @@ import build.buildfarm.cas.cfc.LegacyDirectoryCFC;
 import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.common.Dispenser;
 import build.buildfarm.common.EmptyInputStreamFactory;
 import build.buildfarm.common.FailoverInputStreamFactory;
 import build.buildfarm.common.InputStreamFactory;
@@ -74,8 +73,9 @@ import build.buildfarm.worker.filesystem.CFCExecFileSystem;
 import build.buildfarm.worker.filesystem.CFCLinkExecFileSystem;
 import build.buildfarm.worker.filesystem.ExecFileSystem;
 import build.buildfarm.worker.filesystem.FuseCAS;
+import build.buildfarm.worker.persistent.PersistentExecutor;
+import build.buildfarm.worker.persistent.PersistentWorkerAwareExecOwnerPool;
 import build.buildfarm.worker.resources.LocalResourceSet;
-import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import build.buildfarm.worker.resources.LocalResourceSetUtils;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
@@ -101,7 +101,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.UserPrincipal;
-import java.util.ArrayDeque;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -156,6 +156,7 @@ public final class Worker extends LoggingMain {
   private Server server;
   private Path root;
   private ExecFileSystem execFileSystem;
+  private @Nullable PersistentWorkerAwareExecOwnerPool execOwnerIndexResource;
   private Pipeline pipeline;
   private PipelineStage matchStage;
   private ShardWorkerContext context;
@@ -255,7 +256,8 @@ public final class Worker extends LoggingMain {
       SuperscalarPipelineStage reportResultStage =
           new ReportResultStage(context, completeStage, errorStage);
       SuperscalarPipelineStage executeActionStage =
-          new ExecuteActionStage(context, reportResultStage, errorStage);
+          new ExecuteActionStage(
+              context, reportResultStage, errorStage, execFileSystem, execOwnerIndexResource);
       PipelineStage releaseClaimAndRequeueStage = new ReleaseClaimStage(context::requeue);
       SuperscalarPipelineStage inputFetchStage =
           new InputFetchStage(context, executeActionStage, releaseClaimAndRequeueStage);
@@ -340,7 +342,7 @@ public final class Worker extends LoggingMain {
     }
   }
 
-  private ExecFileSystem createExecFileSystem(
+  private void initializeExecFileSystem(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
@@ -353,7 +355,6 @@ public final class Worker extends LoggingMain {
     checkState(storage != null, "no exec fs cas specified");
     if (storage instanceof CASFileCache cfc) {
       FileSystem fileSystem = cfc.getRoot().getFileSystem();
-      PoolResource execOwnerIndexResource = null;
       ImmutableMap<String, UserPrincipal> owners = ImmutableMap.of();
       // there's some sense that ownerNames might be specifiable as 1, but not 2, and 3 being the
       // minimum passing the config validation
@@ -361,7 +362,10 @@ public final class Worker extends LoggingMain {
         if (!Strings.isNullOrEmpty(ownerName)) {
           owners = ImmutableMap.of(ownerName, getOwner(ownerName, fileSystem));
           execOwnerIndexResource =
-              new PoolResource(new Dispenser<>(ownerName), REPORT_RESULT_STAGE);
+              new PersistentWorkerAwareExecOwnerPool(
+                  PersistentExecutor.workerIndex,
+                  Collections.singleton(ownerName),
+                  REPORT_RESULT_STAGE);
         }
       } else {
         ImmutableMap.Builder<String, UserPrincipal> builder = ImmutableMap.builder();
@@ -374,18 +378,20 @@ public final class Worker extends LoggingMain {
         }
         owners = builder.build();
         execOwnerIndexResource =
-            new PoolResource(new ArrayDeque<>(owners.keySet()), REPORT_RESULT_STAGE);
+            new PersistentWorkerAwareExecOwnerPool(
+                PersistentExecutor.workerIndex, owners.keySet(), REPORT_RESULT_STAGE);
       }
       if (execOwnerIndexResource != null) {
         resourceSet.resources.put(
-            ShardWorkerContext.EXEC_OWNER_RESOURCE_NAME, execOwnerIndexResource);
+            LocalResourceSet.EXEC_OWNER_RESOURCE_NAME, execOwnerIndexResource);
       }
 
-      return createCFCExecFileSystem(
-          removeDirectoryService, accessRecorder, fetchService, cfc, owners);
+      execFileSystem =
+          createCFCExecFileSystem(
+              removeDirectoryService, accessRecorder, fetchService, cfc, owners);
     } else {
       // FIXME not the only fuse backing capacity...
-      return createFuseExecFileSystem(remoteInputStreamFactory, storage);
+      execFileSystem = createFuseExecFileSystem(remoteInputStreamFactory, storage);
     }
   }
 
@@ -736,16 +742,15 @@ public final class Worker extends LoggingMain {
             zstdBufferPool,
             configs.getWorker().getStorages());
     // may modify resourceSet to provide additional resources
-    execFileSystem =
-        createExecFileSystem(
-            remoteInputStreamFactory,
-            removeDirectoryService,
-            accessRecorder,
-            fetchService,
-            storage,
-            resourceSet,
-            configs.getWorker().getExecOwner(),
-            execOwners);
+    initializeExecFileSystem(
+        remoteInputStreamFactory,
+        removeDirectoryService,
+        accessRecorder,
+        fetchService,
+        storage,
+        resourceSet,
+        configs.getWorker().getExecOwner(),
+        execOwners);
 
     instance = new WorkerInstance(configs.getWorker().getPublicName(), backplane, storage);
 

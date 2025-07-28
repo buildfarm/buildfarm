@@ -15,8 +15,6 @@
 package build.buildfarm.worker;
 
 import static build.buildfarm.common.Claim.Stage.EXECUTE_ACTION_STAGE;
-import static com.google.common.collect.Maps.transformValues;
-import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.protobuf.util.Durations.add;
 import static com.google.protobuf.util.Durations.compare;
 import static com.google.protobuf.util.Durations.fromSeconds;
@@ -29,7 +27,6 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.Claim;
 import build.buildfarm.common.ProcessUtils;
 import build.buildfarm.common.Time;
@@ -37,10 +34,12 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ExecutionPolicy;
-import build.buildfarm.common.config.ExecutionWrapper;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.worker.WorkerContext.IOResource;
+import build.buildfarm.worker.executionwrappers.ExecutionWrapperUtils;
+import build.buildfarm.worker.filesystem.ExecFileSystem;
 import build.buildfarm.worker.persistent.PersistentExecutor;
+import build.buildfarm.worker.persistent.PersistentWorkerAwareExecOwnerPool;
 import build.buildfarm.worker.persistent.WorkFilesContext;
 import build.buildfarm.worker.resources.ResourceLimits;
 import com.github.dockerjava.api.DockerClient;
@@ -63,15 +62,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import lombok.extern.java.Log;
@@ -84,6 +80,8 @@ class Executor {
   private final ExecutionContext executionContext;
   private final ExecuteActionStage owner;
   private final java.util.concurrent.Executor pollerExecutor;
+  private final ExecFileSystem execFileSystem;
+  private final @Nullable PersistentWorkerAwareExecOwnerPool execOwnerPool;
   private int exitCode = INCOMPLETE_EXIT_CODE;
   private boolean wasErrored = false;
   private boolean polling = false;
@@ -92,11 +90,15 @@ class Executor {
       WorkerContext workerContext,
       ExecutionContext executionContext,
       ExecuteActionStage owner,
-      java.util.concurrent.Executor pollerExecutor) {
+      java.util.concurrent.Executor pollerExecutor,
+      ExecFileSystem execFileSystem,
+      @Nullable PersistentWorkerAwareExecOwnerPool execOwnerPool) {
     this.workerContext = workerContext;
     this.executionContext = executionContext;
     this.owner = owner;
     this.pollerExecutor = pollerExecutor;
+    this.execFileSystem = execFileSystem;
+    this.execOwnerPool = execOwnerPool;
   }
 
   // ensure that only one error put attempt occurs
@@ -214,72 +216,6 @@ class Executor {
     return timeout;
   }
 
-  private static final class Interpolator {
-    private final Iterable<?> value;
-
-    Interpolator(String value) {
-      this(ImmutableList.of(value));
-    }
-
-    Interpolator(Iterable<?> value) {
-      this.value = value;
-    }
-
-    void inject(Consumer<String> consumer) {
-      Iterables.transform(value, String::valueOf).forEach(consumer);
-    }
-  }
-
-  private static Map<String, Interpolator> createInterpolations(
-      Claim claim, Iterable<Property> properties) {
-    Map<String, Interpolator> interpolations = new HashMap<>();
-    if (claim != null) {
-      for (Map.Entry<String, List<Object>> pool : claim.getPools()) {
-        List<Object> ids = pool.getValue();
-        interpolations.put(pool.getKey(), new Interpolator(ids));
-        for (int i = 0; i < ids.size(); i++) {
-          interpolations.put(pool.getKey() + "-" + i, new Interpolator(String.valueOf(ids.get(i))));
-        }
-      }
-    }
-    interpolations.putAll(
-        transformValues(
-            uniqueIndex(properties, Property::getName),
-            property -> new Interpolator(property.getValue())));
-    return interpolations;
-  }
-
-  private static Iterable<String> transformWrapper(
-      ExecutionWrapper wrapper, Map<String, Interpolator> interpolations) {
-    ImmutableList.Builder<String> arguments = ImmutableList.builder();
-
-    arguments.add(wrapper.getPath());
-
-    if (wrapper.getArguments() != null) {
-      for (String argument : wrapper.getArguments()) {
-        // If the argument is of the form <propertyName>, substitute the value of
-        // the property from the platform specification.
-        if (!argument.equals("<>")
-            && argument.charAt(0) == '<'
-            && argument.charAt(argument.length() - 1) == '>') {
-          // substitute with matching interpolation
-          // if this property is not present, the wrapper is ignored
-          String name = argument.substring(1, argument.length() - 1);
-          Interpolator interpolator = interpolations.get(name);
-          if (interpolator == null) {
-            return ImmutableList.of();
-          }
-          interpolator.inject(arguments::add);
-        } else {
-          // If the argument isn't of the form <propertyName>, add the argument directly:
-          arguments.add(argument);
-        }
-      }
-    }
-
-    return arguments.build();
-  }
-
   private long executePolled(
       ResourceLimits limits,
       Iterable<ExecutionPolicy> policies,
@@ -296,27 +232,28 @@ class Executor {
       workingDirectory = workingDirectory.resolve(command.getWorkingDirectory());
     }
 
-    // similar to the policy selection here
-    Map<String, Interpolator> interpolations =
-        createInterpolations(
-            executionContext.claim, executionContext.command.getPlatform().getPropertiesList());
-
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
 
     Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(
             operationName,
-            executionContext.claim.owner(),
+            executionContext.claim.getOwner(),
             arguments,
             executionContext.command,
             workingDirectory)) {
-
-      // Apply custom execution policies AFTER built-in wrappers
-      for (ExecutionPolicy policy : policies) {
-        if (policy.getExecutionWrapper() != null) {
-          arguments.addAll(transformWrapper(policy.getExecutionWrapper(), interpolations));
-        }
+      /*
+       * If we're using a persistent worker, `PersistentExecutor` will assume responsibility of evaluating
+       * execution wrappers. Because `PersistentExecutor` swaps out the exec owner last-minute and the exec owner can be
+       * an argument to an execution wrapper, we need to evaluate execution wrappers after the swapping has taken place.
+       */
+      if (!shouldRunOnPersistentWorker(limits)) {
+        // Apply custom execution policies AFTER built-in wrappers
+        arguments.addAll(
+            ExecutionWrapperUtils.evaluateExecutionWrappers(
+                policies,
+                executionContext.claim,
+                executionContext.command.getPlatform().getPropertiesList()));
       }
 
       // Windows requires that relative command programs are absolutized
@@ -344,7 +281,8 @@ class Executor {
               // executingMetadata.getStdoutStreamName(),
               // executingMetadata.getStderrStreamName(),
               executionContext.executeResponse.getResultBuilder(),
-              executionContext.claim.owner());
+              executionContext.claim,
+              policies);
 
       // From Bazel Test Encyclopedia:
       // If the main process of a test exits, but some of its children are still running,
@@ -508,7 +446,8 @@ class Executor {
       ResourceLimits limits,
       Duration timeout,
       ActionResult.Builder resultBuilder,
-      @Nullable UserPrincipal owner)
+      Claim claim,
+      Iterable<ExecutionPolicy> policies)
       throws IOException, InterruptedException {
     ProcessBuilder processBuilder =
         new ProcessBuilder(arguments).directory(execDir.toAbsolutePath().toFile());
@@ -545,7 +484,11 @@ class Executor {
           timeout,
           PersistentExecutor.defaultWorkRootsDir,
           resultBuilder,
-          owner);
+          execFileSystem,
+          execOwnerPool,
+          claim,
+          policies,
+          executionContext.command.getPlatform().getPropertiesList());
     }
 
     // run the action under docker

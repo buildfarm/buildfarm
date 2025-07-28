@@ -42,7 +42,11 @@ public class PersistentWorker implements Worker<WorkRequest, WorkResponse> {
     this.key = key;
     this.execRoot = key.getExecRoot().resolve(workerDir);
     this.initCmd =
-        ImmutableList.<String>builder().addAll(key.getCmd()).addAll(key.getArgs()).build();
+        ImmutableList.<String>builder()
+            .addAll(key.getWrapperArguments())
+            .addAll(key.getCmd())
+            .addAll(key.getArgs())
+            .build();
 
     Files.createDirectories(execRoot);
 
