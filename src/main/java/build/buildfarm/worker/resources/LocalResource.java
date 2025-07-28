@@ -20,5 +20,5 @@ import java.util.Optional;
 public interface LocalResource {
   int available();
 
-  Optional<Lease> tryAcquire(int amount);
+  Optional<? extends Lease> tryAcquire(int amount);
 }

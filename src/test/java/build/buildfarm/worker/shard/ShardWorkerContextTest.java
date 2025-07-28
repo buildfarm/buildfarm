@@ -35,7 +35,6 @@ import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.Claim;
-import build.buildfarm.common.Dispenser;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.config.BuildfarmConfigs;
 import build.buildfarm.common.config.ExecutionPolicy;
@@ -46,8 +45,9 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.MatchListener;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.filesystem.ExecFileSystem;
+import build.buildfarm.worker.persistent.PersistentExecutor;
+import build.buildfarm.worker.persistent.PersistentWorkerAwareExecOwnerPool;
 import build.buildfarm.worker.resources.LocalResourceSet;
-import build.buildfarm.worker.resources.LocalResourceSet.PoolResource;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Jimfs;
@@ -55,6 +55,7 @@ import com.google.protobuf.Duration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
@@ -213,8 +214,11 @@ public class ShardWorkerContextTest {
   public void resourceExhaustedIgnoresEntryWithExecOwner() throws Exception {
     LocalResourceSet resourceSet = new LocalResourceSet();
     resourceSet.resources.put(
-        ShardWorkerContext.EXEC_OWNER_RESOURCE_NAME,
-        new PoolResource(new Dispenser<>("exec-user-name"), REPORT_RESULT_STAGE));
+        LocalResourceSet.EXEC_OWNER_RESOURCE_NAME,
+        new PersistentWorkerAwareExecOwnerPool(
+            PersistentExecutor.workerIndex,
+            Collections.singleton("exec-user-name"),
+            REPORT_RESULT_STAGE));
     WorkerContext context = createTestContext(/* policies= */ ImmutableList.of(), resourceSet);
 
     Platform platform =

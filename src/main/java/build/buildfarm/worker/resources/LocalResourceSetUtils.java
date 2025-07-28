@@ -46,6 +46,7 @@ public class LocalResourceSetUtils {
 
   public static final class LocalResourceSetClaim implements Claim {
     private final Map<String, Lease> claimed;
+    private @Nullable UserPrincipal owner;
 
     LocalResourceSetClaim(Map<String, Lease> claimed) {
       this.claimed = claimed;
@@ -80,20 +81,42 @@ public class LocalResourceSetUtils {
     }
 
     @Override
-    public UserPrincipal owner() {
-      return null;
+    public synchronized void replace(String resourceName, Lease lease) {
+      Lease oldLease = claimed.get(resourceName);
+
+      if (oldLease != null) {
+        oldLease.release();
+
+        metrics.resourceUsageMetric.labels(resourceName).dec(oldLease.getAmount());
+        metrics.requestersMetric.labels(resourceName).dec();
+      }
+
+      claimed.put(resourceName, lease);
+
+      metrics.resourceUsageMetric.labels(resourceName).inc(lease.getAmount());
+      metrics.requestersMetric.labels(resourceName).inc();
     }
 
     @Override
-    public Iterable<Entry<String, List<Object>>> getPools() {
+    public @Nullable UserPrincipal getOwner() {
+      return owner;
+    }
+
+    @Override
+    public void setOwner(@Nullable UserPrincipal owner) {
+      this.owner = owner;
+    }
+
+    @Override
+    public Iterable<Entry<String, List<?>>> getPools() {
       return claimed.entrySet().stream()
           .filter(entry -> entry.getValue() instanceof LocalResourceSet.PoolLease)
-          .<Entry<String, List<Object>>>map(
+          .<Entry<String, List<?>>>map(
               entry -> {
-                LocalResourceSet.PoolLease poolLease =
-                    (LocalResourceSet.PoolLease) entry.getValue();
+                LocalResourceSet.PoolLease<?> poolLease =
+                    (LocalResourceSet.PoolLease<?>) entry.getValue();
 
-                return new SimpleEntry<>(entry.getKey(), poolLease.claims());
+                return new SimpleEntry<>(entry.getKey(), poolLease.claims);
               })
           .toList();
     }
@@ -146,7 +169,7 @@ public class LocalResourceSetUtils {
         LocalResource resource = resourceSet.resources.get(resourceName);
 
         // Attempt to claim.  If claiming fails, we must return all other claims.
-        Optional<Lease> lease = resource.tryAcquire(requestAmount);
+        Optional<? extends Lease> lease = resource.tryAcquire(requestAmount);
         if (lease.isPresent()) {
           claimed.put(resourceName, lease.get());
 

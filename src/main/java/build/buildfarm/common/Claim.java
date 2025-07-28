@@ -37,8 +37,12 @@ public interface Claim {
 
   void release();
 
-  @Nullable
-  UserPrincipal owner();
+  void replace(String resourceName, Lease lease);
 
-  Iterable<Entry<String, List<Object>>> getPools();
+  @Nullable
+  UserPrincipal getOwner();
+
+  void setOwner(@Nullable UserPrincipal owner);
+
+  Iterable<Entry<String, List<?>>> getPools();
 }

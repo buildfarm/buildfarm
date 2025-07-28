@@ -19,6 +19,9 @@ public class WorkerKey {
   /** The user the worker process is running under and the owner of the worker's files. */
   @Getter @Nullable private final UserPrincipal owner;
 
+  /** Execution wrapper arguments to be prepended to the worker command. */
+  @Getter private final ImmutableList<String> wrapperArguments;
+
   /**
    * Cached value for the hash of this key, because the value is expensive to calculate
    * (ImmutableMap and ImmutableList do not cache their hashcodes).
@@ -26,8 +29,16 @@ public class WorkerKey {
   private final int hash;
 
   public WorkerKey(BasicWorkerKey basicWorkerKey, @Nullable UserPrincipal owner) {
-    this.basicWorkerKey = Preconditions.checkNotNull(basicWorkerKey);
-    this.owner = owner;
+    this(basicWorkerKey, owner, ImmutableList.of());
+  }
+
+  public WorkerKey(
+      BasicWorkerKey basicWorkerKey,
+      @Nullable UserPrincipal owner,
+      ImmutableList<String> wrapperArguments) {
+      this.basicWorkerKey = Preconditions.checkNotNull(basicWorkerKey);
+      this.owner = owner;
+      this.wrapperArguments = Preconditions.checkNotNull(wrapperArguments);
     this.hash = calculateHashCode();
   }
 
@@ -47,11 +58,12 @@ public class WorkerKey {
       return false;
     }
 
-    if (owner == null && otherWorkerKey.owner == null) {
-      return true;
+    if (!((owner == null && otherWorkerKey.owner == null)
+        || (owner != null && otherWorkerKey.owner != null && owner.equals(otherWorkerKey.owner)))) {
+      return false;
     }
 
-    return owner != null && otherWorkerKey.owner != null && owner.equals(otherWorkerKey.owner);
+    return wrapperArguments.equals(otherWorkerKey.wrapperArguments);
   }
 
   public ImmutableList<String> getArgs() {
@@ -96,6 +108,6 @@ public class WorkerKey {
   }
 
   private int calculateHashCode() {
-    return Objects.hash(basicWorkerKey, owner);
+    return Objects.hash(basicWorkerKey, owner, wrapperArguments);
   }
 }

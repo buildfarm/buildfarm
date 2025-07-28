@@ -21,6 +21,7 @@ import static org.mockito.Mockito.when;
 
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.worker.filesystem.ExecFileSystem;
 import java.nio.file.Path;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -44,7 +45,9 @@ public class ExecuteActionStageTest {
             .setExecDir(Path.of("error-operation-path"))
             .build();
 
-    PipelineStage executeActionStage = new ExecuteActionStage(context, /* output= */ null, error);
+    ExecFileSystem execFileSystem = mock(ExecFileSystem.class);
+    PipelineStage executeActionStage =
+        new ExecuteActionStage(context, /* output= */ null, error, execFileSystem, null);
     executeActionStage.error().put(errorContext);
     verify(context, times(1)).destroyExecDir(errorContext.execDir);
     verify(error, times(1)).put(errorContext);

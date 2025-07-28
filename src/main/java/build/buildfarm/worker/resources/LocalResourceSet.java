@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker.resources;
 
+import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.Claim.Lease;
 import build.buildfarm.common.Claim.Stage;
 import java.util.ArrayList;
@@ -34,6 +35,10 @@ import java.util.concurrent.Semaphore;
  *     resources are specific to the individual worker.
  */
 public class LocalResourceSet {
+  public static final String EXEC_OWNER_RESOURCE_NAME = "exec-owner";
+  public static final Platform.Property EXEC_OWNER_PROPERTY =
+      Platform.Property.newBuilder().setName(EXEC_OWNER_RESOURCE_NAME).setValue("1").build();
+
   public record SemaphoreLease(Semaphore semaphore, Stage stage, int amount) implements Lease {
     @Override
     public int getAmount() {
@@ -67,7 +72,18 @@ public class LocalResourceSet {
     }
   }
 
-  public record PoolLease(Queue<Object> pool, Stage stage, List<Object> claims) implements Lease {
+  public static class PoolLease<A> implements Lease {
+    private final Queue<A> pool;
+    private final Stage stage;
+
+    public final List<A> claims;
+
+    public PoolLease(Queue<A> pool, Stage stage, List<A> claims) {
+      this.pool = pool;
+      this.stage = stage;
+      this.claims = claims;
+    }
+
     @Override
     public int getAmount() {
       return claims.size();
