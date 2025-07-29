@@ -16,7 +16,6 @@ package build.buildfarm.cas.cfc;
 
 import static build.buildfarm.common.DigestUtil.OMITTED_DIGEST_FUNCTIONS;
 import static build.buildfarm.common.io.EvenMoreFiles.setReadOnlyPerms;
-import static build.buildfarm.common.io.Utils.getFileKey;
 import static build.buildfarm.common.io.Utils.getOrIOException;
 import static build.buildfarm.common.io.Utils.listDir;
 import static build.buildfarm.common.io.Utils.stat;
@@ -51,6 +50,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.SymlinkNode;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.DigestMismatchException;
+import build.buildfarm.cas.cfc.LRUDB.SizeEntry;
 import build.buildfarm.common.BuildfarmExecutors;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -79,7 +79,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.hash.HashingOutputStream;
@@ -97,6 +96,7 @@ import io.netty.handler.codec.http.QueryStringDecoder;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
+import java.io.BufferedReader;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -113,7 +113,9 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -172,6 +174,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Consumer<Iterable<Digest>> onExpire;
   private final Executor accessRecorder;
   private final ExecutorService expireService;
+  private final LRUDB db = new TextLRUDB();
+  private volatile Deadline saveLRUAfter = Deadline.after(10, MINUTES);
+  private final Path lru;
 
   private final FixedBufferPool zstdBufferPool;
   @Nullable private final ContentAddressableStorage delegate;
@@ -314,6 +319,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             new FailoverInputStreamFactory(this::newTransparentInput, externalInputStreamFactory));
     this.zstdBufferPool = zstdBufferPool;
 
+    lru = root.resolve("lru.txt");
+
     writes =
         CacheBuilder.newBuilder()
             .expireAfterAccess(1, HOURS)
@@ -422,10 +429,41 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return false;
   }
 
+  private void saveLRU() {
+    List<SizeEntry> list = lruSizeEntryList();
+    try {
+      synchronized (lru) {
+        db.save(list.iterator(), lru);
+      }
+    } catch (Exception e) {
+      log.log(Level.SEVERE, "error saving lru state", e);
+    }
+  }
+
+  /** Not reentrant, not thread safe */
+  private void maybeSaveLRU() {
+    if (saveLRUAfter == null || !saveLRUAfter.isExpired()) {
+      return;
+    }
+    saveLRUAfter = null;
+    expireService.execute(
+        () -> {
+          try {
+            saveLRU();
+          } finally {
+            saveLRUAfter = Deadline.after(10, MINUTES);
+          }
+        });
+  }
+
   private void accessed(Iterable<String> keys) {
     /* could also bucket these */
     try {
-      accessRecorder.execute(() -> recordAccess(keys));
+      accessRecorder.execute(
+          () -> {
+            recordAccess(keys);
+            maybeSaveLRU();
+          });
     } catch (RejectedExecutionException e) {
       log.log(Level.SEVERE, format("could not record access for %d keys", Iterables.size(keys)), e);
     }
@@ -480,7 +518,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
     boolean recordAccess;
     synchronized (this) {
-      recordAccess = state == State.WRITING || state != State.READ_ONLY;
+      recordAccess = state == State.WRITING || state == State.READ_ONLY;
     }
     if (recordAccess) {
       List<String> foundDigests = found.build();
@@ -1261,11 +1299,27 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     fileStore = Files.getFileStore(root);
   }
 
-  public synchronized void stop() throws InterruptedException {
+  @SuppressWarnings({"PMD.CompareObjectsWithEquals"})
+  private synchronized List<SizeEntry> lruSizeEntryList() {
+    /**
+     * Steps the entries in order from oldest to newest access The order is used here to insert into
+     * the lru on load
+     */
+    List<SizeEntry> list = new ArrayList<>(storage.size());
+    for (Entry current = header.after; current != header; current = checkNotNull(current.after)) {
+      list.add(new SizeEntry(current.key, current.size));
+    }
+    return list;
+  }
+
+  public synchronized void stop() throws IOException, InterruptedException {
     if (prometheusMetricsThread != null) {
       prometheusMetricsThread.interrupt();
       prometheusMetricsThread.join();
     }
+    // lock ordering, [this] -> [lru]
+    // path used as lock due to isolation by filename
+    saveLRU();
     state = State.STOPPED;
   }
 
@@ -1295,6 +1349,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             () -> {
               startRoutine(onStartPut, removeDirectoryService, skipLoad);
               synchronized (this) {
+                saveLRUAfter = Deadline.after(10, MINUTES);
                 state = writable ? State.WRITING : State.READ_ONLY;
                 if (writable) {
                   notifyAll();
@@ -1389,7 +1444,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Map<String, Integer> map =
         Map.of(
             "dirs", cacheScanResults.computeDirs.size(),
-            "keys", cacheScanResults.fileKeys.size(),
             "delete", cacheScanResults.deleteFiles.size());
     log.log(Level.INFO, new Gson().toJson(map));
   }
@@ -1412,12 +1466,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     // collect keys from cache root.
     ImmutableList.Builder<Path> computeDirsBuilder = new ImmutableList.Builder<>();
     ImmutableList.Builder<Path> deleteFilesBuilder = new ImmutableList.Builder<>();
-    ImmutableMap.Builder<Object, Entry> fileKeysBuilder = new ImmutableMap.Builder<>();
 
     // TODO invalidate mismatched hash prefix
-    Iterable<Path> files = ImmutableList.of();
+    Set<Path> files = new HashSet<>();
     for (Path path : entryPathStrategy) {
-      files = Iterables.concat(files, listDir(path));
+      files.addAll(listDir(path));
     }
 
     for (Path branchDir : entryPathStrategy.branchDirectories()) {
@@ -1430,12 +1483,32 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
     }
 
+    // TODO test for hex bins
+    try (BufferedReader br = Files.newBufferedReader(lru)) {
+      for (SizeEntry entry : db.entries(br)) {
+        // ignore files in the lru that are not present in the directories
+        Path path = entryPathStrategy.getPath(entry.key());
+        if (files.remove(path)) {
+          processRootFile(onStartPut, path, entry, computeDirsBuilder, deleteFilesBuilder);
+        }
+      }
+      // prevent the lru db from being processed -> removed in the purge below
+      files.remove(lru);
+    } catch (NoSuchFileException e) {
+      // ignore
+    }
     for (Path file : files) {
+      String basename = file.getFileName().toString();
       pool.execute(
           () -> {
             try {
+              FileStatus stat = stat(file, false, fileStore);
               processRootFile(
-                  onStartPut, file, computeDirsBuilder, deleteFilesBuilder, fileKeysBuilder);
+                  onStartPut,
+                  file,
+                  new SizeEntry(basename, stat.getSize()),
+                  computeDirsBuilder,
+                  deleteFilesBuilder);
             } catch (Exception e) {
               log.log(Level.SEVERE, "error reading file " + file.toString(), e);
             }
@@ -1445,63 +1518,45 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     joinThreads(pool, "Scanning Cache Root...");
 
     // log information from scanning cache root.
-    return new CacheScanResults(
-        computeDirsBuilder.build(), deleteFilesBuilder.build(), fileKeysBuilder.build());
+    return new CacheScanResults(computeDirsBuilder.build(), deleteFilesBuilder.build(), null);
   }
 
   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   private void processRootFile(
       Consumer<Digest> onStartPut,
-      Path file,
+      Path path,
+      SizeEntry entry,
       ImmutableList.Builder<Path> computeDirs,
-      ImmutableList.Builder<Path> deleteFiles,
-      ImmutableMap.Builder<Object, Entry> fileKeys)
+      ImmutableList.Builder<Path> deleteFiles)
       throws IOException {
-    String basename = file.getFileName().toString();
-
-    FileStatus stat = stat(file, false, fileStore);
+    String basename = entry.key();
 
     // mark directory for later key compute
-    if (file.toString().endsWith("_dir")) {
-      if (stat.isDirectory()) {
-        synchronized (computeDirs) {
-          computeDirs.add(file);
-        }
-      } else {
-        synchronized (deleteFiles) {
-          deleteFiles.add(file);
-        }
-      }
-    } else if (stat.isDirectory()) {
-      synchronized (deleteFiles) {
-        deleteFiles.add(file);
+    if (basename.endsWith("_dir")) {
+      synchronized (computeDirs) {
+        computeDirs.add(path);
       }
     } else {
       // if cas is full or entry is oversized or empty, mark file for later deletion.
-      long size = stat.getSize();
+      long size = entry.size();
       if (sizeInBytes + size > maxSizeInBytes || size > maxEntrySizeInBytes || size == 0) {
         synchronized (deleteFiles) {
-          deleteFiles.add(file);
+          deleteFiles.add(path);
         }
       } else {
         // get the key entry from the file name.
-        FileEntryKey fileEntryKey = parseFileEntryKey(basename, stat.getSize());
+        FileEntryKey fileEntryKey = parseFileEntryKey(basename, size);
 
         // if key entry file name cannot be parsed, mark file for later deletion.
-        if (fileEntryKey == null || stat.isReadOnlyExecutable() != fileEntryKey.isExecutable()) {
+        if (fileEntryKey == null) {
           synchronized (deleteFiles) {
-            deleteFiles.add(file);
+            deleteFiles.add(path);
           }
         } else {
           String key = fileEntryKey.key();
-          Path keyPath = getPath(key);
           // populate key if it is not currently stored.
           Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
-          Object fileKey = getFileKey(keyPath, stat);
-          synchronized (fileKeys) {
-            fileKeys.put(fileKey, e);
-          }
-          storage.put(e.key, e);
+          checkState(storage.put(e.key, e) == null, key);
           onStartPut.accept(fileEntryKey.digest());
           synchronized (this) {
             if (e.decrementReference(header)) {

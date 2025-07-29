@@ -152,7 +152,7 @@ public class CFCExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public void stop() throws InterruptedException {
+  public void stop() throws IOException, InterruptedException {
     fileCache.stop();
     if (!shutdownAndAwaitTermination(fetchService, 1, MINUTES)) {
       log.log(Level.SEVERE, "could not terminate fetchService");
