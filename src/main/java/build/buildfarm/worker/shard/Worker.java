@@ -910,7 +910,11 @@ public final class Worker extends LoggingMain {
     inputFetchSlotsTotal.set(0);
     if (execFileSystem != null) {
       log.info("Stopping exec filesystem");
-      execFileSystem.stop();
+      try {
+        execFileSystem.stop();
+      } catch (IOException e) {
+        log.log(SEVERE, "error shutting down exec filesystem", e);
+      }
       execFileSystem = null;
     }
     if (server != null) {
