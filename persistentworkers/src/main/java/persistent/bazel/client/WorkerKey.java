@@ -22,23 +22,46 @@ public class WorkerKey {
   /** Execution wrapper arguments to be prepended to the worker command. */
   @Getter private final ImmutableList<String> wrapperArguments;
 
+  @Getter @ToString.Include private final Path execRoot;
+
+  /**
+   * These are used during validation whether a worker is still usable. They are not used to
+   * uniquely identify a kind of worker, thus it is not to be used by the .equals() / .hashCode()
+   * methods.
+   */
+  @Getter private final HashCode workerFilesCombinedHash;
+
+  /**
+   * Worker files with the corresponding hash code.
+   *
+   * <p>These paths should be stable, so use relative paths (unless it's a universal absolute path
+   * like /tmp/my_tools/...)
+   */
+  @Getter private final SortedMap<Path, HashCode> workerFilesWithHashes;
+
   /**
    * Cached value for the hash of this key, because the value is expensive to calculate
    * (ImmutableMap and ImmutableList do not cache their hashcodes).
    */
   private final int hash;
 
-  public WorkerKey(BasicWorkerKey basicWorkerKey, @Nullable UserPrincipal owner) {
-    this(basicWorkerKey, owner, ImmutableList.of());
-  }
-
   public WorkerKey(
       BasicWorkerKey basicWorkerKey,
       @Nullable UserPrincipal owner,
-      ImmutableList<String> wrapperArguments) {
-      this.basicWorkerKey = Preconditions.checkNotNull(basicWorkerKey);
-      this.owner = owner;
-      this.wrapperArguments = Preconditions.checkNotNull(wrapperArguments);
+      ImmutableList<String> wrapperArguments,
+      Path execRoot,
+      HashCode workerFilesCombinedHash,
+      SortedMap<Path, HashCode> workerFilesWithHashes) {
+    // Part of hash
+    this.basicWorkerKey = Preconditions.checkNotNull(basicWorkerKey);
+    this.owner = owner;
+    this.wrapperArguments = Preconditions.checkNotNull(wrapperArguments);
+    this.execRoot = Preconditions.checkNotNull(execRoot);
+
+    // Not part of hash
+    this.workerFilesCombinedHash = Preconditions.checkNotNull(workerFilesCombinedHash);
+    this.workerFilesWithHashes = Preconditions.checkNotNull(workerFilesWithHashes);
+
     this.hash = calculateHashCode();
   }
 
@@ -63,7 +86,11 @@ public class WorkerKey {
       return false;
     }
 
-    return wrapperArguments.equals(otherWorkerKey.wrapperArguments);
+    if (!wrapperArguments.equals(otherWorkerKey.wrapperArguments)) {
+      return false;
+    }
+
+    return execRoot.equals(otherWorkerKey.execRoot);
   }
 
   public ImmutableList<String> getArgs() {
@@ -78,20 +105,8 @@ public class WorkerKey {
     return basicWorkerKey.getEnv();
   }
 
-  public Path getExecRoot() {
-    return basicWorkerKey.getExecRoot();
-  }
-
   public String getMnemonic() {
     return basicWorkerKey.getMnemonic();
-  }
-
-  public HashCode getWorkerFilesCombinedHash() {
-    return basicWorkerKey.getWorkerFilesCombinedHash();
-  }
-
-  public SortedMap<Path, HashCode> getWorkerFilesWithHashes() {
-    return basicWorkerKey.getWorkerFilesWithHashes();
   }
 
   @Override
@@ -108,6 +123,6 @@ public class WorkerKey {
   }
 
   private int calculateHashCode() {
-    return Objects.hash(basicWorkerKey, owner, wrapperArguments);
+    return Objects.hash(basicWorkerKey, owner, wrapperArguments, execRoot);
   }
 }
