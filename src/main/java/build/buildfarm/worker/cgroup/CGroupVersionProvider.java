@@ -24,7 +24,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class CGroupVersionProvider implements Supplier<CGroupVersion> {
-
   @Override
   public CGroupVersion get() {
     /* Try to figure out which version of CGroups is available. */
