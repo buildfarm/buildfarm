@@ -12,6 +12,11 @@ import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.ToString;
 
+/**
+ * The key of the {@link CommonsWorkerPool worker pool}.
+ *
+ * <p>See {@link BasicWorkerKey} for more information between this class and that one.
+ */
 @ToString(onlyExplicitlyIncluded = true)
 public class WorkerKey {
   @Getter @ToString.Include private final BasicWorkerKey basicWorkerKey;

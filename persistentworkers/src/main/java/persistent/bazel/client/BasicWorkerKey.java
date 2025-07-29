@@ -8,10 +8,19 @@ import lombok.Getter;
 import lombok.ToString;
 
 /**
- * Based off of copy-pasting from Bazel's WorkerKey. Has less dependencies, but only ProtoBuf and
+ * Based off of copy-pasting from Bazel's WorkerKey. Has fewer dependencies, but only ProtoBuf and
  * non-multiplex support.
  *
  * <p>Data container that uniquely identifies a kind of worker process.
+ *
+ * <p>You'll notice that this class is named {@link BasicWorkerKey} and that there's a {@link
+ * WorkerKey} class as well. The difference is in addition to containing {@link BasicWorkerKey},
+ * {@link WorkerKey} also contains the exec owner (the user the worker will be run as) and the
+ * fields that are derived from it (namely, {@link build.buildfarm.common.config.ExecutionWrapper
+ * execution wrapper} arguments and the exec root). This sort of separation allows us to, given a
+ * {@link BasicWorkerKey}, preemptively select an exec owner for which we already have an alive
+ * worker with that key. That way, we avoid creating too many workers, which would happen by virtue
+ * of the fact that {@link WorkerKey} is the key of the {@link CommonsWorkerPool worker pool}.
  */
 @ToString(onlyExplicitlyIncluded = true)
 public final class BasicWorkerKey {

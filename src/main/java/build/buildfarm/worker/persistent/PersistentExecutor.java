@@ -170,6 +170,17 @@ public class PersistentExecutor {
     BasicWorkerKey basicKey =
         Keymaker.makeBasicKey(workerExecCmd, workerInitArgs, env, executionName);
 
+    /*
+     * As with any other action, an exec owner is reserved for an action executed by a persistent worker. However,
+     * because the exec owner is part of the worker key, we need to be careful about which exec owner we use. If we use
+     * any random exec owner, we could end up creating a new persistent worker when one already exists with practically
+     * the same worker key (except for the exec owner).
+     *
+     * To prevent runaway persistent worker creation, we attempt to swap the already-reserved exec owner for a more
+     * strategic one. We do this in `PersistentExecutor` instead of in `MatchStage` (where the claim is acquired)
+     * because we don't have enough information in `MatchStage` to know if a persistent worker will be used and
+     * construct a `BasicWorkerKey`, and therefore which exec owner to lease.
+     */
     if (execOwnerPool != null) {
       Optional<PersistentWorkerAwareExecOwnerPool.Lease> newExecOwnerLease =
           execOwnerPool.tryAcquireForPersistentWorker(basicKey);
