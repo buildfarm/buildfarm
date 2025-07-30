@@ -1796,6 +1796,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Files.delete(path);
         deleteExpiredPath = false;
       }
+    } catch (NoSuchFileException e) {
+      // ignore, already removed
     } finally {
       entry = storage.remove(key);
       if (deleteExpiredPath) {
