@@ -147,7 +147,6 @@ public final class Worker extends LoggingMain {
 
   private static BuildfarmConfigs configs = BuildfarmConfigs.getInstance();
 
-  private boolean inGracefulShutdown = false;
   private boolean isPaused = false;
 
   private WorkerInstance instance;
@@ -158,9 +157,12 @@ public final class Worker extends LoggingMain {
   private Path root;
   private ExecFileSystem execFileSystem;
   private Pipeline pipeline;
+  private PipelineStage matchStage;
+  private ShardWorkerContext context;
   private Backplane backplane;
   private LoadingCache<String, StubInstance> workerStubs;
   private AtomicBoolean released = new AtomicBoolean(true);
+  private AtomicBoolean shutdownInitiated = new AtomicBoolean(false);
 
   /**
    * The method will prepare the worker for graceful shutdown when the worker is ready. Note on
@@ -173,11 +175,10 @@ public final class Worker extends LoggingMain {
           "Graceful Shutdown is not enabled. Worker is shutting down without finishing executions"
               + " in progress.");
     } else {
-      inGracefulShutdown = true;
       log.info(
           "Graceful Shutdown - The current worker will not be registered again and should be"
               + " shutdown gracefully!");
-      pipeline.stopMatchingOperations();
+      context.prepareForGracefulShutdown();
       int scanRate = 30; // check every 30 seconds
       int timeWaited = 0;
       int timeOut = configs.getWorker().getGracefulShutdownSeconds();
@@ -563,7 +564,9 @@ public final class Worker extends LoggingMain {
   private void addBlobsLocation(List<Digest> digests, String name) {
     while (!backplane.isStopped()) {
       try {
-        backplane.addBlobsLocation(digests, name);
+        if (configs.getWorker().getCapabilities().isCas()) {
+          backplane.addBlobsLocation(digests, name);
+        }
         return;
       } catch (IOException e) {
         Status status = Status.fromThrowable(e);
@@ -615,7 +618,7 @@ public final class Worker extends LoggingMain {
                   if (pausedFile.exists() && !isPaused) {
                     isPaused = true;
                     log.log(Level.INFO, "The current worker is paused from taking on new work!");
-                    pipeline.stopMatchingOperations();
+                    context.prepareForGracefulShutdown();
                     workerPausedMetric.inc();
                   }
                 } catch (Exception e) {
@@ -627,7 +630,7 @@ public final class Worker extends LoggingMain {
               void registerIfExpired() {
                 long now = System.currentTimeMillis();
                 if (now >= workerRegistrationExpiresAt
-                    && !inGracefulShutdown
+                    && !context.inGracefulShutdown()
                     && !isWorkerPausedFromNewWork()) {
                   // worker must be registered to match
                   addWorker(nextRegistration(now));
@@ -755,7 +758,7 @@ public final class Worker extends LoggingMain {
       writer = new LocalCasWriter(execFileSystem);
     }
 
-    ShardWorkerContext context =
+    context =
         new ShardWorkerContext(
             configs.getWorker().getPublicName(),
             Duration.newBuilder().setSeconds(configs.getWorker().getOperationPollPeriod()).build(),
@@ -814,16 +817,36 @@ public final class Worker extends LoggingMain {
 
   private void awaitTermination() throws InterruptedException {
     pipeline.join();
-    server.awaitTermination();
+    if (server != null && !server.isTerminated()) {
+      int retries = 5;
+      while (retries > 0) {
+        if (shutdownInitiated.get()) {
+          server.shutdown();
+          retries--;
+        }
+        if (server.awaitTermination(shutdownWaitTimeInSeconds, SECONDS)) {
+          retries = 1;
+          break;
+        }
+      }
+      if (retries == 0) {
+        server.shutdownNow();
+        server.awaitTermination();
+      }
+    }
   }
 
   public void initiateShutdown() {
+    if (context != null) {
+      context.prepareForGracefulShutdown();
+    }
     if (pipeline != null) {
-      pipeline.stopMatchingOperations();
+      pipeline.interrupt(matchStage);
     }
     if (server != null) {
       server.shutdown();
     }
+    shutdownInitiated.set(true);
   }
 
   private synchronized void awaitRelease() throws InterruptedException {

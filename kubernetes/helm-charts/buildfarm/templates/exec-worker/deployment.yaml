@@ -62,14 +62,18 @@ spec:
               name: "worker-comm"
             - containerPort: 9090
               name: "metrics"
+          {{- with .Values.execWorker.livenessProbe }}
           livenessProbe:
-            grpc:
-              port: 8982
-            initialDelaySeconds: 10
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.execWorker.readinessProbe }}
           readinessProbe:
-            grpc:
-              port: 8982
-            initialDelaySeconds: 10
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.execWorker.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.execWorker.resources | nindent 12 }}
           volumeMounts:

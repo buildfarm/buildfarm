@@ -9,6 +9,7 @@ metadata:
   annotations:
     {{- toYaml .Values.shardWorker.annotations | nindent 4 }}
 spec:
+  podManagementPolicy: {{ .Values.shardWorker.podManagementPolicy }}
   serviceName: {{ include "buildfarm.fullname" . }}-shard-worker
   {{- if .Values.shardWorker.autoscaling.enabled }}
   replicas: {{ .Values.shardWorker.autoscaling.minReplicas }}
@@ -62,14 +63,18 @@ spec:
               name: "worker-comm"
             - containerPort: 9090
               name: "metrics"
+          {{- with .Values.shardWorker.livenessProbe }}
           livenessProbe:
-            grpc:
-              port: 8982
-            initialDelaySeconds: 10
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.shardWorker.readinessProbe }}
           readinessProbe:
-            grpc:
-              port: 8982
-            initialDelaySeconds: 10
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.shardWorker.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.shardWorker.resources | nindent 12 }}
           volumeMounts:

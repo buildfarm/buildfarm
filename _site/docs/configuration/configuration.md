@@ -222,7 +222,7 @@ server:
 | workersHashName                    | String, _Workers_                        |                 |                       | Redis key used to store a hash of registered workers                                                                                                                                         |
 | workerChannel                      | String, _WorkerChannel_                  |                 |                       | Redis pubsub channel key where changes of the cluster membership are announced                                                                                                               |
 | actionCachePrefix                  | String, _ActionCache_                    |                 |                       | Redis key prefix for all ActionCache entries                                                                                                                                                 |
-| actionCacheExpire                  | Integer, _2419200_                       |                 |                       | The TTL maintained for ActionCache entries, not refreshed on getActionResult hit                                                                                                             |
+| actionCacheExpire                  | Integer, _2419200_                       |                 |                       | The TTL maintained for ActionCache entries, refreshed on getActionResult hit                                                                                                             |
 | actionBlacklistPrefix              | String, _ActionBlacklist_                |                 |                       | Redis key prefix for all blacklisted actions, which are rejected                                                                                                                             |
 | actionBlacklistExpire              | Integer, _3600_                          |                 |                       | The TTL maintained for action blacklist entries                                                                                                                                              |
 | invocationBlacklistPrefix          | String, _InvocationBlacklist_            |                 |                       | Redis key prefix for blacklisted invocations, suffixed with a a tool invocation ID                                                                                                           |
@@ -239,7 +239,7 @@ server:
 | dispatchedOperationsHashName       | String, _DispatchedOperations_           |                 |                       | Redis key of a hash of operation names to the worker lease for its execution, which are monitored by the dispatched monitor                                                                  |
 | operationChannelPrefix             | String, _OperationChannel_               |                 |                       | Redis pubsub channel prefix suffixed by an operation name                                                                                                                                    |
 | casPrefix                          | String, _ContentAddressableStorage_      |                 |                       | Redis key prefix suffixed with a blob digest that maps to a set of workers with that blob's availability                                                                                     |
-| casExpire                          | Integer, _604800_                        |                 |                       | The TTL maintained for CAS entries, which is not refreshed on any read access of the blob                                                                                                    |
+| casExpire                          | Integer, _604800_                        |                 |                       | The TTL maintained for CAS entries, which is refreshed on any read access of the blob                                                                                                    |
 | subscribeToBackplane               | boolean, _true_                          |                 |                       | Enable an agent of the backplane client which subscribes to worker channel and operation channel events. If disabled, responsiveness of watchers and CAS are reduced                         |
 | runFailsafeOperation               | boolean, _true_                          |                 |                       | Enable an agent in the backplane client which monitors watched operations and ensures they are in a known maintained, or expirable state                                                     |
 | maxQueueDepth                      | Integer, _100000_                        |                 |                       | Maximum length that the ready to run queue is allowed to reach to control an arrival flow for execution                                                                                      |
@@ -465,15 +465,39 @@ Example:
 ```yaml
 worker:
   executionPolicies:
+    - name: as-nobody
+      executionWrapper:
+        path: /app/build_buildfarm/as-nobody
+        arguments:
+          - "-u"
+          - "<exec-owner>"
+    - name: unshare
+      executionWrapper:
+        path: /usr/bin/unshare
+        arguments:
+          - "-n"
+          - "-r"
+    - name: linux-sandbox
+      executionWrapper:
+        path: /app/build_buildfarm/linux-sandbox
+        arguments:
+          # use "--" to signal the end of linux-sandbox args. "--" should always be last!
+          - "--"
     - name: test
       executionWrapper:
-        path: /
+        path: /YOUR/WRAPPER
         arguments:
           - arg1
           - arg2
           - "<platform-property-name>"
 ```
 
-_arg1_ and _arg2_ are interpreted literally. _<platform-property-value>_ will be substituted with the value of a property named `"platform-property-name"` from a Command's Platform _or_ the requested pool resources for the execution. If a matching property or pool resource is not found for a specified name, the entire wrapper will be discarded and have no effect on the execution.
+`arg1` and `arg2` are interpreted literally. `<platform-property-value>` will be substituted with the value of a property named `"platform-property-name"` from a Command's Platform _or_ the requested pool resources for the execution. If a matching property or pool resource is not found for a specified name, the entire wrapper will be discarded and have no effect on the execution.
 
-_<exec-owner>_ is an automatically provided pool resource when `execOwner` or `execOwners` is specified, and will contain the value of the execution's owner selected for exec tree creation.
+`<exec-owner>` is an automatically provided pool resource when `execOwner` or `execOwners` is specified, and will contain the value of the execution's owner selected for exec tree creation.
+
+An execution with `as-nobody`, `unshare`, and `linux-sandbox` execution policies enabled would produce a command line like:
+```sh
+/app/build_buildfarm/as-nobody -u <exec-owner> /usr/bin/unshare -n -r /app/build_buildfarm/linux-sandbox -- /YOUR/WRAPPER arg1 arg2 <platform-property-name> ACTION
+```
+where ACTION is the Command from remote execution action.

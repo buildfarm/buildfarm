@@ -37,3 +37,6 @@ common --lockfile_mode=off
 build:linux --sandbox_add_mount_pair=/tmp
 build:macos --sandbox_add_mount_pair=/var/tmp
 build:windows --sandbox_add_mount_pair=C:\Temp
+
+# Planned to be default in Bazel 9; see https://github.com/bazelbuild/bazel/issues/22080
+common --incompatible_disable_native_repo_rules
