@@ -43,6 +43,10 @@ public class Pipeline {
     stageClosePriorities.put(stage, closePriority);
   }
 
+  public void interrupt(PipelineStage stage) {
+    stageThreads.get(stage).interrupt();
+  }
+
   public void start() {
     for (Thread stageThread : stageThreads.values()) {
       stageThread.start();
@@ -58,18 +62,6 @@ public class Pipeline {
       }
     }
     join(true);
-  }
-
-  /** Inform MatchStage to stop matching or picking up new Operations from queue. */
-  public void stopMatchingOperations() {
-    for (Map.Entry<PipelineStage, Thread> entry : stageThreads.entrySet()) {
-      PipelineStage stage = entry.getKey();
-      if (stage instanceof MatchStage matchStage) {
-        matchStage.prepareForGracefulShutdown();
-        entry.getValue().interrupt();
-        return;
-      }
-    }
   }
 
   /**

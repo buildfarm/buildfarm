@@ -26,6 +26,7 @@ config:
             value: "*"
 
 server:
+  annotations: {}
   image:
     repository: bazelbuild/buildfarm-server
     pullPolicy: IfNotPresent
@@ -56,6 +57,7 @@ server:
     #   cpu: 100m
     #   memory: 128Mi
   service:
+    annotations: {}
     type: ClusterIP
     port: 8980
 
@@ -143,6 +145,7 @@ shardWorker:
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
+  annotations: {}
   podManagementPolicy: Parallel # Or "OrderedReady"
   replicaCount: 2
   autoscaling:
@@ -191,6 +194,7 @@ shardWorker:
     size: 50Gi
 
   service:
+    annotations: {}
     type: ClusterIP
     port: 8982
 
@@ -260,6 +264,7 @@ shardWorker:
 
 execWorker:
   enabled: false
+  annotations: {}
   image:
     repository: bazelbuild/buildfarm-worker
     pullPolicy: IfNotPresent
@@ -312,6 +317,7 @@ execWorker:
     size: 50Gi
 
   service:
+    annotations: {}
     type: ClusterIP
     port: 8982
 

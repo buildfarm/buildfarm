@@ -45,7 +45,6 @@ import lombok.extern.java.Log;
 
 @Log
 public class MatchStage extends PipelineStage {
-  private boolean inGracefulShutdown = false;
   private ExecutorService pollerExecutor = newSingleThreadExecutor();
 
   public MatchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -73,7 +72,7 @@ public class MatchStage extends PipelineStage {
     @Override
     public boolean onWaitStart() {
       waitStart = stopwatch.elapsed(MICROSECONDS);
-      return !inGracefulShutdown;
+      return !workerContext.inGracefulShutdown();
     }
 
     @Override
@@ -87,7 +86,7 @@ public class MatchStage extends PipelineStage {
     @Override
     public boolean onEntry(@Nullable QueueEntry queueEntry, Claim claim)
         throws InterruptedException {
-      if (inGracefulShutdown) {
+      if (workerContext.inGracefulShutdown()) {
         throw new InterruptedException();
       }
 
@@ -162,7 +161,7 @@ public class MatchStage extends PipelineStage {
   protected void iterate() throws InterruptedException {
     start(); // clear any previous operation
     // stop matching and picking up any works if the worker is in graceful shutdown.
-    if (inGracefulShutdown || output.isStalled()) {
+    if (!workerContext.isMatching() || output.isStalled()) {
       return;
     }
     Stopwatch stopwatch = Stopwatch.createStarted();
@@ -178,10 +177,6 @@ public class MatchStage extends PipelineStage {
         output.release();
       }
     }
-  }
-
-  void prepareForGracefulShutdown() {
-    inGracefulShutdown = true;
   }
 
   private void putOperation(Operation operation) throws InterruptedException {
