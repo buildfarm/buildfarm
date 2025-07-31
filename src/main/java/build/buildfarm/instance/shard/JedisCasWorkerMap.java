@@ -159,6 +159,7 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   @Override
   public String getAny(Digest blobDigest) {
     String key = redisCasKey(blobDigest);
+    jedis.expire(key, keyExpiration_s);
     return jedis.srandmember(key);
   }
 
@@ -173,6 +174,7 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   @Override
   public Set<String> get(Digest blobDigest) {
     String key = redisCasKey(blobDigest);
+    jedis.expire(key, keyExpiration_s);
     return jedis.smembers(key);
   }
 
