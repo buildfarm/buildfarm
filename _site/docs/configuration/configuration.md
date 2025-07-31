@@ -248,6 +248,7 @@ server:
 | timeout                            | Integer, _10000_                         |                 |                       | Default timeout                                                                                                                                                                              |
 | maxInvocationIdTimeout             | Integer, _604800_                        |                 |                       | Maximum TTL (Time-to-Live in second) of invocationId keys in RedisBackplane                                                                                                                  |
 | maxAttempts                        | Integer, _20_                            |                 |                       | Maximum number of execution attempts                                                                                                                                                         |
+| connectionValidatedOnBorrow        | boolean, _false_                         |                 |                       | Whether to validate Redis connections when borrowing from the pool                                                                                                                                                         |
 
 
 Example:
