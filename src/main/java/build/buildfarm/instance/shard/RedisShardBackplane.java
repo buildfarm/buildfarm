@@ -913,7 +913,11 @@ public class RedisShardBackplane implements Backplane {
   @SuppressWarnings("ConstantConditions")
   @Override
   public ActionResult getActionResult(ActionKey actionKey) throws IOException {
-    String json = client.call(jedis -> state.actionCache.get(jedis, actionKey.toString()));
+    String json =
+        client.call(
+            jedis ->
+                state.actionCache.getex(
+                    jedis, actionKey.toString(), configs.getBackplane().getActionCacheExpire()));
     if (json == null) {
       return null;
     }
