@@ -8,8 +8,8 @@ package(
 java_binary(
     name = "buildfarm-server",
     data = [
-        "//config:base_configs",
-        "//config:base_properties",
+        "//examples:example_configs",
+        "//examples:example_properties",
     ],
     jvm_flags = ensure_accurate_metadata() + add_opens_sun_nio_fs(),
     main_class = "build.buildfarm.server.BuildFarmServer",
@@ -23,8 +23,8 @@ java_binary(
 java_binary(
     name = "buildfarm-shard-worker",
     data = [
-        "//config:base_configs",
-        "//config:base_properties",
+        "//examples:example_configs",
+        "//examples:example_properties",
     ],
     jvm_flags = ensure_accurate_metadata() + add_opens_sun_nio_fs(),
     main_class = "build.buildfarm.worker.shard.Worker",
