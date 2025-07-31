@@ -63,6 +63,7 @@ backplane:
   jedisPoolMaxIdle: 8
   jedisPoolMinIdle: 0
   jedisTimeBetweenEvictionRunsMillis: 30000
+  connectionValidatedOnBorrow: false
   workersHashName: Workers
   workerChannel: WorkerChannel
   actionCachePrefix: ActionCache
